@@ -2745,6 +2745,67 @@ def api_servicos():
             'admin_id': None
         }), 500
 
+@main_bp.route('/api/servicos-disponiveis-obra/<int:obra_id>')
+@login_required
+def api_servicos_disponiveis_obra(obra_id):
+    """API para buscar serviços disponíveis para uma obra específica - Multi-tenant seguro"""
+    try:
+        # Obter admin_id do usuário autenticado
+        if current_user.tipo_usuario == TipoUsuario.ADMIN:
+            admin_id = current_user.id
+        else:
+            admin_id = current_user.admin_id
+            
+        print(f"✅ API SERVIÇOS OBRA: Admin_id={admin_id}, Obra_id={obra_id}")
+        
+        # Verificar se a obra pertence ao admin correto
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            print(f"❌ Obra {obra_id} não encontrada ou não pertence ao admin_id {admin_id}")
+            return jsonify({
+                'success': False,
+                'error': 'Obra não encontrada ou sem permissão',
+                'servicos': []
+            }), 403
+            
+        # Buscar serviços disponíveis do admin
+        servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+        print(f"🎯 Encontrados {len(servicos)} serviços para admin_id={admin_id}")
+        
+        # Processar para JSON
+        servicos_json = []
+        for servico in servicos:
+            servico_data = {
+                'id': servico.id,
+                'nome': servico.nome or 'Serviço sem nome',
+                'descricao': servico.descricao or '',
+                'categoria': servico.categoria or 'Geral',
+                'unidade_medida': servico.unidade_medida or 'un',
+                'unidade_simbolo': servico.unidade_simbolo or 'un',
+                'valor_unitario': float(servico.custo_unitario) if hasattr(servico, 'custo_unitario') and servico.custo_unitario else 0.0,
+                'admin_id': servico.admin_id
+            }
+            servicos_json.append(servico_data)
+        
+        print(f"🚀 API OBRA: Retornando {len(servicos_json)} serviços seguros")
+        
+        return jsonify({
+            'success': True,
+            'servicos': servicos_json,
+            'total': len(servicos_json),
+            'obra_id': obra_id,
+            'admin_id': admin_id
+        })
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ ERRO API SERVIÇOS OBRA: {error_msg}")
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'servicos': []
+        }), 500
+
 # ===== SISTEMA UNIFICADO DE RDO =====
 
 @main_bp.route('/rdos')
