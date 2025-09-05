@@ -2228,19 +2228,22 @@ function exibirServicosParaPrimeiraRDO(servicos) {
                                            min="0" 
                                            max="100" 
                                            value="0"
-                                           placeholder="0">
+                                           placeholder="0"
+                                           form="formNovoRDO">
                                 </div>
                                 <div class="mb-2">
                                     <label class="form-label">Observações</label>
                                     <textarea class="form-control" 
                                               name="subatividade_${servico.id}_${subatividade.id}_observacoes"
                                               rows="2" 
-                                              placeholder="${subatividade.descricao || 'Observações da subatividade...'}"></textarea>
+                                              placeholder="${subatividade.descricao || 'Observações da subatividade...'}"
+                                              form="formNovoRDO"></textarea>
                                 </div>
                                 <!-- Campo oculto para o nome da subatividade -->
                                 <input type="hidden" 
                                        name="nome_subatividade_${servico.id}_${subatividade.id}" 
-                                       value="${subatividade.nome}">
+                                       value="${subatividade.nome}"
+                                       form="formNovoRDO">
                             </div>
                         </div>
                     </div>
@@ -2263,18 +2266,21 @@ function exibirServicosParaPrimeiraRDO(servicos) {
                                        min="0" 
                                        max="100" 
                                        value="0"
-                                       placeholder="0">
+                                       placeholder="0"
+                                       form="formNovoRDO">
                             </div>
                             <div class="mb-2">
                                 <label class="form-label">Observações</label>
                                 <textarea class="form-control" 
                                           name="subatividade_${servico.id}_1_observacoes"
                                           rows="2" 
-                                          placeholder="Descreva o progresso ou observações..."></textarea>
+                                          placeholder="Descreva o progresso ou observações..."
+                                          form="formNovoRDO"></textarea>
                             </div>
                             <input type="hidden" 
                                    name="nome_subatividade_${servico.id}_1" 
-                                   value="${servico.nome}">
+                                   value="${servico.nome}"
+                                   form="formNovoRDO">
                         </div>
                     </div>
                 </div>
