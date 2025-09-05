@@ -2123,17 +2123,155 @@ function preencherFuncionariosContinuacao(funcionarios) {
 }
 
 function exibirMensagemSemRDOAnterior() {
+    console.log('🚀 PRIMEIRA RDO: Carregando serviços da obra...');
+    
+    // Primeiro mostrar mensagem de loading
     const servicosContainer = document.getElementById('servicos-container');
     servicosContainer.innerHTML = `
         <div class="alert alert-info">
             <i class="fas fa-rocket"></i>
             <strong>Primeira RDO da obra!</strong>
-            <br>Serviços carregados com percentual 0% para você preencher.
+            <br>Carregando serviços disponíveis...
         </div>
         <div class="text-center p-4">
-            <i class="fas fa-rocket fa-3x text-success mb-3"></i>
-            <p class="text-muted">Primeira RDO da obra</p>
-            <small>Serviços carregados automaticamente - ajuste os percentuais conforme necessário</small>
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Carregando serviços...</span>
+            </div>
+            <p class="mt-2 text-muted">Buscando serviços da obra para primeira RDO</p>
+        </div>
+    `;
+    
+    // Buscar serviços da obra para primeira RDO
+    const obraId = document.getElementById('obra_id').value;
+    if (obraId) {
+        console.log(`🔍 Buscando serviços para primeira RDO da obra ${obraId}`);
+        carregarServicosParaPrimeiraRDO(obraId);
+    } else {
+        console.error('❌ Obra não selecionada');
+        servicosContainer.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Obra não selecionada</strong>
+                <br>Selecione uma obra primeiro para ver os serviços disponíveis.
+            </div>
+        `;
+    }
+}
+
+function carregarServicosParaPrimeiraRDO(obraId) {
+    console.log(`🔍 PRIMEIRA RDO: Buscando serviços para obra ${obraId}`);
+    
+    // Usar API de serviços da obra existente
+    fetch(`/api/servicos-obra/${obraId}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('📊 Serviços da obra recebidos:', data);
+            
+            if (data.success && data.servicos && data.servicos.length > 0) {
+                console.log(`✅ ${data.servicos.length} serviços encontrados para primeira RDO`);
+                exibirServicosParaPrimeiraRDO(data.servicos);
+            } else {
+                console.log('ℹ️ Nenhum serviço encontrado para esta obra');
+                exibirMensagemSemServicos();
+            }
+        })
+        .catch(error => {
+            console.error('❌ Erro ao carregar serviços da obra:', error);
+            exibirErroCarregamentoServicos();
+        });
+}
+
+function exibirServicosParaPrimeiraRDO(servicos) {
+    console.log(`🎯 Exibindo ${servicos.length} serviços para primeira RDO`);
+    
+    const servicosContainer = document.getElementById('servicos-container');
+    
+    let html = `
+        <div class="alert alert-success">
+            <i class="fas fa-rocket"></i>
+            <strong>Primeira RDO da Obra!</strong> ${servicos.length} serviços carregados com percentual 0%
+            <br><small>Ajuste os percentuais conforme o progresso da obra</small>
+        </div>
+        <div class="row">
+    `;
+    
+    servicos.forEach((servico, index) => {
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-tools text-success"></i>
+                            ${servico.nome || `Serviço ${index + 1}`}
+                        </h6>
+                        <small class="text-muted">Categoria: ${servico.categoria || 'Geral'}</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Percentual de Conclusão (%)</label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   name="subatividade_${servico.id}_1_percentual"
+                                   min="0" 
+                                   max="100" 
+                                   value="0"
+                                   placeholder="0">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Observações</label>
+                            <textarea class="form-control" 
+                                      name="subatividade_${servico.id}_1_observacoes"
+                                      rows="2" 
+                                      placeholder="Descreva o progresso ou observações..."></textarea>
+                        </div>
+                        <!-- Campo oculto para o nome do serviço -->
+                        <input type="hidden" 
+                               name="nome_subatividade_${servico.id}_1" 
+                               value="${servico.nome}">
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+        </div>
+        <div class="alert alert-info mt-3">
+            <i class="fas fa-info-circle"></i>
+            <strong>Dica:</strong> Esta é a primeira RDO da obra. Os serviços foram carregados automaticamente com 0% de conclusão. 
+            Ajuste os percentuais conforme o progresso real da obra.
+        </div>
+    `;
+    
+    servicosContainer.innerHTML = html;
+}
+
+function exibirMensagemSemServicos() {
+    const servicosContainer = document.getElementById('servicos-container');
+    servicosContainer.innerHTML = `
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Nenhum serviço cadastrado</strong>
+            <br>Esta obra não possui serviços cadastrados. Cadastre os serviços primeiro antes de criar RDOs.
+            <br><br>
+            <a href="/servicos" class="btn btn-warning btn-sm">
+                <i class="fas fa-plus"></i> Cadastrar Serviços
+            </a>
+        </div>
+    `;
+}
+
+function exibirErroCarregamentoServicos() {
+    const servicosContainer = document.getElementById('servicos-container');
+    servicosContainer.innerHTML = `
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Erro ao carregar serviços</strong>
+            <br>Não foi possível carregar os serviços da obra. Tente novamente.
+            <br><br>
+            <button class="btn btn-danger btn-sm" onclick="exibirMensagemSemRDOAnterior()">
+                <i class="fas fa-redo"></i> Tentar Novamente
+            </button>
         </div>
     `;
 }
