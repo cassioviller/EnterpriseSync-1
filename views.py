@@ -5461,7 +5461,7 @@ def api_rdo_ultima_dados(obra_id):
                 'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
                 'servicos': servicos_data,
                 'funcionarios': funcionarios_data,
-                'observacoes_gerais': ultimo_rdo.observacoes_gerais or ''
+                'observacoes_gerais': getattr(ultimo_rdo, 'observacoes_gerais', '') or getattr(ultimo_rdo, 'observacoes', '') or ''
             }
         })
         
