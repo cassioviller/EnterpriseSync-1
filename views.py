@@ -1408,22 +1408,35 @@ def nova_obra():
 # ========== SISTEMA DE SERVIÇOS DA OBRA - REFATORADO COMPLETO ==========
 
 def get_admin_id_robusta(obra=None, current_user=None):
-    """Sistema robusto de detecção de admin_id para DESENVOLVIMENTO E PRODUÇÃO"""
+    """Sistema robusto de detecção de admin_id - PRIORIDADE TOTAL AO USUÁRIO LOGADO"""
     try:
-        # 1. Se obra tem admin_id, usar da obra
+        # IMPORTAR current_user se não fornecido
+        if current_user is None:
+            from flask_login import current_user as flask_current_user
+            current_user = flask_current_user
+        
+        # ⚡ PRIORIDADE 1: USUÁRIO LOGADO (SEMPRE PRIMEIRO!)
+        if current_user and current_user.is_authenticated:
+            # Se é ADMIN, usar seu próprio ID
+            from models import TipoUsuario
+            if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
+                print(f"🔒 ADMIN LOGADO: admin_id={current_user.id}")
+                return current_user.id
+            
+            # Se é funcionário, usar admin_id
+            elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                print(f"🔒 FUNCIONÁRIO LOGADO: admin_id={current_user.admin_id}")
+                return current_user.admin_id
+            
+            # Fallback para ID do usuário
+            elif hasattr(current_user, 'id') and current_user.id:
+                print(f"🔒 USUÁRIO GENÉRICO LOGADO: admin_id={current_user.id}")
+                return current_user.id
+        
+        # ⚡ PRIORIDADE 2: Se obra tem admin_id específico
         if obra and hasattr(obra, 'admin_id') and obra.admin_id:
             print(f"🎯 Admin_ID da obra: {obra.admin_id}")
             return obra.admin_id
-        
-        # 2. Se usuário tem admin_id, usar do usuário
-        if current_user and hasattr(current_user, 'admin_id') and current_user.admin_id:
-            print(f"🎯 Admin_ID do usuário: {current_user.admin_id}")
-            return current_user.admin_id
-        
-        # 3. Usar ID do usuário como fallback
-        if current_user and hasattr(current_user, 'id') and current_user.id:
-            print(f"🎯 Admin_ID usando ID do usuário: {current_user.id}")
-            return current_user.id
         
         # 4. DETECÇÃO AUTOMÁTICA PARA PRODUÇÃO - buscar admin_id com mais funcionários
         from sqlalchemy import text
