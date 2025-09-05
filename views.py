@@ -3576,6 +3576,23 @@ def visualizar_rdo(id):
             subatividades_por_servico[servico_id]['subatividades'].append(sub)
             print(f"✅ SUBATIVIDADE ADICIONADA: {sub.nome_subatividade} - {sub.percentual_conclusao}%")
         
+        # ORDENAR SUBATIVIDADES POR NÚMERO (1. 2. 3. etc.)
+        def extrair_numero_subatividade(sub):
+            """Extrair número da subatividade para ordenação (ex: '1. Detalhamento' -> 1)"""
+            try:
+                nome = sub.nome_subatividade
+                if nome and '.' in nome:
+                    return int(nome.split('.')[0])
+                return 999  # Colocar no final se não tem número
+            except:
+                return 999
+        
+        # Aplicar ordenação a cada serviço
+        for servico_id, dados in subatividades_por_servico.items():
+            if dados['subatividades']:
+                dados['subatividades'].sort(key=extrair_numero_subatividade)
+                print(f"🔢 SUBATIVIDADES ORDENADAS PARA SERVIÇO {servico_id}: {len(dados['subatividades'])} itens")
+        
         return render_template('rdo/visualizar_rdo_moderno.html', 
                              rdo=rdo, 
                              subatividades=subatividades,
