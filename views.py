@@ -4951,6 +4951,15 @@ def salvar_rdo_maestria():
         }
         
         if not subatividades_dados:
+            print(f"❌ [EXTRACT:{operation_id}] ERRO_DETALHADO_PRODUCAO:")
+            print(f"   - Admin_ID usado: {admin_id}")
+            print(f"   - Total campos form: {len(list(form_data.keys()))}")
+            print(f"   - Campos com 'subatividade': {[k for k in form_data.keys() if 'subatividade' in k.lower()]}")
+            print(f"   - Campos com 'percentual': {[k for k in form_data.keys() if 'percentual' in k.lower()]}")
+            print(f"   - Percentual fields encontrados: {len(percentual_fields)}")
+            print(f"   - Detalhes percentual_fields: {percentual_fields}")
+            print(f"   - Subatividades extraídas: {len(subatividades_dados)}")
+            
             mastery_observer.add_step(operation_id, 'EXTRACTION_FAILED', extraction_data)
             mastery_observer.finish_operation(operation_id, 'EXTRACTION_ERROR')
             return _erro_validacao(operation_id, 'Nenhuma subatividade encontrada no formulário')
@@ -5164,6 +5173,8 @@ def _extrair_subatividades_form(form_data, operation_id):
     # Garantir admin_id correto
     admin_id = get_admin_id_dinamico()
     print(f"🎯 [EXTRACT:{operation_id}] usando_admin_id={admin_id} para extração de subatividades")
+    print(f"📋 [EXTRACT:{operation_id}] TODOS_CAMPOS_FORM: {list(form_data.keys())}")
+    print(f"🔍 [EXTRACT:{operation_id}] CAMPOS_COM_SUBATIVIDADE: {[k for k in form_data.keys() if 'subatividade' in k.lower()]}")
     
     subatividades = []
     
@@ -5196,10 +5207,24 @@ def _extrair_subatividades_form(form_data, operation_id):
                     if subatividade_id.isdigit():
                         # Buscar informações da subatividade no banco com admin_id correto
                         from models import RDOServicoSubatividade
+                        print(f"🔍 [EXTRACT:{operation_id}] BUSCANDO_SUBATIVIDADE: id={subatividade_id}, admin_id={admin_id}")
+                        
+                        # Primeiro, verificar se existe SEM filtro de admin_id
+                        subatividade_qualquer = db.session.query(RDOServicoSubatividade).filter_by(
+                            id=int(subatividade_id)
+                        ).first()
+                        print(f"📊 [EXTRACT:{operation_id}] SUBATIVIDADE_SEM_FILTRO: {'ENCONTRADA' if subatividade_qualquer else 'NÃO_ENCONTRADA'}")
+                        if subatividade_qualquer:
+                            print(f"   - Admin_ID da subatividade: {subatividade_qualquer.admin_id}")
+                            print(f"   - Serviço_ID: {subatividade_qualquer.servico_id}")
+                            print(f"   - Nome: {subatividade_qualquer.nome_subatividade}")
+                        
+                        # Agora buscar COM filtro de admin_id
                         subatividade_existente = db.session.query(RDOServicoSubatividade).filter_by(
                             id=int(subatividade_id),
                             admin_id=admin_id
                         ).first()
+                        print(f"📊 [EXTRACT:{operation_id}] SUBATIVIDADE_COM_FILTRO: {'ENCONTRADA' if subatividade_existente else 'NÃO_ENCONTRADA'}")
                         
                         if subatividade_existente:
                             percentual = float(value) if value else 0.0
