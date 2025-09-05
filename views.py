@@ -5655,7 +5655,6 @@ def salvar_rdo_flexivel():
             obra_id=obra_id,
             criado_por_id=funcionario_id,
             data_relatorio=data_relatorio,
-            observacoes_gerais=request.form.get('observacoes_gerais', ''),
             local=request.form.get('local', 'Campo'),
             admin_id=admin_id
         )
