@@ -2616,11 +2616,20 @@ def get_admin_id_dinamico():
 def api_servicos():
     """API para buscar serviços - Multi-tenant com sistema robusto"""
     try:
-        # Usar sistema robusto de detecção de admin_id
-        admin_id = get_admin_id_robusta()
-        print(f"✅ API SERVIÇOS: Admin_id via sistema robusto - admin_id={admin_id}")
+        # CORREÇÃO CRÍTICA: Obter admin_id do usuário autenticado
+        if current_user and current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+                print(f"✅ API SERVIÇOS: Admin_id do usuário logado - admin_id={admin_id}")
+            else:
+                admin_id = current_user.admin_id
+                print(f"✅ API SERVIÇOS: Admin_id do funcionário - admin_id={admin_id}")
+        else:
+            # Usar sistema robusto de detecção de admin_id apenas como fallback
+            admin_id = get_admin_id_robusta()
+            print(f"⚠️ API SERVIÇOS FALLBACK: Admin_id via sistema robusto - admin_id={admin_id}")
         
-        # PRIORIDADE 2: Fallback inteligente para desenvolvimento
+        # Se ainda não conseguiu determinar, usar fallback
         if admin_id is None:
             print("⚠️ DESENVOLVIMENTO: Usando fallback inteligente")
             
@@ -2639,7 +2648,7 @@ def api_servicos():
                 user_status = f"Fallback dinâmico (admin_id:{admin_id})"
                 print(f"✅ DESENVOLVIMENTO: {user_status}")
         
-        print(f"🎯 API SERVIÇOS FINAL: {user_status} → admin_id={admin_id}")
+        print(f"🎯 API SERVIÇOS FINAL: admin_id={admin_id}")
         
         # DEBUG DETALHADO DA CONSULTA
         print(f"🔍 DEBUG CONSULTA: admin_id={admin_id} (tipo: {type(admin_id)})")
