@@ -217,9 +217,12 @@ class RDOBusinessRules:
         if not subatividades:
             return 0.0
         
-        # Calcular média ponderada (todas com peso igual por simplicidade)
+        # FÓRMULA UNIFICADA PROGRESSO (consistente com visualização)
         total_progress = sum(float(sub.percentual_conclusao or 0) for sub in subatividades)
-        return round(total_progress / len(subatividades), 2)
+        total_sub = len(subatividades)
+        resultado = round((total_progress / (100 * total_sub)) * 100, 2) if total_sub > 0 else 0.0
+        print(f"🎯 VALIDATIONS PROGRESSO: {total_progress}÷(100×{total_sub})×100 = {resultado}%")
+        return resultado
     
     @staticmethod
     def suggest_next_activities(obra_id):

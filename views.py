@@ -252,12 +252,14 @@ def dashboard():
                 ).order_by(desc(RDO.data_relatorio)).first()
                 
                 if rdo_mais_recente and rdo_mais_recente.servico_subatividades:
-                    # Calcular progresso médio das subatividades
+                    # USAR FÓRMULA UNIFICADA: soma/(100*total)*100
                     total_percentual = sum(
                         sub.percentual_conclusao for sub in rdo_mais_recente.servico_subatividades
                     )
-                    progresso = round(total_percentual / len(rdo_mais_recente.servico_subatividades), 1)
+                    total_sub = len(rdo_mais_recente.servico_subatividades)
+                    progresso = round((total_percentual / (100 * total_sub)) * 100, 1) if total_sub > 0 else 0
                     obra.progresso_atual = min(progresso, 100)  # Max 100%
+                    print(f"🎯 DASHBOARD PROGRESSO OBRA: {total_percentual}÷(100×{total_sub})×100 = {progresso}%")
                     obra.data_ultimo_rdo = rdo_mais_recente.data_relatorio
                     obra.total_subatividades = len(rdo_mais_recente.servico_subatividades)
                 else:
@@ -2144,7 +2146,10 @@ def detalhes_obra(id):
                 
                 if subatividades_rdo:
                     total_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades_rdo)
-                    progresso_geral = total_percentuais / len(subatividades_rdo) if len(subatividades_rdo) > 0 else 0.0
+                    total_sub = len(subatividades_rdo)
+                    # FÓRMULA UNIFICADA
+                    progresso_geral = round((total_percentuais / (100 * total_sub)) * 100, 1) if total_sub > 0 else 0.0
+                    print(f"🎯 KPI OBRA PROGRESSO: {total_percentuais}÷(100×{total_sub})×100 = {progresso_geral}%")
                     print(f"DEBUG PROGRESSO OBRA: {len(subatividades_rdo)} subatividades, progresso geral: {progresso_geral:.1f}%")
                 else:
                     print("DEBUG PROGRESSO: Último RDO sem subatividades registradas")
