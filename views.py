@@ -5320,6 +5320,34 @@ def api_servicos_obra_primeira_rdo(obra_id):
             'error': str(e)
         }), 500
 
+# ROTA FLEXÍVEL PARA SALVAR RDO - CORRIGE ERRO 404
+@main_bp.route('/salvar-rdo-flexivel', methods=['POST'])
+@funcionario_required
+def salvar_rdo_flexivel():
+    """
+    Rota flexível para salvar RDO - compatibilidade com formulários
+    Corrige erro 404 ao salvar primeira RDO
+    """
+    try:
+        print("🚀 SALVAR RDO FLEXÍVEL: Iniciando salvamento")
+        
+        # Verificar se é um salvamento de RDO novo
+        obra_id = request.form.get('obra_id')
+        data_relatorio = request.form.get('data_relatorio')
+        
+        print(f"📋 DADOS RECEBIDOS: obra_id={obra_id}, data={data_relatorio}")
+        print(f"📋 FORM KEYS: {list(request.form.keys())}")
+        
+        # Usar a função unificada de salvamento RDO existente
+        return rdo_salvar_unificado()
+        
+    except Exception as e:
+        print(f"❌ ERRO SALVAR RDO FLEXÍVEL: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f'Erro ao salvar RDO: {str(e)}', 'error')
+        return redirect(url_for('main.funcionario_rdo_novo'))
+
 @main_bp.route('/api/rdo/ultima-dados/<int:obra_id>')
 @funcionario_required
 def api_rdo_ultima_dados(obra_id):
