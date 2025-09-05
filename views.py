@@ -5489,24 +5489,86 @@ def api_servicos_obra_primeira_rdo(obra_id):
 @funcionario_required
 def salvar_rdo_flexivel():
     """
-    Rota flexível para salvar RDO - compatibilidade com formulários
-    Corrige erro 404 ao salvar primeira RDO
+    ARQUITETURA REFATORADA - Joris Kuypers Digital Mastery
+    Implementação robusta com separação clara de responsabilidades
     """
+    # IMPORTAR CLASSES DA NOVA ARQUITETURA
+    from rdo_api_refactored import RDOServiceContext, RDOSubActivityProcessor, RDOPersistenceManager
+    import logging
+    
+    logger = logging.getLogger(__name__)
     try:
-        print("🚀 SALVAR RDO FLEXÍVEL: Iniciando salvamento")
+        # IMPLEMENTAÇÃO DA NOVA ARQUITETURA DIRETAMENTE AQUI
+        logger.info("🎯 JORIS KUYPERS ARCHITECTURE: Iniciando salvamento RDO")
         
-        # Verificar se é um salvamento de RDO novo
-        obra_id = request.form.get('obra_id')
+        # Obter dados básicos da sessão
+        funcionario_id = session.get('funcionario_id')
+        admin_id = session.get('admin_id')
+        obra_id = request.form.get('obra_id', type=int)
+        
+        if not all([funcionario_id, admin_id, obra_id]):
+            flash('Dados de sessão inválidos. Faça login novamente.', 'error')
+            return redirect(url_for('main.funcionario_rdo_novo'))
+            
+        logger.info(f"🎯 Dados da sessão: obra_id={obra_id}, admin_id={admin_id}")
+        
+        # FASE 1: DESCOBRIR CONTEXTO DO SERVIÇO (Arquitetura Joris Kuypers)
+        service_context = RDOServiceContext(obra_id, admin_id)
+        target_service_id, service_name = service_context.get_service_context()
+        
+        if not target_service_id:
+            flash('Não foi possível identificar o serviço para esta obra', 'error')
+            return redirect(url_for('main.funcionario_rdo_novo'))
+            
+        logger.info(f"🎯 SERVIÇO DESCOBERTO: {service_name} (ID: {target_service_id})")
+        
+        # FASE 2: PROCESSAR DADOS DAS SUBATIVIDADES
+        processor = RDOSubActivityProcessor(request.form.to_dict())
+        subactivities = processor.extract_subactivities()
+        
+        if not subactivities:
+            flash('Nenhuma subatividade encontrada no formulário', 'error')
+            return redirect(url_for('main.funcionario_rdo_novo'))
+            
+        logger.info(f"🎯 SUBATIVIDADES PROCESSADAS: {len(subactivities)} itens")
+        
+        # FASE 3: CRIAR RDO PRINCIPAL
         data_relatorio = request.form.get('data_relatorio')
+        if data_relatorio:
+            data_relatorio = datetime.strptime(data_relatorio, '%Y-%m-%d').date()
+        else:
+            data_relatorio = datetime.now().date()
+            
+        # Gerar número RDO
+        count_rdos = RDO.query.filter_by(admin_id=admin_id).count()
+        numero_rdo = f"RDO-{admin_id}-{data_relatorio.year}-{count_rdos + 1:03d}"
         
-        print(f"📋 DADOS RECEBIDOS: obra_id={obra_id}, data={data_relatorio}")
-        print(f"📋 FORM KEYS: {list(request.form.keys())}")
+        rdo = RDO(
+            numero_rdo=numero_rdo,
+            obra_id=obra_id,
+            funcionario_id=funcionario_id,
+            data_relatorio=data_relatorio,
+            observacoes_gerais=request.form.get('observacoes_finais', ''),
+            local=request.form.get('local', 'Campo'),
+            admin_id=admin_id
+        )
         
-        # Usar a função unificada de salvamento RDO existente
-        return rdo_salvar_unificado()
+        # FASE 4: PERSISTIR COM ARQUITETURA ROBUSTA
+        persistence_manager = RDOPersistenceManager(admin_id)
+        success = persistence_manager.save_rdo_with_subactivities(
+            rdo, subactivities, target_service_id
+        )
+        
+        if success:
+            flash(f'RDO {numero_rdo} salvo com sucesso! Serviço: {service_name}', 'success')
+            logger.info(f"✅ RDO {numero_rdo} salvo com {len(subactivities)} subatividades no serviço {target_service_id}")
+            return redirect(url_for('main.funcionario_rdo_consolidado'))
+        else:
+            flash('Erro interno ao salvar RDO', 'error')
+            return redirect(url_for('main.funcionario_rdo_novo'))
         
     except Exception as e:
-        print(f"❌ ERRO SALVAR RDO FLEXÍVEL: {str(e)}")
+        logger.error(f"❌ ERRO CRÍTICO: {str(e)}")
         import traceback
         traceback.print_exc()
         flash(f'Erro ao salvar RDO: {str(e)}', 'error')
