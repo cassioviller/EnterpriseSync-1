@@ -4451,9 +4451,22 @@ def rdo_salvar_unificado():
             rdo_servico_subativ.observacoes_tecnicas = sub_data['observacoes']
             rdo_servico_subativ.admin_id = admin_id_correto
             
-            # Buscar primeiro serviço disponível
-            primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
-            rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
+            # CORREÇÃO JORIS KUYPERS: Usar servico_id CORRETO extraído dos dados
+            servico_id_correto = int(sub_data.get('servico_id', 0))
+            if servico_id_correto > 0:
+                # Validar se o serviço pertence ao admin correto
+                servico = Servico.query.filter_by(id=servico_id_correto, admin_id=admin_id_correto).first()
+                if servico:
+                    rdo_servico_subativ.servico_id = servico_id_correto
+                    print(f"✅ SERVICO_ID CORRETO: {servico_id_correto} ({servico.nome})")
+                else:
+                    print(f"⚠️ Serviço {servico_id_correto} não pertence ao admin {admin_id_correto}")
+                    primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
+                    rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
+            else:
+                # Fallback para primeiro serviço disponível
+                primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
+                rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
             
             db.session.add(rdo_servico_subativ)
             subatividades_processadas += 1
