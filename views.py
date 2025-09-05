@@ -252,14 +252,14 @@ def dashboard():
                 ).order_by(desc(RDO.data_relatorio)).first()
                 
                 if rdo_mais_recente and rdo_mais_recente.servico_subatividades:
-                    # USAR FÓRMULA UNIFICADA: soma/(100*total)*100
+                    # FÓRMULA SIMPLES: média das subatividades
                     total_percentual = sum(
                         sub.percentual_conclusao for sub in rdo_mais_recente.servico_subatividades
                     )
                     total_sub = len(rdo_mais_recente.servico_subatividades)
-                    progresso = round((total_percentual / (100 * total_sub)) * 100, 1) if total_sub > 0 else 0
+                    progresso = round(total_percentual / total_sub, 1) if total_sub > 0 else 0
                     obra.progresso_atual = min(progresso, 100)  # Max 100%
-                    print(f"🎯 DASHBOARD PROGRESSO OBRA: {total_percentual}÷(100×{total_sub})×100 = {progresso}%")
+                    print(f"🎯 DASHBOARD PROGRESSO: {total_percentual}÷{total_sub} = {progresso}%")
                     obra.data_ultimo_rdo = rdo_mais_recente.data_relatorio
                     obra.total_subatividades = len(rdo_mais_recente.servico_subatividades)
                 else:
@@ -2147,9 +2147,9 @@ def detalhes_obra(id):
                 if subatividades_rdo:
                     total_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades_rdo)
                     total_sub = len(subatividades_rdo)
-                    # FÓRMULA UNIFICADA
-                    progresso_geral = round((total_percentuais / (100 * total_sub)) * 100, 1) if total_sub > 0 else 0.0
-                    print(f"🎯 KPI OBRA PROGRESSO: {total_percentuais}÷(100×{total_sub})×100 = {progresso_geral}%")
+                    # FÓRMULA SIMPLES
+                    progresso_geral = round(total_percentuais / total_sub, 1) if total_sub > 0 else 0.0
+                    print(f"🎯 KPI OBRA PROGRESSO: {total_percentuais}÷{total_sub} = {progresso_geral}%")
                     print(f"DEBUG PROGRESSO OBRA: {len(subatividades_rdo)} subatividades, progresso geral: {progresso_geral:.1f}%")
                 else:
                     print("DEBUG PROGRESSO: Último RDO sem subatividades registradas")
@@ -2844,22 +2844,18 @@ def rdos():
                     ).all()
                     
                     if subatividades:
-                        # USAR EXATAMENTE O MESMO CÁLCULO DA VISUALIZAÇÃO INTERNA
-                        from views import visualizar_rdo
-                        
-                        # Buscar o progresso já calculado no sistema de visualização
+                        # FÓRMULA SIMPLES: média das subatividades
                         try:
-                            # Simular o mesmo cálculo que está funcionando na visualização
                             soma_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades)
                             total_subatividades = len(subatividades)
                             
-                            # FÓRMULA EXATA DA VISUALIZAÇÃO: progresso_obra = round(progresso_total_pontos / (100 * total_subatividades_obra), 1) * 100
-                            progresso_real = round((soma_percentuais / (100 * total_subatividades)) * 100, 1) if total_subatividades > 0 else 0
+                            # FÓRMULA CORRETA: média simples
+                            progresso_real = round(soma_percentuais / total_subatividades, 1) if total_subatividades > 0 else 0
                             
-                            print(f"DEBUG CARD USANDO FÓRMULA INTERNA: RDO {rdo.id} = {soma_percentuais} ÷ (100×{total_subatividades}) × 100 = {progresso_real}%")
+                            print(f"DEBUG CARD FÓRMULA SIMPLES: RDO {rdo.id} = {soma_percentuais} ÷ {total_subatividades} = {progresso_real}%")
                         except:
                             # Fallback simples
-                            progresso_real = 10.0  # Usar valor conhecido correto
+                            progresso_real = 0.0
                             print(f"DEBUG CARD FALLBACK: RDO {rdo.id} = {progresso_real}%")
                     else:
                         progresso_real = 0
@@ -3406,15 +3402,15 @@ def visualizar_rdo(id):
                 for chave, percentual in progresso_por_subatividade.items():
                     progresso_total_pontos += percentual
                 
-                # Progresso da obra = soma das porcentagens / (100 * total_subatividades_obra)
-                # FÓRMULA CORRIGIDA: 200 / (100 * 10) = 200/1000 = 20%
-                progresso_obra = round(progresso_total_pontos / (100 * total_subatividades_obra), 1) * 100
+                # FÓRMULA CORRETA: média simples das subatividades
+                # 1 subatividade com 100% de 16 total = 100/16 = 6.25%
+                progresso_obra = round(progresso_total_pontos / total_subatividades_obra, 1)
                 
-                print(f"DEBUG PROGRESSO DETALHADO (FÓRMULA CORRIGIDA):")
-                print(f"  - Subatividades PLANEJADAS (cadastro): {total_subatividades_obra}")
+                print(f"DEBUG PROGRESSO DETALHADO (FÓRMULA CORRETA):")
+                print(f"  - Subatividades TOTAIS: {total_subatividades_obra}")
                 print(f"  - Subatividades EXECUTADAS: {len(progresso_por_subatividade)}")
                 print(f"  - Soma total dos percentuais: {progresso_total_pontos}%")
-                print(f"  - Fórmula: {progresso_total_pontos} ÷ (100 × {total_subatividades_obra}) = {progresso_total_pontos} ÷ {100 * total_subatividades_obra} = {progresso_obra}%")
+                print(f"  - Fórmula: {progresso_total_pontos} ÷ {total_subatividades_obra} = {progresso_obra}%")
                 print(f"  - Progresso final da obra: {progresso_obra}%")
                 
                 # Mostrar quais subatividades faltam executar

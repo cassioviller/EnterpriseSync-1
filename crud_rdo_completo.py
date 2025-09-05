@@ -65,13 +65,13 @@ def listar_rdos():
             total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
             total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
             
-            # FÓRMULA UNIFICADA PROGRESSO
+            # FÓRMULA SIMPLES PROGRESSO
             subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
             if subatividades:
                 soma_perc = sum(s.percentual_conclusao for s in subatividades)
                 total_sub = len(subatividades)
-                progresso_medio = round((soma_perc / (100 * total_sub)) * 100, 1)
-                print(f"🎯 CRUD PROGRESSO RDO {rdo.id}: {soma_perc}÷(100×{total_sub})×100 = {progresso_medio}%")
+                progresso_medio = round(soma_perc / total_sub, 1)
+                print(f"🎯 CRUD PROGRESSO RDO {rdo.id}: {soma_perc}÷{total_sub} = {progresso_medio}%")
             else:
                 progresso_medio = 0
             
@@ -218,12 +218,12 @@ def visualizar_rdo(rdo_id):
         rdo_equipamentos = RDOEquipamento.query.filter_by(rdo_id=rdo_id).all()
         rdo_ocorrencias = RDOOcorrencia.query.filter_by(rdo_id=rdo_id).all()
         
-        # FÓRMULA UNIFICADA ESTATÍSTICAS
+        # FÓRMULA SIMPLES ESTATÍSTICAS
         if rdo_subatividades:
             soma_perc = sum(s.percentual_conclusao for s in rdo_subatividades)
             total_sub = len(rdo_subatividades)
-            progresso_total = round((soma_perc / (100 * total_sub)) * 100, 1)
-            print(f"🎯 CRUD VISUALIZAR PROGRESSO: {soma_perc}÷(100×{total_sub})×100 = {progresso_total}%")
+            progresso_total = round(soma_perc / total_sub, 1)
+            print(f"🎯 CRUD VISUALIZAR PROGRESSO: {soma_perc}÷{total_sub} = {progresso_total}%")
         else:
             progresso_total = 0
         horas_totais = sum(mo.horas_trabalhadas for mo, _ in rdo_funcionarios)

@@ -217,11 +217,11 @@ class RDOBusinessRules:
         if not subatividades:
             return 0.0
         
-        # FÓRMULA UNIFICADA PROGRESSO (consistente com visualização)
+        # FÓRMULA SIMPLES PROGRESSO (média das subatividades)
         total_progress = sum(float(sub.percentual_conclusao or 0) for sub in subatividades)
         total_sub = len(subatividades)
-        resultado = round((total_progress / (100 * total_sub)) * 100, 2) if total_sub > 0 else 0.0
-        print(f"🎯 VALIDATIONS PROGRESSO: {total_progress}÷(100×{total_sub})×100 = {resultado}%")
+        resultado = round(total_progress / total_sub, 2) if total_sub > 0 else 0.0
+        print(f"🎯 VALIDATIONS PROGRESSO: {total_progress}÷{total_sub} = {resultado}%")
         return resultado
     
     @staticmethod
