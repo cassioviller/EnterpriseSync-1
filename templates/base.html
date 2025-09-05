@@ -1121,7 +1121,8 @@
                 const iniciais = obterIniciais(nome).toUpperCase();
                 const cor = gerarCorPorNome(nome);
                 
-                const svg = `data:image/svg+xml;base64,${btoa(`
+                // Criar SVG simples sem base64 para evitar problemas de codificação
+                const svg = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
                     <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="60" cy="60" r="60" fill="${cor}"/>
                         <text x="60" y="68" font-family="Arial" font-size="40" 

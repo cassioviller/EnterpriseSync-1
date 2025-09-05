@@ -11,6 +11,39 @@ def aplicar_logs_rdo_producao():
     
     views_path = '/app/views.py'
     
+def corrigir_svg_base():
+    """Corrige o problema do SVG corrompido no template base"""
+    
+    base_path = '/app/templates/base.html'
+    
+    if not os.path.exists(base_path):
+        print(f"❌ Arquivo {base_path} não encontrado")
+        return False
+    
+    print("🔧 Corrigindo SVG corrompido no template base...")
+    
+    with open(base_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # Corrigir o SVG problemático
+    old_svg = r'const svg = `data:image/svg\+xml;base64,\$\{btoa\(`'
+    new_svg = 'const svg = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`'
+    
+    if re.search(old_svg, content):
+        content = re.sub(old_svg, new_svg, content)
+        
+        try:
+            with open(base_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print("✅ SVG corrompido corrigido no template base")
+            return True
+        except Exception as e:
+            print(f"❌ Erro ao salvar base.html: {e}")
+            return False
+    else:
+        print("ℹ️ SVG já estava correto")
+        return True
+    
     if not os.path.exists(views_path):
         print(f"❌ Arquivo {views_path} não encontrado")
         return False
@@ -58,10 +91,16 @@ def aplicar_logs_rdo_producao():
         return False
 
 if __name__ == "__main__":
-    print("🎯 INICIANDO CORREÇÃO RDO PRODUÇÃO")
+    print("🎯 INICIANDO CORREÇÃO RDO + SVG PRODUÇÃO")
     
-    if aplicar_logs_rdo_producao():
-        print("✅ CORREÇÃO RDO APLICADA COM SUCESSO!")
+    # Corrigir SVG primeiro
+    svg_ok = corrigir_svg_base()
+    
+    # Aplicar logs RDO
+    rdo_ok = aplicar_logs_rdo_producao()
+    
+    if svg_ok and rdo_ok:
+        print("✅ TODAS AS CORREÇÕES APLICADAS COM SUCESSO!")
     else:
-        print("❌ FALHA NA APLICAÇÃO DA CORREÇÃO")
+        print("❌ FALHA EM ALGUMAS CORREÇÕES")
         exit(1)
