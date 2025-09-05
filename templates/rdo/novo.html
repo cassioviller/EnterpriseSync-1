@@ -2018,6 +2018,9 @@ function exibirDadosUltimoRDO(ultimoRDO) {
                         </div>
                     </div>
                     
+                    <!-- CORREÇÃO CRÍTICA: Campo oculto com serviço_id correto -->
+                    <input type="hidden" name="servico_id_correto" value="${servico.id}" form="formNovoRDO">
+                    
                     <div class="card-body ${isExpanded ? '' : 'collapse'}" id="${servicoId}">
                         <div class="row subatividades-grid">
             `;
