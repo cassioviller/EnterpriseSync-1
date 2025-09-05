@@ -1496,12 +1496,32 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         
         # ===== NOVO SISTEMA: USAR TABELA servico_obra_real =====
         
-        # Desativar serviços existentes na nova tabela
-        servicos_desativados = ServicoObraReal.query.filter_by(
+        # ===== EXCLUSÃO AUTOMÁTICA INTELIGENTE =====
+        # Buscar serviços atualmente ativos na obra
+        servicos_atuais = ServicoObraReal.query.filter_by(
             obra_id=obra_id,
             ativo=True
-        ).update({'ativo': False}, synchronize_session=False)
-        print(f"🧹 Serviços anteriores desativados na nova tabela: {servicos_desativados}")
+        ).all()
+        
+        servicos_selecionados_ids = [int(s) for s in servicos_selecionados if s]
+        
+        # Desativar apenas serviços que foram REMOVIDOS da seleção
+        servicos_removidos = 0
+        for servico_atual in servicos_atuais:
+            if servico_atual.servico_id not in servicos_selecionados_ids:
+                print(f"🗑️ REMOVENDO SERVIÇO DA OBRA: ID {servico_atual.servico_id}")
+                servico_atual.ativo = False
+                servicos_removidos += 1
+                
+                # EXCLUSÃO CASCATA - Remover RDOs relacionados AUTOMATICAMENTE
+                rdos_deletados = RDOServicoSubatividade.query.filter_by(
+                    servico_id=servico_atual.servico_id,
+                    admin_id=admin_id
+                ).delete()
+                
+                print(f"🧹 LIMPEZA AUTOMÁTICA: {rdos_deletados} registros de RDO removidos para serviço {servico_atual.servico_id}")
+        
+        print(f"✅ EXCLUSÃO INTELIGENTE: {servicos_removidos} serviços desativados automaticamente")
         
         # Processar novos serviços usando ServicoObraReal
         servicos_processados = 0
@@ -5126,7 +5146,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
         for sub_rdo in subatividades_rdo:
             servico_id = sub_rdo.servico_id
             
-            # Buscar dados do serviço com cache
+            # Buscar dados do serviço com cache - FILTRAR APENAS SERVIÇOS ATIVOS NA OBRA
             if servico_id not in servicos_dict:
                 servico = Servico.query.filter_by(
                     id=servico_id, 
@@ -5135,7 +5155,20 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
                 ).first()
                 
                 if not servico:
-                    print(f"⚠️ SERVICO_NAO_ENCONTRADO: {servico_id} (admin_id={admin_id})")
+                    print(f"⚠️ SERVICO_DESATIVADO_IGNORADO: {servico_id} (admin_id={admin_id})")
+                    continue
+                
+                # VERIFICAR SE SERVIÇO ESTÁ ATIVO NA OBRA ATUAL
+                obra_id = ultimo_rdo.obra_id
+                servico_obra_ativo = ServicoObraReal.query.filter_by(
+                    obra_id=obra_id,
+                    servico_id=servico_id,
+                    admin_id=admin_id,
+                    ativo=True
+                ).first()
+                
+                if not servico_obra_ativo:
+                    print(f"⚠️ SERVICO_REMOVIDO_DA_OBRA: {servico.nome} (ID: {servico_id}) - PULANDO")
                     continue
                     
                 servicos_dict[servico_id] = {
