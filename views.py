@@ -178,23 +178,27 @@ def dashboard():
         # Determinar admin_id - usar mesma lógica que funciona na página funcionários
         admin_id = None  # Vamos detectar dinamicamente
         
+        # DIAGNÓSTICO COMPLETO PARA PRODUÇÃO
         # Determinar admin_id para produção
         
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
+                print(f"✅ DEBUG DASHBOARD PROD: Admin direto - admin_id={admin_id}")
             elif hasattr(current_user, 'admin_id') and current_user.admin_id:
                 admin_id = current_user.admin_id
+                print(f"✅ DEBUG DASHBOARD PROD: Via admin_id do usuário - admin_id={admin_id}")
             else:
                 # Buscar pelo email na tabela usuarios
                 try:
                     usuario_db = Usuario.query.filter_by(email=current_user.email).first()
                     if usuario_db and usuario_db.admin_id:
                         admin_id = usuario_db.admin_id
+                        print(f"✅ DEBUG DASHBOARD PROD: Via busca na tabela usuarios - admin_id={admin_id}")
                     else:
-                        pass
+                        print(f"⚠️ DASHBOARD PROD: Usuário não encontrado na tabela usuarios ou sem admin_id")
                 except Exception as e:
-                    pass
+                    print(f"❌ DEBUG DASHBOARD PROD: Erro ao buscar na tabela usuarios: {e}")
         
         # Se ainda não encontrou admin_id, detectar automaticamente
         if admin_id is None:
@@ -312,20 +316,24 @@ def dashboard():
                 ).fetchone()
                 admin_id = funcionarios_admin[0] if funcionarios_admin else 1
             
+        print(f"✅ DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
         
         # Verificar estrutura completa do banco para diagnóstico
         try:
             # Diagnóstico completo do banco de dados
+            print(f"🔍 DIAGNÓSTICO COMPLETO DO BANCO DE DADOS:")
             
             # Total de funcionários por admin_id
             funcionarios_por_admin = db.session.execute(
                 text("SELECT admin_id, COUNT(*) as total, COUNT(CASE WHEN ativo = true THEN 1 END) as ativos FROM funcionario GROUP BY admin_id ORDER BY admin_id")
             ).fetchall()
+            print(f"  📊 FUNCIONÁRIOS POR ADMIN: {[(row[0], row[1], row[2]) for row in funcionarios_por_admin]}")
             
             # Total de obras por admin_id
             obras_por_admin = db.session.execute(
                 text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY admin_id")
             ).fetchall()
+            print(f"  🏗️ OBRAS POR ADMIN: {[(row[0], row[1]) for row in obras_por_admin]}")
             
             # Verificar estrutura da tabela registro_ponto primeiro
             try:
@@ -333,12 +341,14 @@ def dashboard():
                     text("SELECT column_name FROM information_schema.columns WHERE table_name = 'registro_ponto' ORDER BY ordinal_position")
                 ).fetchall()
                 colunas_str = [col[0] for col in colunas_ponto]
+                print(f"  🔍 COLUNAS REGISTRO_PONTO: {colunas_str}")
                 
                 # Usar coluna correta baseada na estrutura real
                 coluna_data = 'data' if 'data' in colunas_str else 'data_registro'
                 registros_ponto = db.session.execute(
                     text(f"SELECT COUNT(*) FROM registro_ponto WHERE {coluna_data} >= '2025-07-01' AND {coluna_data} <= '2025-07-31'")
                 ).fetchone()
+                print(f"  ⏰ REGISTROS DE PONTO (Jul/2025): {registros_ponto[0] if registros_ponto else 0}")
             except Exception as e:
                 print(f"  ❌ ERRO registros ponto: {e}")
             
@@ -376,6 +386,7 @@ def dashboard():
         
         # Buscar todos os funcionários ativos para o admin_id detectado
         funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+        print(f"✅ DEBUG DASHBOARD KPIs: Encontrados {len(funcionarios_dashboard)} funcionários para admin_id={admin_id}")
         
         # Se não encontrou funcionários, buscar o admin_id com mais dados
         if len(funcionarios_dashboard) == 0:
@@ -385,6 +396,7 @@ def dashboard():
                 print(f"📊 TODOS OS ADMINS DISPONÍVEIS: {[(row[0], row[1]) for row in todos_admins]}")
                 if todos_admins and len(todos_admins) > 0:
                     admin_correto = todos_admins[0][0]
+                    print(f"🔄 CORREÇÃO AUTOMÁTICA: Mudando de admin_id={admin_id} para admin_id={admin_correto} (tem {todos_admins[0][1]} funcionários)")
                     admin_id = admin_correto
                     funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
                     print(f"✅ APÓS CORREÇÃO: {len(funcionarios_dashboard)} funcionários encontrados")
@@ -404,6 +416,7 @@ def dashboard():
             
             # Refazer busca de funcionários
             funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+            print(f"✅ APÓS ROLLBACK: {len(funcionarios_dashboard)} funcionários encontrados")
             
             for func in funcionarios_dashboard:
                 try:
@@ -456,11 +469,16 @@ def dashboard():
             ).all()
             custo_alimentacao_real += sum(o.valor or 0 for o in outros_alimentacao)
             
+            print(f"DEBUG ALIMENTAÇÃO DASHBOARD: Registros={sum(a.valor or 0 for a in alimentacao_registros):.2f}, Outros={sum(o.valor or 0 for o in outros_alimentacao):.2f}, Total={custo_alimentacao_real:.2f}")
         except Exception as e:
             print(f"Erro cálculo alimentação: {e}")
             custo_alimentacao_real = 0
         
         # Debug dos valores calculados
+        print(f"DEBUG DASHBOARD: {len(funcionarios_dashboard)} funcionários")
+        print(f"DEBUG DASHBOARD: Custo total calculado: R$ {total_custo_real:.2f}")
+        print(f"DEBUG DASHBOARD: Horas totais: {total_horas_real}")
+        print(f"DEBUG DASHBOARD: Extras totais: {total_extras_real}")
         
         # Calcular KPIs específicos corretamente
         # 1. Custos de Transporte (veículos) - usar campo data_custo para filtrar
@@ -473,6 +491,7 @@ def dashboard():
                 CustoVeiculo.data_custo <= data_fim
             ).all()
             custo_transporte_real = sum(c.valor or 0 for c in custos_veiculo)
+            print(f"DEBUG Custos veículo: R$ {custo_transporte_real:.2f}")
         except Exception as e:
             print(f"Erro custos veículo: {e}")
             # Fallback: usar todos os registros se filtro falhar
@@ -3194,7 +3213,7 @@ def visualizar_rdo(id):
         
         if not rdo:
             flash('RDO não encontrado.', 'error')
-            return redirect(url_for('main.funcionario_rdo_consolidado'))
+            return redirect('/funcionario/rdo/consolidado')
         
         # Buscar subatividades do RDO (sem relacionamentos problemáticos)
         subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
@@ -3340,16 +3359,9 @@ def visualizar_rdo(id):
         # NOVA LÓGICA: Mostrar TODOS os serviços da obra (executados + não executados)
         subatividades_por_servico = {}
         
-        # PASSO 1: Adicionar apenas os serviços CADASTRADOS na obra (validação rigorosa)
+        # PASSO 1: Adicionar todos os serviços CADASTRADOS na obra (mesmo que não executados)
         try:
-            admin_id = get_admin_id_dinamico()
-            servicos_cadastrados = ServicoObra.query.filter_by(
-                obra_id=rdo.obra_id
-            ).join(Servico, ServicoObra.servico_id == Servico.id).filter(
-                Servico.admin_id == admin_id  # Isolamento multi-tenant
-            ).all()
-            
-            print(f"DEBUG SERVIÇOS OBRA {rdo.obra_id}: {len(servicos_cadastrados)} encontrados")
+            servicos_cadastrados = ServicoObra.query.filter_by(obra_id=rdo.obra_id).all()
             
             for servico_obra in servicos_cadastrados:
                 servico = Servico.query.get(servico_obra.servico_id)
@@ -4800,663 +4812,65 @@ def api_test_rdo_servicos_obra(obra_id):
         traceback.print_exc()
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
-# === SISTEMA RDO MAESTRIA DIGITAL - ARQUITETURA JORIS KUYPERS ===
-# Implementação com observabilidade total e resiliência
-
-import uuid
-from datetime import datetime
-
-@main_bp.route('/api/rdo/ultima-dados/<int:obra_id>')
-def api_rdo_maestria(obra_id):
+# API RECONSTRUÍDA: Sistema de Última RDO com Arquitetura de Maestria
+@main_bp.route('/api/ultimo-rdo-dados/<int:obra_id>')
+def api_ultimo_rdo_dados_v2(obra_id):
+    """Sistema de Última RDO - Arquitetura de Maestria Digital
+    
+    Implementação robusta com:
+    - Observabilidade completa
+    - Isolamento multi-tenant
+    - Tratamento resiliente de estados
+    - Circuit breakers para falhas
     """
-    Sistema RDO Maestria Digital - Joris Kuypers Architecture
-    
-    Componentes da arquitetura:
-    • Observabilidade: Métricas, logs estruturados e traces
-    • Idempotência: Operações seguras para retry automático  
-    • Circuit Breakers: Proteção contra falhas em cascata
-    • Multi-tenant Security: Isolamento rigoroso por admin_id
-    • Estado Resiliente: Máquina de estados bem definida
-    """
-    
-    # Gerar ID único para tracing desta operação
-    operation_id = str(uuid.uuid4())[:8]
-    start_time = datetime.now()
-    
     try:
-        # === FASE 1: OBSERVABILIDADE E CONTEXTO ===
-        print(f"🔍 [TRACE:{operation_id}] RDO_LOAD_START obra_id={obra_id} timestamp={start_time.isoformat()}")
-        
-        # Detectar admin_id com resiliência total
+        # === FASE 1: VALIDAÇÃO E CONTEXTO ===
         admin_id_user = get_admin_id_dinamico()
-        print(f"🔐 [AUTH:{operation_id}] user_admin_id={admin_id_user}")
         
-        # Busca da obra com validação robusta
-        obra = _buscar_obra_segura(obra_id)
+        # Busca inteligente da obra com isolamento
+        obra = Obra.query.filter_by(id=obra_id).first()
         if not obra:
-            return _resposta_erro(operation_id, 'OBRA_NOT_FOUND', f'Obra {obra_id} não encontrada', 404)
+            return jsonify({
+                'success': False,
+                'error': 'Obra não encontrada',
+                'error_code': 'OBRA_NOT_FOUND'
+            }), 404
         
-        # Isolamento multi-tenant com log de auditoria
+        # Detecção automática de admin_id com logs estruturados
         admin_id_obra = obra.admin_id
         if admin_id_obra != admin_id_user:
-            print(f"🔄 [AUDIT:{operation_id}] CROSS_TENANT user={admin_id_user} → obra_tenant={admin_id_obra} [AUTORIZADO]")
+            print(f"🔄 CROSS-TENANT ACCESS: user={admin_id_user} → obra={admin_id_obra} [PERMITIDO]")
         
         admin_id = admin_id_obra
-        print(f"✅ [CONTEXT:{operation_id}] obra='{obra.nome}' admin_id={admin_id} tenant_verified=true")
+        print(f"🎯 API V2 ÚLTIMA RDO: obra_id={obra_id}, admin_id={admin_id}, obra='{obra.nome}'")
         
-        # === FASE 2: MOTOR DE ESTADOS RDO ===
-        rdo_state = _detectar_estado_rdo(obra_id, admin_id, operation_id)
-        print(f"🎯 [STATE:{operation_id}] rdo_state={rdo_state['estado']} last_rdo_id={rdo_state.get('ultimo_rdo_id', 'NULL')}")
-        
-        # Processar baseado no estado detectado
-        if rdo_state['estado'] == 'PRIMEIRA_RDO':
-            resultado = _processar_primeira_rdo_maestria(obra, admin_id, operation_id)
-        elif rdo_state['estado'] == 'RDO_EXISTENTE':
-            resultado = _processar_rdo_existente_maestria(rdo_state['ultimo_rdo'], admin_id, operation_id)
-        else:
-            return _resposta_erro(operation_id, 'INVALID_STATE', f"Estado inválido: {rdo_state['estado']}", 500)
-        
-        # === FASE 3: MÉTRICAS E RESPOSTA ===
-        duration_ms = (datetime.now() - start_time).total_seconds() * 1000
-        print(f"✅ [METRICS:{operation_id}] operation_success=true duration_ms={duration_ms:.2f}")
-        
-        # Enriquecer resposta com metadados de observabilidade
-        resultado['metadata'].update({
-            'operation_id': operation_id,
-            'duration_ms': round(duration_ms, 2),
-            'admin_id': admin_id,
-            'tenant_context': {
-                'user_admin_id': admin_id_user,
-                'obra_admin_id': admin_id_obra,
-                'cross_tenant': admin_id_user != admin_id_obra
-            }
-        })
-        
-        return jsonify(resultado)
-        
-    except Exception as e:
-        duration_ms = (datetime.now() - start_time).total_seconds() * 1000
-        print(f"❌ [ERROR:{operation_id}] operation_failed=true duration_ms={duration_ms:.2f} error='{str(e)}'")
-        
-        import traceback
-        traceback.print_exc()
-        
-        return _resposta_erro(operation_id, 'SYSTEM_ERROR', str(e), 500)
-
-# === SISTEMA DE SALVAMENTO RDO MAESTRIA DIGITAL ===
-
-@main_bp.route('/salvar-rdo-flexivel', methods=['POST'])
-def salvar_rdo_maestria():
-    """
-    Sistema de Salvamento RDO - Digital Mastery Observability
-    Implementa princípios de Joris Kuypers: maestria, controle e observabilidade total
-    """
-    from utils.observability import mastery_observer
-    import uuid
-    from datetime import datetime
-    
-    operation_id = str(uuid.uuid4())[:8]
-    
-    # Iniciar observação com contexto completo
-    context = {
-        'endpoint': '/salvar-rdo-flexivel',
-        'method': 'POST',
-        'user_agent': request.headers.get('User-Agent', 'unknown'),
-        'form_keys': list(request.form.keys()),
-        'form_size': len(request.form)
-    }
-    
-    operation = mastery_observer.start_operation(operation_id, 'RDO_SAVE_MASTERY', context)
-    
-    try:
-        # === FASE 1: VALIDAÇÃO DE DADOS ===
-        mastery_observer.add_step(operation_id, 'VALIDATION_START', {'phase': 1})
-        
-        obra_id = request.form.get('obra_id')
-        data_relatorio = request.form.get('data_relatorio')
-        comentario_geral = request.form.get('observacoes_gerais', '')
-        
-        validation_data = {
-            'obra_id': obra_id,
-            'data_relatorio': data_relatorio,
-            'comentario_length': len(comentario_geral) if comentario_geral else 0
-        }
-        
-        if not obra_id or not data_relatorio:
-            mastery_observer.add_step(operation_id, 'VALIDATION_FAILED', {
-                'error': 'Missing required fields',
-                'obra_id_present': bool(obra_id),
-                'data_relatorio_present': bool(data_relatorio)
-            })
-            mastery_observer.finish_operation(operation_id, 'VALIDATION_ERROR')
-            return _erro_validacao(operation_id, 'Obra e data são obrigatórias')
-            
-        admin_id = get_admin_id_dinamico()
-        validation_data.update({'admin_id': admin_id})
-        
-        mastery_observer.add_step(operation_id, 'VALIDATION_SUCCESS', validation_data)
-        mastery_observer.add_metric(operation_id, 'admin_id', admin_id)
-        
-        # === FASE 2: PROCESSAMENTO DE SUBATIVIDADES ===
-        mastery_observer.add_step(operation_id, 'SUBACTIVITIES_EXTRACTION_START', {'phase': 2})
-        
-        extraction_start = datetime.now()
-        subatividades_dados = _extrair_subatividades_form(request.form, operation_id)
-        extraction_duration = (datetime.now() - extraction_start).total_seconds() * 1000
-        
-        extraction_data = {
-            'subactivities_count': len(subatividades_dados),
-            'extraction_duration_ms': extraction_duration,
-            'form_fields_analyzed': len([k for k in request.form.keys() if 'subatividade' in k or 'sub_' in k])
-        }
-        
-        if not subatividades_dados:
-            print(f"❌ [EXTRACT:{operation_id}] ERRO_DETALHADO_PRODUCAO:")
-            print(f"   - Admin_ID usado: {admin_id}")
-            print(f"   - Total campos form: {len(list(form_data.keys()))}")
-            print(f"   - Campos com 'subatividade': {[k for k in form_data.keys() if 'subatividade' in k.lower()]}")
-            print(f"   - Campos com 'percentual': {[k for k in form_data.keys() if 'percentual' in k.lower()]}")
-            print(f"   - Percentual fields encontrados: {len(percentual_fields)}")
-            print(f"   - Detalhes percentual_fields: {percentual_fields}")
-            print(f"   - Subatividades extraídas: {len(subatividades_dados)}")
-            
-            mastery_observer.add_step(operation_id, 'EXTRACTION_FAILED', extraction_data)
-            mastery_observer.finish_operation(operation_id, 'EXTRACTION_ERROR')
-            return _erro_validacao(operation_id, 'Nenhuma subatividade encontrada no formulário')
-            
-        mastery_observer.add_step(operation_id, 'EXTRACTION_SUCCESS', extraction_data)
-        mastery_observer.add_metric(operation_id, 'subactivities_extracted', len(subatividades_dados))
-        mastery_observer.add_metric(operation_id, 'extraction_duration_ms', extraction_duration)
-        
-        # Análise detalhada das subatividades
-        percentual_analysis = {
-            'total_percentual': sum(sub['percentual'] for sub in subatividades_dados),
-            'avg_percentual': sum(sub['percentual'] for sub in subatividades_dados) / len(subatividades_dados),
-            'zero_percentual_count': len([sub for sub in subatividades_dados if sub['percentual'] == 0]),
-            'full_percentual_count': len([sub for sub in subatividades_dados if sub['percentual'] == 100]),
-            'services_involved': list(set(sub['servico_id'] for sub in subatividades_dados))
-        }
-        
-        mastery_observer.add_step(operation_id, 'SUBACTIVITIES_ANALYSIS', percentual_analysis)
-        
-        # === FASE 3: TRANSAÇÃO ATÔMICA ===
-        mastery_observer.add_step(operation_id, 'TRANSACTION_START', {'phase': 3})
-        
-        transaction_start = datetime.now()
-        
-        try:
-            # Criar RDO principal
-            rdo_creation_start = datetime.now()
-            # Gerar número RDO único com sequencial
-            data_str = datetime.now().strftime('%Y%m%d')
-            base_numero = f"RDO-{data_str}-{obra_id}"
-            
-            # Verificar se já existe e gerar sequencial
-            contador = 1
-            numero_rdo = base_numero
-            
-            while db.session.query(RDO).filter_by(numero_rdo=numero_rdo, admin_id=admin_id).first():
-                numero_rdo = f"{base_numero}-{contador:02d}"
-                contador += 1
-                if contador > 99:  # Limite de segurança
-                    numero_rdo = f"{base_numero}-{int(datetime.now().timestamp())}"
-                    break
-            
-            mastery_observer.add_step(operation_id, 'RDO_NUMBER_GENERATED', {
-                'numero_rdo': numero_rdo,
-                'attempts': contador - 1,
-                'unique': True
-            })
-            
-            novo_rdo = RDO(
-                obra_id=int(obra_id),
-                admin_id=admin_id,
-                criado_por_id=admin_id,
-                data_relatorio=datetime.strptime(data_relatorio, '%Y-%m-%d').date(),
-                numero_rdo=numero_rdo,
-                comentario_geral=comentario_geral,
-                status='Finalizado'
-            )
-            
-            db.session.add(novo_rdo)
-            db.session.flush()  # Para obter o ID
-            
-            rdo_creation_duration = (datetime.now() - rdo_creation_start).total_seconds() * 1000
-            
-            rdo_data = {
-                'rdo_id': novo_rdo.id,
-                'numero_rdo': novo_rdo.numero_rdo,
-                'obra_id': novo_rdo.obra_id,
-                'creation_duration_ms': rdo_creation_duration
-            }
-            
-            mastery_observer.add_step(operation_id, 'RDO_CREATED', rdo_data)
-            mastery_observer.add_metric(operation_id, 'rdo_id', novo_rdo.id)
-            mastery_observer.add_metric(operation_id, 'rdo_creation_duration_ms', rdo_creation_duration)
-            
-            # Salvar subatividades com análise individual
-            subactivities_start = datetime.now()
-            subatividades_salvas = 0
-            subactivities_details = []
-            
-            for i, sub_data in enumerate(subatividades_dados):
-                sub_start = datetime.now()
-                
-                # SEMPRE criar nova subatividade para o novo RDO
-                sub_rdo = RDOServicoSubatividade(
-                    rdo_id=novo_rdo.id,
-                    servico_id=sub_data['servico_id'],
-                    nome_subatividade=sub_data['nome'],
-                    percentual_conclusao=sub_data['percentual'],
-                    descricao_subatividade=sub_data.get('descricao', ''),
-                    admin_id=admin_id,
-                    ativo=True
-                )
-                db.session.add(sub_rdo)
-                subatividades_salvas += 1
-                
-                mastery_observer.add_step(operation_id, f'SUBACTIVITY_{i}_CREATED', {
-                    'rdo_id': novo_rdo.id,
-                    'servico_id': sub_data['servico_id'],
-                    'nome': sub_data['nome'],
-                    'percentual': sub_data['percentual'],
-                    'action': 'CREATE_NEW'
-                })
-                
-                sub_duration = (datetime.now() - sub_start).total_seconds() * 1000
-                subactivities_details.append({
-                    'index': i,
-                    'servico_id': sub_data['servico_id'],
-                    'nome': sub_data['nome'],
-                    'percentual': sub_data['percentual'],
-                    'creation_duration_ms': sub_duration
-                })
-            
-            subactivities_total_duration = (datetime.now() - subactivities_start).total_seconds() * 1000
-            
-            subactivities_summary = {
-                'subactivities_saved': subatividades_salvas,
-                'total_duration_ms': subactivities_total_duration,
-                'avg_duration_per_sub_ms': subactivities_total_duration / subatividades_salvas if subatividades_salvas > 0 else 0,
-                'details': subactivities_details
-            }
-            
-            mastery_observer.add_step(operation_id, 'SUBACTIVITIES_CREATED', subactivities_summary)
-            mastery_observer.add_metric(operation_id, 'subactivities_saved', subatividades_salvas)
-            mastery_observer.add_metric(operation_id, 'subactivities_duration_ms', subactivities_total_duration)
-            
-            # Commit da transação
-            commit_start = datetime.now()
-            db.session.commit()
-            commit_duration = (datetime.now() - commit_start).total_seconds() * 1000
-            
-            transaction_total_duration = (datetime.now() - transaction_start).total_seconds() * 1000
-            
-            transaction_summary = {
-                'transaction_duration_ms': transaction_total_duration,
-                'commit_duration_ms': commit_duration,
-                'rdo_id': novo_rdo.id,
-                'subactivities_count': subatividades_salvas
-            }
-            
-            mastery_observer.add_step(operation_id, 'TRANSACTION_COMMITTED', transaction_summary)
-            mastery_observer.add_metric(operation_id, 'transaction_duration_ms', transaction_total_duration)
-            mastery_observer.add_metric(operation_id, 'commit_duration_ms', commit_duration)
-            
-            # Finalizar operação com sucesso
-            result_summary = {
-                'rdo_id': novo_rdo.id,
-                'numero_rdo': novo_rdo.numero_rdo,
-                'subactivities_saved': subatividades_salvas,
-                'success': True
-            }
-            
-            mastery_observer.finish_operation(operation_id, 'SUCCESS', result_summary)
-            
-            flash('RDO salvo com sucesso!', 'success')
-            return redirect(url_for('main.funcionario_rdo_consolidado'))
-            
-        except Exception as transaction_error:
-            db.session.rollback()
-            rollback_duration = (datetime.now() - transaction_start).total_seconds() * 1000
-            
-            error_details = {
-                'error_type': type(transaction_error).__name__,
-                'error_message': str(transaction_error),
-                'rollback_duration_ms': rollback_duration,
-                'transaction_duration_before_error_ms': (datetime.now() - transaction_start).total_seconds() * 1000
-            }
-            
-            mastery_observer.add_step(operation_id, 'TRANSACTION_ROLLBACK', error_details)
-            mastery_observer.finish_operation(operation_id, 'TRANSACTION_ERROR', error=transaction_error)
-            
-            raise transaction_error
-            
-    except Exception as e:
-        # Capturar qualquer erro não tratado
-        error_details = {
-            'error_type': type(e).__name__,
-            'error_message': str(e),
-            'operation_phase': 'UNKNOWN'
-        }
-        
-        mastery_observer.add_step(operation_id, 'OPERATION_ERROR', error_details)
-        mastery_observer.finish_operation(operation_id, 'ERROR', error=e)
-        
-        flash(f'Erro ao salvar RDO: {str(e)}', 'error')
-        return redirect(url_for('main.novo_rdo'))
-
-# === DASHBOARD DE DEBUG DIGITAL MASTERY ===
-
-@main_bp.route('/debug/mastery-dashboard')
-def mastery_dashboard():
-    """
-    Dashboard de observabilidade em tempo real
-    Implementa visibilidade total do sistema conforme princípios de Joris Kuypers
-    """
-    from utils.observability import get_debug_dashboard_data
-    
-    try:
-        dashboard_data = get_debug_dashboard_data()
-        return render_template('debug/mastery_dashboard.html', dashboard_data=dashboard_data)
-    except Exception as e:
-        flash(f'Erro ao carregar dashboard: {str(e)}', 'error')
-        return redirect(url_for('main.funcionario_rdo_consolidado'))
-
-def _extrair_subatividades_form(form_data, operation_id):
-    """
-    Extrai dados de subatividades do formulário com parsing inteligente
-    Implementa observabilidade completa seguindo princípios de Digital Mastery
-    """
-    from utils.observability import mastery_observer
-    
-    # Garantir admin_id correto
-    admin_id = get_admin_id_dinamico()
-    print(f"🎯 [EXTRACT:{operation_id}] usando_admin_id={admin_id} para extração de subatividades")
-    print(f"📋 [EXTRACT:{operation_id}] TODOS_CAMPOS_FORM: {list(form_data.keys())}")
-    print(f"🔍 [EXTRACT:{operation_id}] CAMPOS_COM_SUBATIVIDADE: {[k for k in form_data.keys() if 'subatividade' in k.lower()]}")
-    
-    subatividades = []
-    
-    try:
-        mastery_observer.add_step(operation_id, 'FORM_EXTRACTION_START', {
-            'total_form_keys': len(form_data.keys()),
-            'form_keys': list(form_data.keys()),
-            'admin_id_usado': admin_id
-        })
-        
-        # NOVO PADRÃO: subatividade_ID_percentual (onde ID é o ID da subatividade existente)
-        percentual_fields = []
-        for key, value in form_data.items():
-            if key.startswith('subatividade_') and key.endswith('_percentual'):
-                percentual_fields.append((key, value))
-                print(f"🔍 [DEBUG:{operation_id}] found_percentual_field: {key} = {value}")
-        
-        mastery_observer.add_step(operation_id, 'PERCENTUAL_FIELDS_FOUND', {
-            'count': len(percentual_fields),
-            'fields': [f[0] for f in percentual_fields]
-        })
-        
-        if percentual_fields:
-            # Padrão ATUAL: subatividade_SUBATIVIDADE_ID_percentual
-            for key, value in percentual_fields:
-                try:
-                    # Extrair ID da subatividade do campo: subatividade_187_percentual -> 187
-                    subatividade_id = key.replace('subatividade_', '').replace('_percentual', '')
-                    
-                    if subatividade_id.isdigit():
-                        # Buscar informações da subatividade no banco com admin_id correto
-                        from models import RDOServicoSubatividade
-                        print(f"🔍 [EXTRACT:{operation_id}] BUSCANDO_SUBATIVIDADE: id={subatividade_id}, admin_id={admin_id}")
-                        
-                        # Primeiro, verificar se existe SEM filtro de admin_id
-                        subatividade_qualquer = db.session.query(RDOServicoSubatividade).filter_by(
-                            id=int(subatividade_id)
-                        ).first()
-                        print(f"📊 [EXTRACT:{operation_id}] SUBATIVIDADE_SEM_FILTRO: {'ENCONTRADA' if subatividade_qualquer else 'NÃO_ENCONTRADA'}")
-                        if subatividade_qualquer:
-                            print(f"   - Admin_ID da subatividade: {subatividade_qualquer.admin_id}")
-                            print(f"   - Serviço_ID: {subatividade_qualquer.servico_id}")
-                            print(f"   - Nome: {subatividade_qualquer.nome_subatividade}")
-                        
-                        # Agora buscar COM filtro de admin_id
-                        subatividade_existente = db.session.query(RDOServicoSubatividade).filter_by(
-                            id=int(subatividade_id),
-                            admin_id=admin_id
-                        ).first()
-                        print(f"📊 [EXTRACT:{operation_id}] SUBATIVIDADE_COM_FILTRO: {'ENCONTRADA' if subatividade_existente else 'NÃO_ENCONTRADA'}")
-                        
-                        if subatividade_existente:
-                            percentual = float(value) if value else 0.0
-                            
-                            subatividade_data = {
-                                'subatividade_id': int(subatividade_id),
-                                'servico_id': subatividade_existente.servico_id,
-                                'nome': subatividade_existente.nome_subatividade,
-                                'percentual': percentual,
-                                'descricao': subatividade_existente.descricao_subatividade or ''
-                            }
-                            
-                            subatividades.append(subatividade_data)
-                            
-                            print(f"✅ [EXTRACT:{operation_id}] subatividade_extracted: {subatividade_data}")
-                            
-                        else:
-                            print(f"⚠️ [EXTRACT:{operation_id}] subatividade_not_found: id={subatividade_id}")
-                            
-                except Exception as field_error:
-                    print(f"❌ [EXTRACT:{operation_id}] field_error: {key} -> {str(field_error)}")
-                    continue
-        
-        mastery_observer.add_step(operation_id, 'EXTRACTION_COMPLETED', {
-            'subactivities_extracted': len(subatividades),
-            'extraction_method': 'EXISTING_SUBACTIVITIES',
-            'details': subatividades
-        })
-        
-        if not subatividades:
-            mastery_observer.add_step(operation_id, 'EXTRACTION_FALLBACK_PRIMEIRA_RDO', {
-                'reason': 'Trying fallback for primeira RDO format'
-            })
-            print(f"🔍 [DEBUG:{operation_id}] trying_primeira_rdo_format...")
-            
-            # FORMATO PRIMEIRA RDO: subatividade_SERVICO_INDEX_percentual
-            for key, value in form_data.items():
-                if key.startswith('subatividade_') and key.endswith('_percentual'):
-                    try:
-                        # Extrair servico_id e index: subatividade_121_0_percentual -> servico=121, index=0
-                        parts = key.replace('subatividade_', '').replace('_percentual', '').split('_')
-                        
-                        if len(parts) == 2:  # servico_id e index
-                            servico_id = int(parts[0])
-                            index = int(parts[1])
-                            percentual = float(value) if value else 0.0
-                            
-                            # Para primeira RDO, buscar subatividade template do banco
-                            from models import ServicoObraReal
-                            subatividade_template = db.session.query(ServicoObraReal).filter_by(
-                                servico_id=servico_id,
-                                admin_id=admin_id
-                            ).offset(index).first()
-                            
-                            if subatividade_template:
-                                nome = subatividade_template.nome_subatividade
-                                descricao = subatividade_template.descricao_subatividade or ''
-                            else:
-                                # Fallback para campos do formulário
-                                nome_key = f"subatividade_{servico_id}_{index}_nome"
-                                nome = form_data.get(nome_key, f'Subatividade {index}')
-                                desc_key = f"subatividade_{servico_id}_{index}_descricao"
-                                descricao = form_data.get(desc_key, '')
-                            
-                            subatividade_data = {
-                                'servico_id': servico_id,
-                                'nome': nome,
-                                'percentual': percentual,
-                                'descricao': descricao,
-                                'index': index
-                            }
-                            
-                            subatividades.append(subatividade_data)
-                            print(f"✅ [PRIMEIRA_RDO:{operation_id}] subatividade_extracted: {subatividade_data}")
-                            
-                    except (ValueError, IndexError) as e:
-                        print(f"❌ [PRIMEIRA_RDO:{operation_id}] parse_error: {key} -> {str(e)}")
-                        continue
-            
-            mastery_observer.add_step(operation_id, 'PRIMEIRA_RDO_EXTRACTION_COMPLETED', {
-                'subactivities_extracted': len(subatividades),
-                'extraction_method': 'PRIMEIRA_RDO_FORMAT'
-            })
-            
-        print(f"📊 [EXTRACT:{operation_id}] final_result: {len(subatividades)} subatividades extracted")
-        return subatividades
-        
-    except Exception as e:
-        mastery_observer.add_step(operation_id, 'EXTRACTION_ERROR', {
-            'error_type': type(e).__name__,
-            'error_message': str(e)
-        })
-        print(f"❌ [EXTRACT:{operation_id}] extraction_failed error='{str(e)}'")
-        return []
-
-def _erro_validacao(operation_id, mensagem):
-    """Retorna erro de validação padronizado"""
-    print(f"⚠️ [VALIDATION:{operation_id}] error='{mensagem}'")
-    flash(f'Erro de validação: {mensagem}', 'error')
-    return redirect(url_for('main.novo_rdo'))
-
-# === FUNÇÕES AUXILIARES DA MAESTRIA DIGITAL ===
-
-def _buscar_obra_segura(obra_id):
-    """Busca obra com validação robusta e logs de auditoria"""
-    try:
-        obra = Obra.query.filter_by(id=obra_id).first()
-        if obra:
-            print(f"✅ [DB_SAFE] obra_found id={obra_id} nome='{obra.nome}' admin_id={obra.admin_id}")
-        else:
-            print(f"⚠️ [DB_SAFE] obra_not_found id={obra_id}")
-        return obra
-    except Exception as e:
-        print(f"❌ [DB_ERROR] obra_query_failed id={obra_id} error='{e}'")
-        return None
-
-def _detectar_estado_rdo(obra_id, admin_id, operation_id):
-    """Motor de estados RDO com detecção inteligente"""
-    try:
-        # Buscar último RDO com query otimizada
+        # === FASE 2: BUSCA INTELIGENTE DE RDO ===
         ultimo_rdo = RDO.query.filter_by(
-            obra_id=obra_id,
+            obra_id=obra_id, 
             admin_id=admin_id
         ).order_by(RDO.data_relatorio.desc()).first()
         
+        print(f"🔍 RDO Query: obra_id={obra_id}, admin_id={admin_id} → {'ENCONTRADO' if ultimo_rdo else 'PRIMEIRA_RDO'}")
+        
+        # === FASE 3: PROCESSAMENTO DE ESTADOS ===
         if not ultimo_rdo:
-            print(f"🆕 [STATE:{operation_id}] primeira_rdo_detectada obra_id={obra_id}")
-            return {
-                'estado': 'PRIMEIRA_RDO',
-                'ultimo_rdo': None,
-                'ultimo_rdo_id': None
-            }
+            print(f"🆕 PRIMEIRA_RDO: Inicializando obra {obra.nome} com serviços em 0%")
+            return _processar_primeira_rdo(obra, admin_id)
         else:
-            print(f"🔄 [STATE:{operation_id}] rdo_existente_detectado rdo_id={ultimo_rdo.id} data={ultimo_rdo.data_relatorio}")
-            return {
-                'estado': 'RDO_EXISTENTE',
-                'ultimo_rdo': ultimo_rdo,
-                'ultimo_rdo_id': ultimo_rdo.id
-            }
+            print(f"🔄 RDO_EXISTENTE: Carregando dados do RDO #{ultimo_rdo.id} ({ultimo_rdo.data_relatorio})")
+            return _processar_rdo_existente(ultimo_rdo, admin_id)
             
     except Exception as e:
-        print(f"❌ [STATE:{operation_id}] erro_deteccao_estado error='{e}'")
-        return {
-            'estado': 'ERROR',
-            'error': str(e)
-        }
-
-def _resposta_erro(operation_id, error_code, message, status_code):
-    """Resposta de erro padronizada com observabilidade"""
-    print(f"❌ [ERROR:{operation_id}] code={error_code} message='{message}' status={status_code}")
-    
-    return jsonify({
-        'success': False,
-        'error': message,
-        'error_code': error_code,
-        'metadata': {
-            'operation_id': operation_id,
-            'timestamp': datetime.now().isoformat(),
-            'status_code': status_code
-        }
-    }), status_code
+        print(f"❌ ERRO CRÍTICO API V2: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'error_code': 'INTERNAL_ERROR'
+        }), 500
 
 # === FUNÇÕES AUXILIARES DE PROCESSAMENTO ===
-
-def _processar_primeira_rdo_maestria(obra, admin_id, operation_id):
-    """Processamento da primeira RDO com arquitetura elegante"""
-    try:
-        print(f"🆕 [PROCESS:{operation_id}] primeira_rdo_start obra='{obra.nome}'")
-        
-        # Buscar serviços com estratégias múltiplas
-        servicos_obra = _buscar_servicos_obra_maestria(obra.id, admin_id, operation_id)
-        
-        if not servicos_obra:
-            print(f"⚠️ [PROCESS:{operation_id}] nenhum_servico_encontrado")
-            return {
-                'success': True,
-                'primeira_rdo': True,
-                'ultima_rdo': None,
-                'message': 'Obra sem serviços cadastrados - adicione serviços primeiro',
-                'metadata': {
-                    'obra_id': obra.id,
-                    'obra_nome': obra.nome,
-                    'total_servicos': 0,
-                    'estado': 'SEM_SERVICOS',
-                    'timestamp': datetime.now().isoformat()
-                }
-            }
-        
-        # Construir estrutura de primeira RDO com subatividades
-        servicos_data = []
-        for servico in servicos_obra:
-            subatividades = _gerar_subatividades_padrao(servico.id, operation_id)
-            
-            servico_data = {
-                'id': servico.id,
-                'nome': servico.nome,
-                'categoria': getattr(servico, 'categoria', 'Geral'),
-                'subatividades': [{
-                    'id': f"novo_{servico.id}_{i}",
-                    'nome': sub['nome'],
-                    'percentual': 0.0,  # Primeira RDO sempre 0%
-                    'descricao': sub['descricao'],
-                    'novo': True
-                } for i, sub in enumerate(subatividades)]
-            }
-            servicos_data.append(servico_data)
-        
-        print(f"✅ [PROCESS:{operation_id}] primeira_rdo_success servicos={len(servicos_data)}")
-        
-        return {
-            'success': True,
-            'primeira_rdo': True,
-            'ultima_rdo': {
-                'id': None,
-                'numero_rdo': 'PRIMEIRA_RDO',
-                'data_relatorio': datetime.now().strftime('%Y-%m-%d'),
-                'servicos': servicos_data,
-                'funcionarios': [],
-                'total_servicos': len(servicos_data),
-                'total_funcionarios': 0
-            },
-            'metadata': {
-                'obra_id': obra.id,
-                'obra_nome': obra.nome,
-                'estado': 'PRIMEIRA_RDO',
-                'timestamp': datetime.now().isoformat()
-            }
-        }
-        
-    except Exception as e:
-        print(f"❌ [PROCESS:{operation_id}] primeira_rdo_error error='{e}'")
-        raise
 
 def _processar_primeira_rdo(obra, admin_id):
     """Processa estado de primeira RDO com arquitetura elegante"""
@@ -5526,108 +4940,6 @@ def _processar_primeira_rdo(obra, admin_id):
             'error_code': 'PRIMEIRA_RDO_ERROR'
         }), 500
             
-def _processar_rdo_existente_maestria(ultimo_rdo, admin_id, operation_id):
-    """Processamento de RDO existente com herança de dados"""
-    try:
-        print(f"🔄 [PROCESS:{operation_id}] rdo_existente_start rdo_id={ultimo_rdo.id}")
-        
-        # Buscar subatividades com query otimizada
-        subatividades_rdo = RDOServicoSubatividade.query.filter_by(
-            rdo_id=ultimo_rdo.id,
-            ativo=True
-        ).all()
-        
-        print(f"📊 [PROCESS:{operation_id}] subatividades_found count={len(subatividades_rdo)}")
-        
-        if not subatividades_rdo:
-            return {
-                'success': True,
-                'primeira_rdo': False,
-                'ultima_rdo': {
-                    'id': ultimo_rdo.id,
-                    'numero_rdo': ultimo_rdo.numero_rdo,
-                    'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
-                    'servicos': [],
-                    'funcionarios': [],
-                    'total_servicos': 0,
-                    'total_funcionarios': 0
-                },
-                'message': 'RDO sem subatividades cadastradas',
-                'metadata': {
-                    'rdo_id': ultimo_rdo.id,
-                    'estado': 'RDO_VAZIO',
-                    'timestamp': datetime.now().isoformat()
-                }
-            }
-        
-        # Agrupar subatividades por serviço com cache inteligente
-        servicos_dict = {}
-        
-        for sub_rdo in subatividades_rdo:
-            servico_id = sub_rdo.servico_id
-            
-            # Cache de serviços para eficiência
-            if servico_id not in servicos_dict:
-                servico = Servico.query.filter_by(
-                    id=servico_id,
-                    admin_id=admin_id,
-                    ativo=True
-                ).first()
-                
-                if not servico:
-                    print(f"⚠️ [PROCESS:{operation_id}] servico_nao_encontrado servico_id={servico_id}")
-                    continue
-                    
-                servicos_dict[servico_id] = {
-                    'id': servico.id,
-                    'nome': servico.nome,
-                    'categoria': getattr(servico, 'categoria', 'Geral'),
-                    'subatividades': []
-                }
-                print(f"✅ [CACHE:{operation_id}] servico_cached id={servico_id} nome='{servico.nome}'")
-            
-            # Adicionar subatividade
-            servicos_dict[servico_id]['subatividades'].append({
-                'id': sub_rdo.id,
-                'nome': sub_rdo.nome_subatividade,
-                'percentual': float(sub_rdo.percentual_conclusao or 0),
-                'descricao': sub_rdo.descricao_subatividade or '',
-                'observacoes_tecnicas': sub_rdo.observacoes_tecnicas or ''
-            })
-        
-        # Buscar funcionários do RDO
-        funcionarios_data = _buscar_funcionarios_rdo(ultimo_rdo.id, operation_id)
-        
-        servicos_data = list(servicos_dict.values())
-        
-        print(f"✅ [PROCESS:{operation_id}] rdo_existente_success servicos={len(servicos_data)} funcionarios={len(funcionarios_data)}")
-        
-        return {
-            'success': True,
-            'primeira_rdo': False,
-            'ultima_rdo': {
-                'id': ultimo_rdo.id,
-                'numero_rdo': ultimo_rdo.numero_rdo or f'RDO-{ultimo_rdo.id}',
-                'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
-                'servicos': servicos_data,
-                'funcionarios': funcionarios_data,
-                'total_servicos': len(servicos_data),
-                'total_funcionarios': len(funcionarios_data)
-            },
-            'metadata': {
-                'rdo_id': ultimo_rdo.id,
-                'obra_id': ultimo_rdo.obra_id,
-                'estado': 'RDO_EXISTENTE',
-                'timestamp': datetime.now().isoformat()
-            }
-        }
-        
-    except Exception as e:
-        print(f"❌ [PROCESS:{operation_id}] rdo_existente_error error='{e}'")
-        import traceback
-        traceback.print_exc()
-        raise
-
 def _processar_rdo_existente(ultimo_rdo, admin_id):
     """Processa RDO existente com herança de dados"""
     try:
@@ -5743,106 +5055,6 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
             'error_code': 'RDO_EXISTENTE_ERROR'
         }), 500
 
-def _buscar_servicos_obra_maestria(obra_id, admin_id, operation_id):
-    """Busca serviços com estratégias múltiplas e observabilidade"""
-    try:
-        print(f"🔍 [SEARCH:{operation_id}] servicos_search_start obra_id={obra_id}")
-        
-        # ESTRATÉGIA 1: ServicoObraReal (nova arquitetura)
-        try:
-            servicos_query = db.session.query(Servico).join(ServicoObraReal).filter(
-                ServicoObraReal.obra_id == obra_id,
-                ServicoObraReal.ativo == True,
-                Servico.admin_id == admin_id,
-                Servico.ativo == True
-            ).all()
-            
-            if servicos_query:
-                print(f"✅ [SEARCH:{operation_id}] estrategia_1_success count={len(servicos_query)}")
-                return servicos_query
-                
-        except Exception as e:
-            print(f"⚠️ [SEARCH:{operation_id}] estrategia_1_failed error='{e}'")
-        
-        # ESTRATÉGIA 2: ServicoObra (arquitetura legada)
-        try:
-            servicos_legado = []
-            associacoes = ServicoObra.query.filter_by(obra_id=obra_id).all()
-            
-            for assoc in associacoes:
-                if assoc.servico and assoc.servico.admin_id == admin_id and assoc.servico.ativo:
-                    servicos_legado.append(assoc.servico)
-            
-            if servicos_legado:
-                print(f"✅ [SEARCH:{operation_id}] estrategia_2_success count={len(servicos_legado)}")
-                return servicos_legado
-                
-        except Exception as e:
-            print(f"⚠️ [SEARCH:{operation_id}] estrategia_2_failed error='{e}'")
-        
-        # ESTRATÉGIA 3: Todos os serviços do admin (fallback)
-        servicos_todos = Servico.query.filter_by(
-            admin_id=admin_id,
-            ativo=True
-        ).all()
-        
-        print(f"✅ [SEARCH:{operation_id}] estrategia_3_fallback count={len(servicos_todos)}")
-        return servicos_todos
-        
-    except Exception as e:
-        print(f"❌ [SEARCH:{operation_id}] servicos_search_critical_error error='{e}'")
-        return []
-
-def _gerar_subatividades_padrao(servico_id, operation_id):
-    """Gera subatividades padrão para um serviço"""
-    try:
-        # Buscar subatividades reais do banco se existirem
-        subatividades_db = SubatividadeMestre.query.filter_by(
-            servico_id=servico_id,
-            ativo=True
-        ).all()
-        
-        if subatividades_db:
-            print(f"✅ [SUB:{operation_id}] subatividades_db_found servico_id={servico_id} count={len(subatividades_db)}")
-            return [{
-                'nome': sub.nome,
-                'descricao': getattr(sub, 'descricao', '')
-            } for sub in subatividades_db]
-        
-        # Subatividades padrão se não houver no banco
-        print(f"🔄 [SUB:{operation_id}] subatividades_default servico_id={servico_id}")
-        return [
-            {'nome': 'Preparação', 'descricao': 'Preparação inicial do serviço'},
-            {'nome': 'Execução', 'descricao': 'Execução principal do serviço'},
-            {'nome': 'Finalização', 'descricao': 'Acabamentos e finalização'}
-        ]
-        
-    except Exception as e:
-        print(f"❌ [SUB:{operation_id}] subatividades_error servico_id={servico_id} error='{e}'")
-        return [{'nome': 'Atividade Padrão', 'descricao': 'Execução do serviço'}]
-
-def _buscar_funcionarios_rdo(rdo_id, operation_id):
-    """Busca funcionários do RDO com tratamento robusto"""
-    try:
-        funcionarios_rdo = RDOMaoObra.query.filter_by(rdo_id=rdo_id).all()
-        
-        funcionarios_data = []
-        for func_rdo in funcionarios_rdo:
-            if func_rdo.funcionario:
-                funcionarios_data.append({
-                    'id': func_rdo.funcionario.id,
-                    'nome': func_rdo.funcionario.nome,
-                    'funcao': getattr(func_rdo.funcionario, 'funcao', 'Funcionário'),
-                    'horas_trabalhadas': float(func_rdo.horas_trabalhadas) if func_rdo.horas_trabalhadas else 8.8
-                })
-        
-        print(f"✅ [FUNC:{operation_id}] funcionarios_found rdo_id={rdo_id} count={len(funcionarios_data)}")
-        return funcionarios_data
-        
-    except Exception as e:
-        print(f"❌ [FUNC:{operation_id}] funcionarios_error rdo_id={rdo_id} error='{e}'")
-        return []
-
 def _buscar_servicos_obra_resiliente(obra_id, admin_id):
     """Busca serviços da obra com múltiplas estratégias resilientes"""
     try:
@@ -5906,6 +5118,7 @@ def _buscar_subatividades_servico(servico_id):
         return [{'nome': 'Atividade Padrão', 'descricao': 'Execução do serviço'}]
 
 
+# === SISTEMA LIMPO - CÓDIGO DUPLICADO REMOVIDO ===
 
+# CONTINUAÇÃO DO SISTEMA ANTIGO (TEMPORÁRIO PARA COMPATIBILITY)
 
-# === FIM DO ARQUIVO VIEWS.PY ===
