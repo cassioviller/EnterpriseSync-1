@@ -5554,6 +5554,23 @@ def api_rdo_ultima_dados(obra_id):
                     'observacoes': sub.observacoes_tecnicas or ''
                 })
         
+        # ORDENAR SUBATIVIDADES ANTES DE CONVERTER PARA LISTA
+        def extrair_numero_subatividade_api(sub):
+            """Extrair número da subatividade para ordenação (ex: '1. Detalhamento' -> 1)"""
+            try:
+                nome = sub.get('nome', '')
+                if nome and '.' in nome:
+                    return int(nome.split('.')[0])
+                return 999  # Colocar no final se não tem número
+            except:
+                return 999
+        
+        # Aplicar ordenação em cada serviço
+        for servico_id, servico_data in servicos_agrupados.items():
+            if servico_data.get('subatividades'):
+                servico_data['subatividades'].sort(key=extrair_numero_subatividade_api)
+                print(f"🔢 API: Subatividades ordenadas para serviço {servico_data['nome']}: {len(servico_data['subatividades'])} itens")
+        
         # Converter para lista
         servicos_data = list(servicos_agrupados.values())
         
