@@ -5875,13 +5875,12 @@ def salvar_rdo_flexivel():
                         # Verificar se funcionário existe
                         funcionario = Funcionario.query.get(funcionario_id_sel)
                         if funcionario:
-                            # Criar registro de mão de obra
+                            # Criar registro de mão de obra - CORRIGIDO (sem admin_id)
                             mao_obra = RDOMaoObra(
                                 rdo_id=rdo.id,
                                 funcionario_id=funcionario_id_sel,
                                 horas_trabalhadas=8.8,  # Padrão
-                                funcao_exercida=funcionario.funcao_ref.nome if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref else 'Funcionário',
-                                admin_id=admin_id
+                                funcao_exercida=funcionario.funcao_ref.nome if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref else 'Funcionário'
                             )
                             db.session.add(mao_obra)
                             logger.info(f"👷 Funcionário salvo: {funcionario.nome} (ID: {funcionario_id_sel})")
