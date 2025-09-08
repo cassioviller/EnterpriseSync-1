@@ -3,7 +3,7 @@ API para funcionários - Sistema RDO
 """
 
 from flask import Blueprint, jsonify, request
-from models import db, Funcionario
+from models import db, Funcionario, TipoUsuario
 import logging
 
 # Configurar logging
