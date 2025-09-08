@@ -5570,18 +5570,29 @@ def salvar_rdo_flexivel():
                 return redirect(url_for('main.funcionario_rdo_novo'))
         
         # FASE 2: PROCESSAR DADOS DAS SUBATIVIDADES (Arquitetura Joris Kuypers INLINE)
-        logger.info(f"🔍 DEBUG FORMULÁRIO - Campos recebidos:")
+        logger.info(f"🔍 DEBUG FORMULÁRIO PRODUÇÃO - TODOS OS CAMPOS:")
+        logger.info(f"📊 Total de campos recebidos: {len(request.form)}")
+        for key, value in request.form.items():
+            logger.info(f"  📝 {key} = {value}")
+        
+        logger.info(f"🔍 DEBUG FORMULÁRIO - Campos subatividade:")
         for key, value in request.form.items():
             if 'subatividade' in key:
-                logger.info(f"  📝 {key} = {value}")
+                logger.info(f"  🎯 {key} = {value}")
         
         subactivities = []
+        logger.error(f"🔍 INICIANDO PROCESSAMENTO - Buscando campos 'subatividade_*_percentual'")
+        campos_encontrados = [k for k in request.form.keys() if k.startswith('subatividade_') and k.endswith('_percentual')]
+        logger.error(f"🔍 Campos subatividade_*_percentual encontrados: {len(campos_encontrados)}")
+        for campo in campos_encontrados:
+            logger.error(f"  🎯 {campo}")
+        
         for field_name, field_value in request.form.items():
             if field_name.startswith('subatividade_') and field_name.endswith('_percentual'):
                 try:
                     # Tentar formato: subatividade_139_292_percentual
                     parts = field_name.replace('subatividade_', '').replace('_percentual', '').split('_')
-                    logger.info(f"🔍 Processando campo {field_name}, parts: {parts}")
+                    logger.error(f"🔍 Processando campo {field_name}, parts: {parts}, valor: {field_value}")
                     
                     if len(parts) >= 2:
                         original_service_id = int(parts[0])
@@ -5593,7 +5604,7 @@ def salvar_rdo_flexivel():
                         nome_field = f"nome_subatividade_{original_service_id}_{sub_id}"
                         nome = request.form.get(nome_field, f"Subatividade {sub_id}")
                         
-                        logger.info(f"📦 Subatividade extraída: {nome} = {percentual}%")
+                        logger.error(f"📦 Subatividade extraída: {nome} = {percentual}%")
                         
                         subactivities.append({
                             'original_service_id': original_service_id,
@@ -5602,17 +5613,22 @@ def salvar_rdo_flexivel():
                             'percentual': percentual,
                             'observacoes': observacoes
                         })
+                    else:
+                        logger.error(f"❌ Campo {field_name} não tem formato esperado: parts={parts}")
                         
                 except (ValueError, IndexError) as e:
-                    logger.warning(f"⚠️ Erro ao processar campo {field_name}: {e}")
+                    logger.error(f"❌ Erro ao processar campo {field_name}: {e}")
                     continue
+        
+        logger.error(f"🎯 RESULTADO LOOP 1: {len(subactivities)} subatividades encontradas")
         
         # FALLBACK: Se não encontrou pelo formato padrão, tentar outros formatos
         if not subactivities:
-            logger.info("🔄 Tentando formatos alternativos de subatividade...")
+            logger.error("🔄 FALLBACK ATIVADO - Tentando formatos alternativos de subatividade...")
+            logger.error(f"🔍 Total de campos com 'percentual': {len([k for k in request.form.keys() if 'percentual' in k])}")
             for field_name, field_value in request.form.items():
                 if 'percentual' in field_name and field_value:
-                    logger.info(f"🔍 Campo percentual encontrado: {field_name} = {field_value}")
+                    logger.error(f"🔍 Campo percentual encontrado: {field_name} = {field_value}")
                     try:
                         # Extrair qualquer número do nome do campo
                         import re
@@ -5663,7 +5679,17 @@ def salvar_rdo_flexivel():
                         continue
         
         if not subactivities:
-            flash('Nenhuma subatividade encontrada no formulário', 'error')
+            # LOG DETALHADO PARA DEBUG PRODUÇÃO
+            logger.error("❌ NENHUMA SUBATIVIDADE ENCONTRADA - DEBUG PRODUÇÃO:")
+            logger.error(f"🔍 Total de campos no formulário: {len(request.form)}")
+            logger.error(f"🔍 Campos do formulário:")
+            for key, value in request.form.items():
+                logger.error(f"  📝 {key} = {value}")
+            logger.error(f"🔍 Target service ID: {target_service_id}")
+            logger.error(f"🔍 Admin ID: {admin_id}")
+            logger.error(f"🔍 Obra ID: {obra_id}")
+            
+            flash(f'ERRO DEBUG: Nenhuma subatividade encontrada. Total campos: {len(request.form)}. Verifique logs para detalhes.', 'error')
             return redirect(url_for('main.funcionario_rdo_novo'))
             
         logger.info(f"🎯 SUBATIVIDADES PROCESSADAS: {len(subactivities)} itens")
