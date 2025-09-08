@@ -7,27 +7,25 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging for production
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create app instance
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+app.secret_key = os.environ.get("SECRET_KEY", "sige-v10-digital-mastery-production-key-2025")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Database configuration - AUTO-DETECTAR AMBIENTE
-database_url = os.environ.get("DATABASE_URL")
-logger = logging.getLogger(__name__)
+# Database configuration - v10.0 Digital Mastery
+database_url = os.environ.get("DATABASE_URL", "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable")
 
 # Auto-detectar ambiente
-if not database_url or "neon" in database_url:
-    # DESENVOLVIMENTO - usar Neon atual
-    database_url = os.environ.get("DATABASE_URL", "postgresql://neon_fallback")
+if "neon" in database_url or "localhost" in database_url:
+    # DESENVOLVIMENTO
     logger.info(f"🔧 DESENVOLVIMENTO DATABASE: {database_url}")
 else:
-    # PRODUÇÃO - usar EasyPanel
-    database_url = "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable" 
-    logger.info(f"🔧 PRODUÇÃO DATABASE: {database_url}")
+    # PRODUÇÃO - EasyPanel
+    logger.info(f"🔧 PRODUÇÃO DATABASE: postgresql://sige:sige@viajey_sige:5432/sige")
 
 # Convert postgres:// to postgresql:// for SQLAlchemy compatibility
 if database_url and database_url.startswith("postgres://"):
@@ -44,9 +42,15 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
     "pool_size": 10,
     "max_overflow": 20,
+    "echo": False  # Desabilitar logs SQL em produção
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['WTF_CSRF_ENABLED'] = False
+
+# Configurações v10.0 Digital Mastery
+app.config['DIGITAL_MASTERY_MODE'] = True
+app.config['OBSERVABILITY_ENABLED'] = True
+app.config['RDO_MASTERY_ENABLED'] = True
 
 # Configurações específicas para resolver erro SERVER_NAME  
 app.config['SERVER_NAME'] = None  # Permite qualquer host
