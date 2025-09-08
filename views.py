@@ -5661,56 +5661,23 @@ def salvar_rdo_flexivel():
                         nome_field = f"nome_subatividade_{original_service_id}_{sub_id}"
                         nome = request.form.get(nome_field, "")
                         
-                        # CORREÇÃO CRÍTICA: Buscar nome real da subatividade mestre
+                        # CORREÇÃO CRÍTICA: Buscar nome real da subatividade mestre DINAMICAMENTE
                         try:
+                            # TENTAR BUSCAR NO BANCO PRIMEIRO (QUALQUER SERVIÇO)
                             subatividade_mestre = db.session.query(SubatividadeMestre).filter_by(
-                                id=int(sub_id),
-                                servico_id=target_service_id
+                                id=int(sub_id)
                             ).first()
                             
                             if subatividade_mestre:
                                 nome = subatividade_mestre.nome
-                                logger.error(f"✅ Nome corrigido da subatividade {sub_id}: {nome}")
+                                logger.error(f"✅ Nome DINÂMICO da subatividade {sub_id}: {nome}")
                             else:
-                                # MAPEAMENTO COMPLETO PRODUÇÃO + DESENVOLVIMENTO + NOVOS IDs
-                                mapeamento_completo = {
-                                    # PRODUÇÃO - Cobertura Metálica (IDs 150-165)
-                                    '150': '1. Detalhamento do projeto',
-                                    '151': '2. Seleção de materiais', 
-                                    '152': '3. Traçagem',
-                                    '153': '4. Corte mecânico',
-                                    '154': '5. Furação',
-                                    '155': '6. Montagem e soldagem',
-                                    '156': '7. Acabamento e pintura', 
-                                    '157': '8. Identificação e logística',
-                                    '158': '9. Planejamento de montagem',
-                                    '159': '10. Preparação do local',
-                                    '160': '11. Transporte para obra',
-                                    '161': '12. Posicionamento e alinhamento',
-                                    '162': '13. Fixação definitiva',
-                                    '163': '14. Inspeção e controle de qualidade',
-                                    '164': '15. Documentação técnica',
-                                    '165': '16. Entrega e aceitação',
-                                    # DESENVOLVIMENTO - Cobertura (IDs originais)
-                                    '15236': 'Preparação da Estrutura',
-                                    '15237': 'Instalação de Terças', 
-                                    '15238': 'Colocação das Telhas',
-                                    '15239': 'Vedação e Calhas',
-                                    # NOVOS IDs - Desenvolvimento atual (456-459)
-                                    '456': 'Preparação da Estrutura',
-                                    '457': 'Instalação de Terças',
-                                    '458': 'Colocação das Telhas',
-                                    '459': 'Vedação e Calhas'
-                                }
-                                if sub_id in mapeamento_completo:
-                                    nome = mapeamento_completo[sub_id]
-                                    logger.error(f"🔄 Mapeamento COMPLETO usado para subatividade {sub_id}: {nome}")
-                                else:
-                                    logger.error(f"❌ IGNORANDO: Subatividade {sub_id} não está no mapeamento - NÃO será salva")
-                                    continue  # Pula esta subatividade
+                                logger.error(f"❌ IGNORANDO: Subatividade {sub_id} não encontrada no banco - NÃO será salva")
+                                continue  # Pula esta subatividade
                                 
                         except Exception as e:
-                            logger.error(f"❌ Erro ao buscar nome da subatividade {sub_id}: {e}")
+                            logger.error(f"❌ Erro ao buscar subatividade {sub_id} no banco: {e}")
+                            continue  # Pula esta subatividade
                         
                         # Só adiciona se tem nome válido
                         if nome and nome.strip():
@@ -5752,89 +5719,22 @@ def salvar_rdo_flexivel():
                             nome = ""  # Não definir valor padrão genérico
                             
                             try:
+                                # BUSCA DINÂMICA NO BANCO (QUALQUER SERVIÇO)
                                 subatividade_mestre = db.session.query(SubatividadeMestre).filter_by(
-                                    id=int(sub_id),
-                                    servico_id=target_service_id
+                                    id=int(sub_id)
                                 ).first()
                                 
                                 if subatividade_mestre:
                                     nome = subatividade_mestre.nome
-                                    logger.info(f"✅ FALLBACK: Nome corrigido da subatividade {sub_id}: {nome}")
+                                    logger.info(f"✅ FALLBACK DINÂMICO: Nome da subatividade {sub_id}: {nome}")
                                 else:
-                                    # MAPEAMENTO COMPLETO PRODUÇÃO + DESENVOLVIMENTO + NOVOS IDs
-                                    mapeamento_producao = {
-                                        # PRODUÇÃO - Cobertura Metálica (IDs 150-165)
-                                        '150': '1. Detalhamento do projeto',
-                                        '151': '2. Seleção de materiais', 
-                                        '152': '3. Traçagem',
-                                        '153': '4. Corte mecânico',
-                                        '154': '5. Furação',
-                                        '155': '6. Montagem e soldagem',
-                                        '156': '7. Acabamento e pintura', 
-                                        '157': '8. Identificação e logística',
-                                        '158': '9. Planejamento de montagem',
-                                        '159': '10. Preparação do local',
-                                        '160': '11. Transporte para obra',
-                                        '161': '12. Posicionamento e alinhamento',
-                                        '162': '13. Fixação definitiva',
-                                        '163': '14. Inspeção e controle de qualidade',
-                                        '164': '15. Documentação técnica',
-                                        '165': '16. Entrega e aceitação',
-                                        # DESENVOLVIMENTO - Cobertura (IDs originais)
-                                        '15236': 'Preparação da Estrutura',
-                                        '15237': 'Instalação de Terças', 
-                                        '15238': 'Colocação das Telhas',
-                                        '15239': 'Vedação e Calhas',
-                                        '440': 'Preparação da Estrutura',  
-                                        '441': 'Instalação de Terças',
-                                        '442': 'Colocação das Telhas', 
-                                        '443': 'Vedação e Calhas',
-                                        # NOVOS IDs - Desenvolvimento atual (456-459)
-                                        '456': 'Preparação da Estrutura',
-                                        '457': 'Instalação de Terças',
-                                        '458': 'Colocação das Telhas',
-                                        '459': 'Vedação e Calhas'
-                                    }
-                                    if sub_id in mapeamento_producao:
-                                        nome = mapeamento_producao[sub_id]
-                                        logger.info(f"🔄 FALLBACK: Mapeamento PRODUÇÃO usado para subatividade {sub_id}: {nome}")
-                                    else:
-                                        logger.warning(f"⚠️ IGNORANDO: Subatividade {sub_id} não encontrada no mapeamento - NÃO será salva")
-                                        continue  # Pula esta subatividade
+                                    logger.warning(f"⚠️ IGNORANDO: Subatividade {sub_id} não existe no banco - NÃO será salva")
+                                    continue  # Pula esta subatividade
                                     
                             except Exception as e:
-                                logger.error(f"❌ FALLBACK: Erro ao buscar nome da subatividade {sub_id}: {e}")
-                                # Mapeamento de emergência COMPLETO + NOVOS IDs
-                                mapeamento_emergencia = {
-                                    # PRODUÇÃO
-                                    '150': '1. Detalhamento do projeto',
-                                    '151': '2. Seleção de materiais', 
-                                    '152': '3. Traçagem',
-                                    '153': '4. Corte mecânico',
-                                    '154': '5. Furação',
-                                    '155': '6. Montagem e soldagem',
-                                    '156': '7. Acabamento e pintura', 
-                                    '157': '8. Identificação e logística',
-                                    '158': '9. Planejamento de montagem',
-                                    '159': '10. Preparação do local',
-                                    '160': '11. Transporte para obra',
-                                    '161': '12. Posicionamento e alinhamento',
-                                    '162': '13. Fixação definitiva',
-                                    '163': '14. Inspeção e controle de qualidade',
-                                    '164': '15. Documentação técnica',
-                                    '165': '16. Entrega e aceitação',
-                                    # DESENVOLVIMENTO - NOVOS IDs
-                                    '456': 'Preparação da Estrutura',
-                                    '457': 'Instalação de Terças',
-                                    '458': 'Colocação das Telhas',
-                                    '459': 'Vedação e Calhas'
-                                }
-                                if sub_id in mapeamento_emergencia:
-                                    nome = mapeamento_emergencia[sub_id]
-                                    logger.error(f"🔧 EMERGÊNCIA: Usando mapeamento para subatividade {sub_id}: {nome}")
-                                else:
-                                    logger.error(f"❌ REJEITANDO: Subatividade {sub_id} não encontrada - NÃO será salva")
-                                    continue  # Pula esta subatividade
+                                logger.error(f"❌ FALLBACK: Erro ao buscar subatividade {sub_id} no banco: {e}")
+                                logger.error(f"❌ REJEITANDO: Subatividade {sub_id} não será salva")
+                                continue  # Pula esta subatividade
                             
                             # Só adiciona se encontrou nome válido
                             if nome and nome.strip():
