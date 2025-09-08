@@ -49,12 +49,11 @@ RUN groupadd -r sige && useradd -r -g sige sige
 WORKDIR /app
 
 # Multi-stage dependency caching (Joris principle: efficiency)
-COPY requirements.txt pyproject.toml* setup.py* ./
+COPY pyproject.toml* setup.py* ./
 
 # Instalar dependências Python com otimização (Digital Mastery)
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    # Instalar dependências principais
-    if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi && \
+    # Instalar dependências principais do pyproject.toml
     if [ -f pyproject.toml ]; then pip install --no-cache-dir .; fi && \
     # Cleanup pip cache
     pip cache purge
