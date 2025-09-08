@@ -1,0 +1,42 @@
+# SIGE v10.0 - Dockerfile Otimizado para Produção
+# Versão simplificada para deploy EasyPanel/Hostinger
+FROM python:3.11-slim
+
+# Variáveis de ambiente
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV FLASK_ENV=production
+ENV PORT=5000
+
+# Instalar dependências do sistema (mínimas)
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    gcc \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Copiar requirements e instalar dependências Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar código da aplicação
+COPY . .
+
+# Copiar entrypoint otimizado
+COPY docker-entrypoint-production-simple.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint-production-simple.sh
+
+# Criar diretório de logs
+RUN mkdir -p /app/logs
+
+# Expor porta
+EXPOSE 5000
+
+# Definir entrypoint
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-production-simple.sh"]
+
+# Comando padrão
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--keep-alive", "2", "main:app"]
