@@ -91,14 +91,14 @@ try:
         db.create_all()
         logger.info('✅ All tables created successfully!')
         
-        # Execute migrations with observability
-        logger.info('🔄 Executing Digital Mastery migrations...')
-        try:
-            from migrations import executar_migracoes
-            executar_migracoes()
-            logger.info('✅ Migrations completed successfully!')
-        except Exception as migration_error:
-            logger.warning(f'⚠️ Migration warning: {migration_error}')
+        # MIGRAÇÕES DESABILITADAS - Corrigindo logs infinitos em produção
+        logger.info('🔇 Digital Mastery migrations DISABLED - preventing infinite logs')
+        # try:
+        #     from migrations import executar_migracoes
+        #     executar_migracoes()
+        #     logger.info('✅ Migrations completed successfully!')
+        # except Exception as migration_error:
+        #     logger.warning(f'⚠️ Migration warning: {migration_error}')
         
         # Database schema validation
         from sqlalchemy import inspect
