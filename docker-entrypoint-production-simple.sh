@@ -45,12 +45,28 @@ try:
               AND id NOT IN (15236, 15237, 15238, 15239)
         '''))
         
-        # Correção de nomes em RDOs existentes
+        # Correção de nomes em RDOs existentes (PRODUÇÃO)
         corrections = {
             'Subatividade 440': 'Preparação da Estrutura',
             'Subatividade 441': 'Instalação de Terças', 
             'Subatividade 442': 'Colocação das Telhas',
-            'Subatividade 443': 'Vedação e Calhas'
+            'Subatividade 443': 'Vedação e Calhas',
+            'Subatividade 150': '1. Detalhamento do projeto',
+            'Subatividade 151': '2. Seleção de materiais', 
+            'Subatividade 152': '3. Traçagem',
+            'Subatividade 153': '4. Corte mecânico',
+            'Subatividade 154': '5. Furação',
+            'Subatividade 155': '6. Montagem e soldagem',
+            'Subatividade 156': '7. Acabamento e pintura', 
+            'Subatividade 157': '8. Identificação e logística',
+            'Subatividade 158': '9. Planejamento de montagem',
+            'Subatividade 159': '10. Preparação do local',
+            'Subatividade 160': '11. Transporte para obra',
+            'Subatividade 161': '12. Posicionamento e alinhamento',
+            'Subatividade 162': '13. Fixação definitiva',
+            'Subatividade 163': '14. Inspeção e controle de qualidade',
+            'Subatividade 164': '15. Documentação técnica',
+            'Subatividade 165': '16. Entrega e aceitação'
         }
         
         for old_name, new_name in corrections.items():
@@ -66,9 +82,15 @@ try:
             WHERE nome_subatividade IN (\"Etapa Inicial\", \"Etapa Intermediária\")
         '''))
         
-        # Corrigir admin_id
+        # Corrigir admin_id (PRODUÇÃO usa admin_id=2)
         db.session.execute(text('''
-            UPDATE rdo SET admin_id = 10 
+            UPDATE rdo SET admin_id = 2 
+            WHERE admin_id IS NULL OR admin_id = 0 OR admin_id = 10
+        '''))
+        
+        # Corrigir funcionários órfãos
+        db.session.execute(text('''
+            UPDATE funcionario SET admin_id = 2 
             WHERE admin_id IS NULL OR admin_id = 0
         '''))
         
