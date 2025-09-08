@@ -2783,6 +2783,11 @@ def api_servicos_disponiveis_obra(obra_id):
 def rdos():
     """Lista RDOs com controle de acesso e design moderno"""
     try:
+        # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
+        print("🎯 RDO LISTA VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        print("📍 ROTA USADA: /rdos, /rdo, /rdo/lista (rdos)")
+        print("📄 TEMPLATE: rdo_lista_unificada.html (MODERNO)")
+        print("👤 USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
         # Criar sessão isolada para evitar problemas
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
@@ -3024,6 +3029,11 @@ def excluir_rdo(rdo_id):
 def novo_rdo():
     """Formulário para criar novo RDO com pré-carregamento de atividades"""
     try:
+        # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
+        print("🎯 RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        print("📍 ROTA USADA: /rdo/novo (novo_rdo)")
+        print("📄 TEMPLATE: rdo/novo.html (MODERNO)")
+        print("👤 USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
         # Buscar obras disponíveis
@@ -3280,6 +3290,11 @@ def criar_rdo():
 def visualizar_rdo(id):
     """Visualizar RDO específico - SEM VERIFICAÇÃO DE PERMISSÃO"""
     try:
+        # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
+        print("🎯 RDO VISUALIZAR VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        print(f"📍 ROTA USADA: /rdo/{id} (visualizar_rdo)")
+        print("📄 TEMPLATE: rdo/visualizar_rdo_moderno.html (MODERNO)")
+        print("👤 USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
         # Buscar RDO diretamente sem verificação de acesso
         rdo = RDO.query.options(
             db.joinedload(RDO.obra),
@@ -4028,6 +4043,13 @@ def rdo_novo_unificado():
         
         # Template unificado MODERNO para todos os usuários
         template = 'rdo/novo.html'  # SEMPRE usar template moderno
+        
+        # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
+        print("🎯 RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        print("📍 ROTA USADA: /rdo/novo (rdo_novo_unificado)")
+        print(f"📄 TEMPLATE: {template} (MODERNO)")
+        print("👤 USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
+        print(f"🔒 TIPO USUÁRIO: {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'N/A'}")
         
         # Adicionar data atual para o template
         from datetime import date as date_module
