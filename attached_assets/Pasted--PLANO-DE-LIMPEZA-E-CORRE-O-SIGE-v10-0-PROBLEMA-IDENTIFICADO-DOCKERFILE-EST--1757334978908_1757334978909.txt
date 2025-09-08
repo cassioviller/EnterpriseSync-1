@@ -1,0 +1,283 @@
+# 🧹 PLANO DE LIMPEZA E CORREÇÃO - SIGE v10.0
+
+## 🔍 PROBLEMA IDENTIFICADO
+
+**✅ DOCKERFILE ESTÁ CORRETO:**
+```dockerfile
+ENTRYPOINT ["/app/docker-entrypoint-digital-mastery.sh"]
+```
+
+**❌ PROBLEMA REAL:**
+Múltiplos arquivos antigos causando confusão no deploy e desenvolvimento
+
+---
+
+## 📁 ARQUIVOS PARA MANTER (v10.0 Digital Mastery)
+
+### ✅ ARQUIVOS ESSENCIAIS - NÃO DELETAR
+
+#### 1. Configuração Principal
+```
+✅ app.py                                    # Aplicação principal v10.0
+✅ models.py                                 # 93 tabelas consolidadas
+✅ main.py                                   # Entry point Flask
+✅ views.py                                  # Lógica RDO robusta
+✅ pyproject.toml                           # Dependências v10.0
+```
+
+#### 2. Deploy e Docker
+```
+✅ Dockerfile                               # v10.0 Digital Mastery
+✅ docker-entrypoint-digital-mastery.sh    # Script correto
+✅ .dockerignore                           # Otimização build
+```
+
+#### 3. Templates Modernos
+```
+✅ templates/base_completo.html            # Template base v10.0
+✅ templates/rdo/novo.html                 # Interface RDO moderna
+✅ templates/dashboard/                    # Dashboard modernizado
+✅ templates/funcionarios/                 # Interface RH
+✅ templates/propostas/                    # Sistema comercial
+```
+
+#### 4. Blueprints Ativos (18 módulos)
+```
+✅ blueprints/rdo.py                       # Sistema RDO
+✅ blueprints/folha_pagamento.py          # Folha de pagamento
+✅ blueprints/contabilidade.py            # Módulo contábil
+✅ blueprints/propostas.py                # Propostas comerciais
+✅ blueprints/funcionarios.py             # Gestão RH
+✅ blueprints/almoxarifado.py             # Suprimentos
+✅ [outros 12 blueprints ativos]
+```
+
+#### 5. Utilitários v10.0
+```
+✅ utils/idempotency.py                    # Operações idempotentes
+✅ utils/circuit_breaker.py               # Resiliência
+✅ utils/saga.py                          # Transações distribuídas
+✅ utils/observability.py                 # Monitoramento
+```
+
+---
+
+## 🗑️ ARQUIVOS PARA DELETAR (Obsoletos)
+
+### ❌ ARQUIVOS ANTIGOS DE DEPLOY
+
+#### 1. Dockerfiles Antigos
+```
+❌ Dockerfile.old
+❌ Dockerfile.backup
+❌ Dockerfile.v9
+❌ docker-compose.yml                      # Se não usado
+❌ docker-compose.old.yml
+```
+
+#### 2. Entrypoints Antigos
+```
+❌ docker-entrypoint.sh                   # Versão antiga
+❌ entrypoint.sh                          # Versão antiga
+❌ start.sh                               # Script antigo
+❌ run.sh                                 # Script antigo
+```
+
+#### 3. Requirements Antigos
+```
+❌ requirements.txt                       # Substituído por pyproject.toml
+❌ requirements-dev.txt
+❌ requirements.old.txt
+❌ pip-requirements.txt
+```
+
+### ❌ ARQUIVOS ANTIGOS DE CONFIGURAÇÃO
+
+#### 1. Configurações Obsoletas
+```
+❌ config.py.old
+❌ settings.py                            # Se não usado
+❌ config_old.py
+❌ app_old.py
+❌ main_backup.py
+```
+
+#### 2. Models Antigos
+```
+❌ models_old.py
+❌ models_backup.py
+❌ database.py                            # Se duplicado
+❌ db_models.py                           # Se duplicado
+```
+
+### ❌ TEMPLATES ANTIGOS
+
+#### 1. Templates Obsoletos
+```
+❌ templates/base.html                    # Substituído por base_completo.html
+❌ templates/base_old.html
+❌ templates/layout.html                  # Se duplicado
+❌ templates/rdo/index_old.html
+❌ templates/rdo/criar_old.html
+```
+
+#### 2. CSS/JS Antigos
+```
+❌ static/css/style_old.css
+❌ static/css/bootstrap_old.css
+❌ static/js/app_old.js
+❌ static/js/jquery_old.js
+```
+
+### ❌ BLUEPRINTS INATIVOS
+
+#### 1. Blueprints Não Registrados
+```
+❌ blueprints/old_rdo.py
+❌ blueprints/backup_propostas.py
+❌ blueprints/test_*.py                   # Se não são testes reais
+❌ blueprints/deprecated_*.py
+```
+
+### ❌ DOCUMENTAÇÃO EXCESSIVA
+
+#### 1. Documentos Obsoletos (150+ arquivos .md)
+```
+❌ README_old.md
+❌ CHANGELOG_*.md                         # Manter apenas o atual
+❌ docs/old/
+❌ documentation/backup/
+❌ *.backup.md
+❌ temp_*.md
+❌ test_*.md                              # Se não são documentação real
+```
+
+### ❌ ARQUIVOS DE TESTE/DEBUG ANTIGOS
+
+#### 1. Scripts de Teste Obsoletos
+```
+❌ test_*.py                              # Se não são testes unitários reais
+❌ debug_*.py
+❌ temp_*.py
+❌ backup_*.py
+❌ old_*.py
+```
+
+#### 2. Logs e Temporários
+```
+❌ *.log
+❌ *.tmp
+❌ temp/
+❌ logs/                                  # Se não usado
+❌ cache/
+❌ __pycache__/                          # Será recriado
+```
+
+---
+
+## 🔧 SCRIPT DE LIMPEZA AUTOMÁTICA
+
+### 1. Comando de Limpeza Segura
+```bash
+#!/bin/bash
+# LIMPEZA SIGE v10.0 - Remover arquivos obsoletos
+
+echo "🧹 Iniciando limpeza SIGE v10.0..."
+
+# Backup antes da limpeza
+mkdir -p backup_limpeza_$(date +%Y%m%d_%H%M%S)
+
+# Remover Dockerfiles antigos
+rm -f Dockerfile.old Dockerfile.backup Dockerfile.v9
+rm -f docker-compose*.yml
+
+# Remover entrypoints antigos  
+rm -f docker-entrypoint.sh entrypoint.sh start.sh run.sh
+
+# Remover requirements antigos
+rm -f requirements*.txt pip-requirements.txt
+
+# Remover configurações antigas
+rm -f config*.old.py settings.py app_old.py main_backup.py
+rm -f models_old.py models_backup.py database.py db_models.py
+
+# Remover templates antigos
+rm -f templates/base.html templates/base_old.html templates/layout.html
+rm -rf templates/*/old/ templates/*/_old.html
+
+# Remover CSS/JS antigos
+rm -f static/css/*_old.css static/js/*_old.js
+
+# Remover blueprints inativos
+rm -f blueprints/old_*.py blueprints/backup_*.py blueprints/deprecated_*.py
+
+# Remover documentação excessiva (manter apenas essenciais)
+find . -name "*.backup.md" -delete
+find . -name "temp_*.md" -delete
+find . -name "test_*.md" -delete
+
+# Remover arquivos temporários
+rm -f *.log *.tmp
+rm -rf temp/ cache/ __pycache__/
+find . -name "*.pyc" -delete
+
+echo "✅ Limpeza concluída!"
+```
+
+### 2. Validação Pós-Limpeza
+```bash
+#!/bin/bash
+# Verificar se arquivos essenciais ainda existem
+
+echo "🔍 Validando arquivos essenciais..."
+
+ARQUIVOS_ESSENCIAIS=(
+    "app.py"
+    "models.py" 
+    "main.py"
+    "views.py"
+    "pyproject.toml"
+    "Dockerfile"
+    "docker-entrypoint-digital-mastery.sh"
+    "templates/base_completo.html"
+)
+
+for arquivo in "${ARQUIVOS_ESSENCIAIS[@]}"; do
+    if [ -f "$arquivo" ]; then
+        echo "✅ $arquivo"
+    else
+        echo "❌ ERRO: $arquivo não encontrado!"
+    fi
+done
+```
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+### ✅ APÓS A LIMPEZA:
+
+1. **Estrutura Limpa:**
+   - Apenas arquivos v10.0 Digital Mastery
+   - Sem confusão de versões antigas
+   - Deploy mais rápido e confiável
+
+2. **Dockerfile Correto:**
+   - Apontando para `docker-entrypoint-digital-mastery.sh`
+   - Sem referências a arquivos antigos
+   - Build otimizado
+
+3. **Repositório Organizado:**
+   - Fácil manutenção
+   - Sem arquivos duplicados
+   - Estrutura clara para novos desenvolvedores
+
+### 🚀 PRÓXIMOS PASSOS:
+
+1. **Executar limpeza** nos arquivos locais (Replit)
+2. **Commit e push** da versão limpa
+3. **Forçar rebuild** no EasyPanel
+4. **Validar deploy** em produção
+
+**⏱️ TEMPO ESTIMADO:** 30 minutos para limpeza completa + deploy
+
