@@ -177,12 +177,13 @@ with app.app_context():
     db.create_all()
     logging.info("Database tables created/verified")
     
-    # Executar migrações automáticas
-    try:
-        from migrations import executar_migracoes
-        executar_migracoes()
-    except Exception as e:
-        logging.error(f"Erro ao executar migrações: {e}")
+    # MIGRAÇÕES DESABILITADAS para evitar loops infinitos
+    print("🔇 Migrações automáticas DESABILITADAS para parar logs infinitos")
+    # try:
+    #     from migrations import executar_migracoes
+    #     executar_migracoes()
+    # except Exception as e:
+    #     logging.error(f"Erro ao executar migrações: {e}")
     
     # Register additional blueprints
     try:
