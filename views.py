@@ -2483,26 +2483,68 @@ def api_funcionarios_consolidada():
         # Converter para JSON baseado no formato solicitado
         funcionarios_json = []
         for f in funcionarios:
-            if formato_retorno == 'mobile':
-                # Formato mobile simplificado
+            try:
+                if formato_retorno == 'mobile':
+                    # Formato mobile simplificado
+                    # PROTEÇÃO: Verificar referências com segurança
+                    funcao_nome = 'N/A'
+                    departamento_nome = 'N/A'
+                    
+                    try:
+                        funcao_nome = f.funcao_ref.nome if hasattr(f, 'funcao_ref') and f.funcao_ref else 'N/A'
+                    except:
+                        funcao_nome = 'N/A'
+                    
+                    try:
+                        departamento_nome = f.departamento_ref.nome if hasattr(f, 'departamento_ref') and f.departamento_ref else 'N/A'
+                    except:
+                        departamento_nome = 'N/A'
+                    
+                    funcionarios_json.append({
+                        'id': f.id,
+                        'nome': f.nome or 'Sem nome',
+                        'funcao': funcao_nome,
+                        'departamento': departamento_nome
+                    })
+                else:
+                    # Formato admin completo (padrão) - PROTEGIDO
+                    cargo_nome = 'Sem cargo'
+                    departamento_nome = 'Sem departamento'
+                    
+                    try:
+                        cargo_nome = f.funcao_ref.nome if hasattr(f, 'funcao_ref') and f.funcao_ref else 'Sem cargo'
+                    except:
+                        cargo_nome = 'Sem cargo'
+                        
+                    try:
+                        departamento_nome = f.departamento_ref.nome if hasattr(f, 'departamento_ref') and f.departamento_ref else 'Sem departamento'
+                    except:
+                        departamento_nome = 'Sem departamento'
+                    
+                    funcionarios_json.append({
+                        'id': f.id,
+                        'nome': f.nome or 'Sem nome',
+                        'email': f.email or '',
+                        'departamento': departamento_nome,
+                        'cargo': cargo_nome,
+                        'salario': f.salario or 0,
+                        'admin_id': f.admin_id,
+                        'ativo': f.ativo
+                    })
+            except Exception as e:
+                print(f"⚠️ ERRO ao processar funcionário {f.id}: {e}")
+                # Adicionar funcionário básico mesmo com erro
                 funcionarios_json.append({
                     'id': f.id,
-                    'nome': f.nome,
-                    'funcao': f.funcao_ref.nome if f.funcao_ref else 'N/A',
-                    'departamento': f.departamento_ref.nome if f.departamento_ref else 'N/A'
-                })
-            else:
-                # Formato admin completo (padrão)
-                funcionarios_json.append({
-                    'id': f.id,
-                    'nome': f.nome,
-                    'email': f.email or '',
-                    'departamento': f.departamento_ref.nome if f.departamento_ref else 'Sem departamento',
-                    'cargo': f.funcao_ref.nome if f.funcao_ref else 'Sem cargo',
-                    'salario': f.salario or 0,
+                    'nome': f.nome or 'Funcionário',
+                    'cargo': 'Funcionário',
+                    'departamento': 'Sem departamento',
+                    'email': '',
+                    'salario': 0,
                     'admin_id': f.admin_id,
                     'ativo': f.ativo
                 })
+                continue
         
         # Retorno adaptado ao formato
         if formato_retorno == 'mobile':
