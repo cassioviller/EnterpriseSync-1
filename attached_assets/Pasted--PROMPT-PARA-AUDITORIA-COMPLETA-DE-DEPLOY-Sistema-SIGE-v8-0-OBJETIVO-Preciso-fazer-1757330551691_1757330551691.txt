@@ -1,0 +1,245 @@
+# 📋 PROMPT PARA AUDITORIA COMPLETA DE DEPLOY - Sistema SIGE v8.0
+
+## 🎯 OBJETIVO
+
+Preciso fazer uma auditoria completa do processo de deploy para identificar **TODAS** as diferenças entre ambiente de desenvolvimento e produção que estão causando falhas no sistema SIGE v8.0.
+
+## 🚨 SITUAÇÃO ATUAL
+
+O sistema funciona perfeitamente em desenvolvimento mas falha em produção com erros de:
+- Migração de banco de dados
+- Estrutura de tabelas inconsistente
+- Problemas de enum e foreign keys
+- Falhas no processo de inicialização
+
+## 📁 DOCUMENTOS NECESSÁRIOS PARA DIAGNÓSTICO
+
+### **1. ARQUIVOS DE CONFIGURAÇÃO DE DEPLOY**
+
+#### **1.1 Dockerfile e Configurações**
+```
+📄 Dockerfile (versão atual completa)
+📄 docker-compose.yml (se existir)
+📄 .dockerignore
+📄 docker-entrypoint.sh (script atual de inicialização)
+📄 docker-entrypoint-production-fix.sh (versão corrigida)
+📄 docker-entrypoint-unified.sh (versão backup)
+```
+
+#### **1.2 Configurações do EasyPanel**
+```
+📄 Configurações de ambiente do EasyPanel (screenshot ou export)
+📄 Variáveis de ambiente definidas no EasyPanel
+📄 Configurações de rede e portas
+📄 Configurações de volume/storage
+📄 Logs de deploy do EasyPanel (últimas tentativas)
+```
+
+### **2. ARQUIVOS DE CONFIGURAÇÃO DA APLICAÇÃO**
+
+#### **2.1 Configurações Python**
+```
+📄 pyproject.toml (dependências completas)
+📄 requirements.txt (se existir)
+📄 setup.py (se existir)
+📄 app.py ou main.py (arquivo principal)
+📄 config.py ou settings.py (configurações da aplicação)
+```
+
+#### **2.2 Configurações Flask**
+```
+📄 __init__.py (inicialização da aplicação)
+📄 wsgi.py ou gunicorn.conf.py (configuração do servidor)
+📄 .env ou .env.example (variáveis de ambiente)
+📄 .flaskenv (configurações Flask específicas)
+```
+
+### **3. ESTRUTURA DE BANCO DE DADOS**
+
+#### **3.1 Modelos e Migrações**
+```
+📄 models.py (modelos completos)
+📄 migrations/ (pasta completa de migrações)
+   ├── alembic.ini
+   ├── env.py
+   ├── script.py.mako
+   └── versions/ (todos os arquivos de migração)
+📄 migrations.py (sistema de migração customizado)
+📄 database.py ou db.py (configurações de banco)
+```
+
+#### **3.2 Scripts de Inicialização**
+```
+📄 init_db.py (se existir)
+📄 seed.py ou fixtures.py (dados iniciais)
+📄 create_tables.py (se existir)
+📄 backup_restore.py (se existir)
+```
+
+### **4. LOGS E DIAGNÓSTICOS**
+
+#### **4.1 Logs de Produção**
+```
+📄 Logs completos do último deploy falhado
+📄 Logs de inicialização da aplicação
+📄 Logs de erro do PostgreSQL
+📄 Logs do container Docker
+📄 Logs do EasyPanel (deploy e runtime)
+```
+
+#### **4.2 Logs de Desenvolvimento**
+```
+📄 Logs de funcionamento em desenvolvimento
+📄 Output do comando flask db current
+📄 Output do comando flask db history
+📄 Resultado de testes locais
+```
+
+### **5. ESTRUTURA DO PROJETO**
+
+#### **5.1 Arquivos de Estrutura**
+```
+📄 Estrutura completa de diretórios (tree ou ls -la recursivo)
+📄 .gitignore
+📄 README.md (se contém instruções de deploy)
+📄 CHANGELOG.md (se existir)
+```
+
+#### **5.2 Scripts de Automação**
+```
+📄 deploy.sh (se existir)
+📄 build.sh (se existir)
+📄 start.sh (se existir)
+📄 Makefile (se existir)
+```
+
+### **6. CONFIGURAÇÕES DE AMBIENTE**
+
+#### **6.1 Desenvolvimento**
+```
+📄 Configurações locais de banco (DATABASE_URL local)
+📄 Versões de dependências instaladas (pip freeze)
+📄 Versão do Python (python --version)
+📄 Versão do PostgreSQL local
+📄 Sistema operacional de desenvolvimento
+```
+
+#### **6.2 Produção**
+```
+📄 Configurações de banco em produção
+📄 Versões instaladas no container
+📄 Variáveis de ambiente do container
+📄 Configurações de rede do EasyPanel
+📄 Recursos alocados (CPU, RAM, storage)
+```
+
+### **7. TESTES E VALIDAÇÃO**
+
+#### **7.1 Scripts de Teste**
+```
+📄 test_database.py (se existir)
+📄 test_migrations.py (se existir)
+📄 health_check.py (se existir)
+📄 Resultados de testes unitários
+```
+
+#### **7.2 Validação Manual**
+```
+📄 Checklist de deploy (se existir)
+📄 Procedimentos de rollback
+📄 Comandos de verificação pós-deploy
+```
+
+## 🔍 COMANDOS DE DIAGNÓSTICO NECESSÁRIOS
+
+### **Execute estes comandos e forneça os resultados:**
+
+#### **No Ambiente de Desenvolvimento:**
+```bash
+# Estrutura do projeto
+find . -type f -name "*.py" | head -20
+find . -type f -name "*.sh" | head -10
+find . -type f -name "*.yml" -o -name "*.yaml" | head -10
+
+# Configurações Flask
+flask db current
+flask db history
+flask db show
+
+# Dependências
+pip freeze > requirements_dev.txt
+python --version
+psql --version
+
+# Estrutura do banco local
+psql $DATABASE_URL -c "\dt"
+psql $DATABASE_URL -c "\d usuario"
+psql $DATABASE_URL -c "\d servico"
+```
+
+#### **No Ambiente de Produção (via container):**
+```bash
+# Informações do container
+docker ps
+docker logs <container_name> --tail 100
+docker exec <container_name> env | grep -E "(DATABASE|FLASK|PYTHON)"
+
+# Estrutura do banco em produção
+docker exec <container_name> psql $DATABASE_URL -c "\dt"
+docker exec <container_name> psql $DATABASE_URL -c "\d usuario"
+docker exec <container_name> psql $DATABASE_URL -c "\d servico"
+
+# Arquivos no container
+docker exec <container_name> ls -la /app/
+docker exec <container_name> find /app -name "*.py" | head -10
+```
+
+## 📊 COMPARAÇÃO NECESSÁRIA
+
+### **Crie uma tabela comparativa:**
+
+| Aspecto | Desenvolvimento | Produção | Diferença |
+|---------|----------------|----------|-----------|
+| Python Version | ? | ? | ? |
+| PostgreSQL Version | ? | ? | ? |
+| DATABASE_URL | ? | ? | ? |
+| Flask Version | ? | ? | ? |
+| SQLAlchemy Version | ? | ? | ? |
+| Migrações Aplicadas | ? | ? | ? |
+| Estrutura Tabela Usuario | ? | ? | ? |
+| Estrutura Tabela Servico | ? | ? | ? |
+| Enum TipoUsuario | ? | ? | ? |
+| Variáveis de Ambiente | ? | ? | ? |
+
+## 🎯 RESULTADO ESPERADO
+
+Com todos esses documentos, poderei:
+
+1. **Identificar Diferenças Exatas** entre dev e prod
+2. **Criar Script de Deploy Robusto** que funcione em ambos
+3. **Corrigir Inconsistências** de configuração
+4. **Estabelecer Processo Confiável** de deploy
+5. **Prevenir Problemas Futuros** com checklist validado
+
+## 📋 PRIORIDADE DE ENTREGA
+
+### **CRÍTICO (enviar primeiro):**
+- Dockerfile atual
+- Logs de erro completos
+- Estrutura das tabelas em prod vs dev
+- Variáveis de ambiente do EasyPanel
+
+### **IMPORTANTE (enviar em seguida):**
+- models.py completo
+- migrations/ completa
+- pyproject.toml
+- Scripts de entrypoint
+
+### **COMPLEMENTAR (enviar por último):**
+- Logs históricos
+- Documentação
+- Scripts auxiliares
+
+---
+
+**🚨 IMPORTANTE**: Quanto mais documentos você fornecer, mais preciso será o diagnóstico e mais robusta será a solução final. Não hesite em incluir arquivos que pareçam irrelevantes - eles podem conter a chave para resolver o problema!
