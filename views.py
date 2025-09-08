@@ -2546,7 +2546,7 @@ def api_funcionarios_consolidada():
                 })
                 continue
         
-        # Retorno adaptado ao formato
+        # Retorno adaptado ao formato - SEMPRE COM SUCCESS
         if formato_retorno == 'mobile':
             return jsonify({
                 'success': True,
@@ -2554,7 +2554,12 @@ def api_funcionarios_consolidada():
                 'total': len(funcionarios_json)
             })
         else:
-            return jsonify(funcionarios_json)
+            # ✅ CORREÇÃO: Frontend espera formato com success
+            return jsonify({
+                'success': True,
+                'funcionarios': funcionarios_json,
+                'total': len(funcionarios_json)
+            })
         
     except Exception as e:
         print(f"ERRO API FUNCIONÁRIOS CONSOLIDADA: {str(e)}")
@@ -2568,7 +2573,12 @@ def api_funcionarios_consolidada():
                 'funcionarios': []
             }), 500
         else:
-            return jsonify([]), 500
+            # ✅ CORREÇÃO: Retornar erro padronizado também para admin
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'funcionarios': []
+            }), 500
 
 def get_admin_id_dinamico():
     """Função helper para detectar admin_id dinamicamente no sistema multi-tenant"""
