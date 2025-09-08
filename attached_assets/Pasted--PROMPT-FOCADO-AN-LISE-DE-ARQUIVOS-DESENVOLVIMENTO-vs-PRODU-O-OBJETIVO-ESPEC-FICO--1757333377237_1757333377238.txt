@@ -1,0 +1,220 @@
+# 🔍 PROMPT FOCADO: ANÁLISE DE ARQUIVOS - DESENVOLVIMENTO vs PRODUÇÃO
+
+## 🎯 OBJETIVO ESPECÍFICO
+Comparar e identificar diferenças críticas entre os arquivos do desenvolvimento (Replit) e produção (GitHub/EasyPanel) que estão causando o descompasso funcional no SIGE v10.0.
+
+## 📁 ARQUIVOS CRÍTICOS PARA ANÁLISE
+
+### 1. ARQUIVOS DE CONFIGURAÇÃO PRINCIPAL
+
+#### 1.1 `app.py` - Aplicação Principal
+**Analisar:**
+- Versão do sistema (v10.0 Digital Mastery)
+- Blueprints registrados (18 módulos)
+- Configurações de observabilidade
+- Variáveis de ambiente
+- Configuração multi-tenant (admin_id)
+
+**Comparar especificamente:**
+```python
+# Desenvolvimento vs Produção
+app.config['DIGITAL_MASTERY_MODE'] = True
+app.config['OBSERVABILITY_ENABLED'] = True
+# Blueprints registrados
+app.register_blueprint(rdo_bp)
+app.register_blueprint(propostas_bp)
+# etc...
+```
+
+#### 1.2 `models.py` - Estrutura do Banco
+**Analisar:**
+- 93 tabelas consolidadas
+- Campos admin_id em todas as tabelas críticas
+- Relacionamentos entre tabelas
+- Novos campos adicionados na v10.0
+
+**Focar em:**
+```python
+class RDO(db.Model):
+    # Campos específicos da v10.0
+    admin_id = db.Column(db.Integer, nullable=False)
+    # Novos campos para Digital Mastery
+```
+
+### 2. SISTEMA RDO (CRÍTICO)
+
+#### 2.1 Blueprint RDO
+**Arquivos a comparar:**
+- `blueprints/rdo.py` ou arquivo equivalente
+- Rotas de RDO (/rdo/*, /api/rdo/*)
+- Lógica de descoberta automática de serviços
+- Processamento das 16 subatividades
+
+**Analisar especificamente:**
+```python
+# Descoberta automática de serviços
+def descobrir_servico_automatico():
+    # COBERTURA METÁLICA - ID: 139
+    
+# Processamento de subatividades
+def processar_subatividades():
+    # 16 subatividades com nomes reais
+```
+
+#### 2.2 Templates RDO
+**Arquivos a comparar:**
+- `templates/rdo/` - Todos os templates
+- `templates/base_completo.html` - Template base modernizado
+- CSS/JS específicos do RDO
+- Interface Digital Mastery vs interface antiga
+
+**Verificar:**
+- Design responsivo implementado
+- Cards elegantes vs listas simples
+- Gradientes e animações suaves
+- Formulários de subatividades
+
+### 3. ARQUIVOS DE DEPLOY
+
+#### 3.1 `Dockerfile`
+**Comparar linha por linha:**
+```dockerfile
+# Desenvolvimento vs Produção
+FROM python:3.11-slim-bookworm
+LABEL version="10.0" architecture="Digital Mastery"
+ENV FLASK_ENV=production
+ENV DIGITAL_MASTERY_MODE=true
+ENV OBSERVABILITY_ENABLED=true
+ENV GUNICORN_WORKERS=4
+HEALTHCHECK --interval=30s --timeout=15s CMD curl -f http://localhost:5000/health
+ENTRYPOINT ["/app/docker-entrypoint-digital-mastery.sh"]
+```
+
+#### 3.2 `docker-entrypoint-digital-mastery.sh`
+**Verificar:**
+- Permissões de execução (chmod +x)
+- Comandos de inicialização
+- Configurações de produção
+- Migrações (devem estar desabilitadas)
+
+#### 3.3 `pyproject.toml`
+**Comparar dependências:**
+```toml
+[tool.poetry.dependencies]
+python = "^3.11"
+flask = "3.1.1"
+sqlalchemy = "2.0.41"
+# Todas as 36 dependências
+```
+
+### 4. BLUEPRINTS E MÓDULOS
+
+#### 4.1 Blueprints Registrados (18 módulos)
+**Verificar se todos estão presentes:**
+- folha_pagamento
+- contabilidade  
+- templates
+- alimentação
+- propostas
+- api_organizer
+- categorias_servicos
+- configurações
+- api_servicos_obra_limpa
+- rdo (crítico)
+- funcionarios
+- almoxarifado
+- relatorios
+- etc.
+
+#### 4.2 Utilitários de Resiliência
+**Arquivos a comparar:**
+- `utils/idempotency.py`
+- `utils/circuit_breaker.py`
+- `utils/saga.py`
+- Implementação dos padrões Joris Kuypers
+
+### 5. TEMPLATES E FRONTEND
+
+#### 5.1 Template Base
+**Arquivo crítico:** `templates/base_completo.html`
+**Verificar:**
+- Bootstrap atualizado
+- Meta tags PWA
+- CSS personalizado
+- JavaScript moderno
+- Responsividade mobile
+
+#### 5.2 Templates Específicos
+**Comparar:**
+- `templates/dashboard/` - Dashboard modernizado
+- `templates/funcionarios/` - Interface de RH
+- `templates/propostas/` - Sistema comercial
+- `templates/rdo/` - Interface RDO (CRÍTICO)
+
+### 6. ARQUIVOS DE CONFIGURAÇÃO
+
+#### 6.1 Configurações de Produção
+**Verificar:**
+- Configurações de banco PostgreSQL
+- Variáveis de ambiente
+- Configurações de segurança
+- SSL e CORS
+
+#### 6.2 Health Checks e Observabilidade
+**Arquivos:**
+- Rotas `/health`
+- `/debug/mastery-dashboard`
+- Logs estruturados
+- Métricas de monitoramento
+
+## 🔍 METODOLOGIA DE COMPARAÇÃO
+
+### Para cada arquivo identificado:
+
+1. **DESENVOLVIMENTO (Replit):**
+   - Extrair conteúdo atual
+   - Identificar versão/timestamp
+   - Listar funcionalidades implementadas
+
+2. **PRODUÇÃO (GitHub):**
+   - Verificar conteúdo no repositório
+   - Comparar com desenvolvimento
+   - Identificar diferenças críticas
+
+3. **ANÁLISE DE IMPACTO:**
+   - Quais diferenças causam o problema RDO?
+   - Quais afetam a interface?
+   - Quais impedem funcionalidades?
+
+## 📋 FORMATO DE RESPOSTA ESPERADO
+
+Para cada arquivo analisado:
+
+```
+📁 ARQUIVO: nome_do_arquivo.py
+🔍 STATUS: [SINCRONIZADO/DESSINCRONIZADO/AUSENTE]
+⚠️ DIFERENÇAS CRÍTICAS:
+   - Linha X: função Y ausente em produção
+   - Linha Z: configuração W diferente
+🎯 IMPACTO: Como afeta o funcionamento
+🔧 CORREÇÃO: O que precisa ser atualizado
+```
+
+## 🚨 PRIORIDADE DE ANÁLISE
+
+1. **CRÍTICO:** Arquivos RDO (blueprint, templates, lógica)
+2. **ALTO:** app.py, models.py, Dockerfile
+3. **MÉDIO:** Templates base, utilitários
+4. **BAIXO:** Documentação, arquivos auxiliares
+
+## 🎯 RESULTADO FINAL ESPERADO
+
+**Lista completa de arquivos que precisam ser sincronizados entre desenvolvimento e produção, com:**
+- Identificação exata das diferenças
+- Impacto de cada diferença no funcionamento
+- Ordem de prioridade para correção
+- Arquivos que podem ser copiados diretamente
+- Arquivos que precisam de merge cuidadoso
+
+**FOCO:** Resolver especificamente por que o RDO não funciona em produção e por que a interface está antiga, através da análise precisa dos arquivos.
+
