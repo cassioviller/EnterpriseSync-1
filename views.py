@@ -5892,8 +5892,25 @@ def api_rdo_ultima_dados(obra_id):
             
             # Adicionar subatividade ao serviço
             if servico_id in servicos_agrupados:
+                # CORREÇÃO CRÍTICA: Buscar ID correto da subatividade_mestre
+                subatividade_mestre_id = sub.id  # Fallback para o ID atual
+                try:
+                    # Buscar o ID correto na tabela subatividade_mestre pelo nome e serviço
+                    subatividade_mestre = db.session.query(SubatividadeMestre).filter_by(
+                        nome=sub.nome_subatividade,
+                        servico_id=servico_id
+                    ).first()
+                    
+                    if subatividade_mestre:
+                        subatividade_mestre_id = subatividade_mestre.id
+                        print(f"✅ API CORRIGIDA: {sub.nome_subatividade} -> ID correto {subatividade_mestre_id}")
+                    else:
+                        print(f"⚠️ API: Subatividade '{sub.nome_subatividade}' não encontrada na tabela mestre")
+                except Exception as e:
+                    print(f"❌ API: Erro ao buscar ID da subatividade mestre: {e}")
+                
                 servicos_agrupados[servico_id]['subatividades'].append({
-                    'id': sub.id,
+                    'id': subatividade_mestre_id,  # ✅ ID correto da subatividade_mestre
                     'nome': sub.nome_subatividade,
                     'percentual': float(sub.percentual_conclusao or 0),
                     'observacoes': sub.observacoes_tecnicas or ''
