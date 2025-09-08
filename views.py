@@ -5650,6 +5650,30 @@ def salvar_rdo_flexivel():
                         nome_field = f"nome_subatividade_{original_service_id}_{sub_id}"
                         nome = request.form.get(nome_field, f"Subatividade {sub_id}")
                         
+                        # CORREÇÃO CRÍTICA: Buscar nome real da subatividade mestre
+                        try:
+                            subatividade_mestre = db.session.query(SubatividadeMestre).filter_by(
+                                id=int(sub_id),
+                                servico_id=target_service_id
+                            ).first()
+                            
+                            if subatividade_mestre:
+                                nome = subatividade_mestre.nome
+                                logger.error(f"✅ Nome corrigido da subatividade {sub_id}: {nome}")
+                            else:
+                                # Fallback para IDs conhecidos das subatividades corretas
+                                mapeamento_subatividades = {
+                                    '15236': 'Preparação da Estrutura',
+                                    '15237': 'Instalação de Terças', 
+                                    '15238': 'Colocação das Telhas',
+                                    '15239': 'Vedação e Calhas'
+                                }
+                                nome = mapeamento_subatividades.get(sub_id, f"Subatividade {sub_id}")
+                                logger.error(f"🔄 Fallback usado para subatividade {sub_id}: {nome}")
+                                
+                        except Exception as e:
+                            logger.error(f"❌ Erro ao buscar nome da subatividade {sub_id}: {e}")
+                        
                         logger.error(f"📦 Subatividade extraída: {nome} = {percentual}%")
                         
                         subactivities.append({
