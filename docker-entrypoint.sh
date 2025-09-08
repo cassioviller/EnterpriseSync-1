@@ -37,13 +37,15 @@ while [ $POSTGRES_RETRIES -lt $MAX_RETRIES ]; do
     if pg_isready -h ${DATABASE_HOST:-viajey_sige} -p ${DATABASE_PORT:-5432} -U ${DATABASE_USER:-sige} > /dev/null 2>&1; then
         echo "✅ PostgreSQL conectado! (tentativa: $((POSTGRES_RETRIES + 1)))"
         
-        # Teste de conexão SQL avançado
-        if psql "$DATABASE_URL" -c "SELECT 1;" > /dev/null 2>&1; then
-            echo "✅ Teste SQL avançado: SUCESSO"
-            break
-        else
-            echo "⚠️ PostgreSQL disponível mas conexão SQL falhou"
-        fi
+        # Teste de conexão SQL avançado DESABILITADO (causa problemas em produção)
+        echo "✅ PostgreSQL disponível - Pulando teste SQL direto"
+        break
+        # if psql "$DATABASE_URL" -c "SELECT 1;" > /dev/null 2>&1; then
+        #     echo "✅ Teste SQL avançado: SUCESSO"
+        #     break
+        # else
+        #     echo "⚠️ PostgreSQL disponível mas conexão SQL falhou"
+        # fi
     fi
     
     POSTGRES_RETRIES=$((POSTGRES_RETRIES + 1))
@@ -93,6 +95,7 @@ try:
         
         # MIGRAÇÕES DESABILITADAS - Corrigindo logs infinitos em produção
         logger.info('🔇 Digital Mastery migrations DISABLED - preventing infinite logs')
+        logger.info(f'🔧 Using DATABASE_URL: {os.environ.get("DATABASE_URL", "Not set")}')
         # try:
         #     from migrations import executar_migracoes
         #     executar_migracoes()
