@@ -605,7 +605,8 @@ function carregarDadosUltimoRDO() {
                 } else if (data.ultima_rdo) {
                     const rdo_num = data.ultima_rdo.numero_rdo;
                     console.log(`🔄 [RDO_EXISTENTE:${operation_id}] rdo=${rdo_num} estado=LOADED`);
-                    exibirDadosUltimoRDOMaestria(data.ultima_rdo, data.metadata);
+                    // Usar sempre a versão moderna unificada
+                    exibirDadosPrimeiraRDOMaestria(data.ultima_rdo, data.metadata);
                 } else {
                     console.log(`ℹ️ [SEM_DADOS:${operation_id}] estado=EMPTY`);
                     exibirMensagemSemRDOAnterior();
@@ -762,28 +763,23 @@ function exibirDadosPrimeiraRDOMaestria(primeiraRDO, metadata) {
             </div>
         `;
         
-        // === PROCESSAMENTO DE SERVIÇOS ===
-        if (primeiraRDO && primeiraRDO.servicos && primeiraRDO.servicos.length > 0) {
-            console.log(`📊 [RENDER:${operation_id}] rendering_services count=${primeiraRDO.servicos.length}`);
-            
-            // Estatísticas dos serviços
-            const totalSubatividades = primeiraRDO.servicos.reduce((acc, s) => acc + (s.subatividades?.length || 0), 0);
-            
-            html += `
-                <div class="row mb-4">
-                    <div class="col-md-8">
-                        <h6 class="text-success mb-0">
-                            <i class="fas fa-tasks me-2"></i>Serviços da Obra
-                        </h6>
-                        <small class="text-muted">${primeiraRDO.servicos.length} serviços • ${totalSubatividades} subatividades</small>
-                    </div>
-                    <div class="col-md-4 text-end">
-                        <div class="badge bg-success-subtle text-success px-3 py-2">
-                            <i class="fas fa-check-circle me-1"></i>Prontos para execução
-                        </div>
-                    </div>
-                </div>
-            `;
+        // INTERFACE SIMPLIFICADA - NÃO GERAR CARDS
+        html += `
+            <div class="alert alert-info mt-4">
+                <h6><i class="fas fa-info-circle me-2"></i>Próximos Passos:</h6>
+                <ol class="mb-0">
+                    <li>Selecione os funcionários na seção "Mão de Obra"</li>
+                    <li>Preencha as observações gerais</li>
+                    <li>Clique em "Finalizar RDO" para salvar</li>
+                </ol>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        console.log(`✅ [RENDER:${operation_id}] interface_simplificada_concluida`);
+        return;
+        
+        if (false) { // BLOCO DESATIVADO - NÃO GERAR CARDS
             
             // === RENDERIZAÇÃO DE SERVIÇOS COM DESIGN MODERNO ===
             primeiraRDO.servicos.forEach((servico, index) => {
