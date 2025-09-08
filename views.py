@@ -5648,7 +5648,7 @@ def salvar_rdo_flexivel():
                         obs_field = f"subatividade_{original_service_id}_{sub_id}_observacoes"
                         observacoes = request.form.get(obs_field, "")
                         nome_field = f"nome_subatividade_{original_service_id}_{sub_id}"
-                        nome = request.form.get(nome_field, f"Subatividade {sub_id}")
+                        nome = request.form.get(nome_field, "")
                         
                         # CORREÇÃO CRÍTICA: Buscar nome real da subatividade mestre
                         try:
@@ -5686,21 +5686,28 @@ def salvar_rdo_flexivel():
                                     '15238': 'Colocação das Telhas',
                                     '15239': 'Vedação e Calhas'
                                 }
-                                nome = mapeamento_completo.get(sub_id, f"Subatividade {sub_id}")
-                                logger.error(f"🔄 Mapeamento COMPLETO usado para subatividade {sub_id}: {nome}")
+                                if sub_id in mapeamento_completo:
+                                    nome = mapeamento_completo[sub_id]
+                                    logger.error(f"🔄 Mapeamento COMPLETO usado para subatividade {sub_id}: {nome}")
+                                else:
+                                    logger.error(f"❌ IGNORANDO: Subatividade {sub_id} não está no mapeamento - NÃO será salva")
+                                    continue  # Pula esta subatividade
                                 
                         except Exception as e:
                             logger.error(f"❌ Erro ao buscar nome da subatividade {sub_id}: {e}")
                         
-                        logger.error(f"📦 Subatividade extraída: {nome} = {percentual}%")
-                        
-                        subactivities.append({
-                            'original_service_id': original_service_id,
-                            'sub_id': sub_id,
-                            'nome': nome,
-                            'percentual': percentual,
-                            'observacoes': observacoes
-                        })
+                        # Só adiciona se tem nome válido
+                        if nome and nome.strip():
+                            logger.error(f"📦 Subatividade extraída: {nome} = {percentual}%")
+                            subactivities.append({
+                                'original_service_id': original_service_id,
+                                'sub_id': sub_id,
+                                'nome': nome,
+                                'percentual': percentual,
+                                'observacoes': observacoes
+                            })
+                        else:
+                            logger.error(f"❌ REJEITANDO subatividade {sub_id}: nome vazio ou inválido")
                     else:
                         logger.error(f"❌ Campo {field_name} não tem formato esperado: parts={parts}")
                         
@@ -5726,7 +5733,7 @@ def salvar_rdo_flexivel():
                             percentual = float(field_value) if field_value else 0.0
                             
                             # CORREÇÃO CRÍTICA FALLBACK: Buscar nome real da subatividade mestre
-                            nome = f"Subatividade {sub_id}"  # Valor padrão
+                            nome = ""  # Não definir valor padrão genérico
                             
                             try:
                                 subatividade_mestre = db.session.query(SubatividadeMestre).filter_by(
@@ -5766,8 +5773,12 @@ def salvar_rdo_flexivel():
                                         '442': 'Colocação das Telhas', 
                                         '443': 'Vedação e Calhas'
                                     }
-                                    nome = mapeamento_producao.get(sub_id, f"Subatividade {sub_id}")
-                                    logger.info(f"🔄 FALLBACK: Mapeamento PRODUÇÃO usado para subatividade {sub_id}: {nome}")
+                                    if sub_id in mapeamento_producao:
+                                        nome = mapeamento_producao[sub_id]
+                                        logger.info(f"🔄 FALLBACK: Mapeamento PRODUÇÃO usado para subatividade {sub_id}: {nome}")
+                                    else:
+                                        logger.warning(f"⚠️ IGNORANDO: Subatividade {sub_id} não encontrada no mapeamento - NÃO será salva")
+                                        continue  # Pula esta subatividade
                                     
                             except Exception as e:
                                 logger.error(f"❌ FALLBACK: Erro ao buscar nome da subatividade {sub_id}: {e}")
@@ -5790,16 +5801,25 @@ def salvar_rdo_flexivel():
                                     '164': '15. Documentação técnica',
                                     '165': '16. Entrega e aceitação'
                                 }
-                                nome = mapeamento_emergencia.get(sub_id, f"Subatividade {sub_id}")
+                                if sub_id in mapeamento_emergencia:
+                                    nome = mapeamento_emergencia[sub_id]
+                                    logger.error(f"🔧 EMERGÊNCIA: Usando mapeamento para subatividade {sub_id}: {nome}")
+                                else:
+                                    logger.error(f"❌ REJEITANDO: Subatividade {sub_id} não encontrada - NÃO será salva")
+                                    continue  # Pula esta subatividade
                             
-                            subactivities.append({
-                                'original_service_id': target_service_id,
-                                'sub_id': sub_id,
-                                'nome': nome,
-                                'percentual': percentual,
-                                'observacoes': ""
-                            })
-                            logger.info(f"✅ Subatividade alternativa: {nome} = {percentual}%")
+                            # Só adiciona se encontrou nome válido
+                            if nome and nome.strip():
+                                subactivities.append({
+                                    'original_service_id': target_service_id,
+                                    'sub_id': sub_id,
+                                    'nome': nome,
+                                    'percentual': percentual,
+                                    'observacoes': ""
+                                })
+                                logger.info(f"✅ Subatividade alternativa: {nome} = {percentual}%")
+                            else:
+                                logger.error(f"❌ REJEITANDO subatividade {sub_id} no fallback: nome vazio")
                     except:
                         continue
         
