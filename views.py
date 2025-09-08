@@ -3519,8 +3519,13 @@ def visualizar_rdo(id):
                         
                         # Criar apenas subatividades que não foram executadas
                         for nome_sub in subatividades_especificas:
+                            # VERIFICAÇÃO ROBUSTA PARA EVITAR DUPLICAÇÃO
                             ja_executada = any(
-                                sub.nome_subatividade == nome_sub for sub in subatividades 
+                                (
+                                    sub.nome_subatividade == nome_sub or
+                                    sub.nome_subatividade.lower().strip() == nome_sub.lower().strip()
+                                )
+                                for sub in subatividades 
                                 if sub.servico_id == servico.id
                             )
                             
@@ -3538,8 +3543,14 @@ def visualizar_rdo(id):
                     else:
                         # Usar subatividades do cadastro, mas filtradas
                         for sub_mestre in subatividades_mestre:
+                            # VERIFICAÇÃO ROBUSTA PARA EVITAR DUPLICAÇÃO
                             ja_executada = any(
-                                sub.nome_subatividade == sub_mestre.nome for sub in subatividades 
+                                (
+                                    sub.nome_subatividade == sub_mestre.nome or
+                                    sub.nome_subatividade.lower().strip() == sub_mestre.nome.lower().strip() or
+                                    (hasattr(sub, 'subatividade_id') and sub.subatividade_id == sub_mestre.id)
+                                )
+                                for sub in subatividades 
                                 if sub.servico_id == servico.id
                             )
                             
