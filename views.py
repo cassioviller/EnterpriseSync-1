@@ -2255,6 +2255,172 @@ def super_admin_dashboard():
                          admins=admins, 
                          total_admins=total_admins)
 
+# ===== DIGITAL MASTERY v10.0 - SISTEMA RDO COMPLETAMENTE NOVO =====
+@main_bp.route('/obra/relatorio/digital')
+@login_required
+def relatorio_digital_novo():
+    """Nova interface RDO Digital Mastery v10.0 - Completamente limpa"""
+    from models import RelatorioObraDigital
+    
+    try:
+        # Sistema robusto de detecção de admin_id
+        admin_id = None
+        if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+            elif hasattr(current_user, 'admin_id'):
+                admin_id = current_user.admin_id
+            else:
+                admin_id = 1  # Fallback
+        else:
+            admin_id = 1  # Fallback para desenvolvimento
+        
+        # Buscar obras do admin
+        obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+        
+        # Data de hoje para o formulário
+        data_hoje = date.today().strftime('%Y-%m-%d')
+        
+        print(f"✅ [DIGITAL_MASTERY_v10] Interface carregada - admin_id={admin_id}, obras={len(obras)}")
+        
+        return render_template('obra/relatorio_digital.html', 
+                             obras=obras,
+                             data_hoje=data_hoje,
+                             admin_id=admin_id)
+                             
+    except Exception as e:
+        print(f"❌ [DIGITAL_MASTERY_v10] Erro: {str(e)}")
+        flash('Erro ao carregar interface digital - tente novamente', 'error')
+        return redirect(url_for('main.dashboard'))
+
+@main_bp.route('/obra/relatorio/processar', methods=['POST'])
+@login_required 
+def processar_relatorio_digital():
+    """Processar formulário do Relatório Digital v10.0"""
+    from models import RelatorioObraDigital
+    
+    try:
+        # Obter dados do formulário
+        obra_id = request.form.get('obra_id')
+        data_relatorio_str = request.form.get('data_relatorio')
+        condicoes_climaticas = request.form.get('condicoes_climaticas')
+        local_obra = request.form.get('local_obra')
+        observacoes_gerais = request.form.get('observacoes_gerais')
+        
+        # Validações básicas
+        if not obra_id:
+            flash('Selecione uma obra', 'error')
+            return redirect(url_for('main.relatorio_digital_novo'))
+        
+        if not data_relatorio_str:
+            flash('Informe a data do relatório', 'error')
+            return redirect(url_for('main.relatorio_digital_novo'))
+        
+        # Converter data
+        data_relatorio = datetime.strptime(data_relatorio_str, '%Y-%m-%d').date()
+        
+        # Sistema robusto de admin_id
+        admin_id = None
+        if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+            elif hasattr(current_user, 'admin_id'):
+                admin_id = current_user.admin_id
+            else:
+                admin_id = 1
+        else:
+            admin_id = 1
+        
+        # Verificar se já existe relatório para esta obra/data
+        relatorio_existente = RelatorioObraDigital.query.filter_by(
+            obra_id=obra_id,
+            data_relatorio=data_relatorio,
+            admin_id=admin_id
+        ).first()
+        
+        if relatorio_existente:
+            flash(f'Já existe um relatório digital para esta obra em {data_relatorio_str}', 'warning')
+            return redirect(url_for('main.relatorio_digital_novo'))
+        
+        # Criar novo relatório digital
+        novo_relatorio = RelatorioObraDigital(
+            admin_id=admin_id,
+            obra_id=int(obra_id),
+            criado_por_id=current_user.id,
+            data_relatorio=data_relatorio,
+            condicoes_climaticas=condicoes_climaticas,
+            local_obra=local_obra,
+            observacoes_gerais=observacoes_gerais
+        )
+        
+        # Gerar número único
+        novo_relatorio.gerar_numero_relatorio()
+        
+        # Salvar no banco
+        db.session.add(novo_relatorio)
+        db.session.commit()
+        
+        print(f"✅ [DIGITAL_MASTERY_v10] Relatório {novo_relatorio.numero_relatorio} salvo com sucesso")
+        
+        # Resposta JSON se AJAX
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'status': 'success',
+                'message': f'Relatório Digital {novo_relatorio.numero_relatorio} salvo com sucesso!',
+                'redirect': url_for('main.listar_relatorios_digitais')
+            })
+        
+        flash(f'Relatório Digital {novo_relatorio.numero_relatorio} criado com sucesso!', 'success')
+        return redirect(url_for('main.listar_relatorios_digitais'))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ [DIGITAL_MASTERY_v10] Erro ao processar: {str(e)}")
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'status': 'error',
+                'message': f'Erro ao salvar relatório: {str(e)}'
+            })
+        
+        flash(f'Erro ao salvar relatório: {str(e)}', 'error')
+        return redirect(url_for('main.relatorio_digital_novo'))
+
+@main_bp.route('/obra/relatorios/digitais')
+@login_required
+def listar_relatorios_digitais():
+    """Listar todos os Relatórios Digitais v10.0"""
+    from models import RelatorioObraDigital
+    
+    try:
+        # Sistema robusto de admin_id
+        admin_id = None
+        if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+            elif hasattr(current_user, 'admin_id'):
+                admin_id = current_user.admin_id
+            else:
+                admin_id = 1
+        else:
+            admin_id = 1
+        
+        # Buscar relatórios digitais
+        relatorios = RelatorioObraDigital.query.filter_by(
+            admin_id=admin_id
+        ).join(Obra).order_by(RelatorioObraDigital.data_relatorio.desc()).all()
+        
+        print(f"✅ [DIGITAL_MASTERY_v10] Listando {len(relatorios)} relatórios digitais")
+        
+        return render_template('obra/relatorios_digitais_lista.html', 
+                             relatorios=relatorios,
+                             total_relatorios=len(relatorios))
+                             
+    except Exception as e:
+        print(f"❌ [DIGITAL_MASTERY_v10] Erro na listagem: {str(e)}")
+        flash('Erro ao carregar relatórios digitais', 'error')
+        return redirect(url_for('main.dashboard'))
+
 # ===== FUNCIONÁRIO DASHBOARD =====
 @main_bp.route('/funcionario-dashboard')
 @funcionario_required
