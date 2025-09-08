@@ -5661,15 +5661,33 @@ def salvar_rdo_flexivel():
                                 nome = subatividade_mestre.nome
                                 logger.error(f"✅ Nome corrigido da subatividade {sub_id}: {nome}")
                             else:
-                                # Fallback para IDs conhecidos das subatividades corretas
-                                mapeamento_subatividades = {
+                                # MAPEAMENTO COMPLETO PRODUÇÃO + DESENVOLVIMENTO
+                                mapeamento_completo = {
+                                    # PRODUÇÃO - Cobertura Metálica (IDs 150-165)
+                                    '150': '1. Detalhamento do projeto',
+                                    '151': '2. Seleção de materiais', 
+                                    '152': '3. Traçagem',
+                                    '153': '4. Corte mecânico',
+                                    '154': '5. Furação',
+                                    '155': '6. Montagem e soldagem',
+                                    '156': '7. Acabamento e pintura', 
+                                    '157': '8. Identificação e logística',
+                                    '158': '9. Planejamento de montagem',
+                                    '159': '10. Preparação do local',
+                                    '160': '11. Transporte para obra',
+                                    '161': '12. Posicionamento e alinhamento',
+                                    '162': '13. Fixação definitiva',
+                                    '163': '14. Inspeção e controle de qualidade',
+                                    '164': '15. Documentação técnica',
+                                    '165': '16. Entrega e aceitação',
+                                    # DESENVOLVIMENTO - Cobertura (IDs originais)
                                     '15236': 'Preparação da Estrutura',
                                     '15237': 'Instalação de Terças', 
                                     '15238': 'Colocação das Telhas',
                                     '15239': 'Vedação e Calhas'
                                 }
-                                nome = mapeamento_subatividades.get(sub_id, f"Subatividade {sub_id}")
-                                logger.error(f"🔄 Fallback usado para subatividade {sub_id}: {nome}")
+                                nome = mapeamento_completo.get(sub_id, f"Subatividade {sub_id}")
+                                logger.error(f"🔄 Mapeamento COMPLETO usado para subatividade {sub_id}: {nome}")
                                 
                         except Exception as e:
                             logger.error(f"❌ Erro ao buscar nome da subatividade {sub_id}: {e}")
@@ -5720,30 +5738,59 @@ def salvar_rdo_flexivel():
                                     nome = subatividade_mestre.nome
                                     logger.info(f"✅ FALLBACK: Nome corrigido da subatividade {sub_id}: {nome}")
                                 else:
-                                    # Mapeamento fixo para IDs conhecidos da cobertura
-                                    mapeamento_cobertura = {
+                                    # MAPEAMENTO COMPLETO PRODUÇÃO (IDs 150-165) - COBERTURA METÁLICA
+                                    mapeamento_producao = {
+                                        '150': '1. Detalhamento do projeto',
+                                        '151': '2. Seleção de materiais', 
+                                        '152': '3. Traçagem',
+                                        '153': '4. Corte mecânico',
+                                        '154': '5. Furação',
+                                        '155': '6. Montagem e soldagem',
+                                        '156': '7. Acabamento e pintura', 
+                                        '157': '8. Identificação e logística',
+                                        '158': '9. Planejamento de montagem',
+                                        '159': '10. Preparação do local',
+                                        '160': '11. Transporte para obra',
+                                        '161': '12. Posicionamento e alinhamento',
+                                        '162': '13. Fixação definitiva',
+                                        '163': '14. Inspeção e controle de qualidade',
+                                        '164': '15. Documentação técnica',
+                                        '165': '16. Entrega e aceitação',
+                                        # Desenvolvimento (IDs originais)
                                         '15236': 'Preparação da Estrutura',
                                         '15237': 'Instalação de Terças', 
                                         '15238': 'Colocação das Telhas',
                                         '15239': 'Vedação e Calhas',
-                                        '440': 'Preparação da Estrutura',  # IDs usados no RDO
+                                        '440': 'Preparação da Estrutura',  
                                         '441': 'Instalação de Terças',
                                         '442': 'Colocação das Telhas', 
                                         '443': 'Vedação e Calhas'
                                     }
-                                    nome = mapeamento_cobertura.get(sub_id, f"Subatividade {sub_id}")
-                                    logger.info(f"🔄 FALLBACK: Mapeamento usado para subatividade {sub_id}: {nome}")
+                                    nome = mapeamento_producao.get(sub_id, f"Subatividade {sub_id}")
+                                    logger.info(f"🔄 FALLBACK: Mapeamento PRODUÇÃO usado para subatividade {sub_id}: {nome}")
                                     
                             except Exception as e:
                                 logger.error(f"❌ FALLBACK: Erro ao buscar nome da subatividade {sub_id}: {e}")
-                                # Mapeamento de emergência
-                                mapeamento_cobertura = {
-                                    '440': 'Preparação da Estrutura',
-                                    '441': 'Instalação de Terças',
-                                    '442': 'Colocação das Telhas', 
-                                    '443': 'Vedação e Calhas'
+                                # Mapeamento de emergência COMPLETO
+                                mapeamento_emergencia = {
+                                    '150': '1. Detalhamento do projeto',
+                                    '151': '2. Seleção de materiais', 
+                                    '152': '3. Traçagem',
+                                    '153': '4. Corte mecânico',
+                                    '154': '5. Furação',
+                                    '155': '6. Montagem e soldagem',
+                                    '156': '7. Acabamento e pintura', 
+                                    '157': '8. Identificação e logística',
+                                    '158': '9. Planejamento de montagem',
+                                    '159': '10. Preparação do local',
+                                    '160': '11. Transporte para obra',
+                                    '161': '12. Posicionamento e alinhamento',
+                                    '162': '13. Fixação definitiva',
+                                    '163': '14. Inspeção e controle de qualidade',
+                                    '164': '15. Documentação técnica',
+                                    '165': '16. Entrega e aceitação'
                                 }
-                                nome = mapeamento_cobertura.get(sub_id, f"Subatividade {sub_id}")
+                                nome = mapeamento_emergencia.get(sub_id, f"Subatividade {sub_id}")
                             
                             subactivities.append({
                                 'original_service_id': target_service_id,
