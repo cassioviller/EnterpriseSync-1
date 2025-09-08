@@ -4453,12 +4453,13 @@ def rdo_salvar_unificado():
         subatividades_processadas = 0
         
         # CORREÇÃO JORIS KUYPERS: Extração robusta de subatividades (Kaipa da primeira vez certo)
-        def extrair_subatividades_formulario_robusto(form_data):
+        def extrair_subatividades_formulario_robusto(form_data, admin_id):
             """Extração robusta com múltiplas estratégias - Joris Kuypers approach"""
             subatividades = []
             
             print(f"🔍 EXTRAÇÃO ROBUSTA - Dados recebidos: {len(form_data)} campos")
-            print(f"🎯 AMBIENTE: {'PRODUÇÃO' if admin_id_correto == 2 else 'DESENVOLVIMENTO'} (admin_id={admin_id_correto})")
+            print(f"🎯 AMBIENTE: {'PRODUÇÃO' if admin_id == 2 else 'DESENVOLVIMENTO'} (admin_id={admin_id})")
+            print(f"👤 USUÁRIO ATUAL: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
             
             # Estratégia 1: Buscar padrões conhecidos
             subatividades_map = {}
@@ -4478,19 +4479,19 @@ def rdo_salvar_unificado():
                                 
                                 # SOLUÇÃO ROBUSTA PARA PRODUÇÃO: Auto-detectar serviço correto
                                 # Aplicar lógica para qualquer admin_id (desenvolvimento E produção)
-                                if admin_id_correto == 50 and 292 <= servico_original_id <= 307:
+                                if admin_id == 50 and 292 <= servico_original_id <= 307:
                                     # FORÇAR COBERTURA METÁLICA (ID: 139) para admin_id=50
                                     servico_id = 139
                                     print(f"🎯 BYPASS DIRETO ADMIN 50: Subatividade {servico_original_id} -> COBERTURA METÁLICA (139)")
-                                elif admin_id_correto == 2:
+                                elif admin_id == 2:
                                     # CORREÇÃO PRODUÇÃO: Buscar primeiro serviço disponível para admin_id=2
-                                    primeiro_servico_producao = Servico.query.filter_by(admin_id=admin_id_correto).first()
+                                    primeiro_servico_producao = Servico.query.filter_by(admin_id=admin_id).first()
                                     if primeiro_servico_producao:
                                         servico_id = primeiro_servico_producao.id
                                         print(f"🎯 PRODUÇÃO ADMIN 2: Usando primeiro serviço disponível ID={servico_id} ({primeiro_servico_producao.nome})")
                                     else:
                                         servico_id = servico_original_id  # Fallback
-                                        print(f"⚠️ PRODUÇÃO: Nenhum serviço encontrado para admin_id=2, usando original {servico_original_id}")
+                                        print(f"⚠️ PRODUÇÃO: Nenhum serviço encontrado para admin_id={admin_id}, usando original {servico_original_id}")
                                 else:
                                     # 1. Priorizar campo oculto do JavaScript (se enviado)
                                     servico_id_correto_js = request.form.get('servico_id_correto')
@@ -4501,7 +4502,7 @@ def rdo_salvar_unificado():
                                         # 2. Fallback: Buscar da última RDO
                                         ultimo_servico_rdo = db.session.query(RDOServicoSubatividade).join(RDO).filter(
                                             RDO.obra_id == obra_id,
-                                            RDO.admin_id == admin_id_correto,
+                                            RDO.admin_id == admin_id,
                                             RDO.id != rdo.id  # Não o RDO atual sendo criado
                                         ).order_by(RDO.data_relatorio.desc()).first()
                                         
@@ -4539,7 +4540,7 @@ def rdo_salvar_unificado():
                                     try:
                                         rdo_anterior_sub = db.session.query(RDOServicoSubatividade).join(RDO).filter(
                                             RDO.obra_id == obra_id,
-                                            RDO.admin_id == admin_id_correto,
+                                            RDO.admin_id == admin_id,
                                             RDO.id != rdo.id,  # Não o RDO atual
                                             RDOServicoSubatividade.nome_subatividade.like(f'%. %')  # Nomes reais (não genéricos)
                                         ).order_by(RDO.data_relatorio.desc()).first()
@@ -4625,7 +4626,7 @@ def rdo_salvar_unificado():
             return subatividades
         
         # Aplicar extração robusta
-        subatividades_extraidas = extrair_subatividades_formulario_robusto(request.form)
+        subatividades_extraidas = extrair_subatividades_formulario_robusto(request.form, admin_id_correto)
         
         # Validação robusta COM FALLBACK PARA PRODUÇÃO
         if not subatividades_extraidas:
