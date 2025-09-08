@@ -323,6 +323,40 @@
     border-color: #28a745 !important;
     box-shadow: 0 2px 8px rgba(40,167,69,0.1) !important;
 }
+
+/* === CSS DIGITAL MASTERY PARA NOVAS CLASSES === */
+.subatividades-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.subatividade-item {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.funcionarios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.funcionario-item {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.funcionario-item:hover {
+    border-color: #198754;
+    box-shadow: 0 2px 8px rgba(25,135,84,0.1);
+}
 </style>
 {% endblock %}
 
@@ -696,7 +730,7 @@ function exibirDadosUltimoRDO(ultimoRDO) {
             
             ultimoRDO.funcionarios.forEach(funcionario => {
                 html += `
-                    <div class="col-md-6 mb-2">
+                    <div class="funcionario-item">
                         <div class="d-flex align-items-center p-3 bg-light rounded">
                             <i class="fas fa-user-hard-hat me-2 text-primary"></i>
                             <div class="flex-grow-1">
@@ -1178,21 +1212,21 @@ function renderizarTemplatePadrao() {
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Armação de Ferro</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_2" value="100" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Concretagem</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_3" value="70" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Cura do Concreto</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_4" value="10" step="0.1" min="0" max="100" form="formNovoRDO">
@@ -1218,29 +1252,29 @@ function renderizarTemplatePadrao() {
                     </div>
                 </div>
                 <div class="servico-body collapse" id="body-manta">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
+                    <div class="subatividades-grid">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Preparação da Superfície</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_5" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Aplicação do Primer</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_6" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Instalação da Manta</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_7" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Acabamento e Vedação</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_8" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
@@ -1266,22 +1300,22 @@ function renderizarTemplatePadrao() {
                     </div>
                 </div>
                 <div class="servico-body collapse" id="body-beiral">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
+                    <div class="subatividades-grid">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Medição e Marcação</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_9" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Corte das Peças</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_10" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="subatividade-item mb-3">
                             <label class="form-label">Fixação dos Suportes</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_11" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
@@ -1434,11 +1468,11 @@ function atualizarListaFuncionarios() {
         <div class="funcionario-item card mb-3">
             <div class="card-body">
                 <div class="row align-items-center">
-                    <div class="col-md-8">
+                    <div class="info-section">
                         <h6 class="mb-1">${f.nome}</h6>
                         <small class="text-muted">${f.funcao} - ${f.departamento}</small>
                     </div>
-                    <div class="col-md-4 text-end">
+                    <div class="action-section text-end">
                         <button class="btn btn-sm btn-outline-danger" onclick="removerFuncionario(${f.id})">
                             <i class="fas fa-times"></i>
                         </button>
@@ -1577,7 +1611,7 @@ function exibirListaFuncionarios(funcionarios) {
         const btnIcon = jaSelecionado ? 'fa-check' : 'fa-plus';
         
         html += `
-            <div class="col-md-6 col-lg-4 mb-3">
+            <div class="funcionario-card mb-3">
                 <div class="card h-100">
                     <div class="card-body">
                         <h6 class="card-title">${func.nome}</h6>
@@ -1675,7 +1709,7 @@ function atualizarListaFuncionarios() {
                         </div>
                         
                         <div class="row">
-                            <div class="col-md-12">
+                            <div class="full-width">
                                 <label class="form-label">Horas Trabalhadas</label>
                                 <input type="number" class="form-control form-control-sm" 
                                        min="0" max="24" step="0.1" 
@@ -1771,7 +1805,7 @@ function renderizarFuncionarios(funcionarios) {
     
     funcionarios.forEach(funcionario => {
         html += `
-            <div class="col-md-6 col-lg-4 mb-3">
+            <div class="funcionario-card mb-3">
                 <div class="funcionario-card">
                     <div class="form-check">
                         <input class="form-check-input" 
@@ -1789,7 +1823,7 @@ function renderizarFuncionarios(funcionarios) {
                     </div>
                     <div class="funcionario-details" id="details_${funcionario.id}" style="display: none;">
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="half-width">
                                 <label class="form-label">Função</label>
                                 <input type="text" 
                                        class="form-control form-control-sm" 
@@ -1797,7 +1831,7 @@ function renderizarFuncionarios(funcionarios) {
                                        value="${funcionario.cargo}"
                                        form="formNovoRDO">
                             </div>
-                            <div class="col-md-6">
+                            <div class="half-width">
                                 <label class="form-label">Horas</label>
                                 <input type="number" 
                                        class="form-control form-control-sm" 
