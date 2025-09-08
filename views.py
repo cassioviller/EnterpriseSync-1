@@ -2421,6 +2421,9 @@ def listar_relatorios_digitais():
         flash('Erro ao carregar relatórios digitais', 'error')
         return redirect(url_for('main.dashboard'))
 
+# ===== API PARA TESTAR ÚLTIMO RDO - CONTINUAÇÃO IMPLEMENTAÇÃO =====
+# Função api_servicos_obra_primeira_rdo já existe na linha ~5656 - removida duplicação
+
 # ===== FUNCIONÁRIO DASHBOARD =====
 @main_bp.route('/funcionario-dashboard')
 @funcionario_required

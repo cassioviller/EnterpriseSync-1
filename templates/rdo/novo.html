@@ -1971,7 +1971,72 @@ function carregarServicosParaPrimeiraRDO(obraId) {
         });
 }
 
-// Função removida - interface antiga substituída por versão moderna
+function exibirServicosParaPrimeiraRDO(servicos) {
+    console.log(`📋 PRIMEIRA RDO: Renderizando ${servicos.length} serviços`);
+    
+    const servicosContainer = document.getElementById('servicos-container');
+    
+    let html = `
+        <div class="alert alert-success mb-4">
+            <i class="fas fa-check-circle"></i>
+            <strong>Primeira RDO da obra!</strong>
+            <br>Encontrados ${servicos.length} serviços disponíveis. Selecione os serviços executados hoje.
+        </div>
+        <div class="row">
+    `;
+    
+    servicos.forEach(servico => {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card h-100 servico-card">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-tools me-2 text-primary"></i>
+                            ${servico.nome}
+                        </h6>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" 
+                                   name="servicos_executados[]" value="${servico.id}" 
+                                   id="servico_${servico.id}">
+                            <label class="form-check-label" for="servico_${servico.id}">
+                                Executado hoje
+                            </label>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Percentual executado:</label>
+                            <input type="number" class="form-control form-control-sm" 
+                                   name="servico_${servico.id}_percentual" 
+                                   min="0" max="100" value="0" step="0.1">
+                        </div>
+                        <small class="text-muted">
+                            ${servico.descricao_tecnica || 'Serviço da obra'}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+        </div>
+        <div class="alert alert-info mt-3">
+            <i class="fas fa-lightbulb"></i>
+            <strong>Dica:</strong> Marque apenas os serviços que foram realmente executados hoje e informe o percentual de conclusão.
+        </div>
+    `;
+    
+    servicosContainer.innerHTML = html;
+    
+    // Adicionar event listeners para os checkboxes
+    document.querySelectorAll('input[name="servicos_executados[]"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const percentualInput = document.querySelector(`input[name="servico_${this.value}_percentual"]`);
+            if (this.checked && percentualInput.value == 0) {
+                percentualInput.value = 10; // Valor padrão quando selecionado
+            }
+        });
+    });
+}
 
 function exibirMensagemSemServicos() {
     const servicosContainer = document.getElementById('servicos-container');
