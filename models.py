@@ -189,6 +189,7 @@ class ServicoObraReal(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
+    servico = db.relationship('Servico', foreign_keys=[servico_id], backref='servicos_obra_real', lazy=True)
     responsavel = db.relationship('Funcionario', foreign_keys=[responsavel_id], backref='servicos_responsavel_real', lazy=True)
     aprovado_por = db.relationship('Funcionario', foreign_keys=[aprovado_por_id], backref='servicos_aprovados_real', lazy=True)
     admin = db.relationship('Usuario', backref='servicos_obra_real_criados', lazy=True)
