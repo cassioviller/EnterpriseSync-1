@@ -1,0 +1,371 @@
+# 🏗️ REUNIÃO DE ANÁLISE DO SIGE v10.0 - SISTEMA MULTIAGENTE
+
+**Data:** Hoje | **Objetivo:** Construir prompt abrangente para análise completa do sistema
+**Participantes:** 15 Especialistas | **Moderador:** David Li (Arquiteto de Sistemas)
+
+---
+
+## 🎯 ABERTURA DA REUNIÃO
+
+**David Li (Arquiteto de Sistemas):** 
+"Pessoal, estamos aqui para analisar o SIGE v10.0 que está em desenvolvimento. Temos um sistema Flask multi-tenant para construção civil com módulos de RDO, propostas comerciais e gestão de funcionários. Cada um de vocês vai contribuir com sua expertise para construirmos um prompt que capture TODOS os aspectos necessários para uma análise completa. Vamos começar?"
+
+---
+
+## 💰 PERSPECTIVA FINANCEIRA
+
+**Ricardo Mendes (Estrategista Financeiro):**
+"David, olhando o sistema, vejo que temos módulos de folha de pagamento e contabilidade, mas preciso entender melhor a estrutura financeira. Para uma análise completa, precisamos saber:
+
+- Como está estruturado o controle de custos por obra?
+- Existe integração entre RDO e apropriação de custos?
+- O sistema calcula margem de contribuição por projeto?
+- Como funciona o fluxo de caixa integrado?
+- Há controle de orçamento vs realizado?"
+
+**Laura Ferreira (Contadora Especializada):**
+"Complementando o Ricardo, do ponto de vista contábil e fiscal:
+
+- Qual o regime tributário configurado no sistema?
+- Como está a estrutura de centros de custo?
+- O sistema gera as obrigações acessórias automaticamente?
+- Há controle de INSS por obra?
+- Como funciona a integração com o eSocial?"
+
+---
+
+## 🏗️ PERSPECTIVA OPERACIONAL
+
+**Carlos Andrade (Mestre de Obras Digital):**
+"Pessoal, o RDO é o coração da operação no canteiro. Preciso entender:
+
+- Como funciona a interface mobile para o canteiro?
+- O sistema permite upload de fotos das atividades?
+- Há controle de produtividade por equipe?
+- Como é feita a medição de serviços?
+- Existe integração com cronograma físico?"
+
+**Ana Schmidt (Engenheira de Planejamento):**
+"Carlos, concordo. E do ponto de vista de planejamento:
+
+- O sistema integra com BIM ou cronogramas externos?
+- Como funciona o controle de avanço físico-financeiro?
+- Há alertas para desvios de prazo ou custo?
+- O sistema suporta metodologias ágeis como Last Planner?
+- Como é feito o controle de recursos e equipamentos?"
+
+---
+
+## 👥 PERSPECTIVA DE RECURSOS HUMANOS
+
+**Roberto Siqueira (Especialista em RH):**
+"Galera, vi que tem gestão de funcionários, mas preciso saber:
+
+- Como funciona o controle de ponto eletrônico?
+- O sistema calcula automaticamente horas extras e adicionais?
+- Há controle de EPIs e treinamentos de segurança?
+- Como é feita a gestão de subempreiteiros?
+- Existe módulo de avaliação de desempenho?"
+
+**Fernando Lima (Gestor de Suprimentos):**
+"Roberto, e do lado de suprimentos:
+
+- O sistema tem módulo de compras integrado?
+- Como funciona o controle de estoque de materiais?
+- Há gestão de fornecedores e contratos?
+- O sistema permite requisições de material por obra?
+- Existe controle de recebimento e qualidade?"
+
+---
+
+## 💼 PERSPECTIVA COMERCIAL
+
+**Mônica Azevedo (Especialista Comercial):**
+"Pessoal, vejo que tem propostas comerciais, mas preciso entender:
+
+- Como funciona o CRM integrado?
+- O sistema gera propostas automáticas com base no orçamento?
+- Há controle de pipeline de vendas?
+- Como é feito o acompanhamento pós-venda?
+- Existe módulo de contratos e aditivos?"
+
+**Gabriel Martins (Analista de CRM e Marketing):**
+"Mônica, complementando:
+
+- O sistema tem integração com leads de marketing digital?
+- Como funciona a automação de follow-up?
+- Há dashboards de conversão e ROI?
+- O sistema permite segmentação de clientes?
+- Existe módulo de campanhas e comunicação?"
+
+---
+
+## ✅ PERSPECTIVA DE QUALIDADE E COMPLIANCE
+
+**Sandra Costa (Especialista em Qualidade):**
+"Galera, qualidade é fundamental:
+
+- O sistema tem módulo de controle de qualidade?
+- Como funciona o registro de não conformidades?
+- Há checklists digitais para inspeções?
+- O sistema gera relatórios de qualidade?
+- Existe controle de certificações e normas?"
+
+**Tiago Alves (Especialista em Compliance):**
+"Sandra, e do lado legal:
+
+- Como o sistema garante conformidade com a legislação?
+- Há controle de licenças e alvarás por obra?
+- O sistema tem auditoria de ações dos usuários?
+- Como funciona a gestão de riscos regulatórios?
+- Existe módulo de documentos legais?"
+
+---
+
+## 💻 PERSPECTIVA TÉCNICA
+
+**Lucas Gomes (Desenvolvedor Backend):**
+"Pessoal, do ponto de vista técnico:
+
+- Como está a arquitetura de microsserviços?
+- O sistema tem testes automatizados?
+- Como funciona a gestão de transações distribuídas?
+- Há monitoramento de performance?
+- O código segue padrões de Clean Code?"
+
+**Sofia Costa (Desenvolvedora Frontend):**
+"Lucas, e da experiência do usuário:
+
+- Como está a responsividade para mobile?
+- O sistema é acessível (a11y)?
+- Há componentes reutilizáveis?
+- Como funciona a navegação entre módulos?
+- O design é consistente em todas as telas?"
+
+**Marina Oliveira (Engenheira DevOps):**
+"Galera, infraestrutura é crítica:
+
+- Como está configurado o CI/CD?
+- O sistema tem monitoramento e alertas?
+- Como funciona o backup e disaster recovery?
+- Há métricas de SLA e disponibilidade?
+- O deploy é automatizado e seguro?"
+
+**Beatriz Lima (Analista de Dados e BI):**
+"Pessoal, dados são o ouro do sistema:
+
+- Como está estruturado o data warehouse?
+- O sistema tem dashboards executivos?
+- Há relatórios preditivos?
+- Como funciona a integração de dados entre módulos?
+- Existe governança de dados implementada?"
+
+---
+
+## 🎯 SÍNTESE E CONSTRUÇÃO DO PROMPT
+
+**David Li (Arquiteto de Sistemas):**
+"Excelente! Com base em todas essas perspectivas, vou consolidar um prompt abrangente que capture todos os aspectos críticos para análise do SIGE v10.0..."
+
+
+
+
+---
+
+## 📋 PROMPT FINAL CONSTRUÍDO PELA EQUIPE
+
+**David Li (Arquiteto de Sistemas):**
+"Com base em todas as contribuições, aqui está o prompt abrangente que construímos juntos:"
+
+---
+
+# 🔍 PROMPT PARA ANÁLISE COMPLETA DO SIGE v10.0
+
+## CONTEXTO GERAL
+Analise o SIGE v10.0 (Sistema Integrado de Gestão Empresarial) - um sistema Flask multi-tenant para construção civil com arquitetura "Digital Mastery" baseada nos princípios de Joris Kuypers. O sistema está em desenvolvimento com deploy via Docker/EasyPanel.
+
+## 1. ANÁLISE ARQUITETURAL E TÉCNICA
+
+### 1.1 Arquitetura de Software
+- Avalie a estrutura de microsserviços e blueprints implementados
+- Analise a estratégia multi-tenant (isolamento por admin_id)
+- Examine os padrões de resiliência (circuit breakers, saga, idempotência)
+- Verifique a implementação dos princípios "Kaipa da primeira vez certo"
+- Avalie a escalabilidade e manutenibilidade do código
+
+### 1.2 Stack Tecnológico
+- Analise a escolha do stack (Flask 3.1.1, PostgreSQL 16.9, SQLAlchemy 2.0.41)
+- Examine a configuração Docker e estratégia de deploy
+- Avalie a estrutura do banco de dados (81 tabelas)
+- Verifique a implementação de observabilidade e health checks
+
+### 1.3 Qualidade do Código
+- Examine a estrutura de pastas e organização do código
+- Avalie a implementação de testes automatizados
+- Verifique padrões de Clean Code e documentação
+- Analise a gestão de dependências (pyproject.toml)
+
+## 2. ANÁLISE FUNCIONAL POR MÓDULO
+
+### 2.1 Sistema RDO (Relatório Diário de Obra)
+- Como funciona a descoberta automática de serviços?
+- Qual o fluxo de processamento das 16 subatividades?
+- Como é feita a integração com o cronograma físico?
+- Há controle de produtividade e medição de serviços?
+- O sistema permite upload de evidências (fotos/vídeos)?
+- Como funciona a interface mobile para o canteiro?
+
+### 2.2 Sistema de Propostas Comerciais
+- Qual o processo de geração automática de propostas?
+- Como funciona a integração com orçamentos?
+- Há templates reutilizáveis e personalizáveis?
+- Como é feito o controle de versões e aprovações?
+- Existe portal do cliente para acompanhamento?
+
+### 2.3 Gestão Financeira e Contábil
+- Como funciona a apropriação de custos por obra?
+- Há controle de fluxo de caixa integrado?
+- Como é calculada a margem de contribuição?
+- O sistema gera demonstrativos financeiros?
+- Qual a integração com obrigações fiscais?
+
+### 2.4 Gestão de Recursos Humanos
+- Como funciona o controle de ponto eletrônico?
+- Há cálculo automático de folha de pagamento?
+- Como é feita a gestão de subempreiteiros?
+- Existe controle de EPIs e treinamentos?
+- O sistema integra com eSocial?
+
+### 2.5 Gestão de Suprimentos
+- Há módulo de compras integrado?
+- Como funciona o controle de estoque?
+- Existe gestão de fornecedores?
+- Como são feitas as requisições por obra?
+- Há controle de recebimento e qualidade?
+
+## 3. ANÁLISE DE EXPERIÊNCIA DO USUÁRIO
+
+### 3.1 Interface e Usabilidade
+- Como está a responsividade para diferentes dispositivos?
+- A navegação entre módulos é intuitiva?
+- Há consistência visual em todo o sistema?
+- O sistema é acessível (WCAG)?
+- Como funciona a experiência mobile no canteiro?
+
+### 3.2 Performance e Disponibilidade
+- Quais são os tempos de resposta das principais funcionalidades?
+- Como está configurado o monitoramento de performance?
+- Há métricas de SLA e disponibilidade?
+- O sistema suporta carga concorrente?
+
+## 4. ANÁLISE DE SEGURANÇA E COMPLIANCE
+
+### 4.1 Segurança da Informação
+- Como funciona a autenticação e autorização?
+- Há controle de acesso baseado em roles?
+- Como são protegidos os dados sensíveis?
+- Existe auditoria de ações dos usuários?
+- O sistema atende à LGPD?
+
+### 4.2 Compliance Regulatório
+- O sistema atende às normas da construção civil?
+- Há controle de licenças e alvarás?
+- Como é feita a gestão de documentos legais?
+- Existe controle de riscos regulatórios?
+
+## 5. ANÁLISE DE DADOS E BUSINESS INTELLIGENCE
+
+### 5.1 Estrutura de Dados
+- Como está organizado o data warehouse?
+- Há governança de dados implementada?
+- Como funciona a integração entre módulos?
+- Existe fonte única da verdade?
+
+### 5.2 Relatórios e Dashboards
+- Quais KPIs estão disponíveis?
+- Há dashboards executivos?
+- O sistema oferece análises preditivas?
+- Como funciona a exportação de dados?
+
+## 6. ANÁLISE OPERACIONAL E DE NEGÓCIO
+
+### 6.1 Processos de Negócio
+- Como o sistema suporta os processos da construção civil?
+- Há automação de workflows?
+- Como funciona a integração entre departamentos?
+- O sistema permite customização por empresa?
+
+### 6.2 Escalabilidade do Negócio
+- O sistema suporta múltiplas obras simultâneas?
+- Como funciona a gestão multi-tenant?
+- Há flexibilidade para diferentes tipos de construção?
+- O sistema permite expansão para novos mercados?
+
+## 7. ANÁLISE DE DEPLOY E OPERAÇÕES
+
+### 7.1 Infraestrutura
+- Como está configurado o ambiente de produção?
+- Há estratégia de backup e disaster recovery?
+- Como funciona o monitoramento de infraestrutura?
+- Existe plano de escalabilidade horizontal?
+
+### 7.2 DevOps e CI/CD
+- Como está configurado o pipeline de deploy?
+- Há testes automatizados no pipeline?
+- Como funciona o rollback em caso de problemas?
+- Existe estratégia de blue-green deployment?
+
+## 8. PONTOS CRÍTICOS IDENTIFICADOS
+
+### 8.1 Problemas Atuais
+- Quais são os principais bugs ou limitações?
+- Há diferenças entre desenvolvimento e produção?
+- Quais funcionalidades estão incompletas?
+- Existem gargalos de performance?
+
+### 8.2 Riscos e Vulnerabilidades
+- Quais são os principais riscos técnicos?
+- Há vulnerabilidades de segurança?
+- Existem pontos únicos de falha?
+- Quais são os riscos de negócio?
+
+## 9. RECOMENDAÇÕES E PRÓXIMOS PASSOS
+
+### 9.1 Melhorias Técnicas
+- Quais refatorações são necessárias?
+- Que funcionalidades devem ser priorizadas?
+- Como melhorar a performance?
+- Que padrões devem ser implementados?
+
+### 9.2 Evolução do Produto
+- Quais funcionalidades estão faltando?
+- Como expandir para novos mercados?
+- Que integrações são necessárias?
+- Como melhorar a experiência do usuário?
+
+---
+
+**OBJETIVO FINAL:** Fornecer uma análise 360° do SIGE v10.0, identificando pontos fortes, fragilidades, oportunidades de melhoria e roadmap de evolução, considerando todas as perspectivas: técnica, funcional, operacional, financeira, legal e estratégica.
+
+---
+
+## 🎯 ENCERRAMENTO DA REUNIÃO
+
+**David Li (Arquiteto de Sistemas):**
+"Perfeito, pessoal! Construímos um prompt extremamente abrangente que vai permitir uma análise completa do SIGE v10.0. Cada um de vocês contribuiu com sua expertise específica, garantindo que nenhum aspecto crítico seja esquecido. 
+
+Este prompt vai permitir:
+- Análise técnica profunda da arquitetura
+- Avaliação funcional de todos os módulos
+- Verificação de compliance e segurança
+- Análise de experiência do usuário
+- Avaliação de processos de negócio
+- Identificação de riscos e oportunidades
+
+Obrigado a todos pela contribuição!"
+
+**Todos os Especialistas:** "Reunião produtiva! Prompt abrangente construído com sucesso!"
+
+---
+
+*Reunião encerrada às [timestamp] - Próxima etapa: Aplicação do prompt para análise completa do sistema*
