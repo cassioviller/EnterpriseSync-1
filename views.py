@@ -5672,7 +5672,7 @@ def salvar_rdo_flexivel():
                                 nome = subatividade_mestre.nome
                                 logger.error(f"✅ Nome corrigido da subatividade {sub_id}: {nome}")
                             else:
-                                # MAPEAMENTO COMPLETO PRODUÇÃO + DESENVOLVIMENTO
+                                # MAPEAMENTO COMPLETO PRODUÇÃO + DESENVOLVIMENTO + NOVOS IDs
                                 mapeamento_completo = {
                                     # PRODUÇÃO - Cobertura Metálica (IDs 150-165)
                                     '150': '1. Detalhamento do projeto',
@@ -5695,7 +5695,12 @@ def salvar_rdo_flexivel():
                                     '15236': 'Preparação da Estrutura',
                                     '15237': 'Instalação de Terças', 
                                     '15238': 'Colocação das Telhas',
-                                    '15239': 'Vedação e Calhas'
+                                    '15239': 'Vedação e Calhas',
+                                    # NOVOS IDs - Desenvolvimento atual (456-459)
+                                    '456': 'Preparação da Estrutura',
+                                    '457': 'Instalação de Terças',
+                                    '458': 'Colocação das Telhas',
+                                    '459': 'Vedação e Calhas'
                                 }
                                 if sub_id in mapeamento_completo:
                                     nome = mapeamento_completo[sub_id]
@@ -5756,8 +5761,9 @@ def salvar_rdo_flexivel():
                                     nome = subatividade_mestre.nome
                                     logger.info(f"✅ FALLBACK: Nome corrigido da subatividade {sub_id}: {nome}")
                                 else:
-                                    # MAPEAMENTO COMPLETO PRODUÇÃO (IDs 150-165) - COBERTURA METÁLICA
+                                    # MAPEAMENTO COMPLETO PRODUÇÃO + DESENVOLVIMENTO + NOVOS IDs
                                     mapeamento_producao = {
+                                        # PRODUÇÃO - Cobertura Metálica (IDs 150-165)
                                         '150': '1. Detalhamento do projeto',
                                         '151': '2. Seleção de materiais', 
                                         '152': '3. Traçagem',
@@ -5774,7 +5780,7 @@ def salvar_rdo_flexivel():
                                         '163': '14. Inspeção e controle de qualidade',
                                         '164': '15. Documentação técnica',
                                         '165': '16. Entrega e aceitação',
-                                        # Desenvolvimento (IDs originais)
+                                        # DESENVOLVIMENTO - Cobertura (IDs originais)
                                         '15236': 'Preparação da Estrutura',
                                         '15237': 'Instalação de Terças', 
                                         '15238': 'Colocação das Telhas',
@@ -5782,7 +5788,12 @@ def salvar_rdo_flexivel():
                                         '440': 'Preparação da Estrutura',  
                                         '441': 'Instalação de Terças',
                                         '442': 'Colocação das Telhas', 
-                                        '443': 'Vedação e Calhas'
+                                        '443': 'Vedação e Calhas',
+                                        # NOVOS IDs - Desenvolvimento atual (456-459)
+                                        '456': 'Preparação da Estrutura',
+                                        '457': 'Instalação de Terças',
+                                        '458': 'Colocação das Telhas',
+                                        '459': 'Vedação e Calhas'
                                     }
                                     if sub_id in mapeamento_producao:
                                         nome = mapeamento_producao[sub_id]
@@ -5793,8 +5804,9 @@ def salvar_rdo_flexivel():
                                     
                             except Exception as e:
                                 logger.error(f"❌ FALLBACK: Erro ao buscar nome da subatividade {sub_id}: {e}")
-                                # Mapeamento de emergência COMPLETO
+                                # Mapeamento de emergência COMPLETO + NOVOS IDs
                                 mapeamento_emergencia = {
+                                    # PRODUÇÃO
                                     '150': '1. Detalhamento do projeto',
                                     '151': '2. Seleção de materiais', 
                                     '152': '3. Traçagem',
@@ -5810,7 +5822,12 @@ def salvar_rdo_flexivel():
                                     '162': '13. Fixação definitiva',
                                     '163': '14. Inspeção e controle de qualidade',
                                     '164': '15. Documentação técnica',
-                                    '165': '16. Entrega e aceitação'
+                                    '165': '16. Entrega e aceitação',
+                                    # DESENVOLVIMENTO - NOVOS IDs
+                                    '456': 'Preparação da Estrutura',
+                                    '457': 'Instalação de Terças',
+                                    '458': 'Colocação das Telhas',
+                                    '459': 'Vedação e Calhas'
                                 }
                                 if sub_id in mapeamento_emergencia:
                                     nome = mapeamento_emergencia[sub_id]
