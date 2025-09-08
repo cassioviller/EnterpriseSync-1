@@ -323,40 +323,6 @@
     border-color: #28a745 !important;
     box-shadow: 0 2px 8px rgba(40,167,69,0.1) !important;
 }
-
-/* === CSS DIGITAL MASTERY PARA NOVAS CLASSES === */
-.subatividades-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-.subatividade-item {
-    background: #f8fafc;
-    padding: 1rem;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-}
-
-.funcionarios-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-}
-
-.funcionario-item {
-    background: white;
-    padding: 1rem;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    transition: all 0.2s ease;
-}
-
-.funcionario-item:hover {
-    border-color: #198754;
-    box-shadow: 0 2px 8px rgba(25,135,84,0.1);
-}
 </style>
 {% endblock %}
 
@@ -423,31 +389,35 @@
                                    value="{{ data_hoje }}" required>
                         </div>
                         
-                        <div class="filtros-grid">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-cloud"></i>
-                                    Condições Climáticas
-                                </label>
-                                <select class="form-control" id="clima" name="clima">
-                                    <option value="">Selecione</option>
-                                    <option value="ensolarado">☀️ Ensolarado</option>
-                                    <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
-                                    <option value="nublado">☁️ Nublado</option>
-                                    <option value="chuva_leve">🌦️ Chuva Leve</option>
-                                    <option value="chuva_forte">🌧️ Chuva Forte</option>
-                                    <option value="tempestade">⛈️ Tempestade</option>
-                                </select>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-cloud"></i>
+                                        Condições Climáticas
+                                    </label>
+                                    <select class="form-control" id="clima" name="clima">
+                                        <option value="">Selecione</option>
+                                        <option value="ensolarado">☀️ Ensolarado</option>
+                                        <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
+                                        <option value="nublado">☁️ Nublado</option>
+                                        <option value="chuva_leve">🌦️ Chuva Leve</option>
+                                        <option value="chuva_forte">🌧️ Chuva Forte</option>
+                                        <option value="tempestade">⛈️ Tempestade</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                    Local
-                                </label>
-                                <select class="form-control" id="local" name="local" required>
-                                    <option value="Campo" selected>🏗️ Campo</option>
-                                    <option value="Oficina">🔧 Oficina</option>
-                                </select>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        Local
+                                    </label>
+                                    <select class="form-control" id="local" name="local" required>
+                                        <option value="Campo" selected>🏗️ Campo</option>
+                                        <option value="Oficina">🔧 Oficina</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -500,28 +470,32 @@
                 </div>
                 
                 <!-- Interface Simples de Seleção -->
-                <div class="filtros-grid">
-                    <div class="form-group mb-3">
-                        <label class="form-label">
-                            <i class="fas fa-search"></i>
-                            Buscar e Selecionar Funcionário
-                        </label>
-                        <div class="input-group">
-                            <input type="text" 
-                                   class="form-control" 
-                                   id="buscarFuncionario" 
-                                   placeholder="Digite o nome do funcionário..."
-                                   autocomplete="off">
-                            <button class="btn btn-success" type="button" onclick="buscarTodosFuncionarios()">
-                                <i class="fas fa-users"></i> Ver Todos
-                            </button>
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="form-group mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-search"></i>
+                                Buscar e Selecionar Funcionário
+                            </label>
+                            <div class="input-group">
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="buscarFuncionario" 
+                                       placeholder="Digite o nome do funcionário..."
+                                       autocomplete="off">
+                                <button class="btn btn-success" type="button" onclick="buscarTodosFuncionarios()">
+                                    <i class="fas fa-users"></i> Ver Todos
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div class="form-group mb-3">
-                        <label class="form-label">Ação</label>
-                        <button class="btn btn-outline-danger w-100" type="button" onclick="limparTodosFuncionarios()">
-                            <i class="fas fa-trash"></i> Limpar Todos
-                        </button>
+                    <div class="col-md-4">
+                        <div class="form-group mb-3">
+                            <label class="form-label">Ação</label>
+                            <button class="btn btn-outline-danger w-100" type="button" onclick="limparTodosFuncionarios()">
+                                <i class="fas fa-trash"></i> Limpar Todos
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -730,7 +704,7 @@ function exibirDadosUltimoRDO(ultimoRDO) {
             
             ultimoRDO.funcionarios.forEach(funcionario => {
                 html += `
-                    <div class="funcionario-item">
+                    <div class="col-md-6 mb-2">
                         <div class="d-flex align-items-center p-3 bg-light rounded">
                             <i class="fas fa-user-hard-hat me-2 text-primary"></i>
                             <div class="flex-grow-1">
@@ -820,20 +794,58 @@ function exibirDadosPrimeiraRDOMaestria(primeiraRDO, metadata) {
                 
                 const gradient = gradientColors[index % gradientColors.length];
                 
-                // CÓDIGO ANTIGO REMOVIDO - USAR APENAS INTERFACE SIMPLIFICADA
                 html += `
-                    <div class="alert alert-success mt-3">
-                        <h6><i class="fas fa-cogs me-2"></i>Serviço: ${servico.nome}</h6>
-                        <p class="mb-0">Categoria: ${servico.categoria || 'Geral'} • Subatividades: ${servico.subatividades?.length || 0}</p>
+                    <div class="card border-0 shadow-lg mb-4 overflow-hidden" style="border-radius: 12px;">
+                        <div class="card-header border-0 p-0">
+                            <div class="p-4" style="background: ${gradient}; color: white;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-2 fw-bold">${servico.nome}</h6>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <span class="badge bg-white bg-opacity-25 px-3 py-1">
+                                                <i class="fas fa-tag me-1"></i>${servico.categoria}
+                                            </span>
+                                            <span class="badge bg-white bg-opacity-25 px-3 py-1">
+                                                <i class="fas fa-list me-1"></i>${servico.subatividades?.length || 0} etapas
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="progress bg-white bg-opacity-25" style="width: 120px; height: 10px; border-radius: 5px;">
+                                            <div class="progress-bar bg-white bg-opacity-50" style="width: 0%; border-radius: 5px;"></div>
+                                        </div>
+                                        <small class="d-block mt-1 opacity-90">0% inicial</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            ${renderizarSubatividadesEditaveisMaestria(servico, operation_id)}
+                        </div>
                     </div>
                 `;
             });
             
-            // INTERFACE MODERNA SIMPLIFICADA
+            // === DICAS E PRÓXIMOS PASSOS ===
             html += `
-                <div class="alert alert-info mt-4">
-                    <h6><i class="fas fa-lightbulb me-2"></i>Próximos Passos</h6>
-                    <p class="mb-0">Todos os serviços foram carregados. Continue preenchendo o formulário e finalize o RDO.</p>
+                <div class="card border-0 shadow-sm bg-light">
+                    <div class="card-body p-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h6 class="text-primary mb-2">
+                                    <i class="fas fa-lightbulb me-2"></i>Próximos Passos
+                                </h6>
+                                <p class="mb-0 text-muted">
+                                    Todos os serviços foram inicializados com 0%. Você pode ajustar os percentuais de cada subatividade ao criar o primeiro RDO.
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-success btn-lg" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+                                    <i class="fas fa-arrow-up me-2"></i>Criar RDO
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
             
@@ -871,14 +883,75 @@ function exibirDadosPrimeiraRDOMaestria(primeiraRDO, metadata) {
     }
 }
 
-// FUNÇÃO SIMPLIFICADA - INTERFACE DIGITAL MASTERY
+// === RENDERIZAÇÃO DE SUBATIVIDADES EDITÁVEIS ===
 function renderizarSubatividadesEditaveisMaestria(servico, operation_id) {
-    console.log(`📋 [SUB_EDITABLE:${operation_id}] servico=${servico.nome} simplificado`);
-    return `
-        <div class="alert alert-info">
-            <small><i class="fas fa-info-circle me-2"></i>Subatividades serão carregadas automaticamente no RDO</small>
-        </div>
-    `;
+    const subatividades = servico.subatividades || [];
+    
+    if (subatividades.length === 0) {
+        return `
+            <div class="text-center py-3">
+                <i class="fas fa-info-circle text-muted me-2"></i>
+                <span class="text-muted">Nenhuma subatividade cadastrada para este serviço</span>
+            </div>
+        `;
+    }
+    
+    console.log(`📋 [SUB_EDITABLE:${operation_id}] servico=${servico.nome} subatividades=${subatividades.length}`);
+    
+    let html = '<div class="row g-3">';
+    
+    subatividades.forEach((sub, index) => {
+        const inputId = `sub_${servico.id}_${index}`;
+        const progressColors = ['secondary', 'info', 'success', 'warning'];
+        const progressColor = progressColors[index % progressColors.length];
+        
+        html += `
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-light border-0 py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="fw-bold text-${progressColor}">${sub.nome}</small>
+                            <span class="badge bg-${progressColor} bg-opacity-25 text-${progressColor} px-2 py-1" id="badge_${inputId}">
+                                0%
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="mb-2">
+                            <div class="progress" style="height: 10px; border-radius: 5px;">
+                                <div class="progress-bar bg-${progressColor}" id="progress_${inputId}" style="width: 0%; border-radius: 5px;"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group input-group-sm">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="${inputId}"
+                                   name="subatividade_${servico.id}_${index}_percentual"
+                                   value="0"
+                                   min="0"
+                                   max="100"
+                                   step="0.1"
+                                   onchange="atualizarProgressoSubatividade('${inputId}', this.value)"
+                                   oninput="atualizarProgressoSubatividade('${inputId}', this.value)"
+                                   form="formNovoRDO">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        
+                        ${sub.descricao ? `<small class="text-muted d-block mt-2">${sub.descricao}</small>` : ''}
+                        
+                        <!-- Campos hidden para envio -->
+                        <input type="hidden" name="subatividade_${servico.id}_${index}_id" value="${sub.id}">
+                        <input type="hidden" name="subatividade_${servico.id}_${index}_nome" value="${sub.nome}">
+                        <input type="hidden" name="subatividade_${servico.id}_${index}_servico_id" value="${servico.id}">
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    return html;
 }
 
 // === FUNÇÃO PARA ATUALIZAR PROGRESSO EM TEMPO REAL ===
@@ -903,14 +976,45 @@ function atualizarProgressoSubatividade(inputId, valor) {
     }
 }
 
-// FUNÇÃO SIMPLIFICADA MODERNA
+// === RENDERIZAÇÃO DE SUBATIVIDADES MODERNA (somente visualização) ===
 function renderizarSubatividadesMaestria(subatividades, operation_id) {
-    console.log(`📋 [SUB_RENDER:${operation_id}] interface_simplificada`);
-    return `
-        <div class="alert alert-success">
-            <i class="fas fa-check-circle me-2"></i>Subatividades carregadas: ${subatividades?.length || 0}
-        </div>
-    `;
+    if (!subatividades || subatividades.length === 0) {
+        return `
+            <div class="text-center py-3">
+                <i class="fas fa-info-circle text-muted me-2"></i>
+                <span class="text-muted">Nenhuma subatividade específica cadastrada</span>
+            </div>
+        `;
+    }
+    
+    console.log(`📋 [SUB_RENDER:${operation_id}] subatividades_count=${subatividades.length}`);
+    
+    let html = '<div class="row g-3">';
+    
+    subatividades.forEach((sub, index) => {
+        const progressColors = ['bg-secondary', 'bg-info', 'bg-success', 'bg-warning'];
+        const progressColor = progressColors[index % progressColors.length];
+        
+        html += `
+            <div class="col-md-6">
+                <div class="p-3 border rounded-3 bg-white h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-medium text-dark">${sub.nome}</div>
+                        <div class="badge ${progressColor} bg-opacity-25 text-dark px-2 py-1">
+                            ${sub.percentual || 0}%
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 8px; border-radius: 4px;">
+                        <div class="progress-bar ${progressColor}" style="width: ${sub.percentual || 0}%; border-radius: 4px;"></div>
+                    </div>
+                    ${sub.descricao ? `<small class="text-muted d-block mt-2">${sub.descricao}</small>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    return html;
 }
 
 // === FUNÇÃO LEGADA MANTIDA PARA COMPATIBILIDADE ===
@@ -1125,7 +1229,7 @@ function renderizarServicosComDadosUltimoRDO(data) {
                     </div>
                 </div>
                 <div class="servico-body ${isAberto ? '' : 'collapse'}" id="body-${servicoId}">
-                    <div class="subatividades-grid">
+                    <div class="row">
         `;
         
         servico.subatividades.forEach((subatividade, subIndex) => {
@@ -1133,7 +1237,7 @@ function renderizarServicosComDadosUltimoRDO(data) {
             const valorPadrao = temUltimoRDO ? (subatividade.percentual_executado || 0) : 0;
             
             html += `
-                <div class="subatividade-item mb-3">
+                <div class="col-md-6 mb-3">
                     <label class="form-label">${subatividade.nome}</label>
                     <div class="input-group">
                         <input type="number" 
@@ -1204,29 +1308,29 @@ function renderizarTemplatePadrao() {
                     </div>
                 </div>
                 <div class="servico-body collapse" id="body-estrutura">
-                    <div class="subatividades-grid">
-                        <div class="subatividade-item mb-3">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Montagem de Formas</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_1" value="100" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="subatividade-item mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Armação de Ferro</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_2" value="100" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="subatividade-item mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Concretagem</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_3" value="70" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="subatividade-item mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Cura do Concreto</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_4" value="10" step="0.1" min="0" max="100" form="formNovoRDO">
@@ -1252,29 +1356,29 @@ function renderizarTemplatePadrao() {
                     </div>
                 </div>
                 <div class="servico-body collapse" id="body-manta">
-                    <div class="subatividades-grid">
-                        <div class="subatividade-item mb-3">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Preparação da Superfície</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_5" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="subatividade-item mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Aplicação do Primer</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_6" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="subatividade-item mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Instalação da Manta</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_7" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="subatividade-item mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Acabamento e Vedação</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_8" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
@@ -1300,22 +1404,22 @@ function renderizarTemplatePadrao() {
                     </div>
                 </div>
                 <div class="servico-body collapse" id="body-beiral">
-                    <div class="subatividades-grid">
-                        <div class="subatividade-item mb-3">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Medição e Marcação</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_9" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="subatividade-item mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Corte das Peças</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_10" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
                                 <span class="input-group-text">%</span>
                             </div>
                         </div>
-                        <div class="subatividade-item mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Fixação dos Suportes</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="subatividade_11" value="0" step="0.1" min="0" max="100" form="formNovoRDO">
@@ -1468,11 +1572,11 @@ function atualizarListaFuncionarios() {
         <div class="funcionario-item card mb-3">
             <div class="card-body">
                 <div class="row align-items-center">
-                    <div class="info-section">
+                    <div class="col-md-8">
                         <h6 class="mb-1">${f.nome}</h6>
                         <small class="text-muted">${f.funcao} - ${f.departamento}</small>
                     </div>
-                    <div class="action-section text-end">
+                    <div class="col-md-4 text-end">
                         <button class="btn btn-sm btn-outline-danger" onclick="removerFuncionario(${f.id})">
                             <i class="fas fa-times"></i>
                         </button>
@@ -1611,7 +1715,7 @@ function exibirListaFuncionarios(funcionarios) {
         const btnIcon = jaSelecionado ? 'fa-check' : 'fa-plus';
         
         html += `
-            <div class="funcionario-card mb-3">
+            <div class="col-md-6 col-lg-4 mb-3">
                 <div class="card h-100">
                     <div class="card-body">
                         <h6 class="card-title">${func.nome}</h6>
@@ -1709,7 +1813,7 @@ function atualizarListaFuncionarios() {
                         </div>
                         
                         <div class="row">
-                            <div class="full-width">
+                            <div class="col-md-12">
                                 <label class="form-label">Horas Trabalhadas</label>
                                 <input type="number" class="form-control form-control-sm" 
                                        min="0" max="24" step="0.1" 
@@ -1805,7 +1909,7 @@ function renderizarFuncionarios(funcionarios) {
     
     funcionarios.forEach(funcionario => {
         html += `
-            <div class="funcionario-card mb-3">
+            <div class="col-md-6 col-lg-4 mb-3">
                 <div class="funcionario-card">
                     <div class="form-check">
                         <input class="form-check-input" 
@@ -1823,7 +1927,7 @@ function renderizarFuncionarios(funcionarios) {
                     </div>
                     <div class="funcionario-details" id="details_${funcionario.id}" style="display: none;">
                         <div class="row">
-                            <div class="half-width">
+                            <div class="col-md-6">
                                 <label class="form-label">Função</label>
                                 <input type="text" 
                                        class="form-control form-control-sm" 
@@ -1831,7 +1935,7 @@ function renderizarFuncionarios(funcionarios) {
                                        value="${funcionario.cargo}"
                                        form="formNovoRDO">
                             </div>
-                            <div class="half-width">
+                            <div class="col-md-6">
                                 <label class="form-label">Horas</label>
                                 <input type="number" 
                                        class="form-control form-control-sm" 
@@ -1971,72 +2075,7 @@ function carregarServicosParaPrimeiraRDO(obraId) {
         });
 }
 
-function exibirServicosParaPrimeiraRDO(servicos) {
-    console.log(`📋 PRIMEIRA RDO: Renderizando ${servicos.length} serviços`);
-    
-    const servicosContainer = document.getElementById('servicos-container');
-    
-    let html = `
-        <div class="alert alert-success mb-4">
-            <i class="fas fa-check-circle"></i>
-            <strong>Primeira RDO da obra!</strong>
-            <br>Encontrados ${servicos.length} serviços disponíveis. Selecione os serviços executados hoje.
-        </div>
-        <div class="row">
-    `;
-    
-    servicos.forEach(servico => {
-        html += `
-            <div class="col-md-6 mb-3">
-                <div class="card h-100 servico-card">
-                    <div class="card-body">
-                        <h6 class="card-title">
-                            <i class="fas fa-tools me-2 text-primary"></i>
-                            ${servico.nome}
-                        </h6>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" 
-                                   name="servicos_executados[]" value="${servico.id}" 
-                                   id="servico_${servico.id}">
-                            <label class="form-check-label" for="servico_${servico.id}">
-                                Executado hoje
-                            </label>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label small">Percentual executado:</label>
-                            <input type="number" class="form-control form-control-sm" 
-                                   name="servico_${servico.id}_percentual" 
-                                   min="0" max="100" value="0" step="0.1">
-                        </div>
-                        <small class="text-muted">
-                            ${servico.descricao_tecnica || 'Serviço da obra'}
-                        </small>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += `
-        </div>
-        <div class="alert alert-info mt-3">
-            <i class="fas fa-lightbulb"></i>
-            <strong>Dica:</strong> Marque apenas os serviços que foram realmente executados hoje e informe o percentual de conclusão.
-        </div>
-    `;
-    
-    servicosContainer.innerHTML = html;
-    
-    // Adicionar event listeners para os checkboxes
-    document.querySelectorAll('input[name="servicos_executados[]"]').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const percentualInput = document.querySelector(`input[name="servico_${this.value}_percentual"]`);
-            if (this.checked && percentualInput.value == 0) {
-                percentualInput.value = 10; // Valor padrão quando selecionado
-            }
-        });
-    });
-}
+// Função removida - interface antiga substituída por versão moderna
 
 function exibirMensagemSemServicos() {
     const servicosContainer = document.getElementById('servicos-container');
