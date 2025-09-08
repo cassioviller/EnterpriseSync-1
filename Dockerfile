@@ -120,7 +120,7 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=5 \
       || exit 1
 
 # Comando de entrada com Digital Mastery (Produção Otimizada)
-ENTRYPOINT ["/app/docker-entrypoint-digital-mastery.sh"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["gunicorn", \
     "--bind", "0.0.0.0:5000", \
     "--workers", "${GUNICORN_WORKERS:-4}", \
