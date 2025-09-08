@@ -4026,11 +4026,8 @@ def rdo_novo_unificado():
         if obra_id:
             obra_selecionada = next((obra for obra in obras if obra.id == obra_id), None)
         
-        # Template unificado baseado no tipo de usuário
-        if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            template = 'funcionario/rdo_consolidado.html'
-        else:
-            template = 'rdo/novo.html'
+        # Template unificado MODERNO para todos os usuários
+        template = 'rdo/novo.html'  # SEMPRE usar template moderno
         
         # Adicionar data atual para o template
         from datetime import date as date_module
@@ -4868,7 +4865,7 @@ def rdo_visualizar_unificado(id):
         
         # Template baseado no tipo de usuário
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            template = 'funcionario/rdo_consolidado.html'
+            template = 'rdo/novo.html'  # SEMPRE usar template moderno
         else:
             template = 'rdo/visualizar_rdo.html'
         
