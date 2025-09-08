@@ -15,11 +15,19 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Database configuration - Optimized for EasyPanel deployment
+# Database configuration - AUTO-DETECTAR AMBIENTE
 database_url = os.environ.get("DATABASE_URL")
-if not database_url:
-    # EasyPanel default PostgreSQL URL pattern
-    database_url = "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable"
+logger = logging.getLogger(__name__)
+
+# Auto-detectar ambiente
+if not database_url or "neon" in database_url:
+    # DESENVOLVIMENTO - usar Neon atual
+    database_url = os.environ.get("DATABASE_URL", "postgresql://neon_fallback")
+    logger.info(f"🔧 DESENVOLVIMENTO DATABASE: {database_url}")
+else:
+    # PRODUÇÃO - usar EasyPanel
+    database_url = "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable" 
+    logger.info(f"🔧 PRODUÇÃO DATABASE: {database_url}")
 
 # Convert postgres:// to postgresql:// for SQLAlchemy compatibility
 if database_url and database_url.startswith("postgres://"):

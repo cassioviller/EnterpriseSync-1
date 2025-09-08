@@ -4632,27 +4632,22 @@ def rdo_salvar_unificado():
         if not subatividades_extraidas:
             print("❌ NENHUMA SUBATIVIDADE VÁLIDA ENCONTRADA - TENTANDO FALLBACK PRODUÇÃO")
             
-            # FALLBACK PARA PRODUÇÃO: Criar subatividade padrão se nenhuma for encontrada
-            if admin_id_correto == 2:  # Produção
-                print("🚨 EXECUTANDO FALLBACK PRODUÇÃO - Criando subatividade padrão")
-                primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
-                if primeiro_servico:
-                    subatividades_extraidas = [{
-                        'id': 'fallback_prod',
-                        'servico_id': primeiro_servico.id,
-                        'subatividade_id': '1',
-                        'nome': 'Serviços Gerais',
-                        'percentual': 0.0,
-                        'observacoes': 'Subatividade criada automaticamente para produção'
-                    }]
-                    print(f"✅ FALLBACK CRIADO: {primeiro_servico.nome} - Serviços Gerais")
-                else:
-                    print("❌ FALLBACK FALHOU: Nenhum serviço encontrado para admin_id=2")
-                    flash(f'ERRO PRODUÇÃO: Nenhum serviço cadastrado para admin_id={admin_id_correto}. Cadastre um serviço primeiro.', 'error')
-                    return redirect(url_for('main.rdo_novo_unificado'))
+            # FALLBACK ROBUSTEZ: Criar subatividade para qualquer admin_id sem dados
+            print(f"🚨 EXECUTANDO FALLBACK ROBUSTEZ - admin_id={admin_id_correto}")
+            primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
+            if primeiro_servico:
+                subatividades_extraidas = [{
+                    'id': 'fallback_robust',
+                    'servico_id': primeiro_servico.id,
+                    'subatividade_id': '1',
+                    'nome': 'Serviços Gerais',
+                    'percentual': 0.0,
+                    'observacoes': 'Subatividade criada automaticamente (fallback robusto)'
+                }]
+                print(f"✅ FALLBACK CRIADO: {primeiro_servico.nome} - Serviços Gerais")
             else:
-                print("❌ NENHUMA SUBATIVIDADE VÁLIDA ENCONTRADA")
-                flash('Erro: Nenhuma subatividade válida encontrada no formulário', 'error')
+                print(f"❌ FALLBACK FALHOU: Nenhum serviço encontrado para admin_id={admin_id_correto}")
+                flash(f'ERRO: Nenhum serviço cadastrado para admin_id={admin_id_correto}. Cadastre um serviço primeiro.', 'error')
                 return redirect(url_for('main.rdo_novo_unificado'))
         
         print(f"✅ VALIDAÇÃO PASSOU: {len(subatividades_extraidas)} subatividades válidas")

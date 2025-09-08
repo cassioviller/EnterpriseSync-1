@@ -18,8 +18,14 @@ echo "📊 Observabilidade Completa + RDO System"
 echo "⚡ Implementação Joris Kuypers Principles"
 echo "🎯 =============================================="
 
-# Configuração de ambiente Digital Mastery
-export DATABASE_URL="${DATABASE_URL:-postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable}"
+# Configuração de ambiente Digital Mastery - AUTO-DETECTAR
+if [ -z "$DATABASE_URL" ]; then
+    # Se não houver DATABASE_URL definida, usar EasyPanel
+    export DATABASE_URL="postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable"
+    echo "🎯 PRODUÇÃO: Usando DATABASE_URL EasyPanel"
+else
+    echo "🎯 DESENVOLVIMENTO: Usando DATABASE_URL existente"
+fi
 export FLASK_APP=main.py
 export DIGITAL_MASTERY_MODE=true
 export OBSERVABILITY_ENABLED=true
@@ -37,15 +43,13 @@ while [ $POSTGRES_RETRIES -lt $MAX_RETRIES ]; do
     if pg_isready -h ${DATABASE_HOST:-viajey_sige} -p ${DATABASE_PORT:-5432} -U ${DATABASE_USER:-sige} > /dev/null 2>&1; then
         echo "✅ PostgreSQL conectado! (tentativa: $((POSTGRES_RETRIES + 1)))"
         
-        # Teste de conexão SQL avançado DESABILITADO (causa problemas em produção)
-        echo "✅ PostgreSQL disponível - Pulando teste SQL direto"
-        break
-        # if psql "$DATABASE_URL" -c "SELECT 1;" > /dev/null 2>&1; then
-        #     echo "✅ Teste SQL avançado: SUCESSO"
-        #     break
-        # else
-        #     echo "⚠️ PostgreSQL disponível mas conexão SQL falhou"
-        # fi
+        # Teste de conexão SQL avançado REATIVADO - Deploy EasyPanel completo
+        if psql "$DATABASE_URL" -c "SELECT 1;" > /dev/null 2>&1; then
+            echo "✅ Teste SQL avançado: SUCESSO"
+            break
+        else
+            echo "⚠️ PostgreSQL disponível mas conexão SQL falhou"
+        fi
     fi
     
     POSTGRES_RETRIES=$((POSTGRES_RETRIES + 1))
@@ -93,15 +97,15 @@ try:
         db.create_all()
         logger.info('✅ All tables created successfully!')
         
-        # MIGRAÇÕES DESABILITADAS - Corrigindo logs infinitos em produção
-        logger.info('🔇 Digital Mastery migrations DISABLED - preventing infinite logs')
+        # MIGRAÇÕES REATIVADAS - Deploy completo EasyPanel
+        logger.info('🔄 Digital Mastery migrations ENABLED - full deploy')
         logger.info(f'🔧 Using DATABASE_URL: {os.environ.get("DATABASE_URL", "Not set")}')
-        # try:
-        #     from migrations import executar_migracoes
-        #     executar_migracoes()
-        #     logger.info('✅ Migrations completed successfully!')
-        # except Exception as migration_error:
-        #     logger.warning(f'⚠️ Migration warning: {migration_error}')
+        try:
+            from migrations import executar_migracoes
+            executar_migracoes()
+            logger.info('✅ Migrations completed successfully!')
+        except Exception as migration_error:
+            logger.warning(f'⚠️ Migration warning: {migration_error}')
         
         # Database schema validation
         from sqlalchemy import inspect

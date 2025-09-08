@@ -11,9 +11,11 @@ logger = logging.getLogger(__name__)
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
+    REATIVADO PARA DEPLOY EASYPANEL COMPLETO
     """
     try:
-        logger.info("🔄 Iniciando migrações automáticas do banco de dados...")
+        logger.info("🔄 Iniciando migrações automáticas COMPLETAS do banco EasyPanel...")
+        logger.info("🎯 TARGET DATABASE: postgresql://sige:sige@viajey_sige:5432/sige")
         
         # Verificar se a tabela existe, se não existir, criar completa
         garantir_tabela_proposta_templates_existe()
