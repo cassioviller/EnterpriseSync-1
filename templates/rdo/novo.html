@@ -509,10 +509,31 @@ function exibirMensagemSemRDOAnterior() {
     if (obraId) {
         console.log(`🔍 PRIMEIRA RDO: Buscando serviços para obra ${obraId}`);
         carregarServicosParaPrimeiraRDO(obraId);
+    } else {
+        console.log('⚠️ Nenhuma obra selecionada');
+        const servicosContainer = document.getElementById('servicos-container');
+        servicosContainer.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Selecione uma obra</strong>
+                <br>Selecione uma obra primeiro para ver os serviços disponíveis.
+            </div>
+        `;
     }
 }
 
 function carregarServicosParaPrimeiraRDO(obraId) {
+    // Exibir loading primeiro
+    const servicosContainer = document.getElementById('servicos-container');
+    servicosContainer.innerHTML = `
+        <div class="text-center p-4">
+            <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p class="mt-2 text-muted">Carregando serviços da obra...</p>
+        </div>
+    `;
+
     fetch(`/api/servicos-obra-primeira-rdo/${obraId}`)
         .then(response => response.json())
         .then(data => {
