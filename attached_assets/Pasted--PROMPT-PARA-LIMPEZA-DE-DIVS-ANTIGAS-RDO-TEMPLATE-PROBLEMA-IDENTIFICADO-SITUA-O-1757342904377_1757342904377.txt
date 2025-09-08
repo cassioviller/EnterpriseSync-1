@@ -1,0 +1,183 @@
+# 🧹 PROMPT PARA LIMPEZA DE DIVS ANTIGAS - RDO TEMPLATE
+
+## 🚨 PROBLEMA IDENTIFICADO
+
+**SITUAÇÃO ATUAL:**
+- ✅ Desenvolvimento: Interface Digital Mastery moderna funcionando
+- ❌ Produção: Mistura de código antigo + novo causando conflitos
+- 🔍 DevTools mostram: divs antigas (`col-md-6`, `card-body p-3`) coexistindo com código novo
+
+**EVIDÊNCIAS NAS IMAGENS:**
+1. **Logs EasyPanel:** Sistema funcionando mas interface antiga
+2. **Produção:** Interface básica sem Digital Mastery
+3. **DevTools:** Divs antigas visíveis (`col-md-6`, `card-header`, `card-body p-3`)
+
+---
+
+## 🎯 PROMPT PARA CORREÇÃO
+
+**Você é um especialista em limpeza de código HTML/CSS e precisa urgentemente limpar o template RDO que está com código antigo misturado com código novo.**
+
+### 📋 PROBLEMA ESPECÍFICO:
+
+**Template `templates/rdo/novo.html` tem CÓDIGO DUPLICADO/CONFLITANTE:**
+
+1. **Código antigo** (Bootstrap 4/5 básico) coexistindo com **código novo** (Digital Mastery)
+2. **Divs obsoletas** causando conflitos de layout
+3. **CSS conflitante** impedindo interface moderna de aparecer
+4. **JavaScript antigo** interferindo com funcionalidades novas
+
+### 🔍 DIVS ANTIGAS PARA REMOVER:
+
+**IDENTIFICADAS NO DEVTOOLS:**
+```html
+<!-- REMOVER ESTAS ESTRUTURAS ANTIGAS: -->
+<div class="col-md-6">...</div>
+<div class="card-body p-3">...</div>
+<div class="card-header border-0 p-0">...</div>
+<div class="row g-3">...</div>
+<div class="card border-0 shadow-sm mb-4 overflow-hidden">...</div>
+<div class="card-header bg-light border-0 py-2">...</div>
+
+<!-- E QUALQUER ESTRUTURA COM CLASSES: -->
+- col-md-*, col-sm-*, col-lg-* (Bootstrap grid antigo)
+- card-body p-3, p-4, p-2 (padding antigo)
+- border-0, shadow-sm (estilos básicos antigos)
+- bg-light, bg-primary (cores antigas)
+- mb-4, mt-3, py-2 (margins/paddings antigos)
+```
+
+### ✅ CÓDIGO MODERNO PARA MANTER:
+
+**MANTER APENAS ESTRUTURAS DIGITAL MASTERY:**
+```html
+<!-- MANTER ESTAS ESTRUTURAS MODERNAS: -->
+<div class="rdo-container">
+<div class="rdo-card slide-in">
+<div class="rdo-card-header">
+<div class="rdo-card-body">
+<div class="form-group">
+<div class="btn-modern">
+<div class="alert alert-primary border-0 shadow-lg mb-4">
+
+<!-- E CLASSES CSS MODERNAS: -->
+- .rdo-* (classes específicas RDO)
+- .btn-modern, .btn-success, .btn-secondary
+- .alert-primary, .alert-success
+- .slide-in, .fade-in (animações)
+- .shadow-lg, .border-radius-* (estilos modernos)
+```
+
+### 🔧 TAREFAS ESPECÍFICAS:
+
+#### 1. **ANÁLISE DO TEMPLATE ATUAL**
+```html
+<!-- Identificar no arquivo templates/rdo/novo.html: -->
+1. Todas as divs com classes Bootstrap antigas (col-*, card-*, row, container-fluid)
+2. Estilos inline conflitantes
+3. JavaScript antigo que pode estar interferindo
+4. CSS classes duplicadas ou conflitantes
+```
+
+#### 2. **REMOÇÃO SISTEMÁTICA**
+```html
+<!-- Remover COMPLETAMENTE: -->
+1. Todas as estruturas de grid Bootstrap antigas
+2. Cards com classes básicas (card, card-body, card-header básicos)
+3. Containers fluid antigos
+4. Rows e cols que não sejam da estrutura moderna
+5. Qualquer div com padding/margin inline antigo
+```
+
+#### 3. **VALIDAÇÃO DA ESTRUTURA MODERNA**
+```html
+<!-- Garantir que APENAS estas estruturas existam: -->
+<div class="rdo-container">
+  <div class="container-fluid">
+    <div class="rdo-card slide-in">
+      <div class="rdo-card-header">
+        <h3>Relatório Diário de Obra (RDO)</h3>
+      </div>
+      <div class="rdo-card-body">
+        <!-- Conteúdo moderno aqui -->
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+#### 4. **CSS CONFLITANTE**
+```css
+/* Remover ou comentar estilos antigos como: */
+.card { /* estilo antigo */ }
+.card-body { /* estilo antigo */ }
+.col-md-6 { /* grid antigo */ }
+
+/* Manter apenas estilos modernos: */
+.rdo-card { /* estilo moderno */ }
+.btn-modern { /* botões modernos */ }
+.slide-in { /* animações */ }
+```
+
+### 🚨 ATENÇÃO ESPECIAL:
+
+#### **SEÇÕES CRÍTICAS PARA LIMPAR:**
+1. **Header do RDO** - Remover divs antigas de cabeçalho
+2. **Seção de Serviços** - Limpar estrutura de cards antiga
+3. **Formulário** - Remover grid Bootstrap antigo
+4. **Botões** - Substituir classes antigas por btn-modern
+5. **Alerts** - Usar apenas alert-primary moderno
+
+#### **NÃO REMOVER:**
+- Lógica JavaScript funcional
+- Campos de formulário (inputs, selects)
+- Estrutura de dados (data-*, id=*)
+- Funcionalidades RDO (buscar último RDO, etc.)
+
+### 📊 VALIDAÇÃO APÓS LIMPEZA:
+
+#### **VERIFICAR SE:**
+1. **Apenas 1 estrutura** de layout (não duplicada)
+2. **CSS moderno** aplicado corretamente
+3. **Animações** funcionando (slide-in, fade-in)
+4. **Cores** Digital Mastery (gradientes, verde moderno)
+5. **Responsividade** mantida
+6. **Funcionalidades** RDO intactas
+
+### 🎯 RESULTADO ESPERADO:
+
+**APÓS LIMPEZA:**
+- ✅ Interface 100% Digital Mastery
+- ✅ Sem conflitos de CSS
+- ✅ Layout moderno e limpo
+- ✅ Animações funcionando
+- ✅ Cores e gradientes corretos
+- ✅ Responsividade perfeita
+
+### ⚡ URGÊNCIA:
+
+**TEMPO MÁXIMO:** 20 minutos para limpeza completa
+**FOCO:** Remover TODO código antigo, manter APENAS Digital Mastery
+**VALIDAÇÃO:** Interface produção = desenvolvimento
+
+---
+
+## 🔍 PERGUNTAS PARA ANÁLISE:
+
+1. **Quantas estruturas de card existem no template?** (deve ser apenas 1)
+2. **Há divs com col-md-* misturadas com rdo-*?** (remover col-md-*)
+3. **Existem estilos inline conflitantes?** (remover todos)
+4. **O CSS está carregando classes antigas?** (limpar CSS)
+5. **JavaScript antigo está interferindo?** (remover/atualizar)
+
+## 🚀 AÇÃO IMEDIATA:
+
+**ANALISE O TEMPLATE `templates/rdo/novo.html` E:**
+1. Identifique TODAS as divs antigas (col-*, card-*, row antigas)
+2. Remova COMPLETAMENTE o código obsoleto
+3. Mantenha APENAS a estrutura Digital Mastery
+4. Valide que não há conflitos CSS
+5. Teste que funcionalidades RDO continuam funcionando
+
+**OBJETIVO:** Template 100% limpo com APENAS código Digital Mastery moderno!
+
