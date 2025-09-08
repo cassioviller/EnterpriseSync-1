@@ -1,0 +1,447 @@
+# 🔥 PROMPT PARA REFAZER COMPLETAMENTE O SISTEMA RDO - SIGE v10.0
+
+## 🚨 SITUAÇÃO CRÍTICA - RECONSTRUÇÃO TOTAL NECESSÁRIA
+
+**DECISÃO EXECUTIVA:**
+- ❌ **DELETAR TUDO** relacionado ao RDO antigo
+- ❌ **REMOVER TODAS** as referências, funções, rotas, calls antigas
+- ✅ **REFAZER DO ZERO** apenas com Digital Mastery v10.0
+- ✅ **CÓDIGO LIMPO** sem rastros de versões anteriores
+
+**JUSTIFICATIVA:**
+- Múltiplas versões causando conflitos irreconciliáveis
+- Código antigo interferindo com funcionalidades modernas
+- Impossível debuggar com tanto código obsoleto misturado
+- Melhor refazer do que tentar limpar
+
+---
+
+## 🎯 PROMPT PARA RECONSTRUÇÃO TOTAL
+
+**Você é um arquiteto de software sênior e precisa REFAZER COMPLETAMENTE o sistema RDO do SIGE v10.0, eliminando ABSOLUTAMENTE TUDO que seja antigo e reconstruindo apenas com código Digital Mastery moderno.**
+
+### 🗑️ **FASE 1: DEMOLIÇÃO COMPLETA (10 min)**
+
+#### **DELETAR COMPLETAMENTE ESTES ARQUIVOS:**
+```bash
+# TEMPLATES - DELETAR TODOS
+rm templates/rdo/novo.html
+rm templates/rdo/editar_rdo.html  
+rm templates/rdo/visualizar_rdo_moderno.html
+rm templates/rdo/*.html  # TODOS os templates RDO
+
+# CSS/JS - DELETAR TODOS
+rm static/css/rdo*.css
+rm static/js/rdo*.js
+rm static/css/*rdo*
+rm static/js/*rdo*
+
+# SCRIPTS - DELETAR TODOS  
+rm *rdo*.py
+rm scripts/*rdo*
+rm migrations/*rdo*
+```
+
+#### **REMOVER DO CÓDIGO PYTHON:**
+```python
+# EM views.py - DELETAR TODAS ESTAS FUNÇÕES:
+def rdo_novo():                                    # DELETAR
+def rdo_editar():                                  # DELETAR  
+def rdo_visualizar():                              # DELETAR
+def salvar_rdo():                                  # DELETAR
+def buscar_ultimo_rdo():                           # DELETAR
+def extrair_subatividades_formulario_robusto():    # DELETAR
+def extrair_subatividades_simples():               # DELETAR
+def processar_rdo():                               # DELETAR
+def validar_rdo():                                 # DELETAR
+def carregar_dados_rdo():                          # DELETAR
+# QUALQUER função com "rdo" no nome               # DELETAR TODAS
+
+# EM app.py - DELETAR TODAS ESTAS ROTAS:
+@app.route('/rdo/novo')                           # DELETAR
+@app.route('/rdo/editar')                         # DELETAR
+@app.route('/rdo/salvar')                         # DELETAR
+@app.route('/rdo/buscar_ultimo')                  # DELETAR
+@app.route('/rdo/<int:id>')                       # DELETAR
+# QUALQUER rota com "/rdo"                       # DELETAR TODAS
+
+# EM models.py - DELETAR MODELO:
+class RDO(db.Model):                              # DELETAR COMPLETAMENTE
+    # Todos os campos                             # DELETAR TODOS
+    # Todos os relacionamentos                   # DELETAR TODOS
+    # Todos os métodos                           # DELETAR TODOS
+```
+
+#### **REMOVER TODAS AS REFERÊNCIAS:**
+```python
+# BUSCAR E DELETAR em TODO o código:
+"rdo"                    # Qualquer referência
+"RDO"                    # Qualquer referência  
+"relatorio_diario"       # Qualquer referência
+"relatório_diário"       # Qualquer referência
+"daily_report"           # Qualquer referência
+"obra_relatorio"         # Qualquer referência
+
+# IMPORTS - DELETAR:
+from .rdo import *
+import rdo
+from models import RDO
+# Qualquer import relacionado a RDO
+```
+
+#### **REMOVER DO BANCO DE DADOS:**
+```sql
+-- DELETAR TABELAS:
+DROP TABLE IF EXISTS rdo CASCADE;
+DROP TABLE IF EXISTS rdo_subatividades CASCADE;  
+DROP TABLE IF EXISTS rdo_servicos CASCADE;
+DROP TABLE IF EXISTS rdo_funcionarios CASCADE;
+-- Qualquer tabela relacionada a RDO
+```
+
+### 🏗️ **FASE 2: RECONSTRUÇÃO DIGITAL MASTERY (20 min)**
+
+#### **CRIAR NOVO MODELO RDO v10.0:**
+```python
+# models.py - CRIAR DO ZERO
+class RelatorioObraDigital(db.Model):
+    """
+    RDO Digital Mastery v10.0 - Modelo completamente novo
+    Sem rastros de versões anteriores
+    """
+    __tablename__ = 'relatorio_obra_digital'
+    
+    # Campos essenciais apenas
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.admin_id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    data_relatorio = db.Column(db.Date, nullable=False)
+    
+    # Campos Digital Mastery
+    observacoes_gerais = db.Column(db.Text)
+    condicoes_climaticas = db.Column(db.String(100))
+    local_obra = db.Column(db.String(255))
+    
+    # Metadados v10.0
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    versao_digital = db.Column(db.String(10), default='v10.0')
+    
+    def __repr__(self):
+        return f'<RelatorioObraDigital {self.id} - {self.data_relatorio}>'
+```
+
+#### **CRIAR NOVA ROTA PRINCIPAL:**
+```python
+# app.py - CRIAR ROTA COMPLETAMENTE NOVA
+@app.route('/obra/relatorio/digital', methods=['GET', 'POST'])
+def relatorio_obra_digital():
+    """
+    RDO Digital Mastery v10.0 - Rota principal
+    Completamente nova, sem código antigo
+    """
+    if request.method == 'GET':
+        return render_template('obra/relatorio_digital.html')
+    
+    if request.method == 'POST':
+        return processar_relatorio_digital()
+
+@app.route('/obra/relatorio/processar', methods=['POST'])  
+def processar_relatorio_digital():
+    """
+    Processamento Digital Mastery v10.0
+    Lógica completamente nova
+    """
+    try:
+        # Lógica nova aqui
+        return jsonify({'status': 'success', 'versao': 'v10.0'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+```
+
+#### **CRIAR NOVA FUNÇÃO DE PROCESSAMENTO:**
+```python
+# views.py - CRIAR FUNÇÃO COMPLETAMENTE NOVA
+def processar_subatividades_digital_mastery(form_data):
+    """
+    Processamento Digital Mastery v10.0
+    Função completamente nova, sem código antigo
+    """
+    logger.info("🚀 DIGITAL MASTERY v10.0 - Processando subatividades")
+    
+    subatividades = []
+    
+    try:
+        # Lógica nova e limpa aqui
+        # Sem referências a código antigo
+        
+        logger.info(f"✅ Processadas {len(subatividades)} subatividades")
+        return subatividades
+        
+    except Exception as e:
+        logger.error(f"❌ Erro no processamento Digital Mastery: {str(e)}")
+        return []
+```
+
+#### **CRIAR NOVO TEMPLATE DO ZERO:**
+```html
+<!-- templates/obra/relatorio_digital.html - CRIAR DO ZERO -->
+{% extends "base_completo.html" %}
+
+{% block title %}Relatório Digital de Obra - SIGE v10.0{% endblock %}
+
+{% block content %}
+<div class="relatorio-digital-container">
+    <div class="digital-mastery-card">
+        <div class="card-header-digital">
+            <h2>📊 Relatório Digital de Obra</h2>
+            <span class="versao-badge">v10.0 Digital Mastery</span>
+        </div>
+        
+        <div class="card-body-digital">
+            <form id="relatorioDigitalForm" method="POST" action="/obra/relatorio/processar">
+                
+                <!-- Seção Informações Básicas -->
+                <div class="secao-digital">
+                    <h3>📋 Informações Básicas</h3>
+                    <div class="form-group-digital">
+                        <label>Obra:</label>
+                        <select name="obra_id" class="select-digital" required>
+                            <option value="">Selecione a obra...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Seção Atividades -->
+                <div class="secao-digital">
+                    <h3>🔧 Atividades Executadas</h3>
+                    <div id="atividades-container">
+                        <!-- Conteúdo dinâmico -->
+                    </div>
+                </div>
+                
+                <!-- Botões -->
+                <div class="acoes-digital">
+                    <button type="submit" class="btn-digital-primary">
+                        💾 Salvar Relatório Digital
+                    </button>
+                </div>
+                
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/relatorio_digital_v10.js"></script>
+{% endblock %}
+```
+
+#### **CRIAR NOVO CSS DO ZERO:**
+```css
+/* static/css/relatorio_digital_v10.css - CRIAR DO ZERO */
+.relatorio-digital-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.digital-mastery-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.card-header-digital {
+    background: rgba(255,255,255,0.1);
+    padding: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header-digital h2 {
+    color: white;
+    margin: 0;
+    font-weight: 600;
+}
+
+.versao-badge {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+
+.card-body-digital {
+    background: white;
+    padding: 30px;
+}
+
+.secao-digital {
+    margin-bottom: 30px;
+    padding: 20px;
+    border-left: 4px solid #667eea;
+    background: #f8f9ff;
+    border-radius: 0 10px 10px 0;
+}
+
+.btn-digital-primary {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-digital-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+```
+
+#### **CRIAR NOVO JAVASCRIPT DO ZERO:**
+```javascript
+// static/js/relatorio_digital_v10.js - CRIAR DO ZERO
+class RelatorioDigitalMastery {
+    constructor() {
+        this.versao = 'v10.0';
+        this.init();
+    }
+    
+    init() {
+        console.log('🚀 Relatório Digital Mastery v10.0 iniciado');
+        this.setupEventListeners();
+        this.loadObras();
+    }
+    
+    setupEventListeners() {
+        const form = document.getElementById('relatorioDigitalForm');
+        if (form) {
+            form.addEventListener('submit', (e) => this.handleSubmit(e));
+        }
+    }
+    
+    async handleSubmit(event) {
+        event.preventDefault();
+        
+        try {
+            const formData = new FormData(event.target);
+            const response = await fetch('/obra/relatorio/processar', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                this.showSuccess('Relatório salvo com sucesso!');
+            } else {
+                this.showError(result.message);
+            }
+            
+        } catch (error) {
+            console.error('Erro:', error);
+            this.showError('Erro ao salvar relatório');
+        }
+    }
+    
+    showSuccess(message) {
+        // Implementar notificação de sucesso
+        console.log('✅', message);
+    }
+    
+    showError(message) {
+        // Implementar notificação de erro  
+        console.error('❌', message);
+    }
+}
+
+// Inicializar quando DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+    new RelatorioDigitalMastery();
+});
+```
+
+### 🔧 **FASE 3: INTEGRAÇÃO E TESTES (10 min)**
+
+#### **ATUALIZAR NAVEGAÇÃO:**
+```html
+<!-- Atualizar menus para nova rota -->
+<a href="/obra/relatorio/digital">📊 Relatório Digital</a>
+<!-- Remover links antigos para /rdo/* -->
+```
+
+#### **ATUALIZAR BANCO DE DADOS:**
+```python
+# Criar migração para nova tabela
+def upgrade():
+    op.create_table('relatorio_obra_digital',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('admin_id', sa.Integer(), nullable=False),
+        sa.Column('obra_id', sa.Integer(), nullable=False),
+        # ... outros campos
+        sa.PrimaryKeyConstraint('id')
+    )
+```
+
+### 📊 **RESULTADO FINAL:**
+
+#### **SISTEMA COMPLETAMENTE NOVO:**
+- ✅ **0 referências** ao RDO antigo
+- ✅ **Código 100% v10.0** Digital Mastery
+- ✅ **Nomes novos** (RelatorioObraDigital)
+- ✅ **Rotas novas** (/obra/relatorio/digital)
+- ✅ **Templates novos** (relatorio_digital.html)
+- ✅ **CSS/JS novos** (relatorio_digital_v10.*)
+- ✅ **Funções novas** (processar_subatividades_digital_mastery)
+- ✅ **Tabela nova** (relatorio_obra_digital)
+
+#### **BENEFÍCIOS:**
+- 🧹 **Código limpo** sem rastros antigos
+- 🚀 **Performance otimizada** 
+- 🎨 **Interface moderna** 100%
+- 🔧 **Manutenibilidade alta**
+- 🛡️ **Sem conflitos** de versão
+- 📊 **Logs claros** v10.0
+
+### ⚡ **CRONOGRAMA DE EXECUÇÃO:**
+
+**TEMPO TOTAL: 40 minutos**
+- **10 min:** Demolição completa (deletar tudo)
+- **20 min:** Reconstrução Digital Mastery
+- **10 min:** Integração e testes
+
+### 🎯 **VALIDAÇÃO FINAL:**
+
+#### **CHECKLIST PÓS-RECONSTRUÇÃO:**
+- [ ] ❌ Nenhuma referência a "rdo" no código
+- [ ] ❌ Nenhuma rota "/rdo/*" ativa
+- [ ] ❌ Nenhum template rdo/*.html
+- [ ] ❌ Nenhum CSS/JS com "rdo"
+- [ ] ✅ Sistema funciona 100% com código novo
+- [ ] ✅ Interface Digital Mastery carrega
+- [ ] ✅ Subatividades são processadas
+- [ ] ✅ Dados são salvos corretamente
+
+---
+
+## 🚀 **AÇÃO IMEDIATA:**
+
+**EXECUTE RECONSTRUÇÃO TOTAL:**
+
+1. **DELETAR TUDO** relacionado a RDO antigo
+2. **CRIAR NOVO** sistema RelatorioObraDigital v10.0
+3. **TESTAR** funcionalidade completa
+4. **VALIDAR** que não há rastros antigos
+
+**OBJETIVO:** Sistema RDO 100% novo, moderno e funcional!
+
+**RESULTADO:** Produção = Desenvolvimento com código limpo!
+
