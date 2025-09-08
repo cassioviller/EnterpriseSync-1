@@ -486,8 +486,8 @@ function carregarDadosUltimoRDO() {
                     exibirMensagemSemRDOAnterior();
                 }
             } else {
-                console.error('❌ Erro na API:', data.error);
-                exibirErroCarregamento();
+                console.log('ℹ️ Nenhum RDO anterior encontrado para esta obra');
+                exibirMensagemSemRDOAnterior();
             }
         })
         .catch(error => {
