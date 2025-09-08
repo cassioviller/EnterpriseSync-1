@@ -5863,6 +5863,34 @@ def salvar_rdo_flexivel():
                 db.session.add(subatividade)
                 logger.debug(f"💾 Subatividade salva: {sub_data['nome']} -> Serviço {target_service_id}")
             
+            # CORREÇÃO CRÍTICA: PROCESSAR FUNCIONÁRIOS SELECIONADOS
+            funcionarios_selecionados = request.form.getlist('funcionarios_selecionados')
+            logger.info(f"👥 PROCESSANDO FUNCIONÁRIOS: {len(funcionarios_selecionados)} selecionados")
+            
+            for funcionario_id_str in funcionarios_selecionados:
+                try:
+                    if funcionario_id_str and funcionario_id_str.strip():
+                        funcionario_id_sel = int(funcionario_id_str.strip())
+                        
+                        # Verificar se funcionário existe
+                        funcionario = Funcionario.query.get(funcionario_id_sel)
+                        if funcionario:
+                            # Criar registro de mão de obra
+                            mao_obra = RDOMaoObra(
+                                rdo_id=rdo.id,
+                                funcionario_id=funcionario_id_sel,
+                                horas_trabalhadas=8.8,  # Padrão
+                                funcao_exercida=funcionario.funcao_ref.nome if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref else 'Funcionário',
+                                admin_id=admin_id
+                            )
+                            db.session.add(mao_obra)
+                            logger.info(f"👷 Funcionário salvo: {funcionario.nome} (ID: {funcionario_id_sel})")
+                        else:
+                            logger.warning(f"⚠️ Funcionário ID {funcionario_id_sel} não encontrado")
+                except Exception as e:
+                    logger.error(f"❌ Erro ao processar funcionário {funcionario_id_str}: {e}")
+                    continue
+            
             # Commit da transação
             db.session.commit()
             success = True
