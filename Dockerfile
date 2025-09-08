@@ -1,55 +1,48 @@
-# DOCKERFILE MAESTRIA DIGITAL - SIGE v10.0 - JORIS KUYPERS ARCHITECTURE
-# Sistema RDO com Observabilidade Completa + Digital Mastery Principles
-# "Kaipa da primeira vez certo" - Implementação robusta para produção
-# Aplicação dos princípios: Robustez, Escalabilidade, Observabilidade e Manutenibilidade
+# DOCKERFILE SIGE v10.0 - DIGITAL MASTERY PRODUCTION
+# Otimizado para EasyPanel/Hostinger - Joris Kuypers Architecture
+# Data: 2025-09-08 - Versão: 10.0.1
 
-# Usar imagem mais leve e segura para produção
-FROM python:3.11-slim-bookworm
+FROM python:3.11-slim
 
-# Metadados Digital Mastery
-LABEL maintainer="SIGE v10.0 Digital Mastery" \
-      version="10.0" \
-      description="Sistema RDO com Observabilidade Completa - Joris Kuypers Architecture" \
-      architecture="Digital Mastery" \
-      observability="Complete"
+# Metadata
+LABEL maintainer="Cassio Viller <cassio@sige.tech>"
+LABEL version="10.0.1"
+LABEL description="SIGE Digital Mastery - Sistema Integrado de Gestão Empresarial"
 
-# Variáveis de build
-ARG DEBIAN_FRONTEND=noninteractive
-ARG BUILD_ENV=production
+# Variáveis de ambiente para produção
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV FLASK_ENV=production
+ENV FLASK_APP=app.py
+ENV DIGITAL_MASTERY_MODE=true
+ENV OBSERVABILITY_ENABLED=true
+ENV LOG_LEVEL=INFO
 
-# Instalar dependências sistema com segurança otimizada (Digital Mastery)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # PostgreSQL client para conexão
+# Configurações de timezone
+ENV TZ=America/Sao_Paulo
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
     postgresql-client \
-    # Ferramentas de observabilidade
     curl \
     wget \
-    jq \
-    # Build tools mínimos
-    gcc \
-    g++ \
-    python3-dev \
+    git \
+    build-essential \
     libpq-dev \
     libffi-dev \
     libssl-dev \
-    make \
-    # Segurança e monitoramento
-    ca-certificates \
-    procps \
-    # Cleanup automático
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /tmp/* \
-    && rm -rf /var/tmp/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Criar usuário para segurança (Digital Mastery principle)
-RUN groupadd -r sige && useradd -r -g sige sige
+# Criar usuário não-root para segurança
+RUN useradd --create-home --shell /bin/bash sige
 
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Multi-stage dependency caching (Joris principle: efficiency)
-COPY pyproject.toml* setup.py* ./
+# Copiar arquivos de dependências primeiro (para cache do Docker)
+COPY pyproject.toml ./
+COPY requirements.txt* ./
 
 # Instalar dependências Python com otimização (Digital Mastery)
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
@@ -107,32 +100,10 @@ ENV FLASK_APP=main.py \
 # Expor porta
 EXPOSE 5000
 
-# Health check avançado com observabilidade (Joris principle: robustness)
-HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=5 \
-  CMD curl -f http://localhost:${PORT:-5000}/health \
-      --connect-timeout 10 \
-      --max-time 15 \
-      --retry 2 \
-      --retry-delay 1 \
-      --retry-max-time 30 \
-      --silent \
-      --show-error \
-      || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
 
-# Comando de entrada com Digital Mastery (Produção Otimizada)
+# Entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["gunicorn", \
-    "--bind", "0.0.0.0:5000", \
-    "--workers", "${GUNICORN_WORKERS:-4}", \
-    "--worker-class", "sync", \
-    "--worker-connections", "1000", \
-    "--timeout", "${GUNICORN_TIMEOUT:-300}", \
-    "--keepalive", "${GUNICORN_KEEPALIVE:-65}", \
-    "--max-requests", "1000", \
-    "--max-requests-jitter", "100", \
-    "--preload", \
-    "--access-logfile", "-", \
-    "--error-logfile", "-", \
-    "--log-level", "info", \
-    "--capture-output", \
-    "main:app"]
+CMD ["python", "app.py"]
