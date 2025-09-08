@@ -2384,18 +2384,30 @@ function exibirDadosPrimeiraRDO(primeiraRDO) {
                                 <h6 class="text-muted"><i class="fas fa-list"></i> Subatividades</h6>
                                 <div class="row">
                                 ${servico.subatividades.map(sub => `
-                                    <div class="col-md-6 mb-2">
-                                        <label class="form-label small">${sub.nome}</label>
-                                        <div class="input-group input-group-sm">
-                                            <input type="number" 
-                                                   class="form-control" 
-                                                   name="subatividade_${sub.id}_percentual"
-                                                   value="0" 
-                                                   min="0" 
-                                                   max="100" 
-                                                   step="0.1"
-                                                   form="formNovoRDO">
-                                            <span class="input-group-text">%</span>
+                                    <div class="col-md-12 mb-3">
+                                        <div class="card border-light">
+                                            <div class="card-body">
+                                                <label class="form-label small">${sub.nome}</label>
+                                                <div class="input-group input-group-sm mb-2">
+                                                    <input type="number" 
+                                                           class="form-control" 
+                                                           name="subatividade_${sub.id}_percentual"
+                                                           value="0" 
+                                                           min="0" 
+                                                           max="100" 
+                                                           step="0.1"
+                                                           form="formNovoRDO">
+                                                    <span class="input-group-text">%</span>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label small">Observações</label>
+                                                    <textarea class="form-control form-control-sm" 
+                                                              name="subatividade_${sub.id}_observacoes"
+                                                              rows="2" 
+                                                              placeholder="Observações da subatividade..."
+                                                              form="formNovoRDO"></textarea>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 `).join('')}
