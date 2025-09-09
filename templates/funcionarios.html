@@ -162,9 +162,6 @@
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#funcionarioModal" onclick="abrirModalNovoFuncionario()">
                         <i class="fas fa-plus"></i> Novo Funcionário
                     </button>
-                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#funcionarioModal" onclick="abrirModalNovoFuncionario()">
-                        <i class="fas fa-plus-circle"></i> Modal Rápido
-                    </button>
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalLancamentoMultiplo">
                         <i class="fas fa-users-cog"></i> Lançamento Múltiplo
                     </button>
@@ -782,9 +779,18 @@ function excluirFuncionario(id) {
 
 function resetForm() {
     document.getElementById('funcionarioForm').reset();
-    document.getElementById('funcionarioModalLabel').textContent = 'Novo Funcionário';
-    document.getElementById('foto-preview').style.display = 'none';
-    document.getElementById('data_admissao').valueAsDate = new Date();
+    const modalLabel = document.getElementById('funcionarioModalLabel') || document.getElementById('modalTitle');
+    if (modalLabel) {
+        modalLabel.textContent = 'Novo Funcionário';
+    }
+    const fotoPreview = document.getElementById('foto-preview');
+    if (fotoPreview) {
+        fotoPreview.style.display = 'none';
+    }
+    const dataAdmissao = document.getElementById('data_admissao');
+    if (dataAdmissao) {
+        dataAdmissao.valueAsDate = new Date();
+    }
 }
 
 // Função para filtrar funcionários
