@@ -1009,15 +1009,6 @@ console.log('Initializing RDO with light theme...');
                     <span>{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</span>
                 </div>
                 
-                <div class="rdo-creator">
-                    <i class="fas fa-user"></i>
-                    <span>{{ rdo.criado_por.nome if rdo.criado_por else 'Sistema' }}</span>
-                </div>
-                
-                <div class="rdo-obra">
-                    <i class="fas fa-building"></i>
-                    <span>{{ rdo.obra.nome }}</span>
-                </div>
                 
                 <div class="rdo-progress">
                     <div class="progress-header">
