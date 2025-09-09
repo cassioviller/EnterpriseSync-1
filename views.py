@@ -6111,7 +6111,7 @@ def api_rdo_ultima_dados(obra_id):
                 funcionarios_data.append({
                     'id': func_rdo.funcionario.id,
                     'nome': func_rdo.funcionario.nome,
-                    'cargo': func_rdo.funcionario.cargo or 'Funcionário',
+                    'cargo': func_rdo.funcionario.funcao_ref.nome if hasattr(func_rdo.funcionario, 'funcao_ref') and func_rdo.funcionario.funcao_ref else 'Funcionário',
                     'horas_trabalhadas': float(func_rdo.horas_trabalhadas or 8.8)
                 })
         
