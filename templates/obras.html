@@ -69,7 +69,8 @@
                     <div class="input-group">
                         <span class="input-group-text"><i class="fas fa-search"></i></span>
                         <input type="text" class="form-control" id="nome" name="nome" 
-                               value="{{ filtros.nome }}" placeholder="Digite o nome da obra...">
+                               value="{{ filtros.nome }}" placeholder="Digite o nome da obra..."
+                               oninput="buscarInstantaneo()" autocomplete="off">
                     </div>
                 </div>
                 
@@ -119,9 +120,9 @@
                                 onclick="setDateRange('ano_atual')">Ano Atual</button>
                         <button type="button" class="btn btn-outline-secondary btn-sm" 
                                 onclick="setDateRange('ultimo_ano')">Último Ano</button>
-                        <a href="{{ url_for('main.obras') }}" class="btn btn-outline-danger btn-sm">
+                        <button type="button" onclick="limparFiltros()" class="btn btn-outline-danger btn-sm">
                             <i class="fas fa-times"></i> Limpar Filtros
-                        </a>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -875,6 +876,42 @@ function setDateRange(periodo) {
     
     // Auto-submit do formulário
     document.getElementById('filtroForm').submit();
+}
+
+// Busca instantânea enquanto digita
+let timeoutId;
+function buscarInstantaneo() {
+    clearTimeout(timeoutId);
+    
+    timeoutId = setTimeout(function() {
+        const nome = document.getElementById('nome').value;
+        const status = document.getElementById('status').value;
+        const dataInicio = document.getElementById('data_inicio').value;
+        const dataFim = document.getElementById('data_fim').value;
+        
+        // Construir URL com parâmetros
+        let url = '/obras?';
+        const params = [];
+        
+        if (nome.trim()) params.push(`nome=${encodeURIComponent(nome)}`);
+        if (status) params.push(`status=${encodeURIComponent(status)}`);
+        if (dataInicio) params.push(`data_inicio=${dataInicio}`);
+        if (dataFim) params.push(`data_fim=${dataFim}`);
+        
+        url += params.join('&');
+        
+        // Redirecionar para aplicar filtros
+        window.location.href = url;
+    }, 500); // Aguardar 500ms após parar de digitar
+}
+
+// Limpar filtros rapidamente
+function limparFiltros() {
+    document.getElementById('nome').value = '';
+    document.getElementById('status').value = '';
+    document.getElementById('data_inicio').value = '';
+    document.getElementById('data_fim').value = '';
+    window.location.href = '/obras';
 }
 </script>
 {% endblock %}
