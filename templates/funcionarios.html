@@ -146,9 +146,9 @@
 
 <!-- Botão Flutuante Mobile -->
 <div class="floating-action d-lg-none">
-    <a href="{{ url_for('main.funcionarios') }}?action=novo" class="btn btn-primary">
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#funcionarioModal" onclick="abrirModalNovoFuncionario()">
         <i class="fas fa-user-plus"></i>
-    </a>
+    </button>
 </div>
 <div class="container-fluid">
     <!-- Cabeçalho -->
@@ -159,9 +159,9 @@
                     <i class="fas fa-users"></i> Funcionários
                 </h1>
                 <div class="btn-group">
-                    <a href="{{ url_for('main.funcionarios') }}" class="btn btn-primary">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#funcionarioModal" onclick="abrirModalNovoFuncionario()">
                         <i class="fas fa-plus"></i> Novo Funcionário
-                    </a>
+                    </button>
                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#funcionarioModal" onclick="abrirModalNovoFuncionario()">
                         <i class="fas fa-plus-circle"></i> Modal Rápido
                     </button>
