@@ -4342,17 +4342,22 @@ def funcionario_rdo_consolidado():
             total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
             total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
             
+            # 🔧 CALCULAR HORAS TRABALHADAS REAIS
+            mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
+            total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
+            
             # Calcular progresso médio
             subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
             progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades) if subatividades else 0
             
-            print(f"DEBUG RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {progresso_medio}% progresso")
+            print(f"DEBUG RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {total_horas_trabalhadas}h trabalhadas, {progresso_medio}% progresso")
             
             rdos_processados.append({
                 'rdo': rdo,
                 'obra': obra,
                 'total_subatividades': total_subatividades,
                 'total_funcionarios': total_funcionarios,
+                'total_horas_trabalhadas': round(total_horas_trabalhadas, 1),
                 'progresso_medio': round(progresso_medio, 1),
                 'status_cor': {
                     'Rascunho': 'warning',
