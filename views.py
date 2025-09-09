@@ -733,7 +733,7 @@ def usuarios():
         )
     ).order_by(Usuario.nome).all()
     
-    logger.info(f"👥 USUÁRIOS: {len(usuarios)} encontrados para admin_id={admin_id}")
+    print(f"👥 USUÁRIOS: {len(usuarios)} encontrados para admin_id={admin_id}")
     
     return render_template('usuarios/listar_usuarios.html', usuarios=usuarios)
 
@@ -765,7 +765,7 @@ def novo_usuario():
             
         except Exception as e:
             db.session.rollback()
-            logger.error(f"❌ Erro ao criar usuário: {e}")
+            print(f"❌ Erro ao criar usuário: {e}")
             flash('❌ Erro ao criar usuário', 'danger')
     
     return render_template('usuarios/novo_usuario.html')
@@ -795,7 +795,7 @@ def editar_usuario(user_id):
             
         except Exception as e:
             db.session.rollback()
-            logger.error(f"❌ Erro ao editar usuário: {e}")
+            print(f"❌ Erro ao editar usuário: {e}")
             flash('❌ Erro ao editar usuário', 'danger')
     
     return render_template('usuarios/editar_usuario.html', usuario=usuario)
