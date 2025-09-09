@@ -747,14 +747,18 @@ def novo_usuario():
             from multitenant_helper import get_admin_id
             admin_id = get_admin_id()
             
-            # Criar usuário
+            # Criar usuário (apenas username e senha obrigatórios)
+            nome = request.form.get('nome') or request.form['username']  # Nome padrão é o username
+            email = request.form.get('email') or f"{request.form['username']}@sige.local"  # Email padrão
+            tipo_usuario = request.form.get('tipo_usuario') or 'FUNCIONARIO'  # Tipo padrão
+            
             usuario = Usuario(
-                nome=request.form['nome'],
-                email=request.form['email'],
+                nome=nome,
+                email=email,
                 username=request.form['username'],
                 password_hash=generate_password_hash(request.form['password']),
-                tipo_usuario=TipoUsuario[request.form['tipo_usuario']],
-                admin_id=admin_id if request.form['tipo_usuario'] != 'ADMIN' else None
+                tipo_usuario=TipoUsuario[tipo_usuario],
+                admin_id=admin_id if tipo_usuario != 'ADMIN' else None
             )
             
             db.session.add(usuario)
