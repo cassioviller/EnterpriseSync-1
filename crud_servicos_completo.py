@@ -1023,9 +1023,36 @@ def importar_excel():
             ).first()
             
             if servico_existente:
-                duplicados += 1
-                logger.warning(f"⚠️ Serviço '{nome_servico}' já existe, ignorando")
-                continue
+                # Verificar modo de importação (padrão: atualizar)
+                modo_importacao = dados.get('modo_importacao', 'atualizar')
+                
+                if modo_importacao == 'ignorar':
+                    duplicados += 1
+                    logger.warning(f"⚠️ Serviço '{nome_servico}' já existe, ignorando")
+                    continue
+                elif modo_importacao == 'atualizar':
+                    # Atualizar serviço existente
+                    servico_existente.descricao = f'Atualizado via Excel - {len(subatividades)} subatividades'
+                    servico_existente.categoria = 'Importado'
+                    
+                    # Remover subatividades antigas
+                    SubatividadeMestre.query.filter_by(servico_id=servico_existente.id).delete()
+                    
+                    # Adicionar novas subatividades
+                    for ordem, nome_sub in enumerate(subatividades, 1):
+                        if nome_sub.strip():
+                            subatividade = SubatividadeMestre(
+                                nome=nome_sub.strip(),
+                                servico_id=servico_existente.id,
+                                ordem_padrao=ordem,
+                                admin_id=admin_id,
+                                ativo=True
+                            )
+                            db.session.add(subatividade)
+                    
+                    importados += 1
+                    logger.info(f"🔄 Serviço '{nome_servico}' atualizado com {len(subatividades)} subatividades")
+                    continue
             
             # Debug: Log dos campos que serão usados
             campos_servico = {

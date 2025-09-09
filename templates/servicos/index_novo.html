@@ -565,14 +565,15 @@ async function importarServicos() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                servicos: dadosExcel
+                servicos: dadosExcel,
+                modo_importacao: 'atualizar'  // atualizar, ignorar ou forcar
             })
         });
         
         const result = await response.json();
         
         if (result.success) {
-            alert(`Importação concluída com sucesso!\n\n✅ ${result.importados} serviços importados\n⚠️ ${result.duplicados} duplicados ignorados`);
+            alert(`Importação concluída com sucesso!\n\n✅ ${result.importados} serviços processados\n⚠️ ${result.duplicados} duplicados encontrados`);
             
             // Fechar modal e recarregar página
             const modal = bootstrap.Modal.getInstance(document.getElementById('modalImportacao'));
