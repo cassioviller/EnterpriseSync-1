@@ -1013,25 +1013,25 @@ console.log('Initializing RDO with light theme...');
                 <div class="rdo-progress">
                     <div class="progress-header">
                         <span>Progresso Geral</span>
-                        <strong>{{ "%.1f"|format(rdo_data.progresso_total|default(0)) }}%</strong>
+                        <strong>{{ "%.1f"|format(rdo_data.progresso_medio|default(0)) }}%</strong>
                     </div>
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ rdo_data.progresso_total|default(0) }}%"></div>
+                        <div class="progress-fill" style="width: {{ rdo_data.progresso_medio|default(0) }}%"></div>
                     </div>
                 </div>
                 
                 <div class="rdo-stats">
                     <div class="stat-item">
                         <i class="fas fa-tasks"></i>
-                        <span>{{ rdo_data.servico_subatividades|length|default(0) }} atividades</span>
+                        <span>{{ rdo_data.total_subatividades|default(0) }} atividades</span>
                     </div>
                     <div class="stat-item">
                         <i class="fas fa-users"></i>
-                        <span>{{ rdo_data.mao_obra|length|default(0) }} funcionários</span>
+                        <span>{{ rdo_data.total_funcionarios|default(0) }} funcionários</span>
                     </div>
                     <div class="stat-item">
                         <i class="fas fa-clock"></i>
-                        <span>{{ "%.1f"|format(rdo_data.horas_totais|default(0)) }}h</span>
+                        <span>{{ "%.1f"|format(rdo_data.total_subatividades|default(0)) }}h</span>
                     </div>
                 </div>
             </div>
