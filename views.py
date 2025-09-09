@@ -6198,5 +6198,59 @@ def _buscar_subatividades_servico(servico_id):
 
 # === SISTEMA LIMPO - CÓDIGO DUPLICADO REMOVIDO ===
 
+@main_bp.route('/novo_ponto', methods=['POST'])
+@login_required
+def novo_ponto():
+    """Cria novo registro de ponto"""
+    try:
+        data = request.form.to_dict()
+        
+        funcionario_id = data.get('funcionario_id')
+        if not funcionario_id:
+            return jsonify({'success': False, 'message': 'Funcionário não informado'}), 400
+        
+        # Buscar funcionário
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 404
+        
+        # Criar registro de ponto
+        registro = RegistroPonto(
+            funcionario_id=funcionario_id,
+            data=datetime.strptime(data.get('data'), '%Y-%m-%d').date(),
+            hora_entrada=datetime.strptime(data.get('hora_entrada'), '%H:%M').time() if data.get('hora_entrada') else None,
+            hora_saida=datetime.strptime(data.get('hora_saida'), '%H:%M').time() if data.get('hora_saida') else None,
+            hora_almoco_saida=datetime.strptime(data.get('hora_almoco_saida'), '%H:%M').time() if data.get('hora_almoco_saida') else None,
+            hora_almoco_retorno=datetime.strptime(data.get('hora_almoco_retorno'), '%H:%M').time() if data.get('hora_almoco_retorno') else None,
+            observacoes=data.get('observacoes', ''),
+            tipo_registro=data.get('tipo_lancamento', 'trabalho_normal')
+        )
+        
+        # Calcular horas trabalhadas se possível
+        if registro.hora_entrada and registro.hora_saida:
+            from utils import calcular_horas_trabalhadas
+            horas_calc = calcular_horas_trabalhadas(
+                registro.hora_entrada,
+                registro.hora_saida,
+                registro.hora_almoco_saida,
+                registro.hora_almoco_retorno,
+                registro.data
+            )
+            registro.horas_trabalhadas = horas_calc['total']
+            registro.horas_extras = horas_calc['extras']
+        
+        db.session.add(registro)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registro de ponto criado com sucesso!',
+            'registro_id': registro.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
+
 # CONTINUAÇÃO DO SISTEMA ANTIGO (TEMPORÁRIO PARA COMPATIBILITY)
 
