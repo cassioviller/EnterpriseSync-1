@@ -1016,7 +1016,7 @@ def importar_excel():
             if not nome_servico:
                 continue
             
-            # Verificar se serviço já existe
+            # Verificar se serviço já existe (INCLUINDO INATIVOS)
             servico_existente = Servico.query.filter_by(
                 nome=nome_servico,
                 admin_id=admin_id
