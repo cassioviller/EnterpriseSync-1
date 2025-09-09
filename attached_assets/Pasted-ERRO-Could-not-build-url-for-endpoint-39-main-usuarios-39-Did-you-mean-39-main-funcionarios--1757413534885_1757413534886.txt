@@ -1,0 +1,47 @@
+ERRO: Could not build url for endpoint &#39;main.usuarios&#39;. Did you mean &#39;main.funcionarios&#39; instead?
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask_login/utils.py&#34;, line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/decorators.py&#34;, line 13, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/configuracoes_views.py&#34;, line 22, in configuracoes
+    return render_template(&#39;configuracoes/index.html&#39;, config=config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py&#34;, line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py&#34;, line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 1295, in render
+    self.environment.handle_exception()
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File &#34;/home/runner/workspace/templates/configuracoes/index.html&#34;, line 1, in top-level template code
+    {% extends &#34;base_completo.html&#34; %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/templates/base_completo.html&#34;, line 852, in top-level template code
+    {% block content %}{% endblock %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/templates/configuracoes/index.html&#34;, line 79, in block &#39;content&#39;
+    &lt;a href=&#34;{{ url_for(&#39;main.usuarios&#39;) }}&#34; class=&#34;btn btn-info&#34;&gt;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 1121, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 1110, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/werkzeug/routing/map.py&#34;, line 924, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint &#39;main.usuarios&#39;. Did you mean &#39;main.funcionarios&#39; instead?
