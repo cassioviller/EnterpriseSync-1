@@ -805,13 +805,91 @@ def editar_usuario(user_id):
     return render_template('usuarios/editar_usuario.html', usuario=usuario)
 
 # ===== FUNCIONÁRIOS =====
-@main_bp.route('/funcionarios')
+@main_bp.route('/funcionarios', methods=['GET', 'POST'])
 def funcionarios():
     # Temporariamente remover decorator para testar
     # @admin_required
-    from models import Departamento, Funcao, HorarioTrabalho, RegistroPonto
+    from models import Departamento, Funcao, HorarioTrabalho, RegistroPonto, Funcionario
     from sqlalchemy import text
+    from werkzeug.utils import secure_filename
+    import os
     
+    # ===== PROCESSAR POST PARA CRIAR NOVO FUNCIONÁRIO =====
+    if request.method == 'POST':
+        try:
+            print("🔄 POST recebido para criar novo funcionário")
+            
+            # Obter admin_id para o novo funcionário
+            if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
+                if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                    admin_id = current_user.id
+                else:
+                    admin_id = current_user.admin_id or current_user.id
+            else:
+                # Fallback
+                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
+                admin_id = admin_counts[0] if admin_counts else 10
+            
+            # Dados obrigatórios
+            nome = request.form.get('nome', '').strip()
+            cpf = request.form.get('cpf', '').strip()
+            codigo = request.form.get('codigo', '').strip()
+            
+            if not nome or not cpf:
+                flash('❌ Nome e CPF são obrigatórios!', 'error')
+                return redirect(url_for('main.funcionarios'))
+            
+            # Verificar se CPF já existe
+            funcionario_existente = Funcionario.query.filter_by(cpf=cpf).first()
+            if funcionario_existente:
+                flash(f'❌ CPF {cpf} já está cadastrado para {funcionario_existente.nome}!', 'error')
+                return redirect(url_for('main.funcionarios'))
+            
+            # Criar novo funcionário
+            novo_funcionario = Funcionario(
+                nome=nome,
+                cpf=cpf,
+                codigo=codigo,
+                email=request.form.get('email', ''),
+                telefone=request.form.get('telefone', ''),
+                endereco=request.form.get('endereco', ''),
+                data_admissao=datetime.strptime(request.form.get('data_admissao', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date(),
+                salario=float(request.form.get('salario', 0)) if request.form.get('salario') else None,
+                departamento_id=int(request.form.get('departamento_id')) if request.form.get('departamento_id') else None,
+                funcao_id=int(request.form.get('funcao_id')) if request.form.get('funcao_id') else None,
+                horario_id=int(request.form.get('horario_id')) if request.form.get('horario_id') else None,
+                admin_id=admin_id,
+                ativo=True
+            )
+            
+            # Processar foto se enviada
+            if 'foto' in request.files and request.files['foto'].filename:
+                foto = request.files['foto']
+                if foto.filename:
+                    filename = secure_filename(f"{codigo}_{foto.filename}")
+                    foto_path = os.path.join('static/fotos_funcionarios', filename)
+                    
+                    # Criar diretório se não existir
+                    os.makedirs(os.path.dirname(foto_path), exist_ok=True)
+                    foto.save(foto_path)
+                    novo_funcionario.foto = filename
+            
+            # Salvar no banco
+            db.session.add(novo_funcionario)
+            db.session.commit()
+            
+            flash(f'✅ Funcionário {nome} cadastrado com sucesso!', 'success')
+            print(f"✅ Funcionário criado: {nome} (ID: {novo_funcionario.id})")
+            
+            return redirect(url_for('main.funcionarios'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Erro ao criar funcionário: {str(e)}")
+            flash(f'❌ Erro ao criar funcionário: {str(e)}', 'error')
+            return redirect(url_for('main.funcionarios'))
+    
+    # ===== LÓGICA GET (LISTAGEM) =====
     # Determinar admin_id corretamente baseado no usuário logado
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
         if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
