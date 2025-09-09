@@ -275,11 +275,16 @@ def index():
         # Usar sistema de erro detalhado
         return handle_detailed_error(e, "Sistema de Serviços", "main.dashboard")
 
-@servicos_crud_bp.route('/novo', methods=['GET'])
+@servicos_crud_bp.route('/novo', methods=['GET', 'POST'])
 def novo_servico():
-    """Exibe formulário para criar novo serviço"""
+    """Exibe formulário para criar novo serviço ou processa se for POST"""
     try:
         admin_id = get_admin_id()
+        
+        # Se for POST, redirecionar para a rota de criação
+        if request.method == 'POST':
+            return criar_servico()
+        
         logger.info(f"📝 Abrindo formulário de novo serviço para admin_id={admin_id}")
         
         # Importar sistema de categorias
