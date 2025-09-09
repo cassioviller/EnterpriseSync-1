@@ -857,7 +857,7 @@ def funcionarios():
                 salario=float(request.form.get('salario', 0)) if request.form.get('salario') else None,
                 departamento_id=int(request.form.get('departamento_id')) if request.form.get('departamento_id') else None,
                 funcao_id=int(request.form.get('funcao_id')) if request.form.get('funcao_id') else None,
-                horario_id=int(request.form.get('horario_id')) if request.form.get('horario_id') else None,
+                horario_trabalho_id=int(request.form.get('horario_id')) if request.form.get('horario_id') else None,
                 admin_id=admin_id,
                 ativo=True
             )
