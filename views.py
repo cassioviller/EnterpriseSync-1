@@ -715,6 +715,91 @@ def dashboard():
                          data_inicio=data_inicio,
                          data_fim=data_fim)
 
+# ===== USUÁRIOS DO SISTEMA =====
+
+@main_bp.route('/usuarios')
+@login_required
+@admin_required  
+def usuarios():
+    """Lista usuários do sistema"""
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    
+    # Buscar todos os usuários (admins e funcionários)
+    usuarios = Usuario.query.filter(
+        db.or_(
+            Usuario.admin_id == admin_id,
+            Usuario.id == admin_id
+        )
+    ).order_by(Usuario.nome).all()
+    
+    logger.info(f"👥 USUÁRIOS: {len(usuarios)} encontrados para admin_id={admin_id}")
+    
+    return render_template('usuarios/listar_usuarios.html', usuarios=usuarios)
+
+@main_bp.route('/usuarios/novo', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def novo_usuario():
+    """Criar novo usuário"""
+    if request.method == 'POST':
+        try:
+            from multitenant_helper import get_admin_id
+            admin_id = get_admin_id()
+            
+            # Criar usuário
+            usuario = Usuario(
+                nome=request.form['nome'],
+                email=request.form['email'],
+                username=request.form['username'],
+                password_hash=generate_password_hash(request.form['password']),
+                tipo_usuario=TipoUsuario[request.form['tipo_usuario']],
+                admin_id=admin_id if request.form['tipo_usuario'] != 'ADMIN' else None
+            )
+            
+            db.session.add(usuario)
+            db.session.commit()
+            
+            flash(f'✅ Usuário {usuario.nome} criado com sucesso!', 'success')
+            return redirect(url_for('main.usuarios'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao criar usuário: {e}")
+            flash('❌ Erro ao criar usuário', 'danger')
+    
+    return render_template('usuarios/novo_usuario.html')
+
+@main_bp.route('/usuarios/<int:user_id>/editar', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def editar_usuario(user_id):
+    """Editar usuário"""
+    usuario = Usuario.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        try:
+            usuario.nome = request.form['nome']
+            usuario.email = request.form['email']
+            usuario.username = request.form['username']
+            usuario.tipo_usuario = TipoUsuario[request.form['tipo_usuario']]
+            usuario.ativo = 'ativo' in request.form
+            
+            # Atualizar senha se fornecida
+            if request.form.get('password'):
+                usuario.password_hash = generate_password_hash(request.form['password'])
+            
+            db.session.commit()
+            flash(f'✅ Usuário {usuario.nome} atualizado!', 'success')
+            return redirect(url_for('main.usuarios'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao editar usuário: {e}")
+            flash('❌ Erro ao editar usuário', 'danger')
+    
+    return render_template('usuarios/editar_usuario.html', usuario=usuario)
+
 # ===== FUNCIONÁRIOS =====
 @main_bp.route('/funcionarios')
 def funcionarios():
