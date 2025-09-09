@@ -1034,6 +1034,7 @@ def importar_excel():
                     # Atualizar serviço existente
                     servico_existente.descricao = f'Atualizado via Excel - {len(subatividades)} subatividades'
                     servico_existente.categoria = 'Importado'
+                    servico_existente.ativo = True  # GARANTIR que fica ativo
                     
                     # Remover subatividades antigas
                     SubatividadeMestre.query.filter_by(servico_id=servico_existente.id).delete()
