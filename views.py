@@ -837,8 +837,22 @@ def funcionarios():
             
             # 🔧 GERAR CÓDIGO AUTOMÁTICO SE VAZIO
             if not codigo:
-                from utils import gerar_codigo_funcionario
-                codigo = gerar_codigo_funcionario()
+                # Buscar último código VV existente
+                ultimo_funcionario = Funcionario.query.filter(
+                    Funcionario.codigo.like('VV%')
+                ).order_by(Funcionario.codigo.desc()).first()
+                
+                if ultimo_funcionario and ultimo_funcionario.codigo:
+                    try:
+                        numero_str = ultimo_funcionario.codigo[2:]  # Remove 'VV'
+                        ultimo_numero = int(numero_str)
+                        novo_numero = ultimo_numero + 1
+                    except (ValueError, TypeError):
+                        novo_numero = 1
+                else:
+                    novo_numero = 1
+                
+                codigo = f"VV{novo_numero:03d}"
                 print(f"✅ Código gerado automaticamente: {codigo}")
             
             if not nome or not cpf:
