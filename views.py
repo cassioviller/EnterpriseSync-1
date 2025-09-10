@@ -835,6 +835,12 @@ def funcionarios():
             cpf = request.form.get('cpf', '').strip()
             codigo = request.form.get('codigo', '').strip()
             
+            # 🔧 GERAR CÓDIGO AUTOMÁTICO SE VAZIO
+            if not codigo:
+                from utils import gerar_codigo_funcionario
+                codigo = gerar_codigo_funcionario()
+                print(f"✅ Código gerado automaticamente: {codigo}")
+            
             if not nome or not cpf:
                 flash('❌ Nome e CPF são obrigatórios!', 'error')
                 return redirect(url_for('main.funcionarios'))
