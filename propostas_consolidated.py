@@ -52,7 +52,7 @@ except ImportError as e:
 # Importar modelos necessários
 from app import db
 from models import (
-    PropostasComerciais, PropostaItens, PropostaTemplates, 
+    PropostaComercialSIGE, PropostaItem, PropostaTemplate, 
     ConfiguracaoEmpresa, Usuario, TipoUsuario, Obra, Servico
 )
 
@@ -119,25 +119,25 @@ def index():
         print(f"DEBUG PROPOSTAS: admin_id={admin_id}, filters=status:{status_filter}, cliente:{cliente_filter}")
         
         # Query base com filtro por admin
-        query = PropostasComerciais.query.filter_by(admin_id=admin_id)
+        query = PropostaComercialSIGE.query.filter_by(admin_id=admin_id)
         
         # Aplicar filtros
         if status_filter:
-            query = query.filter(PropostasComerciais.status == status_filter)
+            query = query.filter(PropostaComercialSIGE.status == status_filter)
         if cliente_filter:
-            query = query.filter(PropostasComerciais.cliente_nome.ilike(f'%{cliente_filter}%'))
+            query = query.filter(PropostaComercialSIGE.cliente_nome.ilike(f'%{cliente_filter}%'))
         
         # Paginação
-        propostas = query.order_by(PropostasComerciais.criado_em.desc()).paginate(
+        propostas = query.order_by(PropostaComercialSIGE.criado_em.desc()).paginate(
             page=page, per_page=20, error_out=False
         )
         
         # Estatísticas para dashboard
         stats = safe_db_operation(lambda: {
-            'total': PropostasComerciais.query.filter_by(admin_id=admin_id).count(),
-            'pendentes': PropostasComerciais.query.filter_by(admin_id=admin_id, status='pendente').count(),
-            'aprovadas': PropostasComerciais.query.filter_by(admin_id=admin_id, status='aprovada').count(),
-            'valor_total': db.session.query(func.sum(PropostasComerciais.valor_total)).filter_by(admin_id=admin_id).scalar() or 0
+            'total': PropostaComercialSIGE.query.filter_by(admin_id=admin_id).count(),
+            'pendentes': PropostaComercialSIGE.query.filter_by(admin_id=admin_id, status='pendente').count(),
+            'aprovadas': PropostaComercialSIGE.query.filter_by(admin_id=admin_id, status='aprovada').count(),
+            'valor_total': db.session.query(func.sum(PropostaComercialSIGE.valor_total)).filter_by(admin_id=admin_id).scalar() or 0
         }, {})
         
         print(f"DEBUG PROPOSTAS: {stats.get('total', 0)} propostas encontradas")
@@ -170,7 +170,7 @@ def nova():
         
         # Buscar templates disponíveis
         templates = safe_db_operation(
-            lambda: PropostaTemplates.query.filter_by(admin_id=admin_id, ativo=True).all(),
+            lambda: PropostaTemplate.query.filter_by(admin_id=admin_id, ativo=True).all(),
             []
         )
         
@@ -229,13 +229,13 @@ def criar():
         # Gerar número da proposta
         ano_atual = datetime.now().year
         last_numero = safe_db_operation(
-            lambda: PropostasComerciais.query.filter_by(admin_id=admin_id).count(),
+            lambda: PropostaComercialSIGE.query.filter_by(admin_id=admin_id).count(),
             0
         )
         numero_proposta = f"PROP-{ano_atual}-{(last_numero + 1):04d}"
         
         # Criar proposta
-        proposta = PropostasComerciais(
+        proposta = PropostaComercialSIGE(
             numero_proposta=numero_proposta,
             assunto=titulo,
             objeto=descricao,
@@ -270,13 +270,13 @@ def visualizar(id):
     try:
         admin_id = get_admin_id()
         
-        proposta = PropostasComerciais.query.filter_by(
+        proposta = PropostaComercialSIGE.query.filter_by(
             id=id, admin_id=admin_id
         ).first_or_404()
         
         # Buscar itens da proposta
         itens = safe_db_operation(
-            lambda: PropostaItens.query.filter_by(proposta_id=id).all(),
+            lambda: PropostaItem.query.filter_by(proposta_id=id).all(),
             []
         )
         
@@ -313,7 +313,7 @@ def gerar_pdf(id):
     try:
         admin_id = get_admin_id()
         
-        proposta = PropostasComerciais.query.filter_by(
+        proposta = PropostaComercialSIGE.query.filter_by(
             id=id, admin_id=admin_id
         ).first_or_404()
         
@@ -403,7 +403,7 @@ def get_template_data(template_id):
     try:
         admin_id = get_admin_id()
         
-        template = PropostaTemplates.query.filter_by(
+        template = PropostaTemplate.query.filter_by(
             id=template_id, admin_id=admin_id
         ).first_or_404()
         
