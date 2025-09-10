@@ -1928,6 +1928,12 @@ def editar_obra(id):
     
     if request.method == 'POST':
         try:
+            # 🔧 ROLLBACK PREVENTIVO: Limpar qualquer sessão corrompida
+            try:
+                db.session.rollback()
+            except:
+                pass
+            
             print(f"🔧 INICIANDO EDIÇÃO DA OBRA {id}: {obra.nome}")
             
             # Atualizar dados básicos da obra
@@ -1948,7 +1954,29 @@ def editar_obra(id):
             # Novos campos
             obra.area_total_m2 = float(request.form.get('area_total_m2', 0)) if request.form.get('area_total_m2') else None
             obra.responsavel_id = int(request.form.get('responsavel_id')) if request.form.get('responsavel_id') else None
-            obra.codigo = request.form.get('codigo', obra.codigo)
+            
+            # 🔧 CÓDIGO DE OBRA: Gerar automático se None/vazio
+            codigo_form = request.form.get('codigo', '').strip()
+            if not codigo_form or codigo_form.lower() == 'none':
+                # Gerar código automático: OB001, OB002, etc.
+                ultimo_obra = Obra.query.filter(
+                    Obra.codigo.like('OB%')
+                ).order_by(Obra.codigo.desc()).first()
+                
+                if ultimo_obra and ultimo_obra.codigo:
+                    try:
+                        numero_str = ultimo_obra.codigo[2:]  # Remove 'OB'
+                        ultimo_numero = int(numero_str)
+                        novo_numero = ultimo_numero + 1
+                    except (ValueError, TypeError):
+                        novo_numero = 1
+                else:
+                    novo_numero = 1
+                
+                obra.codigo = f"OB{novo_numero:03d}"
+                print(f"✅ Código de obra gerado automaticamente: {obra.codigo}")
+            else:
+                obra.codigo = codigo_form
             
             # Dados do cliente
             obra.cliente_nome = request.form.get('cliente_nome', '')
