@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Create app instance
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET")
+app.secret_key = os.environ.get("SECRET_KEY", "sige-v10-digital-mastery-production-key-2025")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Database configuration - v10.0 Digital Mastery
@@ -57,10 +57,8 @@ app.config['SERVER_NAME'] = None  # Permite qualquer host
 app.config['APPLICATION_ROOT'] = '/'  # Raiz da aplicação  
 app.config['PREFERRED_URL_SCHEME'] = 'http'  # Esquema padrão
 
-# Configure CORS for AJAX requests - restrictive for security
-CORS(app, origins=["http://localhost:5000", "https://*.replit.app", "https://*.replit.dev"], 
-     methods=["GET", "POST", "PUT", "DELETE"], 
-     allow_headers=["Content-Type", "Authorization"])
+# Configure CORS for AJAX requests
+CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # Initialize extensions
 from models import db  # Import the db instance from models
@@ -155,14 +153,6 @@ try:
     logging.info("✅ Blueprint ServicoObraReal registrado")
 except ImportError as e:
     logging.warning(f"ServicosObraReal não disponível: {e}")
-
-# Register Lean Construction blueprint
-try:
-    from lean_construction_views import lean_bp
-    app.register_blueprint(lean_bp)
-    logging.info("✅ Blueprint Lean Construction registrado")
-except ImportError as e:
-    logging.warning(f"Lean Construction não disponível: {e}")
 
 # Test routes removed for production cleanliness
 
