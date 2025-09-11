@@ -140,12 +140,21 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <script>
-// CLASSE FASE 2 - FOCO EM DEBUG E CORREÇÕES
+// CLASSE FASE 2 - FOCO EM DEBUG E CORREÇÕES + INTEGRAÇÃO COMPLETA
 class EquipeFase2 {
     constructor() {
         this.obras = [];
+        this.allocations = {};  // Alocações por dia
+        this.currentWeek = null;  // Data da semana atual (segunda-feira)
         this.debugArea = document.getElementById('debug-results');
         this.statusArea = document.getElementById('status-debug');
+        
+        // Estado para rollback robusto
+        this.operationState = {
+            inProgress: false,
+            originalHTML: {},
+            pendingOperation: null
+        };
         
         this.log('=== INICIANDO FASE 2 ===');
         this.init();
@@ -176,12 +185,45 @@ class EquipeFase2 {
             }
             this.log('✅ SortableJS carregado com sucesso');
             
-            this.updateStatus('Sistema inicializado - pronto para testes', 'success');
+            // Calcular semana atual
+            this.calculateCurrentWeek();
+            
+            // Carregar dados automaticamente
+            await this.testarObras();
+            await this.carregarAlocacoes();
+            
+            this.updateStatus('Sistema inicializado - pronto para uso', 'success');
             
         } catch (error) {
             this.log(`❌ ERRO na inicialização: ${error.message}`);
             this.updateStatus(`Erro: ${error.message}`, 'danger');
         }
+    }
+    
+    // MÉTODOS UTILITÁRIOS PARA DATAS
+    calculateCurrentWeek() {
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0=Domingo, 1=Segunda, etc.
+        const monday = new Date(today);
+        
+        // Calcular segunda-feira
+        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        monday.setDate(today.getDate() - daysToSubtract);
+        
+        this.currentWeek = monday.toISOString().split('T')[0]; // YYYY-MM-DD
+        this.log(`📅 Semana atual: ${this.currentWeek}`);
+    }
+    
+    getDateForDay(dayOfWeek) {
+        if (!this.currentWeek) {
+            this.calculateCurrentWeek();
+        }
+        
+        const monday = new Date(this.currentWeek);
+        const targetDate = new Date(monday);
+        targetDate.setDate(monday.getDate() + dayOfWeek);
+        
+        return targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
     }
     
     // TESTE 1: API BÁSICA
@@ -268,6 +310,175 @@ class EquipeFase2 {
         this.setupDragDrop();
     }
     
+    // CARREGAR ALOCAÇÕES EXISTENTES
+    async carregarAlocacoes() {
+        this.log('=== CARREGANDO ALOCAÇÕES EXISTENTES ===');
+        
+        try {
+            const response = await fetch(`/equipe/api/allocations-week?week=${this.currentWeek}`);
+            const result = await response.json();
+            
+            this.log(`Response status: ${response.status}`);
+            this.log(`Response data: ${JSON.stringify(result).substring(0, 200)}...`);
+            
+            if (result.success && result.data) {
+                this.allocations = result.data;
+                this.renderAlocacoes();
+                this.log(`✅ Alocações carregadas para semana ${result.week_start}`);
+            } else {
+                this.log(`⚠️ Nenhuma alocação encontrada: ${result.error || 'Dados vazios'}`);
+            }
+            
+        } catch (error) {
+            this.log(`❌ ERRO ao carregar alocações: ${error.message}`);
+        }
+    }
+    
+    renderAlocacoes() {
+        if (!this.allocations) return;
+        
+        // Limpar todas as drop zones primeiro
+        for (let i = 0; i < 5; i++) {
+            const dayElement = document.getElementById(`day-${i}`);
+            if (dayElement) {
+                // Manter apenas elementos que não são alocações
+                const existingAllocations = dayElement.querySelectorAll('.allocation-item');
+                existingAllocations.forEach(item => item.remove());
+            }
+        }
+        
+        // Renderizar alocações por dia
+        Object.keys(this.allocations).forEach(dayKey => {
+            const dayData = this.allocations[dayKey];
+            const dayElement = document.getElementById(`day-${dayKey}`);
+            
+            if (dayElement && dayData.allocations) {
+                dayData.allocations.forEach(allocation => {
+                    this.renderAllocationItem(dayElement, allocation, parseInt(dayKey));
+                });
+                
+                // Remover placeholder se existir
+                const placeholder = dayElement.querySelector('.text-muted');
+                if (placeholder && placeholder.textContent.includes('Drop zone')) {
+                    placeholder.remove();
+                }
+            }
+        });
+        
+        this.log(`✅ Alocações renderizadas na interface`);
+    }
+    
+    renderAllocationItem(container, allocation, dayOfWeek) {
+        const div = document.createElement('div');
+        div.className = 'card mb-2 allocation-item';
+        div.dataset.obraId = allocation.obra_id;
+        div.dataset.allocationId = allocation.id;
+        div.style.border = '1px solid #28a745';
+        div.style.backgroundColor = '#f8fff8';
+        div.innerHTML = `
+            <div class="card-body p-2">
+                <h6 class="card-title mb-1 text-success">${allocation.obra_codigo}</h6>
+                <small class="text-muted">${allocation.obra_nome.substring(0, 30)}...</small>
+                <div class="mt-1">
+                    <small class="badge bg-success">${allocation.turno_inicio} - ${allocation.turno_fim}</small>
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="window.equipeFase2.removerAlocacaoManual(${allocation.obra_id}, ${dayOfWeek})">
+                        ❌
+                    </button>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+    
+    // MÉTODOS DE SALVAMENTO E REMOÇÃO - APIs INTEGRADAS
+    async salvarAlocacao(obraId, dayOfWeek) {
+        this.log(`💾 Salvando alocação: Obra ${obraId} no dia ${dayOfWeek}`);
+        
+        try {
+            const data_alocacao = this.getDateForDay(dayOfWeek);
+            
+            const response = await fetch('/equipe/api/allocations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    obra_id: parseInt(obraId),
+                    day_of_week: dayOfWeek,
+                    data_alocacao: data_alocacao
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.log(`✅ Alocação salva: ${result.message}`);
+                this.updateStatus(`✅ ${result.message}`, 'success');
+                
+                // Recarregar alocações para atualizar interface
+                await this.carregarAlocacoes();
+                
+                return true;
+            } else {
+                this.log(`❌ Erro ao salvar: ${result.error}`);
+                this.updateStatus(`❌ ${result.error}`, 'danger');
+                return false;
+            }
+            
+        } catch (error) {
+            this.log(`❌ ERRO CRÍTICO ao salvar: ${error.message}`);
+            this.updateStatus(`❌ Erro ao salvar: ${error.message}`, 'danger');
+            return false;
+        }
+    }
+    
+    async removerAlocacao(obraId, dayOfWeek) {
+        this.log(`🗑️ Removendo alocação: Obra ${obraId} do dia ${dayOfWeek}`);
+        
+        try {
+            const data_alocacao = this.getDateForDay(dayOfWeek);
+            
+            const response = await fetch(`/equipe/api/allocations/${obraId}/${data_alocacao}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.log(`✅ Alocação removida: ${result.message}`);
+                this.updateStatus(`✅ ${result.message}`, 'info');
+                
+                // Recarregar alocações para atualizar interface
+                await this.carregarAlocacoes();
+                
+                return true;
+            } else {
+                this.log(`❌ Erro ao remover: ${result.error}`);
+                this.updateStatus(`❌ ${result.error}`, 'warning');
+                return false;
+            }
+            
+        } catch (error) {
+            this.log(`❌ ERRO CRÍTICO ao remover: ${error.message}`);
+            this.updateStatus(`❌ Erro ao remover: ${error.message}`, 'danger');
+            return false;
+        }
+    }
+    
+    // MÉTODO PARA REMOÇÃO MANUAL (BOTÃO ❌)
+    async removerAlocacaoManual(obraId, dayOfWeek) {
+        this.log(`🔴 Remoção manual solicitada: Obra ${obraId} do dia ${dayOfWeek}`);
+        
+        // Confirmar ação
+        const dayName = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][dayOfWeek];
+        if (!confirm(`Deseja remover esta obra do ${dayName}?`)) {
+            this.log('❌ Remoção cancelada pelo usuário');
+            return;
+        }
+        
+        await this.removerAlocacao(obraId, dayOfWeek);
+    }
+    
     // TESTE 3: DRAG & DROP
     testarDragDrop() {
         this.log('=== TESTANDO DRAG & DROP ===');
@@ -295,6 +506,148 @@ class EquipeFase2 {
             this.log(`❌ ERRO no Drag & Drop: ${error.message}`);
             this.updateStatus(`Erro no Drag & Drop: ${error.message}`, 'danger');
         }
+    }
+    
+    // ====================================
+    // MÉTODOS DE ROLLBACK ROBUSTO
+    // ====================================
+    
+    captureStateForRollback(dayElement, dayIndex, operation, item) {
+        this.log(`📷 Capturando estado original para rollback (${operation})`);
+        
+        this.operationState = {
+            inProgress: true,
+            operation: operation,
+            dayIndex: dayIndex,
+            dayElement: dayElement,
+            originalHTML: dayElement.innerHTML,
+            item: item ? item.cloneNode(true) : null,
+            itemParent: item ? item.parentElement : null,
+            itemNextSibling: item ? item.nextElementSibling : null
+        };
+    }
+    
+    executeRollback() {
+        if (!this.operationState.inProgress) {
+            this.log('❌ Nenhuma operação em progresso para rollback');
+            return;
+        }
+        
+        this.log(`↩️ Executando rollback da operação: ${this.operationState.operation}`);
+        
+        try {
+            const { dayElement, originalHTML, operation, item, itemParent, itemNextSibling } = this.operationState;
+            
+            if (operation === 'add') {
+                // Reverter adição: restaurar HTML original
+                dayElement.innerHTML = originalHTML;
+                
+                // Reconfigurar sortable após restauração
+                if (dayElement.sortableInstance) {
+                    dayElement.sortableInstance.destroy();
+                    dayElement.sortableInstance = null;
+                }
+                
+                // Reconfigurar drag & drop
+                this.setupDragDropForDay(this.operationState.dayIndex);
+                
+            } else if (operation === 'remove') {
+                // Reverter remoção: restaurar item removido
+                if (item && itemParent) {
+                    if (itemNextSibling) {
+                        itemParent.insertBefore(item, itemNextSibling);
+                    } else {
+                        itemParent.appendChild(item);
+                    }
+                }
+            }
+            
+            this.updateStatus('↩️ Operação revertida - tente novamente', 'warning');
+            this.log('✅ Rollback executado com sucesso');
+            
+        } catch (error) {
+            this.log(`❌ Erro durante rollback: ${error.message}`);
+            this.updateStatus('❌ Erro crítico no rollback', 'danger');
+        }
+        
+        this.clearRollbackState();
+    }
+    
+    clearRollbackState() {
+        this.operationState = {
+            inProgress: false,
+            originalHTML: {},
+            pendingOperation: null
+        };
+    }
+    
+    // Método auxiliar para reconfigurar drag & drop de um dia específico
+    setupDragDropForDay(dayIndex) {
+        const dayElement = document.getElementById(`day-${dayIndex}`);
+        if (!dayElement) return;
+        
+        // Destruir instância existente se houver
+        if (dayElement.sortableInstance) {
+            dayElement.sortableInstance.destroy();
+            dayElement.sortableInstance = null;
+        }
+        
+        // Recriar instância para este dia com handlers completos
+        const i = dayIndex;
+        dayElement.sortableInstance = Sortable.create(dayElement, {
+            group: 'obras',
+            animation: 150,
+            onAdd: async (evt) => {
+                const obraId = evt.item.dataset.obraId;
+                const dayName = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][i];
+                this.log(`🎯 Obra ${obraId} arrastada para ${dayName}!`);
+                
+                this.captureStateForRollback(dayElement, i, 'add', evt.item);
+                this.updateStatus(`💾 Salvando obra no ${dayName}...`, 'info');
+                evt.item.style.opacity = '0.5';
+                
+                const success = await this.salvarAlocacao(obraId, i);
+                
+                if (success) {
+                    this.log(`✅ Obra ${obraId} salva no ${dayName}!`);
+                    evt.item.remove();
+                    
+                    if (dayElement.querySelector('.text-muted')) {
+                        const placeholder = dayElement.querySelector('.text-muted');
+                        if (placeholder.textContent.includes('Drop zone')) {
+                            placeholder.remove();
+                        }
+                    }
+                    
+                    this.clearRollbackState();
+                } else {
+                    this.log(`❌ Erro ao salvar obra ${obraId} no ${dayName} - executando rollback`);
+                    this.executeRollback();
+                }
+            },
+            onRemove: async (evt) => {
+                const obraId = evt.item.dataset.obraId;
+                const allocationId = evt.item.dataset.allocationId;
+                
+                if (allocationId) {
+                    this.log(`🗑️ Removendo alocação ${allocationId} do dia ${i}`);
+                    
+                    this.captureStateForRollback(dayElement, i, 'remove', evt.item);
+                    this.updateStatus(`🗑️ Removendo obra do dia...`, 'warning');
+                    
+                    const success = await this.removerAlocacao(obraId, i);
+                    
+                    if (!success) {
+                        this.log(`❌ Erro ao remover - executando rollback`);
+                        this.executeRollback();
+                    } else {
+                        this.clearRollbackState();
+                    }
+                } else {
+                    this.log(`📤 Item temporário removido do dia ${i}`);
+                }
+            }
+        });
     }
     
     setupDragDrop() {
@@ -325,22 +678,69 @@ class EquipeFase2 {
                     dayElement.sortableInstance = Sortable.create(dayElement, {
                         group: 'obras',
                         animation: 150,
-                        onAdd: (evt) => {
+                        onAdd: async (evt) => {
                             const obraId = evt.item.dataset.obraId;
                             const dayName = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][i];
-                            this.log(`✅ Obra ${obraId} adicionada ao ${dayName}!`);
-                            this.updateStatus(`Obra adicionada ao ${dayName}`, 'success');
+                            this.log(`🎯 Obra ${obraId} arrastada para ${dayName}!`);
                             
-                            // Limpar placeholder
-                            if (dayElement.querySelector('.text-muted')) {
-                                const placeholder = dayElement.querySelector('.text-muted');
-                                if (placeholder.textContent.includes('Drop zone')) {
-                                    placeholder.remove();
+                            // Capturar estado original para rollback
+                            this.captureStateForRollback(dayElement, i, 'add', evt.item);
+                            
+                            // Mostrar feedback de carregamento
+                            this.updateStatus(`💾 Salvando obra no ${dayName}...`, 'info');
+                            evt.item.style.opacity = '0.5';
+                            
+                            // Salvar via API
+                            const success = await this.salvarAlocacao(obraId, i);
+                            
+                            if (success) {
+                                // Sucesso - o carregamento automático já atualizou a interface
+                                this.log(`✅ Obra ${obraId} salva no ${dayName}!`);
+                                
+                                // Remover o item arrastado (será substituído pela renderização correta)
+                                evt.item.remove();
+                                
+                                // Limpar placeholder
+                                if (dayElement.querySelector('.text-muted')) {
+                                    const placeholder = dayElement.querySelector('.text-muted');
+                                    if (placeholder.textContent.includes('Drop zone')) {
+                                        placeholder.remove();
+                                    }
                                 }
+                                
+                                // Limpar estado de rollback
+                                this.clearRollbackState();
+                            } else {
+                                // Erro - executar rollback
+                                this.log(`❌ Erro ao salvar obra ${obraId} no ${dayName} - executando rollback`);
+                                this.executeRollback();
                             }
                         },
-                        onRemove: (evt) => {
-                            this.log(`📤 Obra removida do dia ${i}`);
+                        onRemove: async (evt) => {
+                            const obraId = evt.item.dataset.obraId;
+                            const allocationId = evt.item.dataset.allocationId;
+                            
+                            // Se tem allocationId, é uma alocação existente sendo removida
+                            if (allocationId) {
+                                this.log(`🗑️ Removendo alocação ${allocationId} do dia ${i}`);
+                                
+                                // Capturar estado original para rollback
+                                this.captureStateForRollback(dayElement, i, 'remove', evt.item);
+                                
+                                this.updateStatus(`🗑️ Removendo obra do dia...`, 'warning');
+                                
+                                const success = await this.removerAlocacao(obraId, i);
+                                
+                                if (!success) {
+                                    // Se falhou, executar rollback
+                                    this.log(`❌ Erro ao remover - executando rollback`);
+                                    this.executeRollback();
+                                } else {
+                                    this.clearRollbackState();
+                                }
+                            } else {
+                                this.log(`📤 Item temporário removido do dia ${i}`);
+                            }
                         }
                     });
                 }

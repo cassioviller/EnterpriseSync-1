@@ -2545,6 +2545,13 @@ class Allocation(db.Model):
     admin = db.relationship('Usuario', backref='allocations')
     funcionarios = db.relationship('AllocationEmployee', backref='allocation', cascade='all, delete-orphan')
     
+    # Constraint de integridade: uma obra não pode ser alocada duas vezes no mesmo dia
+    __table_args__ = (
+        db.UniqueConstraint('admin_id', 'obra_id', 'data_alocacao', name='uk_allocation_admin_obra_data'),
+        db.Index('idx_allocation_admin_data', 'admin_id', 'data_alocacao'),
+        db.Index('idx_allocation_obra_data', 'obra_id', 'data_alocacao'),
+    )
+    
     def __repr__(self):
         return f'<Allocation {self.obra.nome} - {self.data_alocacao}>'
     
