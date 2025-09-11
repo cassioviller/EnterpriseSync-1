@@ -1,0 +1,776 @@
+{% extends "base_completo.html" %}
+
+{% block title %}👥 Funcionários - {{ allocation.obra.codigo }} ({{ allocation.data_alocacao.strftime('%d/%m') }}){% endblock %}
+
+{% block head_content %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<style>
+/* ===========================================
+   DRILL-DOWN FUNCIONÁRIOS - CANTEIRO UX
+   =========================================== */
+
+.funcionarios-container {
+    padding: 8px;
+    max-width: 100%;
+}
+
+/* Header da obra/dia */
+.allocation-header {
+    background: linear-gradient(135deg, #2c5530, #198754);
+    color: white;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.obra-info {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 16px;
+}
+
+.obra-details h3 {
+    margin: 0 0 4px 0;
+    font-size: 1.3rem;
+}
+
+.obra-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    font-size: 0.9rem;
+}
+
+.meta-item {
+    background: rgba(255,255,255,0.15);
+    padding: 4px 8px;
+    border-radius: 6px;
+    backdrop-filter: blur(10px);
+}
+
+/* Layout dual: Disponíveis | Alocados */
+.funcionarios-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    min-height: 500px;
+}
+
+.funcionarios-section {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.section-disponivel {
+    border-color: #17a2b8;
+}
+
+.section-alocados {
+    border-color: #198754;
+}
+
+.section-header {
+    font-weight: bold;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    text-align: center;
+    color: white;
+}
+
+.header-disponivel {
+    background: linear-gradient(135deg, #17a2b8, #20c997);
+}
+
+.header-alocados {
+    background: linear-gradient(135deg, #198754, #28a745);
+}
+
+/* Cartões de funcionário */
+.funcionario-card {
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: grab;
+    transition: all 0.2s ease;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+}
+
+.funcionario-card:hover {
+    background: #e8f5e8;
+    border-color: #198754;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(25,135,84,0.2);
+}
+
+.funcionario-card:active {
+    cursor: grabbing;
+    transform: scale(1.02);
+}
+
+.funcionario-card.alocado {
+    background: linear-gradient(135deg, #d4edda, #c3e6cb);
+    border-color: #198754;
+}
+
+.funcionario-card.dragging {
+    opacity: 0.5;
+    transform: rotate(3deg);
+}
+
+/* Avatar do funcionário */
+.funcionario-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #198754;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.funcionario-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Info do funcionário */
+.funcionario-info {
+    flex: 1;
+    min-width: 0; /* Para truncar texto */
+}
+
+.funcionario-nome {
+    font-weight: bold;
+    color: #2c5530;
+    margin-bottom: 2px;
+    font-size: 0.95rem;
+}
+
+.funcionario-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #6c757d;
+    flex-wrap: wrap;
+}
+
+.meta-badge {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* Funcionário alocado - dados extras */
+.funcionario-alocado .funcionario-info {
+    color: #155724;
+}
+
+.funcionario-alocado .meta-badge {
+    background: rgba(255,255,255,0.7);
+}
+
+.turno-info {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    background: rgba(25,135,84,0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: bold;
+}
+
+.papel-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 8px;
+    background: #ffc107;
+    color: #856404;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: bold;
+}
+
+/* Estados de drop */
+.section-disponivel.drag-over {
+    background: #d1ecf1;
+    border-color: #17a2b8;
+    border-style: dashed;
+}
+
+.section-alocados.drag-over {
+    background: #d4edda;
+    border-color: #198754;
+    border-style: dashed;
+}
+
+/* Botões de ação */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.btn-action {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 120px;
+    font-size: 0.9rem;
+}
+
+.btn-voltar {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-voltar:hover {
+    background: #5a6268;
+}
+
+.btn-salvar {
+    background: #198754;
+    color: white;
+}
+
+.btn-salvar:hover {
+    background: #157347;
+}
+
+.btn-limpar {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-limpar:hover {
+    background: #bb2d3b;
+}
+
+/* Empty states */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.empty-state i {
+    font-size: 2rem;
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* Loading e feedback */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.loading-spinner {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Responsividade mobile */
+@media (max-width: 768px) {
+    .funcionarios-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .obra-info {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+    
+    .obra-meta {
+        justify-content: center;
+    }
+    
+    .funcionario-card {
+        padding: 8px;
+        min-height: 50px;
+    }
+    
+    .funcionario-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+    }
+    
+    .funcionarios-container {
+        padding: 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .btn-action {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .funcionario-meta {
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+/* Animações de feedback */
+@keyframes pulseGreen {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); background: #28a745; }
+}
+
+.funcionario-card.success {
+    animation: pulseGreen 0.6s ease;
+}
+
+.funcionario-card.removing {
+    animation: slideOut 0.4s ease forwards;
+}
+
+@keyframes slideOut {
+    to {
+        transform: translateX(-100%);
+        opacity: 0;
+        height: 0;
+        margin: 0;
+        padding: 0;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="funcionarios-container">
+    <!-- Header da obra/dia -->
+    <div class="allocation-header">
+        <div class="obra-info">
+            <div class="obra-details">
+                <h3>🏗️ {{ allocation.obra.nome }}</h3>
+                <div class="obra-meta">
+                    <div class="meta-item">📅 {{ allocation.data_alocacao.strftime('%A, %d/%m/%Y') }}</div>
+                    <div class="meta-item">⏰ {{ allocation.turno_inicio.strftime('%H:%M') if allocation.turno_inicio else '08:00' }} - {{ allocation.turno_fim.strftime('%H:%M') if allocation.turno_fim else '17:00' }}</div>
+                    <div class="meta-item">👥 {{ funcionarios_alocados|length }} funcionários</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid: Disponíveis | Alocados -->
+    <div class="funcionarios-grid">
+        <!-- Funcionários disponíveis -->
+        <div class="funcionarios-section section-disponivel">
+            <div class="section-header header-disponivel">
+                🆓 Funcionários Disponíveis ({{ funcionarios_disponiveis|length }})
+            </div>
+            
+            <div id="funcionarios-disponiveis" class="funcionarios-list">
+                {% if funcionarios_disponiveis %}
+                    {% for funcionario in funcionarios_disponiveis %}
+                    <div class="funcionario-card" 
+                         data-funcionario-id="{{ funcionario.id }}"
+                         data-funcionario-nome="{{ funcionario.nome }}"
+                         data-funcionario-funcao="{{ funcionario.funcao }}">
+                        
+                        <div class="funcionario-avatar">
+                            {% if funcionario.foto_base64 %}
+                                <img src="data:image/jpeg;base64,{{ funcionario.foto_base64 }}" alt="{{ funcionario.nome }}">
+                            {% else %}
+                                {{ funcionario.nome[0].upper() }}
+                            {% endif %}
+                        </div>
+                        
+                        <div class="funcionario-info">
+                            <div class="funcionario-nome">{{ funcionario.nome }}</div>
+                            <div class="funcionario-meta">
+                                <span class="meta-badge">{{ funcionario.funcao or 'Função não informada' }}</span>
+                                {% if funcionario.codigo %}
+                                <span class="meta-badge">#{{ funcionario.codigo }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i>😴</i>
+                        Todos os funcionários já estão alocados neste dia
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Funcionários alocados nesta obra/dia -->
+        <div class="funcionarios-section section-alocados">
+            <div class="section-header header-alocados">
+                ✅ Alocados Nesta Obra ({{ funcionarios_alocados|length }})
+            </div>
+            
+            <div id="funcionarios-alocados" class="funcionarios-list">
+                {% if funcionarios_alocados %}
+                    {% for allocation_employee in funcionarios_alocados %}
+                    <div class="funcionario-card funcionario-alocado" 
+                         data-allocation-employee-id="{{ allocation_employee.id }}"
+                         data-funcionario-id="{{ allocation_employee.funcionario.id }}"
+                         data-funcionario-nome="{{ allocation_employee.funcionario.nome }}">
+                        
+                        <div class="funcionario-avatar">
+                            {% if allocation_employee.funcionario.foto_base64 %}
+                                <img src="data:image/jpeg;base64,{{ allocation_employee.funcionario.foto_base64 }}" alt="{{ allocation_employee.funcionario.nome }}">
+                            {% else %}
+                                {{ allocation_employee.funcionario.nome[0].upper() }}
+                            {% endif %}
+                        </div>
+                        
+                        <div class="funcionario-info">
+                            <div class="funcionario-nome">{{ allocation_employee.funcionario.nome }}</div>
+                            <div class="funcionario-meta">
+                                <span class="meta-badge">{{ allocation_employee.funcionario.funcao or 'Função não informada' }}</span>
+                                {% if allocation_employee.papel %}
+                                <span class="meta-badge">{{ allocation_employee.papel }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Turno personalizado -->
+                        <div class="turno-info">
+                            {{ allocation_employee.turno_inicio.strftime('%H:%M') if allocation_employee.turno_inicio else '08:00' }}-{{ allocation_employee.turno_fim.strftime('%H:%M') if allocation_employee.turno_fim else '17:00' }}
+                        </div>
+                        
+                        {% if allocation_employee.papel %}
+                        <div class="papel-badge">{{ allocation_employee.papel }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i>👈</i>
+                        Arraste funcionários da esquerda para alocar nesta obra
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Botões de ação -->
+    <div class="action-buttons">
+        <button class="btn-action btn-voltar" onclick="voltarCalendario()">
+            ← Voltar ao Calendário
+        </button>
+        <button class="btn-action btn-limpar" onclick="limparTodasAlocacoes()" style="display: {{ 'block' if funcionarios_alocados else 'none' }}">
+            🗑️ Limpar Todas
+        </button>
+        <button class="btn-action btn-salvar" onclick="salvarAlteracoes()" disabled>
+            💾 Salvar Alterações
+        </button>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay">
+    <div class="loading-spinner">
+        <div class="spinner-border text-primary" role="status"></div>
+        <span>Processando...</span>
+    </div>
+</div>
+
+<script>
+// ===================================
+// DRILL-DOWN FUNCIONÁRIOS SISTEMA
+// Performance e UX canteiro
+// ===================================
+
+let allocationId = {{ allocation.id }};
+let pendingChanges = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeFuncionariosDragDrop();
+    console.log('👥 Sistema funcionários inicializado - Allocation #' + allocationId);
+});
+
+function initializeFuncionariosDragDrop() {
+    // Lista de funcionários disponíveis
+    const disponiveis = document.getElementById('funcionarios-disponiveis');
+    if (disponiveis) {
+        new Sortable(disponiveis, {
+            group: {
+                name: 'funcionarios',
+                pull: 'clone',
+                put: true  // Permite retornar funcionários
+            },
+            animation: 200,
+            ghostClass: 'funcionario-card',
+            chosenClass: 'dragging',
+            onStart: function(evt) {
+                console.log('🟢 Drag funcionário:', evt.item.dataset.funcionarioNome);
+                hapticFeedback('impact');
+            }
+        });
+    }
+
+    // Lista de funcionários alocados
+    const alocados = document.getElementById('funcionarios-alocados');
+    if (alocados) {
+        new Sortable(alocados, {
+            group: {
+                name: 'funcionarios',
+                pull: true,   // Permite arrastar para fora (desalocar)
+                put: true     // Aceita novos funcionários
+            },
+            animation: 200,
+            ghostClass: 'funcionario-card',
+            chosenClass: 'dragging',
+            onAdd: function(evt) {
+                // Funcionário adicionado à obra
+                const funcionarioElement = evt.item;
+                const funcionarioId = funcionarioElement.dataset.funcionarioId;
+                const funcionarioNome = funcionarioElement.dataset.funcionarioNome;
+                
+                console.log(`🟡 Alocar: ${funcionarioNome} → Obra`);
+                alocarFuncionario(funcionarioId, funcionarioElement);
+            },
+            onRemove: function(evt) {
+                // Funcionário removido da obra
+                const funcionarioElement = evt.item;
+                const allocationEmployeeId = funcionarioElement.dataset.allocationEmployeeId;
+                
+                if (allocationEmployeeId) {
+                    console.log('🔴 Desalocar funcionário:', allocationEmployeeId);
+                    desalocarFuncionario(allocationEmployeeId, funcionarioElement);
+                }
+            }
+        });
+    }
+}
+
+// ===================================
+// API CALLS FUNCIONÁRIOS
+// ===================================
+
+async function alocarFuncionario(funcionarioId, elemento) {
+    try {
+        elemento.classList.add('loading');
+        
+        const response = await fetch('/equipe/api/allocation-employees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                allocation_id: allocationId,
+                funcionario_id: parseInt(funcionarioId),
+                turno_inicio: '{{ allocation.turno_inicio.strftime("%H:%M") if allocation.turno_inicio else "08:00" }}',
+                turno_fim: '{{ allocation.turno_fim.strftime("%H:%M") if allocation.turno_fim else "17:00" }}',
+                papel: '',
+                observacao: ''
+            })
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Transformar elemento para alocado
+            elemento.className = 'funcionario-card funcionario-alocado';
+            elemento.dataset.allocationEmployeeId = result.id;
+            
+            // Adicionar indicadores visuais
+            const turnoInfo = document.createElement('div');
+            turnoInfo.className = 'turno-info';
+            turnoInfo.textContent = '{{ allocation.turno_inicio.strftime("%H:%M") if allocation.turno_inicio else "08:00" }}-{{ allocation.turno_fim.strftime("%H:%M") if allocation.turno_fim else "17:00" }}';
+            elemento.appendChild(turnoInfo);
+            
+            elemento.classList.add('success');
+            setTimeout(() => elemento.classList.remove('success'), 600);
+            
+            console.log('✅ Funcionário alocado:', result.id);
+            showToast(`${elemento.dataset.funcionarioNome} alocado com sucesso!`, 'success');
+            hapticFeedback('success');
+            
+            updateSaveButton();
+            
+        } else {
+            throw new Error(result.error || 'Erro ao alocar funcionário');
+        }
+    } catch (error) {
+        console.error('❌ Erro alocar funcionário:', error);
+        showToast(error.message, 'error');
+        hapticFeedback('error');
+        
+        // Mover de volta para disponíveis em caso de erro
+        document.getElementById('funcionarios-disponiveis').appendChild(elemento);
+    } finally {
+        elemento.classList.remove('loading');
+    }
+}
+
+async function desalocarFuncionario(allocationEmployeeId, elemento) {
+    try {
+        const response = await fetch(`/equipe/api/allocation-employees/${allocationEmployeeId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Transformar elemento para disponível
+            elemento.className = 'funcionario-card';
+            delete elemento.dataset.allocationEmployeeId;
+            
+            // Remover indicadores visuais
+            const turnoInfo = elemento.querySelector('.turno-info');
+            const papelBadge = elemento.querySelector('.papel-badge');
+            if (turnoInfo) turnoInfo.remove();
+            if (papelBadge) papelBadge.remove();
+            
+            console.log('✅ Funcionário desalocado:', allocationEmployeeId);
+            showToast(`${elemento.dataset.funcionarioNome} removido da obra`, 'info');
+            hapticFeedback('impact');
+            
+            updateSaveButton();
+            
+        } else {
+            throw new Error(result.error || 'Erro ao desalocar funcionário');
+        }
+    } catch (error) {
+        console.error('❌ Erro desalocar funcionário:', error);
+        showToast(error.message, 'error');
+        hapticFeedback('error');
+        
+        // Mover de volta para alocados em caso de erro
+        document.getElementById('funcionarios-alocados').appendChild(elemento);
+    }
+}
+
+// ===================================
+// AÇÕES DO USUÁRIO
+// ===================================
+
+function voltarCalendario() {
+    window.location.href = '/equipe/alocacao';
+}
+
+function limparTodasAlocacoes() {
+    if (!confirm('Tem certeza que deseja remover todos os funcionários desta obra?')) {
+        return;
+    }
+    
+    const alocados = document.querySelectorAll('#funcionarios-alocados .funcionario-alocado');
+    alocados.forEach(elemento => {
+        const allocationEmployeeId = elemento.dataset.allocationEmployeeId;
+        if (allocationEmployeeId) {
+            desalocarFuncionario(allocationEmployeeId, elemento);
+        }
+    });
+}
+
+function salvarAlteracoes() {
+    // Placeholder para futuras funcionalidades de save em batch
+    showToast('Alterações salvas em tempo real!', 'success');
+    updateSaveButton(false);
+}
+
+function updateSaveButton(hasChanges = true) {
+    const saveBtn = document.querySelector('.btn-salvar');
+    if (saveBtn) {
+        saveBtn.disabled = !hasChanges;
+        pendingChanges = hasChanges;
+    }
+}
+
+// ===================================
+// UTILIDADES E FEEDBACK
+// ===================================
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#198754' : '#17a2b8'};
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        z-index: 2000;
+        animation: slideIn 0.3s ease;
+        max-width: 300px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    `;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+function hapticFeedback(type = 'impact') {
+    if (navigator.vibrate) {
+        const patterns = {
+            'impact': [10],
+            'success': [10, 50, 10],
+            'error': [100, 30, 100]
+        };
+        navigator.vibrate(patterns[type] || patterns.impact);
+    }
+}
+
+// Confirmação antes de sair com mudanças não salvas
+window.addEventListener('beforeunload', function(e) {
+    if (pendingChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
+console.log('🔧 Funcionários Drill-down System initialized - Touch optimized for construction management');
+</script>
+{% endblock %}
