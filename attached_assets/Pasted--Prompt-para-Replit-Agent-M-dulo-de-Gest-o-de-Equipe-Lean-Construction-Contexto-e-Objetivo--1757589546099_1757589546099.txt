@@ -1,0 +1,297 @@
+# Prompt para Replit Agent: Módulo de Gestão de Equipe Lean Construction
+
+## Contexto e Objetivo
+
+Quero criar um módulo de **Gestão de Equipe Lean Construction** integrado a um sistema existente chamado SIGE. Este módulo implementará os princípios do Last Planner System® para transformar a gestão de equipes na construção civil, substituindo planilhas manuais por uma solução digital colaborativa.
+
+## Especificações Técnicas
+
+### Stack Tecnológico
+- **Backend**: Flask (Python)
+- **Frontend**: HTML5, CSS3, JavaScript (Vanilla ou framework leve)
+- **Banco de Dados**: SQLite (para desenvolvimento) com SQLAlchemy ORM
+- **Interface**: Responsiva (mobile-first) com design moderno
+- **Autenticação**: Sistema simples de login/logout
+
+### Funcionalidades Core
+
+#### 1. Quadro Kanban Interativo
+- **Colunas**: "A Fazer", "Em Andamento", "Concluído", "Impedimentos"
+- **Cartões de Tarefa** com:
+  - Título da atividade
+  - Responsável (com avatar)
+  - Progresso (%)
+  - Prioridade (visual)
+  - Data planejada
+  - Comentários
+- **Drag & Drop** para mover tarefas entre colunas
+- **Filtros** por obra, responsável, data
+
+#### 2. Daily Huddle (Reunião Diária)
+- **Timer de 15 minutos** visível
+- **Lista de participantes** com avatares
+- **Compromissos do dia** (checkboxes)
+- **Seção de impedimentos** com botão "Adicionar"
+- **Registro de ações** definidas na reunião
+
+#### 3. Weekly Planning (Planejamento Semanal)
+- **Interface colaborativa** para planejamento
+- **Timeline semanal** (Segunda a Domingo)
+- **Alocação de recursos** (funcionários, equipamentos)
+- **Identificação de restrições** com alertas visuais
+- **Cálculo automático de capacidade** da equipe
+
+#### 4. Gestão de Restrições
+- **Cadastro de impedimentos** por categoria:
+  - Material
+  - Equipamento
+  - Design/Projeto
+  - Externos
+  - Clima
+- **Responsável pela resolução**
+- **Prazo para resolução**
+- **Status** (Identificada, Em Resolução, Resolvida)
+- **Impacto estimado** (dias/custo)
+
+#### 5. Dashboard de Métricas
+- **PPC (Percent Plan Complete)** em destaque
+- **Gráficos de tendência** semanal
+- **Análise de restrições** por categoria
+- **Produtividade por equipe**
+- **Análise de variação** (causas de não cumprimento)
+
+### Modelo de Dados
+
+```python
+# Estrutura básica das tabelas principais
+
+class Usuario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    senha = db.Column(db.String(60), nullable=False)
+    foto = db.Column(db.String(200), default='default.jpg')
+    funcao = db.Column(db.String(50), default='Funcionário')
+    is_last_planner = db.Column(db.Boolean, default=False)
+
+class Obra(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(200), nullable=False)
+    codigo = db.Column(db.String(50), unique=True)
+    data_inicio = db.Column(db.Date)
+    data_previsao_fim = db.Column(db.Date)
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+
+class LeanTask(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text)
+    status = db.Column(db.String(20), default='A Fazer')
+    prioridade = db.Column(db.Integer, default=3)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    data_planejada = db.Column(db.Date, nullable=False)
+    data_conclusao = db.Column(db.Date)
+    percentual_conclusao = db.Column(db.Float, default=0.0)
+    horas_estimadas = db.Column(db.Float, default=8.0)
+    horas_reais = db.Column(db.Float)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class WeeklyPlan(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    week_start = db.Column(db.Date, nullable=False)
+    ppc_target = db.Column(db.Float, default=85.0)
+    ppc_actual = db.Column(db.Float, default=0.0)
+    total_tasks_planned = db.Column(db.Integer, default=0)
+    total_tasks_completed = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(20), default='Planejamento')
+
+class Constraint(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text)
+    categoria = db.Column(db.String(50), nullable=False)
+    severidade = db.Column(db.String(20), default='Media')
+    status = db.Column(db.String(20), default='Identificada')
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    data_identificacao = db.Column(db.DateTime, default=datetime.utcnow)
+    prazo_resolucao = db.Column(db.Date)
+    impacto_dias = db.Column(db.Integer, default=0)
+
+class DailyHuddle(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    data = db.Column(db.Date, nullable=False)
+    facilitador_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    duracao_minutos = db.Column(db.Integer)
+    compromissos = db.Column(db.JSON)
+    impedimentos = db.Column(db.JSON)
+    acoes_definidas = db.Column(db.JSON)
+```
+
+### Design e UX
+
+#### Paleta de Cores
+- **Primária**: Azul (#2563eb) - Confiança e profissionalismo
+- **Secundária**: Laranja (#f97316) - Energia e ação
+- **Sucesso**: Verde (#16a34a) - Tarefas concluídas
+- **Alerta**: Vermelho (#dc2626) - Impedimentos
+- **Neutro**: Cinza (#6b7280) - Textos e backgrounds
+
+#### Layout Responsivo
+- **Desktop**: Sidebar fixa + área principal
+- **Tablet**: Sidebar colapsável
+- **Mobile**: Menu hambúrguer + navegação bottom
+
+#### Componentes Visuais
+- **Cards** com sombras suaves e bordas arredondadas
+- **Avatares circulares** para usuários
+- **Progress bars** animadas
+- **Badges** para status e prioridades
+- **Modais** para formulários
+- **Tooltips** para informações adicionais
+
+### Funcionalidades Específicas
+
+#### Kanban Board
+```javascript
+// Funcionalidade drag & drop
+function allowDrop(ev) {
+    ev.preventDefault();
+}
+
+function drag(ev) {
+    ev.dataTransfer.setData("text", ev.target.id);
+}
+
+function drop(ev) {
+    ev.preventDefault();
+    var data = ev.dataTransfer.getData("text");
+    var taskCard = document.getElementById(data);
+    var newStatus = ev.target.closest('.kanban-column').dataset.status;
+    
+    // Atualizar no backend
+    updateTaskStatus(data, newStatus);
+    
+    // Mover visualmente
+    ev.target.appendChild(taskCard);
+}
+```
+
+#### Cálculo PPC Automático
+```python
+def calculate_ppc(weekly_plan_id):
+    plan = WeeklyPlan.query.get(weekly_plan_id)
+    tasks = LeanTask.query.filter_by(
+        obra_id=plan.obra_id,
+        data_planejada__between=(plan.week_start, plan.week_start + timedelta(days=6))
+    ).all()
+    
+    completed = sum(1 for task in tasks if task.status == 'Concluído')
+    total = len(tasks)
+    
+    ppc = (completed / total * 100) if total > 0 else 0
+    plan.ppc_actual = ppc
+    plan.total_tasks_planned = total
+    plan.total_tasks_completed = completed
+    
+    db.session.commit()
+    return ppc
+```
+
+### Dados de Exemplo
+
+Inclua dados de exemplo realistas:
+
+#### Usuários
+- **João Silva** (Encarregado) - Last Planner
+- **Maria Santos** (Pedreiro) 
+- **Carlos Oliveira** (Eletricista)
+- **Ana Costa** (Gestora de Obra) - Last Planner
+
+#### Obras
+- **Residencial Jardim das Flores** - 120 unidades
+- **Edifício Comercial Centro** - 15 andares
+- **Casa Unifamiliar Alphaville** - Alto padrão
+
+#### Tarefas Exemplo
+- **Concretagem laje 3º andar** - João Silva - Em Andamento (75%)
+- **Instalação elétrica apartamentos 201-205** - Carlos Oliveira - A Fazer
+- **Alvenaria externa bloco A** - Maria Santos - Concluído (100%)
+- **Impermeabilização terraço** - João Silva - Impedimento (Aguardando material)
+
+#### Restrições Exemplo
+- **Material**: Atraso na entrega de vergalhões - Severidade Alta
+- **Equipamento**: Guincho em manutenção - Severidade Média  
+- **Design**: Revisão projeto hidráulico - Severidade Crítica
+
+### Requisitos de Implementação
+
+1. **Estrutura do Projeto**:
+   ```
+   lean_construction_app/
+   ├── app.py (Flask main)
+   ├── models.py (SQLAlchemy models)
+   ├── routes.py (API endpoints)
+   ├── static/
+   │   ├── css/style.css
+   │   ├── js/main.js
+   │   └── images/
+   ├── templates/
+   │   ├── base.html
+   │   ├── kanban.html
+   │   ├── daily_huddle.html
+   │   ├── weekly_planning.html
+   │   ├── dashboard.html
+   │   └── constraints.html
+   └── requirements.txt
+   ```
+
+2. **APIs RESTful**:
+   - `GET/POST /api/tasks` - Gestão de tarefas
+   - `PUT /api/tasks/<id>/status` - Atualizar status
+   - `GET/POST /api/constraints` - Gestão de restrições
+   - `GET/POST /api/weekly-plans` - Planejamento semanal
+   - `GET/POST /api/daily-huddles` - Daily huddles
+   - `GET /api/metrics/ppc` - Métricas PPC
+
+3. **Autenticação Simples**:
+   - Login/logout básico
+   - Sessões Flask
+   - Proteção de rotas
+
+4. **Responsividade**:
+   - Bootstrap ou CSS Grid/Flexbox
+   - Breakpoints: 768px (tablet), 1024px (desktop)
+   - Touch-friendly (botões mín. 44px)
+
+### Critérios de Sucesso
+
+- [ ] Interface Kanban funcional com drag & drop
+- [ ] Cálculo automático de PPC
+- [ ] Daily Huddle com timer e registro
+- [ ] Weekly Planning colaborativo
+- [ ] Dashboard com métricas visuais
+- [ ] Gestão completa de restrições
+- [ ] Design responsivo e moderno
+- [ ] Dados de exemplo populados
+- [ ] APIs funcionais para todas as operações
+
+### Prompt de Execução
+
+**"Crie um sistema completo de Gestão de Equipe Lean Construction usando Flask, implementando todas as funcionalidades especificadas acima. O sistema deve ter interface moderna e responsiva, com quadro Kanban interativo, daily huddles, planejamento semanal, gestão de restrições e dashboard de métricas PPC. Inclua dados de exemplo realistas da construção civil e garanta que todas as funcionalidades estejam totalmente operacionais."**
+
+---
+
+## Instruções Adicionais para o Replit Agent
+
+1. **Comece com o modelo de dados** - Crie primeiro todas as tabelas e relacionamentos
+2. **Implemente as APIs** - Endpoints RESTful para todas as operações
+3. **Desenvolva a interface Kanban** - Funcionalidade drag & drop prioritária
+4. **Adicione dados de exemplo** - Popule com dados realistas
+5. **Teste cada funcionalidade** - Garanta que tudo funciona antes de avançar
+6. **Otimize para mobile** - Interface responsiva é essencial
+
+**Foque na experiência do usuário e na funcionalidade completa do sistema Lean Construction!**
