@@ -2519,3 +2519,119 @@ class ConfiguracaoEmpresa(db.Model):
             cls.ativo == True
         ).order_by(cls.nome).all()
 
+# ================================
+# MÓDULO DE GESTÃO DE EQUIPE - LEAN & EFICIENTE
+# ================================
+
+class Allocation(db.Model):
+    """Alocação de obra por dia - Tela A (Obras→Dias)
+    
+    Cada registro representa UMA OBRA alocada em UM DIA específico.
+    Ex: UNO PTO na Segunda-feira das 08:00 às 17:00
+    """
+    __tablename__ = 'allocation'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    data_alocacao = db.Column(db.Date, nullable=False)
+    turno_inicio = db.Column(db.Time, default=time(8, 0))  # 08:00
+    turno_fim = db.Column(db.Time, default=time(17, 0))    # 17:00
+    nota = db.Column(db.String(100))  # Observação curta
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='allocations')
+    admin = db.relationship('Usuario', backref='allocations')
+    funcionarios = db.relationship('AllocationEmployee', backref='allocation', cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<Allocation {self.obra.nome} - {self.data_alocacao}>'
+    
+    @property
+    def funcionarios_count(self):
+        """Quantos funcionários estão alocados nesta obra/dia"""
+        return len(self.funcionarios)
+
+class AllocationEmployee(db.Model):
+    """Funcionários alocados em obra/dia - Tela B (Pessoas→Obra)
+    
+    Cada registro é UM FUNCIONÁRIO trabalhando em uma alocação específica.
+    Ex: João Silva trabalhando no UNO PTO na Segunda das 08:00-12:00 como soldador
+    """
+    __tablename__ = 'allocation_employee'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    allocation_id = db.Column(db.Integer, db.ForeignKey('allocation.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    turno_inicio = db.Column(db.Time, default=time(8, 0))
+    turno_fim = db.Column(db.Time, default=time(17, 0))
+    papel = db.Column(db.String(50))  # Ex: "soldador", "ajudante", "líder"
+    observacao = db.Column(db.String(100))  # Obs específica do funcionário
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='allocations')
+    
+    def __repr__(self):
+        return f'<AllocationEmployee {self.funcionario.nome} - {self.allocation.obra.nome}>'
+    
+    def has_conflict_with_date(self, target_date):
+        """Verifica se funcionário tem conflito em outra obra na mesma data"""
+        from sqlalchemy import and_
+        conflicts = AllocationEmployee.query.join(Allocation).filter(
+            and_(
+                AllocationEmployee.funcionario_id == self.funcionario_id,
+                Allocation.data_alocacao == target_date,
+                AllocationEmployee.id != self.id
+            )
+        ).count()
+        return conflicts > 0
+
+class WeeklyPlan(db.Model):
+    """Planejamento semanal por obra - Tela C (opcional)
+    
+    Container para organizar atividades de uma obra durante uma semana.
+    Ex: Semana 09/09 - Obra UNO PTO
+    """
+    __tablename__ = 'weekly_plan'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    week_start = db.Column(db.Date, nullable=False)  # Segunda-feira da semana
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='weekly_plans')
+    admin = db.relationship('Usuario', backref='weekly_plans')
+    items = db.relationship('WeeklyPlanItem', backref='weekly_plan', cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<WeeklyPlan {self.obra.nome} - {self.week_start}>'
+
+class WeeklyPlanItem(db.Model):
+    """Atividades do planejamento semanal - Drag & drop de serviços
+    
+    Cada item é UMA ATIVIDADE planejada para um dia específico.
+    Ex: Soldagem de vigas na Terça-feira das 14:00-18:00 com João como responsável
+    """
+    __tablename__ = 'weekly_plan_item'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    weekly_plan_id = db.Column(db.Integer, db.ForeignKey('weekly_plan.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    day_of_week = db.Column(db.Integer, nullable=False)  # 0=Segunda, 1=Terça...4=Sexta
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    turno_inicio = db.Column(db.Time, default=time(8, 0))
+    turno_fim = db.Column(db.Time, default=time(17, 0))
+    nota_curta = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    servico = db.relationship('Servico', backref='weekly_plan_items')
+    responsavel = db.relationship('Funcionario', backref='weekly_plan_items')
+    
+    def __repr__(self):
+        return f'<WeeklyPlanItem {self.servico.nome} - Dia {self.day_of_week}>'
+

@@ -1,0 +1,252 @@
+Visão geral do módulo (2 telas + 1 drill-down)
+
+Tela A — Alocação Semanal (Obras → Dias): você monta a semana posicionando obras por dia (blocos coloridos).
+
+Tela B — Alocação do Dia/Obra (Funcionários → Obra): ao clicar num bloco de obra de um dia, abre a alocação de pessoas para aquela obra naquele dia.
+
+Tela C — Weekly Planner da Obra (opcional, simples): linha do tempo da obra na semana, com atividades e responsável/turno. (Funciona como referência visual, não bloqueia nada.)
+
+Tela A — Alocação Semanal (Obras → Dias)
+Objetivo
+
+Montar a grade da semana rapidamente, colocando quais obras acontecem em cada dia. Isso substitui a etapa atual do Excel em que você escreve “UNO”, “STRADA”, etc. nas células da semana.
+
+Layout
+
+Header:
+
+Seletor de Semana (<<, >>, “Hoje”).
+
+Filtro: Obra (Todas/por obra), Time/Função (opcional), Turno (opcional).
+
+Ações: Duplicar semana anterior, Limpar dia, Exportar.
+
+Lateral esquerda (Fonte de Obras):
+
+Lista de obras ativas (com cor fixa por obra).
+
+Campo de busca.
+
+Cada obra mostra: nome curto (ex.: UNO PTO), código (ex.: 208.25) e ícone do líder (tooltip com telefone/endereço).
+
+Grade semanal:
+
+Colunas: Seg…Sex.
+
+Linhas: faixas horárias simples (ex.: Manhã / Tarde / Noite) ou “Dia inteiro” (configurável por empresa).
+
+Células vazias aceitam blocos de obras.
+
+Drag & Drop (obras → dias)
+
+Arrastar da lateral (obra) para a célula (dia/faixa): cria bloco de obra naquele dia.
+
+Soltar abre mini-form in-place com: Turno (ou “Dia inteiro”), Observação curta (opcional).
+
+Mover: arrastar o bloco para outro dia/faixa.
+
+Copiar: Shift + arrastar duplica para outro dia.
+
+Remover: tecla Del no bloco ou ícone “lixeira” no bloco.
+
+Redimensionar (se você optar por turnos): puxar a borda do bloco para ajustar início/fim dentro do dia.
+
+Regras e validações (Tempo real)
+
+Capacidade global por dia (opcional): badge leve (ex.: “3 obras no mesmo turno”). Não bloqueia.
+
+Conflito de obra única: se a política da sua empresa for “uma obra por faixa/turno por equipe”, mostramos alerta (não bloqueia).
+
+Ausências massivas: se o RH tiver feriado/lock, badge cinza no dia.
+
+Empty states e atalhos
+
+Empty: célula vazia mostra “Solte aqui uma obra”.
+
+Duplicar semana anterior: clona todos os blocos de obra (sem pessoas ainda).
+
+Context menu (clique direito no bloco): Editar turno, Copiar para… (Seg–Sex), Excluir.
+
+Ação de drill-down
+
+Clique no bloco de obra de Quarta/Manhã, por exemplo → abre a Tela B já “focada” em Obra: UNO, Dia: Quarta, Turno: Manhã (se houver turnos) para alocar as pessoas.
+
+Tela B — Alocação do Dia/Obra (Funcionários → Obra)
+Objetivo
+
+Definir quem vai nessa obra naquele dia (e turno). É aqui que você coloca as pessoas.
+
+Layout
+
+Header: Obra – Dia (ex.: UNO PTO – Quarta (Manhã)), botão Voltar.
+
+Coluna esquerda — Lista de Disponíveis:
+
+Funcionários filtrados por função/equipe (com busca).
+
+Avatar, nome, função, e capacidade do dia (ex.: “0/8h”, “4/8h”).
+
+Etiquetas de ausência (Férias/Atestado) deixam o card cinza e bloqueiam arrasto.
+
+Coluna direita — Alocados nessa obra:
+
+Grade de cards por pessoa com turno (se aplicável) e observação curta (ex.: “solda chapa”).
+
+Rodapé com contador: “Alocados: 6 | Capacidade sugerida: 8”.
+
+Drag & Drop (pessoas → obra)
+
+Arrastar da lista de disponíveis para a área de Alocados: cria o vínculo (pessoa, obra, data, turno).
+
+Ao soltar, mini-form rápido: turno (se diferente do padrão), papel/função (opcional), obs curta.
+
+Remover: arrastar do lado direito de volta para a esquerda ou clicar em “remover” no card.
+
+Reordenar: arrastar dentro da área de alocados (só muda ordem visual).
+
+Multi-seleção: Ctrl/Cmd + clique em múltiplos disponíveis → arrastar todos de uma vez.
+
+Copiar para outro turno (mesmo dia): Alt + arrastar duplica (se a empresa permitir turnos duplos).
+
+Mover para outra obra/dia: Arrastar o grupo para o breadcrumb/“migalha de pão” no topo (abre seletor rápido de dia/obra da semana).
+
+Regras e validações
+
+Sobreposição: impede salvar se a pessoa já estiver em outra obra no mesmo dia/turno (erro claro com atalho “Ir para conflito”).
+
+Capacidade individual: se exceder horas do contrato no dia, badge amarelo no card (não bloqueia).
+
+Qualificação (opcional): se a obra exigir função específica (ex.: eletricista) e a pessoa não tiver, badge vermelho (aviso).
+
+Ausência: bloqueia drop se a pessoa estiver em férias/atestado no dia.
+
+Turno inválido: se a obra daquele dia só tem “Manhã”, não deixa alocar em “Tarde”.
+
+Agilidade
+
+Duplicar de ontem: botão que puxa os alocados de terça → quarta (mantém pessoas, limpa observações).
+
+Salvar e ir para próximo dia: para passar rápido por Seg → Sex.
+
+Export leve: lista dessa obra/dia em PDF (ordem, nome, função, turno, telefone).
+
+Tela C — Weekly Planner da Obra (simples, opcional)
+
+Serve de visual de apoio por obra: arraste atividades da esquerda para Seg…Sex, defina responsável/turno no bloco.
+
+Sem dependências e sem métricas aqui.
+
+Coerência leve com a Tela B: se o responsável de uma atividade não estiver alocado na obra naquele dia, aparece um badge de atenção. (Não bloqueia; é só para você ajustar se quiser.)
+
+Como tudo se encadeia no dia a dia
+
+Monte a semana de obras na Tela A (drag de obras para dias).
+
+Para cada bloco de obra/dia importante, clique e aloque as pessoas na Tela B (drag de pessoas para a obra).
+
+(Opcional) Abra a Tela C da obra para visualizar atividades da semana e checar se o responsável está mesmo alocado naquele dia.
+
+Regras de cores e legibilidade
+
+Cor fixa por obra (ex.: UNO = azul, STRADA = laranja, MADRID = verde).
+
+Cards de pessoa seguem fundo branco com borda da cor da obra (a obra “pinta” tudo que pertence a ela).
+
+Badges:
+
+Conflito/Qualificação: vermelho.
+
+Capacidade extrapolada: amarelo.
+
+Ausência: cinza.
+
+Modelo de dados (enxuto, compatível com o que você já desenhou)
+
+allocation(id, obra_id, date, turno_inicio, turno_fim, nota) → Tela A (obra/dia/turno).
+
+allocation_employee(id, allocation_id, funcionario_id, turno_inicio, turno_fim, papel, obs) → Tela B (pessoas nessa obra/dia).
+
+weekly_plan(id, obra_id, week_start) e
+weekly_plan_item(id, weekly_plan_id, servico_id, day_of_week, responsavel_id, turno_inicio, turno_fim, nota_curta) → Tela C (opcional).
+
+Regras de drag & drop (detalhe técnico que evita dor de cabeça)
+
+DND-A (Obra→Dia)
+
+Source: lista de obras (drag handle no card).
+
+Target: célula da grade (Seg…Sex / turno).
+
+Payload: { obraId, defaultTurno }.
+
+OnEnter: highlight da célula.
+
+OnDrop: cria allocation, abre mini-form (turno/nota), confirma.
+
+OnMove: atualiza allocation.date/turno.
+
+OnCopy (Shift): duplica allocation no novo dia.
+
+OnRemove: deleta allocation e todos os allocation_employee associados (confirm dialog).
+
+DND-B (Pessoa→Obra/Dia)
+
+Source: card da pessoa (lista de disponíveis).
+
+Target: área de alocados.
+
+Guards antes de aceitar o drop:
+
+verificar ausência nesse dia;
+
+verificar conflito (já alocado em outra obra/mesmo turno);
+
+verificar qualificação (se você ligar essa regra).
+
+OnDrop: cria allocation_employee.
+
+OnMove dentro da mesma obra/dia: só reordena (não muda dados).
+
+OnMove para outro dia/obra (via breadcrumb): atualiza allocation_id do vínculo.
+
+OnCopy (Alt): duplica allocation_employee com ajuste de turno.
+
+Undo: “Ctrl+Z” desfaz último drop (mantemos um stack no front por usabilidade).
+
+Performance/UX
+
+DND visualmente “leve” (ghost card).
+
+Debounce de 200ms para salvar em lote quando você arrasta várias pessoas.
+
+Conflitos e mensagens (claras e objetivas)
+
+Sobreposição: “João já está alocado em STRADA (Quarta, manhã). [Abrir]”.
+
+Ausência: “Maria está em atestado neste dia.”
+
+Capacidade: “Lucas com 10h/8h no dia. (segue permitido)”.
+
+Qualificação: “Pedro não é eletricista. (alocar assim mesmo?)”.
+
+Teclado e mobile (rápidos)
+
+Teclado:
+
+Setas mudam dia selecionado; Enter abre mini-form; Del remove bloco.
+
+Ctrl+Enter = salvar e ir para próximo dia.
+
+Mobile:
+
+DND por “tocar e segurar”; lista de pessoas vira carrossel; botão Adicionar todos do time X (macro útil no celular).
+
+Roadmap em 3 entregas (sem gordura)
+
+Tela A (Obras→Dias) + conflitos básicos + duplicar semana.
+
+Tela B (Pessoas→Obra/Dia) + regras de sobreposição/ausência + multi-seleção.
+
+(Opcional) Tela C simples + coerência leve com a alocação + export.
+
+Se quiser, eu já transformo isso em wireframes clicáveis (HTML/React) com os estados (vazio, normal, conflito) e o fluxo de DnD implementado no front para você validar com o time.

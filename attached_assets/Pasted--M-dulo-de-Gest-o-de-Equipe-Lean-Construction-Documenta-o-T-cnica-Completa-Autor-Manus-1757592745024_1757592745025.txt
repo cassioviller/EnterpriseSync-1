@@ -1,0 +1,590 @@
+# Módulo de Gestão de Equipe Lean Construction
+## Documentação Técnica Completa
+
+**Autor:** Manus AI  
+**Data:** 11 de setembro de 2025  
+**Versão:** 1.0
+
+---
+
+## Sumário
+
+1. [Introdução](#1-introdução)
+2. [Análise do Contexto Atual](#2-análise-do-contexto-atual)
+3. [Fundamentos do Lean Construction](#3-fundamentos-do-lean-construction)
+4. [Solução Proposta](#4-solução-proposta)
+5. [Design da Interface - Alocação de Equipes](#5-design-da-interface---alocação-de-equipes)
+6. [Design da Interface - Weekly Planner](#6-design-da-interface---weekly-planner)
+7. [Especificação Técnica](#7-especificação-técnica)
+8. [Plano de Implementação](#8-plano-de-implementação)
+9. [Benefícios Esperados](#9-benefícios-esperados)
+10. [Conclusão](#10-conclusão)
+
+---
+
+## 1. Introdução
+
+Este documento apresenta a especificação completa para o novo módulo de Gestão de Equipe baseado em Lean Construction para o sistema SIGE. O módulo foi projetado para atender às necessidades específicas de planejamento e alocação de equipes em projetos de construção civil, com foco em duas funcionalidades principais:
+
+1. **Alocação de Equipes por Obra**: Interface tipo calendário para visualização e gestão da alocação de funcionários em diferentes obras.
+2. **Weekly Planner com Fluxo de Atividades**: Ferramenta colaborativa para planejamento semanal, gestão de restrições e acompanhamento de performance.
+
+O módulo foi concebido para integrar-se perfeitamente ao sistema SIGE existente, aproveitando ao máximo os dados e funcionalidades já implementados, enquanto adiciona novas capacidades baseadas nas melhores práticas modernas de Lean Construction.
+
+---
+
+## 2. Análise do Contexto Atual
+
+### 2.1 Processo Atual
+
+Atualmente, a alocação de equipes é gerenciada através de uma planilha Excel com as seguintes características:
+
+- **Estrutura da Planilha:**
+  - Eixo Horizontal: Dias da semana (Segunda a Sexta)
+  - Eixo Vertical: Funcionários organizados por equipe/função
+  - Células: Contêm informações de obra, função e status
+
+- **Padrão de Informações por Célula:**
+  - Nome da obra (ex: UNO PTO, UNO BCO, MADRID OPEN MALL)
+  - Função/atividade específica
+  - Status visual (cores diferentes para diferentes situações)
+  - Códigos de identificação (208.25, 297.25, etc.)
+
+### 2.2 Pontos de Dor Identificados
+
+1. **Processo Manual Intensivo**
+   - Atualização manual diária da planilha
+   - Risco de erros humanos
+   - Dificuldade de sincronização entre equipes
+
+2. **Falta de Visibilidade em Tempo Real**
+   - Informações desatualizadas
+   - Dificuldade de acompanhar mudanças durante o dia
+   - Sem notificações automáticas
+
+3. **Limitações de Colaboração**
+   - Apenas uma pessoa pode editar por vez
+   - Sem histórico de alterações
+   - Comunicação fragmentada
+
+4. **Ausência de Métricas**
+   - Sem indicadores de produtividade
+   - Falta de análise de eficiência
+   - Sem dados para tomada de decisão
+
+5. **Gestão de Restrições Reativa**
+   - Problemas identificados apenas quando ocorrem
+   - Sem planejamento preventivo
+   - Falta de rastreabilidade de impedimentos
+
+### 2.3 Integração com SIGE Existente
+
+O sistema SIGE já possui uma base sólida de funcionalidades que podem ser aproveitadas:
+
+- **Funcionários**: Cadastro completo com dados pessoais, fotos e documentos
+- **Obras**: Projetos ativos, responsáveis, cronogramas
+- **RDO**: Histórico de atividades diárias
+- **Serviços**: Catálogo de atividades padronizadas
+- **Progresso**: Percentuais de conclusão por atividade
+
+---
+
+## 3. Fundamentos do Lean Construction
+
+### 3.1 Princípios Básicos
+
+- **Eliminação de desperdicios**: Identificar e eliminar tudo que não agrega valor
+- **Otimização de processos**: Melhoria contínua da eficiência e colaboração
+- **Geração de valor**: Foco nas necessidades do cliente
+- **Melhoria contínua**: Aprendizagem constante para excelência
+
+### 3.2 Last Planner System (LPS)
+
+O Last Planner System é uma metodologia de planejamento e controle de produção que promove a criação de um fluxo de trabalho previsível entre as várias partes envolvidas, para alcançar resultados confiáveis. Estrutura-se em 5 conversas principais:
+
+1. **Should** (Pull-planning): O que deveria ser feito
+2. **Can** (Make-ready): O que pode ser feito (sem restrições)
+3. **Will** (Weekly work planning): O que será feito (compromissos)
+4. **Did** (Daily huddles): O que foi feito
+5. **Learn** (Análise de variação): Aprender com a performance
+
+### 3.3 Limitações do LPS Tradicional
+
+- **Processo manual intensivo**: Dependente de reuniões presenciais
+- **Falta de integração digital**: Planilhas e post-its físicos
+- **Baixa taxa de sucesso**: Apenas 54% das tarefas planejadas são concluídas
+- **Dificuldade de escalabilidade**: Complexo para múltiplas obras
+- **Limitações de colaboração remota**: Não adaptado para trabalho híbrido
+
+### 3.4 Metodologias Modernas
+
+As abordagens modernas de Lean Construction incorporam ferramentas digitais e metodologias híbridas:
+
+- **Lean Construction Digital**: Ferramentas colaborativas online
+- **Collaborative Planning Systems**: Plataformas como COCOPLAN
+- **Metodologias Híbridas**: Integração com Scrum, BIM, IoT e IA
+
+---
+
+## 4. Solução Proposta
+
+### 4.1 Visão Geral
+
+A solução proposta consiste em um novo módulo para o SIGE com duas funcionalidades principais:
+
+1. **Alocação de Equipes por Obra**: Interface tipo calendário para visualização e gestão da alocação de funcionários em diferentes obras.
+2. **Weekly Planner com Fluxo de Atividades**: Ferramenta colaborativa para planejamento semanal, gestão de restrições e acompanhamento de performance.
+
+### 4.2 Objetivos
+
+- **Digitalizar** o processo atual de alocação de equipes
+- **Implementar** metodologias modernas de Lean Construction
+- **Integrar** com o sistema SIGE existente
+- **Melhorar** a colaboração e comunicação entre equipes
+- **Fornecer** métricas e indicadores para tomada de decisão
+
+### 4.3 Abordagem
+
+A solução adota uma abordagem híbrida que combina:
+
+- **Familiaridade**: Mantém a estrutura visual de calendário já conhecida pelos usuários
+- **Inovação**: Adiciona funcionalidades avançadas de Lean Construction digital
+- **Integração**: Aproveita ao máximo os dados existentes no SIGE
+- **Escalabilidade**: Permite crescimento e adaptação a diferentes tipos de projeto
+
+---
+
+## 5. Design da Interface - Alocação de Equipes
+
+### 5.1 Layout Principal
+
+#### 5.1.1 Cabeçalho da Interface
+- **Logo e Título**: "Construction Team Allocation" 
+- **Filtros Principais**:
+  - Dropdown "Projects" para filtrar por obra específica
+  - Dropdown "Skills" para filtrar por habilidades/funções
+  - Campo de busca "Search employees" para localizar funcionários
+- **Seletor de Data**: Navegação semanal com setas para anterior/próximo
+
+#### 5.1.2 Sidebar Esquerda - Lista de Funcionários
+**Funcionalidades:**
+- **Fotos dos funcionários**: Integração com cadastro SIGE existente
+- **Indicadores de capacidade**: "8h / 8h" mostrando horas alocadas vs disponíveis
+- **Status visual**: Cores indicando disponibilidade (verde=disponível, amarelo=parcial, vermelho=ocupado)
+- **Filtros rápidos**: Botões para filtrar por função (FRC - Funcionário, etc.)
+- **Drag source**: Funcionários podem ser arrastados para o calendário
+
+#### 5.1.3 Grid Principal - Calendário Semanal
+**Estrutura:**
+- **Colunas**: Dias da semana (Segunda a Sexta)
+- **Linhas**: Funcionários alocados
+- **Células**: Cards de alocação com informações do projeto
+
+**Cards de Alocação:**
+- **Código do projeto**: UNO PTO, MADRID OPEN MALL, STRADA
+- **Código numérico**: 208.25, 268.25, etc. (integração com SIGE)
+- **Cores por projeto**: Verde, Laranja, Azul para identificação visual
+- **Horário**: Quando aplicável (12:00 PM - 6:00 PM)
+
+### 5.2 Funcionalidades Interativas
+
+#### 5.2.1 Drag & Drop
+- **Arrastar funcionários**: Da sidebar para células do calendário
+- **Realocar entre dias**: Mover cards entre diferentes dias
+- **Realocar entre projetos**: Trocar funcionários entre obras
+- **Feedback visual**: Highlight das áreas válidas durante o drag
+
+#### 5.2.2 Tooltips e Detalhes
+- **Hover nos cards**: Informações detalhadas da alocação
+- **Tooltip de conflitos**: Alertas quando há sobreposição de horários
+- **Detalhes do funcionário**: Habilidades, histórico, performance
+
+#### 5.2.3 Indicadores Visuais
+- **Conflitos de agenda**: Badge vermelho com número de conflitos
+- **Capacidade excedida**: Indicador visual quando funcionário está sobrecarregado
+- **Status de confirmação**: Verde (confirmado), Amarelo (pendente), Vermelho (conflito)
+
+### 5.3 Funcionalidades Específicas
+
+#### 5.3.1 Gestão de Capacidade
+- **Cálculo automático**: Horas disponíveis vs alocadas
+- **Alertas de sobrecarga**: Notificação quando excede capacidade
+- **Visualização de gaps**: Identificar funcionários subutilizados
+
+#### 5.3.2 Gestão de Conflitos
+- **Detecção automática**: Identificar conflitos de horário/local
+- **Resolução assistida**: Sugestões para resolver conflitos
+- **Histórico de mudanças**: Rastreabilidade de todas as alterações
+
+#### 5.3.3 Filtros e Busca
+- **Por projeto**: Mostrar apenas funcionários de obras específicas
+- **Por habilidade**: Filtrar por função/especialização
+- **Por disponibilidade**: Mostrar apenas disponíveis
+- **Busca textual**: Localizar funcionários por nome
+
+#### 5.3.4 Exportação e Relatórios
+- **Export para Excel**: Manter compatibilidade com processo atual
+- **Relatório de utilização**: Análise de capacidade por período
+- **Relatório de conflitos**: Lista de problemas identificados
+
+---
+
+## 6. Design da Interface - Weekly Planner
+
+### 6.1 Layout Principal
+
+#### 6.1.1 Sidebar Esquerda - Gestão de Contexto
+
+**Constraints Management (Gestão de Restrições)**
+- **Cards de restrições**: Alertas visuais em vermelho para problemas identificados
+- **Responsável**: Foto e nome da pessoa responsável pela resolução
+- **Prazo**: Data limite para resolução (Wed 24, Thur 25)
+- **Tipos de restrição**: Material Delays, Equipment Issues, Design Issues, External Factors
+- **Status tracking**: Identificada → Em Resolução → Resolvida
+
+**Resources (Recursos Disponíveis)**
+- **Equipment cards**: Escavadeira, Betoneira com status de disponibilidade
+- **Capacity indicators**: "100 CU TD", "8 CY" mostrando capacidade disponível
+- **Availability status**: Available, In Use, Maintenance
+- **Booking system**: Reserva de equipamentos para atividades
+
+**Team Capacity (Capacidade da Equipe)**
+- **Progress bars**: Indicadores visuais de carga de trabalho por funcionário
+- **Color coding**: Verde (disponível), Amarelo (parcial), Vermelho (sobrecarregado)
+- **Skill indicators**: Identificação de especialidades por funcionário
+- **Availability forecast**: Previsão de disponibilidade para próximas semanas
+
+#### 6.1.2 Área Central - Weekly Timeline
+
+**Grid Semanal**
+- **Colunas**: Dias da semana (MON, TUE, WED, THU, FRI)
+- **Cards de atividade**: Tarefas alocadas por dia
+- **Dependency arrows**: Setas conectando atividades dependentes
+- **Drag & drop**: Realocação de atividades entre dias
+
+**Activity Cards**
+- **Projeto**: UNO PTO, MADRID OPEN MALL, STRADA
+- **Código**: 208.25, 268.25 (integração com SIGE)
+- **Responsável**: Foto do funcionário alocado
+- **Status visual**: Cores por projeto e estado da atividade
+- **Dependencies**: Conexões visuais com outras atividades
+
+**Flow Management**
+- **Dependency tracking**: Visualização de dependências críticas
+- **Bottleneck identification**: Identificação automática de gargalos
+- **Flow optimization**: Sugestões para otimizar sequência de atividades
+- **Critical path**: Destaque do caminho crítico do projeto
+
+#### 6.1.3 Área Superior Direita - Métricas PPC
+
+**PPC Dashboard**
+- **Circular progress**: Indicador visual de 87% de conclusão
+- **Trend arrow**: Seta indicando tendência (↑ melhorando, ↓ piorando)
+- **Historical data**: Comparação com semanas anteriores
+- **Target vs actual**: Meta vs realizado
+
+#### 6.1.4 Área Inferior - Daily Huddles
+
+**Commitment Tracking**
+- **Daily grid**: MON, TUE, WED, THU, FRI
+- **Commitment status**: ✓ (cumprido), ○ (pendente), ✗ (não cumprido)
+- **Quick updates**: Interface rápida para atualizar status
+- **Failure reasons**: Captura de motivos quando não cumprido
+
+**Daily Huddle Interface**
+- **Today's commitments**: Lista de compromissos do dia
+- **Yesterday's results**: Resultados do dia anterior
+- **Today's plan**: Plano para o dia atual
+- **Impediments**: Novos impedimentos identificados
+
+### 6.2 Funcionalidades Avançadas
+
+#### 6.2.1 Collaborative Planning
+**Pull Planning Sessions:**
+- **Virtual sessions**: Reuniões online para planejamento
+- **Real-time collaboration**: Múltiplos usuários editando simultaneamente
+- **Sticky notes digitais**: Post-its virtuais para brainstorming
+- **Voting system**: Priorização colaborativa de atividades
+
+#### 6.2.2 Constraint Management
+**Proactive Approach:**
+- **Early identification**: Identificação antecipada de restrições
+- **Assignment tracking**: Responsáveis por resolver cada restrição
+- **Escalation rules**: Regras automáticas de escalação
+- **Resolution tracking**: Acompanhamento até resolução completa
+
+#### 6.2.3 Flow Optimization
+**Intelligent Suggestions:**
+- **Sequence optimization**: Sugestões para melhor sequência
+- **Resource leveling**: Nivelamento automático de recursos
+- **Bottleneck alerts**: Alertas de gargalos potenciais
+- **Alternative paths**: Caminhos alternativos quando há bloqueios
+
+#### 6.2.4 Integration Features
+**SIGE Integration:**
+- **RDO sync**: Sincronização com relatórios diários
+- **Employee data**: Integração com cadastro de funcionários
+- **Project data**: Dados de obras e serviços
+- **Historical analysis**: Análise de dados históricos
+
+---
+
+## 7. Especificação Técnica
+
+### 7.1 Visão Geral da Arquitetura
+
+A solução será desenvolvida como um novo módulo dentro do sistema SIGE existente, aproveitando ao máximo a arquitetura multi-tenant, a base de dados e os serviços de autenticação e autorização já implementados. A arquitetura seguirá um modelo de microsserviços, com novos serviços para as funcionalidades Lean, que se comunicarão com os serviços existentes através de APIs RESTful.
+
+### 7.2 Modelagem de Dados
+
+A modelagem de dados será uma extensão do schema existente no SIGE, com a criação de novas tabelas para suportar as funcionalidades de Lean Construction. As novas tabelas terão relacionamentos com as tabelas existentes de `Funcionario`, `Obra` e `ServicoObraReal`.
+
+#### 7.2.1 Novas Tabelas
+
+**`lean_allocation`**
+```sql
+CREATE TABLE lean_allocation (
+    id SERIAL PRIMARY KEY,
+    funcionario_id INTEGER REFERENCES funcionario(id),
+    obra_id INTEGER REFERENCES obra(id),
+    data_alocacao DATE NOT NULL,
+    horas_planejadas FLOAT DEFAULT 8.0,
+    status VARCHAR(20) DEFAULT 'planejado',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**`weekly_plan`**
+```sql
+CREATE TABLE weekly_plan (
+    id SERIAL PRIMARY KEY,
+    obra_id INTEGER REFERENCES obra(id),
+    week_start DATE NOT NULL,
+    ppc_target FLOAT DEFAULT 85.0,
+    ppc_actual FLOAT DEFAULT 0.0,
+    status VARCHAR(20) DEFAULT 'planning'
+);
+```
+
+**`lean_task`**
+```sql
+CREATE TABLE lean_task (
+    id SERIAL PRIMARY KEY,
+    weekly_plan_id INTEGER REFERENCES weekly_plan(id),
+    servico_obra_id INTEGER REFERENCES servico_obra_real(id),
+    planned_date DATE NOT NULL,
+    status VARCHAR(20) DEFAULT 'planned',
+    dependencies JSON -- Array de IDs de tarefas dependentes
+);
+```
+
+**`constraint`**
+```sql
+CREATE TABLE constraint (
+    id SERIAL PRIMARY KEY,
+    lean_task_id INTEGER REFERENCES lean_task(id),
+    type VARCHAR(50) NOT NULL, -- Material, Equipment, Design, External
+    description TEXT NOT NULL,
+    responsible_id INTEGER REFERENCES funcionario(id),
+    due_date DATE,
+    status VARCHAR(20) DEFAULT 'identified'
+);
+```
+
+**`daily_commitment`**
+```sql
+CREATE TABLE daily_commitment (
+    id SERIAL PRIMARY KEY,
+    lean_task_id INTEGER REFERENCES lean_task(id),
+    funcionario_id INTEGER REFERENCES funcionario(id),
+    commitment_date DATE NOT NULL,
+    commitment_met BOOLEAN DEFAULT NULL,
+    failure_reason VARCHAR(100),
+    notes TEXT
+);
+```
+
+**`ppc_metric`**
+```sql
+CREATE TABLE ppc_metric (
+    id SERIAL PRIMARY KEY,
+    weekly_plan_id INTEGER REFERENCES weekly_plan(id),
+    calculation_date TIMESTAMP DEFAULT NOW(),
+    ppc_percentage FLOAT NOT NULL,
+    tasks_planned INTEGER NOT NULL,
+    tasks_completed INTEGER NOT NULL
+);
+```
+
+### 7.3 APIs e Microsserviços
+
+Serão desenvolvidos novos microsserviços para as funcionalidades de Lean Construction, que se comunicarão com os serviços existentes do SIGE através de APIs RESTful. Os novos serviços serão:
+
+#### 7.3.1 Serviço de Alocação
+
+**Endpoints:**
+```
+GET /api/allocations/{obra_id}/{week}
+POST /api/allocations
+PUT /api/allocations/{id}
+DELETE /api/allocations/{id}
+GET /api/allocations/conflicts
+```
+
+#### 7.3.2 Serviço de Planejamento Semanal
+
+**Endpoints:**
+```
+GET /api/weekly-plans/{obra_id}/{week}
+POST /api/weekly-plans
+PUT /api/weekly-plans/{id}
+GET /api/lean-tasks/{weekly_plan_id}
+POST /api/lean-tasks
+PUT /api/lean-tasks/{id}/status
+```
+
+#### 7.3.3 Serviço de Restrições
+
+**Endpoints:**
+```
+GET /api/constraints/{weekly_plan_id}
+POST /api/constraints
+PUT /api/constraints/{id}/resolve
+GET /api/constraints/dashboard
+```
+
+#### 7.3.4 Serviço de Métricas
+
+**Endpoints:**
+```
+GET /api/ppc/{weekly_plan_id}
+POST /api/ppc/calculate
+GET /api/ppc/history/{obra_id}
+GET /api/ppc/dashboard
+```
+
+### 7.4 Frontend
+
+O frontend será desenvolvido utilizando um framework moderno como React ou Vue.js, e será integrado ao frontend existente do SIGE. As novas interfaces serão desenvolvidas como componentes reutilizáveis, seguindo o design system do SIGE.
+
+#### 7.4.1 Componentes Principais
+
+- **TeamAllocationCalendar**: Componente principal da interface de alocação de equipes
+- **EmployeeList**: Lista de funcionários com filtros e busca
+- **AllocationCard**: Card de alocação de funcionário a obra
+- **WeeklyPlannerBoard**: Componente principal do weekly planner
+- **ConstraintManager**: Gerenciador de restrições
+- **TaskFlowCard**: Card de tarefa com dependências
+- **PPCDashboard**: Dashboard de métricas PPC
+- **DailyHuddle**: Interface para daily huddles
+
+### 7.5 Tecnologias
+
+- **Backend**: Python com Flask ou FastAPI
+- **Frontend**: React ou Vue.js
+- **Banco de dados**: PostgreSQL (o mesmo do SIGE)
+- **Comunicação**: APIs RESTful com JSON
+- **Autenticação**: JWT (o mesmo do SIGE)
+
+---
+
+## 8. Plano de Implementação
+
+### 8.1 Fases de Implementação
+
+A implementação será dividida em sprints de 2 semanas, com entregas incrementais de funcionalidades.
+
+#### 8.1.1 Sprint 1: Foundation (2 semanas)
+- Estrutura do banco de dados
+- APIs básicas
+- Componentes de UI fundamentais
+
+#### 8.1.2 Sprint 2: Alocação de Equipes (2 semanas)
+- Interface de calendário
+- Drag & drop de funcionários
+- Detecção de conflitos
+
+#### 8.1.3 Sprint 3: Weekly Planner (2 semanas)
+- Interface de planejamento semanal
+- Gestão de dependências
+- Fluxo de atividades
+
+#### 8.1.4 Sprint 4: Gestão de Restrições (2 semanas)
+- Interface de gestão de restrições
+- Daily huddles
+- Commitment tracking
+
+#### 8.1.5 Sprint 5: Métricas e Dashboard (2 semanas)
+- Cálculo de PPC
+- Dashboard de métricas
+- Relatórios e exportação
+
+#### 8.1.6 Sprint 6: Finalização (2 semanas)
+- Testes de integração
+- Ajustes finais
+- Documentação e treinamento
+
+### 8.2 Estratégia de Migração
+
+A migração dos dados existentes para o novo módulo será feita de forma gradual:
+
+1. **Fase 1**: Importação dos dados de funcionários, obras e serviços
+2. **Fase 2**: Importação das alocações atuais da planilha Excel
+3. **Fase 3**: Criação dos primeiros planos semanais
+4. **Fase 4**: Operação paralela (Excel + novo módulo)
+5. **Fase 5**: Transição completa para o novo módulo
+
+### 8.3 Treinamento e Adoção
+
+Para garantir a adoção bem-sucedida do novo módulo, será implementado um plano de treinamento:
+
+1. **Workshops introdutórios**: Conceitos de Lean Construction
+2. **Treinamento hands-on**: Uso das novas interfaces
+3. **Suporte dedicado**: Durante as primeiras semanas de uso
+4. **Documentação detalhada**: Manuais e vídeos tutoriais
+5. **Feedback contínuo**: Ajustes baseados no feedback dos usuários
+
+---
+
+## 9. Benefícios Esperados
+
+### 9.1 Benefícios Operacionais
+
+- **Redução de 70% no tempo de planejamento semanal**
+- **Aumento de 40% na visibilidade de restrições**
+- **Melhoria de 30% na comunicação entre equipes**
+- **Eliminação de conflitos de alocação**
+- **Redução de 25% no tempo de ciclo das atividades**
+
+### 9.2 Benefícios Estratégicos
+
+- **Implementação de metodologia Lean Construction**
+- **Dados para análise de produtividade**
+- **Base para melhoria contínua**
+- **Diferenciação competitiva no mercado**
+- **Escalabilidade para crescimento futuro**
+
+### 9.3 Benefícios Técnicos
+
+- **Integração total com sistema existente**
+- **Aproveitamento máximo de dados históricos**
+- **Interface moderna e responsiva**
+- **Escalabilidade para crescimento futuro**
+- **Manutenção simplificada**
+
+---
+
+## 10. Conclusão
+
+O módulo de Gestão de Equipe Lean Construction representa uma evolução significativa na forma como a empresa gerencia suas equipes e projetos. Ao combinar os princípios do Lean Construction com ferramentas digitais modernas, o módulo permitirá:
+
+1. **Transformar** o processo manual atual em um fluxo digital eficiente
+2. **Melhorar** a colaboração e comunicação entre equipes
+3. **Aumentar** a previsibilidade e confiabilidade dos projetos
+4. **Fornecer** dados e métricas para tomada de decisão
+5. **Implementar** uma cultura de melhoria contínua
+
+A solução foi projetada para integrar-se perfeitamente ao sistema SIGE existente, aproveitando ao máximo os dados e funcionalidades já implementados, enquanto adiciona novas capacidades baseadas nas melhores práticas modernas de Lean Construction.
+
+Com a implementação deste módulo, a empresa estará posicionada na vanguarda da gestão de projetos de construção, com ferramentas que não apenas resolvem os problemas atuais, mas também estabelecem uma base sólida para crescimento e melhoria contínua no futuro.
+

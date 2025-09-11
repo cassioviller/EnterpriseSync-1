@@ -1,0 +1,83 @@
+
+
+
+# Módulo de Gestão de Equipe - Proposta Enxuta
+
+## 1. Introdução
+
+Esta proposta descreve um módulo de gestão de equipe focado em duas funcionalidades essenciais, projetado para substituir a planilha Excel atual de forma simples e direta. A solução foi redefinida com base no seu feedback para eliminar funcionalidades desnecessárias e focar no que realmente importa.
+
+## 2. Escopo Enxuto
+
+### 2.1. Funcionalidades Incluídas
+
+- **Calendário de Alocação Hierárquica**: Alocação em dois níveis (obras→dias, funcionários→obras) com vistas semanal e mensal.
+- **Weekly Planner Simplificado**: Planejamento semanal por obra com drag & drop de atividades e fluxo visual básico.
+
+### 2.2. Funcionalidades Excluídas
+
+- Daily Huddles, métricas PPC, gestão de restrições, gestão de recursos, dependências complexas, etc.
+
+
+
+
+## 3. Design da Alocação Hierárquica
+
+### 3.1. Nível 1: Obras por Dias
+
+- **Interface**: Calendário semanal/mensal com drag & drop de obras.
+- **Funcionalidades**: Filtros básicos, toggle de visualização, cores por obra.
+
+![Nível 1: Obras por Dias](https://private-us-east-1.manuscdn.com/sessionFile/6plGEZxcIxQ1jJLfDAYr7m/sandbox/F36dujh86hUlxAZ1Yywmsc-images_1757593669628_na1fn_L2hvbWUvdWJ1bnR1L21vY2t1cF9uaXZlbDFfb2JyYXNfZGlhcw.png?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvNnBsR0VaeGNJeFExakpMZkRBWXI3bS9zYW5kYm94L0YzNmR1amg4NmhVbHhBWjFZeXdtc2MtaW1hZ2VzXzE3NTc1OTM2Njk2MjhfbmExZm5fTDJodmJXVXZkV0oxYm5SMUwyMXZZMnQxY0Y5dWFYWmxiREZmYjJKeVlYTmZaR2xoY3cucG5nIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=UM7xdgX-g2XnFut6THlJh~~HWAdWUryfR~Gyetgpyo1IVKH69wcasHNHT39bL5IR-sKPjrZXEhQHadk3rtllK27wdojOk6wgJYlOkLyTo2X3z~yDDNj-leptJu3afb5WB5vIcDNBKI9x2Nqp8cWElxkP06YP-PRQTyj96wcfsn1AddpF~mdJVtrHui51hO6XkFyqaGjz9K~UToMhJVnG7EarwtnI-~~OGQu69YJ4AQAalAc730enPms8euPNnoHiSKfVKEm1BzzJEveVx6FmWjP-8MjOu~hYdHZwv-AvGZHcy0xdNs3jjRgRgzo2U13VLAXer5DV29A2HMmFBsby9w__)
+
+### 3.2. Nível 2: Funcionários por Obra
+
+- **Interface**: Drill-down a partir do Nível 1, com lista de funcionários disponíveis e alocados.
+- **Funcionalidades**: Drag & drop de funcionários, detecção de conflitos, botão de voltar.
+
+![Nível 2: Funcionários por Obra](https://private-us-east-1.manuscdn.com/sessionFile/6plGEZxcIxQ1jJLfDAYr7m/sandbox/F36dujh86hUlxAZ1Yywmsc-images_1757593669629_na1fn_L2hvbWUvdWJ1bnR1L21vY2t1cF9uaXZlbDJfZnVuY2lvbmFyaW9zX29icmE.png?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvNnBsR0VaeGNJeFExakpMZkRBWXI3bS9zYW5kYm94L0YzNmR1amg4NmhVbHhBWjFZeXdtc2MtaW1hZ2VzXzE3NTc1OTM2Njk2MjlfbmExZm5fTDJodmJXVXZkV0oxYm5SMUwyMXZZMnQxY0Y5dWFYWmxiREpmWm5WdVkybHZibUZ5YVc5elgyOWljbUUucG5nIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=BH1EuHoDd3aFTgO9jo0QZgbNhYdv5jrO5AWd0Y8B392XrItK~gHgWi8E8rC7fAMrkuPkYS-14AMDJaKjxk5cokTHZgdcFwbNZNxANz6k5VyC5eHY9~V3FVbfmyCBM5ytwSHjcD6IOSuoUFJjd~9h4WbqdsYH~9ve2TjLrIp3z~wvFSLNhWN~6bmy2PscXjVuUKoorb1f~D2xumIIbE-nMMfpxZo0fQY3ZLmyKAehUaWsIKyr5-PSvX6S1aTAF6qxaUYkvoL5Kk4TQc4vfQAxm6xVn0BH9gS6LvNMX4t5IisqSADX6wR2HcS1apVX4bClHmGtBT7gOu4fQEinODcv2A__)
+
+### 3.3. Vista Mensal
+
+- **Interface**: Visão geral do mês com obras alocadas em cada dia.
+
+![Vista Mensal](https://private-us-east-1.manuscdn.com/sessionFile/6plGEZxcIxQ1jJLfDAYr7m/sandbox/F36dujh86hUlxAZ1Yywmsc-images_1757593669641_na1fn_L2hvbWUvdWJ1bnR1L21vY2t1cF92aXN0YV9tZW5zYWw.png?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvNnBsR0VaeGNJeFExakpMZkRBWXI3bS9zYW5kYm94L0YzNmR1amg4NmhVbHhBWjFZeXdtc2MtaW1hZ2VzXzE3NTc1OTM2Njk2NDFfbmExZm5fTDJodmJXVXZkV0oxYm5SMUwyMXZZMnQxY0Y5MmFYTjBZVjl0Wlc1ellXdy5wbmciLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTg3NjE2MDB9fX1dfQ__&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=a9RskThOyXzrZ7khSRcsjh6sZsX6d2ocCdVUp~zQJSh5D-VeAQ15Y7rwIDN4GEA0TDm8qGImdqpK1NIaaW7fcaEjdCypchZ-XRPecAN12B28naxOVJWVdCh9gJrXHb7ItGEf1B0uJ6rHpjb7JC0QwR35--or-pts~hM-0x-WfB6dZVuVYqOHsPciNw5JfE5iehGWPOIkAYLCNJDJOAaz~e9OV6eblZUmlAe2IO8eg19bjH-RJfnugTfzHVe59~8EHH7ZFMcFhZRc-4kGfwYFUnhjApIyOB6VAkngcWc4TEX8AhVf1sjiEpfPN6zvcQNcXSakFoY9f~~UgJfumHSzeg__)
+
+
+
+
+## 4. Design do Weekly Planner Simplificado
+
+- **Interface**: Timeline semanal por obra com catálogo de atividades do SIGE.
+- **Funcionalidades**: Drag & drop de atividades, definição de responsável/turno, fluxo visual simples.
+
+![Weekly Planner Simplificado](https://private-us-east-1.manuscdn.com/sessionFile/6plGEZxcIxQ1jJLfDAYr7m/sandbox/F36dujh86hUlxAZ1Yywmsc-images_1757593669643_na1fn_L2hvbWUvdWJ1bnR1L21vY2t1cF93ZWVrbHlfcGxhbm5lcl9zaW1wbGVz.png?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvNnBsR0VaeGNJeFExakpMZkRBWXI3bS9zYW5kYm94L0YzNmR1amg4NmhVbHhBWjFZeXdtc2MtaW1hZ2VzXzE3NTc1OTM2Njk2NDNfbmExZm5fTDJodmJXVXZkV0oxYm5SMUwyMXZZMnQxY0Y5M1pXVnJiSGxmY0d4aGJtNWxjbDl6YVcxd2JHVnoucG5nIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=az9a4t3--gjBq3~dxSyKGcO86HcSjLMTGmEnUgq3fcwFFnDBjXl1L9AntZdovdEwB1lqkkG8J7Aga6jtXke8OcJ0BZgP8PSBZxic-~cmOC3htGrAMKjbQuMUk~ZRhFNR8vWEIIHww7nc7bIpBIZ-F6UHYeHQRjgJ9Lwht0s7qH8D1FSb17Pse4hjklZGF3Nw-6RkHWdWHn9y38AUy37f65A~U9eUeIPmDEB48wxFlMZSBxrDq2IiOMkqt6SQcaQ55z4o~LYg0FdBSjCW45xm2Cd5L~tukii70w9D~jDHtMU085RGxv81qGEPFJK7hPQQQrhrQ3w-kPxmRj-m1BunyQ__)
+
+
+
+
+## 5. Especificação Técnica Enxuta
+
+### 5.1. Modelagem de Dados
+
+```sql
+CREATE TABLE allocation (id SERIAL PRIMARY KEY, obra_id INTEGER, data_alocacao DATE);
+CREATE TABLE allocation_employee (id SERIAL PRIMARY KEY, allocation_id INTEGER, funcionario_id INTEGER, turno_inicio TIME, turno_fim TIME);
+CREATE TABLE weekly_plan (id SERIAL PRIMARY KEY, obra_id INTEGER, week_start DATE);
+CREATE TABLE weekly_plan_item (id SERIAL PRIMARY KEY, weekly_plan_id INTEGER, servico_id INTEGER, day_of_week INTEGER, responsavel_id INTEGER, turno_inicio TIME, turno_fim TIME, nota_curta TEXT);
+```
+
+### 5.2. Endpoints Essenciais
+
+- `GET /api/allocations`
+- `POST /api/allocations`
+- `GET /api/weekly-plans`
+- `POST /api/weekly-plans`
+
+## 6. Roadmap Realista (3 Entregas)
+
+1. **Alocação Hierárquica**: Implementação completa da funcionalidade de alocação.
+2. **Weekly Planner Básico**: Implementação da funcionalidade de planejamento semanal.
+3. **Coerência e Exportação**: Sincronização entre as duas funcionalidades e exportação para Excel.
+
+
