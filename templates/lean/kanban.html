@@ -1,0 +1,536 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Kanban Board - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-1">
+                        <i class="fas fa-columns me-2 text-success"></i>
+                        Kanban Board
+                    </h4>
+                    <p class="text-muted mb-0">Gestão visual do fluxo de trabalho</p>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <!-- Seletor de Obra -->
+                    <select id="obraSelector" class="form-select" style="min-width: 200px;">
+                        <option value="">Selecione uma obra...</option>
+                        {% for obra in obras %}
+                        <option value="{{ obra.id }}" 
+                                {% if obra.id == obra_selecionada %}selected{% endif %}>
+                            {{ obra.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+                        <i class="fas fa-plus me-1"></i>Nova Tarefa
+                    </button>
+                    
+                    <a href="{{ url_for('lean.dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="row" id="kanbanBoard">
+        <!-- Coluna A Fazer -->
+        <div class="col-lg-3 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-clipboard me-2"></i>
+                        A Fazer
+                        <span class="badge bg-light text-dark ms-2">{{ tasks_by_status['A Fazer']|length }}</span>
+                    </h6>
+                </div>
+                <div class="card-body kanban-column" data-status="A Fazer" style="min-height: 500px;">
+                    {% for task in tasks_by_status['A Fazer'] %}
+                    <div class="kanban-card mb-3" draggable="true" data-task-id="{{ task.id }}">
+                        <div class="card">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0 text-truncate">{{ task.titulo }}</h6>
+                                    <span class="badge bg-{{ 'danger' if task.prioridade >= 4 else ('warning' if task.prioridade == 3 else 'info') }}">
+                                        P{{ task.prioridade }}
+                                    </span>
+                                </div>
+                                
+                                {% if task.descricao %}
+                                <p class="card-text small text-muted">{{ task.descricao[:60] }}{% if task.descricao|length > 60 %}...{% endif %}</p>
+                                {% endif %}
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ task.responsavel.foto if task.responsavel.foto else '/static/images/default-avatar.png' }}" 
+                                             class="rounded-circle me-2" width="24" height="24" 
+                                             alt="{{ task.responsavel.nome if task.responsavel }}">
+                                        <small class="text-muted">{{ task.responsavel.nome[:15] if task.responsavel }}{% if task.responsavel and task.responsavel.nome|length > 15 %}...{% endif %}</small>
+                                    </div>
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        {{ task.data_planejada.strftime('%d/%m') if task.data_planejada }}
+                                    </small>
+                                </div>
+                                
+                                <div class="progress mb-2" style="height: 4px;">
+                                    <div class="progress-bar bg-success" 
+                                         style="width: {{ task.percentual_conclusao }}%"></div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">{{ task.percentual_conclusao }}% concluído</small>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary btn-sm" 
+                                                onclick="editTask({{ task.id }})" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info btn-sm" 
+                                                onclick="viewTask({{ task.id }})" title="Detalhes">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna Em Andamento -->
+        <div class="col-lg-3 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-play-circle me-2"></i>
+                        Em Andamento
+                        <span class="badge bg-light text-dark ms-2">{{ tasks_by_status['Em Andamento']|length }}</span>
+                    </h6>
+                </div>
+                <div class="card-body kanban-column" data-status="Em Andamento" style="min-height: 500px;">
+                    {% for task in tasks_by_status['Em Andamento'] %}
+                    <div class="kanban-card mb-3" draggable="true" data-task-id="{{ task.id }}">
+                        <div class="card border-primary">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0 text-truncate">{{ task.titulo }}</h6>
+                                    <span class="badge bg-{{ 'danger' if task.prioridade >= 4 else ('warning' if task.prioridade == 3 else 'info') }}">
+                                        P{{ task.prioridade }}
+                                    </span>
+                                </div>
+                                
+                                {% if task.descricao %}
+                                <p class="card-text small text-muted">{{ task.descricao[:60] }}{% if task.descricao|length > 60 %}...{% endif %}</p>
+                                {% endif %}
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ task.responsavel.foto if task.responsavel.foto else '/static/images/default-avatar.png' }}" 
+                                             class="rounded-circle me-2" width="24" height="24" 
+                                             alt="{{ task.responsavel.nome if task.responsavel }}">
+                                        <small class="text-muted">{{ task.responsavel.nome[:15] if task.responsavel }}{% if task.responsavel and task.responsavel.nome|length > 15 %}...{% endif %}</small>
+                                    </div>
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        {{ task.data_planejada.strftime('%d/%m') if task.data_planejada }}
+                                    </small>
+                                </div>
+                                
+                                <div class="progress mb-2" style="height: 4px;">
+                                    <div class="progress-bar bg-primary" 
+                                         style="width: {{ task.percentual_conclusao }}%"></div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">{{ task.percentual_conclusao }}% concluído</small>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary btn-sm" 
+                                                onclick="editTask({{ task.id }})" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info btn-sm" 
+                                                onclick="viewTask({{ task.id }})" title="Detalhes">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna Concluído -->
+        <div class="col-lg-3 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Concluído
+                        <span class="badge bg-light text-dark ms-2">{{ tasks_by_status['Concluído']|length }}</span>
+                    </h6>
+                </div>
+                <div class="card-body kanban-column" data-status="Concluído" style="min-height: 500px;">
+                    {% for task in tasks_by_status['Concluído'] %}
+                    <div class="kanban-card mb-3" draggable="true" data-task-id="{{ task.id }}">
+                        <div class="card border-success">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0 text-truncate">{{ task.titulo }}</h6>
+                                    <i class="fas fa-check text-success"></i>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ task.responsavel.foto if task.responsavel.foto else '/static/images/default-avatar.png' }}" 
+                                             class="rounded-circle me-2" width="24" height="24" 
+                                             alt="{{ task.responsavel.nome if task.responsavel }}">
+                                        <small class="text-muted">{{ task.responsavel.nome[:15] if task.responsavel }}{% if task.responsavel and task.responsavel.nome|length > 15 %}...{% endif %}</small>
+                                    </div>
+                                    <small class="text-success">
+                                        <i class="fas fa-calendar-check me-1"></i>
+                                        {{ task.data_conclusao_real.strftime('%d/%m') if task.data_conclusao_real }}
+                                    </small>
+                                </div>
+                                
+                                <div class="progress mb-2" style="height: 4px;">
+                                    <div class="progress-bar bg-success" style="width: 100%"></div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-success">100% concluído</small>
+                                    <button class="btn btn-outline-info btn-sm" 
+                                            onclick="viewTask({{ task.id }})" title="Detalhes">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna Impedimentos -->
+        <div class="col-lg-3 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-danger text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Impedimentos
+                        <span class="badge bg-light text-dark ms-2">{{ tasks_by_status['Impedimento']|length }}</span>
+                    </h6>
+                </div>
+                <div class="card-body kanban-column" data-status="Impedimento" style="min-height: 500px;">
+                    {% for task in tasks_by_status['Impedimento'] %}
+                    <div class="kanban-card mb-3" draggable="true" data-task-id="{{ task.id }}">
+                        <div class="card border-danger">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0 text-truncate">{{ task.titulo }}</h6>
+                                    <i class="fas fa-exclamation-triangle text-danger"></i>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ task.responsavel.foto if task.responsavel.foto else '/static/images/default-avatar.png' }}" 
+                                             class="rounded-circle me-2" width="24" height="24" 
+                                             alt="{{ task.responsavel.nome if task.responsavel }}">
+                                        <small class="text-muted">{{ task.responsavel.nome[:15] if task.responsavel }}{% if task.responsavel and task.responsavel.nome|length > 15 %}...{% endif %}</small>
+                                    </div>
+                                    <small class="text-danger">
+                                        <i class="fas fa-exclamation-circle me-1"></i>
+                                        Bloqueada
+                                    </small>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-danger">Impedimento ativo</small>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-warning btn-sm" 
+                                                onclick="resolveConstraint({{ task.id }})" title="Resolver">
+                                            <i class="fas fa-tools"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info btn-sm" 
+                                                onclick="viewTask({{ task.id }})" title="Detalhes">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nova Tarefa -->
+<div class="modal fade" id="addTaskModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nova Tarefa Lean</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addTaskForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label class="form-label">Título da Tarefa *</label>
+                                <input type="text" class="form-control" name="titulo" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Prioridade</label>
+                                <select class="form-select" name="prioridade">
+                                    <option value="1">1 - Baixa</option>
+                                    <option value="2">2 - Normal</option>
+                                    <option value="3" selected>3 - Média</option>
+                                    <option value="4">4 - Alta</option>
+                                    <option value="5">5 - Crítica</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Descrição</label>
+                        <textarea class="form-control" name="descricao" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Responsável *</label>
+                                <select class="form-select" name="responsavel_id" required>
+                                    <option value="">Selecione...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Data Planejada *</label>
+                                <input type="date" class="form-control" name="data_planejada" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Horas Estimadas</label>
+                                <input type="number" class="form-control" name="horas_estimadas" value="8" step="0.5" min="0.5">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" name="status">
+                                    <option value="A Fazer" selected>A Fazer</option>
+                                    <option value="Em Andamento">Em Andamento</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save me-1"></i>Criar Tarefa
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variáveis globais
+let currentObraId = {{ obra_selecionada or 'null' }};
+
+// Drag and Drop
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDragAndDrop();
+    loadFuncionarios();
+});
+
+function initializeDragAndDrop() {
+    const kanbanCards = document.querySelectorAll('.kanban-card');
+    const columns = document.querySelectorAll('.kanban-column');
+
+    kanbanCards.forEach(card => {
+        card.addEventListener('dragstart', function(e) {
+            e.dataTransfer.setData('text/plain', this.dataset.taskId);
+            this.classList.add('dragging');
+        });
+
+        card.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+        });
+    });
+
+    columns.forEach(column => {
+        column.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        });
+
+        column.addEventListener('dragleave', function() {
+            this.classList.remove('drag-over');
+        });
+
+        column.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            
+            const taskId = e.dataTransfer.getData('text/plain');
+            const newStatus = this.dataset.status;
+            
+            updateTaskStatus(taskId, newStatus);
+        });
+    });
+}
+
+function updateTaskStatus(taskId, newStatus) {
+    fetch(`/equipe/api/tasks/${taskId}/status`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            status: newStatus
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Erro ao atualizar tarefa: ' + data.error);
+        } else {
+            location.reload(); // Recarregar para mostrar a mudança
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao atualizar tarefa');
+    });
+}
+
+// Seletor de obra
+document.getElementById('obraSelector').addEventListener('change', function() {
+    if (this.value) {
+        window.location.href = `{{ url_for('lean.kanban') }}?obra_id=${this.value}`;
+    }
+});
+
+// Carregar funcionários da obra
+function loadFuncionarios() {
+    if (currentObraId) {
+        fetch(`/equipe/api/funcionarios/${currentObraId}`)
+            .then(response => response.json())
+            .then(funcionarios => {
+                const select = document.querySelector('[name="responsavel_id"]');
+                select.innerHTML = '<option value="">Selecione...</option>';
+                
+                funcionarios.forEach(funcionario => {
+                    const option = document.createElement('option');
+                    option.value = funcionario.id;
+                    option.textContent = funcionario.nome;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Erro ao carregar funcionários:', error));
+    }
+}
+
+// Form de nova tarefa
+document.getElementById('addTaskForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (!currentObraId) {
+        alert('Selecione uma obra primeiro');
+        return;
+    }
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    data.obra_id = currentObraId;
+    
+    fetch('/equipe/api/tasks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Erro ao criar tarefa: ' + data.error);
+        } else {
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao criar tarefa');
+    });
+});
+
+function editTask(taskId) {
+    // Implementar modal de edição
+    alert('Modal de edição em desenvolvimento');
+}
+
+function viewTask(taskId) {
+    // Implementar modal de visualização
+    alert('Modal de detalhes em desenvolvimento');
+}
+
+function resolveConstraint(taskId) {
+    // Implementar resolução de impedimento
+    alert('Resolução de impedimento em desenvolvimento');
+}
+</script>
+
+<style>
+.kanban-card {
+    cursor: move;
+    transition: transform 0.2s;
+}
+
+.kanban-card:hover {
+    transform: translateY(-2px);
+}
+
+.kanban-card.dragging {
+    opacity: 0.5;
+}
+
+.kanban-column.drag-over {
+    background-color: rgba(0, 123, 255, 0.1);
+    border: 2px dashed #007bff;
+}
+
+.kanban-column {
+    transition: background-color 0.2s, border 0.2s;
+    border-radius: 8px;
+}
+</style>
+{% endblock %}

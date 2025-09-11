@@ -2519,3 +2519,276 @@ class ConfiguracaoEmpresa(db.Model):
             cls.ativo == True
         ).order_by(cls.nome).all()
 
+
+# ===== MÓDULO LEAN CONSTRUCTION =====
+# Novos modelos para gestão de equipe baseada em Last Planner System
+
+class LeanTask(db.Model):
+    """Tarefas do sistema Lean Construction - Kanban Board"""
+    __tablename__ = 'lean_task'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text)
+    status = db.Column(db.String(20), default='A Fazer')  # A Fazer, Em Andamento, Concluído, Impedimento
+    prioridade = db.Column(db.Integer, default=3)  # 1-5 (1=Baixa, 5=Crítica)
+    
+    # Relacionamentos com modelos existentes
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Datas e tempos
+    data_planejada = db.Column(db.Date, nullable=False)
+    data_conclusao_real = db.Column(db.Date)
+    horas_estimadas = db.Column(db.Float, default=8.0)
+    horas_reais = db.Column(db.Float)
+    percentual_conclusao = db.Column(db.Float, default=0.0)
+    
+    # Dados adicionais 
+    checklist = db.Column(db.JSON)  # Lista de itens do checklist
+    anexos = db.Column(db.JSON)  # Lista de anexos
+    comentarios = db.Column(db.Text)
+    
+    # Controle
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='lean_tasks')
+    responsavel = db.relationship('Funcionario', backref='tarefas_lean')
+    criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id], backref='tarefas_criadas')
+
+class WeeklyPlan(db.Model):
+    """Planejamento semanal - Last Planner System"""
+    __tablename__ = 'weekly_plan'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Período da semana
+    semana_inicio = db.Column(db.Date, nullable=False)  # Segunda-feira
+    semana_fim = db.Column(db.Date, nullable=False)     # Domingo
+    
+    # Metas e resultados
+    ppc_target = db.Column(db.Float, default=85.0)  # Meta PPC para a semana
+    ppc_actual = db.Column(db.Float, default=0.0)   # PPC real calculado
+    total_tasks_planned = db.Column(db.Integer, default=0)
+    total_tasks_completed = db.Column(db.Integer, default=0)
+    
+    # Sessão de planejamento
+    planning_session_date = db.Column(db.DateTime)
+    status = db.Column(db.String(20), default='Planejamento')  # Planejamento, Ativa, Concluída
+    observacoes = db.Column(db.Text)
+    
+    # Controle
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='weekly_plans')
+
+class WeeklyPlanTask(db.Model):
+    """Tabela de associação entre planos semanais e tarefas"""
+    __tablename__ = 'weekly_plan_task'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    weekly_plan_id = db.Column(db.Integer, db.ForeignKey('weekly_plan.id'), nullable=False)
+    lean_task_id = db.Column(db.Integer, db.ForeignKey('lean_task.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Dados específicos da tarefa no plano
+    ordem_execucao = db.Column(db.Integer, default=0)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Constraint única
+    __table_args__ = (db.UniqueConstraint('weekly_plan_id', 'lean_task_id', name='unique_plan_task'),)
+
+class DailyHuddle(db.Model):
+    """Reuniões diárias de 15 minutos - Daily Huddles"""
+    __tablename__ = 'daily_huddle'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Dados da reunião
+    data_reuniao = db.Column(db.Date, nullable=False)
+    facilitador_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    duracao_minutos = db.Column(db.Integer, default=15)
+    
+    # Conteúdo da reunião
+    compromissos = db.Column(db.JSON)  # Lista de compromissos
+    impedimentos = db.Column(db.JSON)  # Lista de impedimentos identificados
+    acoes_definidas = db.Column(db.JSON)  # Ações definidas na reunião
+    participantes = db.Column(db.JSON)  # Lista de IDs dos participantes
+    
+    # Observações
+    observacoes = db.Column(db.Text)
+    
+    # Controle
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='daily_huddles')
+    facilitador = db.relationship('Funcionario', backref='huddles_facilitadas')
+
+class Constraint(db.Model):
+    """Gestão de restrições e impedimentos"""
+    __tablename__ = 'constraint'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text, nullable=False)
+    
+    # Categorização
+    tipo = db.Column(db.String(50), nullable=False)  # Material, Equipment, Design, External, Weather
+    severidade = db.Column(db.String(20), default='Media')  # Baixa, Media, Alta, Crítica
+    status = db.Column(db.String(20), default='Identificada')  # Identificada, Em Resolução, Resolvida
+    
+    # Relacionamentos
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    lean_task_id = db.Column(db.Integer, db.ForeignKey('lean_task.id'), nullable=True)  # Pode ser geral
+    responsavel_resolucao_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Datas
+    data_identificacao = db.Column(db.DateTime, default=datetime.utcnow)
+    prazo_resolucao = db.Column(db.Date)
+    data_resolucao_real = db.Column(db.DateTime)
+    
+    # Impacto
+    impacto_dias = db.Column(db.Integer, default=0)
+    custo_estimado = db.Column(db.Float, default=0.0)
+    
+    # Ações
+    acoes_propostas = db.Column(db.Text)
+    acoes_tomadas = db.Column(db.Text)
+    resultado_obtido = db.Column(db.Text)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='constraints')
+    tarefa = db.relationship('LeanTask', backref='constraints')
+    responsavel = db.relationship('Funcionario', foreign_keys=[responsavel_resolucao_id], backref='constraints_responsavel')
+    criado_por = db.relationship('Funcionario', foreign_keys=[criado_por_id], backref='constraints_criadas')
+
+class TaskDependency(db.Model):
+    """Dependências entre tarefas"""
+    __tablename__ = 'task_dependency'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    predecessor_task_id = db.Column(db.Integer, db.ForeignKey('lean_task.id'), nullable=False)
+    successor_task_id = db.Column(db.Integer, db.ForeignKey('lean_task.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Tipo de dependência
+    dependency_type = db.Column(db.String(20), default='FS')  # FS=Finish-to-Start, SS=Start-to-Start
+    lag_days = db.Column(db.Integer, default=0)  # Dias de folga
+    is_critical = db.Column(db.Boolean, default=False)
+    
+    # Controle
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Constraint única para evitar duplicatas
+    __table_args__ = (db.UniqueConstraint('predecessor_task_id', 'successor_task_id', name='unique_dependency'),)
+    
+    # Relacionamentos
+    predecessor = db.relationship('LeanTask', foreign_keys=[predecessor_task_id], backref='dependents')
+    successor = db.relationship('LeanTask', foreign_keys=[successor_task_id], backref='dependencies')
+
+class PPCMetric(db.Model):
+    """Métricas de PPC (Percent Plan Complete) semanais"""
+    __tablename__ = 'ppc_metric'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    weekly_plan_id = db.Column(db.Integer, db.ForeignKey('weekly_plan.id'), nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Período de cálculo
+    semana_inicio = db.Column(db.Date, nullable=False)
+    semana_fim = db.Column(db.Date, nullable=False)
+    
+    # Métricas calculadas
+    calculation_date = db.Column(db.DateTime, default=datetime.utcnow)
+    ppc_percentage = db.Column(db.Float, nullable=False)  # % Plan Complete
+    tasks_planned = db.Column(db.Integer, nullable=False)
+    tasks_completed = db.Column(db.Integer, nullable=False)
+    tasks_partial = db.Column(db.Integer, default=0)
+    tasks_not_started = db.Column(db.Integer, default=0)
+    
+    # Análise de tendência
+    average_completion = db.Column(db.Float)  # % média das tarefas parciais
+    trend_direction = db.Column(db.String(10))  # 'up', 'down', 'stable'
+    benchmark_comparison = db.Column(db.Float)  # Comparação com semanas anteriores
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='ppc_metrics')
+    weekly_plan = db.relationship('WeeklyPlan', backref='ppc_metrics')
+
+class VariationAnalysis(db.Model):
+    """Análise de variação - Por que as tarefas não foram concluídas"""
+    __tablename__ = 'variation_analysis'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    lean_task_id = db.Column(db.Integer, db.ForeignKey('lean_task.id'), nullable=True)  # Pode ser análise geral
+    weekly_plan_id = db.Column(db.Integer, db.ForeignKey('weekly_plan.id'), nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Categorização da falha
+    failure_category = db.Column(db.String(50), nullable=False)  # Design, Material, Equipment, Weather, External
+    root_cause = db.Column(db.String(200), nullable=False)
+    detailed_description = db.Column(db.Text)
+    
+    # Ações corretivas e preventivas
+    corrective_action = db.Column(db.Text)
+    preventive_action = db.Column(db.Text)
+    
+    # Impacto
+    impact_days = db.Column(db.Integer, default=0)
+    impact_cost = db.Column(db.Float, default=0.0)
+    recurrence_risk = db.Column(db.String(20), default='Médio')  # Baixo, Médio, Alto
+    
+    # Aprendizado
+    lesson_learned = db.Column(db.Text)
+    
+    # Controle
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='variation_analyses')
+    lean_task = db.relationship('LeanTask', backref='variation_analyses')
+    weekly_plan = db.relationship('WeeklyPlan', backref='variation_analyses')
+
+class DailyCommitment(db.Model):
+    """Compromissos diários assumidos nas reuniões"""
+    __tablename__ = 'daily_commitment'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    daily_huddle_id = db.Column(db.Integer, db.ForeignKey('daily_huddle.id'), nullable=False)
+    lean_task_id = db.Column(db.Integer, db.ForeignKey('lean_task.id'), nullable=True)  # Pode ser compromisso geral
+    comprometido_por_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Compromisso
+    commitment_date = db.Column(db.Date, nullable=False)  # Data do compromisso
+    commitment_text = db.Column(db.String(500), nullable=False)  # "Finalizar soldagem da viga principal"
+    is_ready_to_work = db.Column(db.Boolean, default=False)  # Sem restrições para executar
+    
+    # Resultado
+    commitment_met = db.Column(db.Boolean, default=None)  # null=pendente, True=cumpriu, False=não cumpriu
+    completion_percentage = db.Column(db.Float, default=0.0)
+    failure_reason = db.Column(db.String(100))  # Se não cumpriu
+    notes = db.Column(db.Text)
+    
+    # Controle
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    daily_huddle = db.relationship('DailyHuddle', backref='commitments')
+    lean_task = db.relationship('LeanTask', backref='commitments')
+    comprometido_por = db.relationship('Funcionario', backref='compromissos_assumidos')
+
