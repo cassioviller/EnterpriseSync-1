@@ -379,7 +379,7 @@
     <!-- Navegação de semana -->
     <div class="week-nav">
         <button onclick="navigateWeek(-1)">◀ Anterior</button>
-        <span class="current-week">Semana de {{ monday.strftime('%d/%m') }} a {{ (monday + timedelta(days=4)).strftime('%d/%m') }}</span>
+        <span class="current-week">Semana de {{ monday.strftime('%d/%m') }} a {{ friday.strftime('%d/%m') }}</span>
         <button onclick="navigateWeek(1)">Próxima ▶</button>
     </div>
 

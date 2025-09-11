@@ -125,10 +125,14 @@ def alocacao_semanal():
         
         logging.info(f"EQUIPE: Carregada semana {monday} - {len(allocations)} alocações")
         
+        # Calcular data final da semana para o template
+        friday = monday + timedelta(days=4)
+        
         return render_template('equipe/alocacao_semanal.html',
                              obras=obras,
                              week_grid=week_grid,
                              monday=monday,
+                             friday=friday,
                              week_dates=week_dates,
                              stats=stats)
                              
