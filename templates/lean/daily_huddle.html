@@ -1,0 +1,466 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Daily Huddle - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-1">
+                        <i class="fas fa-users me-2 text-primary"></i>
+                        Daily Huddle - Reunião Diária
+                    </h4>
+                    <p class="text-muted mb-0">Reunião de alinhamento de 15 minutos</p>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <!-- Seletor de Obra -->
+                    <select id="obraSelector" class="form-select" style="min-width: 200px;">
+                        <option value="">Selecione uma obra...</option>
+                        {% for obra in obras %}
+                        <option value="{{ obra.id }}" 
+                                {% if obra.id == obra_selecionada %}selected{% endif %}>
+                            {{ obra.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#huddleModal">
+                        <i class="fas fa-play me-1"></i>Iniciar Huddle
+                    </button>
+                    
+                    <a href="{{ url_for('lean.dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if obra_selecionada %}
+    <div class="row">
+        <!-- Cronômetro -->
+        <div class="col-lg-4 mb-4">
+            <div class="card text-center">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>
+                        Timer - 15 minutos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="display-1 text-primary mb-3" id="timer">15:00</div>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-success" onclick="startTimer()">
+                            <i class="fas fa-play"></i> Iniciar
+                        </button>
+                        <button class="btn btn-warning" onclick="pauseTimer()">
+                            <i class="fas fa-pause"></i> Pausar
+                        </button>
+                        <button class="btn btn-secondary" onclick="resetTimer()">
+                            <i class="fas fa-redo"></i> Reiniciar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Equipe Presente -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-friends me-2"></i>
+                        Equipe Presente
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if funcionarios_obra %}
+                    <div class="row">
+                        {% for funcionario in funcionarios_obra %}
+                        <div class="col-6 mb-2">
+                            <div class="d-flex align-items-center">
+                                <div class="form-check me-2">
+                                    <input class="form-check-input" type="checkbox" 
+                                           value="{{ funcionario.id }}" 
+                                           id="participante_{{ funcionario.id }}"
+                                           name="participantes">
+                                </div>
+                                <img src="{{ funcionario.foto if funcionario.foto else '/static/images/default-avatar.png' }}" 
+                                     class="rounded-circle me-2" width="32" height="32" 
+                                     alt="{{ funcionario.nome }}">
+                                <small class="text-truncate">{{ funcionario.nome[:12] }}{% if funcionario.nome|length > 12 %}...{% endif %}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">Nenhum funcionário encontrado para esta obra</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Rápido -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>
+                        Status Rápido
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <small class="text-muted">Tarefas do Dia</small>
+                        <div class="progress mb-1" style="height: 8px;">
+                            {% set total_tasks = tasks_hoje|length %}
+                            {% set completed_tasks = tasks_hoje|selectattr('status', 'equalto', 'Concluído')|list|length %}
+                            {% set progress = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0 %}
+                            <div class="progress-bar bg-success" style="width: {{ progress }}%"></div>
+                        </div>
+                        <small>{{ completed_tasks }}/{{ total_tasks }} concluídas ({{ progress|round|int }}%)</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <small class="text-muted">Impedimentos Ativos</small>
+                        <h5 class="text-{{ 'danger' if impedimentos|length > 0 else 'success' }}">
+                            {{ impedimentos|length }}
+                            {% if impedimentos|length == 0 %}
+                            <i class="fas fa-check-circle ms-1"></i>
+                            {% endif %}
+                        </h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarefas do Dia -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tasks me-2"></i>
+                        Tarefas Planejadas para Hoje
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if tasks_hoje %}
+                    <div class="row">
+                        {% for task in tasks_hoje %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card border-start border-{{ 'success' if task.status == 'Concluído' else ('primary' if task.status == 'Em Andamento' else ('danger' if task.status == 'Impedimento' else 'secondary')) }} border-4">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="card-title mb-0">{{ task.titulo }}</h6>
+                                        <span class="badge bg-{{ 'success' if task.status == 'Concluído' else ('primary' if task.status == 'Em Andamento' else ('danger' if task.status == 'Impedimento' else 'secondary')) }}">
+                                            {{ task.status }}
+                                        </span>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <img src="{{ task.responsavel.foto if task.responsavel and task.responsavel.foto else '/static/images/default-avatar.png' }}" 
+                                             class="rounded-circle me-2" width="24" height="24" 
+                                             alt="{{ task.responsavel.nome if task.responsavel }}">
+                                        <small class="text-muted">{{ task.responsavel.nome if task.responsavel }}</small>
+                                    </div>
+                                    <div class="progress" style="height: 4px;">
+                                        <div class="progress-bar bg-{{ 'success' if task.status == 'Concluído' else 'primary' }}" 
+                                             style="width: {{ task.percentual_conclusao }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ task.percentual_conclusao }}% concluído</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-calendar-day fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhuma tarefa planejada para hoje</h5>
+                        <p class="text-muted">Vá para o Kanban para adicionar tarefas</p>
+                        <a href="{{ url_for('lean.kanban', obra_id=obra_selecionada) }}" class="btn btn-primary">
+                            <i class="fas fa-columns me-1"></i>Ir para Kanban
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Impedimentos -->
+    {% if impedimentos %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0 text-dark">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Impedimentos Ativos ({{ impedimentos|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for impedimento in impedimentos %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-{{ 'danger' if impedimento.severidade == 'Crítica' else ('warning' if impedimento.severidade == 'Alta' else 'info') }}">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="card-title mb-0">{{ impedimento.titulo }}</h6>
+                                        <span class="badge bg-{{ 'danger' if impedimento.severidade == 'Crítica' else ('warning' if impedimento.severidade == 'Alta' else 'info') }}">
+                                            {{ impedimento.severidade }}
+                                        </span>
+                                    </div>
+                                    <p class="card-text small text-muted mb-2">{{ impedimento.descricao[:80] }}{% if impedimento.descricao|length > 80 %}...{% endif %}</p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">
+                                            Tipo: {{ impedimento.tipo }}
+                                        </small>
+                                        <small class="text-muted">
+                                            Responsável: {{ impedimento.responsavel.nome if impedimento.responsavel }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-building fa-4x text-muted mb-4"></i>
+                <h4 class="text-muted">Selecione uma obra para iniciar o Daily Huddle</h4>
+                <p class="text-muted">Escolha uma obra no seletor acima para ver as tarefas e equipe</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Daily Huddle -->
+<div class="modal fade" id="huddleModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar Daily Huddle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="huddleForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Facilitador</label>
+                                <select class="form-select" name="facilitador_id" required>
+                                    <option value="">Selecione o facilitador...</option>
+                                    {% for funcionario in funcionarios_obra %}
+                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Duração (minutos)</label>
+                                <input type="number" class="form-control" name="duracao_minutos" value="15" min="5" max="30">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Compromissos da Equipe</label>
+                        <textarea class="form-control" name="compromissos" rows="3" 
+                                  placeholder="Liste os compromissos assumidos pela equipe para hoje..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Impedimentos Identificados</label>
+                        <textarea class="form-control" name="impedimentos" rows="3" 
+                                  placeholder="Descreva impedimentos ou bloqueios identificados..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Ações Definidas</label>
+                        <textarea class="form-control" name="acoes_definidas" rows="3" 
+                                  placeholder="Liste as ações definidas na reunião..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Observações</label>
+                        <textarea class="form-control" name="observacoes" rows="2" 
+                                  placeholder="Observações adicionais sobre a reunião..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Salvar Huddle
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variáveis globais
+let timerInterval;
+let timerMinutes = 15;
+let timerSeconds = 0;
+let timerRunning = false;
+
+// Seletor de obra
+document.getElementById('obraSelector').addEventListener('change', function() {
+    if (this.value) {
+        window.location.href = `{{ url_for('lean.daily_huddle') }}?obra_id=${this.value}`;
+    }
+});
+
+// Timer Functions
+function updateTimerDisplay() {
+    const display = document.getElementById('timer');
+    const minutes = String(timerMinutes).padStart(2, '0');
+    const seconds = String(timerSeconds).padStart(2, '0');
+    display.textContent = `${minutes}:${seconds}`;
+    
+    // Mudar cor quando restam menos de 2 minutos
+    if (timerMinutes < 2) {
+        display.classList.remove('text-primary');
+        display.classList.add('text-warning');
+    }
+    
+    // Mudar cor quando resta menos de 1 minuto
+    if (timerMinutes < 1) {
+        display.classList.remove('text-warning');
+        display.classList.add('text-danger');
+    }
+}
+
+function startTimer() {
+    if (!timerRunning) {
+        timerRunning = true;
+        timerInterval = setInterval(() => {
+            if (timerSeconds > 0) {
+                timerSeconds--;
+            } else if (timerMinutes > 0) {
+                timerMinutes--;
+                timerSeconds = 59;
+            } else {
+                // Timer acabou
+                clearInterval(timerInterval);
+                timerRunning = false;
+                alert('⏰ Tempo acabou! Daily Huddle deve ser finalizado.');
+                
+                // Som de alerta (opcional)
+                if ('Notification' in window) {
+                    new Notification('Daily Huddle', {
+                        body: 'Tempo de 15 minutos esgotado!',
+                        icon: '/static/images/favicon.ico'
+                    });
+                }
+            }
+            updateTimerDisplay();
+        }, 1000);
+    }
+}
+
+function pauseTimer() {
+    if (timerRunning) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+    }
+}
+
+function resetTimer() {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    timerMinutes = 15;
+    timerSeconds = 0;
+    const display = document.getElementById('timer');
+    display.classList.remove('text-warning', 'text-danger');
+    display.classList.add('text-primary');
+    updateTimerDisplay();
+}
+
+// Form submission
+document.getElementById('huddleForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (!{{ obra_selecionada or 'null' }}) {
+        alert('Selecione uma obra primeiro');
+        return;
+    }
+    
+    const formData = new FormData(this);
+    
+    // Pegar participantes selecionados
+    const participantes = Array.from(document.querySelectorAll('input[name="participantes"]:checked'))
+                              .map(cb => parseInt(cb.value));
+    
+    const data = {
+        obra_id: {{ obra_selecionada or 'null' }},
+        facilitador_id: parseInt(formData.get('facilitador_id')),
+        duracao_minutos: parseInt(formData.get('duracao_minutos')),
+        compromissos: formData.get('compromissos').split('\n').filter(line => line.trim()),
+        impedimentos: formData.get('impedimentos').split('\n').filter(line => line.trim()),
+        acoes_definidas: formData.get('acoes_definidas').split('\n').filter(line => line.trim()),
+        observacoes: formData.get('observacoes'),
+        participantes: participantes
+    };
+    
+    fetch('/equipe/api/daily-huddle', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.error) {
+            alert('Erro ao salvar huddle: ' + result.error);
+        } else {
+            alert('Daily Huddle salvo com sucesso!');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar huddle');
+    });
+});
+
+// Solicitar permissão para notificações
+if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+}
+</script>
+
+<style>
+#timer {
+    transition: color 0.3s ease;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+}
+
+.card-body .progress {
+    transition: width 0.3s ease;
+}
+
+.form-check-input:checked {
+    background-color: #198754;
+    border-color: #198754;
+}
+</style>
+{% endblock %}
