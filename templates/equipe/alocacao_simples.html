@@ -61,8 +61,8 @@
                     <span>Carregando semana...</span>
                 </div>
                 
-                <div class="card-body" id="weekly-grid">
-                    <div class="row">
+                <div class="card-body weekly-grid-container" id="weekly-grid">
+                    <div class="row weekly-grid">
                         <!-- SEGUNDA -->
                         <div class="col">
                             <h6 class="text-center day-header" id="header-day-0">
@@ -72,7 +72,10 @@
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
                                  data-day="0" 
-                                 id="day-0">
+                                 id="day-0"
+                                 role="region"
+                                 aria-label="Zona para obras de segunda-feira"
+                                 tabindex="0">
                                 <small class="text-muted">Arraste obras aqui</small>
                             </div>
                         </div>
@@ -86,7 +89,10 @@
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
                                  data-day="1" 
-                                 id="day-1">
+                                 id="day-1"
+                                 role="region"
+                                 aria-label="Zona para obras de terça-feira"
+                                 tabindex="0">
                                 <small class="text-muted">Arraste obras aqui</small>
                             </div>
                         </div>
@@ -100,7 +106,10 @@
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
                                  data-day="2" 
-                                 id="day-2">
+                                 id="day-2"
+                                 role="region"
+                                 aria-label="Zona para obras de quarta-feira"
+                                 tabindex="0">
                                 <small class="text-muted">Arraste obras aqui</small>
                             </div>
                         </div>
@@ -114,7 +123,10 @@
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
                                  data-day="3" 
-                                 id="day-3">
+                                 id="day-3"
+                                 role="region"
+                                 aria-label="Zona para obras de quinta-feira"
+                                 tabindex="0">
                                 <small class="text-muted">Arraste obras aqui</small>
                             </div>
                         </div>
@@ -128,7 +140,10 @@
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
                                  data-day="4" 
-                                 id="day-4">
+                                 id="day-4"
+                                 role="region"
+                                 aria-label="Zona para obras de sexta-feira"
+                                 tabindex="0">
                                 <small class="text-muted">Arraste obras aqui</small>
                             </div>
                         </div>
@@ -138,10 +153,15 @@
         </div>
     </div>
     
-    <!-- PAINEL DE DEBUG MELHORADO -->
-    <div class="card mt-4">
+    <!-- PAINEL DE DEBUG MELHORADO - Minimalista -->
+    <div class="card mt-4 debug-panel" style="display: none;" id="debug-panel">
         <div class="card-header">
-            <h5>🔍 FASE 2 - DEBUG E TESTE</h5>
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">🔍 Ferramentas de Desenvolvimento</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('debug-panel').style.display='none'">
+                    ✕ Fechar
+                </button>
+            </div>
         </div>
         <div class="card-body">
             <div class="row">
@@ -152,12 +172,12 @@
                 </div>
                 <div class="col-md-4">
                     <button class="btn btn-warning w-100" onclick="testarObras()">
-                        🏗️ Testar Carregamento Obras
+                        🏗️ Recarregar Obras
                     </button>
                 </div>
                 <div class="col-md-4">
                     <button class="btn btn-success w-100" onclick="testarDragDrop()">
-                        🎯 Testar Drag & Drop
+                        🎯 Reconfigurar Drag & Drop
                     </button>
                 </div>
             </div>
@@ -170,6 +190,13 @@
                 </div>
             </div>
         </div>
+    </div>
+    
+    <!-- BOTÃO PARA MOSTRAR DEBUG (apenas para desenvolvimento) -->
+    <div class="position-fixed" style="bottom: 20px; left: 20px; z-index: 1000;">
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('debug-panel').style.display='block'" title="Mostrar ferramentas de desenvolvimento">
+            🔧
+        </button>
     </div>
 </div>
 {% endblock %}
@@ -265,6 +292,394 @@
         0% { opacity: 1; }
         50% { opacity: 0.5; }
         100% { opacity: 1; }
+    }
+    
+    /* ===================================
+       MELHORIAS DE UX - SISTEMAS NOVOS
+       =================================== */
+    
+    /* TOAST SYSTEM MELHORADO */
+    .custom-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        padding: 12px 16px;
+        min-width: 280px;
+        transform: translateX(350px);
+        transition: all 0.3s ease;
+        border-left: 4px solid #007bff;
+    }
+    
+    .custom-toast.show {
+        transform: translateX(0);
+    }
+    
+    .custom-toast.toast-success {
+        border-left-color: #28a745;
+    }
+    
+    .custom-toast.toast-error {
+        border-left-color: #dc3545;
+    }
+    
+    .custom-toast.toast-warning {
+        border-left-color: #ffc107;
+    }
+    
+    .custom-toast.toast-loading {
+        border-left-color: #17a2b8;
+    }
+    
+    .toast-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .toast-icon {
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+    
+    .toast-message {
+        font-weight: 500;
+        color: #333;
+    }
+    
+    /* LOADING ELEGANTE PARA OPERAÇÕES */
+    .operation-loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        z-index: 100;
+        transition: opacity 0.3s ease;
+    }
+    
+    .operation-loading-overlay.fade-out {
+        opacity: 0;
+    }
+    
+    .operation-loading-content {
+        text-align: center;
+        color: #007bff;
+        font-weight: 500;
+    }
+    
+    .spinner-elegant {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #e3f2fd;
+        border-top: 3px solid #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 8px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* CONTADOR DE OBRAS POR DIA */
+    .day-counter {
+        margin-top: 4px;
+        text-align: center;
+    }
+    
+    .day-counter .badge {
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+    
+    /* INDICADORES DE CAPACIDADE */
+    .drop-zone.capacity-low {
+        border-color: #28a745 !important;
+        background-color: #f8fff8 !important;
+    }
+    
+    .drop-zone.capacity-medium {
+        border-color: #ffc107 !important;
+        background-color: #fffdf8 !important;
+    }
+    
+    .drop-zone.capacity-high {
+        border-color: #fd7e14 !important;
+        background-color: #fff8f5 !important;
+    }
+    
+    .drop-zone.capacity-full {
+        border-color: #dc3545 !important;
+        background-color: #fff5f5 !important;
+    }
+    
+    /* ESTADOS DE DRAG & DROP APRIMORADOS */
+    .drop-zone-active {
+        border-color: #007bff !important;
+        background-color: #f8f9ff !important;
+        transform: scale(1.02);
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+    }
+    
+    .drop-zone-invalid {
+        border-color: #dc3545 !important;
+        background-color: #fff5f5 !important;
+        animation: shake 0.5s ease-in-out;
+    }
+    
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+    
+    .obra-draggable.dragging {
+        opacity: 0.8;
+        transform: rotate(5deg) scale(1.05);
+        z-index: 1000;
+    }
+    
+    /* MODAL DE CONFIRMAÇÃO DE REMOÇÃO */
+    .removal-confirmation-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .removal-confirmation-modal.show {
+        opacity: 1;
+    }
+    
+    .removal-confirmation-content {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+    }
+    
+    .removal-confirmation-modal.show .removal-confirmation-content {
+        transform: scale(1);
+    }
+    
+    .confirmation-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        justify-content: flex-end;
+    }
+    
+    .confirmation-buttons .btn {
+        min-width: 100px;
+    }
+    
+    /* TOOLTIPS APRIMORADOS */
+    .obra-tooltip {
+        position: absolute;
+        background: #333;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+        max-width: 250px;
+        word-wrap: break-word;
+    }
+    
+    .obra-tooltip.show {
+        opacity: 1;
+    }
+    
+    .obra-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #333 transparent transparent transparent;
+    }
+    
+    /* RESPONSIVIDADE PARA TABLETS */
+    @media (max-width: 768px) {
+        .container-fluid {
+            padding: 8px;
+        }
+        
+        .row {
+            margin: 0;
+        }
+        
+        .col-md-3, .col-md-9 {
+            padding: 4px;
+        }
+        
+        /* Layout em stack para tablets */
+        .col-md-3 {
+            margin-bottom: 16px;
+        }
+        
+        /* Botões de navegação maiores para touch */
+        .btn-group .btn {
+            padding: 12px 16px;
+            font-size: 14px;
+            min-height: 48px;
+        }
+        
+        /* Drop zones maiores para touch */
+        .drop-zone {
+            min-height: 120px !important;
+            padding: 16px !important;
+        }
+        
+        /* Cards de obra maiores para touch */
+        .obra-draggable {
+            margin-bottom: 8px;
+        }
+        
+        .obra-draggable .card-body {
+            padding: 12px !important;
+        }
+        
+        /* Botões de remoção maiores */
+        .allocation-item .btn-sm {
+            min-width: 36px;
+            min-height: 36px;
+        }
+        
+        /* Toast responsivo */
+        .custom-toast {
+            right: 10px;
+            left: 10px;
+            min-width: auto;
+            transform: translateY(-100px);
+        }
+        
+        .custom-toast.show {
+            transform: translateY(0);
+        }
+        
+        /* Modal responsivo */
+        .removal-confirmation-content {
+            margin: 20px;
+            width: calc(100% - 40px);
+        }
+    }
+    
+    @media (max-width: 576px) {
+        /* Grid semanal em scroll horizontal para celulares */
+        .weekly-grid-container {
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+        
+        .weekly-grid {
+            min-width: 600px;
+        }
+        
+        /* Cabeçalhos menores */
+        h3 {
+            font-size: 1.5rem;
+        }
+        
+        h5 {
+            font-size: 1.1rem;
+        }
+        
+        /* Debug panel minimizado */
+        .debug-panel {
+            display: none;
+        }
+    }
+    
+    /* MELHORIAS DE ACESSIBILIDADE */
+    .obra-draggable:focus,
+    .allocation-item:focus {
+        outline: 2px solid #007bff;
+        outline-offset: 2px;
+    }
+    
+    .btn:focus {
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+    }
+    
+    /* ANIMAÇÕES SUAVES */
+    .card, .drop-zone, .btn, .badge {
+        transition: all 0.2s ease;
+    }
+    
+    .allocation-item {
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* INDICADORES VISUAIS MELHORADOS */
+    .status-debug {
+        transition: all 0.3s ease;
+        border-radius: 8px;
+    }
+    
+    .obras-count {
+        font-weight: 600;
+        color: #007bff;
+    }
+    
+    /* PERSONALIZAÇÃO ADICIONAL PARA TABLETS DE OBRA */
+    @media (min-width: 768px) and (max-width: 1024px) {
+        /* Tablet landscape otimizado */
+        .drop-zone {
+            min-height: 180px;
+        }
+        
+        .obra-draggable {
+            font-size: 14px;
+        }
+        
+        .btn-group {
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        
+        .btn-group .btn {
+            flex: 1;
+            min-width: 120px;
+        }
     }
 </style>
 
@@ -621,22 +1036,36 @@ class EquipeFase2 {
         
         container.innerHTML = '';
         countElement.textContent = `${this.obras.length} obras encontradas`;
+        countElement.className = 'obras-count';
         
         this.obras.forEach((obra, index) => {
             const div = document.createElement('div');
             div.className = 'card mb-2 obra-draggable';
             div.dataset.obraId = obra.id;
             div.style.cursor = 'grab';
+            div.setAttribute('tabindex', '0'); // Acessibilidade
+            
             div.innerHTML = `
                 <div class="card-body p-2">
                     <h6 class="card-title mb-1 text-primary">${obra.codigo}</h6>
-                    <small class="text-muted">${obra.nome}</small>
+                    <small class="text-muted">${obra.nome.length > 30 ? obra.nome.substring(0, 30) + '...' : obra.nome}</small>
                 </div>
             `;
+            
+            // Adicionar tooltips com detalhes da obra
+            this.addTooltipToElement(div, {
+                title: `${obra.codigo} - ${obra.nome}`,
+                content: `
+                    <strong>Código:</strong> ${obra.codigo}<br>
+                    <strong>Nome:</strong> ${obra.nome}<br>
+                    <strong>ID:</strong> ${obra.id}
+                `
+            });
+            
             container.appendChild(div);
         });
         
-        this.log(`✅ ${this.obras.length} obras renderizadas no DOM`);
+        this.log(`✅ ${this.obras.length} obras renderizadas no DOM com tooltips`);
         
         // Configurar drag & drop após renderizar
         this.setupDragDrop();
@@ -691,13 +1120,18 @@ class EquipeFase2 {
                 
                 // Remover placeholder se existir
                 const placeholder = dayElement.querySelector('.text-muted');
-                if (placeholder && placeholder.textContent.includes('Drop zone')) {
+                if (placeholder && placeholder.textContent.includes('Arraste')) {
                     placeholder.remove();
                 }
             }
         });
         
-        this.log(`✅ Alocações renderizadas na interface`);
+        // Atualizar contadores para todos os dias
+        for (let i = 0; i < 5; i++) {
+            this.updateDayCounter(i);
+        }
+        
+        this.log(`✅ Alocações renderizadas na interface com contadores`);
     }
     
     renderAllocationItem(container, allocation, dayOfWeek) {
@@ -797,18 +1231,98 @@ class EquipeFase2 {
         }
     }
     
-    // MÉTODO PARA REMOÇÃO MANUAL (BOTÃO ❌)
+    // SISTEMA DE TOOLTIPS
+    addTooltipToElement(element, tooltipData) {
+        let tooltip = null;
+        let timeoutId = null;
+        
+        const showTooltip = (e) => {
+            // Limpar timeout anterior
+            if (timeoutId) clearTimeout(timeoutId);
+            
+            // Remover tooltip existente
+            this.hideTooltip();
+            
+            // Criar novo tooltip
+            tooltip = document.createElement('div');
+            tooltip.className = 'obra-tooltip';
+            tooltip.innerHTML = tooltipData.content;
+            
+            document.body.appendChild(tooltip);
+            
+            // Posicionar tooltip
+            const rect = element.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            
+            let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+            let top = rect.top - tooltipRect.height - 10;
+            
+            // Ajustar se sair da tela
+            if (left < 10) left = 10;
+            if (left + tooltipRect.width > window.innerWidth - 10) {
+                left = window.innerWidth - tooltipRect.width - 10;
+            }
+            if (top < 10) {
+                top = rect.bottom + 10;
+            }
+            
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+            
+            // Mostrar com delay
+            timeoutId = setTimeout(() => {
+                tooltip.classList.add('show');
+            }, 500);
+        };
+        
+        const hideTooltip = () => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            this.hideTooltip();
+        };
+        
+        element.addEventListener('mouseenter', showTooltip);
+        element.addEventListener('mouseleave', hideTooltip);
+        element.addEventListener('touchstart', showTooltip);
+        element.addEventListener('touchend', hideTooltip);
+    }
+    
+    hideTooltip() {
+        const existingTooltip = document.querySelector('.obra-tooltip');
+        if (existingTooltip) {
+            existingTooltip.classList.remove('show');
+            setTimeout(() => existingTooltip.remove(), 300);
+        }
+    }
+    
+    // MÉTODO PARA REMOÇÃO MANUAL (BOTÃO ❌) - MELHORADO
     async removerAlocacaoManual(obraId, dayOfWeek) {
         this.log(`🔴 Remoção manual solicitada: Obra ${obraId} do dia ${dayOfWeek}`);
         
-        // Confirmar ação
+        // Buscar informações da obra para confirmação melhorada
+        const obra = this.obras.find(o => o.id.toString() === obraId.toString());
         const dayName = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][dayOfWeek];
-        if (!confirm(`Deseja remover esta obra do ${dayName}?`)) {
+        
+        // Usar confirmação melhorada
+        const confirmed = await this.confirmRemoval(
+            obra || {codigo: `#${obraId}`, nome: 'Obra não identificada'}, 
+            dayName
+        );
+        
+        if (!confirmed) {
             this.log('❌ Remoção cancelada pelo usuário');
             return;
         }
         
-        await this.removerAlocacao(obraId, dayOfWeek);
+        // Executar remoção com feedback melhorado
+        const success = await this.removerAlocacao(obraId, dayOfWeek);
+        
+        if (success) {
+            this.showToast(`✅ Obra removida do ${dayName}`, 'success', 2000);
+            this.updateDayCounter(dayOfWeek);
+        }
     }
     
     // TESTE 3: DRAG & DROP
@@ -982,8 +1496,180 @@ class EquipeFase2 {
         });
     }
     
+    // VALIDAÇÃO INTELIGENTE: Verificar duplicatas
+    isDuplicateAllocation(obraId, dayOfWeek) {
+        const dayElement = document.getElementById(`day-${dayOfWeek}`);
+        if (!dayElement) return false;
+        
+        const existingAllocations = dayElement.querySelectorAll('.allocation-item');
+        for (let allocation of existingAllocations) {
+            if (allocation.dataset.obraId === obraId.toString()) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // TOAST SYSTEM MELHORADO
+    showToast(message, type = 'info', duration = 3000) {
+        // Remove toast existente se houver
+        const existingToast = document.querySelector('.custom-toast');
+        if (existingToast) {
+            existingToast.remove();
+        }
+        
+        const toast = document.createElement('div');
+        toast.className = `custom-toast toast-${type}`;
+        
+        const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️',
+            loading: '⏳'
+        };
+        
+        toast.innerHTML = `
+            <div class="toast-content">
+                <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+                <span class="toast-message">${message}</span>
+            </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Animação de entrada
+        setTimeout(() => toast.classList.add('show'), 100);
+        
+        // Auto-remove após duração especificada
+        if (duration > 0) {
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+        
+        return toast;
+    }
+    
+    // LOADING ELEGANTE PARA OPERAÇÕES
+    showOperationLoading(dayElement, operation = 'salvando') {
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.className = 'operation-loading-overlay';
+        loadingOverlay.innerHTML = `
+            <div class="operation-loading-content">
+                <div class="spinner-elegant"></div>
+                <span>${operation}...</span>
+            </div>
+        `;
+        
+        dayElement.style.position = 'relative';
+        dayElement.appendChild(loadingOverlay);
+        
+        return loadingOverlay;
+    }
+    
+    hideOperationLoading(loadingOverlay) {
+        if (loadingOverlay) {
+            loadingOverlay.classList.add('fade-out');
+            setTimeout(() => loadingOverlay.remove(), 300);
+        }
+    }
+    
+    // CONTADOR DE OBRAS POR DIA
+    updateDayCounter(dayOfWeek) {
+        const dayElement = document.getElementById(`day-${dayOfWeek}`);
+        const headerElement = document.getElementById(`header-day-${dayOfWeek}`);
+        
+        if (!dayElement || !headerElement) return;
+        
+        const allocationCount = dayElement.querySelectorAll('.allocation-item').length;
+        
+        // Remover contador existente
+        const existingCounter = headerElement.querySelector('.day-counter');
+        if (existingCounter) {
+            existingCounter.remove();
+        }
+        
+        // Adicionar novo contador
+        if (allocationCount > 0) {
+            const counter = document.createElement('div');
+            counter.className = 'day-counter';
+            counter.innerHTML = `<span class="badge bg-primary">${allocationCount}</span>`;
+            headerElement.appendChild(counter);
+        }
+        
+        // Atualizar indicador visual de capacidade
+        this.updateCapacityIndicator(dayOfWeek, allocationCount);
+    }
+    
+    // INDICADOR DE CAPACIDADE POR DIA
+    updateCapacityIndicator(dayOfWeek, allocationCount) {
+        const dayElement = document.getElementById(`day-${dayOfWeek}`);
+        if (!dayElement) return;
+        
+        // Remove classes de capacidade existentes
+        dayElement.classList.remove('capacity-low', 'capacity-medium', 'capacity-high', 'capacity-full');
+        
+        // Aplica classe baseada na quantidade de obras
+        if (allocationCount === 0) {
+            // Sem classe especial para vazio
+        } else if (allocationCount <= 2) {
+            dayElement.classList.add('capacity-low');
+        } else if (allocationCount <= 4) {
+            dayElement.classList.add('capacity-medium');
+        } else if (allocationCount <= 6) {
+            dayElement.classList.add('capacity-high');
+        } else {
+            dayElement.classList.add('capacity-full');
+        }
+    }
+    
+    // CONFIRMAÇÃO MELHORADA DE REMOÇÃO
+    async confirmRemoval(obraInfo, dayName) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'removal-confirmation-modal';
+            modal.innerHTML = `
+                <div class="removal-confirmation-content">
+                    <h5>🗑️ Confirmar Remoção</h5>
+                    <p>Deseja remover a obra <strong>${obraInfo.codigo}</strong> do <strong>${dayName}</strong>?</p>
+                    <p class="text-muted">${obraInfo.nome}</p>
+                    <div class="confirmation-buttons">
+                        <button class="btn btn-outline-secondary" id="cancel-removal">Cancelar</button>
+                        <button class="btn btn-danger" id="confirm-removal">🗑️ Remover</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            setTimeout(() => modal.classList.add('show'), 100);
+            
+            document.getElementById('confirm-removal').onclick = () => {
+                modal.classList.remove('show');
+                setTimeout(() => modal.remove(), 300);
+                resolve(true);
+            };
+            
+            document.getElementById('cancel-removal').onclick = () => {
+                modal.classList.remove('show');
+                setTimeout(() => modal.remove(), 300);
+                resolve(false);
+            };
+            
+            // Fechar com ESC ou clique fora
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                    setTimeout(() => modal.remove(), 300);
+                    resolve(false);
+                }
+            };
+        });
+    }
+
     setupDragDrop() {
-        this.log('Configurando SortableJS...');
+        this.log('Configurando SortableJS com validações inteligentes...');
         
         try {
             // Lista de obras (source)
@@ -999,6 +1685,21 @@ class EquipeFase2 {
                     animation: 150,
                     onStart: (evt) => {
                         this.log(`🎯 Arrastando obra: ${evt.item.dataset.obraId}`);
+                        
+                        // Adicionar efeito visual de arraste
+                        evt.item.classList.add('dragging');
+                        
+                        // Destacar drop zones válidas
+                        document.querySelectorAll('.drop-zone').forEach(zone => {
+                            zone.classList.add('drop-zone-active');
+                        });
+                    },
+                    onEnd: (evt) => {
+                        // Remover efeitos visuais
+                        evt.item.classList.remove('dragging');
+                        document.querySelectorAll('.drop-zone').forEach(zone => {
+                            zone.classList.remove('drop-zone-active', 'drop-zone-invalid');
+                        });
                     }
                 });
             }
@@ -1013,21 +1714,47 @@ class EquipeFase2 {
                         onAdd: async (evt) => {
                             const obraId = evt.item.dataset.obraId;
                             const dayName = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][i];
+                            
+                            // VALIDAÇÃO INTELIGENTE: Verificar duplicata
+                            if (this.isDuplicateAllocation(obraId, i)) {
+                                this.log(`❌ Obra ${obraId} já está alocada no ${dayName}!`);
+                                
+                                // Feedback visual de erro
+                                dayElement.classList.add('drop-zone-invalid');
+                                setTimeout(() => dayElement.classList.remove('drop-zone-invalid'), 1500);
+                                
+                                // Toast de erro
+                                this.showToast(`Obra já alocada neste dia!`, 'warning', 3000);
+                                
+                                // Remover item duplicado
+                                evt.item.remove();
+                                return;
+                            }
+                            
                             this.log(`🎯 Obra ${obraId} arrastada para ${dayName}!`);
                             
                             // Capturar estado original para rollback
                             this.captureStateForRollback(dayElement, i, 'add', evt.item);
                             
-                            // Mostrar feedback de carregamento
-                            this.updateStatus(`💾 Salvando obra no ${dayName}...`, 'info');
+                            // Loading elegante
+                            const loadingOverlay = this.showOperationLoading(dayElement, 'Salvando obra');
                             evt.item.style.opacity = '0.5';
+                            
+                            // Toast de loading
+                            const loadingToast = this.showToast(`Salvando obra no ${dayName}...`, 'loading', 0);
                             
                             // Salvar via API
                             const success = await this.salvarAlocacao(obraId, i);
                             
+                            // Remover loading
+                            this.hideOperationLoading(loadingOverlay);
+                            loadingToast.remove();
+                            
                             if (success) {
-                                // Sucesso - o carregamento automático já atualizou a interface
                                 this.log(`✅ Obra ${obraId} salva no ${dayName}!`);
+                                
+                                // Toast de sucesso
+                                this.showToast(`✅ Obra salva no ${dayName}!`, 'success', 2000);
                                 
                                 // Remover o item arrastado (será substituído pela renderização correta)
                                 evt.item.remove();
@@ -1035,16 +1762,20 @@ class EquipeFase2 {
                                 // Limpar placeholder
                                 if (dayElement.querySelector('.text-muted')) {
                                     const placeholder = dayElement.querySelector('.text-muted');
-                                    if (placeholder.textContent.includes('Drop zone')) {
+                                    if (placeholder.textContent.includes('Arraste')) {
                                         placeholder.remove();
                                     }
                                 }
+                                
+                                // Atualizar contador
+                                this.updateDayCounter(i);
                                 
                                 // Limpar estado de rollback
                                 this.clearRollbackState();
                             } else {
                                 // Erro - executar rollback
                                 this.log(`❌ Erro ao salvar obra ${obraId} no ${dayName} - executando rollback`);
+                                this.showToast(`❌ Erro ao salvar obra`, 'error', 3000);
                                 this.executeRollback();
                             }
                         },
@@ -1056,18 +1787,43 @@ class EquipeFase2 {
                             if (allocationId) {
                                 this.log(`🗑️ Removendo alocação ${allocationId} do dia ${i}`);
                                 
+                                // Buscar informações da obra para confirmação
+                                const obra = this.obras.find(o => o.id.toString() === obraId);
+                                const dayName = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][i];
+                                
+                                // Confirmação melhorada
+                                const confirmed = await this.confirmRemoval(
+                                    obra || {codigo: `#${obraId}`, nome: 'Obra não identificada'}, 
+                                    dayName
+                                );
+                                
+                                if (!confirmed) {
+                                    // Usuário cancelou - recarregar alocações para restaurar
+                                    await this.carregarAlocacoes();
+                                    return;
+                                }
+                                
                                 // Capturar estado original para rollback
                                 this.captureStateForRollback(dayElement, i, 'remove', evt.item);
                                 
-                                this.updateStatus(`🗑️ Removendo obra do dia...`, 'warning');
+                                // Loading para remoção
+                                const loadingOverlay = this.showOperationLoading(dayElement, 'Removendo obra');
+                                const loadingToast = this.showToast(`Removendo obra do ${dayName}...`, 'loading', 0);
                                 
                                 const success = await this.removerAlocacao(obraId, i);
+                                
+                                // Remover loading
+                                this.hideOperationLoading(loadingOverlay);
+                                loadingToast.remove();
                                 
                                 if (!success) {
                                     // Se falhou, executar rollback
                                     this.log(`❌ Erro ao remover - executando rollback`);
+                                    this.showToast(`❌ Erro ao remover obra`, 'error', 3000);
                                     this.executeRollback();
                                 } else {
+                                    this.showToast(`✅ Obra removida do ${dayName}`, 'success', 2000);
+                                    this.updateDayCounter(i);
                                     this.clearRollbackState();
                                 }
                             } else {
@@ -1078,7 +1834,7 @@ class EquipeFase2 {
                 }
             }
             
-            this.log('✅ Todas as drop zones configuradas');
+            this.log('✅ Todas as drop zones configuradas com validações inteligentes');
             
         } catch (error) {
             this.log(`❌ ERRO ao configurar SortableJS: ${error.message}`);
