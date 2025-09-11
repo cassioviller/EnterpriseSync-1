@@ -1,0 +1,70 @@
+# PROMPT FASE 3 - Finalização e Polimento
+
+## CONTEXTO
+Você implementou todas as funcionalidades core do módulo de gestão de equipe. Agora precisa finalizar com polimentos, integrações e funcionalidades de produção.
+
+## O QUE JÁ ESTÁ PRONTO
+✅ Frontend refatorado no padrão SIGE
+✅ Alocação hierárquica completa (semanal + mensal)
+✅ Weekly planner funcional
+✅ Filtros e melhorias de usabilidade
+✅ Todas as funcionalidades core implementadas
+
+## SEU OBJETIVO NESTA FASE
+Finalizar o módulo com qualidade de produção:
+
+### 1. INTEGRAÇÃO E COERÊNCIA
+- Sincronização visual entre alocação e weekly planner
+- Indicadores quando há divergências entre os dois
+- Navegação fluida entre as funcionalidades
+- Breadcrumbs e contexto claro para o usuário
+
+### 2. EXPORTAÇÃO E RELATÓRIOS
+- Exportar alocação semanal/mensal para Excel
+- Relatório simples de utilização de funcionários
+- Exportar planejamento semanal
+- Formato compatível com planilha Excel original
+
+### 3. VALIDAÇÕES E FEEDBACK
+- Validações robustas no frontend e backend
+- Mensagens de erro claras e acionáveis
+- Confirmações para ações destrutivas
+- Loading states para operações assíncronas
+
+### 4. RESPONSIVIDADE E PERFORMANCE
+- Interface funcional em tablets (principal dispositivo)
+- Performance otimizada para drag & drop
+- Lazy loading se necessário
+- Testes em diferentes resoluções
+
+### 5. DOCUMENTAÇÃO E MANUTENIBILIDADE
+- Comentários no código JavaScript complexo
+- README com instruções de uso
+- Estrutura de arquivos organizada
+- Logs adequados para debugging
+
+## ABORDAGEM TÉCNICA
+- **Testes manuais** extensivos em cenários reais
+- **Otimização progressiva** sem quebrar funcionalidades
+- **Código limpo** pensando em manutenção futura
+- **Documentação prática** para outros desenvolvedores
+
+## PRIORIDADES
+1. **Integração e coerência** (experiência unificada)
+2. **Exportação Excel** (compatibilidade com processo atual)
+3. **Validações e feedback** (robustez)
+4. **Responsividade** (usabilidade em campo)
+
+## CRITÉRIO DE SUCESSO FINAL
+- Módulo substitui completamente a planilha Excel
+- Interface intuitiva para usuários de canteiro
+- Performance adequada em tablets
+- Integração transparente com resto do SIGE
+- Código maintível e documentado
+
+## ENTREGA FINAL
+- Módulo 100% funcional e testado
+- Documentação de uso
+- Código organizado e comentado
+- Pronto para produção
+

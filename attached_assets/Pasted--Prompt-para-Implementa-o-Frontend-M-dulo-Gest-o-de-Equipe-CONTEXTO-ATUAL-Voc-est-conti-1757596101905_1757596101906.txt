@@ -1,0 +1,57 @@
+# Prompt para Implementação Frontend - Módulo Gestão de Equipe
+
+## CONTEXTO ATUAL
+Você está continuando a implementação de um módulo de gestão de equipe para o sistema SIGE (Flask + PostgreSQL + Bootstrap). O backend está 100% funcional, mas o frontend precisa ser refatorado para seguir o padrão visual do sistema.
+
+## SITUAÇÃO ATUAL
+✅ **JÁ IMPLEMENTADO:**
+- Backend completo (models, APIs REST, drag & drop funcional)
+- Templates HTML básicos criados
+- Integração com sistema existente
+- Sortable.js funcionando
+
+❌ **PROBLEMA PRINCIPAL:**
+- Frontend não segue o padrão visual do SIGE
+- CSS custom demais ao invés de usar Bootstrap existente
+- Falta vista mensal e weekly planner
+
+## SEU OBJETIVO
+Refatorar e completar o frontend mantendo toda a lógica backend atual, focando em:
+
+1. **Seguir o padrão SIGE**: Usar `base_completo.html` e classes Bootstrap existentes
+2. **Manter funcionalidade**: Drag & drop e APIs já funcionam, não quebrar
+3. **Completar funcionalidades**: Adicionar vista mensal e weekly planner
+4. **Consistência visual**: Interface deve parecer nativa do sistema
+
+## PADRÃO VISUAL A SEGUIR
+O SIGE usa estrutura de cards Bootstrap:
+```html
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title">Título</h5>
+        </div>
+        <div class="card-body">
+            <!-- Conteúdo -->
+        </div>
+    </div>
+</div>
+```
+
+## ARQUIVOS PRINCIPAIS
+- `equipe_views.py` (backend funcionando - NÃO ALTERAR)
+- `templates/equipe/alocacao_semanal.html` (refatorar visual)
+- `templates/equipe/allocation_funcionarios.html` (refatorar visual)
+- `templates/base_completo.html` (padrão a seguir)
+
+## ABORDAGEM
+1. Analise o padrão visual do `base_completo.html`
+2. Refatore os templates existentes mantendo a lógica JavaScript
+3. Implemente as funcionalidades faltantes (vista mensal, weekly planner)
+4. Teste se drag & drop continua funcionando
+
+## PRIORIDADES
+1. **Visual consistente** com o resto do SIGE
+2. **Funcionalidade preservada** (não quebrar o que já funciona)
+3. **Completar features** faltantes da proposta original
+

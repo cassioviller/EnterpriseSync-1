@@ -3,510 +3,411 @@
 {% block title %}📋 Gestão de Equipe - Semana {{ monday.strftime('%d/%m') }}{% endblock %}
 
 {% block head_content %}
-<!-- Sortable.js para drag & drop otimizado mobile -->
+<!-- Sortable.js para drag & drop -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <style>
-/* ===========================================
-   CSS MOBILE-FIRST PARA CANTEIRO DE OBRA
-   =========================================== */
-
-/* Base responsiva - tablet como prioridade */
-.equipe-container {
-    padding: 8px;
-    max-width: 100%;
-    overflow-x: auto;
+/* Estilo específico para drag & drop mantendo padrão SIGE */
+.obra-draggable {
+    cursor: grab;
+    transition: all 0.2s ease;
 }
 
-/* Header com stats rápidas */
-.equipe-header {
-    background: linear-gradient(135deg, #2c5530, #198754);
-    border-radius: 12px;
-    padding: 16px;
+.obra-draggable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(25, 135, 84, 0.2) !important;
+}
+
+.obra-draggable:active {
+    cursor: grabbing;
+    transform: scale(1.02);
+}
+
+.obra-draggable.dragging {
+    opacity: 0.6;
+    transform: rotate(3deg);
+}
+
+.day-drop-zone {
+    min-height: 300px;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    background: #fafafa;
+    transition: all 0.3s ease;
+}
+
+.day-drop-zone.drag-over {
+    background: #d4edda;
+    border-color: #198754;
+    border-style: solid;
+}
+
+.allocated-work {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
     color: white;
-    margin-bottom: 16px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
 }
 
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 12px;
-    margin-top: 12px;
+.allocated-work:hover {
+    background: linear-gradient(135deg, #157347 0%, #0f5132 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
 }
 
-.stat-item {
+.employee-count-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ffc107;
+    color: #856404;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.week-stats {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.stat-box {
     text-align: center;
-    padding: 8px;
+    padding: 10px;
     background: rgba(255,255,255,0.15);
     border-radius: 8px;
     backdrop-filter: blur(10px);
 }
 
 .stat-number {
+    display: block;
     font-size: 1.8rem;
     font-weight: bold;
-    display: block;
+    margin-bottom: 4px;
 }
 
 .stat-label {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     opacity: 0.9;
-}
-
-/* Grade semanal - layout horizontal otimizado */
-.week-grid {
-    display: grid;
-    grid-template-columns: 120px 1fr;
-    gap: 16px;
-    min-height: 500px;
-}
-
-/* Sidebar de obras - fonte para drag */
-.obras-sidebar {
-    background: #f8f9fa;
-    border-radius: 12px;
-    padding: 12px;
-    border: 2px solid #dee2e6;
-    position: sticky;
-    top: 20px;
-    max-height: 70vh;
-    overflow-y: auto;
-}
-
-.obras-title {
-    font-weight: bold;
-    color: #2c5530;
-    margin-bottom: 12px;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.obra-item {
-    background: white;
-    border: 2px solid #198754;
-    border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 8px;
-    cursor: grab;
-    transition: all 0.2s ease;
-    font-size: 0.85rem;
-    min-height: 44px; /* Touch target mínimo */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
-
-.obra-item:hover {
-    background: #e8f5e8;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(25,135,84,0.2);
-}
-
-.obra-item:active {
-    cursor: grabbing;
-    transform: scale(1.05);
-}
-
-/* Grid dos dias da semana */
-.days-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 8px;
-    background: white;
-    border-radius: 12px;
-    padding: 12px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.day-column {
-    min-height: 400px;
-    background: #fafafa;
-    border: 2px dashed #d1ecf1;
-    border-radius: 8px;
-    padding: 8px;
-    transition: all 0.3s ease;
-}
-
-.day-column.drag-over {
-    background: #d4edda;
-    border-color: #198754;
-    border-style: solid;
-    box-shadow: inset 0 0 20px rgba(25,135,84,0.1);
-}
-
-.day-header {
-    font-weight: bold;
-    color: #2c5530;
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-    text-align: center;
-    padding: 6px;
-    background: rgba(25,135,84,0.1);
-    border-radius: 6px;
-}
-
-/* Obras alocadas (dropadas) */
-.allocated-obra {
-    background: linear-gradient(135deg, #198754, #28a745);
-    color: white;
-    border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 0.85rem;
-    position: relative;
-    min-height: 44px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.allocated-obra:hover {
-    background: linear-gradient(135deg, #28a745, #34ce57);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(25,135,84,0.3);
-}
-
-.obra-nome {
-    font-weight: bold;
-    margin-bottom: 2px;
-}
-
-.obra-turno {
-    font-size: 0.75rem;
-    opacity: 0.9;
-}
-
-.funcionarios-count {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.7rem;
-    font-weight: bold;
-}
-
-/* Botões de ação rápida */
-.quick-actions {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 1000;
-}
-
-.action-btn {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: #198754;
-    color: white;
-    border: none;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(25,135,84,0.3);
-}
-
-.action-btn:hover {
-    background: #28a745;
-    transform: scale(1.1);
-    box-shadow: 0 6px 20px rgba(25,135,84,0.4);
-}
-
-/* Navegação de semana */
-.week-nav {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-    background: white;
-    padding: 12px 16px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.week-nav button {
-    background: #198754;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background 0.2s ease;
-}
-
-.week-nav button:hover {
-    background: #28a745;
-}
-
-.current-week {
-    font-weight: bold;
-    color: #2c5530;
-    font-size: 1.1rem;
 }
 
 /* Loading states */
-.loading {
-    opacity: 0.6;
-    pointer-events: none;
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
 }
 
-.loading::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 20px;
-    height: 20px;
-    border: 2px solid #f3f3f3;
-    border-top: 2px solid #198754;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    transform: translate(-50%, -50%);
+.loading-content {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
 }
 
-@keyframes spin {
-    0% { transform: translate(-50%, -50%) rotate(0deg); }
-    100% { transform: translate(-50%, -50%) rotate(360deg); }
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
 }
 
-/* Responsividade progressiva */
-@media (max-width: 768px) {
-    .week-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-    
-    .obras-sidebar {
-        max-height: 200px;
-        position: static;
-        order: 2;
-    }
-    
-    .days-grid {
-        grid-template-columns: repeat(2, 1fr);
-        order: 1;
-    }
-    
-    .equipe-header {
-        padding: 12px;
-    }
-    
-    .stats-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
+.custom-toast {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    padding: 16px;
+    margin-bottom: 10px;
+    border-left: 4px solid #198754;
+    animation: slideIn 0.3s ease;
 }
 
-@media (max-width: 480px) {
-    .days-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .stat-number {
-        font-size: 1.4rem;
-    }
-    
-    .equipe-container {
-        padding: 4px;
-    }
-}
-
-/* Estados visuais para feedback tátil */
-.obra-item.dragging {
-    opacity: 0.5;
-    transform: rotate(5deg);
-}
-
-.allocated-obra.removing {
-    animation: slideOut 0.3s ease forwards;
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes slideOut {
-    to {
-        transform: translateX(100%);
-        opacity: 0;
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+/* Responsividade mobile */
+@media (max-width: 768px) {
+    .day-drop-zone {
+        min-height: 200px;
     }
-}
-
-/* Melhor contraste para text legibility */
-.day-header {
-    color: #000;
-    font-weight: 600;
-}
-
-.obra-nome {
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    
+    .week-stats .row {
+        text-align: center;
+    }
+    
+    .allocated-work {
+        font-size: 0.9rem;
+        padding: 8px;
+    }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="equipe-container">
-    <!-- Header com estatísticas rápidas -->
-    <div class="equipe-header">
-        <h2>📋 Gestão de Equipe - Canteiro Otimizado</h2>
-        <div class="stats-grid">
-            <div class="stat-item">
-                <span class="stat-number">{{ stats.total_obras }}</span>
-                <span class="stat-label">Obras</span>
+<div class="container-fluid">
+    <!-- Header com estatísticas -->
+    <div class="week-stats">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0">📋 Gestão de Equipe - Canteiro Inteligente</h3>
+            <div class="btn-group">
+                <button class="btn btn-light" onclick="navigateWeek(-1)">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </button>
+                <button class="btn btn-light" onclick="goToToday()">
+                    <i class="fas fa-calendar-day"></i> Hoje
+                </button>
+                <button class="btn btn-light" onclick="navigateWeek(1)">
+                    Próxima <i class="fas fa-chevron-right"></i>
+                </button>
             </div>
-            <div class="stat-item">
-                <span class="stat-number">{{ stats.total_alocacoes_semana }}</span>
-                <span class="stat-label">Alocações</span>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <span class="stat-number">{{ stats.total_obras }}</span>
+                    <span class="stat-label">Obras Ativas</span>
+                </div>
             </div>
-            <div class="stat-item">
-                <span class="stat-number">{{ stats.funcionarios_alocados }}</span>
-                <span class="stat-label">Funcionários</span>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <span class="stat-number">{{ stats.total_alocacoes_semana }}</span>
+                    <span class="stat-label">Alocações</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <span class="stat-number">{{ stats.funcionarios_alocados }}</span>
+                    <span class="stat-label">Funcionários</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-box">
+                    <span class="stat-number">{{ monday.strftime('%d/%m') }} - {{ friday.strftime('%d/%m') }}</span>
+                    <span class="stat-label">Semana Atual</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Navegação de semana -->
-    <div class="week-nav">
-        <button onclick="navigateWeek(-1)">◀ Anterior</button>
-        <span class="current-week">Semana de {{ monday.strftime('%d/%m') }} a {{ friday.strftime('%d/%m') }}</span>
-        <button onclick="navigateWeek(1)">Próxima ▶</button>
-    </div>
-
-    <!-- Grid principal: Sidebar + Dias -->
-    <div class="week-grid">
-        <!-- Sidebar: Lista de obras para arrastar -->
-        <div class="obras-sidebar">
-            <div class="obras-title">🏗️ Obras Disponíveis</div>
-            <div id="obras-list">
-                {% for obra in obras %}
-                <div class="obra-item" 
-                     data-obra-id="{{ obra.id }}"
-                     data-obra-nome="{{ obra.nome }}"
-                     data-obra-codigo="{{ obra.codigo }}">
-                    <strong>{{ obra.codigo }}</strong><br>
-                    <small>{{ obra.nome[:20] }}...</small>
+    <div class="row">
+        <!-- Sidebar: Obras Disponíveis -->
+        <div class="col-lg-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">
+                        <i class="fas fa-hammer text-primary me-2"></i>
+                        Obras Disponíveis
+                    </h5>
                 </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Grid dos dias da semana -->
-        <div class="days-grid">
-            {% set weekdays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'] %}
-            {% for day_index in range(5) %}
-            <div class="day-column" 
-                 data-day="{{ day_index }}"
-                 data-date="{{ week_grid[day_index]['date'].strftime('%Y-%m-%d') }}">
-                
-                <div class="day-header">
-                    {{ weekdays[day_index] }}<br>
-                    <small>{{ week_grid[day_index]['date_str'] }}</small>
-                </div>
-
-                <!-- Obras já alocadas neste dia -->
-                <div class="allocated-obras" data-day="{{ day_index }}">
-                    {% for allocation in week_grid[day_index]['allocations'] %}
-                    <div class="allocated-obra" 
-                         data-allocation-id="{{ allocation.id }}"
-                         onclick="openFuncionarios({{ allocation.id }})">
-                        
-                        <div class="obra-nome">{{ allocation.obra.codigo }}</div>
-                        <div class="obra-turno">
-                            {{ allocation.turno_inicio.strftime('%H:%M') if allocation.turno_inicio else '08:00' }} - 
-                            {{ allocation.turno_fim.strftime('%H:%M') if allocation.turno_fim else '17:00' }}
+                <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                    <div id="obras-source" class="obras-list">
+                        {% for obra in obras %}
+                        <div class="card obra-draggable mb-2" 
+                             data-obra-id="{{ obra.id }}"
+                             data-obra-nome="{{ obra.nome }}"
+                             data-obra-codigo="{{ obra.codigo }}">
+                            <div class="card-body p-3">
+                                <h6 class="card-title mb-1">{{ obra.codigo }}</h6>
+                                <small class="text-muted">{{ obra.nome[:30] }}{% if obra.nome|length > 30 %}...{% endif %}</small>
+                            </div>
                         </div>
+                        {% endfor %}
                         
-                        <div class="funcionarios-count">{{ allocation.funcionarios_count }}</div>
+                        {% if not obras %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-info-circle mb-2"></i><br>
+                            <small>Nenhuma obra ativa encontrada</small>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endfor %}
                 </div>
             </div>
-            {% endfor %}
+        </div>
+
+        <!-- Grade Semanal -->
+        <div class="col-lg-9">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-calendar-week text-primary me-2"></i>
+                            Grade Semanal
+                        </h5>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-primary active" onclick="switchView('week')">
+                                <i class="fas fa-calendar-week"></i> Semanal
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="switchView('month')">
+                                <i class="fas fa-calendar-alt"></i> Mensal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="weekly-view">
+                        {% set weekdays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'] %}
+                        {% for day_index in range(5) %}
+                        <div class="col">
+                            <div class="mb-2">
+                                <h6 class="text-center mb-3">
+                                    <strong>{{ weekdays[day_index] }}</strong><br>
+                                    <small class="text-muted">{{ week_grid[day_index]['date_str'] }}</small>
+                                </h6>
+                            </div>
+                            
+                            <div class="day-drop-zone" 
+                                 data-day="{{ day_index }}"
+                                 data-date="{{ week_grid[day_index]['date'].strftime('%Y-%m-%d') }}">
+                                
+                                <div class="allocated-works" data-day="{{ day_index }}">
+                                    {% for allocation in week_grid[day_index]['allocations'] %}
+                                    <div class="allocated-work" 
+                                         data-allocation-id="{{ allocation.id }}"
+                                         onclick="openEmployeeAllocation({{ allocation.id }})">
+                                        
+                                        <div class="fw-bold">{{ allocation.obra.codigo }}</div>
+                                        <div style="font-size: 0.8rem; opacity: 0.9;">
+                                            {{ allocation.turno_inicio.strftime('%H:%M') if allocation.turno_inicio else '08:00' }} - 
+                                            {{ allocation.turno_fim.strftime('%H:%M') if allocation.turno_fim else '17:00' }}
+                                        </div>
+                                        
+                                        {% if allocation.funcionarios_count > 0 %}
+                                        <div class="employee-count-badge">{{ allocation.funcionarios_count }}</div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                {% if not week_grid[day_index]['allocations'] %}
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-hand-point-left mb-2"></i><br>
+                                    <small>Arraste obras aqui</small>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Botões de ação rápida -->
-    <div class="quick-actions">
-        <button class="action-btn" onclick="refreshWeek()" title="Atualizar">
-            🔄
-        </button>
-        <button class="action-btn" onclick="goToToday()" title="Hoje">
-            📅
-        </button>
+    <div class="position-fixed" style="bottom: 20px; right: 20px; z-index: 1000;">
+        <div class="btn-group-vertical">
+            <button class="btn btn-primary btn-lg rounded-circle mb-2" 
+                    onclick="refreshWeek()" 
+                    title="Atualizar"
+                    style="width: 56px; height: 56px;">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <button class="btn btn-success btn-lg rounded-circle" 
+                    onclick="openWeeklyPlanner()" 
+                    title="Weekly Planner"
+                    style="width: 56px; height: 56px;">
+                <i class="fas fa-tasks"></i>
+            </button>
+        </div>
     </div>
 </div>
 
-<!-- JavaScript drag & drop otimizado -->
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay">
+    <div class="loading-content">
+        <div class="spinner-border text-primary mb-3" role="status">
+            <span class="visually-hidden">Carregando...</span>
+        </div>
+        <div>Processando alocação...</div>
+    </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
 <script>
 // ===================================
-// SISTEMA DRAG & DROP LEAN
-// Performance crítica para canteiro
+// SISTEMA DRAG & DROP - PADRÃO SIGE
 // ===================================
 
 let currentWeekStart = '{{ monday.strftime("%Y-%m-%d") }}';
-let draggedElement = null;
+let currentView = 'week';
 
-// Inicializar drag & drop nas obras
 document.addEventListener('DOMContentLoaded', function() {
     initializeDragAndDrop();
-    console.log('🚀 Sistema EQUIPE inicializado - Canteiro ready!');
+    console.log('🚀 Sistema EQUIPE inicializado - Padrão SIGE');
 });
 
 function initializeDragAndDrop() {
-    // Obras sidebar - fonte para drag
-    const obrasList = document.getElementById('obras-list');
-    if (obrasList) {
-        new Sortable(obrasList, {
+    // Obras source - sidebar
+    const obrasSource = document.getElementById('obras-source');
+    if (obrasSource) {
+        new Sortable(obrasSource, {
             group: {
                 name: 'obras',
-                pull: 'clone', // Clona em vez de mover
-                put: false     // Não aceita drops
+                pull: 'clone',
+                put: false
             },
-            sort: false,       // Não reordena sidebar
+            sort: false,
             animation: 150,
-            ghostClass: 'obra-item',
+            ghostClass: 'obra-draggable',
             chosenClass: 'dragging',
             onStart: function(evt) {
                 console.log('🟢 Drag iniciado:', evt.item.dataset.obraNome);
+                showLoadingOverlay();
             }
         });
     }
 
-    // Dias da semana - destino para drop
-    document.querySelectorAll('.allocated-obras').forEach(dayContainer => {
+    // Drop zones - dias da semana
+    document.querySelectorAll('.allocated-works').forEach(dayContainer => {
         new Sortable(dayContainer, {
             group: {
                 name: 'obras',
-                pull: false,    // Não permite arrastar para fora
-                put: true       // Aceita drops
+                pull: false,
+                put: true
             },
             animation: 200,
-            ghostClass: 'allocated-obra',
+            ghostClass: 'allocated-work',
             onAdd: function(evt) {
-                // Nova obra dropada neste dia
                 const obraElement = evt.item;
-                const dayDate = evt.to.closest('.day-column').dataset.date;
+                const dayDate = evt.to.closest('.day-drop-zone').dataset.date;
                 const obraId = obraElement.dataset.obraId;
-                const obraNome = obraElement.dataset.obraNome;
                 
-                console.log(`🟡 Drop: ${obraNome} → ${dayDate}`);
-                
-                // Criar alocação via API
+                console.log(`🟡 Drop: ${obraElement.dataset.obraNome} → ${dayDate}`);
                 createAllocation(obraId, dayDate, obraElement);
             },
             onRemove: function(evt) {
-                // Obra removida (deletada)
                 const allocationId = evt.item.dataset.allocationId;
                 if (allocationId) {
                     console.log('🔴 Removendo alocação:', allocationId);
@@ -515,21 +416,33 @@ function initializeDragAndDrop() {
             }
         });
     });
+
+    // Drop zones visual feedback
+    document.querySelectorAll('.day-drop-zone').forEach(zone => {
+        zone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        });
+        
+        zone.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+        
+        zone.addEventListener('drop', function(e) {
+            this.classList.remove('drag-over');
+        });
+    });
 }
 
 // ===================================
-// API CALLS - RÁPIDAS E DIRETAS
+// API CALLS
 // ===================================
 
 async function createAllocation(obraId, dataAlocacao, elemento) {
     try {
-        elemento.classList.add('loading');
-        
         const response = await fetch('/equipe/api/allocations', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 obra_id: parseInt(obraId),
                 data_alocacao: dataAlocacao,
@@ -543,14 +456,13 @@ async function createAllocation(obraId, dataAlocacao, elemento) {
         
         if (response.ok) {
             // Transformar em obra alocada
-            elemento.className = 'allocated-obra';
+            elemento.className = 'allocated-work';
             elemento.dataset.allocationId = result.id;
+            elemento.onclick = () => openEmployeeAllocation(result.id);
             elemento.innerHTML = `
-                <div class="obra-nome">${elemento.dataset.obraCodigo || elemento.dataset.obraNome}</div>
-                <div class="obra-turno">08:00 - 17:00</div>
-                <div class="funcionarios-count">0</div>
+                <div class="fw-bold">${elemento.dataset.obraCodigo || elemento.dataset.obraNome}</div>
+                <div style="font-size: 0.8rem; opacity: 0.9;">08:00 - 17:00</div>
             `;
-            elemento.onclick = () => openFuncionarios(result.id);
             
             console.log('✅ Alocação criada:', result.id);
             showToast('Obra alocada com sucesso!', 'success');
@@ -561,11 +473,9 @@ async function createAllocation(obraId, dataAlocacao, elemento) {
     } catch (error) {
         console.error('❌ Erro create allocation:', error);
         showToast(error.message, 'error');
-        
-        // Remover elemento em caso de erro
         elemento.remove();
     } finally {
-        elemento.classList.remove('loading');
+        hideLoadingOverlay();
     }
 }
 
@@ -575,12 +485,11 @@ async function deleteAllocation(allocationId) {
             method: 'DELETE'
         });
 
-        const result = await response.json();
-        
         if (response.ok) {
             console.log('✅ Alocação removida:', allocationId);
             showToast('Obra removida da semana', 'info');
         } else {
+            const result = await response.json();
             throw new Error(result.error || 'Erro ao remover alocação');
         }
     } catch (error) {
@@ -606,37 +515,74 @@ function goToToday() {
 }
 
 function refreshWeek() {
+    showLoadingOverlay();
     window.location.reload();
 }
 
-function openFuncionarios(allocationId) {
+function openEmployeeAllocation(allocationId) {
     window.location.href = `/equipe/funcionarios/${allocationId}`;
+}
+
+function switchView(view) {
+    currentView = view;
+    
+    // Update button states
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('btn-primary', 'active');
+        btn.classList.add('btn-outline-primary');
+    });
+    
+    if (view === 'week') {
+        document.querySelector('.btn-group .btn:first-child').classList.remove('btn-outline-primary');
+        document.querySelector('.btn-group .btn:first-child').classList.add('btn-primary', 'active');
+        // Implementar vista semanal (já está ativa)
+    } else if (view === 'month') {
+        document.querySelector('.btn-group .btn:last-child').classList.remove('btn-outline-primary');
+        document.querySelector('.btn-group .btn:last-child').classList.add('btn-primary', 'active');
+        // TODO: Implementar vista mensal
+        showToast('Vista mensal será implementada em breve', 'info');
+    }
+}
+
+function openWeeklyPlanner() {
+    // TODO: Implementar Weekly Planner
+    showToast('Weekly Planner será implementado em breve', 'info');
 }
 
 // ===================================
 // FEEDBACK VISUAL
 // ===================================
 
+function showLoadingOverlay() {
+    document.getElementById('loading-overlay').style.display = 'flex';
+}
+
+function hideLoadingOverlay() {
+    document.getElementById('loading-overlay').style.display = 'none';
+}
+
 function showToast(message, type = 'info') {
-    // Toast simples sem dependências
+    const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#198754' : '#17a2b8'};
-        color: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        z-index: 2000;
-        animation: slideIn 0.3s ease;
-        max-width: 300px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    `;
-    toast.textContent = message;
     
-    document.body.appendChild(toast);
+    const colors = {
+        'success': '#198754',
+        'error': '#dc3545',
+        'info': '#17a2b8',
+        'warning': '#ffc107'
+    };
+    
+    toast.className = 'custom-toast';
+    toast.style.borderLeftColor = colors[type] || colors.info;
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} me-2" 
+               style="color: ${colors[type] || colors.info}"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    container.appendChild(toast);
     
     setTimeout(() => {
         toast.style.animation = 'slideOut 0.3s ease forwards';
@@ -656,28 +602,6 @@ function hapticFeedback(type = 'impact') {
     }
 }
 
-// ===================================
-// PWA E PERFORMANCE
-// ===================================
-
-// Service Worker para funcionamento offline (futuro)
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(console.error);
-}
-
-// Preload da próxima semana para performance
-window.addEventListener('load', () => {
-    const nextWeek = new Date(currentWeekStart);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const nextWeekUrl = `/equipe/alocacao?week=${nextWeek.toISOString().split('T')[0]}`;
-    
-    // Prefetch silencioso
-    const link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.href = nextWeekUrl;
-    document.head.appendChild(link);
-});
-
-console.log('🔧 EQUIPE Drag&Drop System initialized - Mobile optimized for construction sites');
+console.log('🔧 EQUIPE System initialized - SIGE Pattern Compliant');
 </script>
 {% endblock %}
