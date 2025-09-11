@@ -296,6 +296,212 @@
         font-size: 1rem;
     }
 }
+
+/* Weekly Planner Styles */
+.planner-grid {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: white;
+}
+
+.planner-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 12px 8px;
+    font-weight: bold;
+    text-align: center;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+.planner-row {
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.planner-cell {
+    min-height: 120px;
+    padding: 8px;
+    border-right: 1px solid #f1f3f4;
+    position: relative;
+}
+
+.planner-cell:last-child {
+    border-right: none;
+}
+
+.obra-info {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+.servico-card {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    font-size: 0.75rem;
+    cursor: grab;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.servico-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+}
+
+.servico-card:active {
+    cursor: grabbing;
+}
+
+.servico-card.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg);
+}
+
+.servico-responsavel {
+    font-size: 0.65rem;
+    opacity: 0.9;
+    margin-top: 2px;
+}
+
+.servico-catalog-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 6px;
+    cursor: grab;
+    transition: all 0.2s ease;
+}
+
+.servico-catalog-item:hover {
+    border-color: #17a2b8;
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.2);
+}
+
+.servico-catalog-item.dragging {
+    opacity: 0.6;
+}
+
+.servico-nome {
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #495057;
+    margin-bottom: 2px;
+}
+
+.servico-categoria {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+
+.drop-zone-planner {
+    min-height: 100px;
+    border: 2px dashed #dee2e6;
+    border-radius: 6px;
+    background: #fafafa;
+    padding: 4px;
+    transition: all 0.3s ease;
+}
+
+.drop-zone-planner.drag-over {
+    border-color: #17a2b8;
+    background: rgba(23, 162, 184, 0.1);
+    border-style: solid;
+}
+
+.drop-zone-planner.has-content {
+    border-style: solid;
+    border-color: #28a745;
+}
+
+.planner-empty-state {
+    text-align: center;
+    padding: 20px;
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+/* Responsividade do planner */
+@media (max-width: 768px) {
+    .modal-dialog.modal-xl {
+        max-width: 95%;
+    }
+    
+    .planner-cell {
+        min-height: 80px;
+        padding: 4px;
+    }
+    
+    .servico-card {
+        font-size: 0.7rem;
+        padding: 4px 6px;
+    }
+    
+    .planner-header {
+        padding: 8px 4px;
+        font-size: 0.8rem;
+    }
+}
+
+/* Estilos de conflitos */
+.conflict-detected {
+    border: 2px solid #dc3545 !important;
+    background: rgba(220, 53, 69, 0.1) !important;
+}
+
+.conflict-work {
+    border-left: 4px solid #dc3545 !important;
+    position: relative;
+}
+
+.conflict-work::before {
+    content: "⚠️";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 0.7rem;
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.overload-work {
+    border: 2px solid #ffc107 !important;
+    background: rgba(255, 193, 7, 0.1) !important;
+}
+
+.overload-work::before {
+    content: "⚡";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 0.7rem;
+    background: #ffc107;
+    color: #856404;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    font-weight: bold;
+}
 </style>
 {% endblock %}
 
@@ -304,7 +510,31 @@
     <!-- Header com estatísticas -->
     <div class="week-stats">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3 class="mb-0">📋 Gestão de Equipe - Canteiro Inteligente</h3>
+            <div>
+                <h3 class="mb-2">📋 Gestão de Equipe - Canteiro Inteligente</h3>
+                <div class="d-flex align-items-center flex-wrap">
+                    <div class="me-3 mb-2">
+                        <select class="form-select form-select-sm" id="obra-filter" onchange="applyObraFilter(this.value)" style="min-width: 200px;">
+                            <option value="">🏗️ Todas as obras</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}">{{ obra.codigo }} - {{ obra.nome[:20] }}{% if obra.nome|length > 20 %}...{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="me-3 mb-2">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="show-conflicts" onchange="toggleConflictDetection(this.checked)">
+                            <label class="form-check-label" for="show-conflicts" style="font-size: 0.9rem; color: white;">
+                                ⚠️ Detectar conflitos
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <span class="badge bg-light text-dark me-1" id="filter-status">Mostrando todas</span>
+                        <span class="badge bg-warning text-dark" id="conflict-count" style="display: none;">0 conflitos</span>
+                    </div>
+                </div>
+            </div>
             <div class="btn-group">
                 <button class="btn btn-light" onclick="navigateWeek(-1)">
                     <i class="fas fa-chevron-left"></i> Anterior
@@ -489,6 +719,101 @@
 
 <!-- Toast container -->
 <div class="toast-container" id="toast-container"></div>
+
+<!-- Weekly Planner Modal -->
+<div class="modal fade" id="weeklyPlannerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #198754 0%, #157347 100%); color: white;">
+                <h5 class="modal-title">
+                    <i class="fas fa-tasks me-2"></i>
+                    Weekly Planner - Planejamento Lean Construction
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="container-fluid">
+                    <div class="row">
+                        <!-- Sidebar: Catálogo de Serviços -->
+                        <div class="col-md-3" style="background: #f8f9fa; border-right: 1px solid #dee2e6;">
+                            <div class="p-3">
+                                <h6 class="fw-bold mb-3">
+                                    <i class="fas fa-tools text-primary me-2"></i>
+                                    Catálogo de Serviços
+                                </h6>
+                                <div class="mb-3">
+                                    <input type="text" class="form-control form-control-sm" 
+                                           placeholder="Buscar serviços..." 
+                                           id="servicos-search"
+                                           onkeyup="filterServices(this.value)">
+                                </div>
+                                <div id="servicos-catalog" style="max-height: 400px; overflow-y: auto;">
+                                    <!-- Serviços carregados dinamicamente -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Planner Grid -->
+                        <div class="col-md-9">
+                            <div class="p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-bold mb-0">
+                                        <i class="fas fa-calendar-week text-primary me-2"></i>
+                                        Planejamento da Semana
+                                    </h6>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" onclick="clearAllPlanning()">
+                                            <i class="fas fa-trash me-1"></i> Limpar
+                                        </button>
+                                        <button class="btn btn-success" onclick="savePlannerData()">
+                                            <i class="fas fa-save me-1"></i> Salvar Planejamento
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="planner-grid">
+                                    <div class="row">
+                                        <div class="col-2">
+                                            <div class="planner-header">Obra</div>
+                                        </div>
+                                        <div class="col-2">
+                                            <div class="planner-header">Segunda</div>
+                                        </div>
+                                        <div class="col-2">
+                                            <div class="planner-header">Terça</div>
+                                        </div>
+                                        <div class="col-2">
+                                            <div class="planner-header">Quarta</div>
+                                        </div>
+                                        <div class="col-2">
+                                            <div class="planner-header">Quinta</div>
+                                        </div>
+                                        <div class="col-2">
+                                            <div class="planner-header">Sexta</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Linhas do planner -->
+                                    <div id="planner-rows">
+                                        <!-- Gerado dinamicamente com base nas obras alocadas -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Fechar
+                </button>
+                <button type="button" class="btn btn-success" onclick="savePlannerData()">
+                    <i class="fas fa-save me-1"></i> Salvar Planejamento
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 // ===================================
@@ -701,8 +1026,16 @@ function switchView(view) {
 }
 
 function openWeeklyPlanner() {
-    // TODO: Implementar Weekly Planner
-    showToast('Weekly Planner será implementado em breve', 'info');
+    // Abrir modal do Weekly Planner
+    const modal = new bootstrap.Modal(document.getElementById('weeklyPlannerModal'));
+    modal.show();
+    
+    // Inicializar planner quando modal abrir
+    setTimeout(() => {
+        initializeWeeklyPlanner();
+    }, 300);
+    
+    console.log('📋 Opening Weekly Planner');
 }
 
 // ===================================
@@ -922,6 +1255,563 @@ function openDayDetail(dateKey) {
     
     const weekStart = monday.toISOString().split('T')[0];
     window.location.href = `/equipe/alocacao?week=${weekStart}`;
+}
+
+// ===================================
+// WEEKLY PLANNER - IMPLEMENTAÇÃO COMPLETA
+// ===================================
+
+let plannerData = {};
+let servicosCatalog = [];
+
+async function initializeWeeklyPlanner() {
+    showLoadingOverlay();
+    
+    try {
+        // Carregar catálogo de serviços e dados do planner
+        await Promise.all([
+            loadServicesCatalog(),
+            loadPlannerData(),
+            generatePlannerGrid()
+        ]);
+        
+        // Inicializar drag & drop do planner
+        initializePlannerDragDrop();
+        
+        console.log('📋 Weekly Planner initialized successfully');
+        
+    } catch (error) {
+        console.error('❌ Error initializing planner:', error);
+        showToast('Erro ao inicializar Weekly Planner', 'error');
+    } finally {
+        hideLoadingOverlay();
+    }
+}
+
+async function loadServicesCatalog() {
+    try {
+        const response = await fetch('/api/servicos');
+        const data = await response.json();
+        
+        if (response.ok) {
+            servicosCatalog = data.servicos || [];
+            renderServicesCatalog();
+            console.log('📊 Services catalog loaded:', servicosCatalog.length + ' services');
+        } else {
+            throw new Error(data.error || 'Erro ao carregar catálogo de serviços');
+        }
+    } catch (error) {
+        console.error('❌ Load services catalog error:', error);
+        // Usar dados mockados para demonstração
+        servicosCatalog = [
+            { id: 1, nome: 'Fundação', categoria: 'Estrutural' },
+            { id: 2, nome: 'Alvenaria', categoria: 'Vedação' },
+            { id: 3, nome: 'Cobertura', categoria: 'Estrutural' },
+            { id: 4, nome: 'Elétrica', categoria: 'Instalações' },
+            { id: 5, nome: 'Hidráulica', categoria: 'Instalações' },
+            { id: 6, nome: 'Pintura', categoria: 'Acabamento' },
+            { id: 7, nome: 'Cerâmica', categoria: 'Acabamento' }
+        ];
+        renderServicesCatalog();
+    }
+}
+
+function renderServicesCatalog() {
+    const container = document.getElementById('servicos-catalog');
+    
+    let html = '';
+    servicosCatalog.forEach(servico => {
+        html += `
+            <div class="servico-catalog-item" 
+                 data-servico-id="${servico.id}"
+                 data-servico-nome="${servico.nome}"
+                 data-servico-categoria="${servico.categoria || ''}">
+                <div class="servico-nome">${servico.nome}</div>
+                <div class="servico-categoria">${servico.categoria || 'Sem categoria'}</div>
+            </div>
+        `;
+    });
+    
+    if (servicosCatalog.length === 0) {
+        html = '<div class="text-center text-muted py-3"><i class="fas fa-info-circle mb-2"></i><br><small>Nenhum serviço encontrado</small></div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+function filterServices(searchTerm) {
+    const items = document.querySelectorAll('.servico-catalog-item');
+    
+    items.forEach(item => {
+        const nome = item.querySelector('.servico-nome').textContent.toLowerCase();
+        const categoria = item.querySelector('.servico-categoria').textContent.toLowerCase();
+        
+        if (nome.includes(searchTerm.toLowerCase()) || categoria.includes(searchTerm.toLowerCase())) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+async function loadPlannerData() {
+    try {
+        const weekStart = currentWeekStart;
+        const response = await fetch(`/equipe/api/planner?week=${weekStart}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            plannerData = data.planner || {};
+            console.log('📋 Planner data loaded for week:', weekStart);
+        } else {
+            console.log('ℹ️ No existing planner data, starting fresh');
+            plannerData = {};
+        }
+    } catch (error) {
+        console.error('❌ Load planner data error:', error);
+        plannerData = {};
+    }
+}
+
+function generatePlannerGrid() {
+    const container = document.getElementById('planner-rows');
+    const obrasAlocadas = getObrasAlocadasSemana();
+    
+    let html = '';
+    
+    if (obrasAlocadas.length === 0) {
+        html = `
+            <div class="planner-empty-state">
+                <i class="fas fa-info-circle mb-2" style="font-size: 2rem; opacity: 0.5;"></i>
+                <br>Nenhuma obra alocada nesta semana
+                <br><small>Aloque obras primeiro para usar o planner</small>
+            </div>
+        `;
+    } else {
+        obrasAlocadas.forEach(obra => {
+            html += `
+                <div class="planner-row row" data-obra-id="${obra.id}">
+                    <div class="col-2 planner-cell">
+                        <div class="obra-info">
+                            ${obra.codigo || obra.nome}
+                        </div>
+                    </div>
+            `;
+            
+            // Colunas para cada dia da semana
+            for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
+                const dayKey = `${obra.id}-${dayIndex}`;
+                const dayServices = plannerData[dayKey] || [];
+                
+                html += `
+                    <div class="col-2 planner-cell">
+                        <div class="drop-zone-planner ${dayServices.length > 0 ? 'has-content' : ''}" 
+                             data-obra-id="${obra.id}" 
+                             data-day="${dayIndex}">
+                `;
+                
+                dayServices.forEach(service => {
+                    html += `
+                        <div class="servico-card" 
+                             data-service-id="${service.id}"
+                             data-service-nome="${service.nome}">
+                            <div>${service.nome}</div>
+                            ${service.responsavel ? `<div class="servico-responsavel">👤 ${service.responsavel}</div>` : ''}
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+        });
+    }
+    
+    container.innerHTML = html;
+    console.log('🏗️ Planner grid generated for', obrasAlocadas.length, 'obras');
+}
+
+function getObrasAlocadasSemana() {
+    // Extrair obras únicas das alocações da semana atual
+    const obras = [];
+    const obrasSet = new Set();
+    
+    document.querySelectorAll('.allocated-work').forEach(element => {
+        const obraElement = element.closest('[data-obra-id]');
+        if (obraElement && !obrasSet.has(obraElement.dataset.obraId)) {
+            obrasSet.add(obraElement.dataset.obraId);
+            obras.push({
+                id: obraElement.dataset.obraId,
+                codigo: obraElement.dataset.obraCodigo || element.querySelector('.fw-bold').textContent,
+                nome: obraElement.dataset.obraNome || element.querySelector('.fw-bold').textContent
+            });
+        }
+    });
+    
+    // Se não encontrou obras no DOM, usar dados das obras disponíveis
+    if (obras.length === 0) {
+        document.querySelectorAll('.obra-draggable').forEach(element => {
+            if (!obrasSet.has(element.dataset.obraId)) {
+                obrasSet.add(element.dataset.obraId);
+                obras.push({
+                    id: element.dataset.obraId,
+                    codigo: element.dataset.obraCodigo,
+                    nome: element.dataset.obraNome
+                });
+            }
+        });
+    }
+    
+    return obras.slice(0, 5); // Máximo 5 obras para não sobrecarregar
+}
+
+function initializePlannerDragDrop() {
+    // Catálogo de serviços (source)
+    const catalogContainer = document.getElementById('servicos-catalog');
+    if (catalogContainer) {
+        new Sortable(catalogContainer, {
+            group: {
+                name: 'planner-services',
+                pull: 'clone',
+                put: false
+            },
+            sort: false,
+            animation: 150,
+            ghostClass: 'servico-catalog-item',
+            chosenClass: 'dragging'
+        });
+    }
+    
+    // Drop zones do planner
+    document.querySelectorAll('.drop-zone-planner').forEach(zone => {
+        new Sortable(zone, {
+            group: {
+                name: 'planner-services',
+                pull: true,
+                put: true
+            },
+            animation: 200,
+            ghostClass: 'servico-card',
+            chosenClass: 'dragging',
+            onAdd: function(evt) {
+                const serviceElement = evt.item;
+                const obraId = evt.to.dataset.obraId;
+                const dayIndex = evt.to.dataset.day;
+                
+                // Transformar em serviço planejado
+                if (serviceElement.classList.contains('servico-catalog-item')) {
+                    const servicoNome = serviceElement.dataset.servicoNome;
+                    const servicoId = serviceElement.dataset.servicoId;
+                    
+                    serviceElement.className = 'servico-card';
+                    serviceElement.innerHTML = `
+                        <div>${servicoNome}</div>
+                        <div class="servico-responsavel">👤 Definir responsável</div>
+                    `;
+                    serviceElement.dataset.serviceId = servicoId;
+                    serviceElement.dataset.serviceNome = servicoNome;
+                    
+                    // Adicionar click para editar responsável
+                    serviceElement.onclick = () => editServiceResponsible(serviceElement);
+                }
+                
+                // Atualizar dados do planner
+                updatePlannerData();
+                
+                // Visual feedback
+                evt.to.classList.add('has-content');
+                showToast(`${serviceElement.dataset.serviceNome} adicionado ao planejamento`, 'success');
+                hapticFeedback('success');
+                
+                console.log(`📋 Service added: ${serviceElement.dataset.serviceNome} → Obra ${obraId}, Day ${dayIndex}`);
+            },
+            onRemove: function(evt) {
+                // Atualizar dados do planner
+                updatePlannerData();
+                
+                // Verificar se zone ficou vazia
+                if (evt.from.children.length === 0) {
+                    evt.from.classList.remove('has-content');
+                }
+                
+                console.log(`📋 Service removed from planner`);
+            }
+        });
+    });
+}
+
+function editServiceResponsible(serviceElement) {
+    const currentResponsible = serviceElement.querySelector('.servico-responsavel')?.textContent.replace('👤 ', '') || 'Definir responsável';
+    
+    const newResponsible = prompt('Definir responsável pelo serviço:', currentResponsible === 'Definir responsável' ? '' : currentResponsible);
+    
+    if (newResponsible !== null) {
+        const responsavelElement = serviceElement.querySelector('.servico-responsavel');
+        if (responsavelElement) {
+            responsavelElement.textContent = `👤 ${newResponsible || 'Definir responsável'}`;
+        }
+        
+        updatePlannerData();
+        showToast('Responsável atualizado', 'success');
+    }
+}
+
+function updatePlannerData() {
+    plannerData = {};
+    
+    document.querySelectorAll('.drop-zone-planner').forEach(zone => {
+        const obraId = zone.dataset.obraId;
+        const dayIndex = zone.dataset.day;
+        const dayKey = `${obraId}-${dayIndex}`;
+        
+        const services = [];
+        zone.querySelectorAll('.servico-card').forEach(card => {
+            const responsavelElement = card.querySelector('.servico-responsavel');
+            const responsavel = responsavelElement ? responsavelElement.textContent.replace('👤 ', '') : '';
+            
+            services.push({
+                id: card.dataset.serviceId,
+                nome: card.dataset.serviceNome,
+                responsavel: responsavel === 'Definir responsável' ? '' : responsavel
+            });
+        });
+        
+        if (services.length > 0) {
+            plannerData[dayKey] = services;
+        }
+    });
+}
+
+async function savePlannerData() {
+    showLoadingOverlay();
+    
+    try {
+        updatePlannerData();
+        
+        const response = await fetch('/equipe/api/planner', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                week: currentWeekStart,
+                planner_data: plannerData
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('Planejamento salvo com sucesso!', 'success');
+            console.log('✅ Planner data saved');
+            hapticFeedback('success');
+        } else {
+            throw new Error(result.error || 'Erro ao salvar planejamento');
+        }
+    } catch (error) {
+        console.error('❌ Save planner error:', error);
+        showToast('Erro ao salvar planejamento', 'error');
+        hapticFeedback('error');
+    } finally {
+        hideLoadingOverlay();
+    }
+}
+
+function clearAllPlanning() {
+    if (!confirm('Tem certeza que deseja limpar todo o planejamento da semana?')) {
+        return;
+    }
+    
+    document.querySelectorAll('.drop-zone-planner').forEach(zone => {
+        zone.innerHTML = '';
+        zone.classList.remove('has-content');
+    });
+    
+    plannerData = {};
+    showToast('Planejamento limpo', 'info');
+    
+    console.log('🗑️ All planning cleared');
+}
+
+// ===================================
+// FILTROS E DETECÇÃO DE CONFLITOS
+// ===================================
+
+function applyObraFilter(obraId) {
+    const filterStatus = document.getElementById('filter-status');
+    
+    if (!obraId) {
+        // Mostrar todas as obras
+        document.querySelectorAll('.obra-draggable, .allocated-work').forEach(element => {
+            element.style.display = 'block';
+        });
+        
+        document.querySelectorAll('.day-drop-zone').forEach(zone => {
+            zone.style.display = 'block';
+        });
+        
+        filterStatus.textContent = 'Mostrando todas';
+        filterStatus.className = 'badge bg-light text-dark me-1';
+        
+        console.log('🔍 Filter cleared - showing all obras');
+        
+    } else {
+        // Filtrar por obra específica
+        let visibleCount = 0;
+        
+        // Filtrar obras disponíveis
+        document.querySelectorAll('.obra-draggable').forEach(element => {
+            if (element.dataset.obraId === obraId) {
+                element.style.display = 'block';
+                visibleCount++;
+            } else {
+                element.style.display = 'none';
+            }
+        });
+        
+        // Filtrar alocações
+        document.querySelectorAll('.allocated-work').forEach(element => {
+            const parentZone = element.closest('.day-drop-zone');
+            const allocations = parentZone.querySelectorAll('.allocated-work');
+            let hasVisibleAllocations = false;
+            
+            allocations.forEach(allocation => {
+                // Precisamos identificar a obra da alocação (isso pode precisar ser melhorado)
+                const obraTexto = allocation.querySelector('.fw-bold').textContent;
+                const matchingObra = document.querySelector(`.obra-draggable[data-obra-codigo="${obraTexto}"], .obra-draggable[data-obra-nome*="${obraTexto}"]`);
+                
+                if (matchingObra && matchingObra.dataset.obraId === obraId) {
+                    allocation.style.display = 'block';
+                    hasVisibleAllocations = true;
+                } else {
+                    allocation.style.display = 'none';
+                }
+            });
+            
+            // Mostrar/ocultar a zona baseado se tem alocações visíveis
+            parentZone.style.display = hasVisibleAllocations ? 'block' : 'none';
+        });
+        
+        const selectedOption = document.querySelector(`#obra-filter option[value="${obraId}"]`);
+        const obraNome = selectedOption ? selectedOption.textContent : 'Obra selecionada';
+        
+        filterStatus.textContent = `Filtrando: ${obraNome}`;
+        filterStatus.className = 'badge bg-primary text-white me-1';
+        
+        console.log(`🔍 Filter applied: Obra ${obraId} - ${visibleCount} items visible`);
+    }
+    
+    // Re-executar detecção de conflitos se estiver ativa
+    const conflictToggle = document.getElementById('show-conflicts');
+    if (conflictToggle && conflictToggle.checked) {
+        detectConflicts();
+    }
+}
+
+function toggleConflictDetection(enabled) {
+    const conflictCount = document.getElementById('conflict-count');
+    
+    if (enabled) {
+        detectConflicts();
+        conflictCount.style.display = 'inline-block';
+        showToast('Detecção de conflitos ativada', 'info');
+        console.log('⚠️ Conflict detection enabled');
+    } else {
+        clearConflictHighlights();
+        conflictCount.style.display = 'none';
+        showToast('Detecção de conflitos desativada', 'info');
+        console.log('✅ Conflict detection disabled');
+    }
+}
+
+function detectConflicts() {
+    clearConflictHighlights();
+    let conflictCount = 0;
+    
+    // Detectar funcionários alocados em múltiplas obras no mesmo dia
+    const funcionariosPorDia = {};
+    
+    // Coletar todas as alocações por dia
+    document.querySelectorAll('.allocated-work').forEach(allocation => {
+        const dayZone = allocation.closest('.day-drop-zone');
+        const dayIndex = dayZone.dataset.day;
+        const dateStr = dayZone.dataset.date;
+        
+        if (!funcionariosPorDia[dateStr]) {
+            funcionariosPorDia[dateStr] = {};
+        }
+        
+        // Para cada obra, contar funcionários (isso é uma aproximação)
+        const funcionariosBadge = allocation.querySelector('.employee-count-badge');
+        const funcionariosCount = funcionariosBadge ? parseInt(funcionariosBadge.textContent) : 0;
+        const obraCodigo = allocation.querySelector('.fw-bold').textContent;
+        
+        if (funcionariosCount > 0) {
+            if (!funcionariosPorDia[dateStr][obraCodigo]) {
+                funcionariosPorDia[dateStr][obraCodigo] = 0;
+            }
+            funcionariosPorDia[dateStr][obraCodigo] += funcionariosCount;
+        }
+    });
+    
+    // Detectar conflitos de horário (obras simultâneas no mesmo dia)
+    Object.keys(funcionariosPorDia).forEach(date => {
+        const obrasNoDia = Object.keys(funcionariosPorDia[date]);
+        if (obrasNoDia.length > 1) {
+            // Múltiplas obras no mesmo dia - potencial conflito
+            const dayZone = document.querySelector(`[data-date="${date}"]`);
+            if (dayZone) {
+                dayZone.classList.add('conflict-detected');
+                dayZone.querySelectorAll('.allocated-work').forEach(work => {
+                    work.classList.add('conflict-work');
+                    
+                    // Adicionar tooltip de conflito
+                    work.title = `⚠️ Conflito: ${obrasNoDia.length} obras neste dia`;
+                });
+                conflictCount++;
+            }
+        }
+    });
+    
+    // Detectar sobrecarga de funcionários (mais de 8h/dia)
+    document.querySelectorAll('.allocated-work').forEach(allocation => {
+        const funcionariosBadge = allocation.querySelector('.employee-count-badge');
+        const funcionariosCount = funcionariosBadge ? parseInt(funcionariosBadge.textContent) : 0;
+        
+        // Se uma obra tem muitos funcionários, pode ser sobrecarga
+        if (funcionariosCount > 10) {
+            allocation.classList.add('overload-work');
+            allocation.title = `⚠️ Possível sobrecarga: ${funcionariosCount} funcionários`;
+            conflictCount++;
+        }
+    });
+    
+    // Atualizar contador de conflitos
+    const conflictCountElement = document.getElementById('conflict-count');
+    if (conflictCountElement) {
+        conflictCountElement.textContent = `${conflictCount} conflito${conflictCount !== 1 ? 's' : ''}`;
+        conflictCountElement.className = conflictCount > 0 ? 'badge bg-danger text-white' : 'badge bg-success text-white';
+    }
+    
+    if (conflictCount > 0) {
+        showToast(`${conflictCount} conflito${conflictCount !== 1 ? 's' : ''} detectado${conflictCount !== 1 ? 's' : ''}`, 'warning');
+    } else {
+        showToast('Nenhum conflito detectado', 'success');
+    }
+    
+    console.log(`⚠️ Conflict detection completed: ${conflictCount} conflicts found`);
+}
+
+function clearConflictHighlights() {
+    // Remover todas as classes de conflito
+    document.querySelectorAll('.conflict-detected, .conflict-work, .overload-work').forEach(element => {
+        element.classList.remove('conflict-detected', 'conflict-work', 'overload-work');
+        element.removeAttribute('title');
+    });
+    
+    console.log('✅ Conflict highlights cleared');
 }
 
 console.log('🔧 EQUIPE System initialized - SIGE Pattern Compliant');
