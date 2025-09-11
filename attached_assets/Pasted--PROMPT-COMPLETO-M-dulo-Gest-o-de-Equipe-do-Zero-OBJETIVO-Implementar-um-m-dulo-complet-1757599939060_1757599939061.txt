@@ -1,0 +1,2221 @@
+# PROMPT COMPLETO - Módulo Gestão de Equipe do Zero
+
+## 🎯 OBJETIVO
+Implementar um módulo completo de gestão de equipe para o sistema SIGE, com funcionalidades de alocação de obras por dias da semana e planejamento semanal, seguindo metodologia Lean Construction.
+
+## 📋 FUNCIONALIDADES PRINCIPAIS
+1. **Alocação Hierárquica**: Obras → Dias → Funcionários
+2. **Drag & Drop**: Interface intuitiva para alocação
+3. **Vista Semanal/Mensal**: Calendário de alocações
+4. **Weekly Planner**: Planejamento de atividades por obra
+5. **Integração SIGE**: Multi-tenant, autenticação, permissões
+
+## 🏗️ ARQUITETURA DO SISTEMA
+
+### Estrutura de Arquivos
+```
+projeto/
+├── models.py                    # Modelos de dados
+├── equipe_views.py             # Rotas e APIs
+├── templates/
+│   └── equipe/
+│       ├── alocacao_semanal.html
+│       ├── funcionarios_modal.html
+│       └── weekly_planner.html
+├── static/
+│   ├── css/
+│   │   └── equipe.css
+│   └── js/
+│       └── equipe.js
+└── migrations/                  # Migrações do banco
+```
+
+## 📊 MODELAGEM DE DADOS
+
+### 1. Modelos SQLAlchemy (models.py)
+```python
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, date, time
+from sqlalchemy import Index, UniqueConstraint
+
+db = SQLAlchemy()
+
+class Allocation(db.Model):
+    """Alocação de obra por dia - Nível 1: Obras→Dias"""
+    __tablename__ = 'allocation'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    data_alocacao = db.Column(db.Date, nullable=False)
+    turno_inicio = db.Column(db.Time, default=time(8, 0))
+    turno_fim = db.Column(db.Time, default=time(17, 0))
+    nota = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='allocations')
+    admin = db.relationship('Usuario', backref='allocations_created')
+    funcionarios = db.relationship('AllocationEmployee', backref='allocation', cascade='all, delete-orphan')
+    
+    # Índices para performance
+    __table_args__ = (
+        Index('idx_allocation_admin_date', 'admin_id', 'data_alocacao'),
+        Index('idx_allocation_obra_date', 'obra_id', 'data_alocacao'),
+        UniqueConstraint('obra_id', 'data_alocacao', name='uq_obra_data_allocation'),
+    )
+    
+    @property
+    def funcionarios_count(self):
+        return len(self.funcionarios)
+    
+    @property
+    def day_of_week(self):
+        return self.data_alocacao.weekday()  # 0=Segunda
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'obra_id': self.obra_id,
+            'obra_codigo': self.obra.codigo if self.obra else None,
+            'obra_nome': self.obra.nome if self.obra else None,
+            'data_alocacao': self.data_alocacao.isoformat(),
+            'turno_inicio': self.turno_inicio.strftime('%H:%M'),
+            'turno_fim': self.turno_fim.strftime('%H:%M'),
+            'funcionarios_count': self.funcionarios_count,
+            'day_of_week': self.day_of_week,
+            'nota': self.nota
+        }
+
+class AllocationEmployee(db.Model):
+    """Funcionários alocados em obra/dia - Nível 2: Funcionários→Obra"""
+    __tablename__ = 'allocation_employee'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    allocation_id = db.Column(db.Integer, db.ForeignKey('allocation.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    turno_inicio = db.Column(db.Time, default=time(8, 0))
+    turno_fim = db.Column(db.Time, default=time(17, 0))
+    funcao = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='allocations')
+    
+    # Índices
+    __table_args__ = (
+        Index('idx_alloc_emp_allocation', 'allocation_id'),
+        Index('idx_alloc_emp_funcionario', 'funcionario_id'),
+        UniqueConstraint('allocation_id', 'funcionario_id', name='uq_allocation_funcionario'),
+    )
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'allocation_id': self.allocation_id,
+            'funcionario_id': self.funcionario_id,
+            'funcionario_nome': self.funcionario.nome if self.funcionario else None,
+            'turno_inicio': self.turno_inicio.strftime('%H:%M'),
+            'turno_fim': self.turno_fim.strftime('%H:%M'),
+            'funcao': self.funcao
+        }
+
+class WeeklyPlan(db.Model):
+    """Planejamento semanal por obra"""
+    __tablename__ = 'weekly_plan'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    week_start = db.Column(db.Date, nullable=False)  # Segunda-feira da semana
+    status = db.Column(db.String(20), default='draft')  # draft, approved, completed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='weekly_plans')
+    admin = db.relationship('Usuario', backref='weekly_plans_created')
+    items = db.relationship('WeeklyPlanItem', backref='weekly_plan', cascade='all, delete-orphan')
+    
+    # Índices
+    __table_args__ = (
+        Index('idx_weekly_plan_admin_week', 'admin_id', 'week_start'),
+        Index('idx_weekly_plan_obra_week', 'obra_id', 'week_start'),
+        UniqueConstraint('obra_id', 'week_start', name='uq_obra_week_plan'),
+    )
+
+class WeeklyPlanItem(db.Model):
+    """Itens do planejamento semanal - serviços por dia"""
+    __tablename__ = 'weekly_plan_item'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    weekly_plan_id = db.Column(db.Integer, db.ForeignKey('weekly_plan.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    day_of_week = db.Column(db.Integer, nullable=False)  # 0=Segunda, 4=Sexta
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    turno_inicio = db.Column(db.Time, default=time(8, 0))
+    turno_fim = db.Column(db.Time, default=time(17, 0))
+    nota_curta = db.Column(db.String(200))
+    ordem = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    servico = db.relationship('Servico', backref='weekly_plan_items')
+    responsavel = db.relationship('Funcionario', backref='weekly_plan_items')
+    
+    # Índices
+    __table_args__ = (
+        Index('idx_weekly_item_plan_day', 'weekly_plan_id', 'day_of_week'),
+        Index('idx_weekly_item_servico', 'servico_id'),
+    )
+```
+
+## 🔧 BACKEND - APIs E ROTAS
+
+### 2. Blueprint Principal (equipe_views.py)
+```python
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_required, current_user
+from auth import admin_required
+from datetime import datetime, date, timedelta, time
+from sqlalchemy import func, and_, or_
+from app import db
+from models import (
+    Allocation, AllocationEmployee, WeeklyPlan, WeeklyPlanItem,
+    Funcionario, Obra, Servico, Usuario, TipoUsuario
+)
+import json
+import logging
+
+# Blueprint
+equipe_bp = Blueprint('equipe', __name__, url_prefix='/equipe')
+
+# Utilitários
+def get_admin_id():
+    """Retorna admin_id do usuário atual"""
+    if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
+        if current_user.tipo_usuario == TipoUsuario.ADMIN:
+            return current_user.id
+        elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+            return current_user.admin_id
+    return current_user.id if current_user.is_authenticated else None
+
+def get_monday_of_week(target_date):
+    """Retorna segunda-feira da semana da data informada"""
+    days_since_monday = target_date.weekday()
+    monday = target_date - timedelta(days=days_since_monday)
+    return monday
+
+def json_response(data=None, message=None, status=200, error=None):
+    """Resposta JSON padronizada"""
+    response = {
+        'success': status < 400,
+        'data': data,
+        'message': message,
+        'error': error,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+    return jsonify(response), status
+
+def safe_db_operation(operation, default_value=None, error_message="Erro na operação"):
+    """Executa operação DB com tratamento seguro"""
+    try:
+        return operation()
+    except Exception as e:
+        logging.error(f"EQUIPE DB ERROR: {str(e)}")
+        try:
+            db.session.rollback()
+        except:
+            pass
+        return default_value
+
+# ================================
+# ROTAS PRINCIPAIS
+# ================================
+
+@equipe_bp.route('/')
+@equipe_bp.route('/alocacao')
+@login_required
+@admin_required
+def alocacao_semanal():
+    """Página principal - Alocação semanal"""
+    try:
+        admin_id = get_admin_id()
+        
+        # Data da semana (parâmetro ou atual)
+        week_param = request.args.get('week')
+        if week_param:
+            try:
+                target_date = datetime.strptime(week_param, '%Y-%m-%d').date()
+            except:
+                target_date = date.today()
+        else:
+            target_date = date.today()
+        
+        monday = get_monday_of_week(target_date)
+        friday = monday + timedelta(days=4)
+        week_dates = [monday + timedelta(days=i) for i in range(5)]
+        
+        # Obras ativas
+        obras = safe_db_operation(
+            lambda: Obra.query.filter_by(admin_id=admin_id, status='ativa').order_by(Obra.nome).all(),
+            []
+        )
+        
+        # Alocações da semana
+        allocations = safe_db_operation(
+            lambda: Allocation.query.filter(
+                and_(
+                    Allocation.admin_id == admin_id,
+                    Allocation.data_alocacao >= monday,
+                    Allocation.data_alocacao <= friday
+                )
+            ).all(),
+            []
+        )
+        
+        # Organizar alocações por dia
+        week_grid = []
+        for i, week_date in enumerate(week_dates):
+            day_allocations = [a for a in allocations if a.data_alocacao == week_date]
+            week_grid.append({
+                'date': week_date,
+                'date_str': week_date.strftime('%d/%m'),
+                'allocations': day_allocations
+            })
+        
+        # Estatísticas
+        stats = {
+            'total_obras': len(obras),
+            'total_alocacoes_semana': len(allocations),
+            'funcionarios_alocados': sum(a.funcionarios_count for a in allocations)
+        }
+        
+        return render_template('equipe/alocacao_semanal.html',
+                             obras=obras,
+                             week_grid=week_grid,
+                             week_dates=week_dates,
+                             monday=monday,
+                             friday=friday,
+                             stats=stats)
+        
+    except Exception as e:
+        logging.error(f"Erro na alocação semanal: {str(e)}")
+        flash('Erro ao carregar página de alocação', 'error')
+        return redirect(url_for('main.dashboard'))
+
+# ================================
+# APIs REST
+# ================================
+
+@equipe_bp.route('/api/obras', methods=['GET'])
+@login_required
+def get_obras():
+    """GET /api/equipe/obras - Lista obras ativas"""
+    try:
+        admin_id = get_admin_id()
+        
+        obras = Obra.query.filter_by(
+            admin_id=admin_id, 
+            status='ativa'
+        ).order_by(Obra.nome).all()
+        
+        result = []
+        for obra in obras:
+            result.append({
+                'id': obra.id,
+                'codigo': obra.codigo,
+                'nome': obra.nome,
+                'cor': f"hsl({hash(obra.codigo) % 360}, 70%, 50%)"
+            })
+        
+        return json_response(data=result)
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar obras: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+
+@equipe_bp.route('/api/allocations', methods=['GET'])
+@login_required
+def get_allocations():
+    """GET /api/equipe/allocations?week_start=2024-01-15&obra_id=123"""
+    try:
+        admin_id = get_admin_id()
+        week_start = request.args.get('week_start')
+        obra_id = request.args.get('obra_id')
+        
+        # Parse da data
+        if week_start:
+            start_date = datetime.strptime(week_start, '%Y-%m-%d').date()
+        else:
+            start_date = date.today()
+            start_date = start_date - timedelta(days=start_date.weekday())
+        
+        end_date = start_date + timedelta(days=4)
+        
+        # Query
+        query = Allocation.query.filter(
+            and_(
+                Allocation.admin_id == admin_id,
+                Allocation.data_alocacao >= start_date,
+                Allocation.data_alocacao <= end_date
+            )
+        )
+        
+        if obra_id:
+            query = query.filter(Allocation.obra_id == obra_id)
+        
+        allocations = query.all()
+        result = [a.to_dict() for a in allocations]
+        
+        return json_response(data=result)
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar alocações: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+
+@equipe_bp.route('/api/allocations', methods=['POST'])
+@login_required
+def create_allocation():
+    """POST /api/equipe/allocations"""
+    try:
+        data = request.get_json()
+        
+        # Validação
+        required_fields = ['obra_id', 'data_alocacao']
+        for field in required_fields:
+            if field not in data:
+                return json_response(error=f"Campo obrigatório: {field}", status=400)
+        
+        admin_id = get_admin_id()
+        obra_id = data['obra_id']
+        data_alocacao = datetime.strptime(data['data_alocacao'], '%Y-%m-%d').date()
+        
+        # Verifica se obra existe
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return json_response(error="Obra não encontrada", status=404)
+        
+        # Verifica duplicata
+        existing = Allocation.query.filter_by(
+            obra_id=obra_id, 
+            data_alocacao=data_alocacao
+        ).first()
+        if existing:
+            return json_response(error="Obra já alocada nesta data", status=409)
+        
+        # Cria alocação
+        allocation = Allocation(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            data_alocacao=data_alocacao,
+            turno_inicio=datetime.strptime(data.get('turno_inicio', '08:00'), '%H:%M').time(),
+            turno_fim=datetime.strptime(data.get('turno_fim', '17:00'), '%H:%M').time(),
+            nota=data.get('nota', '')
+        )
+        
+        db.session.add(allocation)
+        db.session.commit()
+        
+        return json_response(
+            data=allocation.to_dict(),
+            message="Alocação criada com sucesso",
+            status=201
+        )
+        
+    except ValueError as e:
+        return json_response(error="Formato de data inválido", status=400)
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao criar alocação: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+
+@equipe_bp.route('/api/allocations/<int:allocation_id>', methods=['DELETE'])
+@login_required
+def delete_allocation(allocation_id):
+    """DELETE /api/equipe/allocations/123"""
+    try:
+        admin_id = get_admin_id()
+        
+        allocation = Allocation.query.filter_by(
+            id=allocation_id, 
+            admin_id=admin_id
+        ).first()
+        
+        if not allocation:
+            return json_response(error="Alocação não encontrada", status=404)
+        
+        db.session.delete(allocation)
+        db.session.commit()
+        
+        return json_response(message="Alocação removida com sucesso")
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao deletar alocação: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+
+@equipe_bp.route('/api/funcionarios', methods=['GET'])
+@login_required
+def get_funcionarios():
+    """GET /api/equipe/funcionarios?allocation_id=123"""
+    try:
+        admin_id = get_admin_id()
+        allocation_id = request.args.get('allocation_id')
+        
+        # Funcionários disponíveis
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            status='ativo'
+        ).order_by(Funcionario.nome).all()
+        
+        result = []
+        for func in funcionarios:
+            # Verifica se já está alocado
+            is_allocated = False
+            if allocation_id:
+                is_allocated = AllocationEmployee.query.filter_by(
+                    allocation_id=allocation_id,
+                    funcionario_id=func.id
+                ).first() is not None
+            
+            result.append({
+                'id': func.id,
+                'nome': func.nome,
+                'funcao': func.funcao,
+                'is_allocated': is_allocated
+            })
+        
+        return json_response(data=result)
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar funcionários: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+
+@equipe_bp.route('/api/allocation-employees', methods=['POST'])
+@login_required
+def add_employee_to_allocation():
+    """POST /api/equipe/allocation-employees"""
+    try:
+        data = request.get_json()
+        
+        # Validação
+        required_fields = ['allocation_id', 'funcionario_id']
+        for field in required_fields:
+            if field not in data:
+                return json_response(error=f"Campo obrigatório: {field}", status=400)
+        
+        allocation_id = data['allocation_id']
+        funcionario_id = data['funcionario_id']
+        
+        # Verifica se alocação existe e pertence ao admin
+        admin_id = get_admin_id()
+        allocation = Allocation.query.filter_by(
+            id=allocation_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not allocation:
+            return json_response(error="Alocação não encontrada", status=404)
+        
+        # Verifica se funcionário existe
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            return json_response(error="Funcionário não encontrado", status=404)
+        
+        # Verifica duplicata
+        existing = AllocationEmployee.query.filter_by(
+            allocation_id=allocation_id,
+            funcionario_id=funcionario_id
+        ).first()
+        
+        if existing:
+            return json_response(error="Funcionário já alocado", status=409)
+        
+        # Cria alocação de funcionário
+        alloc_employee = AllocationEmployee(
+            allocation_id=allocation_id,
+            funcionario_id=funcionario_id,
+            turno_inicio=datetime.strptime(data.get('turno_inicio', '08:00'), '%H:%M').time(),
+            turno_fim=datetime.strptime(data.get('turno_fim', '17:00'), '%H:%M').time(),
+            funcao=data.get('funcao', '')
+        )
+        
+        db.session.add(alloc_employee)
+        db.session.commit()
+        
+        return json_response(
+            data=alloc_employee.to_dict(),
+            message="Funcionário alocado com sucesso",
+            status=201
+        )
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao alocar funcionário: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+
+@equipe_bp.route('/api/allocation-employees/<int:alloc_employee_id>', methods=['DELETE'])
+@login_required
+def remove_employee_from_allocation(alloc_employee_id):
+    """DELETE /api/equipe/allocation-employees/123"""
+    try:
+        admin_id = get_admin_id()
+        
+        # Busca com join para verificar permissão
+        alloc_employee = db.session.query(AllocationEmployee).join(Allocation).filter(
+            AllocationEmployee.id == alloc_employee_id,
+            Allocation.admin_id == admin_id
+        ).first()
+        
+        if not alloc_employee:
+            return json_response(error="Alocação de funcionário não encontrada", status=404)
+        
+        db.session.delete(alloc_employee)
+        db.session.commit()
+        
+        return json_response(message="Funcionário removido da alocação")
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao remover funcionário: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+```
+
+## 🎨 FRONTEND - INTERFACE PRINCIPAL
+
+### 3. Template HTML (templates/equipe/alocacao_semanal.html)
+```html
+{% extends "base_completo.html" %}
+
+{% block title %}📋 Gestão de Equipe - Semana {{ monday.strftime('%d/%m') }}{% endblock %}
+
+{% block head_content %}
+<!-- SortableJS para drag & drop -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<!-- CSS específico do módulo -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/equipe.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumbs -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">🏠 SIGE</a></li>
+            <li class="breadcrumb-item active">📋 Gestão de Equipe</li>
+        </ol>
+    </nav>
+
+    <!-- Header com estatísticas e navegação -->
+    <div class="card mb-4 equipe-header">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h3 class="mb-2">📋 Gestão de Equipe</h3>
+                    <p class="text-muted mb-0">
+                        Semana de {{ monday.strftime('%d/%m/%Y') }} a {{ friday.strftime('%d/%m/%Y') }}
+                    </p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="btn-group mb-2">
+                        <button class="btn btn-outline-primary" onclick="navigateWeek(-1)">
+                            <i class="fas fa-chevron-left"></i> Anterior
+                        </button>
+                        <button class="btn btn-primary" onclick="goToToday()">
+                            <i class="fas fa-calendar-day"></i> Hoje
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="navigateWeek(1)">
+                            Próxima <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-success active" data-view="week">
+                            <i class="fas fa-calendar-week"></i> Semanal
+                        </button>
+                        <button class="btn btn-outline-success" data-view="month">
+                            <i class="fas fa-calendar-alt"></i> Mensal
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Estatísticas -->
+            <div class="row mt-3">
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ stats.total_obras }}</div>
+                        <div class="stat-label">Obras Ativas</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ stats.total_alocacoes_semana }}</div>
+                        <div class="stat-label">Alocações</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ stats.funcionarios_alocados }}</div>
+                        <div class="stat-label">Funcionários</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ ((stats.funcionarios_alocados / (stats.total_obras * 5)) * 100) | round(1) if stats.total_obras > 0 else 0 }}%</div>
+                        <div class="stat-label">Utilização</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid principal -->
+    <div class="row">
+        <!-- Sidebar: Obras disponíveis -->
+        <div class="col-lg-3">
+            <div class="card obras-sidebar">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-hammer text-primary"></i>
+                        Obras Disponíveis
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Filtros -->
+                    <div class="mb-3">
+                        <input type="text" class="form-control form-control-sm" 
+                               placeholder="🔍 Buscar obras..." 
+                               id="obra-search"
+                               onkeyup="filterObras(this.value)">
+                    </div>
+                    
+                    <!-- Lista de obras -->
+                    <div id="obras-list" class="obras-list">
+                        {% for obra in obras %}
+                        <div class="obra-card" 
+                             data-obra-id="{{ obra.id }}"
+                             data-obra-nome="{{ obra.nome }}"
+                             data-obra-codigo="{{ obra.codigo }}">
+                            <div class="obra-header">
+                                <h6 class="obra-codigo">{{ obra.codigo }}</h6>
+                                <div class="obra-color" style="background: hsl({{ loop.index * 137 % 360 }}, 70%, 50%);"></div>
+                            </div>
+                            <div class="obra-nome">{{ obra.nome[:40] }}{% if obra.nome|length > 40 %}...{% endif %}</div>
+                        </div>
+                        {% endfor %}
+                        
+                        {% if not obras %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-info-circle mb-2"></i><br>
+                            <small>Nenhuma obra ativa</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grade semanal -->
+        <div class="col-lg-9">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-calendar-week text-primary"></i>
+                        Grade Semanal
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Vista semanal -->
+                    <div id="weekly-view" class="week-grid">
+                        {% set weekdays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'] %}
+                        {% for day_index in range(5) %}
+                        <div class="day-column">
+                            <div class="day-header">
+                                <div class="day-name">{{ weekdays[day_index] }}</div>
+                                <div class="day-date">{{ week_grid[day_index]['date_str'] }}</div>
+                            </div>
+                            
+                            <div class="day-content drop-zone" 
+                                 data-day="{{ day_index }}"
+                                 data-date="{{ week_grid[day_index]['date'].strftime('%Y-%m-%d') }}">
+                                
+                                <!-- Alocações existentes -->
+                                {% for allocation in week_grid[day_index]['allocations'] %}
+                                <div class="allocated-obra" 
+                                     data-allocation-id="{{ allocation.id }}"
+                                     onclick="openEmployeeModal({{ allocation.id }})">
+                                    <div class="obra-info">
+                                        <div class="obra-codigo">{{ allocation.obra.codigo }}</div>
+                                        <div class="obra-turno">
+                                            {{ allocation.turno_inicio.strftime('%H:%M') }} - 
+                                            {{ allocation.turno_fim.strftime('%H:%M') }}
+                                        </div>
+                                    </div>
+                                    
+                                    {% if allocation.funcionarios_count > 0 %}
+                                    <div class="employee-badge">{{ allocation.funcionarios_count }}</div>
+                                    {% endif %}
+                                    
+                                    <div class="obra-actions">
+                                        <button class="btn btn-sm btn-outline-light" 
+                                                onclick="event.stopPropagation(); editAllocation({{ allocation.id }})">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="event.stopPropagation(); deleteAllocation({{ allocation.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                
+                                <!-- Drop zone vazia -->
+                                {% if not week_grid[day_index]['allocations'] %}
+                                <div class="empty-drop-zone">
+                                    <i class="fas fa-plus-circle"></i>
+                                    <div>Arraste obras aqui</div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Vista mensal (oculta inicialmente) -->
+                    <div id="monthly-view" class="d-none">
+                        <div id="calendar-container">
+                            <!-- Será gerado via JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botões de ação flutuantes -->
+    <div class="floating-actions">
+        <button class="btn btn-primary btn-floating" 
+                onclick="openWeeklyPlanner()" 
+                title="Weekly Planner">
+            <i class="fas fa-tasks"></i>
+        </button>
+        <button class="btn btn-success btn-floating" 
+                onclick="exportToExcel()" 
+                title="Exportar Excel">
+            <i class="fas fa-file-excel"></i>
+        </button>
+        <button class="btn btn-info btn-floating" 
+                onclick="refreshData()" 
+                title="Atualizar">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Modal: Funcionários -->
+<div class="modal fade" id="employeeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-users"></i>
+                    Funcionários - <span id="modal-obra-nome"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Funcionários disponíveis -->
+                    <div class="col-md-6">
+                        <h6>Disponíveis</h6>
+                        <div id="available-employees" class="employee-list">
+                            <!-- Carregado via JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <!-- Funcionários alocados -->
+                    <div class="col-md-6">
+                        <h6>Alocados</h6>
+                        <div id="allocated-employees" class="employee-list">
+                            <!-- Carregado via JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="saveEmployeeAllocations()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" class="loading-overlay">
+    <div class="loading-content">
+        <div class="spinner-border text-primary"></div>
+        <div class="mt-2">Processando...</div>
+    </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container" class="toast-container"></div>
+{% endblock %}
+
+{% block scripts %}
+<!-- JavaScript específico do módulo -->
+<script src="{{ url_for('static', filename='js/equipe.js') }}"></script>
+
+<script>
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    window.equipeManager = new EquipeManager({
+        currentWeek: '{{ monday.strftime("%Y-%m-%d") }}',
+        apiBase: '/equipe/api'
+    });
+});
+
+// Funções globais para navegação
+function navigateWeek(direction) {
+    const currentDate = new Date('{{ monday.strftime("%Y-%m-%d") }}');
+    currentDate.setDate(currentDate.getDate() + (direction * 7));
+    
+    const newWeek = currentDate.toISOString().split('T')[0];
+    window.location.href = `?week=${newWeek}`;
+}
+
+function goToToday() {
+    window.location.href = window.location.pathname;
+}
+
+function openEmployeeModal(allocationId) {
+    window.equipeManager.openEmployeeModal(allocationId);
+}
+
+function editAllocation(allocationId) {
+    window.equipeManager.editAllocation(allocationId);
+}
+
+function deleteAllocation(allocationId) {
+    window.equipeManager.deleteAllocation(allocationId);
+}
+
+function openWeeklyPlanner() {
+    window.equipeManager.openWeeklyPlanner();
+}
+
+function exportToExcel() {
+    window.equipeManager.exportToExcel();
+}
+
+function refreshData() {
+    window.equipeManager.refreshData();
+}
+
+function filterObras(searchTerm) {
+    window.equipeManager.filterObras(searchTerm);
+}
+</script>
+{% endblock %}
+```
+
+## 🎨 CSS PERSONALIZADO
+
+### 4. Estilos (static/css/equipe.css)
+```css
+/* ================================
+   GESTÃO DE EQUIPE - ESTILOS
+   ================================ */
+
+/* Header e estatísticas */
+.equipe-header {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+    border: none;
+}
+
+.equipe-header .card-body {
+    padding: 1.5rem;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    backdrop-filter: blur(10px);
+}
+
+.stat-number {
+    font-size: 1.8rem;
+    font-weight: bold;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* Sidebar de obras */
+.obras-sidebar {
+    height: fit-content;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.obras-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.obra-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: grab;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.obra-card:hover {
+    border-color: #198754;
+    box-shadow: 0 2px 8px rgba(25, 135, 84, 0.2);
+    transform: translateY(-1px);
+}
+
+.obra-card:active {
+    cursor: grabbing;
+}
+
+.obra-card.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg);
+}
+
+.obra-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.obra-codigo {
+    font-weight: bold;
+    font-size: 0.9rem;
+    margin: 0;
+    color: #495057;
+}
+
+.obra-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.obra-nome {
+    font-size: 0.8rem;
+    color: #6c757d;
+    line-height: 1.2;
+}
+
+/* Grade semanal */
+.week-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.day-column {
+    background: white;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+.day-header {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+    padding: 0.75rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.day-name {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.day-date {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+.day-content {
+    flex: 1;
+    padding: 0.5rem;
+    min-height: 350px;
+    position: relative;
+}
+
+/* Drop zones */
+.drop-zone {
+    border: 2px dashed transparent;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    min-height: 100%;
+}
+
+.drop-zone.drag-over {
+    border-color: #198754;
+    background: rgba(25, 135, 84, 0.1);
+    border-style: solid;
+}
+
+.empty-drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6c757d;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.empty-drop-zone i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+/* Obras alocadas */
+.allocated-obra {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.allocated-obra:hover {
+    background: linear-gradient(135deg, #157347 0%, #0f5132 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
+}
+
+.allocated-obra:hover .obra-actions {
+    opacity: 1;
+}
+
+.obra-info {
+    margin-bottom: 0.5rem;
+}
+
+.obra-codigo {
+    font-weight: bold;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.obra-turno {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+.employee-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ffc107;
+    color: #856404;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.obra-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.obra-actions .btn {
+    padding: 0.25rem 0.5rem;
+    margin-left: 0.25rem;
+}
+
+/* Botões flutuantes */
+.floating-actions {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 1000;
+}
+
+.btn-floating {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: all 0.2s ease;
+}
+
+.btn-floating:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+}
+
+/* Modal de funcionários */
+.employee-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 0.5rem;
+}
+
+.employee-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.employee-item:hover {
+    border-color: #198754;
+    background: #f8f9fa;
+}
+
+.employee-item.selected {
+    background: #d4edda;
+    border-color: #198754;
+}
+
+.employee-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.employee-function {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.loading-overlay.show {
+    display: flex;
+}
+
+.loading-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+}
+
+.custom-toast {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid #198754;
+    animation: slideIn 0.3s ease;
+    max-width: 300px;
+}
+
+.custom-toast.error {
+    border-left-color: #dc3545;
+}
+
+.custom-toast.warning {
+    border-left-color: #ffc107;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .week-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+    }
+    
+    .day-column {
+        min-height: 250px;
+    }
+    
+    .day-content {
+        min-height: 200px;
+        padding: 0.25rem;
+    }
+    
+    .allocated-obra {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .floating-actions {
+        bottom: 1rem;
+        right: 1rem;
+    }
+    
+    .btn-floating {
+        width: 48px;
+        height: 48px;
+    }
+    
+    .stat-card {
+        margin-bottom: 1rem;
+    }
+    
+    .obras-sidebar {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .week-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .equipe-header .row {
+        text-align: center;
+    }
+    
+    .equipe-header .col-md-6:last-child {
+        margin-top: 1rem;
+    }
+}
+
+/* Animações */
+.fade-in {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-up {
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Estados de conflito */
+.conflict-detected {
+    border: 2px solid #dc3545 !important;
+    background: rgba(220, 53, 69, 0.1) !important;
+}
+
+.conflict-obra::before {
+    content: "⚠️";
+    position: absolute;
+    top: 0.25rem;
+    left: 0.25rem;
+    font-size: 0.8rem;
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+/* Filtros e busca */
+#obra-search {
+    border-radius: 20px;
+    padding-left: 2.5rem;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='%236c757d' viewBox='0 0 16 16'%3e%3cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: 0.75rem center;
+    background-size: 1rem;
+}
+
+.obra-card.filtered {
+    display: none;
+}
+
+/* Indicadores de status */
+.sync-indicator {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+}
+
+.sync-indicator.syncing {
+    background: #ffc107;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+```
+
+## 🚀 JAVASCRIPT PRINCIPAL
+
+### 5. Lógica Frontend (static/js/equipe.js)
+```javascript
+/**
+ * GESTÃO DE EQUIPE - JAVASCRIPT PRINCIPAL
+ * Sistema completo de drag & drop e gerenciamento de alocações
+ */
+
+class EquipeManager {
+    constructor(options = {}) {
+        this.options = {
+            currentWeek: options.currentWeek || this.getCurrentWeek(),
+            apiBase: options.apiBase || '/equipe/api',
+            ...options
+        };
+        
+        this.obras = [];
+        this.allocations = [];
+        this.funcionarios = [];
+        this.sortables = [];
+        this.currentAllocationId = null;
+        
+        this.init();
+    }
+    
+    getCurrentWeek() {
+        const today = new Date();
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - today.getDay() + 1);
+        return monday.toISOString().split('T')[0];
+    }
+    
+    async init() {
+        try {
+            this.showLoading(true);
+            
+            await this.loadObras();
+            await this.loadAllocations();
+            this.setupDragDrop();
+            this.setupEventListeners();
+            this.renderObras();
+            this.renderAllocations();
+            
+            this.showToast('Sistema carregado com sucesso', 'success');
+        } catch (error) {
+            console.error('Erro na inicialização:', error);
+            this.showToast('Erro ao carregar sistema', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    // ================================
+    // API CALLS
+    // ================================
+    
+    async apiCall(endpoint, options = {}) {
+        const url = `${this.options.apiBase}${endpoint}`;
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            ...options
+        };
+        
+        const response = await fetch(url, config);
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro na API');
+        }
+        
+        return result;
+    }
+    
+    async loadObras() {
+        const result = await this.apiCall('/obras');
+        this.obras = result.data || [];
+    }
+    
+    async loadAllocations() {
+        const result = await this.apiCall(`/allocations?week_start=${this.options.currentWeek}`);
+        this.allocations = result.data || [];
+    }
+    
+    async loadFuncionarios(allocationId = null) {
+        const endpoint = allocationId ? 
+            `/funcionarios?allocation_id=${allocationId}` : 
+            '/funcionarios';
+        const result = await this.apiCall(endpoint);
+        this.funcionarios = result.data || [];
+    }
+    
+    async createAllocation(obraId, dataAlocacao) {
+        const result = await this.apiCall('/allocations', {
+            method: 'POST',
+            body: JSON.stringify({
+                obra_id: parseInt(obraId),
+                data_alocacao: dataAlocacao
+            })
+        });
+        
+        return result.data;
+    }
+    
+    async deleteAllocation(allocationId) {
+        await this.apiCall(`/allocations/${allocationId}`, {
+            method: 'DELETE'
+        });
+    }
+    
+    async addEmployeeToAllocation(allocationId, funcionarioId) {
+        const result = await this.apiCall('/allocation-employees', {
+            method: 'POST',
+            body: JSON.stringify({
+                allocation_id: allocationId,
+                funcionario_id: funcionarioId
+            })
+        });
+        
+        return result.data;
+    }
+    
+    async removeEmployeeFromAllocation(allocEmployeeId) {
+        await this.apiCall(`/allocation-employees/${allocEmployeeId}`, {
+            method: 'DELETE'
+        });
+    }
+    
+    // ================================
+    // DRAG & DROP
+    // ================================
+    
+    setupDragDrop() {
+        // Limpar sortables existentes
+        this.sortables.forEach(sortable => sortable.destroy());
+        this.sortables = [];
+        
+        // Obras sidebar (source)
+        const obrasList = document.getElementById('obras-list');
+        if (obrasList) {
+            const sortable = Sortable.create(obrasList, {
+                group: {
+                    name: 'obras',
+                    pull: 'clone',
+                    put: false
+                },
+                sort: false,
+                animation: 150,
+                onStart: (evt) => {
+                    evt.item.classList.add('dragging');
+                    document.querySelectorAll('.drop-zone').forEach(zone => {
+                        zone.classList.add('drag-active');
+                    });
+                },
+                onEnd: (evt) => {
+                    evt.item.classList.remove('dragging');
+                    document.querySelectorAll('.drop-zone').forEach(zone => {
+                        zone.classList.remove('drag-active', 'drag-over');
+                    });
+                }
+            });
+            
+            this.sortables.push(sortable);
+        }
+        
+        // Day columns (targets)
+        document.querySelectorAll('.day-content.drop-zone').forEach((dayContent, index) => {
+            const sortable = Sortable.create(dayContent, {
+                group: 'obras',
+                animation: 150,
+                onAdd: async (evt) => {
+                    const obraId = evt.item.dataset.obraId;
+                    const date = dayContent.dataset.date;
+                    
+                    // Remove o item clonado
+                    evt.item.remove();
+                    
+                    try {
+                        await this.handleObraDropped(obraId, date);
+                    } catch (error) {
+                        console.error('Erro ao adicionar obra:', error);
+                        this.showToast(error.message, 'error');
+                    }
+                },
+                onRemove: async (evt) => {
+                    const allocationId = evt.item.dataset.allocationId;
+                    if (allocationId) {
+                        try {
+                            await this.deleteAllocation(allocationId);
+                            this.showToast('Alocação removida', 'success');
+                            await this.refreshAllocations();
+                        } catch (error) {
+                            console.error('Erro ao remover alocação:', error);
+                            this.showToast(error.message, 'error');
+                        }
+                    }
+                },
+                onOver: (evt) => {
+                    evt.to.classList.add('drag-over');
+                },
+                onOut: (evt) => {
+                    evt.from.classList.remove('drag-over');
+                }
+            });
+            
+            this.sortables.push(sortable);
+        });
+    }
+    
+    async handleObraDropped(obraId, date) {
+        this.showLoading(true);
+        
+        try {
+            const allocation = await this.createAllocation(obraId, date);
+            await this.refreshAllocations();
+            this.showToast('Obra alocada com sucesso', 'success');
+            
+            // Abrir modal de funcionários automaticamente
+            setTimeout(() => {
+                this.openEmployeeModal(allocation.id);
+            }, 500);
+            
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    // ================================
+    // RENDERIZAÇÃO
+    // ================================
+    
+    renderObras() {
+        const container = document.getElementById('obras-list');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        this.obras.forEach((obra, index) => {
+            const div = document.createElement('div');
+            div.className = 'obra-card';
+            div.dataset.obraId = obra.id;
+            div.dataset.obraNome = obra.nome;
+            div.dataset.obraCodigo = obra.codigo;
+            
+            const hue = (index * 137) % 360;
+            
+            div.innerHTML = `
+                <div class="obra-header">
+                    <h6 class="obra-codigo">${obra.codigo}</h6>
+                    <div class="obra-color" style="background: hsl(${hue}, 70%, 50%);"></div>
+                </div>
+                <div class="obra-nome">${this.truncateText(obra.nome, 40)}</div>
+            `;
+            
+            container.appendChild(div);
+        });
+        
+        if (this.obras.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-info-circle mb-2"></i><br>
+                    <small>Nenhuma obra ativa</small>
+                </div>
+            `;
+        }
+    }
+    
+    renderAllocations() {
+        // Limpar alocações existentes
+        document.querySelectorAll('.allocated-obra').forEach(el => el.remove());
+        document.querySelectorAll('.empty-drop-zone').forEach(el => el.style.display = 'flex');
+        
+        this.allocations.forEach(allocation => {
+            const dayContent = document.querySelector(`[data-day="${allocation.day_of_week}"]`);
+            if (dayContent) {
+                // Ocultar empty state
+                const emptyZone = dayContent.querySelector('.empty-drop-zone');
+                if (emptyZone) emptyZone.style.display = 'none';
+                
+                // Criar elemento da obra alocada
+                const div = document.createElement('div');
+                div.className = 'allocated-obra fade-in';
+                div.dataset.allocationId = allocation.id;
+                div.onclick = () => this.openEmployeeModal(allocation.id);
+                
+                div.innerHTML = `
+                    <div class="obra-info">
+                        <div class="obra-codigo">${allocation.obra_codigo}</div>
+                        <div class="obra-turno">${allocation.turno_inicio} - ${allocation.turno_fim}</div>
+                    </div>
+                    
+                    ${allocation.funcionarios_count > 0 ? 
+                        `<div class="employee-badge">${allocation.funcionarios_count}</div>` : ''}
+                    
+                    <div class="obra-actions">
+                        <button class="btn btn-sm btn-outline-light" 
+                                onclick="event.stopPropagation(); window.equipeManager.editAllocation(${allocation.id})"
+                                title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" 
+                                onclick="event.stopPropagation(); window.equipeManager.confirmDeleteAllocation(${allocation.id})"
+                                title="Remover">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                dayContent.appendChild(div);
+            }
+        });
+    }
+    
+    // ================================
+    // MODAL DE FUNCIONÁRIOS
+    // ================================
+    
+    async openEmployeeModal(allocationId) {
+        this.currentAllocationId = allocationId;
+        
+        try {
+            this.showLoading(true);
+            
+            // Buscar dados
+            const allocation = this.allocations.find(a => a.id === allocationId);
+            if (!allocation) throw new Error('Alocação não encontrada');
+            
+            await this.loadFuncionarios(allocationId);
+            
+            // Atualizar modal
+            document.getElementById('modal-obra-nome').textContent = 
+                `${allocation.obra_codigo} - ${allocation.obra_nome}`;
+            
+            this.renderEmployeeModal();
+            
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+            modal.show();
+            
+        } catch (error) {
+            console.error('Erro ao abrir modal:', error);
+            this.showToast(error.message, 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    renderEmployeeModal() {
+        const availableContainer = document.getElementById('available-employees');
+        const allocatedContainer = document.getElementById('allocated-employees');
+        
+        if (!availableContainer || !allocatedContainer) return;
+        
+        // Funcionários disponíveis
+        availableContainer.innerHTML = '';
+        const available = this.funcionarios.filter(f => !f.is_allocated);
+        
+        available.forEach(funcionario => {
+            const div = document.createElement('div');
+            div.className = 'employee-item';
+            div.dataset.funcionarioId = funcionario.id;
+            div.onclick = () => this.toggleEmployeeSelection(div);
+            
+            div.innerHTML = `
+                <div class="employee-name">${funcionario.nome}</div>
+                <div class="employee-function">${funcionario.funcao || 'Sem função definida'}</div>
+            `;
+            
+            availableContainer.appendChild(div);
+        });
+        
+        // Funcionários alocados
+        allocatedContainer.innerHTML = '';
+        const allocated = this.funcionarios.filter(f => f.is_allocated);
+        
+        allocated.forEach(funcionario => {
+            const div = document.createElement('div');
+            div.className = 'employee-item selected';
+            div.dataset.funcionarioId = funcionario.id;
+            div.onclick = () => this.toggleEmployeeSelection(div);
+            
+            div.innerHTML = `
+                <div class="employee-name">${funcionario.nome}</div>
+                <div class="employee-function">${funcionario.funcao || 'Sem função definida'}</div>
+                <button class="btn btn-sm btn-outline-danger float-end" 
+                        onclick="event.stopPropagation(); this.parentElement.click()">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            allocatedContainer.appendChild(div);
+        });
+        
+        // Empty states
+        if (available.length === 0) {
+            availableContainer.innerHTML = '<div class="text-muted text-center p-3">Nenhum funcionário disponível</div>';
+        }
+        
+        if (allocated.length === 0) {
+            allocatedContainer.innerHTML = '<div class="text-muted text-center p-3">Nenhum funcionário alocado</div>';
+        }
+    }
+    
+    toggleEmployeeSelection(element) {
+        element.classList.toggle('selected');
+    }
+    
+    async saveEmployeeAllocations() {
+        if (!this.currentAllocationId) return;
+        
+        try {
+            this.showLoading(true);
+            
+            const selectedElements = document.querySelectorAll('#available-employees .employee-item.selected');
+            const deselectedElements = document.querySelectorAll('#allocated-employees .employee-item:not(.selected)');
+            
+            // Adicionar funcionários selecionados
+            for (const element of selectedElements) {
+                const funcionarioId = element.dataset.funcionarioId;
+                await this.addEmployeeToAllocation(this.currentAllocationId, funcionarioId);
+            }
+            
+            // Remover funcionários desmarcados
+            for (const element of deselectedElements) {
+                const funcionarioId = element.dataset.funcionarioId;
+                // Buscar allocation_employee_id para remover
+                // TODO: Implementar busca do ID correto
+            }
+            
+            // Fechar modal e atualizar
+            bootstrap.Modal.getInstance(document.getElementById('employeeModal')).hide();
+            await this.refreshAllocations();
+            this.showToast('Funcionários atualizados com sucesso', 'success');
+            
+        } catch (error) {
+            console.error('Erro ao salvar funcionários:', error);
+            this.showToast(error.message, 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    // ================================
+    // UTILITÁRIOS
+    // ================================
+    
+    setupEventListeners() {
+        // Filtro de obras
+        const searchInput = document.getElementById('obra-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.filterObras(e.target.value);
+            });
+        }
+        
+        // Botões de vista
+        document.querySelectorAll('[data-view]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const view = e.target.dataset.view;
+                this.switchView(view);
+            });
+        });
+    }
+    
+    filterObras(searchTerm) {
+        const term = searchTerm.toLowerCase();
+        
+        document.querySelectorAll('.obra-card').forEach(card => {
+            const codigo = card.dataset.obraCodigo.toLowerCase();
+            const nome = card.dataset.obraNome.toLowerCase();
+            
+            if (codigo.includes(term) || nome.includes(term)) {
+                card.classList.remove('filtered');
+            } else {
+                card.classList.add('filtered');
+            }
+        });
+    }
+    
+    switchView(view) {
+        const weeklyView = document.getElementById('weekly-view');
+        const monthlyView = document.getElementById('monthly-view');
+        const buttons = document.querySelectorAll('[data-view]');
+        
+        buttons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === view);
+            btn.classList.toggle('btn-success', btn.dataset.view === view);
+            btn.classList.toggle('btn-outline-success', btn.dataset.view !== view);
+        });
+        
+        if (view === 'week') {
+            weeklyView.classList.remove('d-none');
+            monthlyView.classList.add('d-none');
+        } else {
+            weeklyView.classList.add('d-none');
+            monthlyView.classList.remove('d-none');
+            this.renderMonthlyView();
+        }
+    }
+    
+    renderMonthlyView() {
+        // TODO: Implementar vista mensal
+        const container = document.getElementById('calendar-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="text-center p-5">
+                    <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
+                    <h5>Vista Mensal</h5>
+                    <p class="text-muted">Em desenvolvimento...</p>
+                </div>
+            `;
+        }
+    }
+    
+    async refreshData() {
+        try {
+            this.showLoading(true);
+            await this.loadObras();
+            await this.loadAllocations();
+            this.renderObras();
+            this.renderAllocations();
+            this.showToast('Dados atualizados', 'success');
+        } catch (error) {
+            console.error('Erro ao atualizar:', error);
+            this.showToast('Erro ao atualizar dados', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    async refreshAllocations() {
+        await this.loadAllocations();
+        this.renderAllocations();
+    }
+    
+    confirmDeleteAllocation(allocationId) {
+        if (confirm('Tem certeza que deseja remover esta alocação?')) {
+            this.deleteAllocationConfirmed(allocationId);
+        }
+    }
+    
+    async deleteAllocationConfirmed(allocationId) {
+        try {
+            this.showLoading(true);
+            await this.deleteAllocation(allocationId);
+            await this.refreshAllocations();
+            this.showToast('Alocação removida com sucesso', 'success');
+        } catch (error) {
+            console.error('Erro ao remover alocação:', error);
+            this.showToast(error.message, 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    editAllocation(allocationId) {
+        // TODO: Implementar edição de alocação
+        this.showToast('Funcionalidade em desenvolvimento', 'info');
+    }
+    
+    openWeeklyPlanner() {
+        // TODO: Implementar weekly planner
+        this.showToast('Weekly Planner em desenvolvimento', 'info');
+    }
+    
+    exportToExcel() {
+        // TODO: Implementar exportação
+        this.showToast('Exportação em desenvolvimento', 'info');
+    }
+    
+    truncateText(text, maxLength) {
+        return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    }
+    
+    showLoading(show) {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.classList.toggle('show', show);
+        }
+    }
+    
+    showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        
+        const toast = document.createElement('div');
+        toast.className = `custom-toast ${type}`;
+        toast.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <span>${message}</span>
+                <button class="btn-close btn-close-sm ms-2" onclick="this.parentElement.parentElement.remove()"></button>
+            </div>
+        `;
+        
+        container.appendChild(toast);
+        
+        // Auto remove após 5 segundos
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.remove();
+            }
+        }, 5000);
+    }
+}
+
+// Exportar para uso global
+window.EquipeManager = EquipeManager;
+```
+
+## 🗄️ MIGRAÇÃO DO BANCO DE DADOS
+
+### 6. Script de Migração
+```python
+"""
+Migração para módulo de gestão de equipe
+"""
+
+from flask_migrate import Migrate
+from app import app, db
+
+# Executar migração
+# flask db init (se primeira vez)
+# flask db migrate -m "Adicionar tabelas de gestão de equipe"
+# flask db upgrade
+
+# Ou executar SQL diretamente:
+
+CREATE_TABLES_SQL = """
+-- Tabela de alocações
+CREATE TABLE IF NOT EXISTS allocation (
+    id SERIAL PRIMARY KEY,
+    admin_id INTEGER NOT NULL,
+    obra_id INTEGER NOT NULL,
+    data_alocacao DATE NOT NULL,
+    turno_inicio TIME DEFAULT '08:00:00',
+    turno_fim TIME DEFAULT '17:00:00',
+    nota TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (admin_id) REFERENCES usuario(id),
+    FOREIGN KEY (obra_id) REFERENCES obra(id),
+    UNIQUE(obra_id, data_alocacao)
+);
+
+-- Tabela de funcionários alocados
+CREATE TABLE IF NOT EXISTS allocation_employee (
+    id SERIAL PRIMARY KEY,
+    allocation_id INTEGER NOT NULL,
+    funcionario_id INTEGER NOT NULL,
+    turno_inicio TIME DEFAULT '08:00:00',
+    turno_fim TIME DEFAULT '17:00:00',
+    funcao VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (allocation_id) REFERENCES allocation(id) ON DELETE CASCADE,
+    FOREIGN KEY (funcionario_id) REFERENCES funcionario(id),
+    UNIQUE(allocation_id, funcionario_id)
+);
+
+-- Tabela de planejamento semanal
+CREATE TABLE IF NOT EXISTS weekly_plan (
+    id SERIAL PRIMARY KEY,
+    admin_id INTEGER NOT NULL,
+    obra_id INTEGER NOT NULL,
+    week_start DATE NOT NULL,
+    status VARCHAR(20) DEFAULT 'draft',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (admin_id) REFERENCES usuario(id),
+    FOREIGN KEY (obra_id) REFERENCES obra(id),
+    UNIQUE(obra_id, week_start)
+);
+
+-- Tabela de itens do planejamento
+CREATE TABLE IF NOT EXISTS weekly_plan_item (
+    id SERIAL PRIMARY KEY,
+    weekly_plan_id INTEGER NOT NULL,
+    servico_id INTEGER NOT NULL,
+    day_of_week INTEGER NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
+    responsavel_id INTEGER,
+    turno_inicio TIME DEFAULT '08:00:00',
+    turno_fim TIME DEFAULT '17:00:00',
+    nota_curta VARCHAR(200),
+    ordem INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (weekly_plan_id) REFERENCES weekly_plan(id) ON DELETE CASCADE,
+    FOREIGN KEY (servico_id) REFERENCES servico(id),
+    FOREIGN KEY (responsavel_id) REFERENCES funcionario(id)
+);
+
+-- Índices para performance
+CREATE INDEX IF NOT EXISTS idx_allocation_admin_date ON allocation(admin_id, data_alocacao);
+CREATE INDEX IF NOT EXISTS idx_allocation_obra_date ON allocation(obra_id, data_alocacao);
+CREATE INDEX IF NOT EXISTS idx_alloc_emp_allocation ON allocation_employee(allocation_id);
+CREATE INDEX IF NOT EXISTS idx_alloc_emp_funcionario ON allocation_employee(funcionario_id);
+CREATE INDEX IF NOT EXISTS idx_weekly_plan_admin_week ON weekly_plan(admin_id, week_start);
+CREATE INDEX IF NOT EXISTS idx_weekly_plan_obra_week ON weekly_plan(obra_id, week_start);
+CREATE INDEX IF NOT EXISTS idx_weekly_item_plan_day ON weekly_plan_item(weekly_plan_id, day_of_week);
+CREATE INDEX IF NOT EXISTS idx_weekly_item_servico ON weekly_plan_item(servico_id);
+"""
+
+def run_migration():
+    """Executa a migração das tabelas"""
+    try:
+        db.engine.execute(CREATE_TABLES_SQL)
+        print("✅ Migração executada com sucesso!")
+    except Exception as e:
+        print(f"❌ Erro na migração: {e}")
+
+if __name__ == '__main__':
+    with app.app_context():
+        run_migration()
+```
+
+## 🔧 INTEGRAÇÃO COM SISTEMA EXISTENTE
+
+### 7. Registro do Blueprint (app.py)
+```python
+# Adicionar no app.py principal:
+
+from equipe_views import equipe_bp
+
+# Registrar blueprint
+app.register_blueprint(equipe_bp)
+
+# Adicionar no menu principal (base_completo.html):
+"""
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('equipe.alocacao_semanal') }}">
+        <i class="fas fa-users"></i>
+        Equipe
+    </a>
+</li>
+"""
+```
+
+## 📋 CHECKLIST DE IMPLEMENTAÇÃO
+
+### Fase 1: Base
+- [ ] Criar modelos no `models.py`
+- [ ] Executar migração do banco
+- [ ] Criar `equipe_views.py` com APIs básicas
+- [ ] Registrar blueprint no `app.py`
+- [ ] Testar APIs com Postman/curl
+
+### Fase 2: Interface
+- [ ] Criar template `alocacao_semanal.html`
+- [ ] Adicionar CSS em `static/css/equipe.css`
+- [ ] Implementar JavaScript em `static/js/equipe.js`
+- [ ] Testar drag & drop básico
+- [ ] Integrar com menu principal
+
+### Fase 3: Funcionalidades
+- [ ] Modal de funcionários
+- [ ] Vista mensal
+- [ ] Weekly planner
+- [ ] Exportação Excel
+- [ ] Validações e tratamento de erros
+
+### Fase 4: Otimizações
+- [ ] Performance e índices
+- [ ] Responsividade mobile
+- [ ] Testes automatizados
+- [ ] Documentação
+
+## 🎯 RESULTADO ESPERADO
+
+Ao final da implementação, você terá:
+
+1. **Sistema completo** de gestão de equipe integrado ao SIGE
+2. **Interface drag & drop** intuitiva e responsiva
+3. **APIs REST** robustas e documentadas
+4. **Banco de dados** otimizado com índices
+5. **Código modular** e manutenível
+6. **Funcionalidades avançadas** como weekly planner e exportação
+
+O módulo substituirá completamente as planilhas Excel atuais, oferecendo uma experiência moderna e eficiente para gestão de equipes em canteiros de obra.
+
