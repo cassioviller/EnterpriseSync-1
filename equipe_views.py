@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from auth import admin_required
 from datetime import datetime, date, timedelta, time
 from app import db
-from models import Allocation, AllocationEmployee, Funcionario, Obra, Servico, Usuario, TipoUsuario
+from models import Allocation, AllocationEmployee, Funcionario, Obra, Servico, Usuario, TipoUsuario, WeeklyPlan
 import logging
 
 equipe_bp = Blueprint('equipe', __name__, url_prefix='/equipe')
@@ -33,6 +33,13 @@ def get_monday_of_week(target_date):
 @login_required
 @admin_required
 def alocacao_semanal():
+    """Redirecionar para teste FASE 1"""
+    return redirect(url_for('equipe.alocacao_teste_fase1'))
+
+@equipe_bp.route('/teste-fase1')
+@login_required
+@admin_required
+def alocacao_teste_fase1():
     """Tela principal - Grid semanal"""
     try:
         admin_id = get_admin_id()
@@ -79,13 +86,9 @@ def alocacao_semanal():
         
         logging.info(f"EQUIPE: Carregada semana {monday} - {len(allocations)} alocações")
         
-        return render_template('equipe/alocacao_semanal.html',
-                             obras=obras,
-                             week_grid=week_grid,
-                             monday=monday,
-                             friday=friday,
-                             week_dates=week_dates,
-                             stats=stats)
+        # FASE 1: Renderizar template simplificado
+        return render_template('equipe/alocacao_simples.html',
+                             debug={'admin_id': admin_id, 'total_obras': len(obras)})
         
     except Exception as e:
         logging.error(f"EQUIPE ERROR: {str(e)}")
@@ -190,3 +193,129 @@ def api_delete_allocation(allocation_id):
         db.session.rollback()
         logging.error(f"API DELETE ERROR: {str(e)}")
         return jsonify({'error': 'Erro interno'}), 500
+
+# ===================================  
+# FASE 1: APIs ULTRA SIMPLES - TESTE
+# SEGUINDO PLANO REALISTA EXATAMENTE
+# ===================================
+
+def get_current_admin_id():
+    """Descubra como funciona no NOSSO sistema - FASE 1"""
+    # TESTE PRIMEIRO - adapte conforme necessário
+    if hasattr(current_user, 'admin_id') and current_user.admin_id:
+        return current_user.admin_id
+    return current_user.id  # Fallback
+
+@equipe_bp.route('/api/test', methods=['GET'])
+@login_required
+def test_api():
+    """API de teste para validar integração - FASE 1"""
+    try:
+        return jsonify({
+            'status': 'ok',
+            'user_id': current_user.id,
+            'admin_id': get_current_admin_id(),
+            'user_type': str(type(current_user)),
+            'user_tipo_usuario': str(current_user.tipo_usuario) if hasattr(current_user, 'tipo_usuario') else 'N/A',
+            'timestamp': datetime.now().isoformat(),
+            'message': 'FASE 1: API funcionando!'
+        })
+    except Exception as e:
+        print(f"ERRO API TEST: {e}")  # Debug simples
+        return jsonify({'status': 'error', 'error': str(e)})
+
+@equipe_bp.route('/api/obras-simples', methods=['GET'])
+@login_required
+def get_obras_simples():
+    """Lista obras - VERSÃO SIMPLES FASE 1"""
+    try:
+        # Use a query que você já conhece
+        admin_id = get_current_admin_id()
+        print(f"=== DEBUG OBRAS: admin_id={admin_id} ===")
+        
+        # ADAPTE conforme seu modelo Obra atual
+        obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.codigo).all()
+        print(f"=== DEBUG: Encontradas {len(obras)} obras ===")
+        
+        result = []
+        for obra in obras:
+            result.append({
+                'id': obra.id,
+                'codigo': obra.codigo,
+                'nome': obra.nome[:50] + ('...' if len(obra.nome) > 50 else '')  # Truncar nome longo
+            })
+        
+        return jsonify({
+            'success': True, 
+            'data': result, 
+            'count': len(result),
+            'admin_id': admin_id,
+            'message': 'FASE 1: Obras carregadas!'
+        })
+        
+    except Exception as e:
+        print(f"ERRO API OBRAS: {e}")  # Debug simples
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+@equipe_bp.route('/api/allocations-simples', methods=['GET'])
+@login_required
+def get_allocations_simples():
+    """Lista alocações - VERSÃO SIMPLES FASE 1"""
+    try:
+        admin_id = get_current_admin_id()
+        week_start = request.args.get('week_start')
+        
+        print(f"=== DEBUG ALLOCATIONS: admin_id={admin_id}, week_start={week_start} ===")
+        
+        # Parse da data ou usa semana atual
+        if week_start:
+            start_date = datetime.strptime(week_start, '%Y-%m-%d').date()
+        else:
+            today = date.today()
+            start_date = get_monday_of_week(today)
+        
+        end_date = start_date + timedelta(days=4)  # Sexta-feira
+        
+        # Query simples
+        allocations = Allocation.query.filter(
+            Allocation.admin_id == admin_id,
+            Allocation.data_alocacao >= start_date,
+            Allocation.data_alocacao <= end_date
+        ).all()
+        
+        print(f"=== DEBUG: Encontradas {len(allocations)} alocações ===")
+        
+        result = []
+        for alloc in allocations:
+            # Buscar obra (sem relacionamento por enquanto)
+            obra = Obra.query.get(alloc.obra_id)
+            obra_nome = obra.nome if obra else f"Obra ID {alloc.obra_id}"
+            obra_codigo = obra.codigo if obra else f"#{alloc.obra_id}"
+            
+            result.append({
+                'id': alloc.id,
+                'obra_id': alloc.obra_id,
+                'obra_codigo': obra_codigo,
+                'obra_nome': obra_nome,
+                'data_alocacao': alloc.data_alocacao.isoformat(),
+                'day_of_week': alloc.data_alocacao.weekday(),  # 0=Segunda
+                'turno_inicio': alloc.turno_inicio.strftime('%H:%M') if alloc.turno_inicio else '08:00',
+                'turno_fim': alloc.turno_fim.strftime('%H:%M') if alloc.turno_fim else '17:00'
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': result,
+            'count': len(result),
+            'week_start': start_date.isoformat(),
+            'week_end': end_date.isoformat(),
+            'message': 'FASE 1: Alocações carregadas!'
+        })
+        
+    except Exception as e:
+        print(f"ERRO API ALLOCATIONS: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})

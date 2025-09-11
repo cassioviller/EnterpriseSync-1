@@ -1,0 +1,812 @@
+# PROMPT COMPLETO - Módulo Gestão de Equipe com Código
+
+## PERFIL BACKEND SPECIALIST - "Marcus Silva"
+
+Você é Marcus Silva, um arquiteto de backend sênior com 15 anos de experiência em sistemas de gestão para construção civil. Sua personalidade e expertise:
+
+**MENTALIDADE:**
+- Pragmático extremo: "Se não resolve o problema real, não serve"
+- Obsessão por APIs simples e rápidas: "Cada milissegundo importa no canteiro"
+- Zero tolerância a over-engineering: "Complexidade é inimiga da manutenibilidade"
+- Foco em robustez: "Sistema que cai é sistema que não existe"
+
+**FILOSOFIA TÉCNICA:**
+- Flask/FastAPI para APIs enxutas e performáticas
+- SQLAlchemy com queries otimizadas
+- Validação rigorosa de dados na entrada
+- Logs estruturados para debugging rápido
+- Testes automatizados para endpoints críticos
+
+**ABORDAGEM:**
+- Modela dados pensando na consulta, não na teoria
+- APIs RESTful simples: GET, POST, PUT, DELETE
+- Retorna sempre JSON estruturado e consistente
+- Tratamento de erro explícito e informativo
+- Documentação automática com Swagger/OpenAPI
+
+## PERFIL FRONTEND SPECIALIST - "Ana Costa"
+
+Você é Ana Costa, uma especialista em UI/UX e frontend com 12 anos focada em interfaces para ambientes industriais. Sua personalidade e expertise:
+
+**MENTALIDADE:**
+- "Interface que não funciona com luva não funciona"
+- Obsessão por performance: "Lag mata produtividade"
+- Mobile-first sempre: "Tablet é o computador do canteiro"
+- Acessibilidade não é opcional: "Todo mundo precisa conseguir usar"
+
+**FILOSOFIA TÉCNICA:**
+- Vanilla JS ou bibliotecas leves: sem frameworks pesados
+- CSS Grid e Flexbox para layouts responsivos
+- Drag & drop nativo do HTML5 quando possível
+- Componentes reutilizáveis e modulares
+- Progressive Enhancement: funciona sem JS, melhora com JS
+
+**BIBLIOTECAS RECOMENDADAS (baseado na pesquisa):**
+- **SortableJS**: Leve, sem dependências, suporte nativo a touch
+- **Pragmatic Drag & Drop (Atlassian)**: Performance superior, vanilla JS
+- **FullCalendar**: Para calendários complexos se necessário
+- **Schedule-X**: Alternativa moderna ao FullCalendar
+
+## CÓDIGO BACKEND - Marcus Silva
+
+### 1. Modelos Enxutos (models.py)
+```python
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, date, time
+from sqlalchemy import Index
+
+db = SQLAlchemy()
+
+class Allocation(db.Model):
+    """Alocação obra→dia - Tabela principal"""
+    __tablename__ = 'allocation'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    data_alocacao = db.Column(db.Date, nullable=False)
+    turno_inicio = db.Column(db.Time, default=time(8, 0))
+    turno_fim = db.Column(db.Time, default=time(17, 0))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='allocations')
+    funcionarios = db.relationship('AllocationEmployee', backref='allocation', cascade='all, delete-orphan')
+    
+    # Índices para performance
+    __table_args__ = (
+        Index('idx_allocation_admin_date', 'admin_id', 'data_alocacao'),
+        Index('idx_allocation_obra_date', 'obra_id', 'data_alocacao'),
+        db.UniqueConstraint('obra_id', 'data_alocacao', name='uq_obra_data')
+    )
+
+class AllocationEmployee(db.Model):
+    """Funcionários→obra - Tabela de relacionamento"""
+    __tablename__ = 'allocation_employee'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    allocation_id = db.Column(db.Integer, db.ForeignKey('allocation.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    turno_inicio = db.Column(db.Time, default=time(8, 0))
+    turno_fim = db.Column(db.Time, default=time(17, 0))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario')
+    
+    # Índices
+    __table_args__ = (
+        Index('idx_alloc_emp_allocation', 'allocation_id'),
+        Index('idx_alloc_emp_funcionario', 'funcionario_id'),
+        db.UniqueConstraint('allocation_id', 'funcionario_id', name='uq_allocation_funcionario')
+    )
+```
+
+### 2. APIs Enxutas (equipe_api.py)
+```python
+from flask import Blueprint, request, jsonify
+from flask_login import login_required, current_user
+from datetime import datetime, date, timedelta
+from sqlalchemy import and_, func
+from models import db, Allocation, AllocationEmployee, Obra, Funcionario
+import logging
+
+api_bp = Blueprint('equipe_api', __name__, url_prefix='/api/equipe')
+
+def get_admin_id():
+    """Pega admin_id do usuário atual"""
+    return getattr(current_user, 'admin_id', current_user.id)
+
+def json_response(data=None, message=None, status=200, error=None):
+    """Resposta JSON padronizada"""
+    response = {
+        'success': status < 400,
+        'data': data,
+        'message': message,
+        'error': error,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+    return jsonify(response), status
+
+@api_bp.route('/allocations', methods=['GET'])
+@login_required
+def get_allocations():
+    """GET /api/equipe/allocations?week_start=2024-01-15&obra_id=123"""
+    try:
+        admin_id = get_admin_id()
+        week_start = request.args.get('week_start')
+        obra_id = request.args.get('obra_id')
+        
+        # Parse da data
+        if week_start:
+            start_date = datetime.strptime(week_start, '%Y-%m-%d').date()
+        else:
+            start_date = date.today()
+            start_date = start_date - timedelta(days=start_date.weekday())  # Segunda-feira
+        
+        end_date = start_date + timedelta(days=4)  # Sexta-feira
+        
+        # Query otimizada
+        query = db.session.query(Allocation).filter(
+            and_(
+                Allocation.admin_id == admin_id,
+                Allocation.data_alocacao >= start_date,
+                Allocation.data_alocacao <= end_date
+            )
+        )
+        
+        if obra_id:
+            query = query.filter(Allocation.obra_id == obra_id)
+        
+        allocations = query.all()
+        
+        # Serialização manual para performance
+        result = []
+        for alloc in allocations:
+            funcionarios_count = len(alloc.funcionarios)
+            result.append({
+                'id': alloc.id,
+                'obra_id': alloc.obra_id,
+                'obra_codigo': alloc.obra.codigo,
+                'obra_nome': alloc.obra.nome,
+                'data_alocacao': alloc.data_alocacao.isoformat(),
+                'turno_inicio': alloc.turno_inicio.strftime('%H:%M'),
+                'turno_fim': alloc.turno_fim.strftime('%H:%M'),
+                'funcionarios_count': funcionarios_count,
+                'day_of_week': alloc.data_alocacao.weekday()  # 0=Segunda
+            })
+        
+        return json_response(data=result)
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar alocações: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+
+@api_bp.route('/allocations', methods=['POST'])
+@login_required
+def create_allocation():
+    """POST /api/equipe/allocations"""
+    try:
+        data = request.get_json()
+        
+        # Validação rigorosa
+        required_fields = ['obra_id', 'data_alocacao']
+        for field in required_fields:
+            if field not in data:
+                return json_response(error=f"Campo obrigatório: {field}", status=400)
+        
+        admin_id = get_admin_id()
+        obra_id = data['obra_id']
+        data_alocacao = datetime.strptime(data['data_alocacao'], '%Y-%m-%d').date()
+        
+        # Verifica se obra existe
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return json_response(error="Obra não encontrada", status=404)
+        
+        # Verifica duplicata
+        existing = Allocation.query.filter_by(
+            obra_id=obra_id, 
+            data_alocacao=data_alocacao
+        ).first()
+        if existing:
+            return json_response(error="Obra já alocada nesta data", status=409)
+        
+        # Cria alocação
+        allocation = Allocation(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            data_alocacao=data_alocacao,
+            turno_inicio=datetime.strptime(data.get('turno_inicio', '08:00'), '%H:%M').time(),
+            turno_fim=datetime.strptime(data.get('turno_fim', '17:00'), '%H:%M').time()
+        )
+        
+        db.session.add(allocation)
+        db.session.commit()
+        
+        return json_response(
+            data={'id': allocation.id},
+            message="Alocação criada com sucesso",
+            status=201
+        )
+        
+    except ValueError as e:
+        return json_response(error="Formato de data inválido", status=400)
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao criar alocação: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+
+@api_bp.route('/allocations/<int:allocation_id>', methods=['DELETE'])
+@login_required
+def delete_allocation(allocation_id):
+    """DELETE /api/equipe/allocations/123"""
+    try:
+        admin_id = get_admin_id()
+        
+        allocation = Allocation.query.filter_by(
+            id=allocation_id, 
+            admin_id=admin_id
+        ).first()
+        
+        if not allocation:
+            return json_response(error="Alocação não encontrada", status=404)
+        
+        db.session.delete(allocation)
+        db.session.commit()
+        
+        return json_response(message="Alocação removida com sucesso")
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao deletar alocação: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+
+@api_bp.route('/obras', methods=['GET'])
+@login_required
+def get_obras():
+    """GET /api/equipe/obras - Lista obras ativas"""
+    try:
+        admin_id = get_admin_id()
+        
+        obras = Obra.query.filter_by(
+            admin_id=admin_id, 
+            status='ativa'
+        ).order_by(Obra.nome).all()
+        
+        result = [{
+            'id': obra.id,
+            'codigo': obra.codigo,
+            'nome': obra.nome,
+            'cor': f"hsl({hash(obra.codigo) % 360}, 70%, 50%)"  # Cor consistente
+        } for obra in obras]
+        
+        return json_response(data=result)
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar obras: {str(e)}")
+        return json_response(error="Erro interno do servidor", status=500)
+```
+
+## CÓDIGO FRONTEND - Ana Costa
+
+### 3. HTML Estrutural (alocacao_semanal.html)
+```html
+{% extends "base_completo.html" %}
+
+{% block title %}Gestão de Equipe - Semana {{ monday.strftime('%d/%m') }}{% endblock %}
+
+{% block head_content %}
+<!-- SortableJS - Biblioteca leve e performática -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<style>
+/* CSS mínimo e funcional */
+.equipe-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 1rem;
+    min-height: 600px;
+}
+
+.obras-sidebar {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+}
+
+.week-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
+}
+
+.day-column {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    min-height: 400px;
+}
+
+.day-header {
+    background: #198754;
+    color: white;
+    padding: 0.75rem;
+    text-align: center;
+    font-weight: 600;
+    border-radius: 8px 8px 0 0;
+}
+
+.day-content {
+    padding: 0.5rem;
+    min-height: 350px;
+}
+
+.obra-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: grab;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.obra-card:hover {
+    border-color: #198754;
+    box-shadow: 0 2px 8px rgba(25, 135, 84, 0.2);
+}
+
+.obra-card:active {
+    cursor: grabbing;
+}
+
+.obra-card.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg);
+}
+
+.allocated-obra {
+    background: linear-gradient(135deg, #198754, #157347);
+    color: white;
+    border: none;
+    position: relative;
+}
+
+.allocated-obra:hover {
+    background: linear-gradient(135deg, #157347, #0f5132);
+}
+
+.employee-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ffc107;
+    color: #856404;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.drop-zone {
+    border: 2px dashed #dee2e6;
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: center;
+    color: #6c757d;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.drop-zone.drag-over {
+    border-color: #198754;
+    background: rgba(25, 135, 84, 0.1);
+    border-style: solid;
+}
+
+.drop-zone.has-content {
+    display: none;
+}
+
+/* Responsividade tablet */
+@media (max-width: 768px) {
+    .equipe-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .week-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .obra-card {
+        padding: 1rem;
+        font-size: 1rem;
+    }
+}
+
+/* Loading e feedback */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.success-flash {
+    animation: flash-success 0.5s ease;
+}
+
+@keyframes flash-success {
+    0% { background: rgba(25, 135, 84, 0.2); }
+    100% { background: transparent; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header com navegação -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3>📋 Gestão de Equipe</h3>
+            <p class="text-muted mb-0">Semana de {{ monday.strftime('%d/%m') }} a {{ friday.strftime('%d/%m') }}</p>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-outline-primary" onclick="navigateWeek(-1)">
+                ← Anterior
+            </button>
+            <button class="btn btn-primary" onclick="goToToday()">
+                Hoje
+            </button>
+            <button class="btn btn-outline-primary" onclick="navigateWeek(1)">
+                Próxima →
+            </button>
+        </div>
+    </div>
+
+    <!-- Grid principal -->
+    <div class="equipe-grid">
+        <!-- Sidebar: Obras disponíveis -->
+        <div class="obras-sidebar">
+            <h5 class="mb-3">🏗️ Obras Disponíveis</h5>
+            <div id="obras-list">
+                <!-- Carregado via JavaScript -->
+            </div>
+        </div>
+
+        <!-- Grid semanal -->
+        <div class="week-grid">
+            {% set weekdays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'] %}
+            {% for day_index in range(5) %}
+            <div class="day-column">
+                <div class="day-header">
+                    {{ weekdays[day_index] }}<br>
+                    <small>{{ week_dates[day_index].strftime('%d/%m') }}</small>
+                </div>
+                <div class="day-content" 
+                     data-day="{{ day_index }}"
+                     data-date="{{ week_dates[day_index].strftime('%Y-%m-%d') }}">
+                    <div class="drop-zone">
+                        Arraste obras aqui
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" 
+     style="background: rgba(0,0,0,0.5); z-index: 2000;">
+    <div class="d-flex align-items-center justify-content-center h-100">
+        <div class="bg-white p-4 rounded">
+            <div class="spinner-border text-primary me-3"></div>
+            Processando...
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// JavaScript modular e performático - Ana Costa style
+class EquipeManager {
+    constructor() {
+        this.currentWeek = '{{ monday.strftime("%Y-%m-%d") }}';
+        this.obras = [];
+        this.allocations = [];
+        this.sortables = [];
+        
+        this.init();
+    }
+    
+    async init() {
+        try {
+            await this.loadObras();
+            await this.loadAllocations();
+            this.setupDragDrop();
+            this.renderObras();
+            this.renderAllocations();
+        } catch (error) {
+            console.error('Erro na inicialização:', error);
+            this.showError('Erro ao carregar dados');
+        }
+    }
+    
+    async loadObras() {
+        const response = await fetch('/api/equipe/obras');
+        const result = await response.json();
+        
+        if (result.success) {
+            this.obras = result.data;
+        } else {
+            throw new Error(result.error);
+        }
+    }
+    
+    async loadAllocations() {
+        const response = await fetch(`/api/equipe/allocations?week_start=${this.currentWeek}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            this.allocations = result.data;
+        } else {
+            throw new Error(result.error);
+        }
+    }
+    
+    renderObras() {
+        const container = document.getElementById('obras-list');
+        container.innerHTML = '';
+        
+        this.obras.forEach(obra => {
+            const card = document.createElement('div');
+            card.className = 'obra-card';
+            card.dataset.obraId = obra.id;
+            card.innerHTML = `
+                <div class="fw-bold">${obra.codigo}</div>
+                <small class="text-muted">${obra.nome}</small>
+            `;
+            container.appendChild(card);
+        });
+    }
+    
+    renderAllocations() {
+        // Limpa alocações existentes
+        document.querySelectorAll('.allocated-obra').forEach(el => el.remove());
+        document.querySelectorAll('.drop-zone').forEach(el => {
+            el.style.display = 'flex';
+            el.classList.remove('has-content');
+        });
+        
+        this.allocations.forEach(allocation => {
+            const dayContent = document.querySelector(`[data-day="${allocation.day_of_week}"]`);
+            if (dayContent) {
+                const dropZone = dayContent.querySelector('.drop-zone');
+                dropZone.style.display = 'none';
+                dropZone.classList.add('has-content');
+                
+                const card = document.createElement('div');
+                card.className = 'obra-card allocated-obra';
+                card.dataset.allocationId = allocation.id;
+                card.innerHTML = `
+                    <div class="fw-bold">${allocation.obra_codigo}</div>
+                    <small>${allocation.turno_inicio} - ${allocation.turno_fim}</small>
+                    ${allocation.funcionarios_count > 0 ? 
+                        `<div class="employee-badge">${allocation.funcionarios_count}</div>` : ''}
+                `;
+                
+                // Click para abrir funcionários
+                card.addEventListener('click', () => {
+                    this.openEmployeeModal(allocation.id);
+                });
+                
+                dayContent.appendChild(card);
+            }
+        });
+    }
+    
+    setupDragDrop() {
+        // Obras sidebar - source
+        const obrasList = document.getElementById('obras-list');
+        Sortable.create(obrasList, {
+            group: {
+                name: 'obras',
+                pull: 'clone',
+                put: false
+            },
+            sort: false,
+            onStart: (evt) => {
+                evt.item.classList.add('dragging');
+            },
+            onEnd: (evt) => {
+                evt.item.classList.remove('dragging');
+            }
+        });
+        
+        // Day columns - targets
+        document.querySelectorAll('.day-content').forEach(dayContent => {
+            Sortable.create(dayContent, {
+                group: 'obras',
+                onAdd: async (evt) => {
+                    const obraId = evt.item.dataset.obraId;
+                    const date = dayContent.dataset.date;
+                    
+                    // Remove o item clonado
+                    evt.item.remove();
+                    
+                    await this.createAllocation(obraId, date);
+                },
+                onRemove: async (evt) => {
+                    const allocationId = evt.item.dataset.allocationId;
+                    if (allocationId) {
+                        await this.deleteAllocation(allocationId);
+                    }
+                }
+            });
+        });
+    }
+    
+    async createAllocation(obraId, date) {
+        this.showLoading(true);
+        
+        try {
+            const response = await fetch('/api/equipe/allocations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    obra_id: parseInt(obraId),
+                    data_alocacao: date
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                await this.loadAllocations();
+                this.renderAllocations();
+                this.showSuccess('Obra alocada com sucesso');
+            } else {
+                this.showError(result.error);
+            }
+        } catch (error) {
+            console.error('Erro ao criar alocação:', error);
+            this.showError('Erro ao alocar obra');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    async deleteAllocation(allocationId) {
+        this.showLoading(true);
+        
+        try {
+            const response = await fetch(`/api/equipe/allocations/${allocationId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                await this.loadAllocations();
+                this.renderAllocations();
+                this.showSuccess('Alocação removida');
+            } else {
+                this.showError(result.error);
+            }
+        } catch (error) {
+            console.error('Erro ao deletar alocação:', error);
+            this.showError('Erro ao remover alocação');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    openEmployeeModal(allocationId) {
+        // TODO: Implementar modal de funcionários
+        console.log('Abrir funcionários para alocação:', allocationId);
+    }
+    
+    showLoading(show) {
+        const overlay = document.getElementById('loading-overlay');
+        overlay.classList.toggle('d-none', !show);
+    }
+    
+    showSuccess(message) {
+        // Toast simples
+        const toast = document.createElement('div');
+        toast.className = 'alert alert-success position-fixed';
+        toast.style.cssText = 'top: 20px; right: 20px; z-index: 2001;';
+        toast.textContent = message;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+    
+    showError(message) {
+        const toast = document.createElement('div');
+        toast.className = 'alert alert-danger position-fixed';
+        toast.style.cssText = 'top: 20px; right: 20px; z-index: 2001;';
+        toast.textContent = message;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
+}
+
+// Funções globais para navegação
+function navigateWeek(direction) {
+    const currentDate = new Date('{{ monday.strftime("%Y-%m-%d") }}');
+    currentDate.setDate(currentDate.getDate() + (direction * 7));
+    
+    const newWeek = currentDate.toISOString().split('T')[0];
+    window.location.href = `?week=${newWeek}`;
+}
+
+function goToToday() {
+    window.location.href = window.location.pathname;
+}
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', () => {
+    window.equipeManager = new EquipeManager();
+});
+</script>
+{% endblock %}
+```
+
+## INSTRUÇÕES DE IMPLEMENTAÇÃO
+
+### 1. BACKEND (Marcus Silva)
+- Implemente os modelos exatamente como especificado
+- APIs devem retornar JSON padronizado sempre
+- Validação rigorosa em todos os endpoints
+- Logs estruturados para debugging
+- Testes unitários para endpoints críticos
+
+### 2. FRONTEND (Ana Costa)
+- HTML estrutural e semântico
+- CSS mínimo, focado na funcionalidade
+- JavaScript modular e performático
+- SortableJS para drag & drop (leve e confiável)
+- Progressive Enhancement
+
+### 3. BIBLIOTECAS RECOMENDADAS
+**Drag & Drop:**
+- **SortableJS** (escolhido): 45KB, sem dependências, touch support
+- Pragmatic Drag & Drop: Performance superior, mais complexo
+- dnd-kit: Apenas se usar React
+
+**Calendário (se necessário):**
+- **FullCalendar**: Maduro, completo
+- Schedule-X: Moderno, alternativa ao FullCalendar
+
+### 4. PRÓXIMOS PASSOS
+1. Implementar backend conforme especificado
+2. Criar HTML estrutural limpo
+3. Adicionar JavaScript modular
+4. Testar drag & drop básico
+5. Implementar modal de funcionários
+6. Adicionar vista mensal
+7. Weekly planner
+
+**FOCO:** Fazer o básico funcionar perfeitamente antes de adicionar funcionalidades extras.
+
