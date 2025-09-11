@@ -3,1044 +3,297 @@
 {% block title %}📋 Gestão de Equipe - Semana {{ monday.strftime('%d/%m') }}{% endblock %}
 
 {% block head_content %}
-<!-- Sortable.js para drag & drop - carregamento garantido -->
+<!-- Sortable.js para drag & drop -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer></script>
 
 <style>
-/* Estilo específico para drag & drop mantendo padrão SIGE */
-.obra-draggable {
-    cursor: grab;
-    transition: all 0.2s ease;
-}
-
-.obra-draggable:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(25, 135, 84, 0.2) !important;
-}
-
-.obra-draggable:active {
-    cursor: grabbing;
-    transform: scale(1.02);
-}
-
-.obra-draggable.dragging {
-    opacity: 0.6;
-    transform: rotate(3deg);
-}
-
+/* CSS MÍNIMO - Apenas classes essenciais */
 .day-drop-zone {
-    min-height: 300px;
-    border: 2px dashed #dee2e6;
+    min-height: 200px;
+    border: 2px dashed #ddd;
+    padding: 10px;
     border-radius: 8px;
-    background: #fafafa;
-    transition: all 0.3s ease;
+    background-color: #fafafa;
 }
 
 .day-drop-zone.drag-over {
-    background: #d4edda;
-    border-color: #198754;
+    border-color: #28a745;
+    background-color: #f8f9fa;
     border-style: solid;
 }
 
-.allocated-work {
-    background: linear-gradient(135deg, #198754 0%, #157347 100%);
-    color: white;
-    border-radius: 8px;
-    padding: 10px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
-}
-
-.allocated-work:hover {
-    background: linear-gradient(135deg, #157347 0%, #0f5132 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
-}
-
-.employee-count-badge {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: #ffc107;
-    color: #856404;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: bold;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.week-stats {
-    background: linear-gradient(135deg, #198754 0%, #157347 100%);
-    color: white;
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 20px;
-}
-
-.stat-box {
-    text-align: center;
-    padding: 10px;
-    background: rgba(255,255,255,0.15);
-    border-radius: 8px;
-    backdrop-filter: blur(10px);
-}
-
-.stat-number {
-    display: block;
-    font-size: 1.8rem;
-    font-weight: bold;
-    margin-bottom: 4px;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    opacity: 0.9;
-}
-
-/* Loading states */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.5);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-}
-
-.loading-content {
-    background: white;
-    padding: 30px;
-    border-radius: 12px;
-    text-align: center;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-}
-
-/* Toast notifications */
-.toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 2000;
-}
-
-.custom-toast {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    padding: 16px;
-    margin-bottom: 10px;
-    border-left: 4px solid #198754;
-    animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-
-@keyframes slideOut {
-    from { transform: translateX(0); opacity: 1; }
-    to { transform: translateX(100%); opacity: 0; }
-}
-
-/* Vista Mensal Styles */
-.calendar-container {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-}
-
-.calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 1px;
-    background: #dee2e6;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.calendar-day {
-    background: white;
-    min-height: 100px;
-    padding: 8px;
-    position: relative;
-    border: 1px solid transparent;
-    transition: all 0.2s ease;
-}
-
-.calendar-day:hover {
-    border-color: #198754;
-    background: #f8f9fa;
-}
-
-.calendar-day.other-month {
-    background: #f8f9fa;
-    color: #6c757d;
-}
-
-.calendar-day.today {
-    background: linear-gradient(135deg, #198754 0%, #157347 100%);
-    color: white;
-}
-
-.calendar-day-number {
-    font-weight: bold;
-    margin-bottom: 4px;
-    font-size: 0.9rem;
-}
-
-.calendar-allocation {
-    background: linear-gradient(135deg, #198754 0%, #157347 100%);
-    color: white;
-    border-radius: 4px;
-    padding: 2px 4px;
-    margin-bottom: 2px;
-    font-size: 0.7rem;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.calendar-allocation:hover {
-    background: linear-gradient(135deg, #157347 0%, #0f5132 100%);
-}
-
-.calendar-header {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    background: linear-gradient(135deg, #198754 0%, #157347 100%);
-    color: white;
-    font-weight: bold;
-    text-align: center;
-    padding: 12px 0;
-}
-
-.calendar-weekday {
-    padding: 8px;
-    font-size: 0.9rem;
-}
-
-.month-navigation {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px;
-    background: white;
-    border-radius: 12px 12px 0 0;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.month-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #495057;
-}
-
-.nav-btn {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 8px 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.nav-btn:hover {
-    background: #198754;
-    color: white;
-    border-color: #198754;
-}
-
-/* Responsividade mobile */
-@media (max-width: 768px) {
-    .day-drop-zone {
-        min-height: 200px;
-    }
-    
-    .week-stats .row {
-        text-align: center;
-    }
-    
-    .allocated-work {
-        font-size: 0.9rem;
-        padding: 8px;
-    }
-    
-    .calendar-day {
-        min-height: 80px;
-        padding: 4px;
-    }
-    
-    .calendar-allocation {
-        font-size: 0.6rem;
-        padding: 1px 2px;
-    }
-    
-    .month-navigation {
-        padding: 12px;
-    }
-    
-    .month-title {
-        font-size: 1rem;
-    }
-}
-
-/* Weekly Planner Styles */
-.planner-grid {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    background: white;
-}
-
-.planner-header {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    padding: 12px 8px;
-    font-weight: bold;
-    text-align: center;
-    border-bottom: 1px solid #dee2e6;
-    font-size: 0.9rem;
-    color: #495057;
-}
-
-.planner-row {
-    border-bottom: 1px solid #f1f3f4;
-}
-
-.planner-cell {
-    min-height: 120px;
-    padding: 8px;
-    border-right: 1px solid #f1f3f4;
-    position: relative;
-}
-
-.planner-cell:last-child {
-    border-right: none;
-}
-
-.obra-info {
-    background: linear-gradient(135deg, #198754 0%, #157347 100%);
-    color: white;
-    border-radius: 6px;
-    padding: 8px;
-    font-size: 0.8rem;
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 4px;
-}
-
-.servico-card {
-    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
-    color: white;
-    border-radius: 4px;
-    padding: 6px 8px;
-    margin-bottom: 4px;
-    font-size: 0.75rem;
+.obra-item {
     cursor: grab;
     transition: all 0.2s ease;
-    position: relative;
 }
 
-.servico-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+.obra-item:hover {
+    background-color: #e9ecef;
 }
 
-.servico-card:active {
+.obra-item:active {
     cursor: grabbing;
 }
 
-.servico-card.dragging {
-    opacity: 0.6;
-    transform: rotate(2deg);
+.allocation-card {
+    background-color: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    margin-bottom: 5px;
+    cursor: pointer;
 }
 
-.servico-responsavel {
-    font-size: 0.65rem;
-    opacity: 0.9;
-    margin-top: 2px;
+.allocation-card:hover {
+    background-color: #bbdefb;
 }
 
-.servico-catalog-item {
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 8px;
-    margin-bottom: 6px;
-    cursor: grab;
-    transition: all 0.2s ease;
-}
-
-.servico-catalog-item:hover {
-    border-color: #17a2b8;
-    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.2);
-}
-
-.servico-catalog-item.dragging {
-    opacity: 0.6;
-}
-
-.servico-nome {
-    font-weight: 600;
-    font-size: 0.8rem;
-    color: #495057;
-    margin-bottom: 2px;
-}
-
-.servico-categoria {
-    font-size: 0.7rem;
-    color: #6c757d;
-}
-
-.drop-zone-planner {
-    min-height: 100px;
-    border: 2px dashed #dee2e6;
-    border-radius: 6px;
-    background: #fafafa;
-    padding: 4px;
-    transition: all 0.3s ease;
-}
-
-.drop-zone-planner.drag-over {
-    border-color: #17a2b8;
-    background: rgba(23, 162, 184, 0.1);
-    border-style: solid;
-}
-
-.drop-zone-planner.has-content {
-    border-style: solid;
-    border-color: #28a745;
-}
-
-.planner-empty-state {
-    text-align: center;
-    padding: 20px;
-    color: #6c757d;
-    font-size: 0.8rem;
-}
-
-/* Responsividade do planner */
-@media (max-width: 768px) {
-    .modal-dialog.modal-xl {
-        max-width: 95%;
-    }
-    
-    .planner-cell {
-        min-height: 80px;
-        padding: 4px;
-    }
-    
-    .servico-card {
-        font-size: 0.7rem;
-        padding: 4px 6px;
-    }
-    
-    .planner-header {
-        padding: 8px 4px;
-        font-size: 0.8rem;
-    }
-}
-
-/* Estilos de conflitos */
-.conflict-detected {
-    border: 2px solid #dc3545 !important;
-    background: rgba(220, 53, 69, 0.1) !important;
-}
-
-.conflict-work {
-    border-left: 4px solid #dc3545 !important;
-    position: relative;
-}
-
-.conflict-work::before {
-    content: "⚠️";
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    font-size: 0.7rem;
-    background: #dc3545;
+.week-header {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
     color: white;
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
 }
 
-.overload-work {
-    border: 2px solid #ffc107 !important;
-    background: rgba(255, 193, 7, 0.1) !important;
-}
-
-.overload-work::before {
-    content: "⚡";
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    font-size: 0.7rem;
-    background: #ffc107;
-    color: #856404;
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-    font-weight: bold;
+.sidebar-obras {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    max-height: 500px;
+    overflow-y: auto;
 }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Breadcrumbs -->
-    <div class="breadcrumb-container mb-3">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-0">
-                <li class="breadcrumb-item"><a href="/">🏠 SIGE</a></li>
-                <li class="breadcrumb-item"><a href="/equipe">👥 Gestão de Equipe</a></li>
-                <li class="breadcrumb-item active" aria-current="page">📋 Alocação Semanal</li>
-            </ol>
-        </nav>
-    </div>
-    <!-- Header com estatísticas -->
-    <div class="week-stats">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+    <!-- Breadcrumbs simples -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">🏠 SIGE</a></li>
+            <li class="breadcrumb-item"><a href="/equipe">👥 Gestão de Equipe</a></li>
+            <li class="breadcrumb-item active">📋 Alocação Semanal</li>
+        </ol>
+    </nav>
+
+    <!-- Header simples -->
+    <div class="week-header">
+        <div class="d-flex justify-content-between align-items-center">
             <div>
-                <h3 class="mb-2">📋 Gestão de Equipe - Canteiro Inteligente</h3>
-                <div class="d-flex align-items-center flex-wrap">
-                    <div class="me-3 mb-2">
-                        <select class="form-select form-select-sm" id="obra-filter" onchange="applyObraFilter(this.value)" style="min-width: 200px;">
-                            <option value="">🏗️ Todas as obras</option>
-                            {% for obra in obras %}
-                            <option value="{{ obra.id }}">{{ obra.codigo }} - {{ obra.nome[:20] }}{% if obra.nome|length > 20 %}...{% endif %}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="me-3 mb-2">
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="checkbox" id="show-conflicts" onchange="toggleConflictDetection(this.checked)">
-                            <label class="form-check-label" for="show-conflicts" style="font-size: 0.9rem; color: white;">
-                                ⚠️ Detectar conflitos
-                            </label>
-                        </div>
-                    </div>
-                    <div class="mb-2">
-                        <span class="badge bg-light text-dark me-1" id="filter-status">Mostrando todas</span>
-                        <span class="badge bg-warning text-dark" id="conflict-count" style="display: none;">0 conflitos</span>
-                        <span class="badge bg-success text-white me-1" id="sync-indicator" style="display: none;">
-                            <i class="fas fa-check-circle me-1"></i>Sincronizado
-                        </span>
-                    </div>
-                </div>
+                <h3 class="mb-1">📋 Gestão de Equipe</h3>
+                <p class="mb-0">Semana: {{ monday.strftime('%d/%m') }} - {{ friday.strftime('%d/%m') }}</p>
             </div>
             <div class="btn-group">
-                <button class="btn btn-light" onclick="navigateWeek(-1)">
+                <button class="btn btn-light btn-sm" onclick="navigateWeek(-1)">
                     <i class="fas fa-chevron-left"></i> Anterior
                 </button>
-                <button class="btn btn-light" onclick="goToToday()">
+                <button class="btn btn-light btn-sm" onclick="goToToday()">
                     <i class="fas fa-calendar-day"></i> Hoje
                 </button>
-                <button class="btn btn-light" onclick="navigateWeek(1)">
+                <button class="btn btn-light btn-sm" onclick="navigateWeek(1)">
                     Próxima <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
         </div>
-        
-        <div class="row">
-            <div class="col-md-3">
-                <div class="stat-box">
-                    <span class="stat-number">{{ stats.total_obras }}</span>
-                    <span class="stat-label">Obras Ativas</span>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-box">
-                    <span class="stat-number">{{ stats.total_alocacoes_semana }}</span>
-                    <span class="stat-label">Alocações</span>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-box">
-                    <span class="stat-number">{{ stats.funcionarios_alocados }}</span>
-                    <span class="stat-label">Funcionários</span>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stat-box">
-                    <span class="stat-number">{{ monday.strftime('%d/%m') }} - {{ friday.strftime('%d/%m') }}</span>
-                    <span class="stat-label">Semana Atual</span>
+    </div>
+
+    <!-- Grid principal -->
+    <div class="row">
+        <!-- Sidebar obras -->
+        <div class="col-lg-3">
+            <div class="sidebar-obras">
+                <h5 class="mb-3">
+                    <i class="fas fa-hammer text-primary"></i> Obras Disponíveis
+                </h5>
+                <div id="obras-source" class="list-group">
+                    {% for obra in obras %}
+                    <div class="list-group-item obra-item" 
+                         data-obra-id="{{ obra.id }}"
+                         data-obra-nome="{{ obra.nome }}"
+                         data-obra-codigo="{{ obra.codigo }}">
+                        <strong>{{ obra.codigo }}</strong><br>
+                        <small class="text-muted">{{ obra.nome[:30] }}{% if obra.nome|length > 30 %}...{% endif %}</small>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if not obras %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-info-circle mb-2"></i><br>
+                        <small>Nenhuma obra ativa</small>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="row">
-        <!-- Sidebar: Obras Disponíveis -->
-        <div class="col-lg-3">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title">
-                        <i class="fas fa-hammer text-primary me-2"></i>
-                        Obras Disponíveis
-                    </h5>
+        <!-- Grid semana -->
+        <div class="col-lg-9">
+            <!-- Headers dos dias -->
+            <div class="row mb-3">
+                {% set weekdays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'] %}
+                {% for i in range(5) %}
+                <div class="col text-center">
+                    <strong>{{ weekdays[i] }}</strong><br>
+                    <small class="text-muted">{{ week_dates[i].strftime('%d/%m') }}</small>
                 </div>
-                <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                    <div id="obras-source" class="obras-list">
-                        {% for obra in obras %}
-                        <div class="card obra-draggable mb-2" 
-                             data-obra-id="{{ obra.id }}"
-                             data-obra-nome="{{ obra.nome }}"
-                             data-obra-codigo="{{ obra.codigo }}">
-                            <div class="card-body p-3">
-                                <h6 class="card-title mb-1">{{ obra.codigo }}</h6>
-                                <small class="text-muted">{{ obra.nome[:30] }}{% if obra.nome|length > 30 %}...{% endif %}</small>
-                            </div>
-                        </div>
-                        {% endfor %}
+                {% endfor %}
+            </div>
+            
+            <!-- Grid de dias -->
+            <div class="row">
+                {% for i in range(5) %}
+                <div class="col">
+                    <div class="day-drop-zone list-group" 
+                         data-day="{{ i }}" 
+                         data-date="{{ week_dates[i].strftime('%Y-%m-%d') }}">
                         
-                        {% if not obras %}
+                        <!-- Alocações existentes -->
+                        {% if week_grid[i] and week_grid[i]['allocations'] %}
+                            {% for allocation in week_grid[i]['allocations'] %}
+                            <div class="list-group-item allocation-card" 
+                                 data-allocation-id="{{ allocation.id }}"
+                                 data-obra-id="{{ allocation.obra_id }}"
+                                 onclick="viewAllocation({{ allocation.id }})">
+                                <strong>{{ allocation.obra.codigo }}</strong><br>
+                                <small>
+                                    {{ allocation.turno_inicio.strftime('%H:%M') if allocation.turno_inicio else '08:00' }} - 
+                                    {{ allocation.turno_fim.strftime('%H:%M') if allocation.turno_fim else '17:00' }}
+                                </small>
+                                {% if allocation.funcionarios_count > 0 %}
+                                <span class="badge bg-warning text-dark">{{ allocation.funcionarios_count }}</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <!-- Placeholder quando vazio -->
+                        {% if not (week_grid[i] and week_grid[i]['allocations']) %}
                         <div class="text-center text-muted py-4">
-                            <i class="fas fa-info-circle mb-2"></i><br>
-                            <small>Nenhuma obra ativa encontrada</small>
+                            <i class="fas fa-plus-circle"></i><br>
+                            <small>Arraste obra aqui</small>
                         </div>
                         {% endif %}
                     </div>
                 </div>
+                {% endfor %}
             </div>
         </div>
-
-        <!-- Grade Semanal -->
-        <div class="col-lg-9">
-            <div class="card">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-calendar-week text-primary me-2"></i>
-                            Grade Semanal
-                        </h5>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-primary active" onclick="switchView('week')">
-                                <i class="fas fa-calendar-week"></i> Semanal
-                            </button>
-                            <button class="btn btn-outline-primary" onclick="switchView('month')">
-                                <i class="fas fa-calendar-alt"></i> Mensal
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <!-- Vista Semanal -->
-                    <div class="row" id="weekly-view">
-                        {% set weekdays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'] %}
-                        {% for day_index in range(5) %}
-                        <div class="col">
-                            <div class="mb-2">
-                                <h6 class="text-center mb-3">
-                                    <strong>{{ weekdays[day_index] }}</strong><br>
-                                    <small class="text-muted">{{ week_grid[day_index]['date_str'] }}</small>
-                                </h6>
-                            </div>
-                            
-                            <div class="day-drop-zone" 
-                                 data-day="{{ day_index }}"
-                                 data-date="{{ week_grid[day_index]['date'].strftime('%Y-%m-%d') }}">
-                                
-                                <div class="allocated-works" data-day="{{ day_index }}">
-                                    {% for allocation in week_grid[day_index]['allocations'] %}
-                                    <div class="allocated-work" 
-                                         data-allocation-id="{{ allocation.id }}"
-                                         onclick="openEmployeeAllocation({{ allocation.id }})">
-                                        
-                                        <div class="fw-bold">{{ allocation.obra.codigo }}</div>
-                                        <div style="font-size: 0.8rem; opacity: 0.9;">
-                                            {{ allocation.turno_inicio.strftime('%H:%M') if allocation.turno_inicio else '08:00' }} - 
-                                            {{ allocation.turno_fim.strftime('%H:%M') if allocation.turno_fim else '17:00' }}
-                                        </div>
-                                        
-                                        {% if allocation.funcionarios_count > 0 %}
-                                        <div class="employee-count-badge">{{ allocation.funcionarios_count }}</div>
-                                        {% endif %}
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                                
-                                {% if not week_grid[day_index]['allocations'] %}
-                                <div class="text-center text-muted py-4">
-                                    <i class="fas fa-hand-point-left mb-2"></i><br>
-                                    <small>Arraste obras aqui</small>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-
-                    <!-- Vista Mensal -->
-                    <div class="d-none" id="monthly-view">
-                        <div id="calendar-container">
-                            <!-- Calendar será gerado dinamicamente via JavaScript -->
-                        </div>
-                    </div>
+    </div>
+    
+    <!-- Loading overlay simples -->
+    <div id="loading-overlay" class="d-none position-fixed w-100 h-100" 
+         style="top: 0; left: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div class="d-flex justify-content-center align-items-center h-100">
+            <div class="bg-white p-4 rounded">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 mb-0">Processando...</p>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Botões de ação rápida -->
-    <div class="position-fixed" style="bottom: 20px; right: 20px; z-index: 1000;">
-        <div class="btn-group-vertical">
-            <button class="btn btn-info btn-lg rounded-circle mb-2" 
-                    onclick="exportToExcel('allocation')" 
-                    title="Exportar Alocações"
-                    style="width: 56px; height: 56px;">
-                <i class="fas fa-file-excel"></i>
-            </button>
-            <button class="btn btn-primary btn-lg rounded-circle mb-2" 
-                    onclick="refreshWeek()" 
-                    title="Atualizar"
-                    style="width: 56px; height: 56px;">
-                <i class="fas fa-sync-alt"></i>
-            </button>
-            <button class="btn btn-success btn-lg rounded-circle" 
-                    onclick="openWeeklyPlanner()" 
-                    title="Weekly Planner"
-                    style="width: 56px; height: 56px;">
-                <i class="fas fa-tasks"></i>
-            </button>
-        </div>
-    </div>
 </div>
+{% endblock %}
 
-<!-- Loading overlay -->
-<div class="loading-overlay" id="loading-overlay">
-    <div class="loading-content">
-        <div class="spinner-border text-primary mb-3" role="status">
-            <span class="visually-hidden">Carregando...</span>
-        </div>
-        <div>Processando alocação...</div>
-    </div>
-</div>
-
-<!-- Toast container -->
-<div class="toast-container" id="toast-container"></div>
-
-<!-- Weekly Planner Modal -->
-<div class="modal fade" id="weeklyPlannerModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg, #198754 0%, #157347 100%); color: white;">
-                <h5 class="modal-title">
-                    <i class="fas fa-tasks me-2"></i>
-                    Weekly Planner - Planejamento Lean Construction
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-0">
-                <div class="container-fluid">
-                    <div class="row">
-                        <!-- Sidebar: Catálogo de Serviços -->
-                        <div class="col-md-3" style="background: #f8f9fa; border-right: 1px solid #dee2e6;">
-                            <div class="p-3">
-                                <h6 class="fw-bold mb-3">
-                                    <i class="fas fa-tools text-primary me-2"></i>
-                                    Catálogo de Serviços
-                                </h6>
-                                <div class="mb-3">
-                                    <input type="text" class="form-control form-control-sm" 
-                                           placeholder="Buscar serviços..." 
-                                           id="servicos-search"
-                                           onkeyup="filterServices(this.value)">
-                                </div>
-                                <div id="servicos-catalog" style="max-height: 400px; overflow-y: auto;">
-                                    <!-- Serviços carregados dinamicamente -->
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Planner Grid -->
-                        <div class="col-md-9">
-                            <div class="p-3">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="fw-bold mb-0">
-                                        <i class="fas fa-calendar-week text-primary me-2"></i>
-                                        Planejamento da Semana
-                                    </h6>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" onclick="syncPlannerWithAllocations()">
-                                            <i class="fas fa-sync me-1"></i> Sincronizar
-                                        </button>
-                                        <button class="btn btn-outline-primary" onclick="clearAllPlanning()">
-                                            <i class="fas fa-trash me-1"></i> Limpar
-                                        </button>
-                                        <button class="btn btn-success" onclick="savePlannerData()">
-                                            <i class="fas fa-save me-1"></i> Salvar Planejamento
-                                        </button>
-                                    </div>
-                                    <div class="mt-2" id="sync-status" style="display: none;">
-                                        <span class="badge bg-info">
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            <span id="sync-message">Verificando sincronização...</span>
-                                        </span>
-                                    </div>
-                                </div>
-                                
-                                <div class="planner-grid">
-                                    <div class="row">
-                                        <div class="col-2">
-                                            <div class="planner-header">Obra</div>
-                                        </div>
-                                        <div class="col-2">
-                                            <div class="planner-header">Segunda</div>
-                                        </div>
-                                        <div class="col-2">
-                                            <div class="planner-header">Terça</div>
-                                        </div>
-                                        <div class="col-2">
-                                            <div class="planner-header">Quarta</div>
-                                        </div>
-                                        <div class="col-2">
-                                            <div class="planner-header">Quinta</div>
-                                        </div>
-                                        <div class="col-2">
-                                            <div class="planner-header">Sexta</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Linhas do planner -->
-                                    <div id="planner-rows">
-                                        <!-- Gerado dinamicamente com base nas obras alocadas -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i> Fechar
-                </button>
-                <button type="button" class="btn btn-warning" onclick="exportToExcel('planner')">
-                    <i class="fas fa-file-excel me-1"></i> Exportar Planejamento
-                </button>
-                <button type="button" class="btn btn-success" onclick="savePlannerData()">
-                    <i class="fas fa-save me-1"></i> Salvar Planejamento
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
+{% block extra_js %}
 <script>
-// ===================================
-// SISTEMA DRAG & DROP - PADRÃO SIGE
-// ===================================
+// JAVASCRIPT BÁSICO - Apenas funcionalidade essencial
 
 let currentWeekStart = '{{ monday.strftime("%Y-%m-%d") }}';
-let currentView = 'week';
 
-// Garantir que Sortable.js carregue antes de inicializar
-function waitForSortable() {
-    if (typeof Sortable !== 'undefined') {
-        initializeDragAndDrop();
-        console.log('🚀 Sistema EQUIPE inicializado - Padrão SIGE');
-    } else {
-        setTimeout(waitForSortable, 100);
-    }
-}
+// Inicializar Sortable.js
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSortable();
+});
 
-document.addEventListener('DOMContentLoaded', waitForSortable);
-
-function initializeDragAndDrop() {
-    // Obras source - sidebar
+function initializeSortable() {
+    // Sortable para sidebar de obras (source)
     const obrasSource = document.getElementById('obras-source');
     if (obrasSource) {
-        new Sortable(obrasSource, {
+        Sortable.create(obrasSource, {
             group: {
-                name: 'obras',
+                name: 'shared',
                 pull: 'clone',
                 put: false
             },
             sort: false,
             animation: 150,
-            ghostClass: 'obra-draggable',
-            chosenClass: 'dragging',
             onStart: function(evt) {
-                console.log('🟢 Drag iniciado:', evt.item.dataset.obraNome);
-                showLoadingOverlay();
+                evt.item.style.opacity = '0.6';
             }
         });
     }
 
-    // Drop zones - dias da semana
-    document.querySelectorAll('.allocated-works').forEach(dayContainer => {
-        new Sortable(dayContainer, {
-            group: {
-                name: 'obras',
-                pull: false,
-                put: true
-            },
-            animation: 200,
-            ghostClass: 'allocated-work',
+    // Sortable para cada day-drop-zone
+    document.querySelectorAll('.day-drop-zone').forEach(function(element) {
+        Sortable.create(element, {
+            group: 'shared',
+            animation: 150,
             onAdd: function(evt) {
-                const obraElement = evt.item;
-                const dayDate = evt.to.closest('.day-drop-zone').dataset.date;
-                const obraId = obraElement.dataset.obraId;
+                const obraId = evt.item.dataset.obraId;
+                const day = evt.to.dataset.day;
+                const date = evt.to.dataset.date;
                 
-                console.log(`🟡 Drop: ${obraElement.dataset.obraNome} → ${dayDate}`);
-                createAllocation(obraId, dayDate, obraElement);
-            },
-            onRemove: function(evt) {
-                const allocationId = evt.item.dataset.allocationId;
-                if (allocationId) {
-                    console.log('🔴 Removendo alocação:', allocationId);
-                    deleteAllocation(allocationId);
+                if (obraId && date) {
+                    createAllocation(obraId, date, evt.item, evt.to);
                 }
+                
+                // Remove o item clonado (será recriado pelo servidor)
+                evt.item.remove();
+            },
+            onUpdate: function(evt) {
+                // Handle reordering within same day if needed
+                console.log('Reordered within day');
             }
         });
     });
+}
 
-    // Drop zones visual feedback
-    document.querySelectorAll('.day-drop-zone').forEach(zone => {
-        zone.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.classList.add('drag-over');
-        });
-        
-        zone.addEventListener('dragleave', function(e) {
-            this.classList.remove('drag-over');
-        });
-        
-        zone.addEventListener('drop', function(e) {
-            this.classList.remove('drag-over');
-        });
+// Criar nova alocação
+function createAllocation(obraId, date, draggedItem, targetContainer) {
+    showLoading(true);
+    
+    const data = {
+        obra_id: parseInt(obraId),
+        data_alocacao: date,
+        turno_inicio: '08:00',
+        turno_fim: '17:00'
+    };
+
+    fetch('/equipe/api/allocations', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.error) {
+            showError(result.error);
+        } else {
+            showSuccess('Obra alocada com sucesso!');
+            // Recarregar a página para mostrar mudanças
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showError('Erro ao alocar obra');
+    })
+    .finally(() => {
+        showLoading(false);
     });
 }
 
-// ===================================
-// API CALLS
-// ===================================
-
-async function createAllocation(obraId, dataAlocacao, elemento) {
-    try {
-        // FASE 3: Validações robustas antes de enviar para API
-        const validation = validateAllocation(obraId, dataAlocacao);
-        
-        if (!validation.isValid) {
-            showValidationErrors(validation.errors);
-            elemento.remove();
-            hideLoadingOverlay();
-            return;
-        }
-        
-        // Verificar se já existe alocação para esta obra neste dia
-        const existingAllocation = document.querySelector(
-            `[data-date="${dataAlocacao}"] .allocated-work[data-obra-id="${obraId}"]`
-        );
-        
-        if (existingAllocation) {
-            showValidationErrors(['Esta obra já está alocada para este dia']);
-            elemento.remove();
-            hideLoadingOverlay();
-            return;
-        }
-        
-        const response = await fetch('/equipe/api/allocations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                obra_id: parseInt(obraId),
-                data_alocacao: dataAlocacao,
-                turno_inicio: '08:00',
-                turno_fim: '17:00',
-                nota: ''
-            })
-        });
-
-        const result = await response.json();
-        
-        if (response.ok) {
-            // Transformar em obra alocada
-            elemento.className = 'allocated-work';
-            elemento.dataset.allocationId = result.id;
-            elemento.dataset.obraId = obraId; // Manter para validações futuras
-            elemento.onclick = () => openEmployeeAllocation(result.id);
-            elemento.innerHTML = `
-                <div class="fw-bold">${elemento.dataset.obraCodigo || elemento.dataset.obraNome}</div>
-                <div style="font-size: 0.8rem; opacity: 0.9;">08:00 - 17:00</div>
-                <div class="employee-count-badge" style="display: none;">0</div>
-            `;
-            
-            console.log('✅ Alocação criada:', result.id);
-            showToast('Obra alocada com sucesso! Configure funcionários.', 'success');
-            
-            // FASE 3: Atualizar indicador de sincronização
-            updateSyncIndicator();
-            
-        } else {
-            throw new Error(result.error || 'Erro ao criar alocação');
-        }
-    } catch (error) {
-        console.error('❌ Erro create allocation:', error);
-        
-        // FASE 3: Mensagem de erro melhorada
-        if (error.message.includes('Constraint')) {
-            showValidationErrors(['Esta obra já está alocada para este período']);
-        } else if (error.message.includes('Network')) {
-            showValidationErrors(['Erro de conexão. Verifique sua internet e tente novamente.']);
-        } else {
-            showValidationErrors([error.message || 'Erro inesperado ao criar alocação']);
-        }
-        
-        elemento.remove();
-    } finally {
-        hideLoadingOverlay();
-    }
-}
-
-async function deleteAllocation(allocationId) {
-    try {
-        const response = await fetch(`/equipe/api/allocations/${allocationId}`, {
-            method: 'DELETE'
-        });
-
-        if (response.ok) {
-            console.log('✅ Alocação removida:', allocationId);
-            showToast('Obra removida da semana', 'info');
-        } else {
-            const result = await response.json();
-            throw new Error(result.error || 'Erro ao remover alocação');
-        }
-    } catch (error) {
-        console.error('❌ Erro delete allocation:', error);
-        showToast(error.message, 'error');
-    }
-}
-
-// ===================================
-// NAVEGAÇÃO E UTILITÁRIOS
-// ===================================
-
+// Navegação semanal
 function navigateWeek(direction) {
     const currentDate = new Date(currentWeekStart);
     currentDate.setDate(currentDate.getDate() + (direction * 7));
-    
     const newWeekStart = currentDate.toISOString().split('T')[0];
+    
     window.location.href = `/equipe/alocacao?week=${newWeekStart}`;
 }
 
@@ -1048,1266 +301,48 @@ function goToToday() {
     window.location.href = '/equipe/alocacao';
 }
 
-function refreshWeek() {
-    showLoadingOverlay();
-    window.location.reload();
-}
-
-function openEmployeeAllocation(allocationId) {
+// Ver detalhes da alocação
+function viewAllocation(allocationId) {
     window.location.href = `/equipe/funcionarios/${allocationId}`;
 }
 
-function switchView(view) {
-    currentView = view;
-    
-    // Update button states
-    document.querySelectorAll('.btn-group .btn').forEach(btn => {
-        btn.classList.remove('btn-primary', 'active');
-        btn.classList.add('btn-outline-primary');
-    });
-    
-    if (view === 'week') {
-        document.querySelector('.btn-group .btn:first-child').classList.remove('btn-outline-primary');
-        document.querySelector('.btn-group .btn:first-child').classList.add('btn-primary', 'active');
-        
-        // Mostrar vista semanal
-        document.getElementById('weekly-view').classList.remove('d-none');
-        document.getElementById('monthly-view').classList.add('d-none');
-        
-        console.log('🗓️ Switched to weekly view');
-        
-    } else if (view === 'month') {
-        document.querySelector('.btn-group .btn:last-child').classList.remove('btn-outline-primary');
-        document.querySelector('.btn-group .btn:last-child').classList.add('btn-primary', 'active');
-        
-        // Mostrar vista mensal
-        document.getElementById('weekly-view').classList.add('d-none');
-        document.getElementById('monthly-view').classList.remove('d-none');
-        
-        // Gerar calendário mensal se ainda não foi gerado
-        generateMonthlyCalendar();
-        
-        console.log('📅 Switched to monthly view');
-        showToast('Vista mensal carregada!', 'success');
+// Utilitários de UI
+function showLoading(show) {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.classList.toggle('d-none', !show);
     }
 }
 
-function openWeeklyPlanner() {
-    // Abrir modal do Weekly Planner
-    const modal = new bootstrap.Modal(document.getElementById('weeklyPlannerModal'));
-    modal.show();
-    
-    // Inicializar planner quando modal abrir
-    setTimeout(() => {
-        initializeWeeklyPlanner();
-    }, 300);
-    
-    console.log('📋 Opening Weekly Planner');
+function showSuccess(message) {
+    showToast(message, 'success');
 }
 
-// ===================================
-// FEEDBACK VISUAL
-// ===================================
-
-function showLoadingOverlay() {
-    document.getElementById('loading-overlay').style.display = 'flex';
-}
-
-function hideLoadingOverlay() {
-    document.getElementById('loading-overlay').style.display = 'none';
+function showError(message) {
+    showToast(message, 'danger');
 }
 
 function showToast(message, type = 'info') {
-    const container = document.getElementById('toast-container');
+    // Criar toast simples
     const toast = document.createElement('div');
-    
-    const colors = {
-        'success': '#198754',
-        'error': '#dc3545',
-        'info': '#17a2b8',
-        'warning': '#ffc107'
-    };
-    
-    toast.className = 'custom-toast';
-    toast.style.borderLeftColor = colors[type] || colors.info;
+    toast.className = `alert alert-${type} position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 2000; min-width: 300px;';
     toast.innerHTML = `
         <div class="d-flex align-items-center">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} me-2" 
-               style="color: ${colors[type] || colors.info}"></i>
+            <span class="me-2">${type === 'success' ? '✅' : type === 'danger' ? '❌' : 'ℹ️'}</span>
             <span>${message}</span>
+            <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
         </div>
     `;
     
-    container.appendChild(toast);
+    document.body.appendChild(toast);
     
+    // Auto-remover após 5 segundos
     setTimeout(() => {
-        toast.style.animation = 'slideOut 0.3s ease forwards';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// Haptic feedback para dispositivos móveis
-function hapticFeedback(type = 'impact') {
-    if (navigator.vibrate) {
-        const patterns = {
-            'impact': [10],
-            'success': [10, 50, 10],
-            'error': [100, 30, 100]
-        };
-        navigator.vibrate(patterns[type] || patterns.impact);
-    }
-}
-
-// ===================================
-// VISTA MENSAL - IMPLEMENTAÇÃO COMPLETA
-// ===================================
-
-let currentMonth = new Date('{{ monday.strftime("%Y-%m-%d") }}');
-let monthlyAllocations = {};
-
-async function generateMonthlyCalendar() {
-    showLoadingOverlay();
-    
-    try {
-        // Buscar alocações do mês
-        await loadMonthlyAllocations();
-        
-        // Gerar HTML do calendário
-        renderMonthlyCalendar();
-        
-        console.log('📅 Monthly calendar generated for:', currentMonth.toISOString().substring(0,7));
-        
-    } catch (error) {
-        console.error('❌ Erro generating monthly calendar:', error);
-        showToast('Erro ao carregar vista mensal', 'error');
-    } finally {
-        hideLoadingOverlay();
-    }
-}
-
-async function loadMonthlyAllocations() {
-    const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
-    
-    try {
-        const response = await fetch(`/equipe/api/allocations?month=${monthKey}`);
-        const data = await response.json();
-        
-        if (response.ok) {
-            monthlyAllocations = data.allocations_by_date || {};
-            console.log('📊 Monthly allocations loaded:', Object.keys(monthlyAllocations).length + ' days');
-        } else {
-            throw new Error(data.error || 'Erro ao buscar alocações mensais');
+        if (toast.parentElement) {
+            toast.remove();
         }
-    } catch (error) {
-        console.error('❌ Load monthly allocations error:', error);
-        // Usar dados mockados temporariamente
-        monthlyAllocations = {};
-    }
+    }, 5000);
 }
-
-function renderMonthlyCalendar() {
-    const container = document.getElementById('calendar-container');
-    const today = new Date();
-    
-    // Calcular primeiro e último dia do mês
-    const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-    
-    // Calcular dias do calendário (incluindo dias de outros meses)
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay() + (firstDay.getDay() === 0 ? -6 : 1)); // Segunda-feira
-    
-    const endDate = new Date(lastDay);
-    const remainingDays = 7 - ((lastDay.getDay() + 6) % 7) - 1;
-    endDate.setDate(endDate.getDate() + remainingDays);
-    
-    // Nomes dos meses
-    const monthNames = [
-        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    
-    // HTML do calendário
-    let html = `
-        <div class="calendar-container">
-            <div class="month-navigation">
-                <button class="nav-btn" onclick="navigateMonth(-1)">
-                    <i class="fas fa-chevron-left"></i> Anterior
-                </button>
-                <h4 class="month-title">
-                    ${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}
-                </h4>
-                <button class="nav-btn" onclick="navigateMonth(1)">
-                    Próximo <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-            
-            <div class="calendar-header">
-                <div class="calendar-weekday">Seg</div>
-                <div class="calendar-weekday">Ter</div>
-                <div class="calendar-weekday">Qua</div>
-                <div class="calendar-weekday">Qui</div>
-                <div class="calendar-weekday">Sex</div>
-                <div class="calendar-weekday">Sáb</div>
-                <div class="calendar-weekday">Dom</div>
-            </div>
-            
-            <div class="calendar-grid">
-    `;
-    
-    // Gerar cada dia do calendário
-    const currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
-        const dateKey = currentDate.toISOString().split('T')[0];
-        const isCurrentMonth = currentDate.getMonth() === currentMonth.getMonth();
-        const isToday = currentDate.toDateString() === today.toDateString();
-        const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
-        
-        let dayClass = 'calendar-day';
-        if (!isCurrentMonth) dayClass += ' other-month';
-        if (isToday) dayClass += ' today';
-        
-        // Alocações do dia
-        const dayAllocations = monthlyAllocations[dateKey] || [];
-        let allocationsHtml = '';
-        
-        dayAllocations.slice(0, 3).forEach(allocation => {
-            allocationsHtml += `
-                <div class="calendar-allocation" 
-                     onclick="openEmployeeAllocation(${allocation.id})"
-                     title="${allocation.obra.nome} - ${allocation.funcionarios_count} funcionários">
-                    ${allocation.obra.codigo}
-                    ${allocation.funcionarios_count > 0 ? ` (${allocation.funcionarios_count})` : ''}
-                </div>
-            `;
-        });
-        
-        if (dayAllocations.length > 3) {
-            allocationsHtml += `<div class="calendar-allocation" style="background: #6c757d;">+${dayAllocations.length - 3} mais</div>`;
-        }
-        
-        html += `
-            <div class="${dayClass}" 
-                 data-date="${dateKey}"
-                 ${!isWeekend && isCurrentMonth ? 'onclick="openDayDetail(\'' + dateKey + '\')"' : ''}
-                 ${!isWeekend && isCurrentMonth ? 'style="cursor: pointer;"' : ''}>
-                <div class="calendar-day-number">${currentDate.getDate()}</div>
-                ${allocationsHtml}
-            </div>
-        `;
-        
-        currentDate.setDate(currentDate.getDate() + 1);
-    }
-    
-    html += `
-            </div>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-}
-
-function navigateMonth(direction) {
-    currentMonth.setMonth(currentMonth.getMonth() + direction);
-    generateMonthlyCalendar();
-    
-    console.log('📅 Navigated to month:', currentMonth.getFullYear() + '-' + (currentMonth.getMonth() + 1));
-}
-
-function openDayDetail(dateKey) {
-    // Navegar para a vista semanal do dia selecionado
-    const selectedDate = new Date(dateKey);
-    const monday = new Date(selectedDate);
-    monday.setDate(selectedDate.getDate() - selectedDate.getDay() + 1);
-    
-    const weekStart = monday.toISOString().split('T')[0];
-    window.location.href = `/equipe/alocacao?week=${weekStart}`;
-}
-
-// ===================================
-// WEEKLY PLANNER - IMPLEMENTAÇÃO COMPLETA
-// ===================================
-
-let plannerData = {};
-let servicosCatalog = [];
-
-async function initializeWeeklyPlanner() {
-    showLoadingOverlay();
-    
-    try {
-        // Carregar catálogo de serviços e dados do planner
-        await Promise.all([
-            loadServicesCatalog(),
-            loadPlannerData(),
-            generatePlannerGrid()
-        ]);
-        
-        // Inicializar drag & drop do planner
-        initializePlannerDragDrop();
-        
-        console.log('📋 Weekly Planner initialized successfully');
-        
-    } catch (error) {
-        console.error('❌ Error initializing planner:', error);
-        showToast('Erro ao inicializar Weekly Planner', 'error');
-    } finally {
-        hideLoadingOverlay();
-    }
-}
-
-async function loadServicesCatalog() {
-    try {
-        const response = await fetch('/api/servicos');
-        const data = await response.json();
-        
-        if (response.ok) {
-            servicosCatalog = data.servicos || [];
-            renderServicesCatalog();
-            console.log('📊 Services catalog loaded:', servicosCatalog.length + ' services');
-        } else {
-            throw new Error(data.error || 'Erro ao carregar catálogo de serviços');
-        }
-    } catch (error) {
-        console.error('❌ Load services catalog error:', error);
-        // Usar dados mockados para demonstração
-        servicosCatalog = [
-            { id: 1, nome: 'Fundação', categoria: 'Estrutural' },
-            { id: 2, nome: 'Alvenaria', categoria: 'Vedação' },
-            { id: 3, nome: 'Cobertura', categoria: 'Estrutural' },
-            { id: 4, nome: 'Elétrica', categoria: 'Instalações' },
-            { id: 5, nome: 'Hidráulica', categoria: 'Instalações' },
-            { id: 6, nome: 'Pintura', categoria: 'Acabamento' },
-            { id: 7, nome: 'Cerâmica', categoria: 'Acabamento' }
-        ];
-        renderServicesCatalog();
-    }
-}
-
-function renderServicesCatalog() {
-    const container = document.getElementById('servicos-catalog');
-    
-    let html = '';
-    servicosCatalog.forEach(servico => {
-        html += `
-            <div class="servico-catalog-item" 
-                 data-servico-id="${servico.id}"
-                 data-servico-nome="${servico.nome}"
-                 data-servico-categoria="${servico.categoria || ''}">
-                <div class="servico-nome">${servico.nome}</div>
-                <div class="servico-categoria">${servico.categoria || 'Sem categoria'}</div>
-            </div>
-        `;
-    });
-    
-    if (servicosCatalog.length === 0) {
-        html = '<div class="text-center text-muted py-3"><i class="fas fa-info-circle mb-2"></i><br><small>Nenhum serviço encontrado</small></div>';
-    }
-    
-    container.innerHTML = html;
-}
-
-function filterServices(searchTerm) {
-    const items = document.querySelectorAll('.servico-catalog-item');
-    
-    items.forEach(item => {
-        const nome = item.querySelector('.servico-nome').textContent.toLowerCase();
-        const categoria = item.querySelector('.servico-categoria').textContent.toLowerCase();
-        
-        if (nome.includes(searchTerm.toLowerCase()) || categoria.includes(searchTerm.toLowerCase())) {
-            item.style.display = 'block';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-}
-
-async function loadPlannerData() {
-    try {
-        const weekStart = currentWeekStart;
-        const response = await fetch(`/equipe/api/planner?week=${weekStart}`);
-        const data = await response.json();
-        
-        if (response.ok) {
-            plannerData = data.planner || {};
-            console.log('📋 Planner data loaded for week:', weekStart);
-        } else {
-            console.log('ℹ️ No existing planner data, starting fresh');
-            plannerData = {};
-        }
-    } catch (error) {
-        console.error('❌ Load planner data error:', error);
-        plannerData = {};
-    }
-}
-
-function generatePlannerGrid() {
-    const container = document.getElementById('planner-rows');
-    const obrasAlocadas = getObrasAlocadasSemana();
-    
-    let html = '';
-    
-    if (obrasAlocadas.length === 0) {
-        html = `
-            <div class="planner-empty-state">
-                <i class="fas fa-info-circle mb-2" style="font-size: 2rem; opacity: 0.5;"></i>
-                <br>Nenhuma obra alocada nesta semana
-                <br><small>Aloque obras primeiro para usar o planner</small>
-            </div>
-        `;
-    } else {
-        obrasAlocadas.forEach(obra => {
-            html += `
-                <div class="planner-row row" data-obra-id="${obra.id}">
-                    <div class="col-2 planner-cell">
-                        <div class="obra-info">
-                            ${obra.codigo || obra.nome}
-                        </div>
-                    </div>
-            `;
-            
-            // Colunas para cada dia da semana
-            for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
-                const dayKey = `${obra.id}-${dayIndex}`;
-                const dayServices = plannerData[dayKey] || [];
-                
-                html += `
-                    <div class="col-2 planner-cell">
-                        <div class="drop-zone-planner ${dayServices.length > 0 ? 'has-content' : ''}" 
-                             data-obra-id="${obra.id}" 
-                             data-day="${dayIndex}">
-                `;
-                
-                dayServices.forEach(service => {
-                    html += `
-                        <div class="servico-card" 
-                             data-service-id="${service.id}"
-                             data-service-nome="${service.nome}">
-                            <div>${service.nome}</div>
-                            ${service.responsavel ? `<div class="servico-responsavel">👤 ${service.responsavel}</div>` : ''}
-                        </div>
-                    `;
-                });
-                
-                html += `
-                        </div>
-                    </div>
-                `;
-            }
-            
-            html += `</div>`;
-        });
-    }
-    
-    container.innerHTML = html;
-    console.log('🏗️ Planner grid generated for', obrasAlocadas.length, 'obras');
-}
-
-function getObrasAlocadasSemana() {
-    // Extrair obras únicas das alocações da semana atual
-    const obras = [];
-    const obrasSet = new Set();
-    
-    document.querySelectorAll('.allocated-work').forEach(element => {
-        const obraElement = element.closest('[data-obra-id]');
-        if (obraElement && !obrasSet.has(obraElement.dataset.obraId)) {
-            obrasSet.add(obraElement.dataset.obraId);
-            obras.push({
-                id: obraElement.dataset.obraId,
-                codigo: obraElement.dataset.obraCodigo || element.querySelector('.fw-bold').textContent,
-                nome: obraElement.dataset.obraNome || element.querySelector('.fw-bold').textContent
-            });
-        }
-    });
-    
-    // Se não encontrou obras no DOM, usar dados das obras disponíveis
-    if (obras.length === 0) {
-        document.querySelectorAll('.obra-draggable').forEach(element => {
-            if (!obrasSet.has(element.dataset.obraId)) {
-                obrasSet.add(element.dataset.obraId);
-                obras.push({
-                    id: element.dataset.obraId,
-                    codigo: element.dataset.obraCodigo,
-                    nome: element.dataset.obraNome
-                });
-            }
-        });
-    }
-    
-    return obras.slice(0, 5); // Máximo 5 obras para não sobrecarregar
-}
-
-function initializePlannerDragDrop() {
-    // Catálogo de serviços (source)
-    const catalogContainer = document.getElementById('servicos-catalog');
-    if (catalogContainer) {
-        new Sortable(catalogContainer, {
-            group: {
-                name: 'planner-services',
-                pull: 'clone',
-                put: false
-            },
-            sort: false,
-            animation: 150,
-            ghostClass: 'servico-catalog-item',
-            chosenClass: 'dragging'
-        });
-    }
-    
-    // Drop zones do planner
-    document.querySelectorAll('.drop-zone-planner').forEach(zone => {
-        new Sortable(zone, {
-            group: {
-                name: 'planner-services',
-                pull: true,
-                put: true
-            },
-            animation: 200,
-            ghostClass: 'servico-card',
-            chosenClass: 'dragging',
-            onAdd: function(evt) {
-                const serviceElement = evt.item;
-                const obraId = evt.to.dataset.obraId;
-                const dayIndex = evt.to.dataset.day;
-                
-                // Transformar em serviço planejado
-                if (serviceElement.classList.contains('servico-catalog-item')) {
-                    const servicoNome = serviceElement.dataset.servicoNome;
-                    const servicoId = serviceElement.dataset.servicoId;
-                    
-                    serviceElement.className = 'servico-card';
-                    serviceElement.innerHTML = `
-                        <div>${servicoNome}</div>
-                        <div class="servico-responsavel">👤 Definir responsável</div>
-                    `;
-                    serviceElement.dataset.serviceId = servicoId;
-                    serviceElement.dataset.serviceNome = servicoNome;
-                    
-                    // Adicionar click para editar responsável
-                    serviceElement.onclick = () => editServiceResponsible(serviceElement);
-                }
-                
-                // Atualizar dados do planner
-                updatePlannerData();
-                
-                // Visual feedback
-                evt.to.classList.add('has-content');
-                showToast(`${serviceElement.dataset.serviceNome} adicionado ao planejamento`, 'success');
-                hapticFeedback('success');
-                
-                console.log(`📋 Service added: ${serviceElement.dataset.serviceNome} → Obra ${obraId}, Day ${dayIndex}`);
-            },
-            onRemove: function(evt) {
-                // Atualizar dados do planner
-                updatePlannerData();
-                
-                // Verificar se zone ficou vazia
-                if (evt.from.children.length === 0) {
-                    evt.from.classList.remove('has-content');
-                }
-                
-                console.log(`📋 Service removed from planner`);
-            }
-        });
-    });
-}
-
-function editServiceResponsible(serviceElement) {
-    const currentResponsible = serviceElement.querySelector('.servico-responsavel')?.textContent.replace('👤 ', '') || 'Definir responsável';
-    
-    const newResponsible = prompt('Definir responsável pelo serviço:', currentResponsible === 'Definir responsável' ? '' : currentResponsible);
-    
-    if (newResponsible !== null) {
-        const responsavelElement = serviceElement.querySelector('.servico-responsavel');
-        if (responsavelElement) {
-            responsavelElement.textContent = `👤 ${newResponsible || 'Definir responsável'}`;
-        }
-        
-        updatePlannerData();
-        showToast('Responsável atualizado', 'success');
-    }
-}
-
-function updatePlannerData() {
-    plannerData = {};
-    
-    document.querySelectorAll('.drop-zone-planner').forEach(zone => {
-        const obraId = zone.dataset.obraId;
-        const dayIndex = zone.dataset.day;
-        const dayKey = `${obraId}-${dayIndex}`;
-        
-        const services = [];
-        zone.querySelectorAll('.servico-card').forEach(card => {
-            const responsavelElement = card.querySelector('.servico-responsavel');
-            const responsavel = responsavelElement ? responsavelElement.textContent.replace('👤 ', '') : '';
-            
-            services.push({
-                id: card.dataset.serviceId,
-                nome: card.dataset.serviceNome,
-                responsavel: responsavel === 'Definir responsável' ? '' : responsavel
-            });
-        });
-        
-        if (services.length > 0) {
-            plannerData[dayKey] = services;
-        }
-    });
-}
-
-async function savePlannerData() {
-    showLoadingOverlay();
-    
-    try {
-        updatePlannerData();
-        
-        const response = await fetch('/equipe/api/planner', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                week: currentWeekStart,
-                planner_data: plannerData
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('Planejamento salvo com sucesso!', 'success');
-            console.log('✅ Planner data saved');
-            hapticFeedback('success');
-        } else {
-            throw new Error(result.error || 'Erro ao salvar planejamento');
-        }
-    } catch (error) {
-        console.error('❌ Save planner error:', error);
-        showToast('Erro ao salvar planejamento', 'error');
-        hapticFeedback('error');
-    } finally {
-        hideLoadingOverlay();
-    }
-}
-
-function clearAllPlanning() {
-    if (!confirm('Tem certeza que deseja limpar todo o planejamento da semana?')) {
-        return;
-    }
-    
-    document.querySelectorAll('.drop-zone-planner').forEach(zone => {
-        zone.innerHTML = '';
-        zone.classList.remove('has-content');
-    });
-    
-    plannerData = {};
-    showToast('Planejamento limpo', 'info');
-    
-    console.log('🗑️ All planning cleared');
-}
-
-// ===================================
-// FILTROS E DETECÇÃO DE CONFLITOS
-// ===================================
-
-function applyObraFilter(obraId) {
-    const filterStatus = document.getElementById('filter-status');
-    
-    if (!obraId) {
-        // Mostrar todas as obras
-        document.querySelectorAll('.obra-draggable, .allocated-work').forEach(element => {
-            element.style.display = 'block';
-        });
-        
-        document.querySelectorAll('.day-drop-zone').forEach(zone => {
-            zone.style.display = 'block';
-        });
-        
-        filterStatus.textContent = 'Mostrando todas';
-        filterStatus.className = 'badge bg-light text-dark me-1';
-        
-        console.log('🔍 Filter cleared - showing all obras');
-        
-    } else {
-        // Filtrar por obra específica
-        let visibleCount = 0;
-        
-        // Filtrar obras disponíveis
-        document.querySelectorAll('.obra-draggable').forEach(element => {
-            if (element.dataset.obraId === obraId) {
-                element.style.display = 'block';
-                visibleCount++;
-            } else {
-                element.style.display = 'none';
-            }
-        });
-        
-        // Filtrar alocações
-        document.querySelectorAll('.allocated-work').forEach(element => {
-            const parentZone = element.closest('.day-drop-zone');
-            const allocations = parentZone.querySelectorAll('.allocated-work');
-            let hasVisibleAllocations = false;
-            
-            allocations.forEach(allocation => {
-                // Precisamos identificar a obra da alocação (isso pode precisar ser melhorado)
-                const obraTexto = allocation.querySelector('.fw-bold').textContent;
-                const matchingObra = document.querySelector(`.obra-draggable[data-obra-codigo="${obraTexto}"], .obra-draggable[data-obra-nome*="${obraTexto}"]`);
-                
-                if (matchingObra && matchingObra.dataset.obraId === obraId) {
-                    allocation.style.display = 'block';
-                    hasVisibleAllocations = true;
-                } else {
-                    allocation.style.display = 'none';
-                }
-            });
-            
-            // Mostrar/ocultar a zona baseado se tem alocações visíveis
-            parentZone.style.display = hasVisibleAllocations ? 'block' : 'none';
-        });
-        
-        const selectedOption = document.querySelector(`#obra-filter option[value="${obraId}"]`);
-        const obraNome = selectedOption ? selectedOption.textContent : 'Obra selecionada';
-        
-        filterStatus.textContent = `Filtrando: ${obraNome}`;
-        filterStatus.className = 'badge bg-primary text-white me-1';
-        
-        console.log(`🔍 Filter applied: Obra ${obraId} - ${visibleCount} items visible`);
-    }
-    
-    // Re-executar detecção de conflitos se estiver ativa
-    const conflictToggle = document.getElementById('show-conflicts');
-    if (conflictToggle && conflictToggle.checked) {
-        detectConflicts();
-    }
-}
-
-function toggleConflictDetection(enabled) {
-    const conflictCount = document.getElementById('conflict-count');
-    
-    if (enabled) {
-        detectConflicts();
-        conflictCount.style.display = 'inline-block';
-        showToast('Detecção de conflitos ativada', 'info');
-        console.log('⚠️ Conflict detection enabled');
-    } else {
-        clearConflictHighlights();
-        conflictCount.style.display = 'none';
-        showToast('Detecção de conflitos desativada', 'info');
-        console.log('✅ Conflict detection disabled');
-    }
-}
-
-function detectConflicts() {
-    clearConflictHighlights();
-    let conflictCount = 0;
-    
-    // Detectar funcionários alocados em múltiplas obras no mesmo dia
-    const funcionariosPorDia = {};
-    
-    // Coletar todas as alocações por dia
-    document.querySelectorAll('.allocated-work').forEach(allocation => {
-        const dayZone = allocation.closest('.day-drop-zone');
-        const dayIndex = dayZone.dataset.day;
-        const dateStr = dayZone.dataset.date;
-        
-        if (!funcionariosPorDia[dateStr]) {
-            funcionariosPorDia[dateStr] = {};
-        }
-        
-        // Para cada obra, contar funcionários (isso é uma aproximação)
-        const funcionariosBadge = allocation.querySelector('.employee-count-badge');
-        const funcionariosCount = funcionariosBadge ? parseInt(funcionariosBadge.textContent) : 0;
-        const obraCodigo = allocation.querySelector('.fw-bold').textContent;
-        
-        if (funcionariosCount > 0) {
-            if (!funcionariosPorDia[dateStr][obraCodigo]) {
-                funcionariosPorDia[dateStr][obraCodigo] = 0;
-            }
-            funcionariosPorDia[dateStr][obraCodigo] += funcionariosCount;
-        }
-    });
-    
-    // Detectar conflitos de horário (obras simultâneas no mesmo dia)
-    Object.keys(funcionariosPorDia).forEach(date => {
-        const obrasNoDia = Object.keys(funcionariosPorDia[date]);
-        if (obrasNoDia.length > 1) {
-            // Múltiplas obras no mesmo dia - potencial conflito
-            const dayZone = document.querySelector(`[data-date="${date}"]`);
-            if (dayZone) {
-                dayZone.classList.add('conflict-detected');
-                dayZone.querySelectorAll('.allocated-work').forEach(work => {
-                    work.classList.add('conflict-work');
-                    
-                    // Adicionar tooltip de conflito
-                    work.title = `⚠️ Conflito: ${obrasNoDia.length} obras neste dia`;
-                });
-                conflictCount++;
-            }
-        }
-    });
-    
-    // Detectar sobrecarga de funcionários (mais de 8h/dia)
-    document.querySelectorAll('.allocated-work').forEach(allocation => {
-        const funcionariosBadge = allocation.querySelector('.employee-count-badge');
-        const funcionariosCount = funcionariosBadge ? parseInt(funcionariosBadge.textContent) : 0;
-        
-        // Se uma obra tem muitos funcionários, pode ser sobrecarga
-        if (funcionariosCount > 10) {
-            allocation.classList.add('overload-work');
-            allocation.title = `⚠️ Possível sobrecarga: ${funcionariosCount} funcionários`;
-            conflictCount++;
-        }
-    });
-    
-    // Atualizar contador de conflitos
-    const conflictCountElement = document.getElementById('conflict-count');
-    if (conflictCountElement) {
-        conflictCountElement.textContent = `${conflictCount} conflito${conflictCount !== 1 ? 's' : ''}`;
-        conflictCountElement.className = conflictCount > 0 ? 'badge bg-danger text-white' : 'badge bg-success text-white';
-    }
-    
-    if (conflictCount > 0) {
-        showToast(`${conflictCount} conflito${conflictCount !== 1 ? 's' : ''} detectado${conflictCount !== 1 ? 's' : ''}`, 'warning');
-    } else {
-        showToast('Nenhum conflito detectado', 'success');
-    }
-    
-    console.log(`⚠️ Conflict detection completed: ${conflictCount} conflicts found`);
-}
-
-function clearConflictHighlights() {
-    // Remover todas as classes de conflito
-    document.querySelectorAll('.conflict-detected, .conflict-work, .overload-work').forEach(element => {
-        element.classList.remove('conflict-detected', 'conflict-work', 'overload-work');
-        element.removeAttribute('title');
-    });
-    
-    console.log('✅ Conflict highlights cleared');
-}
-
-// ===================================
-// SINCRONIZAÇÃO E INTEGRAÇÃO - FASE 3
-// ===================================
-
-function syncPlannerWithAllocations() {
-    const syncStatus = document.getElementById('sync-status');
-    const syncMessage = document.getElementById('sync-message');
-    const syncIndicator = document.getElementById('sync-indicator');
-    
-    syncStatus.style.display = 'block';
-    syncMessage.textContent = 'Sincronizando com alocações...';
-    
-    showLoadingOverlay();
-    
-    try {
-        let syncedCount = 0;
-        let divergenceCount = 0;
-        
-        // Obter todas as obras alocadas na semana
-        const obrasAlocadas = getObrasAlocadasSemana();
-        
-        // Para cada obra alocada, verificar se há planejamento correspondente
-        obrasAlocadas.forEach(obra => {
-            for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
-                const dayKey = `${obra.id}-${dayIndex}`;
-                const plannedServices = plannerData[dayKey] || [];
-                
-                // Verificar se há alocação sem planejamento
-                const hasAllocation = checkAllocationForDay(obra.id, dayIndex);
-                
-                if (hasAllocation && plannedServices.length === 0) {
-                    // Criar planejamento básico baseado na alocação
-                    const basicService = {
-                        id: 'auto-sync',
-                        nome: 'Atividades gerais',
-                        responsavel: 'A definir'
-                    };
-                    
-                    plannerData[dayKey] = [basicService];
-                    syncedCount++;
-                    
-                    console.log(`📋 Auto-synced: Obra ${obra.codigo} → Day ${dayIndex}`);
-                    
-                } else if (!hasAllocation && plannedServices.length > 0) {
-                    // Divergência: há planejamento sem alocação
-                    divergenceCount++;
-                    console.log(`⚠️ Divergence: Planning without allocation - Obra ${obra.codigo}, Day ${dayIndex}`);
-                }
-            }
-        });
-        
-        // Re-gerar o grid do planner com dados sincronizados
-        generatePlannerGrid();
-        initializePlannerDragDrop();
-        
-        // Atualizar status de sincronização
-        if (divergenceCount > 0) {
-            syncMessage.textContent = `${syncedCount} sincronizados, ${divergenceCount} divergências`;
-            syncStatus.querySelector('.badge').className = 'badge bg-warning text-dark';
-            syncIndicator.style.display = 'none';
-            
-            showToast(`Sincronização parcial: ${divergenceCount} divergências encontradas`, 'warning');
-            
-        } else {
-            syncMessage.textContent = `${syncedCount} itens sincronizados com sucesso`;
-            syncStatus.querySelector('.badge').className = 'badge bg-success text-white';
-            syncIndicator.style.display = 'inline-block';
-            
-            showToast('Planejamento sincronizado com alocações', 'success');
-        }
-        
-        // Esconder status após 5 segundos
-        setTimeout(() => {
-            syncStatus.style.display = 'none';
-        }, 5000);
-        
-        console.log(`🔄 Sync completed: ${syncedCount} synced, ${divergenceCount} divergences`);
-        hapticFeedback('success');
-        
-    } catch (error) {
-        console.error('❌ Sync error:', error);
-        syncMessage.textContent = 'Erro na sincronização';
-        syncStatus.querySelector('.badge').className = 'badge bg-danger text-white';
-        
-        showToast('Erro ao sincronizar planejamento', 'error');
-        hapticFeedback('error');
-        
-    } finally {
-        hideLoadingOverlay();
-    }
-}
-
-function checkAllocationForDay(obraId, dayIndex) {
-    // Verificar se há uma alocação para essa obra neste dia
-    const dayZones = document.querySelectorAll(`[data-day="${dayIndex}"]`);
-    
-    for (let zone of dayZones) {
-        const allocatedWorks = zone.querySelectorAll('.allocated-work');
-        for (let work of allocatedWorks) {
-            const obraTexto = work.querySelector('.fw-bold')?.textContent;
-            const matchingObra = document.querySelector(`.obra-draggable[data-obra-codigo="${obraTexto}"]`);
-            
-            if (matchingObra && matchingObra.dataset.obraId === obraId) {
-                return true;
-            }
-        }
-    }
-    
-    return false;
-}
-
-// ===================================
-// EXPORTAÇÃO PARA EXCEL - FASE 3
-// ===================================
-
-function exportToExcel(type = 'allocation') {
-    showLoadingOverlay();
-    
-    try {
-        let data = [];
-        let filename = '';
-        
-        if (type === 'allocation') {
-            data = generateAllocationExportData();
-            filename = `Alocacao_Semanal_${currentWeekStart}.xlsx`;
-        } else if (type === 'planner') {
-            data = generatePlannerExportData();
-            filename = `Planejamento_Semanal_${currentWeekStart}.xlsx`;
-        }
-        
-        // Criar workbook usando uma biblioteca de Excel (seria necessário incluir)
-        downloadExcelFile(data, filename);
-        
-        showToast(`Arquivo ${filename} exportado com sucesso!`, 'success');
-        console.log(`📊 Excel exported: ${filename}`);
-        
-    } catch (error) {
-        console.error('❌ Export error:', error);
-        showToast('Erro ao exportar arquivo Excel', 'error');
-    } finally {
-        hideLoadingOverlay();
-    }
-}
-
-function generateAllocationExportData() {
-    const data = [];
-    
-    // Header
-    data.push(['Obra', 'Código', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Total Funcionários']);
-    
-    // Data rows
-    const obrasAlocadas = getObrasAlocadasSemana();
-    
-    obrasAlocadas.forEach(obra => {
-        const row = [obra.nome, obra.codigo];
-        let totalFuncionarios = 0;
-        
-        // Para cada dia da semana
-        for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
-            let dayInfo = '-';
-            let funcionariosCount = 0;
-            
-            // Buscar alocação para este dia
-            const dayZone = document.querySelector(`[data-day="${dayIndex}"]`);
-            if (dayZone) {
-                const allocatedWorks = dayZone.querySelectorAll('.allocated-work');
-                
-                allocatedWorks.forEach(work => {
-                    const obraTexto = work.querySelector('.fw-bold').textContent;
-                    if (obraTexto === obra.codigo) {
-                        const badge = work.querySelector('.employee-count-badge');
-                        funcionariosCount = badge ? parseInt(badge.textContent) : 0;
-                        
-                        const timeText = work.textContent.match(/\d{2}:\d{2} - \d{2}:\d{2}/);
-                        const timeInfo = timeText ? timeText[0] : '08:00 - 17:00';
-                        
-                        dayInfo = `${funcionariosCount} funcionários (${timeInfo})`;
-                        totalFuncionarios += funcionariosCount;
-                    }
-                });
-            }
-            
-            row.push(dayInfo);
-        }
-        
-        row.push(totalFuncionarios);
-        data.push(row);
-    });
-    
-    return data;
-}
-
-function generatePlannerExportData() {
-    const data = [];
-    
-    // Header
-    data.push(['Obra', 'Código', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta']);
-    
-    // Data rows
-    const obrasAlocadas = getObrasAlocadasSemana();
-    
-    obrasAlocadas.forEach(obra => {
-        const row = [obra.nome, obra.codigo];
-        
-        // Para cada dia da semana
-        for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
-            const dayKey = `${obra.id}-${dayIndex}`;
-            const services = plannerData[dayKey] || [];
-            
-            let dayServices = '';
-            if (services.length > 0) {
-                dayServices = services.map(service => {
-                    let serviceText = service.nome;
-                    if (service.responsavel && service.responsavel !== 'Definir responsável') {
-                        serviceText += ` (${service.responsavel})`;
-                    }
-                    return serviceText;
-                }).join('; ');
-            } else {
-                dayServices = '-';
-            }
-            
-            row.push(dayServices);
-        }
-        
-        data.push(row);
-    });
-    
-    return data;
-}
-
-function downloadExcelFile(data, filename) {
-    // Converter dados para CSV como fallback (seria necessário library para Excel real)
-    const csvContent = data.map(row => 
-        row.map(cell => `"${cell}"`).join(',')
-    ).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    
-    if (link.download !== undefined) {
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename.replace('.xlsx', '.csv'));
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-}
-
-// ===================================
-// VALIDAÇÕES E FEEDBACK MELHORADO - FASE 3
-// ===================================
-
-function validateAllocation(obraId, dataAlocacao) {
-    const errors = [];
-    
-    // Validar se obra existe
-    if (!obraId || isNaN(parseInt(obraId))) {
-        errors.push('Obra inválida selecionada');
-    }
-    
-    // Validar data
-    const date = new Date(dataAlocacao);
-    if (isNaN(date.getTime())) {
-        errors.push('Data de alocação inválida');
-    }
-    
-    // Validar se não é fim de semana
-    const dayOfWeek = date.getDay();
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-        errors.push('Não é possível alocar em finais de semana');
-    }
-    
-    // Validar se não é data passada (mais de 1 semana)
-    const today = new Date();
-    const weekAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
-    if (date < weekAgo) {
-        errors.push('Não é possível alocar em datas muito anteriores');
-    }
-    
-    return {
-        isValid: errors.length === 0,
-        errors: errors
-    };
-}
-
-function showValidationErrors(errors) {
-    const errorContainer = document.createElement('div');
-    errorContainer.className = 'alert alert-danger alert-dismissible fade show';
-    errorContainer.style.position = 'fixed';
-    errorContainer.style.top = '20px';
-    errorContainer.style.right = '20px';
-    errorContainer.style.zIndex = '2000';
-    errorContainer.style.maxWidth = '400px';
-    
-    let errorHtml = '<h6><i class="fas fa-exclamation-triangle me-2"></i>Erros encontrados:</h6><ul class="mb-0">';
-    errors.forEach(error => {
-        errorHtml += `<li>${error}</li>`;
-    });
-    errorHtml += '</ul>';
-    errorHtml += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-    
-    errorContainer.innerHTML = errorHtml;
-    document.body.appendChild(errorContainer);
-    
-    // Auto remove após 10 segundos
-    setTimeout(() => {
-        if (errorContainer.parentNode) {
-            errorContainer.remove();
-        }
-    }, 10000);
-}
-
-// ===================================
-// BREADCRUMBS E NAVEGAÇÃO - FASE 3
-// ===================================
-
-function updateBreadcrumbs(currentPage = 'alocacao') {
-    const breadcrumbContainer = document.querySelector('.breadcrumb-container');
-    if (!breadcrumbContainer) return;
-    
-    const breadcrumbs = {
-        'alocacao': [
-            { name: 'SIGE', url: '/' },
-            { name: 'Gestão de Equipe', url: '/equipe' },
-            { name: 'Alocação Semanal', active: true }
-        ],
-        'funcionarios': [
-            { name: 'SIGE', url: '/' },
-            { name: 'Gestão de Equipe', url: '/equipe' },
-            { name: 'Alocação Semanal', url: '/equipe/alocacao' },
-            { name: 'Funcionários', active: true }
-        ],
-        'planner': [
-            { name: 'SIGE', url: '/' },
-            { name: 'Gestão de Equipe', url: '/equipe' },
-            { name: 'Alocação Semanal', url: '/equipe/alocacao' },
-            { name: 'Weekly Planner', active: true }
-        ]
-    };
-    
-    const currentBreadcrumbs = breadcrumbs[currentPage] || breadcrumbs.alocacao;
-    
-    let breadcrumbHtml = '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0">';
-    
-    currentBreadcrumbs.forEach((item, index) => {
-        if (item.active) {
-            breadcrumbHtml += `<li class="breadcrumb-item active" aria-current="page">${item.name}</li>`;
-        } else {
-            breadcrumbHtml += `<li class="breadcrumb-item"><a href="${item.url}">${item.name}</a></li>`;
-        }
-    });
-    
-    breadcrumbHtml += '</ol></nav>';
-    breadcrumbContainer.innerHTML = breadcrumbHtml;
-}
-
-function updateSyncIndicator() {
-    const syncIndicator = document.getElementById('sync-indicator');
-    const obrasAlocadas = getObrasAlocadasSemana();
-    
-    let hasPlanning = false;
-    obrasAlocadas.forEach(obra => {
-        for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
-            const dayKey = `${obra.id}-${dayIndex}`;
-            if (plannerData[dayKey] && plannerData[dayKey].length > 0) {
-                hasPlanning = true;
-                break;
-            }
-        }
-    });
-    
-    if (hasPlanning) {
-        syncIndicator.style.display = 'inline-block';
-        syncIndicator.className = 'badge bg-success text-white me-1';
-        syncIndicator.innerHTML = '<i class="fas fa-check-circle me-1"></i>Sincronizado';
-    } else if (obrasAlocadas.length > 0) {
-        syncIndicator.style.display = 'inline-block';
-        syncIndicator.className = 'badge bg-warning text-dark me-1';
-        syncIndicator.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Sem planejamento';
-    } else {
-        syncIndicator.style.display = 'none';
-    }
-}
-
-// ===================================
-// OTIMIZAÇÃO DE PERFORMANCE - FASE 3
-// ===================================
-
-// Lazy loading para funcionalidades pesadas
-function lazyLoadFeatures() {
-    // Pré-carregar dados em background
-    setTimeout(() => {
-        if (!servicosCatalog.length) {
-            loadServicesCatalog().catch(console.error);
-        }
-    }, 2000);
-    
-    // Otimizar drag & drop para dispositivos móveis
-    if (window.innerWidth <= 768) {
-        // Reduzir animações em dispositivos móveis
-        document.documentElement.style.setProperty('--animation-duration', '0.1s');
-    }
-}
-
-// Debounce para filtros
-let filterTimeout;
-function debouncedFilter(callback, delay = 300) {
-    clearTimeout(filterTimeout);
-    filterTimeout = setTimeout(callback, delay);
-}
-
-// Inicialização otimizada
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar recursos críticos primeiro
-    waitForSortable();
-    
-    // Carregar funcionalidades não-críticas depois
-    setTimeout(lazyLoadFeatures, 1000);
-    
-    // Atualizar indicadores periodicamente
-    setInterval(updateSyncIndicator, 30000); // A cada 30 segundos
-});
-
-console.log('🔧 EQUIPE System initialized - SIGE Pattern Compliant - FASE 3 COMPLETA');
-console.log('📊 Features: ✅ Vista Mensal ✅ Weekly Planner ✅ Filtros ✅ Exportação ✅ Validações ✅ Sincronização');
 </script>
 {% endblock %}

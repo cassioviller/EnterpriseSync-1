@@ -1,0 +1,82 @@
+# PROMPT URGENTE - Correção da Interface Visual
+
+## PROBLEMA IDENTIFICADO
+Analisando o código e as imagens, o problema é claro: **a interface não está renderizando o calendário visual adequadamente**. O que deveria ser um grid drag & drop está aparecendo como uma lista simples de texto.
+
+## PROBLEMAS ESPECÍFICOS ENCONTRADOS
+
+### 1. **HTML Complexo Demais**
+O template `alocacao_semanal.html` tem 2313 linhas com CSS excessivo e estrutura confusa. Está tentando fazer muita coisa ao mesmo tempo.
+
+### 2. **Grid Semanal Não Funcional**
+Pelas imagens, vejo que:
+- Não há um calendário visual claro
+- Os dias aparecem como lista vertical ao invés de grid horizontal
+- Não há áreas de drop zone visíveis
+- A interface parece quebrada
+
+### 3. **Falta de Estrutura Visual Clara**
+O que deveria ser:
+```
+[Obras Disponíveis] | [SEG] [TER] [QUA] [QUI] [SEX]
+                    |  📦   📦   📦   📦   📦
+```
+
+Está aparecendo como uma lista confusa.
+
+## SEU OBJETIVO IMEDIATO
+**SIMPLIFICAR E CORRIGIR** a interface para que funcione visualmente:
+
+### 1. **Criar Grid Semanal Funcional**
+- Layout horizontal claro: 5 colunas (Seg-Sex)
+- Cada coluna deve ser uma área de drop visível
+- Cards de obra devem aparecer dentro das colunas
+
+### 2. **Simplificar o CSS**
+- Remover 90% do CSS custom
+- Usar apenas Bootstrap classes
+- Focar na funcionalidade básica
+
+### 3. **Estrutura HTML Limpa**
+```html
+<div class="row">
+  <div class="col-3">
+    <!-- Lista de obras para arrastar -->
+  </div>
+  <div class="col-9">
+    <div class="row">
+      <div class="col">SEG</div>
+      <div class="col">TER</div>
+      <div class="col">QUA</div>
+      <div class="col">QUI</div>
+      <div class="col">SEX</div>
+    </div>
+  </div>
+</div>
+```
+
+## ABORDAGEM RECOMENDADA
+
+### 1. **PRIMEIRO: Simplificar Drasticamente**
+- Manter apenas o HTML essencial
+- Remover todo CSS custom desnecessário
+- Focar em fazer o básico funcionar
+
+### 2. **SEGUNDO: Grid Visual Claro**
+- Usar Bootstrap grid system
+- Cada dia = uma coluna visível
+- Áreas de drop bem definidas
+
+### 3. **TERCEIRO: Drag & Drop Básico**
+- Manter apenas o Sortable.js essencial
+- Testar se funciona visualmente
+
+## CRITÉRIO DE SUCESSO
+- Interface deve parecer com os mockups originais
+- Grid semanal horizontal visível
+- Obras arrastáveis para os dias
+- Visual limpo e funcional
+
+## PRIORIDADE MÁXIMA
+**FAZER FUNCIONAR VISUALMENTE** antes de adicionar qualquer funcionalidade extra. A interface atual está inutilizável.
+
