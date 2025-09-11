@@ -38,62 +38,53 @@ def alocacao_semanal():
 
 @equipe_bp.route('/teste-fase1')
 @login_required
-@admin_required
 def alocacao_teste_fase1():
-    """Tela principal - Grid semanal"""
+    """Rota principal com debug detalhado - FASE 2"""
     try:
-        admin_id = get_admin_id()
-        
-        # Semana atual
-        today = date.today()
-        week_param = request.args.get('week')
-        if week_param:
-            try:
-                today = datetime.strptime(week_param, '%Y-%m-%d').date()
-            except:
-                pass
-        
-        monday = get_monday_of_week(today)
-        friday = monday + timedelta(days=4)
-        
-        # Datas da semana
-        week_dates = [monday + timedelta(days=i) for i in range(5)]
-        
-        # Obras ativas
-        obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.codigo).all()
-        
-        # Alocações da semana
-        allocations = Allocation.query.filter(
-            Allocation.admin_id == admin_id,
-            Allocation.data_alocacao.between(monday, friday)
-        ).all()
-        
-        # Organizar por data
-        week_grid = {}
-        for allocation in allocations:
-            date_key = allocation.data_alocacao.strftime('%Y-%m-%d')
-            if date_key not in week_grid:
-                week_grid[date_key] = []
-            week_grid[date_key].append(allocation)
-        
-        # Estatísticas
-        stats = {
-            'total_obras': len(obras),
-            'total_alocacoes_semana': len(allocations),
-            'funcionarios_alocados': len(set(ae.funcionario_id for a in allocations 
-                                           for ae in a.funcionarios_alocados if hasattr(a, 'funcionarios_alocados')))
+        # Debug de usuário
+        user_info = {
+            'id': current_user.id,
+            'admin_id': get_current_admin_id(),
+            'type': str(type(current_user)),
+            'authenticated': current_user.is_authenticated
         }
         
-        logging.info(f"EQUIPE: Carregada semana {monday} - {len(allocations)} alocações")
+        print("=== DEBUG TESTE-FASE1 FASE 2 ===")
+        print(f"User info: {user_info}")
         
-        # FASE 1: Renderizar template simplificado
-        return render_template('equipe/alocacao_simples.html',
-                             debug={'admin_id': admin_id, 'total_obras': len(obras)})
+        # Teste básico de obras
+        obras_count = 0
+        try:
+            from models import Obra
+            admin_id = get_current_admin_id() 
+            obras_count = Obra.query.filter_by(admin_id=admin_id, ativo=True).count()
+            print(f"Obras encontradas: {obras_count}")
+        except Exception as e:
+            print(f"ERRO ao contar obras: {e}")
+        
+        # Teste de template
+        return render_template('equipe/alocacao_simples.html', 
+                             debug_info=user_info,
+                             obras_count=obras_count)
         
     except Exception as e:
-        logging.error(f"EQUIPE ERROR: {str(e)}")
-        flash('Erro ao carregar gestão de equipe', 'error')
-        return redirect(url_for('dashboard'))
+        print(f"ERRO COMPLETO FASE 2: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Retorna erro detalhado
+        return f"""
+        <div class="container mt-5">
+            <div class="alert alert-danger">
+                <h3>❌ ERRO NA FASE 2</h3>
+                <p><strong>Erro:</strong> {e}</p>
+                <pre>{traceback.format_exc()}</pre>
+                <hr>
+                <a href="/equipe/teste-sem-auth" class="btn btn-primary">← Voltar ao teste básico</a>
+                <a href="/equipe/debug/test-direct" class="btn btn-info">Testar API Direta</a>
+            </div>
+        </div>
+        """
 
 @equipe_bp.route('/funcionarios/<int:allocation_id>')
 @login_required
@@ -319,3 +310,76 @@ def get_allocations_simples():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
+
+# ===================================  
+# FASE 2: TESTES E DEBUG - IMPLEMENTAÇÃO
+# SEGUINDO PLANO EXATO DO PROMPT
+# ===================================
+
+@equipe_bp.route('/teste-sem-auth')
+def teste_sem_auth():
+    """Teste básico - sem autenticação"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Teste Fase 2</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body>
+        <div class="container mt-5">
+            <div class="alert alert-success">
+                <h1>🎯 FASE 2 - TESTE BÁSICO</h1>
+                <p><strong>✅ Rota funcionando!</strong></p>
+                <p>Blueprint registrado corretamente.</p>
+                <hr>
+                <h3>Próximos testes:</h3>
+                <a href="/equipe/debug/test-direct" class="btn btn-info me-2">Teste API Direta</a>
+                <a href="/equipe/teste-fase1" class="btn btn-warning">Teste com Auth</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+@equipe_bp.route('/debug/test-direct')
+def debug_test_direct():
+    """API de teste - sem autenticação"""
+    import datetime
+    return jsonify({
+        'status': 'API funcionando',
+        'timestamp': datetime.datetime.now().isoformat(),
+        'debug': True,
+        'message': 'Rota de debug ativa',
+        'fase': 2
+    })
+
+@equipe_bp.route('/debug/obras-count')
+@login_required  # Esta precisa de auth
+def debug_obras_count():
+    """Conta obras - com autenticação"""
+    try:
+        admin_id = get_current_admin_id()
+        
+        # Teste básico de query
+        from models import Obra
+        total_obras = Obra.query.count()
+        obras_admin = Obra.query.filter_by(admin_id=admin_id).count()
+        obras_ativas = Obra.query.filter_by(admin_id=admin_id, ativo=True).count()
+        
+        return jsonify({
+            'admin_id': admin_id,
+            'total_obras_sistema': total_obras,
+            'obras_do_admin': obras_admin,
+            'obras_ativas': obras_ativas,
+            'status': 'ok',
+            'fase': 2
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'status': 'error',
+            'fase': 2
+        })

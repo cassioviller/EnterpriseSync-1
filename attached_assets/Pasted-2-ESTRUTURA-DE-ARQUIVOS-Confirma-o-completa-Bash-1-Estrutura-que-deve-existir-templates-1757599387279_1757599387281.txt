@@ -1,0 +1,332 @@
+2. ESTRUTURA DE ARQUIVOS ✅
+
+Confirmação completa:
+
+Bash
+
+
+# 1. Estrutura que deve existir:
+templates/
+├── equipe/
+│   └── alocacao_simples.html  # ← Substituir completamente
+
+# 2. Se não existir, criar:
+mkdir -p templates/equipe/
+
+# 3. Rotas em equipe_views.py:
+# Adicionar APÓS linha 325 (final do arquivo)
+
+
+3. ORDEM DE IMPLEMENTAÇÃO ✅
+
+Sequência CORRETA e SEGURA:
+
+Python
+
+
+# PASSO 1: Adicionar rota de teste básico (SEM AUTH)
+@equipe_bp.route('/teste-sem-auth')
+def teste_sem_auth():
+    return "<h1>Rota funcionando!</h1>"
+
+# PASSO 2: Testar rota básica
+# URL: http://localhost:5000/equipe/teste-sem-auth
+
+# PASSO 3: Adicionar rotas de debug
+@equipe_bp.route('/debug/test-direct')
+def debug_test_direct():
+    # código fornecido...
+
+# PASSO 4: Substituir template HTML
+# PASSO 5: Testar com autenticação
+# PASSO 6: Testar drag & drop
+
+
+4. DEBUGGING E LOGS ✅
+
+Onde aparecem os logs:
+
+Python
+
+
+# Os print() aparecem no terminal onde você rodou o Flask:
+print("=== DEBUG ===")  # ← Aparece no console do servidor
+
+# Para ver no browser também:
+import logging
+logging.basicConfig(level=logging.DEBUG)
+app.logger.debug("Debug message")
+
+# Ou retorne como HTML temporariamente:
+return f"<pre>Debug: {variavel}</pre>"
+
+
+Interpretação de erros:
+
+•
+404: Problema de rota (Blueprint não registrado)
+
+•
+500: Problema no código Python
+
+•
+Template not found: Arquivo HTML não existe no local correto
+
+5. PRÓXIMOS PASSOS ✅
+
+Após Fase 2 funcionar:
+
+1.
+Usar modelos existentes (Allocation, AllocationEmployee) - já estão prontos
+
+2.
+Semana fixa primeiro - navegação depois
+
+3.
+Salvamento simples - uma alocação por vez
+
+
+
+
+📋 IMPLEMENTAÇÃO PASSO-A-PASSO
+
+PASSO 1: TESTE DE ROTA BÁSICA
+
+Python
+
+
+# Adicione no FINAL de equipe_views.py:
+
+@equipe_bp.route('/teste-sem-auth')
+def teste_sem_auth():
+    """Teste básico - sem autenticação"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Teste Fase 2</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body>
+        <div class="container mt-5">
+            <div class="alert alert-success">
+                <h1>🎯 FASE 2 - TESTE BÁSICO</h1>
+                <p><strong>✅ Rota funcionando!</strong></p>
+                <p>Blueprint registrado corretamente.</p>
+                <hr>
+                <h3>Próximos testes:</h3>
+                <a href="/equipe/debug/test-direct" class="btn btn-info me-2">Teste API Direta</a>
+                <a href="/equipe/teste-fase1" class="btn btn-warning">Teste com Auth</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+# TESTE: http://localhost:5000/equipe/teste-sem-auth
+
+
+PASSO 2: ADICIONAR ROTAS DE DEBUG
+
+Python
+
+
+# Adicione após a rota anterior:
+
+@equipe_bp.route('/debug/test-direct')
+def debug_test_direct():
+    """API de teste - sem autenticação"""
+    import datetime
+    return jsonify({
+        'status': 'API funcionando',
+        'timestamp': datetime.datetime.now().isoformat(),
+        'debug': True,
+        'message': 'Rota de debug ativa'
+    })
+
+@equipe_bp.route('/debug/obras-count')
+@login_required  # Esta precisa de auth
+def debug_obras_count():
+    """Conta obras - com autenticação"""
+    try:
+        admin_id = get_current_admin_id()
+        
+        # Teste básico de query
+        from models import Obra
+        total_obras = Obra.query.count()
+        obras_admin = Obra.query.filter_by(admin_id=admin_id).count()
+        
+        return jsonify({
+            'admin_id': admin_id,
+            'total_obras_sistema': total_obras,
+            'obras_do_admin': obras_admin,
+            'status': 'ok'
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'status': 'error'
+        })
+
+# TESTE: 
+# 1. http://localhost:5000/equipe/debug/test-direct (sem auth)
+# 2. http://localhost:5000/equipe/debug/obras-count (com auth)
+
+
+PASSO 3: CRIAR/SUBSTITUIR TEMPLATE
+
+HTML
+
+
+<!-- templates/equipe/alocacao_simples.html -->
+<!-- Use o código HTML completo fornecido no prompt anterior -->
+<!-- Substitua COMPLETAMENTE o arquivo existente -->
+
+
+PASSO 4: ROTA PRINCIPAL COM DEBUG
+
+Python
+
+
+# Modifique a rota existente para adicionar debug:
+
+@equipe_bp.route('/teste-fase1')
+@login_required
+def teste_fase1():
+    """Rota principal com debug detalhado"""
+    try:
+        # Debug de usuário
+        user_info = {
+            'id': current_user.id,
+            'admin_id': get_current_admin_id(),
+            'type': str(type(current_user))
+        }
+        
+        print("=== DEBUG TESTE-FASE1 ===")
+        print(f"User info: {user_info}")
+        
+        # Teste de template
+        return render_template('equipe/alocacao_simples.html', 
+                             debug_info=user_info)
+        
+    except Exception as e:
+        print(f"ERRO COMPLETO: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Retorna erro detalhado
+        return f"""
+        <div class="alert alert-danger">
+            <h3>❌ ERRO NA FASE 2</h3>
+            <p><strong>Erro:</strong> {e}</p>
+            <pre>{traceback.format_exc()}</pre>
+            <hr>
+            <a href="/equipe/teste-sem-auth">← Voltar ao teste básico</a>
+        </div>
+        """
+
+
+PASSO 5: CHECKLIST DE VALIDAÇÃO
+
+Bash
+
+
+# Execute NESTA ORDEM:
+
+# ✅ 1. Teste rota básica (sem auth)
+curl http://localhost:5000/equipe/teste-sem-auth
+# Esperado: HTML com "Rota funcionando!"
+
+# ✅ 2. Teste API direta (sem auth)  
+curl http://localhost:5000/equipe/debug/test-direct
+# Esperado: JSON com status "API funcionando"
+
+# ✅ 3. Teste rota com auth (precisa estar logado)
+# Acesse no browser: http://localhost:5000/equipe/teste-fase1
+# Esperado: Página HTML da Fase 2 carrega
+
+# ✅ 4. Teste API com auth (no browser, após login)
+# Acesse: http://localhost:5000/equipe/debug/obras-count  
+# Esperado: JSON com contagem de obras
+
+# ✅ 5. Teste drag & drop
+# Na página da Fase 2, clique nos botões de teste
+
+
+🚨 TROUBLESHOOTING
+
+Problema: 404 na rota básica
+
+Python
+
+
+# Verifique se Blueprint está registrado em app.py:
+from equipe_views import equipe_bp
+app.register_blueprint(equipe_bp)
+
+# Debug:
+print("Blueprints registrados:", app.blueprints.keys())
+
+
+Problema: Template not found
+
+Bash
+
+
+# Verifique estrutura:
+ls -la templates/equipe/
+# Deve mostrar: alocacao_simples.html
+
+# Se não existir:
+mkdir -p templates/equipe/
+touch templates/equipe/alocacao_simples.html
+
+
+Problema: Erro de autenticação
+
+Python
+
+
+# Temporariamente remova @login_required:
+@equipe_bp.route('/teste-fase1')
+# @login_required  # ← Comente esta linha
+def teste_fase1():
+    # código...
+
+
+✅ APROVAÇÃO PARA PROSSEGUIR
+
+Sua proposta de ação está PERFEITA!
+
+Pode prosseguir exatamente nesta ordem:
+
+1.
+✅ Adicionar rotas de debug
+
+2.
+✅ Substituir template
+
+3.
+✅ Testar acesso básico
+
+4.
+✅ Testar APIs
+
+5.
+✅ Validar drag & drop
+
+Após cada passo, me envie:
+
+•
+Screenshot ou resultado
+
+•
+Qualquer erro encontrado
+
+•
+Status do checklist
+
+Não avance para o próximo passo até o atual funcionar 100%!
+

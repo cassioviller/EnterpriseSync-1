@@ -1,72 +1,96 @@
 {% extends "base_completo.html" %}
 
-{% block title %}📋 Gestão de Equipe - FASE 1 TESTE{% endblock %}
+{% block title %}Gestão de Equipe - FASE 2{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <h3>📋 Gestão de Equipe - FASE 1 TESTE</h3>
-    <p class="text-muted">Implementação gradual e segura - "FUNCIONA PRIMEIRO, OTIMIZA DEPOIS"</p>
+    <h3>📋 Gestão de Equipe - FASE 2 CORREÇÕES</h3>
+    <p class="text-muted">Implementação gradual - "FUNCIONA PRIMEIRO, OTIMIZA DEPOIS"</p>
     
-    <!-- Layout Bootstrap simples -->
+    <!-- STATUS DE DEBUG -->
+    <div class="alert alert-info" id="status-debug">
+        <strong>Status:</strong> Carregando sistema...
+    </div>
+    
     <div class="row">
-        <!-- Sidebar: Obras -->
+        <!-- SIDEBAR: OBRAS -->
         <div class="col-md-3">
             <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">🏗️ Obras</h5>
+                <div class="card-header">
+                    <h5>🏗️ Obras Disponíveis</h5>
+                    <small id="obras-count">Carregando...</small>
                 </div>
-                <div class="card-body" id="obras-list">
-                    <div class="text-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Carregando...</span>
+                <div class="card-body">
+                    <div id="obras-list" style="min-height: 300px;">
+                        <div class="text-center text-muted p-4">
+                            <div class="spinner-border spinner-border-sm me-2"></div>
+                            Carregando obras...
                         </div>
-                        <p class="mt-2 text-muted">Carregando obras...</p>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Grid semanal -->
+        <!-- GRID SEMANAL -->
         <div class="col-md-9">
             <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0">📅 Semana - FASE 1</h5>
+                <div class="card-header">
+                    <h5>📅 Semana - FASE 2</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
+                        <!-- SEGUNDA -->
                         <div class="col">
                             <h6 class="text-center">Segunda</h6>
-                            <div class="border p-3" style="min-height: 200px; border-radius: 8px;" 
-                                 data-day="0" id="day-0">
-                                <small class="text-muted">Arraste obras aqui</small>
+                            <div class="border rounded p-3 drop-zone" 
+                                 style="min-height: 200px; background: #f8f9fa;" 
+                                 data-day="0" 
+                                 id="day-0">
+                                <small class="text-muted">Drop zone Segunda</small>
                             </div>
                         </div>
+                        
+                        <!-- TERÇA -->
                         <div class="col">
                             <h6 class="text-center">Terça</h6>
-                            <div class="border p-3" style="min-height: 200px; border-radius: 8px;" 
-                                 data-day="1" id="day-1">
-                                <small class="text-muted">Arraste obras aqui</small>
+                            <div class="border rounded p-3 drop-zone" 
+                                 style="min-height: 200px; background: #f8f9fa;" 
+                                 data-day="1" 
+                                 id="day-1">
+                                <small class="text-muted">Drop zone Terça</small>
                             </div>
                         </div>
+                        
+                        <!-- QUARTA -->
                         <div class="col">
                             <h6 class="text-center">Quarta</h6>
-                            <div class="border p-3" style="min-height: 200px; border-radius: 8px;" 
-                                 data-day="2" id="day-2">
-                                <small class="text-muted">Arraste obras aqui</small>
+                            <div class="border rounded p-3 drop-zone" 
+                                 style="min-height: 200px; background: #f8f9fa;" 
+                                 data-day="2" 
+                                 id="day-2">
+                                <small class="text-muted">Drop zone Quarta</small>
                             </div>
                         </div>
+                        
+                        <!-- QUINTA -->
                         <div class="col">
                             <h6 class="text-center">Quinta</h6>
-                            <div class="border p-3" style="min-height: 200px; border-radius: 8px;" 
-                                 data-day="3" id="day-3">
-                                <small class="text-muted">Arraste obras aqui</small>
+                            <div class="border rounded p-3 drop-zone" 
+                                 style="min-height: 200px; background: #f8f9fa;" 
+                                 data-day="3" 
+                                 id="day-3">
+                                <small class="text-muted">Drop zone Quinta</small>
                             </div>
                         </div>
+                        
+                        <!-- SEXTA -->
                         <div class="col">
                             <h6 class="text-center">Sexta</h6>
-                            <div class="border p-3" style="min-height: 200px; border-radius: 8px;" 
-                                 data-day="4" id="day-4">
-                                <small class="text-muted">Arraste obras aqui</small>
+                            <div class="border rounded p-3 drop-zone" 
+                                 style="min-height: 200px; background: #f8f9fa;" 
+                                 data-day="4" 
+                                 id="day-4">
+                                <small class="text-muted">Drop zone Sexta</small>
                             </div>
                         </div>
                     </div>
@@ -74,21 +98,36 @@
             </div>
         </div>
     </div>
-</div>
-
-<!-- Debug info -->
-<div class="container-fluid mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card bg-light">
-                <div class="card-header">
-                    <h6 class="mb-0">🔍 FASE 1 - DEBUG E TESTE</h6>
+    
+    <!-- PAINEL DE DEBUG MELHORADO -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5>🔍 FASE 2 - DEBUG E TESTE</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <button class="btn btn-info w-100" onclick="testarAPI()">
+                        🔍 Testar API Básica
+                    </button>
                 </div>
-                <div class="card-body">
-                    <button class="btn btn-info me-2" onclick="testAPI()">🔍 Testar API</button>
-                    <button class="btn btn-secondary me-2" onclick="testObras()">🏗️ Testar Obras</button>
-                    <button class="btn btn-warning" onclick="testAllocations()">📋 Testar Alocações</button>
-                    <div id="debug-info" class="mt-3"></div>
+                <div class="col-md-4">
+                    <button class="btn btn-warning w-100" onclick="testarObras()">
+                        🏗️ Testar Carregamento Obras
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-success w-100" onclick="testarDragDrop()">
+                        🎯 Testar Drag & Drop
+                    </button>
+                </div>
+            </div>
+            
+            <!-- ÁREA DE RESULTADOS -->
+            <div class="mt-3">
+                <h6>Resultados dos Testes:</h6>
+                <div id="debug-results" class="border rounded p-3" style="background: #f8f9fa; min-height: 100px; font-family: monospace; font-size: 0.9rem;">
+                    Clique nos botões acima para testar...
                 </div>
             </div>
         </div>
@@ -96,111 +135,122 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
+<!-- SortableJS - CDN confiável -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-<script>
-// ===================================
-// FASE 1: JavaScript SIMPLES
-// SEGUINDO PLANO REALISTA
-// ===================================
 
-class EquipeSimples {
+<script>
+// CLASSE FASE 2 - FOCO EM DEBUG E CORREÇÕES
+class EquipeFase2 {
     constructor() {
         this.obras = [];
-        this.allocations = [];
+        this.debugArea = document.getElementById('debug-results');
+        this.statusArea = document.getElementById('status-debug');
+        
+        this.log('=== INICIANDO FASE 2 ===');
         this.init();
     }
     
-    async init() {
-        console.log('=== INICIANDO EQUIPE SIMPLES - FASE 1 ===');
-        await this.testAPI();
-        await this.loadObras();
-        await this.loadAllocations();
-        this.setupDragDrop();
-        console.log('=== EQUIPE SIMPLES INICIALIZADA ===');
-    }
-    
-    async testAPI() {
-        console.log('=== TESTANDO API ===');
-        try {
-            const response = await fetch('/equipe/api/test');
-            const data = await response.json();
-            console.log('✅ API Test Result:', data);
-            
-            document.getElementById('debug-info').innerHTML = `
-                <div class="alert alert-success">
-                    <strong>✅ API FUNCIONANDO!</strong><br>
-                    User ID: ${data.user_id}<br>
-                    Admin ID: ${data.admin_id}<br>
-                    Tipo: ${data.user_tipo_usuario}<br>
-                    Status: ${data.status}<br>
-                    Mensagem: ${data.message}
-                </div>
-            `;
-        } catch (error) {
-            console.error('❌ API Test Error:', error);
-            document.getElementById('debug-info').innerHTML = `
-                <div class="alert alert-danger">
-                    <strong>❌ API ERRO:</strong> ${error.message}
-                </div>
-            `;
+    log(message) {
+        console.log(message);
+        if (this.debugArea) {
+            this.debugArea.innerHTML += `${new Date().toLocaleTimeString()}: ${message}\n`;
+            this.debugArea.scrollTop = this.debugArea.scrollHeight;
         }
     }
     
-    async loadObras() {
-        console.log('=== CARREGANDO OBRAS ===');
+    updateStatus(message, type = 'info') {
+        if (this.statusArea) {
+            this.statusArea.className = `alert alert-${type}`;
+            this.statusArea.innerHTML = `<strong>Status:</strong> ${message}`;
+        }
+    }
+    
+    async init() {
+        try {
+            this.log('Verificando se SortableJS carregou...');
+            if (typeof Sortable === 'undefined') {
+                this.log('❌ ERRO: SortableJS não carregou!');
+                this.updateStatus('SortableJS não carregou', 'danger');
+                return;
+            }
+            this.log('✅ SortableJS carregado com sucesso');
+            
+            this.updateStatus('Sistema inicializado - pronto para testes', 'success');
+            
+        } catch (error) {
+            this.log(`❌ ERRO na inicialização: ${error.message}`);
+            this.updateStatus(`Erro: ${error.message}`, 'danger');
+        }
+    }
+    
+    // TESTE 1: API BÁSICA
+    async testarAPI() {
+        this.log('=== TESTANDO API BÁSICA ===');
+        
+        try {
+            // Teste 1: API sem autenticação
+            this.log('Testando /equipe/debug/test-direct...');
+            const response1 = await fetch('/equipe/debug/test-direct');
+            const data1 = await response1.json();
+            this.log(`✅ API direta: ${JSON.stringify(data1)}`);
+            
+            // Teste 2: API com autenticação
+            this.log('Testando /equipe/debug/obras-count...');
+            const response2 = await fetch('/equipe/debug/obras-count');
+            const data2 = await response2.json();
+            this.log(`✅ API obras: ${JSON.stringify(data2)}`);
+            
+            this.updateStatus('APIs funcionando corretamente', 'success');
+            
+        } catch (error) {
+            this.log(`❌ ERRO na API: ${error.message}`);
+            this.updateStatus(`Erro na API: ${error.message}`, 'danger');
+        }
+    }
+    
+    // TESTE 2: CARREGAMENTO DE OBRAS
+    async testarObras() {
+        this.log('=== TESTANDO CARREGAMENTO DE OBRAS ===');
+        
         try {
             const response = await fetch('/equipe/api/obras-simples');
             const result = await response.json();
-            console.log('📊 Obras Response:', result);
             
-            if (result.success) {
+            this.log(`Response status: ${response.status}`);
+            this.log(`Response data: ${JSON.stringify(result)}`);
+            
+            if (result.success && result.data) {
                 this.obras = result.data;
+                this.log(`✅ ${this.obras.length} obras carregadas`);
                 this.renderObras();
-                console.log(`✅ ${result.count} obras carregadas`);
+                this.updateStatus(`${this.obras.length} obras carregadas`, 'success');
             } else {
-                console.error('❌ Erro ao carregar obras:', result.error);
-                this.showError('Erro ao carregar obras: ' + result.error);
+                this.log(`❌ Erro no resultado: ${result.error || 'Dados inválidos'}`);
+                this.updateStatus(`Erro: ${result.error || 'Dados inválidos'}`, 'warning');
             }
-        } catch (error) {
-            console.error('❌ Erro na requisição obras:', error);
-            this.showError('Erro de conexão ao carregar obras');
-        }
-    }
-    
-    async loadAllocations() {
-        console.log('=== CARREGANDO ALOCAÇÕES ===');
-        try {
-            const response = await fetch('/equipe/api/allocations-simples');
-            const result = await response.json();
-            console.log('📋 Allocations Response:', result);
             
-            if (result.success) {
-                this.allocations = result.data;
-                this.renderAllocations();
-                console.log(`✅ ${result.count} alocações carregadas`);
-            } else {
-                console.error('❌ Erro ao carregar alocações:', result.error);
-                this.showError('Erro ao carregar alocações: ' + result.error);
-            }
         } catch (error) {
-            console.error('❌ Erro na requisição alocações:', error);
-            this.showError('Erro de conexão ao carregar alocações');
+            this.log(`❌ ERRO ao carregar obras: ${error.message}`);
+            this.updateStatus(`Erro ao carregar obras: ${error.message}`, 'danger');
         }
     }
     
     renderObras() {
         const container = document.getElementById('obras-list');
-        if (this.obras.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center">Nenhuma obra encontrada</p>';
+        const countElement = document.getElementById('obras-count');
+        
+        if (!container) {
+            this.log('❌ Container obras-list não encontrado');
             return;
         }
         
         container.innerHTML = '';
+        countElement.textContent = `${this.obras.length} obras encontradas`;
         
-        this.obras.forEach(obra => {
+        this.obras.forEach((obra, index) => {
             const div = document.createElement('div');
-            div.className = 'card mb-2 obra-card';
+            div.className = 'card mb-2 obra-draggable';
             div.dataset.obraId = obra.id;
             div.style.cursor = 'grab';
             div.innerHTML = `
@@ -212,130 +262,136 @@ class EquipeSimples {
             container.appendChild(div);
         });
         
-        console.log(`✅ ${this.obras.length} obras renderizadas`);
+        this.log(`✅ ${this.obras.length} obras renderizadas no DOM`);
+        
+        // Configurar drag & drop após renderizar
+        this.setupDragDrop();
     }
     
-    renderAllocations() {
-        // Limpar drop zones primeiro
-        for (let i = 0; i < 5; i++) {
-            const dayElement = document.getElementById(`day-${i}`);
-            if (dayElement) {
-                dayElement.innerHTML = '<small class="text-muted">Arraste obras aqui</small>';
+    // TESTE 3: DRAG & DROP
+    testarDragDrop() {
+        this.log('=== TESTANDO DRAG & DROP ===');
+        
+        try {
+            // Verificar se SortableJS está disponível
+            if (typeof Sortable === 'undefined') {
+                this.log('❌ SortableJS não está carregado');
+                this.updateStatus('SortableJS não carregado', 'danger');
+                return;
             }
+            
+            // Testar se obras estão carregadas
+            if (this.obras.length === 0) {
+                this.log('⚠️ Nenhuma obra carregada. Execute "Testar Carregamento Obras" primeiro');
+                this.updateStatus('Carregue obras primeiro', 'warning');
+                return;
+            }
+            
+            this.setupDragDrop();
+            this.log('✅ Drag & Drop configurado com sucesso');
+            this.updateStatus('Drag & Drop ativo - arraste obras para os dias', 'success');
+            
+        } catch (error) {
+            this.log(`❌ ERRO no Drag & Drop: ${error.message}`);
+            this.updateStatus(`Erro no Drag & Drop: ${error.message}`, 'danger');
         }
-        
-        // Renderizar alocações existentes
-        this.allocations.forEach(alloc => {
-            const dayElement = document.getElementById(`day-${alloc.day_of_week}`);
-            if (dayElement) {
-                // Remover placeholder se existir
-                if (dayElement.innerHTML.includes('Arraste obras aqui')) {
-                    dayElement.innerHTML = '';
-                }
-                
-                const allocDiv = document.createElement('div');
-                allocDiv.className = 'card bg-success text-white mb-2';
-                allocDiv.innerHTML = `
-                    <div class="card-body p-2">
-                        <h6 class="card-title mb-1">${alloc.obra_codigo}</h6>
-                        <small>${alloc.turno_inicio} - ${alloc.turno_fim}</small>
-                    </div>
-                `;
-                dayElement.appendChild(allocDiv);
-            }
-        });
-        
-        console.log(`✅ ${this.allocations.length} alocações renderizadas`);
     }
     
     setupDragDrop() {
-        console.log('=== CONFIGURANDO DRAG & DROP ===');
+        this.log('Configurando SortableJS...');
         
-        // SortableJS que você já domina
-        const obrasList = document.getElementById('obras-list');
-        
-        if (obrasList) {
-            Sortable.create(obrasList, {
-                group: {
-                    name: 'obras',
-                    pull: 'clone',
-                    put: false
-                },
-                sort: false,
-                onStart: (evt) => {
-                    console.log('🟡 Drag started:', evt.item.dataset.obraId);
-                }
-            });
-        }
-        
-        // Setup drop zones
-        for (let i = 0; i < 5; i++) {
-            const dayElement = document.getElementById(`day-${i}`);
-            if (dayElement) {
-                Sortable.create(dayElement, {
-                    group: 'obras',
-                    onAdd: (evt) => {
-                        console.log('✅ Obra adicionada:', evt.item.dataset.obraId, 'no dia:', i);
-                        this.showToast(`Obra ${evt.item.querySelector('h6').textContent} adicionada ao dia ${i}!`, 'success');
-                        // TODO FASE 2: Salvar no backend
+        try {
+            // Lista de obras (source)
+            const obrasList = document.getElementById('obras-list');
+            if (obrasList && !obrasList.sortableInstance) {
+                obrasList.sortableInstance = Sortable.create(obrasList, {
+                    group: {
+                        name: 'obras',
+                        pull: 'clone',
+                        put: false
+                    },
+                    sort: false,
+                    animation: 150,
+                    onStart: (evt) => {
+                        this.log(`🎯 Arrastando obra: ${evt.item.dataset.obraId}`);
                     }
                 });
             }
+            
+            // Drop zones (dias da semana)
+            for (let i = 0; i < 5; i++) {
+                const dayElement = document.getElementById(`day-${i}`);
+                if (dayElement && !dayElement.sortableInstance) {
+                    dayElement.sortableInstance = Sortable.create(dayElement, {
+                        group: 'obras',
+                        animation: 150,
+                        onAdd: (evt) => {
+                            const obraId = evt.item.dataset.obraId;
+                            const dayName = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][i];
+                            this.log(`✅ Obra ${obraId} adicionada ao ${dayName}!`);
+                            this.updateStatus(`Obra adicionada ao ${dayName}`, 'success');
+                            
+                            // Limpar placeholder
+                            if (dayElement.querySelector('.text-muted')) {
+                                const placeholder = dayElement.querySelector('.text-muted');
+                                if (placeholder.textContent.includes('Drop zone')) {
+                                    placeholder.remove();
+                                }
+                            }
+                        },
+                        onRemove: (evt) => {
+                            this.log(`📤 Obra removida do dia ${i}`);
+                        }
+                    });
+                }
+            }
+            
+            this.log('✅ Todas as drop zones configuradas');
+            
+        } catch (error) {
+            this.log(`❌ ERRO ao configurar SortableJS: ${error.message}`);
+            throw error;
         }
-        
-        console.log('✅ Drag & Drop configurado');
-    }
-    
-    showError(message) {
-        const container = document.getElementById('debug-info');
-        container.innerHTML = `
-            <div class="alert alert-danger">
-                <strong>❌ Erro:</strong> ${message}
-            </div>
-        `;
-    }
-    
-    showToast(message, type = 'info') {
-        console.log(`📢 Toast: ${message} (${type})`);
-        // TODO: Implementar toast visual na FASE 2
-        
-        // Por enquanto, só alert simples
-        if (type === 'success') {
-            console.log(`✅ ${message}`);
-        } else if (type === 'error') {
-            console.error(`❌ ${message}`);
-        }
     }
 }
 
 // ===================================
-// FUNÇÕES GLOBAIS PARA DEBUG - FASE 1
+// FUNÇÕES GLOBAIS PARA OS BOTÕES
 // ===================================
 
-function testAPI() {
-    console.log('🔍 Testando API...');
-    window.equipe.testAPI();
+function testarAPI() {
+    if (window.equipeFase2) {
+        window.equipeFase2.testarAPI();
+    } else {
+        console.error('EquipeFase2 não inicializada');
+    }
 }
 
-function testObras() {
-    console.log('🏗️ Testando Obras...');
-    window.equipe.loadObras();
+function testarObras() {
+    if (window.equipeFase2) {
+        window.equipeFase2.testarObras();
+    } else {
+        console.error('EquipeFase2 não inicializada');
+    }
 }
 
-function testAllocations() {
-    console.log('📋 Testando Alocações...');
-    window.equipe.loadAllocations();
+function testarDragDrop() {
+    if (window.equipeFase2) {
+        window.equipeFase2.testarDragDrop();
+    } else {
+        console.error('EquipeFase2 não inicializada');
+    }
 }
 
 // ===================================
-// INICIALIZAÇÃO - FASE 1
+// INICIALIZAÇÃO AUTOMÁTICA
 // ===================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 DOM loaded - Inicializando FASE 1...');
-    window.equipe = new EquipeSimples();
+    console.log('🚀 DOM loaded - Inicializando FASE 2...');
+    window.equipeFase2 = new EquipeFase2();
 });
 
-console.log('📜 Script FASE 1 carregado - Aguardando DOM...');
+console.log('📜 Script FASE 2 carregado - Aguardando DOM...');
 </script>
 {% endblock %}
