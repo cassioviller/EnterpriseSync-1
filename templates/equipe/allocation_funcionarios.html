@@ -3,7 +3,7 @@
 {% block title %}👥 Funcionários - {{ allocation.obra.codigo }} ({{ allocation.data_alocacao.strftime('%d/%m') }}){% endblock %}
 
 {% block head_content %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer></script>
 
 <style>
 /* Estilo específico para drag & drop funcionários - Padrão SIGE */
@@ -434,10 +434,17 @@
 let allocationId = {{ allocation.id }};
 let pendingChanges = false;
 
-document.addEventListener('DOMContentLoaded', function() {
-    initializeFuncionariosDragDrop();
-    console.log('👥 Sistema funcionários inicializado - Padrão SIGE - Allocation #' + allocationId);
-});
+// Garantir que Sortable.js carregue antes de inicializar
+function waitForSortable() {
+    if (typeof Sortable !== 'undefined') {
+        initializeFuncionariosDragDrop();
+        console.log('👥 Sistema funcionários inicializado - Padrão SIGE - Allocation #' + allocationId);
+    } else {
+        setTimeout(waitForSortable, 100);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', waitForSortable);
 
 function initializeFuncionariosDragDrop() {
     // Lista de funcionários disponíveis

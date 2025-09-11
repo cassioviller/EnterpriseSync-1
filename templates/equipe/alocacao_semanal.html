@@ -3,8 +3,8 @@
 {% block title %}📋 Gestão de Equipe - Semana {{ monday.strftime('%d/%m') }}{% endblock %}
 
 {% block head_content %}
-<!-- Sortable.js para drag & drop -->
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<!-- Sortable.js para drag & drop - carregamento garantido -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer></script>
 
 <style>
 /* Estilo específico para drag & drop mantendo padrão SIGE */
@@ -363,10 +363,17 @@
 let currentWeekStart = '{{ monday.strftime("%Y-%m-%d") }}';
 let currentView = 'week';
 
-document.addEventListener('DOMContentLoaded', function() {
-    initializeDragAndDrop();
-    console.log('🚀 Sistema EQUIPE inicializado - Padrão SIGE');
-});
+// Garantir que Sortable.js carregue antes de inicializar
+function waitForSortable() {
+    if (typeof Sortable !== 'undefined') {
+        initializeDragAndDrop();
+        console.log('🚀 Sistema EQUIPE inicializado - Padrão SIGE');
+    } else {
+        setTimeout(waitForSortable, 100);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', waitForSortable);
 
 function initializeDragAndDrop() {
     // Obras source - sidebar
