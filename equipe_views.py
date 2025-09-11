@@ -28,11 +28,19 @@ def get_admin_id():
     # Fallback seguro baseado no ID do usuário atual
     return current_user.id
 
-def get_monday_of_week(target_date):
-    """Retorna segunda-feira da semana"""
-    days_since_monday = target_date.weekday()
-    monday = target_date - timedelta(days=days_since_monday)
-    return monday
+def get_sunday_of_week(target_date):
+    """Retorna domingo da semana (início da semana de 7 dias)"""
+    # Python weekday(): 0=Monday, 6=Sunday
+    # Queremos: domingo = início da semana
+    days_since_sunday = (target_date.weekday() + 1) % 7
+    sunday = target_date - timedelta(days=days_since_sunday)
+    return sunday
+
+def convert_to_sunday_weekday(python_weekday):
+    """Converte Python weekday (0=Mon) para Sunday weekday (0=Sun)"""
+    # Python: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+    # Queremos: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+    return (python_weekday + 1) % 7
 
 @equipe_bp.route('/')
 @equipe_bp.route('/alocacao')
@@ -266,9 +274,9 @@ def get_allocations_simples():
             start_date = datetime.strptime(week_start, '%Y-%m-%d').date()
         else:
             today = date.today()
-            start_date = get_monday_of_week(today)
+            start_date = get_sunday_of_week(today)
         
-        end_date = start_date + timedelta(days=4)  # Sexta-feira
+        end_date = start_date + timedelta(days=6)  # Sábado (7 dias total)
         
         # Query simples
         allocations = Allocation.query.filter(
@@ -292,7 +300,7 @@ def get_allocations_simples():
                 'obra_codigo': obra_codigo,
                 'obra_nome': obra_nome,
                 'data_alocacao': alloc.data_alocacao.isoformat(),
-                'day_of_week': alloc.data_alocacao.weekday(),  # 0=Segunda
+                'day_of_week': convert_to_sunday_weekday(alloc.data_alocacao.weekday()),  # 0=Domingo
                 'turno_inicio': alloc.turno_inicio.strftime('%H:%M') if alloc.turno_inicio else '08:00',
                 'turno_fim': alloc.turno_fim.strftime('%H:%M') if alloc.turno_fim else '17:00'
             })
@@ -548,11 +556,11 @@ def api_allocations_week():
                 }), 400
         else:
             today = date.today()
-            start_date = get_monday_of_week(today)
+            start_date = get_sunday_of_week(today)
         
-        # Garantir que seja segunda-feira
-        start_date = get_monday_of_week(start_date)
-        end_date = start_date + timedelta(days=4)  # Sexta-feira
+        # Garantir que seja domingo
+        start_date = get_sunday_of_week(start_date)
+        end_date = start_date + timedelta(days=6)  # Sábado (7 dias total)
         
         # Query das alocações
         allocations = db.session.query(Allocation, Obra).join(
@@ -565,19 +573,21 @@ def api_allocations_week():
         
         # Organizar por dia da semana
         week_data = {}
-        for i in range(5):  # Segunda a Sexta (0-4)
+        day_names = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+        for i in range(7):  # Domingo a Sábado (0-6)
             day_date = start_date + timedelta(days=i)
             week_data[i] = {
                 'date': day_date.isoformat(),
-                'day_name': ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][i],
+                'day_name': day_names[i],
                 'allocations': []
             }
         
         # Processar alocações
         for allocation, obra in allocations:
-            day_of_week = allocation.data_alocacao.weekday()
-            if day_of_week <= 4:  # Segunda a Sexta
-                week_data[day_of_week]['allocations'].append({
+            # Converter weekday do Python (0=Mon) para nosso sistema (0=Sun)
+            sunday_day_of_week = convert_to_sunday_weekday(allocation.data_alocacao.weekday())
+            if sunday_day_of_week in week_data:  # Domingo a Sábado (0-6)
+                week_data[sunday_day_of_week]['allocations'].append({
                     'id': allocation.id,
                     'obra_id': allocation.obra_id,
                     'obra_codigo': obra.codigo,

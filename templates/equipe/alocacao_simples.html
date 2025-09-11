@@ -63,16 +63,33 @@
                 
                 <div class="card-body weekly-grid-container" id="weekly-grid">
                     <div class="row weekly-grid">
-                        <!-- SEGUNDA -->
+                        <!-- DOMINGO -->
                         <div class="col">
                             <h6 class="text-center day-header" id="header-day-0">
-                                <div class="fw-bold">Segunda</div>
+                                <div class="fw-bold">Domingo</div>
                                 <small class="date-display text-muted" id="date-day-0">--/--</small>
                             </h6>
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
                                  data-day="0" 
                                  id="day-0"
+                                 role="region"
+                                 aria-label="Zona para obras de domingo"
+                                 tabindex="0">
+                                <small class="text-muted">Arraste obras aqui</small>
+                            </div>
+                        </div>
+                        
+                        <!-- SEGUNDA -->
+                        <div class="col">
+                            <h6 class="text-center day-header" id="header-day-1">
+                                <div class="fw-bold">Segunda</div>
+                                <small class="date-display text-muted" id="date-day-1">--/--</small>
+                            </h6>
+                            <div class="border rounded p-3 drop-zone" 
+                                 style="min-height: 200px; background: #f8f9fa;" 
+                                 data-day="1" 
+                                 id="day-1"
                                  role="region"
                                  aria-label="Zona para obras de segunda-feira"
                                  tabindex="0">
@@ -82,14 +99,14 @@
                         
                         <!-- TERÇA -->
                         <div class="col">
-                            <h6 class="text-center day-header" id="header-day-1">
+                            <h6 class="text-center day-header" id="header-day-2">
                                 <div class="fw-bold">Terça</div>
-                                <small class="date-display text-muted" id="date-day-1">--/--</small>
+                                <small class="date-display text-muted" id="date-day-2">--/--</small>
                             </h6>
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
-                                 data-day="1" 
-                                 id="day-1"
+                                 data-day="2" 
+                                 id="day-2"
                                  role="region"
                                  aria-label="Zona para obras de terça-feira"
                                  tabindex="0">
@@ -99,14 +116,14 @@
                         
                         <!-- QUARTA -->
                         <div class="col">
-                            <h6 class="text-center day-header" id="header-day-2">
+                            <h6 class="text-center day-header" id="header-day-3">
                                 <div class="fw-bold">Quarta</div>
-                                <small class="date-display text-muted" id="date-day-2">--/--</small>
+                                <small class="date-display text-muted" id="date-day-3">--/--</small>
                             </h6>
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
-                                 data-day="2" 
-                                 id="day-2"
+                                 data-day="3" 
+                                 id="day-3"
                                  role="region"
                                  aria-label="Zona para obras de quarta-feira"
                                  tabindex="0">
@@ -116,14 +133,14 @@
                         
                         <!-- QUINTA -->
                         <div class="col">
-                            <h6 class="text-center day-header" id="header-day-3">
+                            <h6 class="text-center day-header" id="header-day-4">
                                 <div class="fw-bold">Quinta</div>
-                                <small class="date-display text-muted" id="date-day-3">--/--</small>
+                                <small class="date-display text-muted" id="date-day-4">--/--</small>
                             </h6>
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
-                                 data-day="3" 
-                                 id="day-3"
+                                 data-day="4" 
+                                 id="day-4"
                                  role="region"
                                  aria-label="Zona para obras de quinta-feira"
                                  tabindex="0">
@@ -133,16 +150,33 @@
                         
                         <!-- SEXTA -->
                         <div class="col">
-                            <h6 class="text-center day-header" id="header-day-4">
+                            <h6 class="text-center day-header" id="header-day-5">
                                 <div class="fw-bold">Sexta</div>
-                                <small class="date-display text-muted" id="date-day-4">--/--</small>
+                                <small class="date-display text-muted" id="date-day-5">--/--</small>
                             </h6>
                             <div class="border rounded p-3 drop-zone" 
                                  style="min-height: 200px; background: #f8f9fa;" 
-                                 data-day="4" 
-                                 id="day-4"
+                                 data-day="5" 
+                                 id="day-5"
                                  role="region"
                                  aria-label="Zona para obras de sexta-feira"
+                                 tabindex="0">
+                                <small class="text-muted">Arraste obras aqui</small>
+                            </div>
+                        </div>
+                        
+                        <!-- SÁBADO -->
+                        <div class="col">
+                            <h6 class="text-center day-header" id="header-day-6">
+                                <div class="fw-bold">Sábado</div>
+                                <small class="date-display text-muted" id="date-day-6">--/--</small>
+                            </h6>
+                            <div class="border rounded p-3 drop-zone" 
+                                 style="min-height: 200px; background: #f8f9fa;" 
+                                 data-day="6" 
+                                 id="day-6"
+                                 role="region"
+                                 aria-label="Zona para obras de sábado"
                                  tabindex="0">
                                 <small class="text-muted">Arraste obras aqui</small>
                             </div>
@@ -753,15 +787,10 @@ class EquipeFase2 {
     // MÉTODOS UTILITÁRIOS PARA DATAS
     calculateCurrentWeek() {
         const today = new Date();
-        const dayOfWeek = today.getDay(); // 0=Domingo, 1=Segunda, etc.
-        const monday = new Date(today);
+        const sunday = this.getSundayOfWeek(today);
         
-        // Calcular segunda-feira
-        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        monday.setDate(today.getDate() - daysToSubtract);
-        
-        this.currentWeek = monday.toISOString().split('T')[0]; // YYYY-MM-DD
-        this.log(`📅 Semana atual: ${this.currentWeek}`);
+        this.currentWeek = sunday.toISOString().split('T')[0]; // YYYY-MM-DD
+        this.log(`📅 Semana atual (domingo): ${this.currentWeek}`);
     }
     
     getDateForDay(dayOfWeek) {
@@ -769,9 +798,9 @@ class EquipeFase2 {
             this.calculateCurrentWeek();
         }
         
-        const monday = new Date(this.currentWeek);
-        const targetDate = new Date(monday);
-        targetDate.setDate(monday.getDate() + dayOfWeek);
+        const sunday = new Date(this.currentWeek);
+        const targetDate = new Date(sunday);
+        targetDate.setDate(sunday.getDate() + dayOfWeek);
         
         return targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
     }
@@ -791,13 +820,10 @@ class EquipeFase2 {
             if (dateRegex.test(weekParam)) {
                 const date = new Date(weekParam);
                 if (!isNaN(date.getTime())) {
-                    // Calcular segunda-feira da semana desta data
-                    const dayOfWeek = date.getDay();
-                    const monday = new Date(date);
-                    const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                    monday.setDate(date.getDate() - daysToSubtract);
+                    // Calcular domingo da semana desta data
+                    const sunday = this.getSundayOfWeek(date);
                     
-                    this.currentWeek = monday.toISOString().split('T')[0];
+                    this.currentWeek = sunday.toISOString().split('T')[0];
                     this.log(`📅 Semana carregada da URL: ${this.currentWeek}`);
                     return;
                 }
@@ -813,25 +839,25 @@ class EquipeFase2 {
             this.calculateCurrentWeek();
         }
         
-        const monday = new Date(this.currentWeek);
-        const friday = new Date(monday);
-        friday.setDate(monday.getDate() + 4);
+        const sunday = new Date(this.currentWeek);
+        const saturday = new Date(sunday);
+        saturday.setDate(sunday.getDate() + 6);
         
         // Atualizar título da semana
         const weekTitle = document.getElementById('week-title');
         if (weekTitle) {
-            const mondayStr = this.formatDateBrazilian(monday);
-            const fridayStr = this.formatDateBrazilian(friday);
-            weekTitle.textContent = `Semana de ${mondayStr} a ${fridayStr}`;
+            const sundayStr = this.formatDateBrazilian(sunday);
+            const saturdayStr = this.formatDateBrazilian(saturday);
+            weekTitle.textContent = `Semana de ${sundayStr} a ${saturdayStr}`;
         }
         
         // Atualizar cabeçalhos dos dias
-        const dayNames = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
-        for (let i = 0; i < 5; i++) {
+        const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+        for (let i = 0; i < 7; i++) {
             const dateElement = document.getElementById(`date-day-${i}`);
             if (dateElement) {
-                const dayDate = new Date(monday);
-                dayDate.setDate(monday.getDate() + i);
+                const dayDate = new Date(sunday);
+                dayDate.setDate(sunday.getDate() + i);
                 dateElement.textContent = this.formatDateBrazilian(dayDate);
             }
         }
@@ -850,8 +876,8 @@ class EquipeFase2 {
     
     highlightCurrentWeek() {
         const today = new Date();
-        const currentMonday = this.getMondayOfWeek(today);
-        const isCurrentWeek = currentMonday.toISOString().split('T')[0] === this.currentWeek;
+        const currentSunday = this.getSundayOfWeek(today);
+        const isCurrentWeek = currentSunday.toISOString().split('T')[0] === this.currentWeek;
         
         const btnCurrentWeek = document.getElementById('btn-current-week');
         if (btnCurrentWeek) {
@@ -865,7 +891,7 @@ class EquipeFase2 {
         }
         
         // Adicionar classe para semana atual nos cabeçalhos
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 7; i++) {
             const headerElement = document.getElementById(`header-day-${i}`);
             if (headerElement) {
                 if (isCurrentWeek) {
@@ -877,12 +903,11 @@ class EquipeFase2 {
         }
     }
     
-    getMondayOfWeek(date) {
-        const dayOfWeek = date.getDay();
-        const monday = new Date(date);
-        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        monday.setDate(date.getDate() - daysToSubtract);
-        return monday;
+    getSundayOfWeek(date) {
+        const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, etc.
+        const sunday = new Date(date);
+        sunday.setDate(date.getDate() - dayOfWeek); // Sunday is day 0
+        return sunday;
     }
     
     async navegarSemana(direction) {
@@ -893,11 +918,11 @@ class EquipeFase2 {
         
         try {
             // Calcular nova semana
-            const currentMonday = new Date(this.currentWeek);
-            const newMonday = new Date(currentMonday);
-            newMonday.setDate(currentMonday.getDate() + (direction * 7));
+            const currentSunday = new Date(this.currentWeek);
+            const newSunday = new Date(currentSunday);
+            newSunday.setDate(currentSunday.getDate() + (direction * 7));
             
-            this.currentWeek = newMonday.toISOString().split('T')[0];
+            this.currentWeek = newSunday.toISOString().split('T')[0];
             
             // Atualizar URL
             this.updateURL();
@@ -925,10 +950,8 @@ class EquipeFase2 {
         this.showWeekLoading(true);
         
         try {
-            // Calcular semana atual
-            const today = new Date();
-            const monday = this.getMondayOfWeek(today);
-            this.currentWeek = monday.toISOString().split('T')[0];
+            // Calcular semana atual (domingo)
+            this.calculateCurrentWeek();
             
             // Atualizar URL
             this.updateURL();
@@ -1099,7 +1122,7 @@ class EquipeFase2 {
         if (!this.allocations) return;
         
         // Limpar todas as drop zones primeiro
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 7; i++) {
             const dayElement = document.getElementById(`day-${i}`);
             if (dayElement) {
                 // Manter apenas elementos que não são alocações
@@ -1127,7 +1150,7 @@ class EquipeFase2 {
         });
         
         // Atualizar contadores para todos os dias
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 7; i++) {
             this.updateDayCounter(i);
         }
         
@@ -1445,7 +1468,7 @@ class EquipeFase2 {
             animation: 150,
             onAdd: async (evt) => {
                 const obraId = evt.item.dataset.obraId;
-                const dayName = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][i];
+                const dayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][i];
                 this.log(`🎯 Obra ${obraId} arrastada para ${dayName}!`);
                 
                 this.captureStateForRollback(dayElement, i, 'add', evt.item);
@@ -1704,8 +1727,8 @@ class EquipeFase2 {
                 });
             }
             
-            // Drop zones (dias da semana)
-            for (let i = 0; i < 5; i++) {
+            // Drop zones (dias da semana) - CALENDÁRIO COMPLETO 7 DIAS
+            for (let i = 0; i < 7; i++) {
                 const dayElement = document.getElementById(`day-${i}`);
                 if (dayElement && !dayElement.sortableInstance) {
                     dayElement.sortableInstance = Sortable.create(dayElement, {
@@ -1713,7 +1736,7 @@ class EquipeFase2 {
                         animation: 150,
                         onAdd: async (evt) => {
                             const obraId = evt.item.dataset.obraId;
-                            const dayName = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][i];
+                            const dayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][i];
                             
                             // VALIDAÇÃO INTELIGENTE: Verificar duplicata
                             if (this.isDuplicateAllocation(obraId, i)) {
