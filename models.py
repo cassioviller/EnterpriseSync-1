@@ -2,7 +2,7 @@
 # Arquivo único para eliminar dependências circulares
 
 from flask_login import UserMixin
-from datetime import datetime, date
+from datetime import datetime, date, time
 from sqlalchemy import func, JSON, Column, Integer, String, Text, Float, Boolean, DateTime, Date, Time, Numeric, ForeignKey, Enum as SQLEnum
 from enum import Enum
 from flask_sqlalchemy import SQLAlchemy

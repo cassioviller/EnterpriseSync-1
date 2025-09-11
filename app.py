@@ -291,6 +291,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint API serviços obra limpa: {e}")
     
+    # Registrar blueprint EQUIPE - Sistema de Gestão Lean
+    try:
+        from equipe_views import equipe_bp
+        app.register_blueprint(equipe_bp)
+        logging.info("✅ Blueprint EQUIPE (gestão lean) registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint EQUIPE não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint EQUIPE: {e}")
+    
     # Photo migration moved to migrations.py for cleaner app initialization
     
     # Development authentication bypass (PERMANENTEMENTE DESABILITADO)
