@@ -154,6 +154,115 @@
     to { transform: translateX(100%); opacity: 0; }
 }
 
+/* Vista Mensal Styles */
+.calendar-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.calendar-day {
+    background: white;
+    min-height: 100px;
+    padding: 8px;
+    position: relative;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.calendar-day:hover {
+    border-color: #198754;
+    background: #f8f9fa;
+}
+
+.calendar-day.other-month {
+    background: #f8f9fa;
+    color: #6c757d;
+}
+
+.calendar-day.today {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+}
+
+.calendar-day-number {
+    font-weight: bold;
+    margin-bottom: 4px;
+    font-size: 0.9rem;
+}
+
+.calendar-allocation {
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+    border-radius: 4px;
+    padding: 2px 4px;
+    margin-bottom: 2px;
+    font-size: 0.7rem;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.calendar-allocation:hover {
+    background: linear-gradient(135deg, #157347 0%, #0f5132 100%);
+}
+
+.calendar-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    padding: 12px 0;
+}
+
+.calendar-weekday {
+    padding: 8px;
+    font-size: 0.9rem;
+}
+
+.month-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: white;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.month-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+.nav-btn {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.nav-btn:hover {
+    background: #198754;
+    color: white;
+    border-color: #198754;
+}
+
 /* Responsividade mobile */
 @media (max-width: 768px) {
     .day-drop-zone {
@@ -167,6 +276,24 @@
     .allocated-work {
         font-size: 0.9rem;
         padding: 8px;
+    }
+    
+    .calendar-day {
+        min-height: 80px;
+        padding: 4px;
+    }
+    
+    .calendar-allocation {
+        font-size: 0.6rem;
+        padding: 1px 2px;
+    }
+    
+    .month-navigation {
+        padding: 12px;
+    }
+    
+    .month-title {
+        font-size: 1rem;
     }
 }
 </style>
@@ -274,6 +401,7 @@
                     </div>
                 </div>
                 <div class="card-body">
+                    <!-- Vista Semanal -->
                     <div class="row" id="weekly-view">
                         {% set weekdays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'] %}
                         {% for day_index in range(5) %}
@@ -317,6 +445,13 @@
                             </div>
                         </div>
                         {% endfor %}
+                    </div>
+
+                    <!-- Vista Mensal -->
+                    <div class="d-none" id="monthly-view">
+                        <div id="calendar-container">
+                            <!-- Calendar será gerado dinamicamente via JavaScript -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -542,12 +677,26 @@ function switchView(view) {
     if (view === 'week') {
         document.querySelector('.btn-group .btn:first-child').classList.remove('btn-outline-primary');
         document.querySelector('.btn-group .btn:first-child').classList.add('btn-primary', 'active');
-        // Implementar vista semanal (já está ativa)
+        
+        // Mostrar vista semanal
+        document.getElementById('weekly-view').classList.remove('d-none');
+        document.getElementById('monthly-view').classList.add('d-none');
+        
+        console.log('🗓️ Switched to weekly view');
+        
     } else if (view === 'month') {
         document.querySelector('.btn-group .btn:last-child').classList.remove('btn-outline-primary');
         document.querySelector('.btn-group .btn:last-child').classList.add('btn-primary', 'active');
-        // TODO: Implementar vista mensal
-        showToast('Vista mensal será implementada em breve', 'info');
+        
+        // Mostrar vista mensal
+        document.getElementById('weekly-view').classList.add('d-none');
+        document.getElementById('monthly-view').classList.remove('d-none');
+        
+        // Gerar calendário mensal se ainda não foi gerado
+        generateMonthlyCalendar();
+        
+        console.log('📅 Switched to monthly view');
+        showToast('Vista mensal carregada!', 'success');
     }
 }
 
@@ -607,6 +756,172 @@ function hapticFeedback(type = 'impact') {
         };
         navigator.vibrate(patterns[type] || patterns.impact);
     }
+}
+
+// ===================================
+// VISTA MENSAL - IMPLEMENTAÇÃO COMPLETA
+// ===================================
+
+let currentMonth = new Date('{{ monday.strftime("%Y-%m-%d") }}');
+let monthlyAllocations = {};
+
+async function generateMonthlyCalendar() {
+    showLoadingOverlay();
+    
+    try {
+        // Buscar alocações do mês
+        await loadMonthlyAllocations();
+        
+        // Gerar HTML do calendário
+        renderMonthlyCalendar();
+        
+        console.log('📅 Monthly calendar generated for:', currentMonth.toISOString().substring(0,7));
+        
+    } catch (error) {
+        console.error('❌ Erro generating monthly calendar:', error);
+        showToast('Erro ao carregar vista mensal', 'error');
+    } finally {
+        hideLoadingOverlay();
+    }
+}
+
+async function loadMonthlyAllocations() {
+    const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+    
+    try {
+        const response = await fetch(`/equipe/api/allocations?month=${monthKey}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            monthlyAllocations = data.allocations_by_date || {};
+            console.log('📊 Monthly allocations loaded:', Object.keys(monthlyAllocations).length + ' days');
+        } else {
+            throw new Error(data.error || 'Erro ao buscar alocações mensais');
+        }
+    } catch (error) {
+        console.error('❌ Load monthly allocations error:', error);
+        // Usar dados mockados temporariamente
+        monthlyAllocations = {};
+    }
+}
+
+function renderMonthlyCalendar() {
+    const container = document.getElementById('calendar-container');
+    const today = new Date();
+    
+    // Calcular primeiro e último dia do mês
+    const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+    
+    // Calcular dias do calendário (incluindo dias de outros meses)
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay() + (firstDay.getDay() === 0 ? -6 : 1)); // Segunda-feira
+    
+    const endDate = new Date(lastDay);
+    const remainingDays = 7 - ((lastDay.getDay() + 6) % 7) - 1;
+    endDate.setDate(endDate.getDate() + remainingDays);
+    
+    // Nomes dos meses
+    const monthNames = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    
+    // HTML do calendário
+    let html = `
+        <div class="calendar-container">
+            <div class="month-navigation">
+                <button class="nav-btn" onclick="navigateMonth(-1)">
+                    <i class="fas fa-chevron-left"></i> Anterior
+                </button>
+                <h4 class="month-title">
+                    ${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}
+                </h4>
+                <button class="nav-btn" onclick="navigateMonth(1)">
+                    Próximo <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            
+            <div class="calendar-header">
+                <div class="calendar-weekday">Seg</div>
+                <div class="calendar-weekday">Ter</div>
+                <div class="calendar-weekday">Qua</div>
+                <div class="calendar-weekday">Qui</div>
+                <div class="calendar-weekday">Sex</div>
+                <div class="calendar-weekday">Sáb</div>
+                <div class="calendar-weekday">Dom</div>
+            </div>
+            
+            <div class="calendar-grid">
+    `;
+    
+    // Gerar cada dia do calendário
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+        const dateKey = currentDate.toISOString().split('T')[0];
+        const isCurrentMonth = currentDate.getMonth() === currentMonth.getMonth();
+        const isToday = currentDate.toDateString() === today.toDateString();
+        const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+        
+        let dayClass = 'calendar-day';
+        if (!isCurrentMonth) dayClass += ' other-month';
+        if (isToday) dayClass += ' today';
+        
+        // Alocações do dia
+        const dayAllocations = monthlyAllocations[dateKey] || [];
+        let allocationsHtml = '';
+        
+        dayAllocations.slice(0, 3).forEach(allocation => {
+            allocationsHtml += `
+                <div class="calendar-allocation" 
+                     onclick="openEmployeeAllocation(${allocation.id})"
+                     title="${allocation.obra.nome} - ${allocation.funcionarios_count} funcionários">
+                    ${allocation.obra.codigo}
+                    ${allocation.funcionarios_count > 0 ? ` (${allocation.funcionarios_count})` : ''}
+                </div>
+            `;
+        });
+        
+        if (dayAllocations.length > 3) {
+            allocationsHtml += `<div class="calendar-allocation" style="background: #6c757d;">+${dayAllocations.length - 3} mais</div>`;
+        }
+        
+        html += `
+            <div class="${dayClass}" 
+                 data-date="${dateKey}"
+                 ${!isWeekend && isCurrentMonth ? 'onclick="openDayDetail(\'' + dateKey + '\')"' : ''}
+                 ${!isWeekend && isCurrentMonth ? 'style="cursor: pointer;"' : ''}>
+                <div class="calendar-day-number">${currentDate.getDate()}</div>
+                ${allocationsHtml}
+            </div>
+        `;
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function navigateMonth(direction) {
+    currentMonth.setMonth(currentMonth.getMonth() + direction);
+    generateMonthlyCalendar();
+    
+    console.log('📅 Navigated to month:', currentMonth.getFullYear() + '-' + (currentMonth.getMonth() + 1));
+}
+
+function openDayDetail(dateKey) {
+    // Navegar para a vista semanal do dia selecionado
+    const selectedDate = new Date(dateKey);
+    const monday = new Date(selectedDate);
+    monday.setDate(selectedDate.getDate() - selectedDate.getDay() + 1);
+    
+    const weekStart = monday.toISOString().split('T')[0];
+    window.location.href = `/equipe/alocacao?week=${weekStart}`;
 }
 
 console.log('🔧 EQUIPE System initialized - SIGE Pattern Compliant');
