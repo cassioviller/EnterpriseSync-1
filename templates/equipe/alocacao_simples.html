@@ -2284,31 +2284,47 @@ class EquipeFase2 {
         
         if (!this.allocations) return;
         
-        // Limpar todas as drop zones primeiro
+        // CORREÇÃO CRÍTICA: Limpar todas as drop zones específicas (campo e oficina)
         for (let i = 0; i < 7; i++) {
-            const dayElement = document.getElementById(`day-${i}`);
-            if (dayElement) {
-                // Manter apenas elementos que não são alocações
-                const existingAllocations = dayElement.querySelectorAll('.allocation-item');
+            // Limpar zona Campo
+            const campoElement = document.getElementById(`day-${i}-campo`);
+            if (campoElement) {
+                const existingAllocations = campoElement.querySelectorAll('.allocation-item');
+                existingAllocations.forEach(item => item.remove());
+            }
+            
+            // Limpar zona Oficina
+            const oficinaElement = document.getElementById(`day-${i}-oficina`);
+            if (oficinaElement) {
+                const existingAllocations = oficinaElement.querySelectorAll('.allocation-item');
                 existingAllocations.forEach(item => item.remove());
             }
         }
         
-        // Renderizar alocações por dia
+        // CORREÇÃO CRÍTICA: Renderizar alocações na zona correta baseado em local_trabalho
         Object.keys(this.allocations).forEach(dayKey => {
             const dayData = this.allocations[dayKey];
-            const dayElement = document.getElementById(`day-${dayKey}`);
             
-            if (dayElement && dayData.allocations) {
+            if (dayData.allocations) {
                 dayData.allocations.forEach(allocation => {
-                    this.renderAllocationItem(dayElement, allocation, parseInt(dayKey));
+                    // CORREÇÃO: Usar local_trabalho para encontrar o container correto
+                    const localTrabalho = allocation.local_trabalho || 'campo'; // Default campo
+                    const targetElement = document.getElementById(`day-${dayKey}-${localTrabalho}`);
+                    
+                    if (targetElement) {
+                        this.renderAllocationItem(targetElement, allocation, parseInt(dayKey));
+                        
+                        // Remover placeholder se existir nesta zona específica
+                        const placeholder = targetElement.querySelector('.text-muted');
+                        if (placeholder && placeholder.textContent.includes('Arraste')) {
+                            placeholder.remove();
+                        }
+                        
+                        this.log(`✅ CORREÇÃO: Allocation ${allocation.obra_codigo} renderizada em day-${dayKey}-${localTrabalho}`);
+                    } else {
+                        this.log(`❌ ERRO: Elemento day-${dayKey}-${localTrabalho} não encontrado para obra ${allocation.obra_codigo}`);
+                    }
                 });
-                
-                // Remover placeholder se existir
-                const placeholder = dayElement.querySelector('.text-muted');
-                if (placeholder && placeholder.textContent.includes('Arraste')) {
-                    placeholder.remove();
-                }
             }
         });
         
@@ -2320,7 +2336,7 @@ class EquipeFase2 {
         // MODAL INTEGRATION: Agora usa botões dedicados com stopPropagation
         // Removido addClickListenersToAllocations() para evitar conflito com drag & drop
         
-        this.log(`✅ Alocações renderizadas na interface com contadores e integração de modal`);
+        this.log(`✅ CORREÇÃO APLICADA: Alocações renderizadas nas zonas corretas baseado em local_trabalho`);
     }
     
     renderAllocationItem(container, allocation, dayOfWeek) {
