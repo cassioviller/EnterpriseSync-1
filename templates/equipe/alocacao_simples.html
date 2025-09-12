@@ -1877,6 +1877,26 @@ class EquipeFase2 {
     }
     
     // MÉTODOS UTILITÁRIOS PARA DATAS
+    
+    // HELPER PARA PARSING SEGURO DE DATAS ISO (YYYY-MM-DD) SEM PROBLEMAS DE TIMEZONE
+    parseYMDToLocal(dateStr) {
+        // Evita problemas de timezone fazendo parsing manual
+        // Formato esperado: "YYYY-MM-DD"
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) {
+            this.log(`❌ Formato de data inválido: ${dateStr}`);
+            return new Date(); // Fallback para hoje
+        }
+        
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1; // Mês é 0-indexed
+        const day = parseInt(parts[2]);
+        
+        const result = new Date(year, month, day);
+        this.log(`🕒 parseYMDToLocal("${dateStr}") = ${result.toDateString()}`);
+        return result;
+    }
+    
     calculateCurrentWeek() {
         const today = new Date();
         const sunday = this.getSundayOfWeek(today);
@@ -1916,7 +1936,7 @@ class EquipeFase2 {
             // Validar formato YYYY-MM-DD
             const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
             if (dateRegex.test(weekParam)) {
-                const date = new Date(weekParam);
+                const date = this.parseYMDToLocal(weekParam);
                 if (!isNaN(date.getTime())) {
                     // Calcular domingo da semana desta data
                     const sunday = this.getSundayOfWeek(date);
@@ -1937,7 +1957,7 @@ class EquipeFase2 {
             this.calculateCurrentWeek();
         }
         
-        const sunday = new Date(this.currentWeek);
+        const sunday = this.parseYMDToLocal(this.currentWeek);
         const saturday = new Date(sunday);
         saturday.setDate(sunday.getDate() + 6);
         
@@ -2016,7 +2036,7 @@ class EquipeFase2 {
         
         try {
             // Calcular nova semana
-            const currentSunday = new Date(this.currentWeek);
+            const currentSunday = this.parseYMDToLocal(this.currentWeek);
             const newSunday = new Date(currentSunday);
             newSunday.setDate(currentSunday.getDate() + (direction * 7));
             
@@ -3445,8 +3465,9 @@ class EquipeFase2 {
         
         // Atualizar título do modal
         const obraInfo = data.allocation.obra_codigo || `#${data.allocation.obra_id}`;
-        const dataInfo = new Date(data.allocation.data_alocacao).toLocaleDateString('pt-BR');
-        const dayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][new Date(data.allocation.data_alocacao).getDay()];
+        const allocDate = this.parseYMDToLocal(data.allocation.data_alocacao);
+        const dataInfo = allocDate.toLocaleDateString('pt-BR');
+        const dayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][allocDate.getDay()];
         
         document.getElementById('modal-title-text').textContent = `${obraInfo} - ${dayName} (${dataInfo})`;
         

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Correção Timezone</title>
+</head>
+<body>
+    <h1>Teste da Correção de Timezone</h1>
+    <div id="results"></div>
+    
+    <script>
+        // Implementar a mesma função que foi corrigida no template
+        function parseYMDToLocal(dateStr) {
+            console.log(`🕒 parseYMDToLocal("${dateStr}")`);
+            
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) {
+                console.log(`❌ Formato de data inválido: ${dateStr}`);
+                return new Date();
+            }
+            
+            const year = parseInt(parts[0]);
+            const month = parseInt(parts[1]) - 1; // Mês é 0-indexed
+            const day = parseInt(parts[2]);
+            
+            const result = new Date(year, month, day);
+            console.log(`   = ${result.toDateString()}`);
+            return result;
+        }
+        
+        // Função para obter domingo da semana
+        function getSundayOfWeek(date) {
+            const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, etc.
+            const sunday = new Date(date);
+            sunday.setDate(date.getDate() - dayOfWeek);
+            return sunday;
+        }
+        
+        // Teste específico para a data 12/09/2025
+        function testDate() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Testes de Timezone</h2>';
+            
+            // Teste 1: Data 12/09/2025 usando método problemático (UTC)
+            const dateUTC = new Date("2025-09-12");
+            results.innerHTML += `<p><strong>Método problemático (UTC):</strong> new Date("2025-09-12") = ${dateUTC.toDateString()} (dia da semana: ${dateUTC.getDay()})</p>`;
+            
+            // Teste 2: Data 12/09/2025 usando método corrigido (Local)
+            const dateLocal = parseYMDToLocal("2025-09-12");
+            results.innerHTML += `<p><strong>Método corrigido (Local):</strong> parseYMDToLocal("2025-09-12") = ${dateLocal.toDateString()} (dia da semana: ${dateLocal.getDay()})</p>`;
+            
+            // Teste 3: Verificar semana completa começando no domingo
+            const targetSunday = getSundayOfWeek(dateLocal);
+            results.innerHTML += `<p><strong>Domingo da semana:</strong> ${targetSunday.toDateString()}</p>`;
+            
+            // Mostrar semana completa
+            results.innerHTML += '<h3>Semana Completa (Domingo = 0):</h3>';
+            const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+            
+            for (let i = 0; i < 7; i++) {
+                const dayDate = new Date(targetSunday);
+                dayDate.setDate(targetSunday.getDate() + i);
+                
+                const dayStr = dayDate.toLocaleDateString('pt-BR');
+                const isTarget = dayDate.toISOString().split('T')[0] === '2025-09-12';
+                
+                results.innerHTML += `<p style="${isTarget ? 'background: yellow; font-weight: bold;' : ''}">
+                    ${dayNames[i]} (${i}): ${dayStr} ${isTarget ? '← 12/09/2025 DEVE SER SEXTA-FEIRA!' : ''}
+                </p>`;
+            }
+            
+            // Resultado final
+            const finalResult = dateLocal.getDay() === 5 ? '✅ SUCESSO' : '❌ FALHOU';
+            const expectedDay = dayNames[dateLocal.getDay()];
+            
+            results.innerHTML += `<h3 style="color: ${dateLocal.getDay() === 5 ? 'green' : 'red'}">
+                ${finalResult}: 12/09/2025 = ${expectedDay} (esperado: Sexta-feira)
+            </h3>`;
+        }
+        
+        // Executar teste quando página carrega
+        window.onload = testDate;
+    </script>
+</body>
+</html>
