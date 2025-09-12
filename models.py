@@ -2732,25 +2732,30 @@ class WeeklyPlanItem(db.Model):
 # FUNÇÕES PARA LANÇAMENTO AUTOMÁTICO DE PONTO
 # ================================
 
-def processar_lancamentos_automaticos(data_processamento=None):
+def processar_lancamentos_automaticos(data_processamento=None, admin_id=None):
     """
     Processa lançamentos automáticos de ponto para funcionários não alocados
     Deve ser executada via cron job à meia-noite
+    IMPORTANTE: admin_id é obrigatório para isolamento multi-tenant
     """
     from app import db
     from datetime import date, timedelta
     
+    if admin_id is None:
+        raise ValueError("admin_id é obrigatório para isolamento multi-tenant")
+    
     if data_processamento is None:
         data_processamento = date.today() - timedelta(days=1)  # Dia anterior
     
-    # Buscar todos os funcionários ativos
-    funcionarios_ativos = Funcionario.query.filter_by(ativo=True).all()
+    # Buscar todos os funcionários ativos do admin específico
+    funcionarios_ativos = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
     
     for funcionario in funcionarios_ativos:
         # Verificar se funcionário foi alocado nesta data
         alocacao = db.session.query(AllocationEmployee).join(Allocation).filter(
             AllocationEmployee.funcionario_id == funcionario.id,
-            Allocation.data_alocacao == data_processamento
+            Allocation.data_alocacao == data_processamento,
+            Allocation.admin_id == admin_id  # CRÍTICO: Isolamento multi-tenant
         ).first()
         
         if alocacao:
@@ -2807,11 +2812,21 @@ def _eh_feriado(data):
     # Por enquanto, retorna False
     return False
 
-def sincronizar_alocacao_com_horario_funcionario(allocation_employee_id):
-    """Aplica horário do funcionário na alocação se disponível"""
+def sincronizar_alocacao_com_horario_funcionario(allocation_employee_id, admin_id=None):
+    """Aplica horário do funcionário na alocação se disponível
+    IMPORTANTE: admin_id é obrigatório para isolamento multi-tenant
+    """
     from app import db
     
-    allocation_emp = AllocationEmployee.query.get(allocation_employee_id)
+    if admin_id is None:
+        raise ValueError("admin_id é obrigatório para isolamento multi-tenant")
+    
+    # Buscar com validação de admin_id
+    allocation_emp = db.session.query(AllocationEmployee).join(Allocation).filter(
+        AllocationEmployee.id == allocation_employee_id,
+        Allocation.admin_id == admin_id
+    ).first()
+    
     if not allocation_emp:
         return False
     

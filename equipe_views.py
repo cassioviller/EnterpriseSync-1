@@ -827,3 +827,117 @@ def api_delete_allocation_employee(allocation_employee_id):
             'success': False,
             'error': 'Erro interno do servidor'
         }), 500
+
+@equipe_bp.route('/api/sync-ponto', methods=['POST'])
+@login_required
+@admin_required
+def api_sincronizar_ponto_manual():
+    """API: Sincronização manual de ponto para funcionários alocados"""
+    try:
+        from models import processar_lancamentos_automaticos
+        
+        admin_id = get_admin_id()
+        data = request.get_json() or {}
+        
+        # Data opcional para processamento (padrão: ontem)
+        data_processamento = None
+        if data.get('data_processamento'):
+            try:
+                data_processamento = datetime.strptime(data['data_processamento'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Formato de data inválido. Use YYYY-MM-DD'
+                }), 400
+        
+        # Executar processamento automático com admin_id para isolamento
+        sucesso = processar_lancamentos_automaticos(data_processamento, admin_id)
+        
+        if sucesso:
+            data_str = data_processamento.isoformat() if data_processamento else 'ontem'
+            return jsonify({
+                'success': True,
+                'message': f'Sincronização de ponto processada com sucesso para {data_str}',
+                'data_processada': data_str
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao processar sincronização automática de ponto'
+            }), 500
+            
+    except Exception as e:
+        logging.error(f"API SYNC PONTO ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+
+@equipe_bp.route('/api/allocation-employee/<int:allocation_employee_id>/sync-horario', methods=['POST'])
+@login_required
+@admin_required
+def api_sincronizar_horario_funcionario(allocation_employee_id):
+    """API: Aplicar horário do funcionário na alocação"""
+    try:
+        from models import sincronizar_alocacao_com_horario_funcionario
+        
+        admin_id = get_admin_id()
+        
+        # Verificar se allocation_employee pertence ao admin
+        allocation_employee = db.session.query(AllocationEmployee, Allocation).join(
+            Allocation, AllocationEmployee.allocation_id == Allocation.id
+        ).filter(
+            AllocationEmployee.id == allocation_employee_id,
+            Allocation.admin_id == admin_id
+        ).first()
+        
+        if not allocation_employee:
+            return jsonify({
+                'success': False,
+                'error': 'Funcionário alocado não encontrado'
+            }), 404
+        
+        alloc_emp, allocation = allocation_employee
+        funcionario = Funcionario.query.get(alloc_emp.funcionario_id)
+        
+        if not funcionario or not funcionario.horario_trabalho:
+            return jsonify({
+                'success': False,
+                'error': 'Funcionário não possui horário de trabalho cadastrado'
+            }), 400
+        
+        # Sincronizar horário com admin_id para isolamento
+        sucesso = sincronizar_alocacao_com_horario_funcionario(allocation_employee_id, admin_id)
+        
+        if sucesso:
+            # Buscar dados atualizados
+            alloc_emp_updated = AllocationEmployee.query.get(allocation_employee_id)
+            if alloc_emp_updated:
+                return jsonify({
+                    'success': True,
+                    'turno_inicio': alloc_emp_updated.turno_inicio.strftime('%H:%M'),
+                    'turno_fim': alloc_emp_updated.turno_fim.strftime('%H:%M'),
+                    'tipo_lancamento': alloc_emp_updated.tipo_lancamento,
+                    'message': f'Horário do funcionário {funcionario.nome} aplicado com sucesso'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Erro ao buscar dados atualizados'
+                }), 500
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao aplicar horário do funcionário'
+            }), 500
+            
+    except Exception as e:
+        logging.error(f"API SYNC HORARIO ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
