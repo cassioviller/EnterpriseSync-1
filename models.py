@@ -2578,6 +2578,13 @@ class AllocationEmployee(db.Model):
     papel = db.Column(db.String(50))  # Ex: "soldador", "ajudante", "líder"
     observacao = db.Column(db.String(100))  # Obs específica do funcionário
     
+    # Campos de horário de almoço
+    hora_almoco_saida = db.Column(db.Time, default=time(12, 0))     # 12:00
+    hora_almoco_retorno = db.Column(db.Time, default=time(13, 0))   # 13:00
+    
+    # Campo de percentual de extras
+    percentual_extras = db.Column(db.Float, default=0.0)  # 0% por padrão
+    
     # Campos para integração com ponto
     tipo_lancamento = db.Column(db.String(30), default='trabalho_normal')  # trabalho_normal, sabado_trabalhado, domingo_trabalhado, falta, sabado_folga, domingo_folga, feriado_folga
     sincronizado_ponto = db.Column(db.Boolean, default=False)  # Se já foi sincronizado com RegistroPonto
@@ -2662,8 +2669,17 @@ class AllocationEmployee(db.Model):
             registro_existente.tipo_local = self.allocation.local_trabalho
             registro_existente.hora_entrada = self.turno_inicio
             registro_existente.hora_saida = self.turno_fim
+            # Sincronizar novos campos de almoço e percentual
+            if hasattr(registro_existente, 'hora_almoco_saida'):
+                registro_existente.hora_almoco_saida = self.hora_almoco_saida
+            if hasattr(registro_existente, 'hora_almoco_retorno'):
+                registro_existente.hora_almoco_retorno = self.hora_almoco_retorno
+            if hasattr(registro_existente, 'percentual_extras'):
+                registro_existente.percentual_extras = self.percentual_extras
             if hasattr(registro_existente, 'tipo_registro'):
                 registro_existente.tipo_registro = self.tipo_lancamento
+            # Recalcular horas trabalhadas com os novos campos
+            registro_existente.horas_trabalhadas = self._calcular_horas_trabalhadas()
         else:
             # Criar novo registro
             registro = RegistroPonto(
@@ -2675,6 +2691,13 @@ class AllocationEmployee(db.Model):
                 tipo_local=self.allocation.local_trabalho,
                 horas_trabalhadas=self._calcular_horas_trabalhadas()
             )
+            # Adicionar novos campos se disponíveis no modelo RegistroPonto
+            if hasattr(registro, 'hora_almoco_saida'):
+                registro.hora_almoco_saida = self.hora_almoco_saida
+            if hasattr(registro, 'hora_almoco_retorno'):
+                registro.hora_almoco_retorno = self.hora_almoco_retorno
+            if hasattr(registro, 'percentual_extras'):
+                registro.percentual_extras = self.percentual_extras
             if hasattr(registro, 'tipo_registro'):
                 registro.tipo_registro = self.tipo_lancamento
             db.session.add(registro)
@@ -2692,15 +2715,42 @@ class AllocationEmployee(db.Model):
             return False
 
     def _calcular_horas_trabalhadas(self):
-        """Calcula horas trabalhadas baseado no turno"""
+        """Calcula horas trabalhadas baseado no turno, considerando intervalo de almoço"""
         from datetime import datetime, date
         
-        if self.turno_inicio and self.turno_fim:
-            inicio = datetime.combine(date.today(), self.turno_inicio)
-            fim = datetime.combine(date.today(), self.turno_fim)
-            delta = fim - inicio
-            return delta.total_seconds() / 3600
-        return 8.0  # Padrão
+        if not (self.turno_inicio and self.turno_fim):
+            return 8.0  # Padrão
+        
+        # Converter para datetime para cálculos
+        hoje = date.today()
+        inicio = datetime.combine(hoje, self.turno_inicio)
+        fim = datetime.combine(hoje, self.turno_fim)
+        
+        # Calcular total de horas brutas
+        delta_total = fim - inicio
+        horas_brutas = delta_total.total_seconds() / 3600
+        
+        # Descontar intervalo de almoço se os horários estiverem definidos
+        horas_almoco = 0.0
+        if self.hora_almoco_saida and self.hora_almoco_retorno:
+            saida_almoco = datetime.combine(hoje, self.hora_almoco_saida)
+            retorno_almoco = datetime.combine(hoje, self.hora_almoco_retorno)
+            
+            # Verificar se o intervalo de almoço está dentro do horário de trabalho
+            if saida_almoco >= inicio and retorno_almoco <= fim:
+                delta_almoco = retorno_almoco - saida_almoco
+                horas_almoco = delta_almoco.total_seconds() / 3600
+        else:
+            # Se não tiver horários de almoço definidos, usar padrão de 1 hora
+            # apenas se o turno for maior que 6 horas (indicando jornada completa)
+            if horas_brutas > 6.0:
+                horas_almoco = 1.0
+        
+        # Calcular horas efetivamente trabalhadas
+        horas_trabalhadas = horas_brutas - horas_almoco
+        
+        # Garantir que não seja negativo
+        return max(0.0, horas_trabalhadas)
 
 class WeeklyPlan(db.Model):
     """Planejamento semanal por obra - Tela C (opcional)

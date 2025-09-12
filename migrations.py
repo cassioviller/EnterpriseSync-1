@@ -64,6 +64,9 @@ def executar_migracoes():
         
         # Migração 15: CRÍTICA - Adicionar coluna local na tabela RDO para produção
         adicionar_coluna_local_rdo()
+        
+        # Migração 16: NOVA - Adicionar campos faltantes na tabela allocation_employee
+        adicionar_campos_allocation_employee()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -1164,4 +1167,44 @@ def adicionar_coluna_local_rdo():
             
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar coluna 'local' na tabela RDO: {e}")
+        db.session.rollback()
+
+def adicionar_campos_allocation_employee():
+    """Adiciona campos faltantes (hora_almoco_saida, hora_almoco_retorno, percentual_extras) na tabela allocation_employee"""
+    try:
+        logger.info("🔄 Verificando campos faltantes na tabela allocation_employee...")
+        
+        # Lista de campos para verificar/adicionar
+        campos_necessarios = [
+            ('hora_almoco_saida', "TIME DEFAULT '12:00:00'"),
+            ('hora_almoco_retorno', "TIME DEFAULT '13:00:00'"),
+            ('percentual_extras', "REAL DEFAULT 0.0")
+        ]
+        
+        for nome_campo, tipo_sql in campos_necessarios:
+            # Verificar se o campo já existe
+            result = db.session.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='allocation_employee' AND column_name=:campo_nome
+            """), {"campo_nome": nome_campo}).fetchone()
+            
+            if not result:
+                logger.info(f"🔧 Adicionando campo '{nome_campo}' na tabela allocation_employee...")
+                
+                # Adicionar campo
+                db.session.execute(text(f"""
+                    ALTER TABLE allocation_employee 
+                    ADD COLUMN {nome_campo} {tipo_sql}
+                """))
+                
+                logger.info(f"✅ Campo '{nome_campo}' adicionado com sucesso!")
+            else:
+                logger.info(f"✅ Campo '{nome_campo}' já existe na tabela allocation_employee")
+        
+        db.session.commit()
+        logger.info("✅ Todos os campos necessários da tabela allocation_employee verificados/adicionados!")
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao adicionar campos na tabela allocation_employee: {e}")
         db.session.rollback()
