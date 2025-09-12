@@ -66,12 +66,12 @@
         </div>
     </div>
     
-    <!-- CALENDÁRIO SEMANAL EXPANDIDO - LARGURA TOTAL -->
-    <div class="row gx-1">
+    <!-- CALENDÁRIO SEMANAL EXPANDIDO - LARGURA TOTAL DA TELA -->
+    <div class="row g-0 mx-1">
         <div class="col-12">
             <div class="card border-0 shadow-sm">
                 <!-- CABEÇALHO COM NAVEGAÇÃO -->
-                <div class="card-header border-0 bg-light">
+                <div class="card-header border-0 bg-light px-2 py-2">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h5 class="mb-1">📅 Gestão Semanal</h5>
@@ -97,7 +97,7 @@
                     <span>Carregando semana...</span>
                 </div>
                 
-                <div class="card-body p-2 weekly-grid-container" id="weekly-grid">
+                <div class="card-body p-1 weekly-grid-container" id="weekly-grid">
                     <div class="row weekly-grid">
                         <!-- DOMINGO -->
                         <div class="col">
@@ -1170,7 +1170,7 @@
     
     /* CALENDÁRIO EXPANDIDO - SEMPRE UMA LINHA HORIZONTAL - OCUPA TODA LARGURA */
     .weekly-grid-container {
-        padding: 8px 4px; /* Margens mínimas */
+        padding: 4px 2px; /* Margens ultra mínimas */
         overflow-x: auto; /* Scroll horizontal se necessário */
         width: 100%; /* Força ocupar toda largura */
     }
@@ -1179,20 +1179,21 @@
         display: flex !important;
         flex-wrap: nowrap !important; /* NUNCA quebra linha */
         width: 100% !important; /* Força ocupar toda largura disponível */
-        gap: 0.25rem; /* Gap menor para aproveitar espaço */
+        gap: 0.1rem; /* Gap ultra mínimo para aproveitar espaço */
+        margin: 0 !important; /* Remove margens Bootstrap */
     }
     
     .weekly-grid .col {
         flex: 1 1 0px !important; /* Cada dia ocupa espaço igual */
         min-width: 0; /* Permite reduzir se necessário */
-        padding: 0 2px; /* Espaçamento mínimo entre colunas */
+        padding: 0 1px; /* Espaçamento ultra mínimo entre colunas */
         max-width: none !important; /* Remove limitações Bootstrap */
     }
     
     .drop-zone {
         min-height: 250px !important; /* Maior que antes */
-        padding: 8px !important; /* Reduzido para aproveitar espaço */
-        border-radius: 6px !important;
+        padding: 6px !important; /* Ultra reduzido para aproveitar espaço */
+        border-radius: 4px !important;
         margin: 0 !important; /* Remove margens extras */
     }
     
