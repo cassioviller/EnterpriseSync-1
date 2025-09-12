@@ -225,6 +225,113 @@ def get_allocations_simples():
 
 
 
+# ===================================
+# FASE 4: INTEGRAÇÃO HORÁRIOS AUTOMÁTICOS  
+# ===================================
+
+@equipe_bp.route('/api/funcionario/<int:funcionario_id>/horarios', methods=['GET'])
+@login_required
+@admin_required
+def api_get_funcionario_horarios(funcionario_id):
+    """API para buscar horários padrão de funcionário baseado no dia da semana"""
+    try:
+        admin_id = get_admin_id()
+        dia_semana = request.args.get('dia_semana', type=int)  # 0=Domingo, 1=Segunda, etc.
+        
+        # Buscar funcionário
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id, 
+            admin_id=admin_id, 
+            ativo=True
+        ).first()
+        
+        if not funcionario:
+            return jsonify({
+                'success': False, 
+                'error': 'Funcionário não encontrado'
+            }), 404
+        
+        # Buscar horário de trabalho associado
+        horario_trabalho = funcionario.horario_trabalho
+        
+        if not horario_trabalho:
+            # Se não tem horário configurado, retornar padrão
+            return jsonify({
+                'success': True,
+                'funcionario': {
+                    'id': funcionario.id,
+                    'nome': funcionario.nome,
+                    'codigo': funcionario.codigo
+                },
+                'horarios': {
+                    'turno_inicio': '08:00',
+                    'turno_fim': '17:00',
+                    'tipo_lancamento': 'trabalho_normal',
+                    'possui_horario_customizado': False,
+                    'observacao': 'Horário padrão aplicado (funcionário sem horário específico configurado)'
+                }
+            })
+        
+        # Verificar se funcionário trabalha no dia da semana solicitado
+        if dia_semana is not None:
+            dias_trabalho = [int(d.strip()) for d in horario_trabalho.dias_semana.split(',') if d.strip()]
+            
+            trabalha_no_dia = dia_semana in dias_trabalho
+            
+            # Determinar tipo de lançamento automaticamente
+            if not trabalha_no_dia:
+                if dia_semana == 0:  # Domingo
+                    tipo_lancamento = 'domingo_folga'
+                elif dia_semana == 6:  # Sábado
+                    tipo_lancamento = 'sabado_folga'
+                else:
+                    tipo_lancamento = 'falta'  # Dia útil que não trabalha
+            else:
+                if dia_semana == 0:  # Domingo trabalhado
+                    tipo_lancamento = 'domingo_trabalhado'
+                elif dia_semana == 6:  # Sábado trabalhado
+                    tipo_lancamento = 'sabado_trabalhado'
+                else:
+                    tipo_lancamento = 'trabalho_normal'
+        else:
+            # Se não especificou dia, assumir trabalho normal
+            tipo_lancamento = 'trabalho_normal'
+            trabalha_no_dia = True
+        
+        # Preparar resposta
+        response_data = {
+            'success': True,
+            'funcionario': {
+                'id': funcionario.id,
+                'nome': funcionario.nome,
+                'codigo': funcionario.codigo
+            },
+            'horarios': {
+                'turno_inicio': horario_trabalho.entrada.strftime('%H:%M'),
+                'turno_fim': horario_trabalho.saida.strftime('%H:%M'),
+                'saida_almoco': horario_trabalho.saida_almoco.strftime('%H:%M'),
+                'retorno_almoco': horario_trabalho.retorno_almoco.strftime('%H:%M'),
+                'horas_diarias': horario_trabalho.horas_diarias,
+                'valor_hora': horario_trabalho.valor_hora,
+                'tipo_lancamento': tipo_lancamento,
+                'trabalha_no_dia': trabalha_no_dia,
+                'possui_horario_customizado': True,
+                'nome_horario': horario_trabalho.nome,
+                'observacao': f'Horários baseados no esquema "{horario_trabalho.nome}"'
+            }
+        }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        logging.error(f"Erro API horários funcionário: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False, 
+            'error': 'Erro interno do servidor'
+        }), 500
+
 # ===================================  
 # NOVAS APIs - IMPLEMENTAÇÃO COMPLETA
 # CONFORME ESPECIFICAÇÃO

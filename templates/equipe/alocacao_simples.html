@@ -3683,12 +3683,28 @@ class EquipeFase2 {
         const newAddBtn = addBtn.cloneNode(true);
         addBtn.parentNode.replaceChild(newAddBtn, addBtn);
         
-        // Adicionar novo listener
+        // Adicionar novo listener para botão adicionar
         newAddBtn.addEventListener('click', () => {
             this.addFuncionario(allocationId);
         });
         
-        this.log(`✅ MODAL: Event listeners configurados para alocação ${allocationId}`);
+        // FASE 4: Event listener para dropdown de funcionário
+        const selectFuncionario = document.getElementById('select-funcionario');
+        const newSelectFuncionario = selectFuncionario.cloneNode(true);
+        selectFuncionario.parentNode.replaceChild(newSelectFuncionario, selectFuncionario);
+        
+        // Auto-preenchimento de horários ao selecionar funcionário
+        newSelectFuncionario.addEventListener('change', async (e) => {
+            const funcionarioId = e.target.value;
+            if (funcionarioId) {
+                await this.loadHorariosFuncionario(funcionarioId, allocationId);
+            } else {
+                // Reset para padrão quando nenhum funcionário selecionado
+                this.resetHorariosToDefault();
+            }
+        });
+        
+        this.log(`✅ MODAL: Event listeners configurados para alocação ${allocationId} (incluindo auto-preenchimento de horários)`);
     }
     
     /**
@@ -3906,7 +3922,7 @@ class EquipeFase2 {
     /**
      * Seleciona funcionário no formulário (clique no card)
      */
-    selectFuncionario(funcionarioId) {
+    async selectFuncionario(funcionarioId) {
         const selectElement = document.getElementById('select-funcionario');
         selectElement.value = funcionarioId;
         
@@ -3920,8 +3936,157 @@ class EquipeFase2 {
         }
         
         this.log(`👆 MODAL: Funcionário ${funcionarioId} selecionado`);
+        
+        // FASE 4: Auto-preenchimento de horários
+        if (this.currentModalData && this.currentModalData.allocationId) {
+            await this.loadHorariosFuncionario(funcionarioId, this.currentModalData.allocationId);
+        }
     }
     
+    /**
+     * FASE 4: Carrega horários do funcionário e preenche automaticamente
+     */
+    async loadHorariosFuncionario(funcionarioId, allocationId) {
+        try {
+            this.log(`🕐 HORARIOS: Carregando horários para funcionário ${funcionarioId}...`);
+            
+            // Calcular dia da semana baseado na data da alocação
+            const allocation = this.currentModalData?.allocation;
+            let diaSemana = null;
+            
+            if (allocation && allocation.data_alocacao) {
+                const dataAlocacao = new Date(allocation.data_alocacao);
+                diaSemana = dataAlocacao.getDay(); // 0=Domingo, 1=Segunda, etc.
+                this.log(`🕐 HORARIOS: Data da alocação: ${allocation.data_alocacao}, dia da semana: ${diaSemana}`);
+            }
+            
+            // Buscar horários via API
+            const url = `/equipe/api/funcionario/${funcionarioId}/horarios${diaSemana !== null ? `?dia_semana=${diaSemana}` : ''}`;
+            this.log(`📡 HORARIOS: Fazendo requisição para ${url}`);
+            
+            // Mostrar loading visual nos campos de horário
+            this.showHorariosLoading(true);
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`API retornou ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Erro desconhecido da API');
+            }
+            
+            this.log(`✅ HORARIOS: Dados recebidos:`, data);
+            
+            // Aplicar horários nos campos
+            const horarios = data.horarios;
+            const turnoInicioField = document.getElementById('input-turno-inicio');
+            const turnoFimField = document.getElementById('input-turno-fim');
+            
+            if (turnoInicioField && turnoFimField) {
+                turnoInicioField.value = horarios.turno_inicio;
+                turnoFimField.value = horarios.turno_fim;
+                
+                // Adicionar estilo visual para indicar auto-preenchimento
+                turnoInicioField.style.backgroundColor = '#e8f5e8';
+                turnoFimField.style.backgroundColor = '#e8f5e8';
+                
+                // Remover estilo após alguns segundos
+                setTimeout(() => {
+                    turnoInicioField.style.backgroundColor = '';
+                    turnoFimField.style.backgroundColor = '';
+                }, 2000);
+                
+                this.log(`✅ HORARIOS: Campos preenchidos - início: ${horarios.turno_inicio}, fim: ${horarios.turno_fim}`);
+            }
+            
+            // Mostrar tooltip informativo
+            const infoMessage = horarios.possui_horario_customizado 
+                ? `✅ Horários de ${data.funcionario.nome} aplicados (${horarios.nome_horario || 'Personalizado'})`
+                : `ℹ️ Horário padrão aplicado para ${data.funcionario.nome}`;
+            
+            this.showHorariosTooltip(infoMessage, horarios.trabalha_no_dia);
+            
+            // Se não trabalha no dia, mostrar aviso
+            if (!horarios.trabalha_no_dia) {
+                const tipoMsg = this.getTipoLancamentoMessage(horarios.tipo_lancamento);
+                this.showToast(`⚠️ ${data.funcionario.nome} ${tipoMsg}`, 'warning', 4000);
+            }
+            
+        } catch (error) {
+            this.log(`❌ HORARIOS: Erro ao carregar horários - ${error.message}`);
+            this.showToast(`❌ Erro ao carregar horários: ${error.message}`, 'error', 3000);
+            
+            // Em caso de erro, aplicar horários padrão
+            this.resetHorariosToDefault();
+        } finally {
+            // Remover loading visual
+            this.showHorariosLoading(false);
+        }
+    }
+    
+    /**
+     * FASE 4: Reset horários para valores padrão
+     */
+    resetHorariosToDefault() {
+        const turnoInicioField = document.getElementById('input-turno-inicio');
+        const turnoFimField = document.getElementById('input-turno-fim');
+        
+        if (turnoInicioField && turnoFimField) {
+            turnoInicioField.value = '08:00';
+            turnoFimField.value = '17:00';
+            
+            // Remover qualquer estilo visual
+            turnoInicioField.style.backgroundColor = '';
+            turnoFimField.style.backgroundColor = '';
+            
+            this.log(`🔄 HORARIOS: Horários resetados para padrão (08:00-17:00)`);
+        }
+    }
+    
+    /**
+     * FASE 4: Mostra/esconde loading visual nos campos de horário
+     */
+    showHorariosLoading(show) {
+        const turnoInicioField = document.getElementById('input-turno-inicio');
+        const turnoFimField = document.getElementById('input-turno-fim');
+        
+        if (show) {
+            if (turnoInicioField) turnoInicioField.style.backgroundColor = '#f8f9fa';
+            if (turnoFimField) turnoFimField.style.backgroundColor = '#f8f9fa';
+        } else {
+            if (turnoInicioField) turnoInicioField.style.backgroundColor = '';
+            if (turnoFimField) turnoFimField.style.backgroundColor = '';
+        }
+    }
+    
+    /**
+     * FASE 4: Mostra tooltip informativo sobre os horários
+     */
+    showHorariosTooltip(message, trabalhaNodia = true) {
+        const tipo = trabalhaNodia ? 'success' : 'warning';
+        this.showToast(message, tipo, 3000);
+    }
+    
+    /**
+     * FASE 4: Converte tipo de lançamento em mensagem amigável
+     */
+    getTipoLancamentoMessage(tipoLancamento) {
+        const messages = {
+            'domingo_folga': 'não trabalha aos domingos',
+            'sabado_folga': 'não trabalha aos sábados', 
+            'falta': 'não trabalha neste dia da semana',
+            'domingo_trabalhado': 'trabalha neste domingo (hora extra)',
+            'sabado_trabalhado': 'trabalha neste sábado (hora extra)',
+            'trabalho_normal': 'trabalha normalmente neste dia'
+        };
+        
+        return messages[tipoLancamento] || 'horário não definido';
+    }
+
     /**
      * Recarrega dados do modal
      */
