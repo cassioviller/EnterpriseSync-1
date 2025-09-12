@@ -2537,6 +2537,7 @@ class Allocation(db.Model):
     data_alocacao = db.Column(db.Date, nullable=False)
     turno_inicio = db.Column(db.Time, default=time(8, 0))  # 08:00
     turno_fim = db.Column(db.Time, default=time(17, 0))    # 17:00
+    local_trabalho = db.Column(db.String(20), default='campo')  # 'campo' ou 'oficina'
     nota = db.Column(db.String(100))  # Observação curta
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -2545,11 +2546,12 @@ class Allocation(db.Model):
     admin = db.relationship('Usuario', backref='allocations')
     funcionarios = db.relationship('AllocationEmployee', backref='allocation', cascade='all, delete-orphan')
     
-    # Constraint de integridade: uma obra não pode ser alocada duas vezes no mesmo dia
+    # Constraint de integridade: uma obra não pode ser alocada duas vezes no mesmo dia/local
     __table_args__ = (
-        db.UniqueConstraint('admin_id', 'obra_id', 'data_alocacao', name='uk_allocation_admin_obra_data'),
+        db.UniqueConstraint('admin_id', 'obra_id', 'data_alocacao', 'local_trabalho', name='uk_allocation_admin_obra_data_local'),
         db.Index('idx_allocation_admin_data', 'admin_id', 'data_alocacao'),
         db.Index('idx_allocation_obra_data', 'obra_id', 'data_alocacao'),
+        db.Index('idx_allocation_local', 'local_trabalho'),
     )
     
     def __repr__(self):
@@ -2575,6 +2577,12 @@ class AllocationEmployee(db.Model):
     turno_fim = db.Column(db.Time, default=time(17, 0))
     papel = db.Column(db.String(50))  # Ex: "soldador", "ajudante", "líder"
     observacao = db.Column(db.String(100))  # Obs específica do funcionário
+    
+    # Campos para integração com ponto
+    tipo_lancamento = db.Column(db.String(30), default='trabalho_normal')  # trabalho_normal, sabado_trabalhado, domingo_trabalhado, falta, sabado_folga, domingo_folga, feriado_folga
+    sincronizado_ponto = db.Column(db.Boolean, default=False)  # Se já foi sincronizado com RegistroPonto
+    data_sincronizacao = db.Column(db.DateTime)  # Quando foi sincronizado
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
@@ -2597,6 +2605,81 @@ class AllocationEmployee(db.Model):
             )
         ).count()
         return conflicts > 0
+    
+    @property
+    def deve_gerar_ponto(self):
+        """Verifica se deve gerar registro de ponto automaticamente"""
+        return not self.sincronizado_ponto
+
+    def get_tipo_lancamento_automatico(self):
+        """Determina tipo de lançamento baseado no dia da semana"""
+        from app import db
+        
+        dia_semana = self.allocation.data_alocacao.weekday()  # 0=Monday, 6=Sunday
+        
+        if dia_semana < 5:  # Segunda a Sexta (0-4)
+            return 'trabalho_normal'
+        elif dia_semana == 5:  # Sábado
+            return 'sabado_trabalhado'
+        else:  # Domingo
+            return 'domingo_trabalhado'
+
+    def sincronizar_com_ponto(self):
+        """Cria registro de ponto baseado na alocação"""
+        from app import db
+        from datetime import datetime, date
+        
+        # Verificar se já existe registro
+        registro_existente = RegistroPonto.query.filter_by(
+            funcionario_id=self.funcionario_id,
+            data=self.allocation.data_alocacao
+        ).first()
+        
+        if registro_existente:
+            # Atualizar registro existente
+            registro_existente.obra_id = self.allocation.obra_id
+            registro_existente.tipo_local = self.allocation.local_trabalho
+            registro_existente.hora_entrada = self.turno_inicio
+            registro_existente.hora_saida = self.turno_fim
+            if hasattr(registro_existente, 'tipo_registro'):
+                registro_existente.tipo_registro = self.tipo_lancamento
+        else:
+            # Criar novo registro
+            registro = RegistroPonto(
+                funcionario_id=self.funcionario_id,
+                obra_id=self.allocation.obra_id,
+                data=self.allocation.data_alocacao,
+                hora_entrada=self.turno_inicio,
+                hora_saida=self.turno_fim,
+                tipo_local=self.allocation.local_trabalho,
+                horas_trabalhadas=self._calcular_horas_trabalhadas()
+            )
+            if hasattr(registro, 'tipo_registro'):
+                registro.tipo_registro = self.tipo_lancamento
+            db.session.add(registro)
+        
+        # Marcar como sincronizado
+        self.sincronizado_ponto = True
+        self.data_sincronizacao = datetime.utcnow()
+        
+        try:
+            db.session.commit()
+            return True
+        except Exception as e:
+            db.session.rollback()
+            print(f"Erro ao sincronizar ponto: {e}")
+            return False
+
+    def _calcular_horas_trabalhadas(self):
+        """Calcula horas trabalhadas baseado no turno"""
+        from datetime import datetime, date
+        
+        if self.turno_inicio and self.turno_fim:
+            inicio = datetime.combine(date.today(), self.turno_inicio)
+            fim = datetime.combine(date.today(), self.turno_fim)
+            delta = fim - inicio
+            return delta.total_seconds() / 3600
+        return 8.0  # Padrão
 
 class WeeklyPlan(db.Model):
     """Planejamento semanal por obra - Tela C (opcional)
@@ -2644,4 +2727,110 @@ class WeeklyPlanItem(db.Model):
     
     def __repr__(self):
         return f'<WeeklyPlanItem {self.servico.nome} - Dia {self.day_of_week}>'
+
+# ================================
+# FUNÇÕES PARA LANÇAMENTO AUTOMÁTICO DE PONTO
+# ================================
+
+def processar_lancamentos_automaticos(data_processamento=None):
+    """
+    Processa lançamentos automáticos de ponto para funcionários não alocados
+    Deve ser executada via cron job à meia-noite
+    """
+    from app import db
+    from datetime import date, timedelta
+    
+    if data_processamento is None:
+        data_processamento = date.today() - timedelta(days=1)  # Dia anterior
+    
+    # Buscar todos os funcionários ativos
+    funcionarios_ativos = Funcionario.query.filter_by(ativo=True).all()
+    
+    for funcionario in funcionarios_ativos:
+        # Verificar se funcionário foi alocado nesta data
+        alocacao = db.session.query(AllocationEmployee).join(Allocation).filter(
+            AllocationEmployee.funcionario_id == funcionario.id,
+            Allocation.data_alocacao == data_processamento
+        ).first()
+        
+        if alocacao:
+            # Funcionário foi alocado - sincronizar se necessário
+            if not alocacao.sincronizado_ponto:
+                alocacao.sincronizar_com_ponto()
+        else:
+            # Funcionário NÃO foi alocado - gerar falta/folga
+            registro_existente = RegistroPonto.query.filter_by(
+                funcionario_id=funcionario.id,
+                data=data_processamento
+            ).first()
+            
+            if not registro_existente:
+                tipo_registro = _determinar_tipo_falta(data_processamento)
+                
+                registro = RegistroPonto(
+                    funcionario_id=funcionario.id,
+                    data=data_processamento,
+                    horas_trabalhadas=0.0
+                )
+                if hasattr(registro, 'tipo_registro'):
+                    registro.tipo_registro = tipo_registro
+                if hasattr(registro, 'observacoes'):
+                    registro.observacoes = f'Lançamento automático - {tipo_registro}'
+                db.session.add(registro)
+    
+    try:
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao processar lançamentos automáticos: {e}")
+        return False
+
+def _determinar_tipo_falta(data):
+    """Determina tipo de falta baseado no dia da semana"""
+    dia_semana = data.weekday()  # 0=Monday, 6=Sunday
+    
+    # Verificar se é feriado (implementar lógica de feriados)
+    if _eh_feriado(data):
+        return 'feriado_folga'
+    
+    if dia_semana < 5:  # Segunda a Sexta
+        return 'falta'
+    elif dia_semana == 5:  # Sábado
+        return 'sabado_folga'
+    else:  # Domingo
+        return 'domingo_folga'
+
+def _eh_feriado(data):
+    """Verifica se a data é feriado nacional"""
+    # Implementar lógica de feriados nacionais
+    # Por enquanto, retorna False
+    return False
+
+def sincronizar_alocacao_com_horario_funcionario(allocation_employee_id):
+    """Aplica horário do funcionário na alocação se disponível"""
+    from app import db
+    
+    allocation_emp = AllocationEmployee.query.get(allocation_employee_id)
+    if not allocation_emp:
+        return False
+    
+    funcionario = allocation_emp.funcionario
+    if funcionario and funcionario.horario_trabalho:
+        horario = funcionario.horario_trabalho
+        allocation_emp.turno_inicio = horario.entrada
+        allocation_emp.turno_fim = horario.saida
+        
+        # Definir tipo de lançamento baseado no dia
+        allocation_emp.tipo_lancamento = allocation_emp.get_tipo_lancamento_automatico()
+        
+        try:
+            db.session.commit()
+            return True
+        except Exception as e:
+            db.session.rollback()
+            print(f"Erro ao sincronizar horário: {e}")
+            return False
+    
+    return False
 

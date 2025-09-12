@@ -1,0 +1,44 @@
+eu quero que veja o estado atual do repositorio na parte de gestao de equipe, porque o codigo foi atualizado no github
+e que pense em como ira fazer para implementar a funcionalidade que irei dizer
+eu quero que na hora que alocar um funcionario em uma obra na gestao de equipe
+a hora de inicio e fim seja de acordo com o que esta cadastrado no horario do funcionrio
+e tenha o "tipo de lancamento" do ponto 
+Se alocado o funcionario numa data
+vai ser pre preenchido automaticamente mas pode mudar, de seg a sex é trabalho normal
+sab é sabado trabalhado
+dom é domingo trabalhado
+
+porem se o funcionario esta ativo é nao esta alocado, quando virar meia noite do dia posterior faz o lancamento automatico
+seg a sexta é falta
+sab e dom são sabado folga e domingo folga
+feriado nacional - feriado folga
+
+que ai eu nao vou precisar lancar o ponto manualmente no final do mes
+ja ira lancando de acordo com a gestao de funcionarios
+eu posso ter um botao la na parte do funcionario para fazer essa sincronizacao
+porque a gestao pode ser feita e mudada de acordo com o tempo
+uma falta imprevista que muda a alocacao de pessoas
+entao vai excluir muito os funcionarios das obras e adicionar em outra
+
+
+e eu quero alocar as obras  de um dia em campo ou oficina
+ou seja tera dois campos para arrastar em um dia 
+o campo -> campo
+ou o campo -> oficina
+
+por que eu quero que na rdo quando a pessoa selecionar a obra e depois campo ou oficina
+carregue automaticamente os funcionarios
+ou seja o sistema atual esta como
+o campo local do rdo esta pre selecionado campo
+eu quero que deixe selecionar
+e eu nao posso selecionar se eu nao escolho a obra antes
+ou seja
+o usuario tem que escolher a obra primiro
+depois que ele selecionar a obra
+ele esta permitido a selecionar o local
+campo ou oficina
+ao fazer isso
+o sistema buscar a alocacao que esta na gestao de equipe a obra, e se ela esta no campo ou na oficina, poque agora vai estar separado,  e alocar os funcionarios automaticamente para a rdo
+assim o lider de obra nao precisara preencher que, esta naquela obra e economizara tempo e ficara mais satisfeito
+
+e quero que o card de gestao semanal, ocupe a tala praticamente completa horizontalmente para ficar melhor de cisualizar as informacoes porque tera mais espaco
