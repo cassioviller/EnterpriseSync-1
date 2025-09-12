@@ -45,7 +45,6 @@ def convert_to_sunday_weekday(python_weekday):
 @equipe_bp.route('/')
 @equipe_bp.route('/alocacao')
 @login_required
-@admin_required
 def alocacao_semanal():
     """Redirecionar para alocação principal"""
     return redirect(url_for('equipe.alocacao_teste_fase1'))
