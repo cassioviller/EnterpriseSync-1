@@ -491,46 +491,158 @@
 
                         <hr>
 
-                        <!-- ADICIONAR FUNCIONÁRIO -->
+                        <!-- ADICIONAR FUNCIONÁRIO - FORMULÁRIO COMPLETO FASE 2B -->
                         <div class="mb-4">
                             <h6 class="fw-bold mb-3">
                                 <i class="fas fa-user-plus text-primary me-2"></i>
-                                Adicionar Funcionário
+                                Adicionar Funcionário - Horários Completos
                             </h6>
                             
+                            <!-- LINHA 1: FUNCIONÁRIO E PAPEL -->
                             <div class="row">
-                                <!-- SELEÇÃO DE FUNCIONÁRIO -->
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Funcionário</label>
-                                    <select class="form-select" id="select-funcionario">
-                                        <option value="">Selecione...</option>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-user me-1"></i>
+                                        Funcionário *
+                                    </label>
+                                    <select class="form-select" id="select-funcionario" required>
+                                        <option value="">Selecione um funcionário...</option>
                                     </select>
+                                    <div class="invalid-feedback">
+                                        Por favor, selecione um funcionário.
+                                    </div>
                                 </div>
                                 
-                                <!-- HORÁRIO INÍCIO -->
-                                <div class="col-md-2 mb-3">
-                                    <label class="form-label">Início</label>
-                                    <input type="time" class="form-control" id="input-turno-inicio" value="08:00">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-user-tag me-1"></i>
+                                        Papel/Função
+                                    </label>
+                                    <input type="text" class="form-control" id="input-papel" 
+                                           placeholder="Ex: Líder de Equipe, Ajudante, Operador" 
+                                           maxlength="100">
+                                    <small class="form-text text-muted">Função exercida neste dia</small>
+                                </div>
+                            </div>
+                            
+                            <!-- LINHA 2: HORÁRIOS DE TRABALHO -->
+                            <div class="card border-primary mb-3">
+                                <div class="card-header bg-primary text-white py-2">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-clock me-2"></i>
+                                        Horários de Trabalho
+                                    </h6>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="row">
+                                        <div class="col-6 col-md-3 mb-3">
+                                            <label class="form-label fw-bold text-success">
+                                                <i class="fas fa-sign-in-alt me-1"></i>
+                                                Entrada *
+                                            </label>
+                                            <input type="time" class="form-control border-success" 
+                                                   id="input-entrada" value="08:00" required>
+                                            <div class="invalid-feedback">Horário de entrada obrigatório.</div>
+                                        </div>
+                                        
+                                        <div class="col-6 col-md-3 mb-3">
+                                            <label class="form-label fw-bold text-warning">
+                                                <i class="fas fa-utensils me-1"></i>
+                                                Início Almoço
+                                            </label>
+                                            <input type="time" class="form-control border-warning" 
+                                                   id="input-inicio-almoco" value="12:00">
+                                            <small class="form-text text-muted">Deixe vazio se não faz pausa</small>
+                                        </div>
+                                        
+                                        <div class="col-6 col-md-3 mb-3">
+                                            <label class="form-label fw-bold text-warning">
+                                                <i class="fas fa-coffee me-1"></i>
+                                                Fim Almoço
+                                            </label>
+                                            <input type="time" class="form-control border-warning" 
+                                                   id="input-fim-almoco" value="13:00">
+                                            <small class="form-text text-muted">Deixe vazio se não faz pausa</small>
+                                        </div>
+                                        
+                                        <div class="col-6 col-md-3 mb-3">
+                                            <label class="form-label fw-bold text-danger">
+                                                <i class="fas fa-sign-out-alt me-1"></i>
+                                                Saída *
+                                            </label>
+                                            <input type="time" class="form-control border-danger" 
+                                                   id="input-saida" value="17:00" required>
+                                            <div class="invalid-feedback">Horário de saída obrigatório.</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- ALERTAS DE VALIDAÇÃO EM TEMPO REAL -->
+                                    <div id="time-validation-alert" class="alert alert-warning d-none" role="alert">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        <span id="time-validation-message"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- LINHA 3: EXTRAS E TIPO DE LANÇAMENTO -->
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-percentage me-1"></i>
+                                        % Horas Extras
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="input-percentual-extras" 
+                                               value="0" min="0" max="100" step="0.1">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="form-text text-muted">0% = sem extras, 50% = 50% a mais</small>
                                 </div>
                                 
-                                <!-- HORÁRIO FIM -->
-                                <div class="col-md-2 mb-3">
-                                    <label class="form-label">Fim</label>
-                                    <input type="time" class="form-control" id="input-turno-fim" value="17:00">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-calendar-day me-1"></i>
+                                        Tipo de Lançamento
+                                    </label>
+                                    <select class="form-select" id="input-tipo-lancamento" disabled>
+                                        <option value="trabalho_normal">Trabalho Normal</option>
+                                        <option value="sabado_trabalhado">Sábado Trabalhado</option>
+                                        <option value="domingo_trabalhado">Domingo Trabalhado</option>
+                                        <option value="feriado_trabalhado">Feriado Trabalhado</option>
+                                    </select>
+                                    <small class="form-text text-muted">Automático conforme dia da semana</small>
                                 </div>
                                 
-                                <!-- PAPEL/FUNÇÃO -->
-                                <div class="col-md-3 mb-3">
-                                    <label class="form-label">Papel/Função</label>
-                                    <input type="text" class="form-control" id="input-papel" placeholder="Ex: Líder, Ajudante">
-                                </div>
-                                
-                                <!-- BOTÃO ADICIONAR -->
-                                <div class="col-md-1 mb-3">
+                                <div class="col-md-4 mb-3">
                                     <label class="form-label d-block">&nbsp;</label>
-                                    <button type="button" class="btn btn-success w-100" id="btn-add-funcionario">
-                                        <i class="fas fa-plus"></i>
+                                    <button type="button" class="btn btn-success w-100 py-2" id="btn-add-funcionario">
+                                        <i class="fas fa-plus me-2"></i>
+                                        Adicionar Funcionário
                                     </button>
+                                </div>
+                            </div>
+                            
+                            <!-- RESUMO AUTOMÁTICO DE HORAS -->
+                            <div class="card border-info mt-3" id="hours-summary" style="display: none;">
+                                <div class="card-body p-2">
+                                    <div class="row text-center">
+                                        <div class="col">
+                                            <small class="text-muted">Total Horas</small>
+                                            <div class="fw-bold text-primary" id="total-hours">--</div>
+                                        </div>
+                                        <div class="col">
+                                            <small class="text-muted">Pausa Almoço</small>
+                                            <div class="fw-bold text-warning" id="lunch-break">--</div>
+                                        </div>
+                                        <div class="col">
+                                            <small class="text-muted">Horas Líquidas</small>
+                                            <div class="fw-bold text-success" id="net-hours">--</div>
+                                        </div>
+                                        <div class="col">
+                                            <small class="text-muted">Com Extras</small>
+                                            <div class="fw-bold text-info" id="hours-with-extras">--</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3678,6 +3790,8 @@ class EquipeFase2 {
      * Configura event listeners do modal
      */
     setupModalEventListeners(allocationId) {
+        this.log(`🔧 MODAL: Configurando event listeners para alocação ${allocationId}...`);
+        
         // Remover listeners anteriores para evitar duplicação
         const addBtn = document.getElementById('btn-add-funcionario');
         const newAddBtn = addBtn.cloneNode(true);
@@ -3688,7 +3802,7 @@ class EquipeFase2 {
             this.addFuncionario(allocationId);
         });
         
-        // FASE 4: Event listener para dropdown de funcionário
+        // FASE 2B: Event listener para dropdown de funcionário
         const selectFuncionario = document.getElementById('select-funcionario');
         const newSelectFuncionario = selectFuncionario.cloneNode(true);
         selectFuncionario.parentNode.replaceChild(newSelectFuncionario, selectFuncionario);
@@ -3704,63 +3818,302 @@ class EquipeFase2 {
             }
         });
         
-        this.log(`✅ MODAL: Event listeners configurados para alocação ${allocationId} (incluindo auto-preenchimento de horários)`);
+        // FASE 2B: Setup automático do tipo de lançamento baseado no dia da semana
+        this.setupAutomaticTipoLancamento(allocationId);
+        
+        // FASE 2B: Validações em tempo real de horários
+        this.setupTimeValidations();
+        
+        // FASE 2B: Auto-cálculo de horas conforme preenchimento
+        this.setupHoursCalculation();
+        
+        this.log(`✅ MODAL: Event listeners configurados para alocação ${allocationId} (FASE 2B completa)`);
+    }
+    
+    /**
+     * FASE 2B: Configura tipo de lançamento automático baseado no dia da semana
+     */
+    setupAutomaticTipoLancamento(allocationId) {
+        if (!this.currentModalData || !this.currentModalData.allocation) {
+            this.log(`⚠️ MODAL: Dados da alocação não disponíveis para tipo automático`);
+            return;
+        }
+        
+        const allocation = this.currentModalData.allocation;
+        const dataAlocacao = new Date(allocation.data_alocacao + 'T00:00:00');
+        const dayOfWeek = dataAlocacao.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+        
+        let tipoLancamento = 'trabalho_normal';
+        
+        // Determinar tipo baseado no dia da semana
+        if (dayOfWeek === 0) { // Domingo
+            tipoLancamento = 'domingo_trabalhado';
+        } else if (dayOfWeek === 6) { // Sábado
+            tipoLancamento = 'sabado_trabalhado';
+        } else { // Segunda a Sexta
+            tipoLancamento = 'trabalho_normal';
+        }
+        
+        // Aplicar no campo
+        const tipoSelect = document.getElementById('input-tipo-lancamento');
+        if (tipoSelect) {
+            tipoSelect.value = tipoLancamento;
+            this.log(`📅 MODAL: Tipo de lançamento automático: ${tipoLancamento} (dia ${dayOfWeek})`);
+        }
+    }
+    
+    /**
+     * FASE 2B: Configura validações em tempo real de horários
+     */
+    setupTimeValidations() {
+        const entrada = document.getElementById('input-entrada');
+        const inicioAlmoco = document.getElementById('input-inicio-almoco');
+        const fimAlmoco = document.getElementById('input-fim-almoco');
+        const saida = document.getElementById('input-saida');
+        const percentualExtras = document.getElementById('input-percentual-extras');
+        
+        const validateTimes = () => {
+            const alert = document.getElementById('time-validation-alert');
+            const message = document.getElementById('time-validation-message');
+            
+            // Resetar alerta
+            alert.classList.add('d-none');
+            
+            const entradaVal = entrada.value;
+            const inicioAlmocoVal = inicioAlmoco.value;
+            const fimAlmocoVal = fimAlmoco.value;
+            const saidaVal = saida.value;
+            
+            // Validações de sequência
+            let errors = [];
+            
+            if (entradaVal && saidaVal && entradaVal >= saidaVal) {
+                errors.push('Horário de saída deve ser após entrada');
+            }
+            
+            if (entradaVal && inicioAlmocoVal && entradaVal >= inicioAlmocoVal) {
+                errors.push('Início do almoço deve ser após entrada');
+            }
+            
+            if (inicioAlmocoVal && fimAlmocoVal && inicioAlmocoVal >= fimAlmocoVal) {
+                errors.push('Fim do almoço deve ser após início');
+            }
+            
+            if (fimAlmocoVal && saidaVal && fimAlmocoVal >= saidaVal) {
+                errors.push('Saída deve ser após fim do almoço');
+            }
+            
+            // Se ambos almoço estão preenchidos mas só um está preenchido
+            if ((inicioAlmocoVal && !fimAlmocoVal) || (!inicioAlmocoVal && fimAlmocoVal)) {
+                errors.push('Preencha ambos os horários de almoço ou deixe ambos vazios');
+            }
+            
+            if (errors.length > 0) {
+                message.textContent = errors.join(' • ');
+                alert.classList.remove('d-none');
+                return false;
+            }
+            
+            return true;
+        };
+        
+        // Adicionar listeners para validação em tempo real
+        [entrada, inicioAlmoco, fimAlmoco, saida].forEach(input => {
+            input.addEventListener('change', validateTimes);
+            input.addEventListener('blur', validateTimes);
+        });
+        
+        // Validação de porcentagem
+        percentualExtras.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            if (value < 0) e.target.value = 0;
+            if (value > 100) e.target.value = 100;
+        });
+        
+        this.log(`✅ MODAL: Validações de horário configuradas`);
+    }
+    
+    /**
+     * FASE 2B: Configura cálculo automático de horas
+     */
+    setupHoursCalculation() {
+        const entrada = document.getElementById('input-entrada');
+        const inicioAlmoco = document.getElementById('input-inicio-almoco');
+        const fimAlmoco = document.getElementById('input-fim-almoco');
+        const saida = document.getElementById('input-saida');
+        const percentualExtras = document.getElementById('input-percentual-extras');
+        
+        const calculateHours = () => {
+            const entradaVal = entrada.value;
+            const inicioAlmocoVal = inicioAlmoco.value;
+            const fimAlmocoVal = fimAlmoco.value;
+            const saidaVal = saida.value;
+            const extrasVal = parseFloat(percentualExtras.value || 0);
+            
+            if (!entradaVal || !saidaVal) {
+                document.getElementById('hours-summary').style.display = 'none';
+                return;
+            }
+            
+            // Converter horários para minutos
+            const parseTime = (time) => {
+                const [hours, minutes] = time.split(':').map(Number);
+                return hours * 60 + minutes;
+            };
+            
+            const formatTime = (minutes) => {
+                const h = Math.floor(minutes / 60);
+                const m = minutes % 60;
+                return `${h}h${m.toString().padStart(2, '0')}m`;
+            };
+            
+            const entradaMinutes = parseTime(entradaVal);
+            const saidaMinutes = parseTime(saidaVal);
+            
+            // Total bruto
+            let totalMinutes = saidaMinutes - entradaMinutes;
+            if (totalMinutes < 0) totalMinutes += 24 * 60; // Para casos onde saída é no dia seguinte
+            
+            // Pausa de almoço
+            let pausaMinutes = 0;
+            if (inicioAlmocoVal && fimAlmocoVal) {
+                const inicioAlmocoMinutes = parseTime(inicioAlmocoVal);
+                const fimAlmocoMinutes = parseTime(fimAlmocoVal);
+                pausaMinutes = fimAlmocoMinutes - inicioAlmocoMinutes;
+                if (pausaMinutes < 0) pausaMinutes += 24 * 60;
+            }
+            
+            // Horas líquidas
+            const liquidoMinutes = totalMinutes - pausaMinutes;
+            
+            // Com extras
+            const comExtrasMinutes = liquidoMinutes * (1 + extrasVal / 100);
+            
+            // Atualizar display
+            document.getElementById('total-hours').textContent = formatTime(totalMinutes);
+            document.getElementById('lunch-break').textContent = pausaMinutes > 0 ? formatTime(pausaMinutes) : '--';
+            document.getElementById('net-hours').textContent = formatTime(liquidoMinutes);
+            document.getElementById('hours-with-extras').textContent = formatTime(Math.round(comExtrasMinutes));
+            
+            document.getElementById('hours-summary').style.display = 'block';
+        };
+        
+        // Adicionar listeners para cálculo em tempo real
+        [entrada, inicioAlmoco, fimAlmoco, saida, percentualExtras].forEach(input => {
+            input.addEventListener('change', calculateHours);
+            input.addEventListener('input', calculateHours);
+        });
+        
+        this.log(`✅ MODAL: Cálculo automático de horas configurado`);
     }
     
     /**
      * Adiciona funcionário via API - VERSÃO COM LOGS DETALHADOS
      */
     async addFuncionario(allocationId) {
+        // FASE 2B: Coletar TODOS os campos do formulário completo
         const funcionarioId = document.getElementById('select-funcionario').value;
-        const turnoInicio = document.getElementById('input-turno-inicio').value;
-        const turnoFim = document.getElementById('input-turno-fim').value;
+        const entrada = document.getElementById('input-entrada').value;
+        const inicioAlmoco = document.getElementById('input-inicio-almoco').value;
+        const fimAlmoco = document.getElementById('input-fim-almoco').value;
+        const saida = document.getElementById('input-saida').value;
+        const percentualExtras = parseFloat(document.getElementById('input-percentual-extras').value || 0);
+        const tipoLancamento = document.getElementById('input-tipo-lancamento').value;
         const papel = document.getElementById('input-papel').value.trim();
         
-        this.log(`➕ CRUD: Iniciando adição de funcionário - alocação ${allocationId}`);
-        this.log(`📝 CRUD: Dados do formulário - funcionarioId: ${funcionarioId}, turno: ${turnoInicio}-${turnoFim}, papel: '${papel}'`);
+        this.log(`➕ CRUD: Iniciando adição de funcionário FASE 2B - alocação ${allocationId}`);
+        this.log(`📝 CRUD: Dados COMPLETOS do formulário:`);
+        this.log(`   - Funcionário ID: ${funcionarioId}`);
+        this.log(`   - Horários: ${entrada} → ${inicioAlmoco} | ${fimAlmoco} → ${saida}`);
+        this.log(`   - % Extras: ${percentualExtras}%`);
+        this.log(`   - Tipo: ${tipoLancamento}`);
+        this.log(`   - Papel: '${papel}'`);
         
-        // Validações detalhadas
+        // VALIDAÇÕES COMPLETAS FASE 2B
         if (!funcionarioId) {
             this.log(`❌ CRUD: Validação falhou - nenhum funcionário selecionado`);
             this.showToast('Selecione um funcionário', 'warning', 3000);
+            document.getElementById('select-funcionario').focus();
             return;
         }
         
-        if (!turnoInicio || !turnoFim) {
-            this.log(`❌ CRUD: Validação falhou - horários incompletos (início: ${turnoInicio}, fim: ${turnoFim})`);
-            this.showToast('Preencha os horários', 'warning', 3000);
+        if (!entrada || !saida) {
+            this.log(`❌ CRUD: Validação falhou - horários obrigatórios incompletos`);
+            this.showToast('Preencha pelo menos entrada e saída', 'warning', 3000);
             return;
         }
         
-        // Validar se horário fim é após horário início
-        if (turnoFim <= turnoInicio) {
-            this.log(`❌ CRUD: Validação falhou - horário fim (${turnoFim}) não é posterior ao início (${turnoInicio})`);
-            this.showToast('Horário de fim deve ser após horário de início', 'warning', 3000);
+        // Validar sequência de horários
+        if (saida <= entrada) {
+            this.log(`❌ CRUD: Validação falhou - saída (${saida}) não é posterior à entrada (${entrada})`);
+            this.showToast('Horário de saída deve ser após entrada', 'warning', 3000);
+            document.getElementById('input-saida').focus();
             return;
         }
         
-        this.log(`✅ CRUD: Validações aprovadas - prosseguindo com requisição`);
+        // Validar almoço se preenchido
+        if ((inicioAlmoco && !fimAlmoco) || (!inicioAlmoco && fimAlmoco)) {
+            this.log(`❌ CRUD: Validação falhou - almoço parcialmente preenchido`);
+            this.showToast('Preencha ambos os horários de almoço ou deixe ambos vazios', 'warning', 3000);
+            return;
+        }
         
-        // Declarar variáveis antes do try/catch para que fiquem acessíveis em todos os blocos
+        if (inicioAlmoco && fimAlmoco) {
+            if (inicioAlmoco <= entrada) {
+                this.log(`❌ CRUD: Validação falhou - início almoço deve ser após entrada`);
+                this.showToast('Início do almoço deve ser após entrada', 'warning', 3000);
+                return;
+            }
+            if (fimAlmoco <= inicioAlmoco) {
+                this.log(`❌ CRUD: Validação falhou - fim almoço deve ser após início`);
+                this.showToast('Fim do almoço deve ser após início', 'warning', 3000);
+                return;
+            }
+            if (saida <= fimAlmoco) {
+                this.log(`❌ CRUD: Validação falhou - saída deve ser após fim do almoço`);
+                this.showToast('Saída deve ser após fim do almoço', 'warning', 3000);
+                return;
+            }
+        }
+        
+        // Validar percentual de extras
+        if (percentualExtras < 0 || percentualExtras > 100) {
+            this.log(`❌ CRUD: Validação falhou - percentual extras inválido: ${percentualExtras}%`);
+            this.showToast('Percentual de extras deve ser entre 0% e 100%', 'warning', 3000);
+            return;
+        }
+        
+        this.log(`✅ CRUD: Todas validações FASE 2B aprovadas - prosseguindo com requisição`);
+        
+        // Declarar variáveis antes do try/catch
         let originalHtml = '';
         
         try {
             // Mostrar loading no botão
             const addBtn = document.getElementById('btn-add-funcionario');
-            originalHtml = addBtn.innerHTML; // Remover 'const' pois já foi declarado acima
-            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adicionando...';
+            originalHtml = addBtn.innerHTML;
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
             addBtn.disabled = true;
             
+            // PAYLOAD COMPLETO FASE 2B
             const payload = {
                 allocation_id: parseInt(allocationId),
                 funcionario_id: parseInt(funcionarioId),
-                turno_inicio: turnoInicio,
-                turno_fim: turnoFim,
-                papel: papel
+                // Novos campos FASE 2B
+                entrada: entrada,
+                inicio_almoco: inicioAlmoco || null,
+                fim_almoco: fimAlmoco || null,
+                saida: saida,
+                percentual_extras: percentualExtras,
+                tipo_lancamento: tipoLancamento,
+                papel: papel,
+                // Manter compatibilidade com campos antigos
+                turno_inicio: entrada, // Para backward compatibility
+                turno_fim: saida      // Para backward compatibility
             };
             
-            this.log(`📡 CRUD: Enviando POST para /equipe/api/allocation-employee`);
-            this.log(`📡 CRUD: Payload: ${JSON.stringify(payload, null, 2)}`);
+            this.log(`📡 CRUD: Enviando POST FASE 2B para /equipe/api/allocation-employee`);
+            this.log(`📡 CRUD: Payload COMPLETO: ${JSON.stringify(payload, null, 2)}`);
             
             const response = await fetch('/equipe/api/allocation-employee', {
                 method: 'POST',
@@ -3785,10 +4138,13 @@ class EquipeFase2 {
                 throw new Error(data.error || 'Erro desconhecido');
             }
             
-            this.log(`✅ CRUD: Funcionário adicionado com sucesso!`);
-            this.log(`👤 CRUD: Funcionário criado: ${data.funcionario_nome || 'Nome não retornado'}`);
+            this.log(`✅ CRUD: Funcionário FASE 2B adicionado com sucesso!`);
+            this.log(`👤 CRUD: Funcionário: ${data.funcionario_nome || 'Nome não retornado'}`);
             
-            this.showToast(`✅ ${data.funcionario_nome || 'Funcionário'} adicionado!`, 'success', 2000);
+            this.showToast(`✅ ${data.funcionario_nome || 'Funcionário'} adicionado com horários completos!`, 'success', 3000);
+            
+            // Limpar formulário após sucesso
+            this.clearModalForm();
             
             // Recarregar dados do modal
             this.log(`🔄 CRUD: Recarregando dados do modal...`);
@@ -3798,11 +4154,11 @@ class EquipeFase2 {
             this.log(`🔄 CRUD: Atualizando calendário principal...`);
             await this.carregarAlocacoes();
             
-            this.log(`✅ CRUD: Operação de adição concluída com sucesso`);
+            this.log(`✅ CRUD: Operação FASE 2B concluída com sucesso`);
             
         } catch (error) {
-            this.log(`❌ CRUD: ERRO CRÍTICO ao adicionar funcionário - ${error.message}`);
-            this.showToast(`❌ Erro: ${error.message}`, 'error', 4000);
+            this.log(`❌ CRUD: ERRO CRÍTICO FASE 2B ao adicionar funcionário - ${error.message}`);
+            this.showToast(`❌ Erro: ${error.message}`, 'error', 5000);
         } finally {
             // Restaurar botão
             const addBtn = document.getElementById('btn-add-funcionario');
@@ -3812,6 +4168,27 @@ class EquipeFase2 {
             }
             this.log(`🔧 CRUD: Botão de adição restaurado`);
         }
+    }
+    
+    /**
+     * FASE 2B: Limpa formulário após adição bem-sucedida
+     */
+    clearModalForm() {
+        document.getElementById('select-funcionario').value = '';
+        document.getElementById('input-entrada').value = '08:00';
+        document.getElementById('input-inicio-almoco').value = '12:00';
+        document.getElementById('input-fim-almoco').value = '13:00';
+        document.getElementById('input-saida').value = '17:00';
+        document.getElementById('input-percentual-extras').value = '0';
+        document.getElementById('input-papel').value = '';
+        
+        // Esconder resumo de horas
+        document.getElementById('hours-summary').style.display = 'none';
+        
+        // Esconder alerta de validação
+        document.getElementById('time-validation-alert').classList.add('d-none');
+        
+        this.log(`🧹 MODAL: Formulário limpo para próxima entrada`);
     }
     
     /**

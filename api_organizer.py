@@ -11,6 +11,20 @@ def get_current_user_bypass():
 
 api_organizer = Blueprint('api_organizer', __name__, url_prefix='/api')
 
+@api_organizer.route('/', methods=['GET'])
+def api_status():
+    """API status endpoint to prevent 404 errors"""
+    return jsonify({
+        'status': 'active',
+        'message': 'SIGE API v10.0 - Sistema Integrado de Gestão',
+        'endpoints': [
+            '/api/templates/listar',
+            '/api/templates/carregar-multiplos',
+            '/api/propostas/salvar-organizacao',
+            '/api/propostas/<id>/itens-organizados'
+        ]
+    })
+
 @api_organizer.route('/templates/listar', methods=['GET'])
 def listar_templates():
     """Lista todos os templates disponíveis"""

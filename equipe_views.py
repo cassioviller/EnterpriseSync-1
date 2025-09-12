@@ -210,6 +210,11 @@ def get_allocations_simples():
                             'papel': emp.papel or 'Sem função',
                             'turno_inicio': emp.turno_inicio.strftime('%H:%M') if emp.turno_inicio else '08:00',
                             'turno_fim': emp.turno_fim.strftime('%H:%M') if emp.turno_fim else '17:00',
+                            # FASE 2B: Campos lunch para frontend
+                            'inicio_almoco': emp.hora_almoco_saida.strftime('%H:%M') if emp.hora_almoco_saida else '12:00',
+                            'fim_almoco': emp.hora_almoco_retorno.strftime('%H:%M') if emp.hora_almoco_retorno else '13:00',
+                            'percentual_extras': emp.percentual_extras if hasattr(emp, 'percentual_extras') else 0.0,
+                            'tipo_lancamento': emp.tipo_lancamento if hasattr(emp, 'tipo_lancamento') else 'trabalho_normal',
                             'observacao': emp.observacao or ''
                         })
             except Exception as e:
@@ -677,11 +682,12 @@ def api_get_allocation_funcionarios(allocation_id):
 @login_required
 @admin_required
 def api_create_allocation_employee():
-    """API REST: Adicionar funcionário à alocação"""
+    """API REST: FASE 2B - Adicionar funcionário com horários completos"""
     try:
         admin_id = get_admin_id()
         data = request.get_json()
         
+        logging.info(f"📥 API FASE 2B: Recebendo dados: {data}")
 
         if not data:
             return jsonify({
@@ -689,6 +695,7 @@ def api_create_allocation_employee():
                 'error': 'Dados não fornecidos'
             }), 400
         
+        # VALIDAÇÕES BÁSICAS
         allocation_id = data.get('allocation_id')
         funcionario_id = data.get('funcionario_id')
         
@@ -698,7 +705,84 @@ def api_create_allocation_employee():
                 'error': 'Campos obrigatórios: allocation_id, funcionario_id'
             }), 400
         
+        # NOVOS CAMPOS FASE 2B
+        entrada_str = data.get('entrada')
+        inicio_almoco_str = data.get('inicio_almoco')
+        fim_almoco_str = data.get('fim_almoco')
+        saida_str = data.get('saida')
+        percentual_extras = data.get('percentual_extras', 0.0)
+        tipo_lancamento = data.get('tipo_lancamento', 'trabalho_normal')
+        papel = data.get('papel', '').strip()
+        
+        # VALIDAÇÕES FASE 2B
+        if not entrada_str or not saida_str:
+            return jsonify({
+                'success': False,
+                'error': 'Horários de entrada e saída são obrigatórios'
+            }), 400
+        
+        # Validar percentual de extras
+        try:
+            percentual_extras = float(percentual_extras)
+            if percentual_extras < 0 or percentual_extras > 100:
+                raise ValueError("Percentual fora da faixa válida")
+        except (ValueError, TypeError):
+            return jsonify({
+                'success': False,
+                'error': 'Percentual de extras deve ser um número entre 0 e 100'
+            }), 400
+        
+        # CONVERTER HORÁRIOS
+        try:
+            entrada = datetime.strptime(entrada_str, '%H:%M').time()
+            saida = datetime.strptime(saida_str, '%H:%M').time()
+            
+            inicio_almoco = None
+            fim_almoco = None
+            
+            if inicio_almoco_str:
+                inicio_almoco = datetime.strptime(inicio_almoco_str, '%H:%M').time()
+            if fim_almoco_str:
+                fim_almoco = datetime.strptime(fim_almoco_str, '%H:%M').time()
+                
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Formato de horário inválido. Use HH:MM (ex: 08:00)'
+            }), 400
+        
+        # VALIDAÇÕES DE SEQUÊNCIA DE HORÁRIOS
+        if saida <= entrada:
+            return jsonify({
+                'success': False,
+                'error': 'Horário de saída deve ser após entrada'
+            }), 400
+        
+        # Validar almoço se fornecido
+        if (inicio_almoco and not fim_almoco) or (not inicio_almoco and fim_almoco):
+            return jsonify({
+                'success': False,
+                'error': 'Preencha ambos os horários de almoço ou deixe ambos vazios'
+            }), 400
+        
+        if inicio_almoco and fim_almoco:
+            if inicio_almoco <= entrada:
+                return jsonify({
+                    'success': False,
+                    'error': 'Início do almoço deve ser após entrada'
+                }), 400
+            if fim_almoco <= inicio_almoco:
+                return jsonify({
+                    'success': False,
+                    'error': 'Fim do almoço deve ser após início'
+                }), 400
+            if saida <= fim_almoco:
+                return jsonify({
+                    'success': False,
+                    'error': 'Saída deve ser após fim do almoço'
+                }), 400
 
+        # VERIFICAR ALOCAÇÃO
         allocation = Allocation.query.filter_by(
             id=allocation_id,
             admin_id=admin_id
@@ -710,7 +794,7 @@ def api_create_allocation_employee():
                 'error': 'Alocação não encontrada'
             }), 404
         
-        # Verificar se funcionário existe, ativo e pertence ao admin
+        # VERIFICAR FUNCIONÁRIO
         funcionario = Funcionario.query.filter_by(
             id=funcionario_id,
             admin_id=admin_id,
@@ -723,7 +807,7 @@ def api_create_allocation_employee():
                 'error': 'Funcionário não encontrado ou inativo'
             }), 404
         
-        # Verificar duplicação (mesmo funcionário na mesma allocation)
+        # VERIFICAR DUPLICAÇÃO
         existing = AllocationEmployee.query.filter_by(
             allocation_id=allocation_id,
             funcionario_id=funcionario_id
@@ -735,7 +819,7 @@ def api_create_allocation_employee():
                 'error': f'Funcionário {funcionario.nome} já está alocado nesta obra/dia'
             }), 409
         
-        # Verificar conflito de data (funcionário em outra obra no mesmo dia)
+        # VERIFICAR CONFLITO DE DATA
         conflicting_allocation = db.session.query(AllocationEmployee, Allocation).join(
             Allocation, AllocationEmployee.allocation_id == Allocation.id
         ).filter(
@@ -753,75 +837,94 @@ def api_create_allocation_employee():
                 'error': f'Funcionário {funcionario.nome} já está alocado na obra {obra_nome} neste dia'
             }), 409
         
-        # NOVA FUNCIONALIDADE: Usar horário do funcionário se disponível
-        if funcionario.horario_trabalho and not data.get('turno_inicio') and not data.get('turno_fim'):
-            # Aplicar horário do funcionário automaticamente
-            turno_inicio = funcionario.horario_trabalho.entrada
-            turno_fim = funcionario.horario_trabalho.saida
-            horario_origem = 'funcionario'
-        else:
-            # Usar horários fornecidos ou padrão
-            turno_inicio_str = data.get('turno_inicio', '08:00')
-            turno_fim_str = data.get('turno_fim', '17:00')
-            
-            try:
-                turno_inicio = datetime.strptime(turno_inicio_str, '%H:%M').time()
-                turno_fim = datetime.strptime(turno_fim_str, '%H:%M').time()
-                horario_origem = 'manual' if data.get('turno_inicio') or data.get('turno_fim') else 'padrao'
-            except ValueError:
-                return jsonify({
-                    'success': False,
-                    'error': 'Formato de horário inválido. Use HH:MM (ex: 08:00)'
-                }), 400
-        
-        # Criar AllocationEmployee
+        # CRIAR ALLOCATION EMPLOYEE FASE 2B
         allocation_employee = AllocationEmployee()
         allocation_employee.allocation_id = allocation_id
         allocation_employee.funcionario_id = funcionario_id
-        allocation_employee.turno_inicio = turno_inicio
-        allocation_employee.turno_fim = turno_fim
-        allocation_employee.papel = data.get('papel', funcionario.funcao_ref.nome if funcionario.funcao_ref else '')
+        
+        # HORÁRIOS COMPLETOS FASE 2B
+        allocation_employee.turno_inicio = entrada  # Manter compatibilidade
+        allocation_employee.turno_fim = saida      # Manter compatibilidade
+        
+        # MAPPING CORRETO PARA CAMPOS DO BANCO - FASE 2B
+        # Campo lunch mapping correto: inicio_almoco→hora_almoco_saida, fim_almoco→hora_almoco_retorno
+        allocation_employee.hora_almoco_saida = inicio_almoco      # Campo correto do modelo
+        allocation_employee.hora_almoco_retorno = fim_almoco       # Campo correto do modelo
+        allocation_employee.percentual_extras = percentual_extras  # Campo existe no modelo
+        allocation_employee.tipo_lancamento = tipo_lancamento      # Campo existe no modelo
+        
+        allocation_employee.papel = papel or (funcionario.funcao_ref.nome if funcionario.funcao_ref else '')
         allocation_employee.observacao = data.get('observacao', '')
         
-        # NOVA FUNCIONALIDADE: Definir tipo de lançamento automaticamente
-        # Passar data da alocação como parâmetro para evitar erro de relacionamento None
-        allocation_employee.tipo_lancamento = allocation_employee.get_tipo_lancamento_automatico(allocation.data_alocacao)
+        # CÁLCULO AUTOMÁTICO DE HORAS (para logs)
+        entrada_minutes = entrada.hour * 60 + entrada.minute
+        saida_minutes = saida.hour * 60 + saida.minute
+        total_minutes = saida_minutes - entrada_minutes
+        
+        pausa_minutes = 0
+        if inicio_almoco and fim_almoco:
+            pausa_minutes = (fim_almoco.hour * 60 + fim_almoco.minute) - (inicio_almoco.hour * 60 + inicio_almoco.minute)
+        
+        liquido_minutes = total_minutes - pausa_minutes
+        com_extras_minutes = liquido_minutes * (1 + percentual_extras / 100)
+        
+        logging.info(f"💰 FASE 2B: Cálculo de horas para {funcionario.nome}:")
+        logging.info(f"   - Total: {total_minutes//60}h{total_minutes%60:02d}m")
+        logging.info(f"   - Pausa: {pausa_minutes//60}h{pausa_minutes%60:02d}m")
+        logging.info(f"   - Líquido: {liquido_minutes//60}h{liquido_minutes%60:02d}m")
+        logging.info(f"   - Com extras ({percentual_extras}%): {com_extras_minutes//60:.0f}h{com_extras_minutes%60:02.0f}m")
         
         db.session.add(allocation_employee)
         db.session.commit()
         
-        # Buscar dados da obra para retorno - COM VALIDAÇÃO DE ADMIN_ID
+        # BUSCAR OBRA PARA RETORNO
         obra = Obra.query.filter_by(id=allocation.obra_id, admin_id=admin_id).first()
         
-        return jsonify({
+        # RETORNO COMPLETO FASE 2B
+        response_data = {
             'success': True,
             'allocation_employee_id': allocation_employee.id,
             'funcionario_nome': funcionario.nome,
             'funcionario_codigo': funcionario.codigo,
             'obra_codigo': obra.codigo if obra else f"#{allocation.obra_id}",
             'data_alocacao': allocation.data_alocacao.isoformat(),
+            # Horários completos
+            'entrada': allocation_employee.turno_inicio.strftime('%H:%M'),
+            'inicio_almoco': allocation_employee.hora_almoco_saida.strftime('%H:%M') if allocation_employee.hora_almoco_saida else None,
+            'fim_almoco': allocation_employee.hora_almoco_retorno.strftime('%H:%M') if allocation_employee.hora_almoco_retorno else None,
+            'saida': allocation_employee.turno_fim.strftime('%H:%M'),
+            'percentual_extras': percentual_extras,
+            'tipo_lancamento': tipo_lancamento,
+            'papel': allocation_employee.papel,
+            # Para compatibilidade
             'turno_inicio': allocation_employee.turno_inicio.strftime('%H:%M'),
             'turno_fim': allocation_employee.turno_fim.strftime('%H:%M'),
-            'papel': allocation_employee.papel,
-            'tipo_lancamento': allocation_employee.tipo_lancamento,
-            'horario_origem': horario_origem,
-            'message': f'Funcionário {funcionario.nome} adicionado com sucesso'
-        }), 201
+            # Cálculos de horas
+            'total_horas': f"{total_minutes//60}h{total_minutes%60:02d}m",
+            'horas_liquidas': f"{liquido_minutes//60}h{liquido_minutes%60:02d}m",
+            'horas_com_extras': f"{com_extras_minutes//60:.0f}h{com_extras_minutes%60:02.0f}m",
+            'message': f'Funcionário {funcionario.nome} adicionado com horários completos!'
+        }
+        
+        logging.info(f"✅ FASE 2B: Funcionário {funcionario.nome} alocado com sucesso!")
+        
+        return jsonify(response_data), 201
         
     except IntegrityError:
         db.session.rollback()
+        logging.error(f"❌ FASE 2B: Erro de integridade")
         return jsonify({
             'success': False,
             'error': 'Erro de integridade: funcionário já pode estar alocado'
         }), 409
     except Exception as e:
         db.session.rollback()
-        logging.error(f"API CREATE ALLOCATION EMPLOYEE ERROR: {str(e)}")
+        logging.error(f"❌ FASE 2B API ERROR: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
             'success': False,
-            'error': 'Erro interno do servidor'
+            'error': f'Erro interno do servidor: {str(e)}'
         }), 500
 
 @equipe_bp.route('/api/allocation-employee/<int:allocation_employee_id>', methods=['PUT'])
