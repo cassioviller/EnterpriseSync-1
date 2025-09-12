@@ -276,6 +276,7 @@ def api_alocar_obra_restful():
         allocation.data_alocacao = data_alocacao
         allocation.turno_inicio = time(8, 0)  # Padrão 08:00
         allocation.turno_fim = time(17, 0)    # Padrão 17:00
+        allocation.local_trabalho = data.get('local_trabalho', 'campo')  # 'campo' ou 'oficina'
         allocation.nota = data.get('nota', '')
         
         db.session.add(allocation)
@@ -613,18 +614,26 @@ def api_create_allocation_employee():
                 'error': f'Funcionário {funcionario.nome} já está alocado na obra {obra_nome} neste dia'
             }), 409
         
-        # Validar e processar horários
-        turno_inicio_str = data.get('turno_inicio', '08:00')
-        turno_fim_str = data.get('turno_fim', '17:00')
-        
-        try:
-            turno_inicio = datetime.strptime(turno_inicio_str, '%H:%M').time()
-            turno_fim = datetime.strptime(turno_fim_str, '%H:%M').time()
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Formato de horário inválido. Use HH:MM (ex: 08:00)'
-            }), 400
+        # NOVA FUNCIONALIDADE: Usar horário do funcionário se disponível
+        if funcionario.horario_trabalho and not data.get('turno_inicio') and not data.get('turno_fim'):
+            # Aplicar horário do funcionário automaticamente
+            turno_inicio = funcionario.horario_trabalho.entrada
+            turno_fim = funcionario.horario_trabalho.saida
+            horario_origem = 'funcionario'
+        else:
+            # Usar horários fornecidos ou padrão
+            turno_inicio_str = data.get('turno_inicio', '08:00')
+            turno_fim_str = data.get('turno_fim', '17:00')
+            
+            try:
+                turno_inicio = datetime.strptime(turno_inicio_str, '%H:%M').time()
+                turno_fim = datetime.strptime(turno_fim_str, '%H:%M').time()
+                horario_origem = 'manual' if data.get('turno_inicio') or data.get('turno_fim') else 'padrao'
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Formato de horário inválido. Use HH:MM (ex: 08:00)'
+                }), 400
         
         # Criar AllocationEmployee
         allocation_employee = AllocationEmployee()
@@ -634,6 +643,9 @@ def api_create_allocation_employee():
         allocation_employee.turno_fim = turno_fim
         allocation_employee.papel = data.get('papel', funcionario.funcao_ref.nome if funcionario.funcao_ref else '')
         allocation_employee.observacao = data.get('observacao', '')
+        
+        # NOVA FUNCIONALIDADE: Definir tipo de lançamento automaticamente
+        allocation_employee.tipo_lancamento = allocation_employee.get_tipo_lancamento_automatico()
         
         db.session.add(allocation_employee)
         db.session.commit()
@@ -651,6 +663,8 @@ def api_create_allocation_employee():
             'turno_inicio': allocation_employee.turno_inicio.strftime('%H:%M'),
             'turno_fim': allocation_employee.turno_fim.strftime('%H:%M'),
             'papel': allocation_employee.papel,
+            'tipo_lancamento': allocation_employee.tipo_lancamento,
+            'horario_origem': horario_origem,
             'message': f'Funcionário {funcionario.nome} adicionado com sucesso'
         }), 201
         
