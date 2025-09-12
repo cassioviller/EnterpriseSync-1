@@ -195,6 +195,27 @@ def get_allocations_simples():
             obra_nome = obra.nome if obra else f"Obra ID {alloc.obra_id}"
             obra_codigo = obra.codigo if obra else f"#{alloc.obra_id}"
             
+            # Buscar funcionários alocados
+            funcionarios_data = []
+            try:
+                funcionarios_alocados = AllocationEmployee.query.filter_by(allocation_id=alloc.id).all()
+                for emp in funcionarios_alocados:
+                    funcionario = Funcionario.query.filter_by(id=emp.funcionario_id, admin_id=admin_id).first()
+                    if funcionario:  # Validação adicional de segurança
+                        funcionarios_data.append({
+                            'id': funcionario.id,
+                            'nome': funcionario.nome,
+                            'nome_curto': ' '.join(funcionario.nome.split()[:2]),  # Primeiros 2 nomes
+                            'codigo': funcionario.codigo,
+                            'papel': emp.papel or 'Sem função',
+                            'turno_inicio': emp.turno_inicio.strftime('%H:%M') if emp.turno_inicio else '08:00',
+                            'turno_fim': emp.turno_fim.strftime('%H:%M') if emp.turno_fim else '17:00',
+                            'observacao': emp.observacao or ''
+                        })
+            except Exception as e:
+                logging.error(f"Erro ao buscar funcionários da alocação {alloc.id}: {e}")
+                funcionarios_data = []
+            
             result.append({
                 'id': alloc.id,
                 'obra_id': alloc.obra_id,
@@ -204,7 +225,9 @@ def get_allocations_simples():
                 'day_of_week': convert_to_sunday_weekday(alloc.data_alocacao.weekday()),  # 0=Domingo
                 'turno_inicio': alloc.turno_inicio.strftime('%H:%M') if alloc.turno_inicio else '08:00',
                 'turno_fim': alloc.turno_fim.strftime('%H:%M') if alloc.turno_fim else '17:00',
-                'local_trabalho': alloc.local_trabalho or 'campo'  # Campo requerido para renderização correta
+                'local_trabalho': alloc.local_trabalho or 'campo',  # Campo requerido para renderização correta
+                'funcionarios': funcionarios_data,
+                'funcionarios_count': len(funcionarios_data)
             })
         
         return jsonify({

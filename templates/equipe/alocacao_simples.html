@@ -2462,8 +2462,8 @@ class EquipeFase2 {
         
         container.appendChild(div);
         
-        // Carregar lista de funcionários detalhada após adicionar ao DOM
-        this.loadDetailedFuncionariosList(allocation.id);
+        // Carregar lista de funcionários diretamente dos dados da alocação
+        this.renderFuncionariosInCard(allocation.id, allocation.funcionarios || []);
     }
     
     // MÉTODOS DE SALVAMENTO E REMOÇÃO - APIs INTEGRADAS
@@ -4294,6 +4294,45 @@ class EquipeFase2 {
                 </div>
             `;
         }
+    }
+    
+    /**
+     * Renderiza funcionários diretamente no card usando dados da alocação
+     */
+    renderFuncionariosInCard(allocationId, funcionarios) {
+        this.log(`👥 FUNCIONARIOS: Renderizando ${funcionarios.length} funcionários para alocação ${allocationId}`);
+        
+        const funcionariosSection = document.getElementById(`funcionarios-${allocationId}`);
+        if (!funcionariosSection) {
+            this.log(`❌ FUNCIONARIOS: Seção não encontrada para alocação ${allocationId}`);
+            return;
+        }
+        
+        if (!funcionarios || funcionarios.length === 0) {
+            funcionariosSection.innerHTML = `
+                <div class="no-funcionarios" style="font-size: 11px; color: #6c757d; font-style: italic;">
+                    Nenhum funcionário alocado
+                </div>
+            `;
+        } else {
+            // Criar lista simplificada de funcionários com bullets
+            const funcionariosList = funcionarios.map(func => {
+                const papel = func.papel && func.papel !== 'Sem função' ? ` (${func.papel})` : '';
+                return `• ${func.nome_curto || func.nome}${papel}`;
+            }).join('  ');
+            
+            funcionariosSection.innerHTML = `
+                <div class="funcionarios-list-simplified" style="font-size: 12px; color: #495057; line-height: 1.3;">
+                    ${funcionariosList}
+                </div>
+            `;
+        }
+        
+        // Adicionar efeito de hover na seção
+        funcionariosSection.style.cursor = 'pointer';
+        funcionariosSection.title = 'Clique para gerenciar funcionários';
+        
+        this.log(`✅ FUNCIONARIOS: Lista renderizada para alocação ${allocationId} - ${funcionarios.length} funcionário(s)`);
     }
     
     /**

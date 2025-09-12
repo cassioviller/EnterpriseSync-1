@@ -1,0 +1,410 @@
+# 🎯 PROMPT - PRÓXIMO PASSO GESTÃO DE EQUIPE
+**CAMPOS COMPLETOS DE HORÁRIO + CORREÇÃO FUNCIONÁRIOS NOS CARDS**
+
+## 📊 SITUAÇÃO ATUAL ANALISADA
+
+### ✅ O QUE ESTÁ FUNCIONANDO:
+- **Modal abre corretamente** - Clique nos botões 👥 funciona
+- **Funcionários são adicionados** - API salva no banco
+- **Persistência básica** - Dados ficam salvos após F5
+- **Layout campo/oficina** - Separação visual implementada
+
+### ❌ PROBLEMAS IDENTIFICADOS:
+
+1. **FUNCIONÁRIOS NÃO APARECEM NOS CARDS**
+   - Modal salva funcionários no banco
+   - Mas cards continuam mostrando "Erro ao carregar"
+   - API de listagem não está retornando funcionários
+
+2. **CAMPOS DE HORÁRIO INCOMPLETOS**
+   - Modal só tem: Início, Fim, Papel/Função
+   - Faltam: Início Almoço, Fim Almoço, % Extras, Tipo de Lançamento
+   - Não puxa horários cadastrados do funcionário automaticamente
+
+3. **TIPO DE LANÇAMENTO NÃO AUTOMÁTICO**
+   - Deveria preencher automaticamente baseado no dia da semana
+   - Seg-Sex: trabalho_normal
+   - Sáb: sabado_trabalhado  
+   - Dom: domingo_trabalhado
+
+## 🎯 PRÓXIMO PASSO - IMPLEMENTAÇÃO
+
+### **FASE 1: CORRIGIR FUNCIONÁRIOS NOS CARDS**
+
+#### 1.1 Corrigir API de Listagem
+```python
+# equipe_views.py - Linha ~200
+@equipe_bp.route('/api/allocations/week/<data_inicio>')
+@login_required
+def api_get_week_allocations(data_inicio):
+    """API que retorna alocações da semana COM FUNCIONÁRIOS"""
+    try:
+        admin_id = get_admin_id()
+        start_date = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        
+        # Buscar alocações da semana
+        allocations = Allocation.query.filter(
+            Allocation.admin_id == admin_id,
+            Allocation.data_alocacao >= start_date,
+            Allocation.data_alocacao < start_date + timedelta(days=7)
+        ).all()
+        
+        result = []
+        for allocation in allocations:
+            # BUSCAR FUNCIONÁRIOS DA ALOCAÇÃO
+            funcionarios = []
+            for emp in allocation.employees:  # Relacionamento já existe
+                funcionarios.append({
+                    'id': emp.funcionario.id,
+                    'nome': emp.funcionario.nome,
+                    'nome_curto': ' '.join(emp.funcionario.nome.split()[:2]),  # Primeiro e segundo nome
+                    'papel': emp.papel or 'Sem função',
+                    'turno_inicio': emp.turno_inicio.strftime('%H:%M') if emp.turno_inicio else '08:00',
+                    'turno_fim': emp.turno_fim.strftime('%H:%M') if emp.turno_fim else '17:00'
+                })
+            
+            result.append({
+                'id': allocation.id,
+                'obra_id': allocation.obra_id,
+                'obra_nome': allocation.obra.nome,
+                'data_alocacao': allocation.data_alocacao.strftime('%Y-%m-%d'),
+                'local': allocation.local,
+                'funcionarios': funcionarios,  # INCLUIR FUNCIONÁRIOS
+                'funcionarios_count': len(funcionarios)
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar alocações da semana: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+```
+
+#### 1.2 Atualizar JavaScript para Mostrar Funcionários
+```javascript
+// templates/equipe/alocacao_simples.html - Função updateCardContent
+function updateCardContent(card, allocation) {
+    const cardBody = card.querySelector('.card-body');
+    
+    // TÍTULO DA OBRA
+    const obraTitle = `<h6 class="card-title mb-2">${allocation.obra_nome}</h6>`;
+    
+    // LISTA DE FUNCIONÁRIOS
+    let funcionariosHtml = '';
+    if (allocation.funcionarios && allocation.funcionarios.length > 0) {
+        funcionariosHtml = '<div class="funcionarios-list">';
+        allocation.funcionarios.forEach(func => {
+            funcionariosHtml += `
+                <div class="funcionario-item">
+                    <span class="funcionario-nome">${func.nome_curto}</span>
+                    <small class="funcionario-papel text-muted">${func.papel}</small>
+                </div>
+            `;
+        });
+        funcionariosHtml += '</div>';
+    } else {
+        funcionariosHtml = '<small class="text-muted">Nenhum funcionário alocado</small>';
+    }
+    
+    // BOTÕES DE AÇÃO (PEQUENOS)
+    const botoesHtml = `
+        <div class="card-actions">
+            <button class="btn btn-sm btn-outline-primary btn-funcionarios" 
+                    data-allocation-id="${allocation.id}" 
+                    data-obra-nome="${allocation.obra_nome}"
+                    title="Gerenciar funcionários">
+                👥
+            </button>
+            <button class="btn btn-sm btn-outline-danger btn-remover" 
+                    data-allocation-id="${allocation.id}"
+                    title="Remover obra">
+                ✕
+            </button>
+        </div>
+    `;
+    
+    cardBody.innerHTML = obraTitle + funcionariosHtml + botoesHtml;
+}
+```
+
+### **FASE 2: CAMPOS COMPLETOS DE HORÁRIO**
+
+#### 2.1 Atualizar Modal com Todos os Campos
+```html
+<!-- Modal Adicionar Funcionário - CAMPOS COMPLETOS -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <label class="form-label">Funcionário</label>
+        <select id="funcionario-select" class="form-select" required>
+            <option value="">Selecione um funcionário</option>
+        </select>
+    </div>
+</div>
+
+<!-- HORÁRIOS DE TRABALHO -->
+<div class="row mb-3">
+    <div class="col-md-3">
+        <label class="form-label">Entrada</label>
+        <input type="time" id="turno-inicio" class="form-control" value="08:00" required>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Início Almoço</label>
+        <input type="time" id="inicio-almoco" class="form-control" value="12:00">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Fim Almoço</label>
+        <input type="time" id="fim-almoco" class="form-control" value="13:00">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Saída</label>
+        <input type="time" id="turno-fim" class="form-control" value="17:00" required>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <label class="form-label">% Extras</label>
+        <input type="number" id="percentual-extras" class="form-control" value="0" min="0" max="100" step="0.1">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Tipo de Lançamento *</label>
+        <select id="tipo-lancamento" class="form-select" required>
+            <option value="trabalho_normal">Trabalho Normal</option>
+            <option value="sabado_trabalhado">Sábado Trabalhado</option>
+            <option value="domingo_trabalhado">Domingo Trabalhado</option>
+            <option value="falta">Falta</option>
+            <option value="sabado_folga">Sábado Folga</option>
+            <option value="domingo_folga">Domingo Folga</option>
+            <option value="feriado_folga">Feriado Folga</option>
+        </select>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <label class="form-label">Papel/Função</label>
+        <input type="text" id="funcionario-papel" class="form-control" placeholder="Ex: Líder, Ajudante">
+    </div>
+</div>
+```
+
+#### 2.2 JavaScript para Preenchimento Automático
+```javascript
+// Função para preencher horários automaticamente
+function preencherHorariosAutomaticos(funcionarioId, dataAlocacao) {
+    // 1. BUSCAR HORÁRIO CADASTRADO DO FUNCIONÁRIO
+    fetch(`/funcionarios/api/${funcionarioId}/horario`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.horario) {
+                // Preencher campos com horário cadastrado
+                document.getElementById('turno-inicio').value = data.horario.entrada || '08:00';
+                document.getElementById('inicio-almoco').value = data.horario.inicio_almoco || '12:00';
+                document.getElementById('fim-almoco').value = data.horario.fim_almoco || '13:00';
+                document.getElementById('turno-fim').value = data.horario.saida || '17:00';
+            }
+        })
+        .catch(error => console.error('Erro ao buscar horário:', error));
+    
+    // 2. DEFINIR TIPO DE LANÇAMENTO BASEADO NO DIA DA SEMANA
+    const data = new Date(dataAlocacao);
+    const diaSemana = data.getDay(); // 0=Domingo, 1=Segunda, ..., 6=Sábado
+    
+    let tipoLancamento = 'trabalho_normal';
+    if (diaSemana === 6) {
+        tipoLancamento = 'sabado_trabalhado';
+    } else if (diaSemana === 0) {
+        tipoLancamento = 'domingo_trabalhado';
+    }
+    
+    document.getElementById('tipo-lancamento').value = tipoLancamento;
+}
+
+// Chamar quando funcionário for selecionado
+document.getElementById('funcionario-select').addEventListener('change', function() {
+    const funcionarioId = this.value;
+    const dataAlocacao = document.getElementById('modal-data-alocacao').value;
+    
+    if (funcionarioId && dataAlocacao) {
+        preencherHorariosAutomaticos(funcionarioId, dataAlocacao);
+    }
+});
+```
+
+#### 2.3 Atualizar API para Salvar Campos Completos
+```python
+# equipe_views.py - API de adicionar funcionário
+@equipe_bp.route('/api/allocations/<int:allocation_id>/employees', methods=['POST'])
+@login_required
+def api_add_employee_to_allocation(allocation_id):
+    """Adicionar funcionário com campos completos"""
+    try:
+        data = request.get_json()
+        
+        # Validar dados obrigatórios
+        required_fields = ['funcionario_id', 'turno_inicio', 'turno_fim', 'tipo_lancamento']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'error': f'Campo {field} é obrigatório'}), 400
+        
+        # Verificar se funcionário já está alocado
+        existing = AllocationEmployee.query.filter_by(
+            allocation_id=allocation_id,
+            funcionario_id=data['funcionario_id']
+        ).first()
+        
+        if existing:
+            return jsonify({'success': False, 'error': 'Funcionário já está alocado nesta obra/dia'}), 400
+        
+        # Criar nova alocação de funcionário
+        employee_allocation = AllocationEmployee(
+            allocation_id=allocation_id,
+            funcionario_id=data['funcionario_id'],
+            turno_inicio=datetime.strptime(data['turno_inicio'], '%H:%M').time(),
+            turno_fim=datetime.strptime(data['turno_fim'], '%H:%M').time(),
+            inicio_almoco=datetime.strptime(data.get('inicio_almoco', '12:00'), '%H:%M').time(),
+            fim_almoco=datetime.strptime(data.get('fim_almoco', '13:00'), '%H:%M').time(),
+            percentual_extras=float(data.get('percentual_extras', 0)),
+            tipo_lancamento=data['tipo_lancamento'],
+            papel=data.get('papel', ''),
+            observacao=data.get('observacao', '')
+        )
+        
+        db.session.add(employee_allocation)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Funcionário adicionado com sucesso',
+            'employee': {
+                'id': employee_allocation.id,
+                'funcionario_nome': employee_allocation.funcionario.nome,
+                'turno_inicio': employee_allocation.turno_inicio.strftime('%H:%M'),
+                'turno_fim': employee_allocation.turno_fim.strftime('%H:%M'),
+                'tipo_lancamento': employee_allocation.tipo_lancamento
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao adicionar funcionário: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+```
+
+### **FASE 3: API PARA BUSCAR HORÁRIO DO FUNCIONÁRIO**
+
+```python
+# equipe_views.py - Nova API
+@equipe_bp.route('/funcionarios/api/<int:funcionario_id>/horario')
+@login_required
+def api_get_funcionario_horario(funcionario_id):
+    """Buscar horário cadastrado do funcionário"""
+    try:
+        funcionario = Funcionario.query.get_or_404(funcionario_id)
+        
+        # Buscar horário de trabalho
+        horario = None
+        if hasattr(funcionario, 'horario_trabalho') and funcionario.horario_trabalho:
+            horario = {
+                'entrada': funcionario.horario_trabalho.entrada.strftime('%H:%M'),
+                'inicio_almoco': funcionario.horario_trabalho.inicio_almoco.strftime('%H:%M'),
+                'fim_almoco': funcionario.horario_trabalho.fim_almoco.strftime('%H:%M'),
+                'saida': funcionario.horario_trabalho.saida.strftime('%H:%M')
+            }
+        
+        return jsonify({
+            'success': True,
+            'horario': horario,
+            'funcionario': {
+                'id': funcionario.id,
+                'nome': funcionario.nome
+            }
+        })
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar horário do funcionário: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+```
+
+## 🎯 CSS PARA LAYOUT OTIMIZADO DOS CARDS
+
+```css
+/* Cards com funcionários otimizados */
+.funcionarios-list {
+    margin: 8px 0;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.funcionario-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.funcionario-item:last-child {
+    border-bottom: none;
+}
+
+.funcionario-nome {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.funcionario-papel {
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
+.card-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+}
+
+.card-actions .btn {
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+```
+
+## ✅ CHECKLIST DE IMPLEMENTAÇÃO
+
+### **FASE 1 - Funcionários nos Cards:**
+- [ ] Corrigir API `/api/allocations/week/<data>` para incluir funcionários
+- [ ] Atualizar JavaScript `updateCardContent()` para mostrar funcionários
+- [ ] Testar se funcionários aparecem nos cards após adicionar
+
+### **FASE 2 - Campos Completos:**
+- [ ] Adicionar campos de horário completo no modal
+- [ ] Implementar preenchimento automático baseado no funcionário
+- [ ] Implementar tipo de lançamento automático baseado no dia
+- [ ] Atualizar API para salvar todos os campos
+
+### **FASE 3 - API de Horário:**
+- [ ] Criar API para buscar horário do funcionário
+- [ ] Integrar com preenchimento automático
+- [ ] Testar funcionamento completo
+
+## 🚀 RESULTADO ESPERADO
+
+Após implementação:
+1. **Cards mostram funcionários** - Nome curto + função
+2. **Modal completo** - Todos os campos de horário
+3. **Preenchimento automático** - Horários do funcionário + tipo baseado no dia
+4. **Editável** - Usuário pode alterar qualquer campo se necessário
+5. **Persistência total** - Dados salvos e carregados corretamente
+
+**PRIORIDADE:** Implementar na ordem das fases para garantir funcionalidade básica primeiro, depois melhorias.
+
