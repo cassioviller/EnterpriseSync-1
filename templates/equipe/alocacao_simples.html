@@ -3604,17 +3604,20 @@ class EquipeFase2 {
         // Resetar título
         document.getElementById('modal-title-text').textContent = 'Carregando funcionários...';
         
-        // Limpar formulário
+        // Limpar formulário FASE 2B
         document.getElementById('select-funcionario').value = '';
-        document.getElementById('input-turno-inicio').value = '08:00';
-        document.getElementById('input-turno-fim').value = '17:00';
+        document.getElementById('input-entrada').value = '08:00';
+        document.getElementById('input-inicio-almoco').value = '12:00';
+        document.getElementById('input-fim-almoco').value = '13:00';
+        document.getElementById('input-saida').value = '17:00';
+        document.getElementById('input-percentual-extras').value = '0';
         document.getElementById('input-papel').value = '';
         
         // Limpar contadores
         document.getElementById('allocated-count').textContent = '0';
         document.getElementById('available-count').textContent = '0';
         
-        this.log('🔄 MODAL: Reset completo realizado');
+        this.log('🔄 MODAL: Reset completo realizado - FASE 2B');
     }
     
     /**
@@ -4358,23 +4361,23 @@ class EquipeFase2 {
             
             this.log(`✅ HORARIOS: Dados recebidos:`, data);
             
-            // Aplicar horários nos campos
+            // Aplicar horários nos campos FASE 2B
             const horarios = data.horarios;
-            const turnoInicioField = document.getElementById('input-turno-inicio');
-            const turnoFimField = document.getElementById('input-turno-fim');
+            const entradaField = document.getElementById('input-entrada');
+            const saidaField = document.getElementById('input-saida');
             
-            if (turnoInicioField && turnoFimField) {
-                turnoInicioField.value = horarios.turno_inicio;
-                turnoFimField.value = horarios.turno_fim;
+            if (entradaField && saidaField) {
+                entradaField.value = horarios.turno_inicio;
+                saidaField.value = horarios.turno_fim;
                 
                 // Adicionar estilo visual para indicar auto-preenchimento
-                turnoInicioField.style.backgroundColor = '#e8f5e8';
-                turnoFimField.style.backgroundColor = '#e8f5e8';
+                entradaField.style.backgroundColor = '#e8f5e8';
+                saidaField.style.backgroundColor = '#e8f5e8';
                 
                 // Remover estilo após alguns segundos
                 setTimeout(() => {
-                    turnoInicioField.style.backgroundColor = '';
-                    turnoFimField.style.backgroundColor = '';
+                    entradaField.style.backgroundColor = '';
+                    saidaField.style.backgroundColor = '';
                 }, 2000);
                 
                 this.log(`✅ HORARIOS: Campos preenchidos - início: ${horarios.turno_inicio}, fim: ${horarios.turno_fim}`);
@@ -4409,16 +4412,16 @@ class EquipeFase2 {
      * FASE 4: Reset horários para valores padrão
      */
     resetHorariosToDefault() {
-        const turnoInicioField = document.getElementById('input-turno-inicio');
-        const turnoFimField = document.getElementById('input-turno-fim');
+        const entradaField = document.getElementById('input-entrada');
+        const saidaField = document.getElementById('input-saida');
         
-        if (turnoInicioField && turnoFimField) {
-            turnoInicioField.value = '08:00';
-            turnoFimField.value = '17:00';
+        if (entradaField && saidaField) {
+            entradaField.value = '08:00';
+            saidaField.value = '17:00';
             
             // Remover qualquer estilo visual
-            turnoInicioField.style.backgroundColor = '';
-            turnoFimField.style.backgroundColor = '';
+            entradaField.style.backgroundColor = '';
+            saidaField.style.backgroundColor = '';
             
             this.log(`🔄 HORARIOS: Horários resetados para padrão (08:00-17:00)`);
         }
@@ -4428,15 +4431,15 @@ class EquipeFase2 {
      * FASE 4: Mostra/esconde loading visual nos campos de horário
      */
     showHorariosLoading(show) {
-        const turnoInicioField = document.getElementById('input-turno-inicio');
-        const turnoFimField = document.getElementById('input-turno-fim');
+        const entradaField = document.getElementById('input-entrada');
+        const saidaField = document.getElementById('input-saida');
         
         if (show) {
-            if (turnoInicioField) turnoInicioField.style.backgroundColor = '#f8f9fa';
-            if (turnoFimField) turnoFimField.style.backgroundColor = '#f8f9fa';
+            if (entradaField) entradaField.style.backgroundColor = '#f8f9fa';
+            if (saidaField) saidaField.style.backgroundColor = '#f8f9fa';
         } else {
-            if (turnoInicioField) turnoInicioField.style.backgroundColor = '';
-            if (turnoFimField) turnoFimField.style.backgroundColor = '';
+            if (entradaField) entradaField.style.backgroundColor = '';
+            if (saidaField) saidaField.style.backgroundColor = '';
         }
     }
     
