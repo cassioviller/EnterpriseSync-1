@@ -268,6 +268,142 @@
             🔧
         </button>
     </div>
+
+    <!-- MODAL DE FUNCIONÁRIOS -->
+    <div class="modal fade" id="funcionariosModal" tabindex="-1" aria-labelledby="funcionariosModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <!-- HEADER -->
+                <div class="modal-header">
+                    <h5 class="modal-title" id="funcionariosModalLabel">
+                        <i class="fas fa-users me-2"></i>
+                        <span id="modal-title-text">Carregando funcionários...</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+
+                <!-- BODY -->
+                <div class="modal-body">
+                    <!-- LOADING STATE -->
+                    <div id="modal-loading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Carregando dados...</p>
+                    </div>
+
+                    <!-- CONTENT -->
+                    <div id="modal-content" style="display: none;">
+                        <!-- FUNCIONÁRIOS ALOCADOS -->
+                        <div class="mb-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <h6 class="mb-0 fw-bold">
+                                    <i class="fas fa-user-check text-success me-2"></i>
+                                    Funcionários Alocados
+                                </h6>
+                                <span class="badge bg-success ms-2" id="allocated-count">0</span>
+                            </div>
+                            
+                            <div id="funcionarios-alocados-list">
+                                <div class="text-muted text-center py-3">
+                                    <i class="fas fa-user-slash fa-2x mb-2"></i>
+                                    <p>Nenhum funcionário alocado ainda</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- ADICIONAR FUNCIONÁRIO -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold mb-3">
+                                <i class="fas fa-user-plus text-primary me-2"></i>
+                                Adicionar Funcionário
+                            </h6>
+                            
+                            <div class="row">
+                                <!-- SELEÇÃO DE FUNCIONÁRIO -->
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Funcionário</label>
+                                    <select class="form-select" id="select-funcionario">
+                                        <option value="">Selecione...</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- HORÁRIO INÍCIO -->
+                                <div class="col-md-2 mb-3">
+                                    <label class="form-label">Início</label>
+                                    <input type="time" class="form-control" id="input-turno-inicio" value="08:00">
+                                </div>
+                                
+                                <!-- HORÁRIO FIM -->
+                                <div class="col-md-2 mb-3">
+                                    <label class="form-label">Fim</label>
+                                    <input type="time" class="form-control" id="input-turno-fim" value="17:00">
+                                </div>
+                                
+                                <!-- PAPEL/FUNÇÃO -->
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label">Papel/Função</label>
+                                    <input type="text" class="form-control" id="input-papel" placeholder="Ex: Líder, Ajudante">
+                                </div>
+                                
+                                <!-- BOTÃO ADICIONAR -->
+                                <div class="col-md-1 mb-3">
+                                    <label class="form-label d-block">&nbsp;</label>
+                                    <button type="button" class="btn btn-success w-100" id="btn-add-funcionario">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- FUNCIONÁRIOS DISPONÍVEIS -->
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center mb-3">
+                                <h6 class="mb-0 fw-bold">
+                                    <i class="fas fa-users text-info me-2"></i>
+                                    Funcionários Disponíveis
+                                </h6>
+                                <span class="badge bg-info ms-2" id="available-count">0</span>
+                            </div>
+                            
+                            <div id="funcionarios-disponiveis-list" class="row g-2">
+                                <!-- Cards de funcionários disponíveis serão inseridos aqui -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ERROR STATE -->
+                    <div id="modal-error" class="text-center py-4" style="display: none;">
+                        <div class="text-danger">
+                            <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                            <h6>Erro ao carregar dados</h6>
+                            <p class="text-muted" id="modal-error-message"></p>
+                            <button class="btn btn-outline-primary" onclick="window.equipeFase2.reloadModal()">
+                                <i class="fas fa-refresh me-1"></i>
+                                Tentar Novamente
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FOOTER -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        Fechar
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btn-refresh-modal" onclick="window.equipeFase2.reloadModal()">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        Atualizar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -362,6 +498,149 @@
         0% { opacity: 1; }
         50% { opacity: 0.5; }
         100% { opacity: 1; }
+    }
+    
+    /* ===================================
+       MODAL DE FUNCIONÁRIOS - ESTILOS
+       =================================== */
+    
+    .funcionario-alocado-card {
+        background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);
+        border: 1px solid #c3e6cb;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .funcionario-alocado-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
+    }
+    
+    .funcionario-disponivel-card {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .funcionario-disponivel-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
+        border-color: #007bff;
+    }
+    
+    .funcionario-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 18px;
+        margin: 0 auto 8px;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .funcionario-info {
+        margin-left: 12px;
+        flex: 1;
+    }
+    
+    .funcionario-name {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 4px;
+    }
+    
+    .funcionario-details {
+        color: #666;
+        font-size: 0.9em;
+    }
+    
+    .funcionario-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 4px;
+    }
+    
+    .btn-remove-funcionario {
+        padding: 4px 8px;
+        font-size: 0.8em;
+        border-radius: 4px;
+    }
+    
+    .modal-xl {
+        max-width: 1200px;
+    }
+    
+    .empty-state {
+        color: #6c757d;
+        text-align: center;
+        padding: 24px;
+    }
+    
+    .empty-state i {
+        opacity: 0.5;
+        margin-bottom: 12px;
+    }
+    
+    .allocation-item-clickable {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .allocation-item-clickable:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .allocation-item-clickable::after {
+        content: '👥';
+        position: absolute;
+        top: 4px;
+        right: 8px;
+        font-size: 12px;
+        opacity: 0.7;
+    }
+    
+    .funcionario-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #28a745;
+        color: white;
+        border-radius: 50%;
+        width: 18px;
+        height: 18px;
+        font-size: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+    }
+    
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        border-radius: inherit;
     }
     
     /* ===================================
@@ -1629,29 +1908,70 @@ class EquipeFase2 {
     
     // CARREGAR ALOCAÇÕES EXISTENTES
     async carregarAlocacoes() {
-        this.log('=== CARREGANDO ALOCAÇÕES EXISTENTES ===');
+        this.log('=== CRUD: CARREGANDO ALOCAÇÕES EXISTENTES ===');
         
         try {
-            const response = await fetch(`/equipe/api/allocations-week?week=${this.currentWeek}`);
+            const apiUrl = `/equipe/api/allocations-simples?week_start=${this.currentWeek}`;
+            this.log(`📡 CRUD: Fazendo requisição para ${apiUrl}`);
+            
+            const response = await fetch(apiUrl);
+            this.log(`📡 CRUD: Response status: ${response.status} ${response.statusText}`);
+            
+            if (!response.ok) {
+                throw new Error(`API retornou ${response.status}: ${response.statusText}`);
+            }
+            
             const result = await response.json();
+            this.log(`📡 CRUD: Response data: ${JSON.stringify(result, null, 2).substring(0, 300)}...`);
             
-            this.log(`Response status: ${response.status}`);
-            this.log(`Response data: ${JSON.stringify(result).substring(0, 200)}...`);
+            if (!result.success) {
+                throw new Error(result.error || 'Erro desconhecido da API');
+            }
             
-            if (result.success && result.data) {
-                this.allocations = result.data;
-                this.renderAlocacoes();
-                this.log(`✅ Alocações carregadas para semana ${result.week_start}`);
+            if (result.data && result.data.length > 0) {
+                this.log(`✅ CRUD: ${result.data.length} alocações encontradas`);
+                
+                // Renderizar alocações
+                this.renderAlocacoes(result.data);
+                
+                // Aguardar renderização completar, depois atualizar badges
+                setTimeout(() => {
+                    this.log('🔄 CRUD: Atualizando badges de funcionários...');
+                    this.updateAllFuncionariosBadges();
+                }, 500);
+                
+                this.updateStatus(`${result.data.length} alocações carregadas`, 'success');
             } else {
-                this.log(`⚠️ Nenhuma alocação encontrada: ${result.error || 'Dados vazios'}`);
+                this.log(`⚠️ CRUD: Nenhuma alocação encontrada para a semana ${this.currentWeek}`);
+                this.updateStatus('Nenhuma alocação encontrada', 'info');
+                
+                // Limpar grid
+                this.limparGridSemanal();
             }
             
         } catch (error) {
-            this.log(`❌ ERRO ao carregar alocações: ${error.message}`);
+            this.log(`❌ CRUD: ERRO CRÍTICO ao carregar alocações - ${error.message}`);
+            this.updateStatus(`Erro crítico: ${error.message}`, 'danger');
+            
+            // Mostrar erro no grid
+            this.mostrarErroNoGrid(error.message);
         }
     }
     
-    renderAlocacoes() {
+    renderAlocacoes(allocationsData) {
+        // Store allocations data properly
+        if (allocationsData && allocationsData.length > 0) {
+            // Convert array to day-based structure
+            this.allocations = {};
+            allocationsData.forEach(allocation => {
+                const dayOfWeek = new Date(allocation.data_alocacao).getDay();
+                if (!this.allocations[dayOfWeek]) {
+                    this.allocations[dayOfWeek] = { allocations: [] };
+                }
+                this.allocations[dayOfWeek].allocations.push(allocation);
+            });
+        }
+        
         if (!this.allocations) return;
         
         // Limpar todas as drop zones primeiro
@@ -1687,7 +2007,10 @@ class EquipeFase2 {
             this.updateDayCounter(i);
         }
         
-        this.log(`✅ Alocações renderizadas na interface com contadores`);
+        // MODAL INTEGRATION: Agora usa botões dedicados com stopPropagation
+        // Removido addClickListenersToAllocations() para evitar conflito com drag & drop
+        
+        this.log(`✅ Alocações renderizadas na interface com contadores e integração de modal`);
     }
     
     renderAllocationItem(container, allocation, dayOfWeek) {
@@ -1697,19 +2020,38 @@ class EquipeFase2 {
         div.dataset.allocationId = allocation.id;
         div.style.border = '1px solid #28a745';
         div.style.backgroundColor = '#f8fff8';
+        div.style.position = 'relative'; // Para posicionar o badge
         div.innerHTML = `
             <div class="card-body p-2">
                 <h6 class="card-title mb-1 text-success">${allocation.obra_codigo}</h6>
                 <small class="text-muted">${allocation.obra_nome.substring(0, 30)}...</small>
-                <div class="mt-1">
+                <div class="mt-1 d-flex align-items-center justify-content-between">
                     <small class="badge bg-success">${allocation.turno_inicio} - ${allocation.turno_fim}</small>
-                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="window.equipeFase2.removerAlocacaoManual(${allocation.obra_id}, ${dayOfWeek})">
-                        ❌
-                    </button>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary btn-funcionarios" 
+                                onclick="event.stopPropagation(); window.equipeFase2.openFuncionariosModal(${allocation.id})"
+                                title="Gerenciar funcionários">
+                            👤
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" 
+                                onclick="event.stopPropagation(); window.equipeFase2.removerAlocacaoManual(${allocation.obra_id}, ${dayOfWeek})"
+                                title="Remover alocação">
+                            ❌
+                        </button>
+                    </div>
                 </div>
+                <!-- Badge contador de funcionários -->
+                <span class="funcionarios-badge position-absolute top-0 end-0 badge bg-info rounded-pill" 
+                      style="font-size: 10px; margin: 4px;" 
+                      id="badge-${allocation.id}">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </span>
             </div>
         `;
         container.appendChild(div);
+        
+        // Carregar contador de funcionários após adicionar ao DOM
+        this.loadFuncionariosCount(allocation.id);
     }
     
     // MÉTODOS DE SALVAMENTO E REMOÇÃO - APIs INTEGRADAS
@@ -2630,6 +2972,606 @@ class EquipeFase2 {
             .replace(/[\u0300-\u036f]/g, '') // Remove acentos
             .trim();
     }
+    
+    // ===================================
+    // MODAL DE FUNCIONÁRIOS - MÉTODOS
+    // ===================================
+    
+    /**
+     * Abre o modal de funcionários para uma alocação específica
+     */
+    async openFuncionariosModal(allocationId) {
+        if (!allocationId) {
+            this.log('❌ MODAL: ID da alocação não fornecido');
+            return;
+        }
+        
+        this.log(`🔍 MODAL: Abrindo modal para alocação ID ${allocationId}`);
+        
+        // Resetar modal para estado inicial
+        this.resetModal();
+        
+        // Mostrar modal
+        const modal = new bootstrap.Modal(document.getElementById('funcionariosModal'));
+        modal.show();
+        
+        // Carregar dados da alocação
+        await this.loadModalData(allocationId);
+        
+        // Configurar event listeners
+        this.setupModalEventListeners(allocationId);
+    }
+    
+    /**
+     * Reseta o modal para estado inicial
+     */
+    resetModal() {
+        // Mostrar loading, ocultar conteúdo e erro
+        document.getElementById('modal-loading').style.display = 'block';
+        document.getElementById('modal-content').style.display = 'none';
+        document.getElementById('modal-error').style.display = 'none';
+        
+        // Resetar título
+        document.getElementById('modal-title-text').textContent = 'Carregando funcionários...';
+        
+        // Limpar formulário
+        document.getElementById('select-funcionario').value = '';
+        document.getElementById('input-turno-inicio').value = '08:00';
+        document.getElementById('input-turno-fim').value = '17:00';
+        document.getElementById('input-papel').value = '';
+        
+        // Limpar contadores
+        document.getElementById('allocated-count').textContent = '0';
+        document.getElementById('available-count').textContent = '0';
+        
+        this.log('🔄 MODAL: Reset completo realizado');
+    }
+    
+    /**
+     * Carrega os dados da alocação via API
+     */
+    async loadModalData(allocationId) {
+        try {
+            this.log(`📡 MODAL: Carregando dados da alocação ${allocationId}...`);
+            
+            const response = await fetch(`/equipe/api/allocation/${allocationId}/funcionarios`);
+            
+            if (!response.ok) {
+                throw new Error(`API retornou ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Erro desconhecido da API');
+            }
+            
+            this.log(`✅ MODAL: Dados carregados com sucesso`);
+            
+            // Armazenar dados no modal
+            this.currentModalData = {
+                allocationId: allocationId,
+                allocation: data.allocation,
+                funcionariosAlocados: data.funcionarios_alocados || [],
+                funcionariosDisponiveis: data.funcionarios_disponiveis || []
+            };
+            
+            // Renderizar dados no modal
+            this.renderModalContent();
+            
+        } catch (error) {
+            this.log(`❌ MODAL: Erro ao carregar dados - ${error.message}`);
+            this.showModalError(error.message);
+        }
+    }
+    
+    /**
+     * Renderiza o conteúdo do modal
+     */
+    renderModalContent() {
+        const data = this.currentModalData;
+        
+        // Atualizar título do modal
+        const obraInfo = data.allocation.obra_codigo || `#${data.allocation.obra_id}`;
+        const dataInfo = new Date(data.allocation.data_alocacao).toLocaleDateString('pt-BR');
+        const dayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][new Date(data.allocation.data_alocacao).getDay()];
+        
+        document.getElementById('modal-title-text').textContent = `${obraInfo} - ${dayName} (${dataInfo})`;
+        
+        // Renderizar funcionários alocados
+        this.renderFuncionariosAlocados(data.funcionariosAlocados);
+        
+        // Renderizar funcionários disponíveis
+        this.renderFuncionariosDisponiveis(data.funcionariosDisponiveis);
+        
+        // Atualizar contadores
+        document.getElementById('allocated-count').textContent = data.funcionariosAlocados.length;
+        document.getElementById('available-count').textContent = data.funcionariosDisponiveis.length;
+        
+        // Mostrar conteúdo, ocultar loading
+        document.getElementById('modal-loading').style.display = 'none';
+        document.getElementById('modal-content').style.display = 'block';
+        
+        this.log(`✅ MODAL: Conteúdo renderizado - ${data.funcionariosAlocados.length} alocados, ${data.funcionariosDisponiveis.length} disponíveis`);
+    }
+    
+    /**
+     * Renderiza lista de funcionários alocados
+     */
+    renderFuncionariosAlocados(funcionarios) {
+        const container = document.getElementById('funcionarios-alocados-list');
+        
+        if (!funcionarios || funcionarios.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-slash fa-2x mb-2"></i>
+                    <p>Nenhum funcionário alocado ainda</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const html = funcionarios.map(func => {
+            const iniciais = this.getIniciais(func.funcionario_nome);
+            const avatar = this.generateAvatarColor(func.funcionario_nome);
+            
+            return `
+                <div class="funcionario-alocado-card d-flex align-items-center" data-allocation-employee-id="${func.allocation_employee_id}">
+                    <div class="funcionario-avatar" style="background: ${avatar};">
+                        ${iniciais}
+                    </div>
+                    <div class="funcionario-info">
+                        <div class="funcionario-name">${func.funcionario_nome}</div>
+                        <div class="funcionario-details">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                ${func.turno_inicio} - ${func.turno_fim}
+                                ${func.papel ? `<i class="fas fa-user-tag ms-2 me-1"></i>${func.papel}` : ''}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="funcionario-actions">
+                        <button class="btn btn-outline-danger btn-sm btn-remove-funcionario" 
+                                onclick="window.equipeFase2.removeFuncionario(${func.allocation_employee_id})"
+                                title="Remover funcionário">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = html;
+    }
+    
+    /**
+     * Renderiza lista de funcionários disponíveis
+     */
+    renderFuncionariosDisponiveis(funcionarios) {
+        const container = document.getElementById('funcionarios-disponiveis-list');
+        const selectElement = document.getElementById('select-funcionario');
+        
+        // Limpar e popular select
+        selectElement.innerHTML = '<option value="">Selecione...</option>';
+        
+        if (!funcionarios || funcionarios.length === 0) {
+            container.innerHTML = `
+                <div class="col-12">
+                    <div class="empty-state">
+                        <i class="fas fa-users-slash fa-2x mb-2"></i>
+                        <p>Nenhum funcionário disponível</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        // Renderizar cards
+        const cardsHtml = funcionarios.map(func => {
+            const iniciais = this.getIniciais(func.nome);
+            const avatar = this.generateAvatarColor(func.nome);
+            
+            return `
+                <div class="col-md-3 col-sm-4 col-6 mb-2">
+                    <div class="funcionario-disponivel-card" onclick="window.equipeFase2.selectFuncionario(${func.id})">
+                        <div class="funcionario-avatar" style="background: ${avatar};">
+                            ${iniciais}
+                        </div>
+                        <div class="funcionario-name">${func.nome}</div>
+                        <small class="text-muted">${func.funcao || 'Sem função'}</small>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = cardsHtml;
+        
+        // Popular select
+        funcionarios.forEach(func => {
+            const option = document.createElement('option');
+            option.value = func.id;
+            option.textContent = `${func.nome} ${func.funcao ? '(' + func.funcao + ')' : ''}`;
+            selectElement.appendChild(option);
+        });
+    }
+    
+    /**
+     * Configura event listeners do modal
+     */
+    setupModalEventListeners(allocationId) {
+        // Remover listeners anteriores para evitar duplicação
+        const addBtn = document.getElementById('btn-add-funcionario');
+        const newAddBtn = addBtn.cloneNode(true);
+        addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+        
+        // Adicionar novo listener
+        newAddBtn.addEventListener('click', () => {
+            this.addFuncionario(allocationId);
+        });
+        
+        this.log(`✅ MODAL: Event listeners configurados para alocação ${allocationId}`);
+    }
+    
+    /**
+     * Adiciona funcionário via API - VERSÃO COM LOGS DETALHADOS
+     */
+    async addFuncionario(allocationId) {
+        const funcionarioId = document.getElementById('select-funcionario').value;
+        const turnoInicio = document.getElementById('input-turno-inicio').value;
+        const turnoFim = document.getElementById('input-turno-fim').value;
+        const papel = document.getElementById('input-papel').value.trim();
+        
+        this.log(`➕ CRUD: Iniciando adição de funcionário - alocação ${allocationId}`);
+        this.log(`📝 CRUD: Dados do formulário - funcionarioId: ${funcionarioId}, turno: ${turnoInicio}-${turnoFim}, papel: '${papel}'`);
+        
+        // Validações detalhadas
+        if (!funcionarioId) {
+            this.log(`❌ CRUD: Validação falhou - nenhum funcionário selecionado`);
+            this.showToast('Selecione um funcionário', 'warning', 3000);
+            return;
+        }
+        
+        if (!turnoInicio || !turnoFim) {
+            this.log(`❌ CRUD: Validação falhou - horários incompletos (início: ${turnoInicio}, fim: ${turnoFim})`);
+            this.showToast('Preencha os horários', 'warning', 3000);
+            return;
+        }
+        
+        // Validar se horário fim é após horário início
+        if (turnoFim <= turnoInicio) {
+            this.log(`❌ CRUD: Validação falhou - horário fim (${turnoFim}) não é posterior ao início (${turnoInicio})`);
+            this.showToast('Horário de fim deve ser após horário de início', 'warning', 3000);
+            return;
+        }
+        
+        this.log(`✅ CRUD: Validações aprovadas - prosseguindo com requisição`);
+        
+        // Declarar variáveis antes do try/catch para que fiquem acessíveis em todos os blocos
+        let originalHtml = '';
+        
+        try {
+            // Mostrar loading no botão
+            const addBtn = document.getElementById('btn-add-funcionario');
+            originalHtml = addBtn.innerHTML; // Remover 'const' pois já foi declarado acima
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adicionando...';
+            addBtn.disabled = true;
+            
+            const payload = {
+                allocation_id: parseInt(allocationId),
+                funcionario_id: parseInt(funcionarioId),
+                turno_inicio: turnoInicio,
+                turno_fim: turnoFim,
+                papel: papel
+            };
+            
+            this.log(`📡 CRUD: Enviando POST para /equipe/api/allocation-employee`);
+            this.log(`📡 CRUD: Payload: ${JSON.stringify(payload, null, 2)}`);
+            
+            const response = await fetch('/equipe/api/allocation-employee', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            this.log(`📡 CRUD: Response status: ${response.status} ${response.statusText}`);
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                this.log(`❌ CRUD: API retornou erro: ${JSON.stringify(errorData, null, 2)}`);
+                throw new Error(errorData.error || `HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.log(`📡 CRUD: Response data: ${JSON.stringify(data, null, 2)}`);
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Erro desconhecido');
+            }
+            
+            this.log(`✅ CRUD: Funcionário adicionado com sucesso!`);
+            this.log(`👤 CRUD: Funcionário criado: ${data.funcionario_nome || 'Nome não retornado'}`);
+            
+            this.showToast(`✅ ${data.funcionario_nome || 'Funcionário'} adicionado!`, 'success', 2000);
+            
+            // Recarregar dados do modal
+            this.log(`🔄 CRUD: Recarregando dados do modal...`);
+            await this.loadModalData(allocationId);
+            
+            // Atualizar calendário principal
+            this.log(`🔄 CRUD: Atualizando calendário principal...`);
+            await this.carregarAlocacoes();
+            
+            this.log(`✅ CRUD: Operação de adição concluída com sucesso`);
+            
+        } catch (error) {
+            this.log(`❌ CRUD: ERRO CRÍTICO ao adicionar funcionário - ${error.message}`);
+            this.showToast(`❌ Erro: ${error.message}`, 'error', 4000);
+        } finally {
+            // Restaurar botão
+            const addBtn = document.getElementById('btn-add-funcionario');
+            if (addBtn) {
+                addBtn.innerHTML = originalHtml;
+                addBtn.disabled = false;
+            }
+            this.log(`🔧 CRUD: Botão de adição restaurado`);
+        }
+    }
+    
+    /**
+     * Remove funcionário via API - VERSÃO COM LOGS DETALHADOS
+     */
+    async removeFuncionario(allocationEmployeeId) {
+        this.log(`🗑️ CRUD: Iniciando remoção de funcionário - allocation_employee_id: ${allocationEmployeeId}`);
+        
+        if (!confirm('Remover este funcionário da alocação?')) {
+            this.log(`❌ CRUD: Remoção cancelada pelo usuário`);
+            return;
+        }
+        
+        try {
+            this.log(`📡 CRUD: Enviando DELETE para /equipe/api/allocation-employee/${allocationEmployeeId}`);
+            
+            const response = await fetch(`/equipe/api/allocation-employee/${allocationEmployeeId}`, {
+                method: 'DELETE'
+            });
+            
+            this.log(`📡 CRUD: Response status: ${response.status} ${response.statusText}`);
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                this.log(`❌ CRUD: API retornou erro: ${JSON.stringify(errorData, null, 2)}`);
+                throw new Error(errorData.error || `HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.log(`📡 CRUD: Response data: ${JSON.stringify(data, null, 2)}`);
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Erro desconhecido');
+            }
+            
+            this.log(`✅ CRUD: Funcionário removido com sucesso!`);
+            this.log(`👤 CRUD: Funcionário removido: ${data.funcionario_nome || 'Nome não retornado'}`);
+            
+            this.showToast(`✅ ${data.funcionario_nome || 'Funcionário'} removido!`, 'success', 2000);
+            
+            // Recarregar dados do modal
+            this.log(`🔄 CRUD: Recarregando dados do modal...`);
+            await this.loadModalData(this.currentModalData.allocationId);
+            
+            // Atualizar calendário principal
+            this.log(`🔄 CRUD: Atualizando calendário principal...`);
+            await this.carregarAlocacoes();
+            
+            this.log(`✅ CRUD: Operação de remoção concluída com sucesso`);
+            
+        } catch (error) {
+            this.log(`❌ CRUD: ERRO CRÍTICO ao remover funcionário - ${error.message}`);
+            this.showToast(`❌ Erro: ${error.message}`, 'error', 4000);
+        }
+    }
+    
+    /**
+     * FUNÇÕES AUXILIARES PARA GRID
+     */
+    limparGridSemanal() {
+        this.log('🧹 GRID: Limpando grid semanal...');
+        
+        for (let i = 0; i < 7; i++) {
+            const dayElement = document.getElementById(`day-${i}`);
+            if (dayElement) {
+                dayElement.innerHTML = '<small class="text-muted">Arraste obras aqui</small>';
+            }
+        }
+        
+        this.log('✅ GRID: Grid semanal limpo');
+    }
+    
+    mostrarErroNoGrid(errorMessage) {
+        this.log(`❌ GRID: Mostrando erro no grid - ${errorMessage}`);
+        
+        for (let i = 0; i < 7; i++) {
+            const dayElement = document.getElementById(`day-${i}`);
+            if (dayElement) {
+                dayElement.innerHTML = `
+                    <div class="text-center text-danger p-3">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                        <p>Erro ao carregar dados</p>
+                        <small>${errorMessage}</small>
+                    </div>
+                `;
+            }
+        }
+    }
+    
+    /**
+     * Seleciona funcionário no formulário (clique no card)
+     */
+    selectFuncionario(funcionarioId) {
+        const selectElement = document.getElementById('select-funcionario');
+        selectElement.value = funcionarioId;
+        
+        // Highlight visual temporário
+        const card = event.target.closest('.funcionario-disponivel-card');
+        if (card) {
+            card.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                card.style.transform = '';
+            }, 200);
+        }
+        
+        this.log(`👆 MODAL: Funcionário ${funcionarioId} selecionado`);
+    }
+    
+    /**
+     * Recarrega dados do modal
+     */
+    async reloadModal() {
+        if (this.currentModalData) {
+            await this.loadModalData(this.currentModalData.allocationId);
+        }
+    }
+    
+    /**
+     * Mostra erro no modal
+     */
+    showModalError(message) {
+        document.getElementById('modal-loading').style.display = 'none';
+        document.getElementById('modal-content').style.display = 'none';
+        document.getElementById('modal-error').style.display = 'block';
+        document.getElementById('modal-error-message').textContent = message;
+    }
+    
+    /**
+     * Gera iniciais do nome
+     */
+    getIniciais(nome) {
+        if (!nome) return '??';
+        const parts = nome.trim().split(' ');
+        if (parts.length === 1) {
+            return parts[0].substring(0, 2).toUpperCase();
+        }
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    }
+    
+    /**
+     * Gera cor do avatar baseada no nome
+     */
+    generateAvatarColor(nome) {
+        if (!nome) return '#6c757d';
+        
+        const colors = [
+            '#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8',
+            '#6610f2', '#e83e8c', '#fd7e14', '#20c997', '#6f42c1'
+        ];
+        
+        let hash = 0;
+        for (let i = 0; i < nome.length; i++) {
+            hash = nome.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        const index = Math.abs(hash) % colors.length;
+        return colors[index];
+    }
+    
+    // ===================================
+    // INTEGRAÇÃO COM DRAG & DROP EXISTENTE
+    // ===================================
+    
+    /**
+     * Carrega contador de funcionários para uma alocação específica - VERSÃO MELHORADA
+     */
+    async loadFuncionariosCount(allocationId) {
+        try {
+            this.log(`🔄 BADGE: Carregando contador para alocação ${allocationId}...`);
+            
+            const response = await fetch(`/equipe/api/allocation/${allocationId}/funcionarios`);
+            
+            if (!response.ok) {
+                throw new Error(`API retornou ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Erro desconhecido da API');
+            }
+            
+            const count = data.total_alocados || 0;
+            const badgeElement = document.getElementById(`badge-${allocationId}`);
+            
+            if (badgeElement) {
+                if (count > 0) {
+                    badgeElement.innerHTML = `<i class="fas fa-user me-1"></i>${count}`;
+                    badgeElement.className = 'funcionarios-badge position-absolute top-0 end-0 badge bg-success rounded-pill';
+                    badgeElement.style.fontSize = '10px';
+                    badgeElement.style.cursor = 'pointer';
+                    badgeElement.title = `${count} funcionário${count > 1 ? 's' : ''} alocado${count > 1 ? 's' : ''} - Clique para gerenciar`;
+                    
+                    // Adicionar click listener para abrir modal
+                    badgeElement.onclick = (e) => {
+                        e.stopPropagation();
+                        this.openFuncionariosModal(allocationId);
+                    };
+                } else {
+                    badgeElement.innerHTML = '0';
+                    badgeElement.className = 'funcionarios-badge position-absolute top-0 end-0 badge bg-secondary rounded-pill';
+                    badgeElement.style.fontSize = '10px';
+                    badgeElement.style.cursor = 'pointer';
+                    badgeElement.title = 'Nenhum funcionário alocado - Clique para adicionar';
+                    
+                    // Click listener para adicionar funcionário
+                    badgeElement.onclick = (e) => {
+                        e.stopPropagation();
+                        this.openFuncionariosModal(allocationId);
+                    };
+                }
+            }
+            
+            this.log(`✅ BADGE: Contador atualizado - Alocação ${allocationId} tem ${count} funcionário${count !== 1 ? 's' : ''}`);
+            
+        } catch (error) {
+            this.log(`❌ BADGE: Erro ao carregar contador para alocação ${allocationId} - ${error.message}`);
+            const badgeElement = document.getElementById(`badge-${allocationId}`);
+            if (badgeElement) {
+                badgeElement.innerHTML = '⚠️';
+                badgeElement.className = 'funcionarios-badge position-absolute top-0 end-0 badge bg-warning rounded-pill';
+                badgeElement.style.fontSize = '10px';
+                badgeElement.title = `Erro ao carregar contador: ${error.message}`;
+            }
+        }
+    }
+    
+    /**
+     * Atualiza todos os badges de funcionários na tela atual
+     */
+    async updateAllFuncionariosBadges() {
+        this.log('🔄 BADGE: Atualizando todos os contadores de funcionários...');
+        
+        const allocationItems = document.querySelectorAll('.allocation-item[data-allocation-id]');
+        const promises = [];
+        
+        allocationItems.forEach(item => {
+            const allocationId = item.dataset.allocationId;
+            if (allocationId) {
+                promises.push(this.loadFuncionariosCount(allocationId));
+            }
+        });
+        
+        try {
+            await Promise.all(promises);
+            this.log(`✅ BADGE: ${promises.length} contadores atualizados com sucesso`);
+        } catch (error) {
+            this.log(`⚠️ BADGE: Alguns contadores falharam ao atualizar: ${error.message}`);
+        }
+    }
+    
+    /**
+     * REMOVIDO: addClickListenersToAllocations()
+     * Substituído por botões dedicados com stopPropagation para evitar conflito com drag & drop
+     */
 }
 
 // ===================================
