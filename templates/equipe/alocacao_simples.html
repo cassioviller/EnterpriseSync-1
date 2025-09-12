@@ -3,7 +3,7 @@
 {% block title %}Gestão de Equipe - FASE 2{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid px-2">
     <h3>📋 Gestão de Equipe - FASE 2 CORREÇÕES</h3>
     <p class="text-muted">Implementação gradual - "FUNCIONA PRIMEIRO, OTIMIZA DEPOIS"</p>
     
@@ -66,12 +66,12 @@
         </div>
     </div>
     
-    <!-- CALENDÁRIO SEMANAL EXPANDIDO -->
-    <div class="row">
+    <!-- CALENDÁRIO SEMANAL EXPANDIDO - LARGURA TOTAL -->
+    <div class="row gx-1">
         <div class="col-12">
-            <div class="card">
+            <div class="card border-0 shadow-sm">
                 <!-- CABEÇALHO COM NAVEGAÇÃO -->
-                <div class="card-header">
+                <div class="card-header border-0 bg-light">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h5 class="mb-1">📅 Gestão Semanal</h5>
@@ -97,7 +97,7 @@
                     <span>Carregando semana...</span>
                 </div>
                 
-                <div class="card-body weekly-grid-container" id="weekly-grid">
+                <div class="card-body p-2 weekly-grid-container" id="weekly-grid">
                     <div class="row weekly-grid">
                         <!-- DOMINGO -->
                         <div class="col">
@@ -1168,30 +1168,32 @@
         -webkit-box-orient: vertical;
     }
     
-    /* CALENDÁRIO EXPANDIDO - SEMPRE UMA LINHA HORIZONTAL */
+    /* CALENDÁRIO EXPANDIDO - SEMPRE UMA LINHA HORIZONTAL - OCUPA TODA LARGURA */
     .weekly-grid-container {
-        padding: 16px 20px;
+        padding: 8px 4px; /* Margens mínimas */
         overflow-x: auto; /* Scroll horizontal se necessário */
+        width: 100%; /* Força ocupar toda largura */
     }
     
     .weekly-grid {
         display: flex !important;
         flex-wrap: nowrap !important; /* NUNCA quebra linha */
-        min-width: 100%;
-        gap: 0.5rem;
+        width: 100% !important; /* Força ocupar toda largura disponível */
+        gap: 0.25rem; /* Gap menor para aproveitar espaço */
     }
     
     .weekly-grid .col {
         flex: 1 1 0px !important; /* Cada dia ocupa espaço igual */
         min-width: 0; /* Permite reduzir se necessário */
-        padding: 0 4px;
+        padding: 0 2px; /* Espaçamento mínimo entre colunas */
         max-width: none !important; /* Remove limitações Bootstrap */
     }
     
     .drop-zone {
         min-height: 250px !important; /* Maior que antes */
-        padding: 16px !important;
-        border-radius: 10px !important;
+        padding: 8px !important; /* Reduzido para aproveitar espaço */
+        border-radius: 6px !important;
+        margin: 0 !important; /* Remove margens extras */
     }
     
     /* RESPONSIVIDADE ESPECÍFICA PARA LAYOUT HORIZONTAL */
