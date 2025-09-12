@@ -203,7 +203,8 @@ def get_allocations_simples():
                 'data_alocacao': alloc.data_alocacao.isoformat(),
                 'day_of_week': convert_to_sunday_weekday(alloc.data_alocacao.weekday()),  # 0=Domingo
                 'turno_inicio': alloc.turno_inicio.strftime('%H:%M') if alloc.turno_inicio else '08:00',
-                'turno_fim': alloc.turno_fim.strftime('%H:%M') if alloc.turno_fim else '17:00'
+                'turno_fim': alloc.turno_fim.strftime('%H:%M') if alloc.turno_fim else '17:00',
+                'local_trabalho': alloc.local_trabalho or 'campo'  # Campo requerido para renderização correta
             })
         
         return jsonify({

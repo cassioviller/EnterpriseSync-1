@@ -2299,43 +2299,76 @@ class EquipeFase2 {
     
     renderAllocationItem(container, allocation, dayOfWeek) {
         const div = document.createElement('div');
-        div.className = 'card mb-2 allocation-item';
+        div.className = 'card mb-2 allocation-item optimized-card';
         div.dataset.obraId = allocation.obra_id;
         div.dataset.allocationId = allocation.id;
         div.style.border = '1px solid #28a745';
         div.style.backgroundColor = '#f8fff8';
-        div.style.position = 'relative'; // Para posicionar o badge
+        div.style.position = 'relative';
+        div.style.cursor = 'pointer'; // Indicar que é clicável
+        
+        // Determinar ícone do local de trabalho
+        const localIcon = allocation.local_trabalho === 'oficina' ? '🏢' : '🏗️';
+        const localColor = allocation.local_trabalho === 'oficina' ? '#007bff' : '#28a745';
+        
         div.innerHTML = `
             <div class="card-body p-2">
-                <h6 class="card-title mb-1 text-success">${allocation.obra_codigo}</h6>
-                <small class="text-muted">${allocation.obra_nome.substring(0, 30)}...</small>
-                <div class="mt-1 d-flex align-items-center justify-content-between">
-                    <small class="badge bg-success">${allocation.turno_inicio} - ${allocation.turno_fim}</small>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-primary btn-funcionarios" 
+                <!-- Cabeçalho com código e local -->
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <h6 class="card-title mb-0 text-success fw-bold">${allocation.obra_codigo}</h6>
+                    <span class="badge" style="background-color: ${localColor}; font-size: 11px;">
+                        ${localIcon} ${allocation.local_trabalho || 'campo'}
+                    </span>
+                </div>
+                
+                <!-- Nome completo da obra -->
+                <div class="obra-nome-full mb-2" style="font-size: 13px; line-height: 1.3; color: #495057;">
+                    <strong>${allocation.obra_nome}</strong>
+                </div>
+                
+                <!-- Área de funcionários alocados -->
+                <div class="funcionarios-section mb-2" id="funcionarios-${allocation.id}">
+                    <div class="funcionarios-loading" style="font-size: 11px; color: #6c757d;">
+                        <i class="fas fa-spinner fa-spin me-1"></i>Carregando funcionários...
+                    </div>
+                </div>
+                
+                <!-- Rodapé com horário e botões de ação -->
+                <div class="d-flex align-items-center justify-content-between mt-2" style="border-top: 1px solid #e9ecef; padding-top: 8px;">
+                    <small class="badge bg-success" style="font-size: 10px;">
+                        ${allocation.turno_inicio} - ${allocation.turno_fim}
+                    </small>
+                    <div class="btn-group-action">
+                        <button class="btn btn-xs btn-outline-primary" 
                                 onclick="event.stopPropagation(); window.equipeFase2.openFuncionariosModal(${allocation.id})"
-                                title="Gerenciar funcionários">
-                            👤
+                                title="Gerenciar funcionários" 
+                                style="font-size: 10px; padding: 2px 6px;">
+                            👤 Equipe
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" 
+                        <button class="btn btn-xs btn-outline-danger ms-1" 
                                 onclick="event.stopPropagation(); window.equipeFase2.removerAlocacaoManual(${allocation.obra_id}, ${dayOfWeek})"
-                                title="Remover alocação">
-                            ❌
+                                title="Remover alocação"
+                                style="font-size: 10px; padding: 2px 6px;">
+                            🗑️
                         </button>
                     </div>
                 </div>
-                <!-- Badge contador de funcionários -->
-                <span class="funcionarios-badge position-absolute top-0 end-0 badge bg-info rounded-pill" 
-                      style="font-size: 10px; margin: 4px;" 
-                      id="badge-${allocation.id}">
-                    <i class="fas fa-spinner fa-spin"></i>
-                </span>
             </div>
         `;
+        
+        // Adicionar evento de clique para abrir modal (funcionalidade restaurada)
+        div.addEventListener('click', (e) => {
+            // Verificar se não clicou em um botão
+            if (!e.target.closest('button')) {
+                this.log(`🖱️ Click no card - Abrindo modal para alocação ${allocation.id}`);
+                this.openFuncionariosModal(allocation.id);
+            }
+        });
+        
         container.appendChild(div);
         
-        // Carregar contador de funcionários após adicionar ao DOM
-        this.loadFuncionariosCount(allocation.id);
+        // Carregar lista de funcionários detalhada após adicionar ao DOM
+        this.loadDetailedFuncionariosList(allocation.id);
     }
     
     // MÉTODOS DE SALVAMENTO E REMOÇÃO - APIs INTEGRADAS
@@ -3903,18 +3936,186 @@ class EquipeFase2 {
         allocationItems.forEach(item => {
             const allocationId = item.dataset.allocationId;
             if (allocationId) {
-                promises.push(this.loadFuncionariosCount(allocationId));
+                promises.push(this.loadDetailedFuncionariosList(allocationId));
             }
         });
         
         try {
             await Promise.all(promises);
-            this.log(`✅ BADGE: ${promises.length} contadores atualizados com sucesso`);
+            this.log(`✅ BADGE: ${promises.length} listas de funcionários atualizadas com sucesso`);
         } catch (error) {
-            this.log(`⚠️ BADGE: Alguns contadores falharam ao atualizar: ${error.message}`);
+            this.log(`⚠️ BADGE: Algumas listas falharam ao atualizar: ${error.message}`);
+        }
+    }
+
+    /**
+     * Carrega e exibe lista detalhada de funcionários para uma alocação
+     */
+    async loadDetailedFuncionariosList(allocationId) {
+        this.log(`👥 FUNCIONARIOS: Carregando lista detalhada para alocação ${allocationId}...`);
+        
+        const funcionariosSection = document.getElementById(`funcionarios-${allocationId}`);
+        if (!funcionariosSection) {
+            this.log(`❌ FUNCIONARIOS: Seção não encontrada para alocação ${allocationId}`);
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/equipe/api/allocations/${allocationId}/funcionarios`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            this.log(`👥 FUNCIONARIOS: Response para alocação ${allocationId}: ${JSON.stringify(result).substring(0, 200)}...`);
+            
+            if (result.success && result.data) {
+                const funcionarios = result.data;
+                const count = funcionarios.length;
+                
+                if (count === 0) {
+                    funcionariosSection.innerHTML = `
+                        <div class="no-funcionarios" style="font-size: 11px; color: #6c757d; font-style: italic;">
+                            Nenhum funcionário alocado
+                        </div>
+                    `;
+                } else {
+                    // Criar lista compacta de funcionários
+                    const funcionariosList = funcionarios.map(func => {
+                        const isLider = func.is_lider ? ' 👑' : '';
+                        return `<span class="funcionario-item" style="font-size: 11px; background: #e9ecef; padding: 2px 6px; border-radius: 10px; margin-right: 4px; display: inline-block; margin-bottom: 2px;">
+                            ${func.funcionario_nome}${isLider}
+                        </span>`;
+                    }).join('');
+                    
+                    funcionariosSection.innerHTML = `
+                        <div class="funcionarios-list" style="line-height: 1.4;">
+                            ${funcionariosList}
+                        </div>
+                        <div class="funcionarios-summary" style="font-size: 10px; color: #6c757d; margin-top: 4px;">
+                            <i class="fas fa-users me-1"></i>${count} funcionário${count !== 1 ? 's' : ''}
+                        </div>
+                    `;
+                }
+                
+                // Adicionar efeito de hover na seção
+                funcionariosSection.style.cursor = 'pointer';
+                funcionariosSection.title = 'Clique para gerenciar funcionários';
+                
+            } else {
+                throw new Error(result.error || 'Dados inválidos da API');
+            }
+            
+            this.log(`✅ FUNCIONARIOS: Lista atualizada para alocação ${allocationId}`);
+            
+        } catch (error) {
+            this.log(`❌ FUNCIONARIOS: Erro ao carregar lista para alocação ${allocationId} - ${error.message}`);
+            funcionariosSection.innerHTML = `
+                <div class="funcionarios-error" style="font-size: 11px; color: #dc3545;">
+                    <i class="fas fa-exclamation-triangle me-1"></i>Erro ao carregar
+                </div>
+            `;
         }
     }
     
+    /**
+     * Handle drop operation for specific zones (campo/oficina)
+     */
+    async handleDrop(evt, dayIndex, localTrabalho) {
+        const obraId = evt.item.dataset.obraId;
+        const dayName = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dayIndex];
+        const localDisplay = localTrabalho === 'campo' ? 'Campo' : 'Oficina';
+        
+        this.log(`🎯 handleDrop: Obra ${obraId} para ${dayName} (${localDisplay})`);
+        
+        // VALIDAÇÃO INTELIGENTE: Verificar duplicata
+        if (this.isDuplicateAllocation(obraId, dayIndex)) {
+            this.log(`❌ Obra ${obraId} já está alocada no ${dayName}!`);
+            
+            // Feedback visual de erro
+            const dropZone = evt.to;
+            dropZone.classList.add('drop-zone-invalid');
+            setTimeout(() => dropZone.classList.remove('drop-zone-invalid'), 1500);
+            
+            // Toast de erro
+            this.showToast(`Obra já alocada neste dia!`, 'warning', 3000);
+            
+            // Remover item duplicado
+            evt.item.remove();
+            return;
+        }
+        
+        // Capturar estado original para rollback
+        this.captureStateForRollback(evt.to, dayIndex, 'add', evt.item);
+        
+        // Loading elegante
+        const loadingOverlay = this.showOperationLoading(evt.to, `Salvando obra no ${localDisplay.toLowerCase()}`);
+        evt.item.style.opacity = '0.5';
+        
+        // Toast de loading
+        const loadingToast = this.showToast(`Salvando obra no ${dayName} (${localDisplay})...`, 'loading', 0);
+        
+        try {
+            // Salvar via API com informação de local_trabalho
+            const data_alocacao = this.getDateForDay(dayIndex);
+            
+            const response = await fetch('/equipe/api/allocations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    obra_id: parseInt(obraId),
+                    day_of_week: dayIndex,
+                    data_alocacao: data_alocacao,
+                    local_trabalho: localTrabalho
+                })
+            });
+            
+            const result = await response.json();
+            
+            // Remover loading
+            this.hideOperationLoading(loadingOverlay);
+            loadingToast.remove();
+            
+            if (result.success) {
+                this.log(`✅ Obra ${obraId} salva no ${dayName} (${localDisplay})!`);
+                
+                // Toast de sucesso
+                this.showToast(`✅ Obra salva no ${dayName} (${localDisplay})!`, 'success', 2000);
+                
+                // Remover o item arrastado (será substituído pela renderização correta)
+                evt.item.remove();
+                
+                // Remover placeholder se existir
+                const placeholder = evt.to.querySelector('.text-muted');
+                if (placeholder && placeholder.textContent.includes('Arraste')) {
+                    placeholder.remove();
+                }
+                
+                // Recarregar alocações para atualizar interface
+                await this.carregarAlocacoes();
+                
+                // Limpar estado de rollback
+                this.clearRollbackState();
+                
+            } else {
+                throw new Error(result.error || 'Erro desconhecido');
+            }
+            
+        } catch (error) {
+            // Remover loading se ainda não foi removido
+            this.hideOperationLoading(loadingOverlay);
+            loadingToast.remove();
+            
+            // Erro - executar rollback
+            this.log(`❌ Erro ao salvar obra ${obraId}: ${error.message} - executando rollback`);
+            this.showToast(`❌ Erro ao salvar obra: ${error.message}`, 'error', 3000);
+            this.executeRollback();
+        }
+    }
+
     /**
      * REMOVIDO: addClickListenersToAllocations()
      * Substituído por botões dedicados com stopPropagation para evitar conflito com drag & drop
