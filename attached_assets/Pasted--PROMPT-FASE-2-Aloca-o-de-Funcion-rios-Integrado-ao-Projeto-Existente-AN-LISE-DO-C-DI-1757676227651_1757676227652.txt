@@ -1,0 +1,1220 @@
+# PROMPT FASE 2 - Alocação de Funcionários (Integrado ao Projeto Existente)
+
+## 🎯 ANÁLISE DO CÓDIGO ATUAL
+
+**SITUAÇÃO ENCONTRADA NO REPOSITÓRIO:**
+- ✅ **Modelos prontos**: `Allocation` e `AllocationEmployee` já implementados
+- ✅ **Template base**: `alocacao_simples.html` com calendário funcionando
+- ✅ **Rota existente**: `/funcionarios/<int:allocation_id>` já criada
+- ✅ **Template funcionários**: `allocation_funcionarios.html` já existe
+- ✅ **JavaScript**: Classe `EquipeFase2` com drag & drop funcionando
+- ✅ **APIs básicas**: Criação e remoção de alocações implementadas
+
+**O QUE PRECISA SER IMPLEMENTADO:**
+- 🔧 **APIs de funcionários**: Endpoints para gerenciar AllocationEmployee
+- 🔧 **Modal integrado**: Substituir página separada por modal no calendário
+- 🔧 **JavaScript funcionários**: Integrar com EquipeFase2 existente
+- 🔧 **Badge visual**: Mostrar número de funcionários no calendário
+
+## 🏗️ IMPLEMENTAÇÃO FASE 2
+
+### 1. NOVAS APIs EM `equipe_views.py`
+
+```python
+# ================================
+# APIS PARA FUNCIONÁRIOS - INTEGRAÇÃO FASE 2
+# ================================
+
+@equipe_bp.route('/api/allocation/<int:allocation_id>/funcionarios', methods=['GET'])
+@login_required
+@admin_required
+def get_allocation_funcionarios(allocation_id):
+    """GET - Lista funcionários de uma alocação específica"""
+    try:
+        admin_id = get_admin_id()
+        
+        # Verificar se alocação pertence ao admin
+        allocation = Allocation.query.filter_by(
+            id=allocation_id, 
+            admin_id=admin_id
+        ).first()
+        
+        if not allocation:
+            return jsonify({
+                'success': False,
+                'error': 'Alocação não encontrada'
+            }), 404
+        
+        # Funcionários já alocados nesta obra/dia
+        funcionarios_alocados = db.session.query(
+            AllocationEmployee, Funcionario
+        ).join(Funcionario).filter(
+            AllocationEmployee.allocation_id == allocation_id
+        ).all()
+        
+        # Funcionários disponíveis (ativos e não alocados nesta data)
+        funcionarios_alocados_ids = [ae.funcionario_id for ae, f in funcionarios_alocados]
+        
+        # Buscar funcionários que NÃO estão alocados em NENHUMA obra nesta data
+        funcionarios_conflito = db.session.query(AllocationEmployee.funcionario_id).join(Allocation).filter(
+            Allocation.data_alocacao == allocation.data_alocacao,
+            Allocation.admin_id == admin_id
+        ).subquery()
+        
+        funcionarios_disponiveis = Funcionario.query.filter(
+            Funcionario.admin_id == admin_id,
+            Funcionario.ativo == True,
+            ~Funcionario.id.in_(funcionarios_alocados_ids) if funcionarios_alocados_ids else True,
+            ~Funcionario.id.in_(funcionarios_conflito)
+        ).order_by(Funcionario.nome).all()
+        
+        # Formatear resposta
+        result = {
+            'allocation': {
+                'id': allocation.id,
+                'obra_codigo': allocation.obra.codigo,
+                'obra_nome': allocation.obra.nome,
+                'data_alocacao': allocation.data_alocacao.strftime('%Y-%m-%d'),
+                'data_formatada': allocation.data_alocacao.strftime('%d/%m/%Y'),
+                'turno_inicio': allocation.turno_inicio.strftime('%H:%M'),
+                'turno_fim': allocation.turno_fim.strftime('%H:%M'),
+                'funcionarios_count': len(funcionarios_alocados)
+            },
+            'funcionarios_alocados': [
+                {
+                    'allocation_employee_id': ae.id,
+                    'funcionario_id': f.id,
+                    'funcionario_nome': f.nome,
+                    'funcionario_funcao_base': f.funcao,
+                    'turno_inicio': ae.turno_inicio.strftime('%H:%M'),
+                    'turno_fim': ae.turno_fim.strftime('%H:%M'),
+                    'papel': ae.papel,
+                    'observacao': ae.observacao
+                }
+                for ae, f in funcionarios_alocados
+            ],
+            'funcionarios_disponiveis': [
+                {
+                    'funcionario_id': f.id,
+                    'funcionario_nome': f.nome,
+                    'funcionario_funcao': f.funcao,
+                    'funcionario_telefone': getattr(f, 'telefone', ''),
+                    'funcionario_avatar': f'https://ui-avatars.com/api/?name={f.nome}&background=198754&color=fff&size=48'
+                }
+                for f in funcionarios_disponiveis
+            ]
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar funcionários da alocação: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+
+@equipe_bp.route('/api/allocation-employee', methods=['POST'])
+@login_required
+@admin_required
+def add_funcionario_to_allocation():
+    """POST - Adiciona funcionário à alocação"""
+    try:
+        data = request.get_json()
+        admin_id = get_admin_id()
+        
+        # Validação
+        required_fields = ['allocation_id', 'funcionario_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'error': f'Campo obrigatório: {field}'
+                }), 400
+        
+        allocation_id = data['allocation_id']
+        funcionario_id = data['funcionario_id']
+        
+        # Verificar se alocação existe e pertence ao admin
+        allocation = Allocation.query.filter_by(
+            id=allocation_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not allocation:
+            return jsonify({
+                'success': False,
+                'error': 'Alocação não encontrada'
+            }), 404
+        
+        # Verificar se funcionário existe e pertence ao admin
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id,
+            ativo=True
+        ).first()
+        
+        if not funcionario:
+            return jsonify({
+                'success': False,
+                'error': 'Funcionário não encontrado'
+            }), 404
+        
+        # Verificar se já está alocado
+        existing = AllocationEmployee.query.filter_by(
+            allocation_id=allocation_id,
+            funcionario_id=funcionario_id
+        ).first()
+        
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': 'Funcionário já alocado nesta obra/dia'
+            }), 409
+        
+        # Verificar conflito de data (funcionário em outra obra no mesmo dia)
+        conflito = db.session.query(AllocationEmployee).join(Allocation).filter(
+            AllocationEmployee.funcionario_id == funcionario_id,
+            Allocation.data_alocacao == allocation.data_alocacao,
+            Allocation.admin_id == admin_id
+        ).first()
+        
+        if conflito:
+            return jsonify({
+                'success': False,
+                'error': f'Funcionário já alocado em outra obra nesta data'
+            }), 409
+        
+        # Processar horários
+        turno_inicio_str = data.get('turno_inicio', allocation.turno_inicio.strftime('%H:%M'))
+        turno_fim_str = data.get('turno_fim', allocation.turno_fim.strftime('%H:%M'))
+        
+        try:
+            turno_inicio = datetime.strptime(turno_inicio_str, '%H:%M').time()
+            turno_fim = datetime.strptime(turno_fim_str, '%H:%M').time()
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Formato de horário inválido (use HH:MM)'
+            }), 400
+        
+        # Criar alocação de funcionário
+        allocation_employee = AllocationEmployee(
+            allocation_id=allocation_id,
+            funcionario_id=funcionario_id,
+            turno_inicio=turno_inicio,
+            turno_fim=turno_fim,
+            papel=data.get('papel', funcionario.funcao),
+            observacao=data.get('observacao', '')
+        )
+        
+        db.session.add(allocation_employee)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': allocation_employee.id,
+                'funcionario_nome': funcionario.nome,
+                'turno_inicio': allocation_employee.turno_inicio.strftime('%H:%M'),
+                'turno_fim': allocation_employee.turno_fim.strftime('%H:%M'),
+                'papel': allocation_employee.papel
+            },
+            'message': f'Funcionário {funcionario.nome} alocado com sucesso'
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao alocar funcionário: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+
+@equipe_bp.route('/api/allocation-employee/<int:allocation_employee_id>', methods=['PUT'])
+@login_required
+@admin_required
+def update_allocation_employee(allocation_employee_id):
+    """PUT - Atualiza dados do funcionário alocado"""
+    try:
+        data = request.get_json()
+        admin_id = get_admin_id()
+        
+        # Buscar com join para verificar permissão
+        allocation_employee = db.session.query(AllocationEmployee).join(Allocation).filter(
+            AllocationEmployee.id == allocation_employee_id,
+            Allocation.admin_id == admin_id
+        ).first()
+        
+        if not allocation_employee:
+            return jsonify({
+                'success': False,
+                'error': 'Alocação de funcionário não encontrada'
+            }), 404
+        
+        # Atualizar campos permitidos
+        if 'turno_inicio' in data:
+            try:
+                allocation_employee.turno_inicio = datetime.strptime(data['turno_inicio'], '%H:%M').time()
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Formato de turno_inicio inválido'
+                }), 400
+        
+        if 'turno_fim' in data:
+            try:
+                allocation_employee.turno_fim = datetime.strptime(data['turno_fim'], '%H:%M').time()
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Formato de turno_fim inválido'
+                }), 400
+        
+        if 'papel' in data:
+            allocation_employee.papel = data['papel']
+        
+        if 'observacao' in data:
+            allocation_employee.observacao = data['observacao']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': allocation_employee.id,
+                'turno_inicio': allocation_employee.turno_inicio.strftime('%H:%M'),
+                'turno_fim': allocation_employee.turno_fim.strftime('%H:%M'),
+                'papel': allocation_employee.papel,
+                'observacao': allocation_employee.observacao
+            },
+            'message': 'Funcionário atualizado com sucesso'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao atualizar funcionário: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+
+@equipe_bp.route('/api/allocation-employee/<int:allocation_employee_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def remove_funcionario_from_allocation(allocation_employee_id):
+    """DELETE - Remove funcionário da alocação"""
+    try:
+        admin_id = get_admin_id()
+        
+        # Buscar com join para verificar permissão
+        allocation_employee = db.session.query(AllocationEmployee).join(Allocation).filter(
+            AllocationEmployee.id == allocation_employee_id,
+            Allocation.admin_id == admin_id
+        ).first()
+        
+        if not allocation_employee:
+            return jsonify({
+                'success': False,
+                'error': 'Alocação de funcionário não encontrada'
+            }), 404
+        
+        funcionario_nome = allocation_employee.funcionario.nome if allocation_employee.funcionario else "Funcionário"
+        
+        db.session.delete(allocation_employee)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{funcionario_nome} removido da alocação'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao remover funcionário: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+```
+
+### 2. MODAL DE FUNCIONÁRIOS - ADICIONAR AO `alocacao_simples.html`
+
+```html
+<!-- ADICIONAR ANTES DO FECHAMENTO DO </div> PRINCIPAL -->
+
+<!-- Modal: Alocação de Funcionários -->
+<div class="modal fade" id="funcionariosModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-users me-2"></i>
+                    Funcionários - <span id="modal-obra-info">Carregando...</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="modal-body p-0">
+                <!-- Header com informações da alocação -->
+                <div class="allocation-info-header p-3 bg-light border-bottom">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h6 class="mb-1" id="allocation-details">Carregando...</h6>
+                            <small class="text-muted" id="allocation-date-time">Carregando...</small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="funcionarios-stats">
+                                <span class="badge bg-success me-2">
+                                    <i class="fas fa-user-check"></i>
+                                    <span id="funcionarios-alocados-count">0</span> alocados
+                                </span>
+                                <span class="badge bg-info">
+                                    <i class="fas fa-users"></i>
+                                    <span id="funcionarios-disponiveis-count">0</span> disponíveis
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Loading state -->
+                <div id="funcionarios-loading" class="text-center p-5" style="display: none;">
+                    <div class="spinner-border text-primary mb-3"></div>
+                    <div>Carregando funcionários...</div>
+                </div>
+                
+                <!-- Conteúdo principal -->
+                <div class="row g-0" id="funcionarios-content" style="min-height: 500px;">
+                    <!-- Funcionários Disponíveis -->
+                    <div class="col-md-6 border-end">
+                        <div class="funcionarios-section-header p-3 bg-light border-bottom">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-user-plus text-success me-2"></i>
+                                    Disponíveis
+                                </h6>
+                                <button class="btn btn-sm btn-outline-primary" onclick="refreshFuncionarios()">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Filtro de busca -->
+                            <div class="mt-2">
+                                <input type="text" class="form-control form-control-sm" 
+                                       placeholder="🔍 Buscar funcionário..." 
+                                       id="funcionario-search"
+                                       onkeyup="filterFuncionarios(this.value)">
+                            </div>
+                        </div>
+                        
+                        <div class="funcionarios-list-container p-3" style="max-height: 400px; overflow-y: auto;">
+                            <div id="funcionarios-disponiveis-list">
+                                <!-- Carregado via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Funcionários Alocados -->
+                    <div class="col-md-6">
+                        <div class="funcionarios-section-header p-3 bg-light border-bottom">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-user-check text-primary me-2"></i>
+                                    Alocados nesta Obra/Dia
+                                </h6>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-success" onclick="addAllVisible()" title="Adicionar todos visíveis">
+                                        <i class="fas fa-plus-circle"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="removeAllAlocados()" title="Remover todos">
+                                        <i class="fas fa-minus-circle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="funcionarios-list-container p-3" style="max-height: 400px; overflow-y: auto;">
+                            <div id="funcionarios-alocados-list">
+                                <!-- Carregado via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer bg-light">
+                <div class="d-flex justify-content-between w-100">
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary" onclick="exportFuncionarios()">
+                            <i class="fas fa-file-excel me-1"></i>
+                            Exportar
+                        </button>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>
+                            Fechar
+                        </button>
+                        <button type="button" class="btn btn-success" onclick="salvarAlteracoes()">
+                            <i class="fas fa-save me-1"></i>
+                            Salvar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+### 3. CSS PARA FUNCIONÁRIOS - ADICIONAR AO `<style>` EXISTENTE
+
+```css
+/* ================================
+   MODAL DE FUNCIONÁRIOS - FASE 2
+   ================================ */
+
+.funcionarios-stats .badge {
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.funcionarios-section-header {
+    background: #f8f9fa !important;
+}
+
+.funcionarios-section-header h6 {
+    color: #495057;
+    font-weight: 600;
+}
+
+/* Cards de funcionários */
+.funcionario-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.funcionario-card:hover {
+    border-color: #198754;
+    box-shadow: 0 2px 8px rgba(25, 135, 84, 0.15);
+    transform: translateY(-1px);
+}
+
+.funcionario-card.disponivel {
+    border-left: 4px solid #28a745;
+}
+
+.funcionario-card.alocado {
+    border-left: 4px solid #0d6efd;
+    background: #f8f9ff;
+}
+
+.funcionario-card.saving {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.funcionario-card-content {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    gap: 0.75rem;
+}
+
+/* Avatar do funcionário */
+.funcionario-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.funcionario-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Informações do funcionário */
+.funcionario-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.funcionario-nome {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #495057;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.funcionario-funcao {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+}
+
+.funcionario-papel-input {
+    font-size: 0.8rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    width: 100%;
+}
+
+.funcionario-horarios {
+    margin-top: 0.5rem;
+}
+
+.funcionario-horarios input[type="time"] {
+    font-size: 0.75rem;
+    width: 100%;
+}
+
+/* Ações dos funcionários */
+.funcionario-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.funcionario-actions .btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Estados especiais */
+.funcionario-card.conflict {
+    border-color: #dc3545 !important;
+    background: #fff5f5 !important;
+}
+
+.funcionario-card.filtered {
+    display: none;
+}
+
+/* Lista vazia */
+.empty-funcionarios-list {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6c757d;
+}
+
+.empty-funcionarios-list i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Badge de funcionários no calendário */
+.funcionarios-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ffc107;
+    color: #856404;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.funcionarios-badge.empty {
+    background: #6c757d;
+    color: white;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .modal-dialog.modal-xl {
+        margin: 0.5rem;
+        max-width: calc(100% - 1rem);
+    }
+    
+    .row.g-0 {
+        flex-direction: column;
+    }
+    
+    .col-md-6.border-end {
+        border-end: none !important;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .funcionario-card-content {
+        padding: 0.5rem;
+        gap: 0.5rem;
+    }
+    
+    .funcionario-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+}
+```
+
+### 4. JAVASCRIPT PARA FUNCIONÁRIOS - ADICIONAR À CLASSE `EquipeFase2`
+
+```javascript
+// ================================
+// MÉTODOS DE FUNCIONÁRIOS - ADICIONAR À CLASSE EquipeFase2
+// ================================
+
+// Adicionar estas propriedades ao constructor da EquipeFase2:
+constructor() {
+    // ... propriedades existentes ...
+    
+    // Novas propriedades para funcionários
+    this.currentAllocationId = null;
+    this.funcionariosData = null;
+    this.funcionariosModal = null;
+}
+
+// Adicionar estes métodos à classe EquipeFase2:
+
+async abrirModalFuncionarios(allocationId) {
+    try {
+        this.currentAllocationId = allocationId;
+        
+        // Inicializar modal se necessário
+        if (!this.funcionariosModal) {
+            const modalElement = document.getElementById('funcionariosModal');
+            if (modalElement) {
+                this.funcionariosModal = new bootstrap.Modal(modalElement);
+            }
+        }
+        
+        // Mostrar loading
+        this.showFuncionariosLoading(true);
+        
+        // Abrir modal
+        if (this.funcionariosModal) {
+            this.funcionariosModal.show();
+        }
+        
+        // Carregar dados
+        await this.carregarFuncionarios(allocationId);
+        
+    } catch (error) {
+        this.log(`❌ ERRO ao abrir modal de funcionários: ${error.message}`);
+        this.updateStatus(`Erro: ${error.message}`, 'danger');
+    }
+}
+
+async carregarFuncionarios(allocationId) {
+    try {
+        this.log(`📋 Carregando funcionários para alocação ${allocationId}...`);
+        
+        const response = await fetch(`/equipe/api/allocation/${allocationId}/funcionarios`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao carregar funcionários');
+        }
+        
+        this.funcionariosData = result.data;
+        this.renderModalFuncionarios();
+        
+        this.log(`✅ ${this.funcionariosData.funcionarios_disponiveis.length} funcionários disponíveis`);
+        this.log(`✅ ${this.funcionariosData.funcionarios_alocados.length} funcionários alocados`);
+        
+    } catch (error) {
+        this.log(`❌ ERRO ao carregar funcionários: ${error.message}`);
+        throw error;
+    } finally {
+        this.showFuncionariosLoading(false);
+    }
+}
+
+renderModalFuncionarios() {
+    if (!this.funcionariosData) return;
+    
+    const allocation = this.funcionariosData.allocation;
+    
+    // Atualizar header
+    document.getElementById('modal-obra-info').textContent = allocation.obra_codigo;
+    document.getElementById('allocation-details').textContent = 
+        `${allocation.obra_codigo} - ${allocation.obra_nome}`;
+    document.getElementById('allocation-date-time').textContent = 
+        `${allocation.data_formatada} • ${allocation.turno_inicio} - ${allocation.turno_fim}`;
+    
+    // Atualizar contadores
+    document.getElementById('funcionarios-alocados-count').textContent = 
+        this.funcionariosData.funcionarios_alocados.length;
+    document.getElementById('funcionarios-disponiveis-count').textContent = 
+        this.funcionariosData.funcionarios_disponiveis.length;
+    
+    // Renderizar listas
+    this.renderFuncionariosDisponiveis();
+    this.renderFuncionariosAlocados();
+}
+
+renderFuncionariosDisponiveis() {
+    const container = document.getElementById('funcionarios-disponiveis-list');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (this.funcionariosData.funcionarios_disponiveis.length === 0) {
+        container.innerHTML = `
+            <div class="empty-funcionarios-list">
+                <i class="fas fa-user-slash"></i>
+                <div>Nenhum funcionário disponível</div>
+                <small class="text-muted">Todos os funcionários já estão alocados nesta data</small>
+            </div>
+        `;
+        return;
+    }
+    
+    this.funcionariosData.funcionarios_disponiveis.forEach(funcionario => {
+        const card = this.createFuncionarioDisponivelCard(funcionario);
+        container.appendChild(card);
+    });
+}
+
+createFuncionarioDisponivelCard(funcionario) {
+    const div = document.createElement('div');
+    div.className = 'funcionario-card disponivel';
+    div.dataset.funcionarioId = funcionario.funcionario_id;
+    
+    div.innerHTML = `
+        <div class="funcionario-card-content">
+            <div class="funcionario-avatar">
+                <img src="${funcionario.funcionario_avatar}" alt="${funcionario.funcionario_nome}">
+            </div>
+            <div class="funcionario-info">
+                <div class="funcionario-nome">${funcionario.funcionario_nome}</div>
+                <div class="funcionario-funcao">${funcionario.funcionario_funcao || 'Sem função definida'}</div>
+                ${funcionario.funcionario_telefone ? `<small class="text-muted">${funcionario.funcionario_telefone}</small>` : ''}
+            </div>
+            <div class="funcionario-actions">
+                <button class="btn btn-sm btn-success" onclick="adicionarFuncionario(${funcionario.funcionario_id})" title="Adicionar">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    return div;
+}
+
+renderFuncionariosAlocados() {
+    const container = document.getElementById('funcionarios-alocados-list');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (this.funcionariosData.funcionarios_alocados.length === 0) {
+        container.innerHTML = `
+            <div class="empty-funcionarios-list">
+                <i class="fas fa-user-plus"></i>
+                <div>Nenhum funcionário alocado</div>
+                <small class="text-muted">Adicione funcionários da lista ao lado</small>
+            </div>
+        `;
+        return;
+    }
+    
+    this.funcionariosData.funcionarios_alocados.forEach(funcionario => {
+        const card = this.createFuncionarioAlocadoCard(funcionario);
+        container.appendChild(card);
+    });
+}
+
+createFuncionarioAlocadoCard(funcionario) {
+    const div = document.createElement('div');
+    div.className = 'funcionario-card alocado';
+    div.dataset.allocationEmployeeId = funcionario.allocation_employee_id;
+    div.dataset.funcionarioId = funcionario.funcionario_id;
+    
+    div.innerHTML = `
+        <div class="funcionario-card-content">
+            <div class="funcionario-avatar">
+                <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(funcionario.funcionario_nome)}&background=0d6efd&color=fff&size=48" 
+                     alt="${funcionario.funcionario_nome}">
+            </div>
+            <div class="funcionario-info">
+                <div class="funcionario-nome">${funcionario.funcionario_nome}</div>
+                <div class="mb-2">
+                    <input type="text" class="funcionario-papel-input" 
+                           placeholder="Papel/função específica" 
+                           value="${funcionario.papel || funcionario.funcionario_funcao_base || ''}"
+                           onchange="atualizarPapel(${funcionario.allocation_employee_id}, this.value)">
+                </div>
+                <div class="funcionario-horarios">
+                    <div class="row g-1">
+                        <div class="col-6">
+                            <input type="time" class="form-control form-control-sm" 
+                                   value="${funcionario.turno_inicio}"
+                                   onchange="atualizarHorario(${funcionario.allocation_employee_id}, this.value, null)">
+                        </div>
+                        <div class="col-6">
+                            <input type="time" class="form-control form-control-sm" 
+                                   value="${funcionario.turno_fim}"
+                                   onchange="atualizarHorario(${funcionario.allocation_employee_id}, null, this.value)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="funcionario-actions">
+                <button class="btn btn-sm btn-outline-primary" onclick="editarFuncionario(${funcionario.allocation_employee_id})" title="Editar">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="removerFuncionario(${funcionario.allocation_employee_id})" title="Remover">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    return div;
+}
+
+async adicionarFuncionarioToAllocation(funcionarioId) {
+    try {
+        const funcionario = this.funcionariosData.funcionarios_disponiveis.find(f => f.funcionario_id == funcionarioId);
+        if (!funcionario) return;
+        
+        // Mostrar loading no card
+        const card = document.querySelector(`[data-funcionario-id="${funcionarioId}"]`);
+        if (card) card.classList.add('saving');
+        
+        this.log(`➕ Adicionando ${funcionario.funcionario_nome}...`);
+        
+        const response = await fetch('/equipe/api/allocation-employee', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                allocation_id: this.currentAllocationId,
+                funcionario_id: funcionarioId,
+                turno_inicio: this.funcionariosData.allocation.turno_inicio,
+                turno_fim: this.funcionariosData.allocation.turno_fim,
+                papel: funcionario.funcionario_funcao
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao adicionar funcionário');
+        }
+        
+        // Recarregar dados
+        await this.carregarFuncionarios(this.currentAllocationId);
+        
+        this.log(`✅ ${funcionario.funcionario_nome} adicionado com sucesso`);
+        
+        // Atualizar calendário principal
+        this.atualizarBadgeFuncionarios();
+        
+    } catch (error) {
+        this.log(`❌ ERRO ao adicionar funcionário: ${error.message}`);
+        alert(`Erro: ${error.message}`);
+    } finally {
+        // Remover loading
+        const card = document.querySelector(`[data-funcionario-id="${funcionarioId}"]`);
+        if (card) card.classList.remove('saving');
+    }
+}
+
+async removerFuncionarioFromAllocation(allocationEmployeeId) {
+    try {
+        const funcionario = this.funcionariosData.funcionarios_alocados.find(f => f.allocation_employee_id == allocationEmployeeId);
+        if (!funcionario) return;
+        
+        if (!confirm(`Remover ${funcionario.funcionario_nome} desta alocação?`)) {
+            return;
+        }
+        
+        // Mostrar loading
+        const card = document.querySelector(`[data-allocation-employee-id="${allocationEmployeeId}"]`);
+        if (card) card.classList.add('saving');
+        
+        this.log(`➖ Removendo ${funcionario.funcionario_nome}...`);
+        
+        const response = await fetch(`/equipe/api/allocation-employee/${allocationEmployeeId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao remover funcionário');
+        }
+        
+        // Recarregar dados
+        await this.carregarFuncionarios(this.currentAllocationId);
+        
+        this.log(`✅ ${funcionario.funcionario_nome} removido com sucesso`);
+        
+        // Atualizar calendário principal
+        this.atualizarBadgeFuncionarios();
+        
+    } catch (error) {
+        this.log(`❌ ERRO ao remover funcionário: ${error.message}`);
+        alert(`Erro: ${error.message}`);
+    }
+}
+
+async atualizarPapelFuncionario(allocationEmployeeId, novoPapel) {
+    try {
+        const response = await fetch(`/equipe/api/allocation-employee/${allocationEmployeeId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                papel: novoPapel
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao atualizar papel');
+        }
+        
+        this.log(`✅ Papel atualizado para: ${novoPapel}`);
+        
+    } catch (error) {
+        this.log(`❌ ERRO ao atualizar papel: ${error.message}`);
+    }
+}
+
+async atualizarHorarioFuncionario(allocationEmployeeId, turnoInicio, turnoFim) {
+    try {
+        const updateData = {};
+        if (turnoInicio) updateData.turno_inicio = turnoInicio;
+        if (turnoFim) updateData.turno_fim = turnoFim;
+        
+        const response = await fetch(`/equipe/api/allocation-employee/${allocationEmployeeId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao atualizar horário');
+        }
+        
+        this.log(`✅ Horário atualizado`);
+        
+    } catch (error) {
+        this.log(`❌ ERRO ao atualizar horário: ${error.message}`);
+    }
+}
+
+atualizarBadgeFuncionarios() {
+    // Atualizar badge no calendário principal
+    if (this.currentAllocationId && this.funcionariosData) {
+        const allocationElement = document.querySelector(`[data-allocation-id="${this.currentAllocationId}"]`);
+        if (allocationElement) {
+            let badge = allocationElement.querySelector('.funcionarios-badge');
+            const count = this.funcionariosData.funcionarios_alocados.length;
+            
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'funcionarios-badge';
+                allocationElement.appendChild(badge);
+            }
+            
+            badge.innerHTML = `<i class="fas fa-user"></i> ${count}`;
+            badge.className = count > 0 ? 'funcionarios-badge' : 'funcionarios-badge empty';
+        }
+    }
+}
+
+showFuncionariosLoading(show) {
+    const loading = document.getElementById('funcionarios-loading');
+    const content = document.getElementById('funcionarios-content');
+    
+    if (loading && content) {
+        loading.style.display = show ? 'block' : 'none';
+        content.style.display = show ? 'none' : 'flex';
+    }
+}
+
+filterFuncionarios(searchTerm) {
+    const term = searchTerm.toLowerCase();
+    const cards = document.querySelectorAll('#funcionarios-disponiveis-list .funcionario-card');
+    
+    cards.forEach(card => {
+        const nome = card.querySelector('.funcionario-nome').textContent.toLowerCase();
+        const funcao = card.querySelector('.funcionario-funcao').textContent.toLowerCase();
+        
+        if (nome.includes(term) || funcao.includes(term)) {
+            card.classList.remove('filtered');
+        } else {
+            card.classList.add('filtered');
+        }
+    });
+}
+
+// Método para integrar com o clique na obra alocada
+async handleObraClick(allocationId) {
+    await this.abrirModalFuncionarios(allocationId);
+}
+```
+
+### 5. FUNÇÕES GLOBAIS PARA O HTML
+
+```javascript
+// ================================
+// FUNÇÕES GLOBAIS - ADICIONAR AO FINAL DO SCRIPT
+// ================================
+
+// Funções chamadas pelos botões do modal
+function adicionarFuncionario(funcionarioId) {
+    window.equipeFase2.adicionarFuncionarioToAllocation(funcionarioId);
+}
+
+function removerFuncionario(allocationEmployeeId) {
+    window.equipeFase2.removerFuncionarioFromAllocation(allocationEmployeeId);
+}
+
+function atualizarPapel(allocationEmployeeId, novoPapel) {
+    window.equipeFase2.atualizarPapelFuncionario(allocationEmployeeId, novoPapel);
+}
+
+function atualizarHorario(allocationEmployeeId, turnoInicio, turnoFim) {
+    window.equipeFase2.atualizarHorarioFuncionario(allocationEmployeeId, turnoInicio, turnoFim);
+}
+
+function filterFuncionarios(searchTerm) {
+    window.equipeFase2.filterFuncionarios(searchTerm);
+}
+
+function refreshFuncionarios() {
+    if (window.equipeFase2.currentAllocationId) {
+        window.equipeFase2.carregarFuncionarios(window.equipeFase2.currentAllocationId);
+    }
+}
+
+function salvarAlteracoes() {
+    // Fechar modal - alterações já foram salvas automaticamente
+    const modal = bootstrap.Modal.getInstance(document.getElementById('funcionariosModal'));
+    if (modal) modal.hide();
+}
+
+function exportFuncionarios() {
+    alert('Funcionalidade de exportação em desenvolvimento');
+}
+
+// Modificar o clique na obra alocada para abrir modal de funcionários
+function handleAllocationClick(allocationId) {
+    window.equipeFase2.handleObraClick(allocationId);
+}
+```
+
+### 6. MODIFICAR O TEMPLATE PARA INCLUIR ONCLICK
+
+```html
+<!-- MODIFICAR a div da obra alocada no calendário -->
+<div class="obra-alocada" 
+     data-allocation-id="{{ allocation.id }}"
+     onclick="handleAllocationClick({{ allocation.id }})"
+     style="cursor: pointer;">
+    
+    <!-- Conteúdo existente da obra -->
+    <div class="obra-info">
+        <div class="obra-codigo">{{ allocation.obra.codigo }}</div>
+        <div class="obra-turno">{{ allocation.turno_inicio.strftime('%H:%M') }} - {{ allocation.turno_fim.strftime('%H:%M') }}</div>
+    </div>
+    
+    <!-- NOVO: Badge de funcionários -->
+    {% if allocation.funcionarios_count > 0 %}
+    <div class="funcionarios-badge">
+        <i class="fas fa-user"></i> {{ allocation.funcionarios_count }}
+    </div>
+    {% else %}
+    <div class="funcionarios-badge empty">
+        <i class="fas fa-user-plus"></i> 0
+    </div>
+    {% endif %}
+    
+    <!-- Botões de ação existentes -->
+    <div class="obra-actions">
+        <button class="btn btn-sm btn-outline-light" 
+                onclick="event.stopPropagation(); editAllocation({{ allocation.id }})"
+                title="Editar obra">
+            <i class="fas fa-edit"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-danger" 
+                onclick="event.stopPropagation(); deleteAllocation({{ allocation.id }})"
+                title="Remover obra">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+</div>
+```
+
+## 📋 CHECKLIST DE IMPLEMENTAÇÃO
+
+### Fase 1: Backend APIs
+- [ ] Adicionar 4 novas rotas em `equipe_views.py`
+- [ ] Testar endpoints com Postman/curl
+- [ ] Validar relacionamentos AllocationEmployee
+
+### Fase 2: Modal HTML
+- [ ] Adicionar modal ao template `alocacao_simples.html`
+- [ ] Incluir CSS específico para funcionários
+- [ ] Testar abertura/fechamento do modal
+
+### Fase 3: JavaScript
+- [ ] Adicionar métodos à classe `EquipeFase2`
+- [ ] Implementar funções globais
+- [ ] Testar integração completa
+
+### Fase 4: Integração Visual
+- [ ] Modificar clique na obra para abrir modal
+- [ ] Adicionar badges de funcionários
+- [ ] Testar responsividade mobile
+
+## 🎯 RESULTADO ESPERADO
+
+Após implementar a Fase 2, o usuário poderá:
+
+1. **Clicar numa obra alocada** → Modal abre com funcionários
+2. **Ver funcionários disponíveis** → Lista filtrada por conflitos
+3. **Adicionar funcionários** → Drag & drop ou botão
+4. **Definir papéis específicos** → Input editável
+5. **Ajustar horários individuais** → Campos de time
+6. **Ver badges no calendário** → Número de funcionários alocados
+7. **Filtrar funcionários** → Busca por nome/função
+
+Isso completa o **NÍVEL 2** e prepara para o **Weekly Planner (NÍVEL 3)**.
+

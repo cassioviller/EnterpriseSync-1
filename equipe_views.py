@@ -135,76 +135,10 @@ def allocation_funcionarios(allocation_id):
         flash('Erro ao carregar funcionários', 'error')
         return redirect(url_for('equipe.alocacao_semanal'))
 
-@equipe_bp.route('/api/allocations', methods=['POST'])
-@login_required
-@admin_required
-def api_create_allocation():
-    """API: Criar alocação"""
-    try:
-        admin_id = get_admin_id()
-        data = request.get_json()
-        
-        if not data or not data.get('obra_id') or not data.get('data_alocacao'):
-            return jsonify({'error': 'Dados obrigatórios'}), 400
-        
-        # Verificar obra
-        obra = Obra.query.filter_by(id=data['obra_id'], admin_id=admin_id).first()
-        if not obra:
-            return jsonify({'error': 'Obra não encontrada'}), 404
-        
-        # Parse data
-        data_alocacao = datetime.strptime(data['data_alocacao'], '%Y-%m-%d').date()
-        
-        # Criar alocação
-        allocation = Allocation()
-        allocation.admin_id = admin_id
-        allocation.obra_id = data['obra_id']
-        allocation.data_alocacao = data_alocacao
-        allocation.turno_inicio = time(8, 0)
-        allocation.turno_fim = time(17, 0)
-        allocation.nota = data.get('nota', '')
-        
-        db.session.add(allocation)
-        db.session.commit()
-        
-        return jsonify({
-            'id': allocation.id,
-            'message': 'Alocação criada'
-        }), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        logging.error(f"API CREATE ERROR: {str(e)}")
-        return jsonify({'error': 'Erro interno'}), 500
-
-@equipe_bp.route('/api/allocations/<int:allocation_id>', methods=['DELETE'])
-@login_required
-@admin_required
-def api_delete_allocation(allocation_id):
-    """API: Deletar alocação"""
-    try:
-        admin_id = get_admin_id()
-        
-        allocation = Allocation.query.filter_by(id=allocation_id, admin_id=admin_id).first()
-        if not allocation:
-            return jsonify({'error': 'Não encontrada'}), 404
-        
-        db.session.delete(allocation)
-        db.session.commit()
-        
-        return jsonify({'message': 'Removida'})
-        
-    except Exception as e:
-        db.session.rollback()
-        logging.error(f"API DELETE ERROR: {str(e)}")
-        return jsonify({'error': 'Erro interno'}), 500
-
 # ===================================  
-# FASE 1: APIs ULTRA SIMPLES - TESTE
-# SEGUINDO PLANO REALISTA EXATAMENTE
+# ROTAS REMOVIDAS - Duplicadas e inseguras
+# Mantendo apenas versões RESTful completas
 # ===================================
-
-# FUNÇÃO REMOVIDA - usar get_admin_id() consolidada
 
 @equipe_bp.route('/api/test', methods=['GET'])
 @login_required
@@ -289,8 +223,8 @@ def get_allocations_simples():
         
         result = []
         for alloc in allocations:
-            # Buscar obra (sem relacionamento por enquanto)
-            obra = Obra.query.get(alloc.obra_id)
+            # Buscar obra (COM VALIDAÇÃO DE ADMIN_ID)
+            obra = Obra.query.filter_by(id=alloc.obra_id, admin_id=admin_id).first()
             obra_nome = obra.nome if obra else f"Obra ID {alloc.obra_id}"
             obra_codigo = obra.codigo if obra else f"#{alloc.obra_id}"
             
@@ -326,8 +260,10 @@ def get_allocations_simples():
 # ===================================
 
 @equipe_bp.route('/teste-sem-auth')
+@login_required
+@admin_required
 def teste_sem_auth():
-    """Teste básico - sem autenticação"""
+    """Teste básico - AGORA COM autenticação"""
     return """
     <!DOCTYPE html>
     <html>
@@ -352,8 +288,10 @@ def teste_sem_auth():
     """
 
 @equipe_bp.route('/debug/test-direct')
+@login_required
+@admin_required
 def debug_test_direct():
-    """API de teste - sem autenticação"""
+    """API de teste - AGORA COM autenticação"""
     import datetime
     return jsonify({
         'status': 'API funcionando',
@@ -512,8 +450,8 @@ def api_remover_obra_restful(obra_id, data_alocacao):
                 'error': 'Alocação não encontrada'
             }), 404
         
-        # Buscar dados da obra para retorno
-        obra = Obra.query.get(obra_id)
+        # Buscar dados da obra para retorno - COM VALIDAÇÃO DE ADMIN_ID
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         obra_codigo = obra.codigo if obra else f"#{obra_id}"
         
         # Deletar alocação
@@ -613,5 +551,380 @@ def api_allocations_week():
         traceback.print_exc()
         return jsonify({
             'success': False, 
+            'error': 'Erro interno do servidor'
+        }), 500
+
+# ===================================  
+# MÓDULO GESTÃO DE FUNCIONÁRIOS EM ALOCAÇÕES
+# APIs REST para gerenciar funcionários nas alocações de equipe
+# ===================================
+
+@equipe_bp.route('/api/allocation/<int:allocation_id>/funcionarios', methods=['GET'])
+@login_required
+@admin_required
+def api_get_allocation_funcionarios(allocation_id):
+    """API REST: Listar funcionários de uma alocação específica"""
+    try:
+        admin_id = get_admin_id()
+        
+        # Verificar se allocation existe e pertence ao admin
+        allocation = Allocation.query.filter_by(
+            id=allocation_id, 
+            admin_id=admin_id
+        ).first()
+        
+        if not allocation:
+            return jsonify({
+                'success': False,
+                'error': 'Alocação não encontrada'
+            }), 404
+        
+        # Buscar obra para informações adicionais - COM VALIDAÇÃO DE ADMIN_ID
+        obra = Obra.query.filter_by(id=allocation.obra_id, admin_id=admin_id).first()
+        
+        # Funcionários já alocados nesta allocation
+        funcionarios_alocados = db.session.query(AllocationEmployee, Funcionario).join(
+            Funcionario, AllocationEmployee.funcionario_id == Funcionario.id
+        ).filter(
+            AllocationEmployee.allocation_id == allocation_id
+        ).order_by(Funcionario.nome).all()
+        
+        # Funcionários disponíveis (ativos do admin)
+        funcionarios_disponiveis = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        # Serializar funcionários alocados
+        alocados_data = []
+        for alloc_emp, funcionario in funcionarios_alocados:
+            alocados_data.append({
+                'allocation_employee_id': alloc_emp.id,
+                'funcionario_id': funcionario.id,
+                'funcionario_nome': funcionario.nome,
+                'funcionario_codigo': funcionario.codigo,
+                'turno_inicio': alloc_emp.turno_inicio.strftime('%H:%M') if alloc_emp.turno_inicio else '08:00',
+                'turno_fim': alloc_emp.turno_fim.strftime('%H:%M') if alloc_emp.turno_fim else '17:00',
+                'papel': alloc_emp.papel or '',
+                'observacao': alloc_emp.observacao or '',
+                'created_at': alloc_emp.created_at.isoformat()
+            })
+        
+        # Serializar funcionários disponíveis
+        disponiveis_data = []
+        for funcionario in funcionarios_disponiveis:
+            disponiveis_data.append({
+                'id': funcionario.id,
+                'nome': funcionario.nome,
+                'codigo': funcionario.codigo,
+                'funcao': funcionario.funcao_ref.nome if funcionario.funcao_ref else '',
+                'departamento': funcionario.departamento_ref.nome if funcionario.departamento_ref else ''
+            })
+        
+        return jsonify({
+            'success': True,
+            'allocation': {
+                'id': allocation.id,
+                'obra_id': allocation.obra_id,
+                'obra_codigo': obra.codigo if obra else f"#{allocation.obra_id}",
+                'obra_nome': obra.nome if obra else "Obra não encontrada",
+                'data_alocacao': allocation.data_alocacao.isoformat(),
+                'turno_inicio': allocation.turno_inicio.strftime('%H:%M') if allocation.turno_inicio else '08:00',
+                'turno_fim': allocation.turno_fim.strftime('%H:%M') if allocation.turno_fim else '17:00',
+                'nota': allocation.nota or ''
+            },
+            'funcionarios_alocados': alocados_data,
+            'funcionarios_disponiveis': disponiveis_data,
+            'total_alocados': len(alocados_data),
+            'total_disponiveis': len(disponiveis_data)
+        })
+        
+    except Exception as e:
+        logging.error(f"API GET ALLOCATION FUNCIONARIOS ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+
+@equipe_bp.route('/api/allocation-employee', methods=['POST'])
+@login_required
+@admin_required
+def api_create_allocation_employee():
+    """API REST: Adicionar funcionário à alocação"""
+    try:
+        admin_id = get_admin_id()
+        data = request.get_json()
+        
+        # Validações de input
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Dados não fornecidos'
+            }), 400
+        
+        allocation_id = data.get('allocation_id')
+        funcionario_id = data.get('funcionario_id')
+        
+        if not allocation_id or not funcionario_id:
+            return jsonify({
+                'success': False,
+                'error': 'Campos obrigatórios: allocation_id, funcionario_id'
+            }), 400
+        
+        # Verificar se allocation existe e pertence ao admin
+        allocation = Allocation.query.filter_by(
+            id=allocation_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not allocation:
+            return jsonify({
+                'success': False,
+                'error': 'Alocação não encontrada'
+            }), 404
+        
+        # Verificar se funcionário existe, ativo e pertence ao admin
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id,
+            ativo=True
+        ).first()
+        
+        if not funcionario:
+            return jsonify({
+                'success': False,
+                'error': 'Funcionário não encontrado ou inativo'
+            }), 404
+        
+        # Verificar duplicação (mesmo funcionário na mesma allocation)
+        existing = AllocationEmployee.query.filter_by(
+            allocation_id=allocation_id,
+            funcionario_id=funcionario_id
+        ).first()
+        
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': f'Funcionário {funcionario.nome} já está alocado nesta obra/dia'
+            }), 409
+        
+        # Verificar conflito de data (funcionário em outra obra no mesmo dia)
+        conflicting_allocation = db.session.query(AllocationEmployee, Allocation).join(
+            Allocation, AllocationEmployee.allocation_id == Allocation.id
+        ).filter(
+            AllocationEmployee.funcionario_id == funcionario_id,
+            Allocation.data_alocacao == allocation.data_alocacao,
+            Allocation.admin_id == admin_id,
+            AllocationEmployee.allocation_id != allocation_id
+        ).first()
+        
+        if conflicting_allocation:
+            conflicting_obra = Obra.query.filter_by(id=conflicting_allocation[1].obra_id, admin_id=admin_id).first()
+            obra_nome = conflicting_obra.codigo if conflicting_obra else f"Obra #{conflicting_allocation[1].obra_id}"
+            return jsonify({
+                'success': False,
+                'error': f'Funcionário {funcionario.nome} já está alocado na obra {obra_nome} neste dia'
+            }), 409
+        
+        # Validar e processar horários
+        turno_inicio_str = data.get('turno_inicio', '08:00')
+        turno_fim_str = data.get('turno_fim', '17:00')
+        
+        try:
+            turno_inicio = datetime.strptime(turno_inicio_str, '%H:%M').time()
+            turno_fim = datetime.strptime(turno_fim_str, '%H:%M').time()
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Formato de horário inválido. Use HH:MM (ex: 08:00)'
+            }), 400
+        
+        # Criar AllocationEmployee
+        allocation_employee = AllocationEmployee()
+        allocation_employee.allocation_id = allocation_id
+        allocation_employee.funcionario_id = funcionario_id
+        allocation_employee.turno_inicio = turno_inicio
+        allocation_employee.turno_fim = turno_fim
+        allocation_employee.papel = data.get('papel', funcionario.funcao_ref.nome if funcionario.funcao_ref else '')
+        allocation_employee.observacao = data.get('observacao', '')
+        
+        db.session.add(allocation_employee)
+        db.session.commit()
+        
+        # Buscar dados da obra para retorno - COM VALIDAÇÃO DE ADMIN_ID
+        obra = Obra.query.filter_by(id=allocation.obra_id, admin_id=admin_id).first()
+        
+        return jsonify({
+            'success': True,
+            'allocation_employee_id': allocation_employee.id,
+            'funcionario_nome': funcionario.nome,
+            'funcionario_codigo': funcionario.codigo,
+            'obra_codigo': obra.codigo if obra else f"#{allocation.obra_id}",
+            'data_alocacao': allocation.data_alocacao.isoformat(),
+            'turno_inicio': allocation_employee.turno_inicio.strftime('%H:%M'),
+            'turno_fim': allocation_employee.turno_fim.strftime('%H:%M'),
+            'papel': allocation_employee.papel,
+            'message': f'Funcionário {funcionario.nome} adicionado com sucesso'
+        }), 201
+        
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Erro de integridade: funcionário já pode estar alocado'
+        }), 409
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"API CREATE ALLOCATION EMPLOYEE ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+
+@equipe_bp.route('/api/allocation-employee/<int:allocation_employee_id>', methods=['PUT'])
+@login_required
+@admin_required
+def api_update_allocation_employee(allocation_employee_id):
+    """API REST: Atualizar funcionário alocado"""
+    try:
+        admin_id = get_admin_id()
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Dados não fornecidos'
+            }), 400
+        
+        # Buscar AllocationEmployee e verificar se pertence ao admin
+        allocation_employee = db.session.query(AllocationEmployee, Allocation).join(
+            Allocation, AllocationEmployee.allocation_id == Allocation.id
+        ).filter(
+            AllocationEmployee.id == allocation_employee_id,
+            Allocation.admin_id == admin_id
+        ).first()
+        
+        if not allocation_employee:
+            return jsonify({
+                'success': False,
+                'error': 'Funcionário alocado não encontrado'
+            }), 404
+        
+        alloc_emp, allocation = allocation_employee
+        
+        # Validar e processar horários se fornecidos
+        if 'turno_inicio' in data:
+            try:
+                turno_inicio = datetime.strptime(data['turno_inicio'], '%H:%M').time()
+                alloc_emp.turno_inicio = turno_inicio
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Formato de turno_inicio inválido. Use HH:MM'
+                }), 400
+        
+        if 'turno_fim' in data:
+            try:
+                turno_fim = datetime.strptime(data['turno_fim'], '%H:%M').time()
+                alloc_emp.turno_fim = turno_fim
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Formato de turno_fim inválido. Use HH:MM'
+                }), 400
+        
+        # Atualizar outros campos se fornecidos
+        if 'papel' in data:
+            alloc_emp.papel = data['papel']
+        
+        if 'observacao' in data:
+            alloc_emp.observacao = data['observacao']
+        
+        db.session.commit()
+        
+        # Buscar dados do funcionário e obra para retorno - COM VALIDAÇÃO DE ADMIN_ID
+        funcionario = Funcionario.query.filter_by(id=alloc_emp.funcionario_id, admin_id=admin_id).first()
+        obra = Obra.query.filter_by(id=allocation.obra_id, admin_id=admin_id).first()
+        
+        return jsonify({
+            'success': True,
+            'allocation_employee_id': alloc_emp.id,
+            'funcionario_nome': funcionario.nome if funcionario else 'Funcionário não encontrado',
+            'funcionario_codigo': funcionario.codigo if funcionario else '',
+            'obra_codigo': obra.codigo if obra else f"#{allocation.obra_id}",
+            'data_alocacao': allocation.data_alocacao.isoformat(),
+            'turno_inicio': alloc_emp.turno_inicio.strftime('%H:%M'),
+            'turno_fim': alloc_emp.turno_fim.strftime('%H:%M'),
+            'papel': alloc_emp.papel or '',
+            'observacao': alloc_emp.observacao or '',
+            'message': 'Funcionário alocado atualizado com sucesso'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"API UPDATE ALLOCATION EMPLOYEE ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+
+@equipe_bp.route('/api/allocation-employee/<int:allocation_employee_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def api_delete_allocation_employee(allocation_employee_id):
+    """API REST: Remover funcionário da alocação"""
+    try:
+        admin_id = get_admin_id()
+        
+        # Buscar AllocationEmployee e verificar se pertence ao admin
+        allocation_employee = db.session.query(AllocationEmployee, Allocation, Funcionario).join(
+            Allocation, AllocationEmployee.allocation_id == Allocation.id
+        ).join(
+            Funcionario, AllocationEmployee.funcionario_id == Funcionario.id
+        ).filter(
+            AllocationEmployee.id == allocation_employee_id,
+            Allocation.admin_id == admin_id
+        ).first()
+        
+        if not allocation_employee:
+            return jsonify({
+                'success': False,
+                'error': 'Funcionário alocado não encontrado'
+            }), 404
+        
+        alloc_emp, allocation, funcionario = allocation_employee
+        
+        # Buscar dados da obra para retorno - COM VALIDAÇÃO DE ADMIN_ID
+        obra = Obra.query.filter_by(id=allocation.obra_id, admin_id=admin_id).first()
+        
+        # Preparar dados para retorno antes da deleção
+        response_data = {
+            'success': True,
+            'funcionario_nome': funcionario.nome,
+            'funcionario_codigo': funcionario.codigo,
+            'obra_codigo': obra.codigo if obra else f"#{allocation.obra_id}",
+            'data_alocacao': allocation.data_alocacao.isoformat(),
+            'message': f'Funcionário {funcionario.nome} removido da alocação com sucesso'
+        }
+        
+        # Deletar AllocationEmployee
+        db.session.delete(alloc_emp)
+        db.session.commit()
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"API DELETE ALLOCATION EMPLOYEE ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
             'error': 'Erro interno do servidor'
         }), 500

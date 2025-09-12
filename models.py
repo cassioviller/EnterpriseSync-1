@@ -2580,6 +2580,9 @@ class AllocationEmployee(db.Model):
     # Relacionamentos
     funcionario = db.relationship('Funcionario', backref='allocations')
     
+    # CONSTRAINT ÚNICO CRÍTICO PARA SEGURANÇA - EVITA DUPLICAÇÃO
+    __table_args__ = (db.UniqueConstraint('allocation_id', 'funcionario_id', name='_allocation_employee_uc'),)
+    
     def __repr__(self):
         return f'<AllocationEmployee {self.funcionario.nome} - {self.allocation.obra.nome}>'
     
