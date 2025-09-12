@@ -974,7 +974,7 @@
     }
     
     @media (max-width: 576px) {
-        /* Grid semanal em scroll horizontal para celulares */
+        /* Grid semanal em scroll horizontal para celulares - FORÇA UMA LINHA */
         .weekly-grid-container {
             overflow-x: auto;
             padding-bottom: 10px;
@@ -982,6 +982,8 @@
         
         .weekly-grid {
             min-width: 600px;
+            display: flex !important;
+            flex-wrap: nowrap !important;
         }
         
         /* Cabeçalhos menores */
@@ -1166,13 +1168,24 @@
         -webkit-box-orient: vertical;
     }
     
-    /* CALENDÁRIO EXPANDIDO */
+    /* CALENDÁRIO EXPANDIDO - SEMPRE UMA LINHA HORIZONTAL */
     .weekly-grid-container {
         padding: 16px 20px;
+        overflow-x: auto; /* Scroll horizontal se necessário */
+    }
+    
+    .weekly-grid {
+        display: flex !important;
+        flex-wrap: nowrap !important; /* NUNCA quebra linha */
+        min-width: 100%;
+        gap: 0.5rem;
     }
     
     .weekly-grid .col {
-        padding: 0 8px;
+        flex: 1 1 0px !important; /* Cada dia ocupa espaço igual */
+        min-width: 0; /* Permite reduzir se necessário */
+        padding: 0 4px;
+        max-width: none !important; /* Remove limitações Bootstrap */
     }
     
     .drop-zone {
@@ -1256,6 +1269,11 @@
         /* Calendário otimizado para tablet */
         .weekly-grid-container {
             padding: 12px;
+            overflow-x: auto; /* Permite scroll se necessário */
+        }
+        
+        .weekly-grid {
+            min-width: 700px; /* Garante espaço mínimo para 7 dias */
         }
         
         .drop-zone {
@@ -1279,7 +1297,11 @@
         }
         
         .weekly-grid {
-            min-width: 500px; /* Scroll horizontal para semana */
+            min-width: 580px; /* Scroll horizontal para semana - largura ajustada */
+        }
+        
+        .weekly-grid .col {
+            min-width: 80px; /* Largura mínima para cada dia */
         }
         
         .drop-zone {
