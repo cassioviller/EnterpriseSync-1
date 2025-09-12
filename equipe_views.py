@@ -654,7 +654,8 @@ def api_create_allocation_employee():
         allocation_employee.observacao = data.get('observacao', '')
         
         # NOVA FUNCIONALIDADE: Definir tipo de lançamento automaticamente
-        allocation_employee.tipo_lancamento = allocation_employee.get_tipo_lancamento_automatico()
+        # Passar data da alocação como parâmetro para evitar erro de relacionamento None
+        allocation_employee.tipo_lancamento = allocation_employee.get_tipo_lancamento_automatico(allocation.data_alocacao)
         
         db.session.add(allocation_employee)
         db.session.commit()

@@ -2611,11 +2611,32 @@ class AllocationEmployee(db.Model):
         """Verifica se deve gerar registro de ponto automaticamente"""
         return not self.sincronizado_ponto
 
-    def get_tipo_lancamento_automatico(self):
-        """Determina tipo de lançamento baseado no dia da semana"""
+    def get_tipo_lancamento_automatico(self, data_alocacao=None):
+        """Determina tipo de lançamento baseado no dia da semana
+        
+        Args:
+            data_alocacao (date, optional): Data da alocação. Se não fornecida, usa self.allocation.data_alocacao
+        """
         from app import db
         
-        dia_semana = self.allocation.data_alocacao.weekday()  # 0=Monday, 6=Sunday
+        # Usar parâmetro se fornecido, senão tentar usar relacionamento
+        if data_alocacao:
+            target_date = data_alocacao
+        elif self.allocation:
+            target_date = self.allocation.data_alocacao
+        else:
+            # Fallback: tentar carregar allocation manualmente
+            try:
+                allocation = db.session.query(Allocation).filter_by(id=self.allocation_id).first()
+                if allocation:
+                    target_date = allocation.data_alocacao
+                else:
+                    # Se não conseguir carregar, assumir dia útil como padrão
+                    return 'trabalho_normal'
+            except:
+                return 'trabalho_normal'
+        
+        dia_semana = target_date.weekday()  # 0=Monday, 6=Sunday
         
         if dia_semana < 5:  # Segunda a Sexta (0-4)
             return 'trabalho_normal'
@@ -2837,7 +2858,8 @@ def sincronizar_alocacao_com_horario_funcionario(allocation_employee_id, admin_i
         allocation_emp.turno_fim = horario.saida
         
         # Definir tipo de lançamento baseado no dia
-        allocation_emp.tipo_lancamento = allocation_emp.get_tipo_lancamento_automatico()
+        # Usar data da alocação como parâmetro para garantir que funcione sempre
+        allocation_emp.tipo_lancamento = allocation_emp.get_tipo_lancamento_automatico(allocation_emp.allocation.data_alocacao)
         
         try:
             db.session.commit()
