@@ -1,0 +1,835 @@
+# PROMPT - CORREÇÃO E MELHORIA DOS CARDS DE GESTÃO DE EQUIPE
+
+## 🎯 ANÁLISE DOS PROBLEMAS IDENTIFICADOS
+
+**PROBLEMAS ATUAIS:**
+1. ❌ **Cards sem botões de ação** - Não aparecem mais os botões de editar/excluir
+2. ❌ **Modal não abre** - Clique no card não abre modal de funcionários
+3. ❌ **Sem persistência** - Obras não estão sendo salvas nas alocações
+4. ❌ **Layout dos cards** - Precisa otimizar espaço e melhorar visual
+
+**MELHORIAS SOLICITADAS:**
+1. ✅ **Card simplificado**: Apenas nome da obra + lista de funcionários
+2. ✅ **Funcionários otimizados**: Primeiro e segundo nome apenas
+3. ✅ **Botões reposicionados**: No lugar da quantidade, botões menores
+4. ✅ **Funcionalidade restaurada**: Modal e persistência funcionando
+
+## 🏗️ IMPLEMENTAÇÃO COMPLETA
+
+### FASE 1: CORRIGIR PERSISTÊNCIA DAS ALOCAÇÕES
+
+#### 1.1 VERIFICAR E CORRIGIR API DE ALOCAÇÃO
+
+```python
+# VERIFICAR/CORRIGIR EM equipe_views.py
+
+@equipe_bp.route('/api/allocations', methods=['POST'])
+@login_required
+@admin_required
+def api_alocar_obra_restful():
+    """API REST: Criar nova alocação com local (campo/oficina)"""
+    try:
+        admin_id = get_admin_id()
+        data = request.get_json()
+        
+        # Log para debug
+        logging.info(f"🎯 RECEBENDO ALOCAÇÃO: {data}")
+        
+        # Validações obrigatórias
+        required_fields = ['obra_id', 'data_alocacao', 'day_of_week']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'error': f'Campo obrigatório: {field}'
+                }), 400
+        
+        obra_id = data['obra_id']
+        data_alocacao_str = data['data_alocacao']
+        day_of_week = data['day_of_week']
+        local_trabalho = data.get('local_trabalho', 'campo')  # Padrão campo
+        
+        # Validar local
+        if local_trabalho not in ['campo', 'oficina']:
+            return jsonify({
+                'success': False,
+                'error': 'Local deve ser "campo" ou "oficina"'
+            }), 400
+        
+        # Parse da data
+        try:
+            data_alocacao = datetime.strptime(data_alocacao_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Formato de data inválido. Use YYYY-MM-DD'
+            }), 400
+        
+        # Verificar se obra existe e pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({
+                'success': False,
+                'error': 'Obra não encontrada'
+            }), 404
+        
+        # Verificar se já existe alocação para esta obra/data/local
+        existing = Allocation.query.filter_by(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            data_alocacao=data_alocacao,
+            local_trabalho=local_trabalho
+        ).first()
+        
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': f'Obra {obra.codigo} já está alocada em {local_trabalho} neste dia'
+            }), 409
+        
+        # Criar nova alocação
+        allocation = Allocation(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            data_alocacao=data_alocacao,
+            local_trabalho=local_trabalho,
+            turno_inicio=time(8, 0),
+            turno_fim=time(17, 0),
+            nota=data.get('nota', '')
+        )
+        
+        db.session.add(allocation)
+        db.session.commit()
+        
+        logging.info(f"✅ ALOCAÇÃO CRIADA: ID={allocation.id}, Obra={obra.codigo}, Local={local_trabalho}")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'allocation_id': allocation.id,
+                'obra_id': obra.id,
+                'obra_codigo': obra.codigo,
+                'obra_nome': obra.nome,
+                'data_alocacao': data_alocacao.isoformat(),
+                'local_trabalho': local_trabalho,
+                'day_of_week': day_of_week
+            },
+            'message': f'Obra {obra.codigo} alocada em {local_trabalho.title()} com sucesso'
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"❌ ERRO ao alocar obra: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+```
+
+#### 1.2 CORRIGIR API DE LISTAGEM COM LOCAL
+
+```python
+# CORRIGIR EM equipe_views.py
+
+@equipe_bp.route('/api/allocations-week', methods=['GET'])
+@login_required
+@admin_required
+def api_get_allocations_week():
+    """API REST: Listar alocações da semana separadas por local"""
+    try:
+        admin_id = get_admin_id()
+        week_start = request.args.get('week_start')
+        
+        logging.info(f"🔍 BUSCANDO ALOCAÇÕES - Admin: {admin_id}, Semana: {week_start}")
+        
+        # Parse da data ou usa semana atual
+        if week_start:
+            start_date = datetime.strptime(week_start, '%Y-%m-%d').date()
+        else:
+            today = date.today()
+            start_date = get_sunday_of_week(today)
+        
+        end_date = start_date + timedelta(days=6)
+        
+        # Buscar alocações da semana com JOIN para obra
+        allocations = db.session.query(Allocation, Obra).join(Obra).filter(
+            Allocation.admin_id == admin_id,
+            Allocation.data_alocacao >= start_date,
+            Allocation.data_alocacao <= end_date
+        ).order_by(Allocation.data_alocacao, Allocation.local_trabalho, Obra.codigo).all()
+        
+        logging.info(f"📊 ENCONTRADAS {len(allocations)} alocações")
+        
+        # Organizar por dia e local
+        week_data = {}
+        day_names = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+        
+        for i in range(7):  # Domingo a Sábado
+            day_date = start_date + timedelta(days=i)
+            week_data[i] = {
+                'date': day_date.isoformat(),
+                'day_name': day_names[i],
+                'campo': [],
+                'oficina': []
+            }
+        
+        # Processar alocações
+        for allocation, obra in allocations:
+            # Converter weekday do Python (0=Mon) para nosso sistema (0=Sun)
+            sunday_day_of_week = convert_to_sunday_weekday(allocation.data_alocacao.weekday())
+            
+            if sunday_day_of_week in week_data:
+                # Buscar funcionários alocados
+                funcionarios_count = AllocationEmployee.query.filter_by(
+                    allocation_id=allocation.id
+                ).count()
+                
+                # Buscar nomes dos funcionários para exibição
+                funcionarios_alocados = db.session.query(
+                    AllocationEmployee, Funcionario
+                ).join(Funcionario).filter(
+                    AllocationEmployee.allocation_id == allocation.id
+                ).order_by(Funcionario.nome).all()
+                
+                funcionarios_nomes = []
+                for ae, func in funcionarios_alocados:
+                    # Primeiro e segundo nome apenas
+                    nome_parts = func.nome.split()
+                    nome_curto = ' '.join(nome_parts[:2]) if len(nome_parts) >= 2 else nome_parts[0]
+                    funcionarios_nomes.append(nome_curto)
+                
+                allocation_data = {
+                    'id': allocation.id,
+                    'obra_id': obra.id,
+                    'obra_codigo': obra.codigo,
+                    'obra_nome': obra.nome,
+                    'data_alocacao': allocation.data_alocacao.isoformat(),
+                    'local_trabalho': allocation.local_trabalho,
+                    'turno_inicio': allocation.turno_inicio.strftime('%H:%M') if allocation.turno_inicio else '08:00',
+                    'turno_fim': allocation.turno_fim.strftime('%H:%M') if allocation.turno_fim else '17:00',
+                    'funcionarios_count': funcionarios_count,
+                    'funcionarios_nomes': funcionarios_nomes,
+                    'nota': allocation.nota or ''
+                }
+                
+                # Adicionar ao local correto
+                local = allocation.local_trabalho or 'campo'
+                week_data[sunday_day_of_week][local].append(allocation_data)
+        
+        return jsonify({
+            'success': True,
+            'data': week_data,
+            'week_start': start_date.isoformat(),
+            'week_end': end_date.isoformat(),
+            'total_allocations': len(allocations)
+        })
+        
+    except Exception as e:
+        logging.error(f"❌ ERRO ao buscar alocações da semana: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+```
+
+### FASE 2: CORRIGIR LAYOUT DOS CARDS
+
+#### 2.1 NOVO CSS PARA CARDS OTIMIZADOS
+
+```css
+/* SUBSTITUIR CSS DOS CARDS NO TEMPLATE */
+
+/* ================================
+   CARDS DE OBRA OTIMIZADOS
+   ================================ */
+
+.obra-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    min-height: 80px;
+}
+
+.obra-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-color: #007bff;
+}
+
+.obra-card.campo {
+    border-left: 4px solid #28a745;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fff9 100%);
+}
+
+.obra-card.oficina {
+    border-left: 4px solid #007bff;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+}
+
+/* Cabeçalho do card - Nome da obra */
+.obra-card-header {
+    display: flex;
+    justify-content: between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.obra-card-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #495057;
+    line-height: 1.2;
+    flex: 1;
+    margin-right: 0.5rem;
+}
+
+/* Botões de ação - pequenos no canto superior direito */
+.obra-card-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.obra-card-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.obra-card-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.obra-card-btn.btn-funcionarios {
+    background: #28a745;
+    color: white;
+}
+
+.obra-card-btn.btn-funcionarios:hover {
+    background: #218838;
+}
+
+.obra-card-btn.btn-delete {
+    background: #dc3545;
+    color: white;
+}
+
+.obra-card-btn.btn-delete:hover {
+    background: #c82333;
+}
+
+/* Lista de funcionários */
+.obra-funcionarios-list {
+    margin-top: 0.5rem;
+}
+
+.funcionario-item {
+    display: inline-block;
+    background: rgba(0,123,255,0.1);
+    color: #0056b3;
+    padding: 0.2rem 0.4rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    margin-right: 0.3rem;
+    margin-bottom: 0.2rem;
+    border: 1px solid rgba(0,123,255,0.2);
+}
+
+.funcionario-item.campo {
+    background: rgba(40,167,69,0.1);
+    color: #155724;
+    border-color: rgba(40,167,69,0.2);
+}
+
+.funcionario-item.oficina {
+    background: rgba(0,123,255,0.1);
+    color: #0056b3;
+    border-color: rgba(0,123,255,0.2);
+}
+
+/* Estado vazio */
+.obra-funcionarios-empty {
+    color: #6c757d;
+    font-size: 0.7rem;
+    font-style: italic;
+    margin-top: 0.25rem;
+}
+
+/* Horário da obra */
+.obra-horario {
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.obra-horario i {
+    font-size: 0.6rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .obra-card {
+        padding: 0.5rem;
+        min-height: 70px;
+    }
+    
+    .obra-card-title {
+        font-size: 0.8rem;
+    }
+    
+    .obra-card-btn {
+        width: 20px;
+        height: 20px;
+        font-size: 0.6rem;
+    }
+    
+    .funcionario-item {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.3rem;
+    }
+}
+
+/* Animação de loading */
+.obra-card.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.obra-card.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+```
+
+#### 2.2 FUNÇÃO PARA RENDERIZAR CARDS OTIMIZADOS
+
+```javascript
+// ADICIONAR/SUBSTITUIR NO JAVASCRIPT DO TEMPLATE
+
+function renderObraCard(allocation, local) {
+    const card = document.createElement('div');
+    card.className = `obra-card ${local}`;
+    card.dataset.allocationId = allocation.id;
+    card.dataset.obraId = allocation.obra_id;
+    
+    // Preparar lista de funcionários
+    let funcionariosHtml = '';
+    if (allocation.funcionarios_nomes && allocation.funcionarios_nomes.length > 0) {
+        funcionariosHtml = allocation.funcionarios_nomes.map(nome => 
+            `<span class="funcionario-item ${local}">${nome}</span>`
+        ).join('');
+    } else {
+        funcionariosHtml = '<div class="obra-funcionarios-empty">Nenhum funcionário alocado</div>';
+    }
+    
+    card.innerHTML = `
+        <div class="obra-card-header">
+            <div class="obra-card-title">${allocation.obra_codigo}</div>
+            <div class="obra-card-actions">
+                <button class="obra-card-btn btn-funcionarios" 
+                        onclick="event.stopPropagation(); abrirModalFuncionarios(${allocation.id})"
+                        title="Gerenciar funcionários">
+                    <i class="fas fa-users"></i>
+                </button>
+                <button class="obra-card-btn btn-delete" 
+                        onclick="event.stopPropagation(); confirmarExclusaoObra(${allocation.id})"
+                        title="Remover obra">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="obra-funcionarios-list">
+            ${funcionariosHtml}
+        </div>
+        
+        <div class="obra-horario">
+            <i class="fas fa-clock"></i>
+            ${allocation.turno_inicio} - ${allocation.turno_fim}
+        </div>
+    `;
+    
+    // Adicionar evento de clique para abrir modal
+    card.addEventListener('click', function(e) {
+        if (!e.target.closest('.obra-card-btn')) {
+            abrirModalFuncionarios(allocation.id);
+        }
+    });
+    
+    return card;
+}
+
+function renderAllocationsInDropZone(dayOfWeek, local, allocations) {
+    const dropZone = document.querySelector(`[data-day="${dayOfWeek}"][data-local="${local}"]`);
+    if (!dropZone) {
+        console.warn(`❌ Drop zone não encontrada: day=${dayOfWeek}, local=${local}`);
+        return;
+    }
+    
+    // Limpar zona
+    dropZone.innerHTML = '';
+    
+    if (allocations.length === 0) {
+        // Mostrar placeholder
+        dropZone.innerHTML = `
+            <small class="text-muted">Arraste obras para ${local === 'campo' ? 'o campo' : 'a oficina'}</small>
+        `;
+        return;
+    }
+    
+    // Renderizar cards das obras
+    allocations.forEach(allocation => {
+        const card = renderObraCard(allocation, local);
+        dropZone.appendChild(card);
+    });
+    
+    console.log(`✅ Renderizadas ${allocations.length} obras em ${local} - dia ${dayOfWeek}`);
+}
+```
+
+### FASE 3: CORRIGIR DRAG & DROP E MODAL
+
+#### 3.1 FUNÇÃO DE DRAG & DROP CORRIGIDA
+
+```javascript
+// CORRIGIR FUNÇÃO DE DROP
+
+async function handleDrop(event) {
+    event.preventDefault();
+    
+    const dropZone = event.currentTarget;
+    const day = parseInt(dropZone.dataset.day);
+    const local = dropZone.dataset.local;
+    const obraId = event.dataTransfer.getData('text/plain');
+    
+    if (!obraId || !local) {
+        console.error('❌ Dados de drop inválidos:', { obraId, local, day });
+        return;
+    }
+    
+    try {
+        console.log(`🎯 Iniciando drop: Obra ${obraId} → Dia ${day} → ${local}`);
+        
+        // Mostrar loading
+        dropZone.classList.add('dropping');
+        
+        // Calcular data do dia
+        const targetDate = getDateForDay(day);
+        
+        const response = await fetch('/equipe/api/allocations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                obra_id: parseInt(obraId),
+                data_alocacao: targetDate,
+                local_trabalho: local,
+                day_of_week: day
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao alocar obra');
+        }
+        
+        console.log(`✅ Obra alocada com sucesso:`, result.data);
+        
+        // Recarregar alocações para atualizar interface
+        await loadWeekAllocations();
+        
+        // Mostrar feedback visual
+        showSuccessMessage(`Obra ${result.data.obra_codigo} alocada em ${local.toUpperCase()} com sucesso!`);
+        
+    } catch (error) {
+        console.error(`❌ Erro no drop:`, error);
+        showErrorMessage(`Erro: ${error.message}`);
+    } finally {
+        dropZone.classList.remove('dropping');
+    }
+}
+
+function getDateForDay(dayOfWeek) {
+    const startDate = new Date(currentWeekStart);
+    const targetDate = new Date(startDate);
+    targetDate.setDate(startDate.getDate() + dayOfWeek);
+    return targetDate.toISOString().split('T')[0];
+}
+```
+
+#### 3.2 FUNÇÃO PARA ABRIR MODAL CORRIGIDA
+
+```javascript
+// CORRIGIR FUNÇÃO DO MODAL
+
+async function abrirModalFuncionarios(allocationId) {
+    try {
+        console.log(`🔍 Abrindo modal para alocação ${allocationId}`);
+        
+        // Buscar dados da alocação
+        const response = await fetch(`/equipe/api/allocation/${allocationId}/funcionarios`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao carregar funcionários');
+        }
+        
+        const data = result.data;
+        
+        // Atualizar título do modal
+        const modalTitle = document.getElementById('modalFuncionariosTitle');
+        if (modalTitle) {
+            modalTitle.textContent = `${data.obra_codigo} - ${data.obra_nome}`;
+        }
+        
+        // Renderizar funcionários alocados
+        renderFuncionariosAlocados(data.funcionarios_alocados);
+        
+        // Renderizar funcionários disponíveis
+        renderFuncionariosDisponiveis(data.funcionarios_disponiveis);
+        
+        // Armazenar ID da alocação atual
+        window.currentAllocationId = allocationId;
+        
+        // Abrir modal
+        const modal = new bootstrap.Modal(document.getElementById('modalFuncionarios'));
+        modal.show();
+        
+        console.log(`✅ Modal aberto para alocação ${allocationId}`);
+        
+    } catch (error) {
+        console.error(`❌ Erro ao abrir modal:`, error);
+        showErrorMessage(`Erro ao abrir modal: ${error.message}`);
+    }
+}
+
+function renderFuncionariosAlocados(funcionarios) {
+    const container = document.getElementById('funcionarios-alocados');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (funcionarios.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-3">
+                <i class="fas fa-users fa-2x mb-2"></i>
+                <p>Nenhum funcionário alocado</p>
+            </div>
+        `;
+        return;
+    }
+    
+    funcionarios.forEach(func => {
+        const funcElement = document.createElement('div');
+        funcElement.className = 'funcionario-alocado-item';
+        funcElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-2">
+                <div class="flex-grow-1">
+                    <strong>${func.funcionario_nome}</strong>
+                    <small class="text-muted d-block">${func.funcionario_codigo}</small>
+                    <small class="text-info">${func.turno_inicio} - ${func.turno_fim}</small>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" 
+                        onclick="removerFuncionario(${func.allocation_employee_id})"
+                        title="Remover funcionário">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(funcElement);
+    });
+}
+
+function renderFuncionariosDisponiveis(funcionarios) {
+    const container = document.getElementById('funcionarios-disponiveis');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    funcionarios.forEach(func => {
+        const funcElement = document.createElement('div');
+        funcElement.className = 'funcionario-disponivel-item';
+        funcElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-2 cursor-pointer"
+                 onclick="adicionarFuncionario(${func.funcionario_id})">
+                <div>
+                    <strong>${func.funcionario_nome}</strong>
+                    <small class="text-muted d-block">${func.funcionario_codigo}</small>
+                </div>
+                <button class="btn btn-sm btn-outline-success" 
+                        onclick="event.stopPropagation(); adicionarFuncionario(${func.funcionario_id})"
+                        title="Adicionar funcionário">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(funcElement);
+    });
+}
+```
+
+### FASE 4: FUNÇÕES DE FEEDBACK VISUAL
+
+```javascript
+// ADICIONAR FUNÇÕES DE FEEDBACK
+
+function showSuccessMessage(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast align-items-center text-white bg-success border-0';
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-check-circle me-2"></i>
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+
+function showErrorMessage(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast align-items-center text-white bg-danger border-0';
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+
+async function confirmarExclusaoObra(allocationId) {
+    if (!confirm('Tem certeza que deseja remover esta obra da alocação?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/equipe/api/allocations/${allocationId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao excluir alocação');
+        }
+        
+        showSuccessMessage('Obra removida com sucesso!');
+        await loadWeekAllocations();
+        
+    } catch (error) {
+        console.error('❌ Erro ao excluir:', error);
+        showErrorMessage(`Erro: ${error.message}`);
+    }
+}
+```
+
+## 📋 CHECKLIST DE IMPLEMENTAÇÃO
+
+### FASE 1: Corrigir Backend
+- [ ] Verificar e corrigir API de alocação (`/api/allocations`)
+- [ ] Corrigir API de listagem com local (`/api/allocations-week`)
+- [ ] Adicionar logs detalhados para debug
+- [ ] Testar persistência das alocações
+
+### FASE 2: Atualizar Frontend
+- [ ] Implementar novo CSS para cards otimizados
+- [ ] Criar função `renderObraCard()` otimizada
+- [ ] Atualizar função `renderAllocationsInDropZone()`
+- [ ] Testar layout responsivo
+
+### FASE 3: Corrigir Funcionalidades
+- [ ] Corrigir função `handleDrop()` para drag & drop
+- [ ] Corrigir função `abrirModalFuncionarios()`
+- [ ] Implementar renderização de funcionários no modal
+- [ ] Testar clique nos cards
+
+### FASE 4: Melhorias UX
+- [ ] Adicionar funções de feedback visual
+- [ ] Implementar confirmação de exclusão
+- [ ] Adicionar loading states
+- [ ] Testar todas as interações
+
+## 🎯 RESULTADO ESPERADO
+
+Após a implementação:
+
+1. **Cards Otimizados**: 
+   - Apenas nome da obra + funcionários (primeiro e segundo nome)
+   - Botões pequenos no canto superior direito
+   - Layout limpo e responsivo
+
+2. **Funcionalidades Restauradas**:
+   - Clique no card abre modal de funcionários
+   - Drag & drop salva com persistência
+   - Botões de ação funcionando
+
+3. **UX Melhorada**:
+   - Feedback visual para ações
+   - Loading states durante operações
+   - Confirmações para ações destrutivas
+
+4. **Performance**:
+   - Carregamento rápido das alocações
+   - Interface responsiva
+   - Logs detalhados para debug
+
