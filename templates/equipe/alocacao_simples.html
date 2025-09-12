@@ -1807,6 +1807,76 @@
             min-width: 120px;
         }
     }
+
+    /* ===================================
+       BOTÕES MICRO OTIMIZADOS - FASE 3
+       =================================== */
+    
+    /* Botões micro para ações nos cards */
+    .btn-action-micro {
+        transition: all 0.2s ease;
+        font-family: system-ui, -apple-system, sans-serif;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .btn-action-micro:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        z-index: 11;
+    }
+    
+    .btn-action-micro:active {
+        transform: scale(0.95);
+    }
+    
+    /* Container dos botões otimizado */
+    .action-buttons-optimized {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 4px;
+        padding: 1px;
+        backdrop-filter: blur(4px);
+    }
+    
+    /* Hover effect nos cards para mostrar botões */
+    .allocation-item:hover .action-buttons-optimized {
+        opacity: 1 !important;
+        background: rgba(255, 255, 255, 0.95);
+    }
+    
+    /* Nome da obra otimizado */
+    .obra-nome-optimized {
+        text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);
+        letter-spacing: -0.2px;
+    }
+    
+    /* Cards com visual mais limpo */
+    .allocation-item.optimized-card {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+    
+    .allocation-item.optimized-card:hover {
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+        transform: translateY(-1px);
+    }
+    
+    /* Responsividade para botões micro */
+    @media (max-width: 768px) {
+        .btn-action-micro {
+            width: 20px !important;
+            height: 20px !important;
+            font-size: 11px !important;
+        }
+        
+        .obra-nome-optimized {
+            padding-right: 44px !important;
+            font-size: 13px !important;
+        }
+    }
 </style>
 
 <!-- SortableJS - CDN confiável -->
@@ -2351,24 +2421,24 @@ class EquipeFase2 {
         
         div.innerHTML = `
             <div class="card-body p-2" style="position: relative;">
-                <!-- Botões de ação no canto superior direito -->
-                <div class="action-buttons-top-right" style="position: absolute; top: 4px; right: 4px; z-index: 10;">
-                    <button class="btn btn-action-mini btn-outline-primary" 
+                <!-- Botões de ação no canto superior direito - OTIMIZADOS -->
+                <div class="action-buttons-optimized" style="position: absolute; top: 2px; right: 2px; z-index: 10; display: flex; gap: 1px; opacity: 0.7; transition: opacity 0.2s;">
+                    <button class="btn btn-action-micro btn-outline-primary" 
                             onclick="event.stopPropagation(); window.equipeFase2.openFuncionariosModal(${allocation.id})"
                             title="Gerenciar funcionários" 
-                            style="width: 24px; height: 24px; padding: 0; font-size: 12px; margin-right: 2px; border-radius: 4px;">
+                            style="width: 16px; height: 16px; padding: 0; font-size: 9px; border-radius: 3px; border-width: 1px; min-width: 16px; line-height: 1;">
                         👥
                     </button>
-                    <button class="btn btn-action-mini btn-outline-danger" 
+                    <button class="btn btn-action-micro btn-outline-danger" 
                             onclick="event.stopPropagation(); window.equipeFase2.removerAlocacaoManual(${allocation.obra_id}, ${dayOfWeek})"
                             title="Remover alocação"
-                            style="width: 24px; height: 24px; padding: 0; font-size: 12px; border-radius: 4px;">
+                            style="width: 16px; height: 16px; padding: 0; font-size: 9px; border-radius: 3px; border-width: 1px; min-width: 16px; line-height: 1;">
                         🗑️
                     </button>
                 </div>
                 
-                <!-- Nome da obra - com padding para não sobrepor botões -->
-                <div class="obra-nome-simplified" style="font-size: 14px; font-weight: bold; color: #333; margin-bottom: 8px; padding-right: 60px; line-height: 1.2;">
+                <!-- Nome da obra - OTIMIZADO com menos padding -->
+                <div class="obra-nome-optimized" style="font-size: 14px; font-weight: 600; color: #2c3e50; margin-bottom: 8px; padding-right: 36px; line-height: 1.3; word-wrap: break-word;">
                     ${allocation.obra_nome}
                 </div>
                 
