@@ -290,12 +290,20 @@ def api_alocar_obra_restful():
                 'error': f'Obra {obra.codigo} já está alocada neste dia'
             }), 409
         
+        # Retornar payload completo para renderização imediata do card
         return jsonify({
             'success': True,
-            'allocation_id': allocation.id,
-            'obra_codigo': obra.codigo,
-            'obra_nome': obra.nome,
-            'data_alocacao': data_alocacao.isoformat(),
+            'allocation': {
+                'id': allocation.id,
+                'obra_id': allocation.obra_id,
+                'obra_codigo': obra.codigo,
+                'obra_nome': obra.nome,
+                'data_alocacao': data_alocacao.isoformat(),
+                'day_of_week': convert_to_sunday_weekday(data_alocacao.weekday()),  # 0=Domingo
+                'local_trabalho': allocation.local_trabalho,
+                'turno_inicio': allocation.turno_inicio.strftime('%H:%M'),
+                'turno_fim': allocation.turno_fim.strftime('%H:%M')
+            },
             'message': f'Obra {obra.codigo} alocada com sucesso'
         }), 201
         
