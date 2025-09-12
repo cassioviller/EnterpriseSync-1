@@ -1964,7 +1964,8 @@ class EquipeFase2 {
             // Convert array to day-based structure
             this.allocations = {};
             allocationsData.forEach(allocation => {
-                const dayOfWeek = new Date(allocation.data_alocacao).getDay();
+                // Use day_of_week from API instead of recalculating (FIXED BUG)
+                const dayOfWeek = allocation.day_of_week; // 0=Sunday, already correct from backend
                 if (!this.allocations[dayOfWeek]) {
                     this.allocations[dayOfWeek] = { allocations: [] };
                 }
