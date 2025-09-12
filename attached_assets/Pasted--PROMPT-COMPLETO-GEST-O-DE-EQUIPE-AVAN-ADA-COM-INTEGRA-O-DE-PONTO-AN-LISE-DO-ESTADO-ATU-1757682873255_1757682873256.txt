@@ -1,0 +1,1342 @@
+# PROMPT COMPLETO - GESTÃO DE EQUIPE AVANÇADA COM INTEGRAÇÃO DE PONTO
+
+## 🎯 ANÁLISE DO ESTADO ATUAL
+
+**SISTEMA ATUAL FUNCIONANDO:**
+- ✅ Gestão de equipe com drag & drop (obras → dias)
+- ✅ Modal de funcionários funcionando
+- ✅ Modelos: `Allocation`, `AllocationEmployee`, `HorarioTrabalho`, `RegistroPonto`
+- ✅ Interface visual limpa e responsiva
+
+**FUNCIONALIDADES A IMPLEMENTAR:**
+
+### 1. **INTEGRAÇÃO COM HORÁRIO DO FUNCIONÁRIO**
+- Ao alocar funcionário, usar horário cadastrado em `HorarioTrabalho`
+- Pré-preencher tipo de lançamento baseado no dia da semana
+
+### 2. **SISTEMA AUTOMÁTICO DE PONTO**
+- Lançamento automático à meia-noite para funcionários não alocados
+- Botão de sincronização manual
+
+### 3. **ALOCAÇÃO CAMPO/OFICINA**
+- Separar alocações em duas áreas: Campo e Oficina
+- Integração com RDO para carregamento automático
+
+### 4. **LAYOUT EXPANDIDO**
+- Card de gestão semanal ocupando largura completa
+
+## 🏗️ IMPLEMENTAÇÃO DETALHADA
+
+### FASE 1: MODELOS E BANCO DE DADOS
+
+#### 1.1 ATUALIZAR MODELO `Allocation`
+
+```python
+# ADICIONAR AO models.py - CLASSE Allocation
+
+# Adicionar novo campo para local
+local_trabalho = db.Column(db.String(20), default='campo')  # 'campo' ou 'oficina'
+
+# Atualizar constraint para incluir local
+__table_args__ = (
+    db.UniqueConstraint('admin_id', 'obra_id', 'data_alocacao', 'local_trabalho', 
+                       name='uk_allocation_admin_obra_data_local'),
+    db.Index('idx_allocation_admin_data', 'admin_id', 'data_alocacao'),
+    db.Index('idx_allocation_obra_data', 'obra_id', 'data_alocacao'),
+    db.Index('idx_allocation_local', 'local_trabalho'),
+)
+```
+
+#### 1.2 ATUALIZAR MODELO `AllocationEmployee`
+
+```python
+# ADICIONAR AO models.py - CLASSE AllocationEmployee
+
+# Campos para integração com ponto
+tipo_lancamento = db.Column(db.String(30), default='trabalho_normal')  
+# Valores: trabalho_normal, sabado_trabalhado, domingo_trabalhado, falta, sabado_folga, domingo_folga, feriado_folga
+
+sincronizado_ponto = db.Column(db.Boolean, default=False)  # Se já foi sincronizado com RegistroPonto
+data_sincronizacao = db.Column(db.DateTime)  # Quando foi sincronizado
+
+@property
+def deve_gerar_ponto(self):
+    """Verifica se deve gerar registro de ponto automaticamente"""
+    return not self.sincronizado_ponto
+
+def get_tipo_lancamento_automatico(self):
+    """Determina tipo de lançamento baseado no dia da semana"""
+    dia_semana = self.allocation.data_alocacao.weekday()  # 0=Monday, 6=Sunday
+    
+    if dia_semana < 5:  # Segunda a Sexta (0-4)
+        return 'trabalho_normal'
+    elif dia_semana == 5:  # Sábado
+        return 'sabado_trabalhado'
+    else:  # Domingo
+        return 'domingo_trabalhado'
+
+def sincronizar_com_ponto(self):
+    """Cria registro de ponto baseado na alocação"""
+    from models import RegistroPonto
+    
+    # Verificar se já existe registro
+    registro_existente = RegistroPonto.query.filter_by(
+        funcionario_id=self.funcionario_id,
+        data=self.allocation.data_alocacao
+    ).first()
+    
+    if registro_existente:
+        # Atualizar registro existente
+        registro_existente.obra_id = self.allocation.obra_id
+        registro_existente.tipo_local = self.allocation.local_trabalho
+        registro_existente.hora_entrada = self.turno_inicio
+        registro_existente.hora_saida = self.turno_fim
+        registro_existente.tipo_registro = self.tipo_lancamento
+    else:
+        # Criar novo registro
+        registro = RegistroPonto(
+            funcionario_id=self.funcionario_id,
+            obra_id=self.allocation.obra_id,
+            data=self.allocation.data_alocacao,
+            hora_entrada=self.turno_inicio,
+            hora_saida=self.turno_fim,
+            tipo_local=self.allocation.local_trabalho,
+            tipo_registro=self.tipo_lancamento,
+            horas_trabalhadas=self._calcular_horas_trabalhadas()
+        )
+        db.session.add(registro)
+    
+    # Marcar como sincronizado
+    self.sincronizado_ponto = True
+    self.data_sincronizacao = datetime.utcnow()
+    
+    db.session.commit()
+
+def _calcular_horas_trabalhadas(self):
+    """Calcula horas trabalhadas baseado no turno"""
+    if self.turno_inicio and self.turno_fim:
+        inicio = datetime.combine(date.today(), self.turno_inicio)
+        fim = datetime.combine(date.today(), self.turno_fim)
+        delta = fim - inicio
+        return delta.total_seconds() / 3600
+    return 8.0  # Padrão
+```
+
+#### 1.3 FUNÇÃO PARA LANÇAMENTO AUTOMÁTICO
+
+```python
+# ADICIONAR AO models.py - FUNÇÃO GLOBAL
+
+def processar_lancamentos_automaticos(data_processamento=None):
+    """
+    Processa lançamentos automáticos de ponto para funcionários não alocados
+    Deve ser executada via cron job à meia-noite
+    """
+    if data_processamento is None:
+        data_processamento = date.today() - timedelta(days=1)  # Dia anterior
+    
+    # Buscar todos os funcionários ativos
+    funcionarios_ativos = Funcionario.query.filter_by(ativo=True).all()
+    
+    for funcionario in funcionarios_ativos:
+        # Verificar se funcionário foi alocado nesta data
+        alocacao = db.session.query(AllocationEmployee).join(Allocation).filter(
+            AllocationEmployee.funcionario_id == funcionario.id,
+            Allocation.data_alocacao == data_processamento
+        ).first()
+        
+        if alocacao:
+            # Funcionário foi alocado - sincronizar se necessário
+            if not alocacao.sincronizado_ponto:
+                alocacao.sincronizar_com_ponto()
+        else:
+            # Funcionário NÃO foi alocado - gerar falta/folga
+            registro_existente = RegistroPonto.query.filter_by(
+                funcionario_id=funcionario.id,
+                data=data_processamento
+            ).first()
+            
+            if not registro_existente:
+                tipo_registro = _determinar_tipo_falta(data_processamento)
+                
+                registro = RegistroPonto(
+                    funcionario_id=funcionario.id,
+                    data=data_processamento,
+                    tipo_registro=tipo_registro,
+                    horas_trabalhadas=0.0,
+                    observacoes=f'Lançamento automático - {tipo_registro}'
+                )
+                db.session.add(registro)
+    
+    db.session.commit()
+
+def _determinar_tipo_falta(data):
+    """Determina tipo de falta baseado no dia da semana"""
+    dia_semana = data.weekday()  # 0=Monday, 6=Sunday
+    
+    # Verificar se é feriado (implementar lógica de feriados)
+    if _eh_feriado(data):
+        return 'feriado_folga'
+    
+    if dia_semana < 5:  # Segunda a Sexta
+        return 'falta'
+    elif dia_semana == 5:  # Sábado
+        return 'sabado_folga'
+    else:  # Domingo
+        return 'domingo_folga'
+
+def _eh_feriado(data):
+    """Verifica se a data é feriado nacional"""
+    # Implementar lógica de feriados nacionais
+    # Por enquanto, retorna False
+    return False
+```
+
+### FASE 2: BACKEND - APIS ATUALIZADAS
+
+#### 2.1 ATUALIZAR API DE ALOCAÇÃO DE FUNCIONÁRIOS
+
+```python
+# ATUALIZAR EM equipe_views.py
+
+@equipe_bp.route('/api/allocation-employee', methods=['POST'])
+@login_required
+@admin_required
+def add_funcionario_to_allocation():
+    """POST - Adiciona funcionário à alocação com integração de horário"""
+    try:
+        data = request.get_json()
+        admin_id = get_admin_id()
+        
+        # Validação
+        required_fields = ['allocation_id', 'funcionario_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'error': f'Campo obrigatório: {field}'
+                }), 400
+        
+        allocation_id = data['allocation_id']
+        funcionario_id = data['funcionario_id']
+        
+        # Verificar se alocação existe e pertence ao admin
+        allocation = Allocation.query.filter_by(
+            id=allocation_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not allocation:
+            return jsonify({
+                'success': False,
+                'error': 'Alocação não encontrada'
+            }), 404
+        
+        # Verificar se funcionário existe e pertence ao admin
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id,
+            ativo=True
+        ).first()
+        
+        if not funcionario:
+            return jsonify({
+                'success': False,
+                'error': 'Funcionário não encontrado'
+            }), 404
+        
+        # NOVA FUNCIONALIDADE: Usar horário do funcionário
+        horario_funcionario = funcionario.horario_trabalho
+        if horario_funcionario:
+            turno_inicio = horario_funcionario.entrada
+            turno_fim = horario_funcionario.saida
+        else:
+            # Fallback para horário padrão
+            turno_inicio = time(8, 0)
+            turno_fim = time(17, 0)
+        
+        # Permitir override dos horários se fornecidos
+        if 'turno_inicio' in data:
+            try:
+                turno_inicio = datetime.strptime(data['turno_inicio'], '%H:%M').time()
+            except ValueError:
+                pass
+        
+        if 'turno_fim' in data:
+            try:
+                turno_fim = datetime.strptime(data['turno_fim'], '%H:%M').time()
+            except ValueError:
+                pass
+        
+        # Verificar se já está alocado
+        existing = AllocationEmployee.query.filter_by(
+            allocation_id=allocation_id,
+            funcionario_id=funcionario_id
+        ).first()
+        
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': 'Funcionário já alocado nesta obra/dia'
+            }), 409
+        
+        # Verificar conflito de data
+        conflito = db.session.query(AllocationEmployee).join(Allocation).filter(
+            AllocationEmployee.funcionario_id == funcionario_id,
+            Allocation.data_alocacao == allocation.data_alocacao,
+            Allocation.admin_id == admin_id
+        ).first()
+        
+        if conflito:
+            return jsonify({
+                'success': False,
+                'error': f'Funcionário já alocado em outra obra nesta data'
+            }), 409
+        
+        # NOVA FUNCIONALIDADE: Determinar tipo de lançamento automaticamente
+        allocation_employee = AllocationEmployee(
+            allocation_id=allocation_id,
+            funcionario_id=funcionario_id,
+            turno_inicio=turno_inicio,
+            turno_fim=turno_fim,
+            papel=data.get('papel', funcionario.funcao),
+            observacao=data.get('observacao', '')
+        )
+        
+        # Definir tipo de lançamento baseado no dia
+        allocation_employee.tipo_lancamento = allocation_employee.get_tipo_lancamento_automatico()
+        
+        db.session.add(allocation_employee)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': allocation_employee.id,
+                'funcionario_nome': funcionario.nome,
+                'turno_inicio': allocation_employee.turno_inicio.strftime('%H:%M'),
+                'turno_fim': allocation_employee.turno_fim.strftime('%H:%M'),
+                'papel': allocation_employee.papel,
+                'tipo_lancamento': allocation_employee.tipo_lancamento,
+                'horario_origem': 'funcionario' if horario_funcionario else 'padrao'
+            },
+            'message': f'Funcionário {funcionario.nome} alocado com sucesso'
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao alocar funcionário: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+```
+
+#### 2.2 API PARA ALOCAÇÃO COM LOCAL (CAMPO/OFICINA)
+
+```python
+# ADICIONAR EM equipe_views.py
+
+@equipe_bp.route('/api/allocations-local', methods=['POST'])
+@login_required
+@admin_required
+def api_alocar_obra_com_local():
+    """API: Alocar obra especificando campo ou oficina"""
+    try:
+        admin_id = get_admin_id()
+        data = request.get_json()
+        
+        # Validações
+        required_fields = ['obra_id', 'data_alocacao', 'local_trabalho']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'error': f'Campo obrigatório: {field}'
+                }), 400
+        
+        obra_id = data['obra_id']
+        data_alocacao_str = data['data_alocacao']
+        local_trabalho = data['local_trabalho']
+        
+        # Validar local
+        if local_trabalho not in ['campo', 'oficina']:
+            return jsonify({
+                'success': False,
+                'error': 'Local deve ser "campo" ou "oficina"'
+            }), 400
+        
+        # Parse da data
+        try:
+            data_alocacao = datetime.strptime(data_alocacao_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Formato de data inválido. Use YYYY-MM-DD'
+            }), 400
+        
+        # Verificar se obra existe
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id, ativo=True).first()
+        if not obra:
+            return jsonify({
+                'success': False,
+                'error': 'Obra não encontrada'
+            }), 404
+        
+        # Verificar se já existe alocação para esta obra/data/local
+        existing = Allocation.query.filter_by(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            data_alocacao=data_alocacao,
+            local_trabalho=local_trabalho
+        ).first()
+        
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': f'Obra {obra.codigo} já está alocada em {local_trabalho} neste dia'
+            }), 409
+        
+        # Criar alocação
+        allocation = Allocation(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            data_alocacao=data_alocacao,
+            local_trabalho=local_trabalho,
+            turno_inicio=time(8, 0),
+            turno_fim=time(17, 0),
+            nota=data.get('nota', '')
+        )
+        
+        db.session.add(allocation)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'allocation_id': allocation.id,
+                'obra_codigo': obra.codigo,
+                'obra_nome': obra.nome,
+                'data_alocacao': data_alocacao.isoformat(),
+                'local_trabalho': local_trabalho,
+                'local_display': 'Campo' if local_trabalho == 'campo' else 'Oficina'
+            },
+            'message': f'Obra {obra.codigo} alocada em {local_trabalho.title()} com sucesso'
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao alocar obra com local: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+
+@equipe_bp.route('/api/allocations-week-local', methods=['GET'])
+@login_required
+@admin_required
+def get_allocations_week_com_local():
+    """API: Listar alocações da semana separadas por local"""
+    try:
+        admin_id = get_admin_id()
+        week_start = request.args.get('week_start')
+        
+        # Parse da data ou usa semana atual
+        if week_start:
+            start_date = datetime.strptime(week_start, '%Y-%m-%d').date()
+        else:
+            today = date.today()
+            start_date = get_sunday_of_week(today)
+        
+        end_date = start_date + timedelta(days=6)
+        
+        # Buscar alocações da semana
+        allocations = db.session.query(Allocation, Obra).join(Obra).filter(
+            Allocation.admin_id == admin_id,
+            Allocation.data_alocacao >= start_date,
+            Allocation.data_alocacao <= end_date
+        ).order_by(Allocation.data_alocacao, Allocation.local_trabalho, Obra.codigo).all()
+        
+        # Organizar por dia e local
+        result = {}
+        for i in range(7):  # Domingo a Sábado
+            current_date = start_date + timedelta(days=i)
+            day_key = current_date.isoformat()
+            
+            result[day_key] = {
+                'data': current_date.isoformat(),
+                'dia_semana': convert_to_sunday_weekday(current_date.weekday()),
+                'campo': [],
+                'oficina': []
+            }
+        
+        # Preencher alocações
+        for allocation, obra in allocations:
+            day_key = allocation.data_alocacao.isoformat()
+            local = allocation.local_trabalho
+            
+            allocation_data = {
+                'id': allocation.id,
+                'obra_id': obra.id,
+                'obra_codigo': obra.codigo,
+                'obra_nome': obra.nome,
+                'turno_inicio': allocation.turno_inicio.strftime('%H:%M'),
+                'turno_fim': allocation.turno_fim.strftime('%H:%M'),
+                'funcionarios_count': len(allocation.funcionarios),
+                'local_trabalho': local,
+                'nota': allocation.nota
+            }
+            
+            result[day_key][local].append(allocation_data)
+        
+        return jsonify({
+            'success': True,
+            'data': result,
+            'week_start': start_date.isoformat(),
+            'week_end': end_date.isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar alocações da semana: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+```
+
+#### 2.3 API PARA SINCRONIZAÇÃO DE PONTO
+
+```python
+# ADICIONAR EM equipe_views.py
+
+@equipe_bp.route('/api/sincronizar-ponto', methods=['POST'])
+@login_required
+@admin_required
+def sincronizar_ponto_manual():
+    """API: Sincronização manual de ponto baseada nas alocações"""
+    try:
+        data = request.get_json()
+        admin_id = get_admin_id()
+        
+        data_inicio = data.get('data_inicio')
+        data_fim = data.get('data_fim')
+        funcionario_id = data.get('funcionario_id')  # Opcional - para funcionário específico
+        
+        # Validar datas
+        if not data_inicio:
+            data_inicio = date.today().isoformat()
+        
+        if not data_fim:
+            data_fim = data_inicio
+        
+        try:
+            data_inicio_parsed = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            data_fim_parsed = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Formato de data inválido. Use YYYY-MM-DD'
+            }), 400
+        
+        # Buscar alocações no período
+        query = db.session.query(AllocationEmployee).join(Allocation).filter(
+            Allocation.admin_id == admin_id,
+            Allocation.data_alocacao >= data_inicio_parsed,
+            Allocation.data_alocacao <= data_fim_parsed
+        )
+        
+        if funcionario_id:
+            query = query.filter(AllocationEmployee.funcionario_id == funcionario_id)
+        
+        alocacoes = query.all()
+        
+        # Processar sincronizações
+        sincronizados = 0
+        erros = []
+        
+        for alocacao in alocacoes:
+            try:
+                if not alocacao.sincronizado_ponto:
+                    alocacao.sincronizar_com_ponto()
+                    sincronizados += 1
+            except Exception as e:
+                erros.append(f"Erro ao sincronizar {alocacao.funcionario.nome}: {str(e)}")
+        
+        # Processar lançamentos automáticos para funcionários não alocados
+        current_date = data_inicio_parsed
+        while current_date <= data_fim_parsed:
+            try:
+                processar_lancamentos_automaticos(current_date)
+            except Exception as e:
+                erros.append(f"Erro ao processar {current_date}: {str(e)}")
+            
+            current_date += timedelta(days=1)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'sincronizados': sincronizados,
+                'periodo': f"{data_inicio} a {data_fim}",
+                'erros': erros
+            },
+            'message': f'{sincronizados} registros sincronizados com sucesso'
+        })
+        
+    except Exception as e:
+        logging.error(f"Erro na sincronização de ponto: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+
+@equipe_bp.route('/api/funcionarios-rdo/<int:obra_id>/<local_trabalho>/<data_alocacao>', methods=['GET'])
+@login_required
+@admin_required
+def get_funcionarios_para_rdo(obra_id, local_trabalho, data_alocacao):
+    """API: Buscar funcionários alocados para integração com RDO"""
+    try:
+        admin_id = get_admin_id()
+        
+        # Parse da data
+        try:
+            data_parsed = datetime.strptime(data_alocacao, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Formato de data inválido'
+            }), 400
+        
+        # Validar local
+        if local_trabalho not in ['campo', 'oficina']:
+            return jsonify({
+                'success': False,
+                'error': 'Local deve ser "campo" ou "oficina"'
+            }), 400
+        
+        # Buscar alocação
+        allocation = Allocation.query.filter_by(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            data_alocacao=data_parsed,
+            local_trabalho=local_trabalho
+        ).first()
+        
+        if not allocation:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'funcionarios': [],
+                    'message': 'Nenhuma alocação encontrada para esta obra/local/data'
+                }
+            })
+        
+        # Buscar funcionários alocados
+        funcionarios_alocados = db.session.query(
+            AllocationEmployee, Funcionario
+        ).join(Funcionario).filter(
+            AllocationEmployee.allocation_id == allocation.id
+        ).all()
+        
+        # Formatar resposta
+        funcionarios = []
+        for ae, funcionario in funcionarios_alocados:
+            funcionarios.append({
+                'funcionario_id': funcionario.id,
+                'funcionario_nome': funcionario.nome,
+                'funcionario_codigo': funcionario.codigo,
+                'papel': ae.papel,
+                'turno_inicio': ae.turno_inicio.strftime('%H:%M'),
+                'turno_fim': ae.turno_fim.strftime('%H:%M'),
+                'tipo_lancamento': ae.tipo_lancamento
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'allocation_id': allocation.id,
+                'obra_codigo': allocation.obra.codigo,
+                'obra_nome': allocation.obra.nome,
+                'local_trabalho': local_trabalho,
+                'data_alocacao': data_alocacao,
+                'funcionarios': funcionarios
+            }
+        })
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar funcionários para RDO: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor'
+        }), 500
+```
+
+### FASE 3: FRONTEND - INTERFACE ATUALIZADA
+
+#### 3.1 ATUALIZAR TEMPLATE PARA CAMPO/OFICINA
+
+```html
+<!-- SUBSTITUIR O GRID SEMANAL EM alocacao_simples.html -->
+
+<div class="card-body weekly-grid-container-expanded" id="weekly-grid">
+    <!-- Grid expandido para ocupar largura completa -->
+    <div class="weekly-grid-expanded">
+        <!-- Cabeçalho dos dias -->
+        <div class="weekly-header-expanded">
+            <div class="day-header-expanded" data-day="0">
+                <div class="day-name">Domingo</div>
+                <div class="day-date" id="day-date-0">--/--</div>
+            </div>
+            <div class="day-header-expanded" data-day="1">
+                <div class="day-name">Segunda</div>
+                <div class="day-date" id="day-date-1">--/--</div>
+            </div>
+            <div class="day-header-expanded" data-day="2">
+                <div class="day-name">Terça</div>
+                <div class="day-date" id="day-date-2">--/--</div>
+            </div>
+            <div class="day-header-expanded" data-day="3">
+                <div class="day-name">Quarta</div>
+                <div class="day-date" id="day-date-3">--/--</div>
+            </div>
+            <div class="day-header-expanded" data-day="4">
+                <div class="day-name">Quinta</div>
+                <div class="day-date" id="day-date-4">--/--</div>
+            </div>
+            <div class="day-header-expanded" data-day="5">
+                <div class="day-name">Sexta</div>
+                <div class="day-date" id="day-date-5">--/--</div>
+            </div>
+            <div class="day-header-expanded" data-day="6">
+                <div class="day-name">Sábado</div>
+                <div class="day-date" id="day-date-6">--/--</div>
+            </div>
+        </div>
+        
+        <!-- Corpo do grid com Campo/Oficina -->
+        <div class="weekly-body-expanded">
+            <!-- Repetir para cada dia (0-6) -->
+            <div class="day-column-expanded" data-day="0">
+                <!-- Seção Campo -->
+                <div class="local-section campo-section">
+                    <div class="local-header">
+                        <i class="fas fa-hard-hat text-warning"></i>
+                        <span>Campo</span>
+                    </div>
+                    <div class="drop-zone-local" 
+                         data-day="0" 
+                         data-local="campo"
+                         ondrop="dropObraLocal(event)" 
+                         ondragover="allowDrop(event)">
+                        <div class="drop-placeholder">
+                            <i class="fas fa-plus-circle"></i>
+                            <span>Arraste obras aqui</span>
+                        </div>
+                        <!-- Obras alocadas serão inseridas aqui -->
+                    </div>
+                </div>
+                
+                <!-- Seção Oficina -->
+                <div class="local-section oficina-section">
+                    <div class="local-header">
+                        <i class="fas fa-tools text-info"></i>
+                        <span>Oficina</span>
+                    </div>
+                    <div class="drop-zone-local" 
+                         data-day="0" 
+                         data-local="oficina"
+                         ondrop="dropObraLocal(event)" 
+                         ondragover="allowDrop(event)">
+                        <div class="drop-placeholder">
+                            <i class="fas fa-plus-circle"></i>
+                            <span>Arraste obras aqui</span>
+                        </div>
+                        <!-- Obras alocadas serão inseridas aqui -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Repetir para dias 1-6 -->
+            <!-- ... -->
+        </div>
+    </div>
+</div>
+```
+
+#### 3.2 CSS PARA LAYOUT EXPANDIDO
+
+```css
+/* ADICIONAR AO <style> DO TEMPLATE */
+
+/* ================================
+   LAYOUT EXPANDIDO - CAMPO/OFICINA
+   ================================ */
+
+.weekly-grid-container-expanded {
+    padding: 0;
+    margin: 0;
+}
+
+.weekly-grid-expanded {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 600px;
+}
+
+.weekly-header-expanded {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: #dee2e6;
+    border-radius: 8px 8px 0 0;
+}
+
+.day-header-expanded {
+    background: #f8f9fa;
+    padding: 1rem;
+    text-align: center;
+    border-radius: 8px 8px 0 0;
+}
+
+.day-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #495057;
+    margin-bottom: 0.25rem;
+}
+
+.day-date {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.weekly-body-expanded {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: #dee2e6;
+    flex: 1;
+    border-radius: 0 0 8px 8px;
+}
+
+.day-column-expanded {
+    background: white;
+    display: flex;
+    flex-direction: column;
+    min-height: 500px;
+}
+
+/* Seções Campo/Oficina */
+.local-section {
+    flex: 1;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+}
+
+.local-section:last-child {
+    border-bottom: none;
+}
+
+.campo-section {
+    background: #fff8e1;
+}
+
+.oficina-section {
+    background: #e3f2fd;
+}
+
+.local-header {
+    padding: 0.75rem;
+    background: rgba(0,0,0,0.05);
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.drop-zone-local {
+    flex: 1;
+    padding: 0.75rem;
+    min-height: 200px;
+    position: relative;
+}
+
+.drop-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6c757d;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.drop-placeholder i {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Obras alocadas */
+.obra-alocada-local {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.obra-alocada-local:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.obra-alocada-local.campo {
+    border-left: 4px solid #ff9800;
+}
+
+.obra-alocada-local.oficina {
+    border-left: 4px solid #2196f3;
+}
+
+.obra-codigo-local {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #495057;
+    margin-bottom: 0.25rem;
+}
+
+.obra-turno-local {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.obra-funcionarios-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: bold;
+}
+
+.obra-funcionarios-badge.empty {
+    background: #6c757d;
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+    .weekly-header-expanded,
+    .weekly-body-expanded {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .day-column-expanded:nth-child(n+5) {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .weekly-header-expanded,
+    .weekly-body-expanded {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .day-column-expanded:nth-child(n+3) {
+        display: none;
+    }
+    
+    .local-section {
+        min-height: 150px;
+    }
+}
+
+/* Card expandido */
+.card {
+    margin-left: -15px;
+    margin-right: -15px;
+    border-radius: 0;
+}
+
+@media (min-width: 1200px) {
+    .card {
+        margin-left: -30px;
+        margin-right: -30px;
+    }
+}
+```
+
+#### 3.3 JAVASCRIPT ATUALIZADO
+
+```javascript
+// ADICIONAR À CLASSE EquipeFase2
+
+// Propriedades para campo/oficina
+this.currentLocal = 'campo';  // Local atual selecionado
+this.allocationsLocal = {};   // Alocações separadas por local
+
+async carregarAlocacoesComLocal() {
+    try {
+        this.log('📋 Carregando alocações com separação campo/oficina...');
+        
+        const response = await fetch(`/equipe/api/allocations-week-local?week_start=${this.currentWeek}`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao carregar alocações');
+        }
+        
+        this.allocationsLocal = result.data;
+        this.renderCalendarioComLocal();
+        
+        this.log(`✅ Alocações carregadas para semana ${result.week_start}`);
+        
+    } catch (error) {
+        this.log(`❌ ERRO ao carregar alocações: ${error.message}`);
+        throw error;
+    }
+}
+
+renderCalendarioComLocal() {
+    // Limpar grid atual
+    const weeklyGrid = document.getElementById('weekly-grid');
+    if (!weeklyGrid) return;
+    
+    // Atualizar datas dos cabeçalhos
+    for (let day = 0; day < 7; day++) {
+        const dateElement = document.getElementById(`day-date-${day}`);
+        if (dateElement) {
+            const currentDate = new Date(this.currentWeek);
+            currentDate.setDate(currentDate.getDate() + day);
+            dateElement.textContent = currentDate.toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit'
+            });
+        }
+    }
+    
+    // Renderizar alocações por dia e local
+    Object.keys(this.allocationsLocal).forEach(dateKey => {
+        const dayData = this.allocationsLocal[dateKey];
+        const dayOfWeek = dayData.dia_semana;
+        
+        // Renderizar campo
+        this.renderLocalAllocations(dayOfWeek, 'campo', dayData.campo);
+        
+        // Renderizar oficina
+        this.renderLocalAllocations(dayOfWeek, 'oficina', dayData.oficina);
+    });
+}
+
+renderLocalAllocations(dayOfWeek, local, allocations) {
+    const dropZone = document.querySelector(`[data-day="${dayOfWeek}"][data-local="${local}"]`);
+    if (!dropZone) return;
+    
+    // Limpar zona
+    dropZone.innerHTML = '';
+    
+    if (allocations.length === 0) {
+        // Mostrar placeholder
+        dropZone.innerHTML = `
+            <div class="drop-placeholder">
+                <i class="fas fa-plus-circle"></i>
+                <span>Arraste obras aqui</span>
+            </div>
+        `;
+        return;
+    }
+    
+    // Renderizar obras
+    allocations.forEach(allocation => {
+        const obraElement = this.createObraElementLocal(allocation, local);
+        dropZone.appendChild(obraElement);
+    });
+}
+
+createObraElementLocal(allocation, local) {
+    const div = document.createElement('div');
+    div.className = `obra-alocada-local ${local}`;
+    div.dataset.allocationId = allocation.id;
+    div.onclick = () => this.abrirModalFuncionarios(allocation.id);
+    
+    div.innerHTML = `
+        <div class="obra-codigo-local">${allocation.obra_codigo}</div>
+        <div class="obra-turno-local">${allocation.turno_inicio} - ${allocation.turno_fim}</div>
+        
+        ${allocation.funcionarios_count > 0 ? 
+            `<div class="obra-funcionarios-badge">${allocation.funcionarios_count}</div>` :
+            `<div class="obra-funcionarios-badge empty">0</div>`
+        }
+        
+        <div class="obra-actions-local">
+            <button class="btn btn-sm btn-outline-light" 
+                    onclick="event.stopPropagation(); editAllocation(${allocation.id})"
+                    title="Editar">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" 
+                    onclick="event.stopPropagation(); deleteAllocation(${allocation.id})"
+                    title="Remover">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    return div;
+}
+
+// Função para drag & drop com local
+async dropObraLocal(event) {
+    event.preventDefault();
+    
+    const dropZone = event.currentTarget;
+    const day = parseInt(dropZone.dataset.day);
+    const local = dropZone.dataset.local;
+    const obraId = event.dataTransfer.getData('text/plain');
+    
+    if (!obraId) return;
+    
+    try {
+        this.log(`🎯 Alocando obra ${obraId} no dia ${day} em ${local}...`);
+        
+        const targetDate = this.getDateForDay(day);
+        
+        const response = await fetch('/equipe/api/allocations-local', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                obra_id: parseInt(obraId),
+                data_alocacao: targetDate,
+                local_trabalho: local,
+                day_of_week: day
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro ao alocar obra');
+        }
+        
+        // Recarregar alocações
+        await this.carregarAlocacoesComLocal();
+        
+        this.log(`✅ Obra ${result.data.obra_codigo} alocada em ${local} com sucesso`);
+        
+    } catch (error) {
+        this.log(`❌ ERRO ao alocar obra: ${error.message}`);
+        alert(`Erro: ${error.message}`);
+    }
+}
+
+// Função para sincronização de ponto
+async sincronizarPonto(dataInicio = null, dataFim = null) {
+    try {
+        this.log('🔄 Iniciando sincronização de ponto...');
+        
+        const response = await fetch('/equipe/api/sincronizar-ponto', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                data_inicio: dataInicio,
+                data_fim: dataFim
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Erro na sincronização');
+        }
+        
+        this.log(`✅ Sincronização concluída: ${result.data.sincronizados} registros`);
+        
+        if (result.data.erros.length > 0) {
+            this.log(`⚠️ Erros encontrados: ${result.data.erros.join(', ')}`);
+        }
+        
+        alert(`Sincronização concluída!\n${result.data.sincronizados} registros processados`);
+        
+    } catch (error) {
+        this.log(`❌ ERRO na sincronização: ${error.message}`);
+        alert(`Erro na sincronização: ${error.message}`);
+    }
+}
+```
+
+#### 3.4 BOTÃO DE SINCRONIZAÇÃO
+
+```html
+<!-- ADICIONAR AO CABEÇALHO DO CARD -->
+
+<div class="card-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-1">📅 Gestão Semanal</h5>
+            <small id="week-title" class="text-muted">Carregando semana...</small>
+        </div>
+        <div class="btn-group" role="group">
+            <!-- Navegação existente -->
+            <button class="btn btn-outline-primary" id="btn-prev-week">
+                <i class="fas fa-chevron-left"></i> Anterior
+            </button>
+            <button class="btn btn-outline-secondary" id="btn-current-week">
+                Hoje
+            </button>
+            <button class="btn btn-outline-primary" id="btn-next-week">
+                Próxima <i class="fas fa-chevron-right"></i>
+            </button>
+            
+            <!-- NOVO: Botão de sincronização -->
+            <button class="btn btn-success" onclick="sincronizarPontoSemana()" title="Sincronizar ponto desta semana">
+                <i class="fas fa-sync-alt"></i> Sincronizar Ponto
+            </button>
+        </div>
+    </div>
+</div>
+```
+
+### FASE 4: INTEGRAÇÃO COM RDO
+
+#### 4.1 MODIFICAR SELEÇÃO DE OBRA NO RDO
+
+```javascript
+// ADICIONAR AO JAVASCRIPT DO RDO
+
+function onObraChange(obraSelect) {
+    const obraId = obraSelect.value;
+    const localSelect = document.getElementById('local-trabalho');
+    const funcionariosContainer = document.getElementById('funcionarios-container');
+    
+    // Limpar seleções dependentes
+    localSelect.disabled = !obraId;
+    localSelect.value = '';
+    funcionariosContainer.innerHTML = '';
+    
+    if (!obraId) {
+        localSelect.innerHTML = '<option value="">Selecione a obra primeiro</option>';
+        return;
+    }
+    
+    // Habilitar seleção de local
+    localSelect.innerHTML = `
+        <option value="">Selecione o local</option>
+        <option value="campo">Campo</option>
+        <option value="oficina">Oficina</option>
+    `;
+}
+
+async function onLocalChange(localSelect) {
+    const obraId = document.getElementById('obra-select').value;
+    const local = localSelect.value;
+    const dataRdo = document.getElementById('data-rdo').value;
+    
+    if (!obraId || !local || !dataRdo) {
+        return;
+    }
+    
+    try {
+        // Buscar funcionários alocados
+        const response = await fetch(`/equipe/api/funcionarios-rdo/${obraId}/${local}/${dataRdo}`);
+        const result = await response.json();
+        
+        if (result.success && result.data.funcionarios.length > 0) {
+            carregarFuncionariosAutomaticamente(result.data.funcionarios);
+        } else {
+            // Nenhum funcionário alocado - deixar manual
+            document.getElementById('funcionarios-container').innerHTML = 
+                '<p class="text-muted">Nenhum funcionário alocado automaticamente. Adicione manualmente.</p>';
+        }
+        
+    } catch (error) {
+        console.error('Erro ao carregar funcionários:', error);
+    }
+}
+
+function carregarFuncionariosAutomaticamente(funcionarios) {
+    const container = document.getElementById('funcionarios-container');
+    container.innerHTML = '<h6>Funcionários Alocados Automaticamente:</h6>';
+    
+    funcionarios.forEach(funcionario => {
+        const funcionarioElement = document.createElement('div');
+        funcionarioElement.className = 'funcionario-auto-alocado';
+        funcionarioElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-2">
+                <div>
+                    <strong>${funcionario.funcionario_nome}</strong>
+                    <small class="text-muted d-block">${funcionario.papel}</small>
+                    <small class="text-info">${funcionario.turno_inicio} - ${funcionario.turno_fim}</small>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removerFuncionario(${funcionario.funcionario_id})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        container.appendChild(funcionarioElement);
+    });
+}
+```
+
+## 📋 CHECKLIST DE IMPLEMENTAÇÃO
+
+### FASE 1: Banco de Dados
+- [ ] Adicionar campo `local_trabalho` ao modelo `Allocation`
+- [ ] Adicionar campos de ponto ao modelo `AllocationEmployee`
+- [ ] Criar função `processar_lancamentos_automaticos()`
+- [ ] Executar migração do banco
+
+### FASE 2: Backend APIs
+- [ ] Atualizar API de alocação de funcionários
+- [ ] Criar API de alocação com local
+- [ ] Criar API de sincronização de ponto
+- [ ] Criar API para integração com RDO
+
+### FASE 3: Frontend
+- [ ] Atualizar template para campo/oficina
+- [ ] Implementar CSS expandido
+- [ ] Atualizar JavaScript para drag & drop local
+- [ ] Adicionar botão de sincronização
+
+### FASE 4: Integração
+- [ ] Modificar RDO para seleção obra → local
+- [ ] Implementar carregamento automático de funcionários
+- [ ] Testar integração completa
+
+### FASE 5: Automação
+- [ ] Configurar cron job para lançamentos automáticos
+- [ ] Implementar sistema de feriados
+- [ ] Testes de sincronização
+
+## 🎯 RESULTADO ESPERADO
+
+Após a implementação completa:
+
+1. **Gestão Visual Expandida**: Card ocupando largura completa com separação campo/oficina
+2. **Integração de Horários**: Funcionários alocados com horário do cadastro
+3. **Ponto Automático**: Sistema gera faltas/folgas automaticamente
+4. **RDO Inteligente**: Carregamento automático de funcionários baseado na alocação
+5. **Sincronização Manual**: Botão para processar lançamentos quando necessário
+
+O sistema ficará completamente integrado, eliminando trabalho manual e melhorando a experiência do usuário.
+
