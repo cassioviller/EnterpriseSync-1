@@ -47,13 +47,13 @@ def convert_to_sunday_weekday(python_weekday):
 @login_required
 @admin_required
 def alocacao_semanal():
-    """Redirecionar para teste FASE 1"""
+    """Redirecionar para alocação principal"""
     return redirect(url_for('equipe.alocacao_teste_fase1'))
 
 @equipe_bp.route('/teste-fase1')
 @login_required
 def alocacao_teste_fase1():
-    """Rota principal com debug detalhado - FASE 2"""
+    """Rota principal de alocação"""
     try:
         # Debug de usuário
         user_info = {
@@ -63,8 +63,6 @@ def alocacao_teste_fase1():
             'authenticated': current_user.is_authenticated
         }
         
-        print("=== DEBUG TESTE-FASE1 FASE 2 ===")
-        print(f"User info: {user_info}")
         
         # Teste básico de obras
         obras_count = 0
@@ -72,9 +70,8 @@ def alocacao_teste_fase1():
             from models import Obra
             admin_id = get_admin_id() 
             obras_count = Obra.query.filter_by(admin_id=admin_id, ativo=True).count()
-            print(f"Obras encontradas: {obras_count}")
         except Exception as e:
-            print(f"ERRO ao contar obras: {e}")
+            logging.error(f"Erro ao contar obras: {e}")
         
         # Teste de template
         return render_template('equipe/alocacao_simples.html', 
@@ -82,7 +79,7 @@ def alocacao_teste_fase1():
                              obras_count=obras_count)
         
     except Exception as e:
-        print(f"ERRO COMPLETO FASE 2: {e}")
+        logging.error(f"Erro na alocação teste fase 1: {e}")
         import traceback
         traceback.print_exc()
         
@@ -94,8 +91,7 @@ def alocacao_teste_fase1():
                 <p><strong>Erro:</strong> {e}</p>
                 <pre>{traceback.format_exc()}</pre>
                 <hr>
-                <a href="/equipe/teste-sem-auth" class="btn btn-primary">← Voltar ao teste básico</a>
-                <a href="/equipe/debug/test-direct" class="btn btn-info">Testar API Direta</a>
+                <a href="/equipe" class="btn btn-primary">← Voltar ao dashboard</a>
             </div>
         </div>
         """
@@ -135,41 +131,14 @@ def allocation_funcionarios(allocation_id):
         flash('Erro ao carregar funcionários', 'error')
         return redirect(url_for('equipe.alocacao_semanal'))
 
-# ===================================  
-# ROTAS REMOVIDAS - Duplicadas e inseguras
-# Mantendo apenas versões RESTful completas
-# ===================================
-
-@equipe_bp.route('/api/test', methods=['GET'])
-@login_required
-def test_api():
-    """API de teste para validar integração - FASE 1"""
-    try:
-        return jsonify({
-            'status': 'ok',
-            'user_id': current_user.id,
-            'admin_id': get_admin_id(),
-            'user_type': str(type(current_user)),
-            'user_tipo_usuario': str(current_user.tipo_usuario) if hasattr(current_user, 'tipo_usuario') else 'N/A',
-            'timestamp': datetime.now().isoformat(),
-            'message': 'FASE 1: API funcionando!'
-        })
-    except Exception as e:
-        print(f"ERRO API TEST: {e}")  # Debug simples
-        return jsonify({'status': 'error', 'error': str(e)})
 
 @equipe_bp.route('/api/obras-simples', methods=['GET'])
 @login_required
 def get_obras_simples():
-    """Lista obras - VERSÃO SIMPLES FASE 1"""
+    """Lista obras disponíveis"""
     try:
-        # Use a query que você já conhece
         admin_id = get_admin_id()
-        print(f"=== DEBUG OBRAS: admin_id={admin_id} ===")
-        
-        # ADAPTE conforme seu modelo Obra atual
         obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.codigo).all()
-        print(f"=== DEBUG: Encontradas {len(obras)} obras ===")
         
         result = []
         for obra in obras:
@@ -184,11 +153,11 @@ def get_obras_simples():
             'data': result, 
             'count': len(result),
             'admin_id': admin_id,
-            'message': 'FASE 1: Obras carregadas!'
+            'message': 'Obras carregadas com sucesso'
         })
         
     except Exception as e:
-        print(f"ERRO API OBRAS: {e}")  # Debug simples
+        logging.error(f"Erro API obras: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
@@ -196,12 +165,11 @@ def get_obras_simples():
 @equipe_bp.route('/api/allocations-simples', methods=['GET'])
 @login_required
 def get_allocations_simples():
-    """Lista alocações - VERSÃO SIMPLES FASE 1"""
+    """Lista alocações da semana"""
     try:
         admin_id = get_admin_id()
         week_start = request.args.get('week_start')
         
-        print(f"=== DEBUG ALLOCATIONS: admin_id={admin_id}, week_start={week_start} ===")
         
         # Parse da data ou usa semana atual
         if week_start:
@@ -219,7 +187,6 @@ def get_allocations_simples():
             Allocation.data_alocacao <= end_date
         ).all()
         
-        print(f"=== DEBUG: Encontradas {len(allocations)} alocações ===")
         
         result = []
         for alloc in allocations:
@@ -245,91 +212,17 @@ def get_allocations_simples():
             'count': len(result),
             'week_start': start_date.isoformat(),
             'week_end': end_date.isoformat(),
-            'message': 'FASE 1: Alocações carregadas!'
+            'message': 'Alocações carregadas com sucesso'
         })
         
     except Exception as e:
-        print(f"ERRO API ALLOCATIONS: {e}")
+        logging.error(f"Erro API allocations: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
 
-# ===================================  
-# FASE 2: TESTES E DEBUG - IMPLEMENTAÇÃO
-# SEGUINDO PLANO EXATO DO PROMPT
-# ===================================
 
-@equipe_bp.route('/teste-sem-auth')
-@login_required
-@admin_required
-def teste_sem_auth():
-    """Teste básico - AGORA COM autenticação"""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Teste Fase 2</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    </head>
-    <body>
-        <div class="container mt-5">
-            <div class="alert alert-success">
-                <h1>🎯 FASE 2 - TESTE BÁSICO</h1>
-                <p><strong>✅ Rota funcionando!</strong></p>
-                <p>Blueprint registrado corretamente.</p>
-                <hr>
-                <h3>Próximos testes:</h3>
-                <a href="/equipe/debug/test-direct" class="btn btn-info me-2">Teste API Direta</a>
-                <a href="/equipe/teste-fase1" class="btn btn-warning">Teste com Auth</a>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
 
-@equipe_bp.route('/debug/test-direct')
-@login_required
-@admin_required
-def debug_test_direct():
-    """API de teste - AGORA COM autenticação"""
-    import datetime
-    return jsonify({
-        'status': 'API funcionando',
-        'timestamp': datetime.datetime.now().isoformat(),
-        'debug': True,
-        'message': 'Rota de debug ativa',
-        'fase': 2
-    })
-
-@equipe_bp.route('/debug/obras-count')
-@login_required  # Esta precisa de auth
-def debug_obras_count():
-    """Conta obras - com autenticação"""
-    try:
-        admin_id = get_admin_id()
-        
-        # Teste básico de query
-        from models import Obra
-        total_obras = Obra.query.count()
-        obras_admin = Obra.query.filter_by(admin_id=admin_id).count()
-        obras_ativas = Obra.query.filter_by(admin_id=admin_id, ativo=True).count()
-        
-        return jsonify({
-            'admin_id': admin_id,
-            'total_obras_sistema': total_obras,
-            'obras_do_admin': obras_admin,
-            'obras_ativas': obras_ativas,
-            'status': 'ok',
-            'fase': 2
-        })
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'error': str(e),
-            'traceback': traceback.format_exc(),
-            'status': 'error',
-            'fase': 2
-        })
 
 # ===================================  
 # NOVAS APIs - IMPLEMENTAÇÃO COMPLETA
@@ -345,7 +238,7 @@ def api_alocar_obra_restful():
         admin_id = get_admin_id()
         data = request.get_json()
         
-        # Validações de input
+
         if not data:
             return jsonify({'success': False, 'error': 'Dados não fornecidos'}), 400
         
@@ -554,10 +447,6 @@ def api_allocations_week():
             'error': 'Erro interno do servidor'
         }), 500
 
-# ===================================  
-# MÓDULO GESTÃO DE FUNCIONÁRIOS EM ALOCAÇÕES
-# APIs REST para gerenciar funcionários nas alocações de equipe
-# ===================================
 
 @equipe_bp.route('/api/allocation/<int:allocation_id>/funcionarios', methods=['GET'])
 @login_required
@@ -567,7 +456,7 @@ def api_get_allocation_funcionarios(allocation_id):
     try:
         admin_id = get_admin_id()
         
-        # Verificar se allocation existe e pertence ao admin
+
         allocation = Allocation.query.filter_by(
             id=allocation_id, 
             admin_id=admin_id
@@ -579,23 +468,20 @@ def api_get_allocation_funcionarios(allocation_id):
                 'error': 'Alocação não encontrada'
             }), 404
         
-        # Buscar obra para informações adicionais - COM VALIDAÇÃO DE ADMIN_ID
+        # Buscar obra
         obra = Obra.query.filter_by(id=allocation.obra_id, admin_id=admin_id).first()
         
-        # Funcionários já alocados nesta allocation
         funcionarios_alocados = db.session.query(AllocationEmployee, Funcionario).join(
             Funcionario, AllocationEmployee.funcionario_id == Funcionario.id
         ).filter(
             AllocationEmployee.allocation_id == allocation_id
         ).order_by(Funcionario.nome).all()
         
-        # Funcionários disponíveis (ativos do admin)
         funcionarios_disponiveis = Funcionario.query.filter_by(
             admin_id=admin_id,
             ativo=True
         ).order_by(Funcionario.nome).all()
         
-        # Serializar funcionários alocados
         alocados_data = []
         for alloc_emp, funcionario in funcionarios_alocados:
             alocados_data.append({
@@ -610,7 +496,6 @@ def api_get_allocation_funcionarios(allocation_id):
                 'created_at': alloc_emp.created_at.isoformat()
             })
         
-        # Serializar funcionários disponíveis
         disponiveis_data = []
         for funcionario in funcionarios_disponiveis:
             disponiveis_data.append({
@@ -657,7 +542,7 @@ def api_create_allocation_employee():
         admin_id = get_admin_id()
         data = request.get_json()
         
-        # Validações de input
+
         if not data:
             return jsonify({
                 'success': False,
@@ -673,7 +558,7 @@ def api_create_allocation_employee():
                 'error': 'Campos obrigatórios: allocation_id, funcionario_id'
             }), 400
         
-        # Verificar se allocation existe e pertence ao admin
+
         allocation = Allocation.query.filter_by(
             id=allocation_id,
             admin_id=admin_id
