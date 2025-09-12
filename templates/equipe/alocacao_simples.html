@@ -1890,11 +1890,17 @@ class EquipeFase2 {
             this.calculateCurrentWeek();
         }
         
-        const sunday = new Date(this.currentWeek);
+        // CORREÇÃO: Parse local sem UTC para evitar problemas de timezone
+        const parts = this.currentWeek.split('-');
+        const sunday = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        
         const targetDate = new Date(sunday);
         targetDate.setDate(sunday.getDate() + dayOfWeek);
         
-        return targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const result = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        this.log(`📅 getDateForDay(${dayOfWeek}): ${this.currentWeek} + ${dayOfWeek} = ${result}`);
+        
+        return result;
     }
     
     // ===================================  
@@ -2372,7 +2378,7 @@ class EquipeFase2 {
     }
     
     // MÉTODOS DE SALVAMENTO E REMOÇÃO - APIs INTEGRADAS
-    async salvarAlocacao(obraId, dayOfWeek) {
+    async salvarAlocacao(obraId, dayOfWeek, localTrabalho = 'campo') {
         this.log(`💾 Salvando alocação: Obra ${obraId} no dia ${dayOfWeek}`);
         
         try {
@@ -2386,17 +2392,35 @@ class EquipeFase2 {
                 body: JSON.stringify({
                     obra_id: parseInt(obraId),
                     day_of_week: dayOfWeek,
-                    data_alocacao: data_alocacao
+                    data_alocacao: data_alocacao,
+                    local_trabalho: localTrabalho
                 })
             });
             
             const result = await response.json();
+            this.log(`📡 API Response:`, result);
             
             if (result.success) {
                 this.log(`✅ Alocação salva: ${result.message}`);
                 this.updateStatus(`✅ ${result.message}`, 'success');
                 
-                // Recarregar alocações para atualizar interface
+                // CORREÇÃO: Renderizar imediatamente se temos dados da alocação
+                if (result.allocation) {
+                    this.log(`📦 Renderizando nova alocação:`, result.allocation);
+                    const dayElement = document.getElementById(`day-${dayOfWeek}-${localTrabalho}`);
+                    if (dayElement) {
+                        // Remover placeholder
+                        const placeholder = dayElement.querySelector('.text-muted');
+                        if (placeholder && placeholder.textContent.includes('Arraste')) {
+                            placeholder.remove();
+                        }
+                        this.renderAllocationItem(dayElement, result.allocation, dayOfWeek);
+                        this.updateDayCounter(dayOfWeek);
+                        return true;
+                    }
+                }
+                
+                // Fallback: recarregar se não conseguiu renderizar
                 await this.carregarAlocacoes();
                 
                 return true;
@@ -2667,7 +2691,8 @@ class EquipeFase2 {
                 this.updateStatus(`💾 Salvando obra no ${dayName}...`, 'info');
                 evt.item.style.opacity = '0.5';
                 
-                const success = await this.salvarAlocacao(obraId, i);
+                // CORREÇÃO: Usar nova função salvarAlocacao com local_trabalho
+                const success = await this.salvarAlocacao(obraId, i, 'campo');
                 
                 if (success) {
                     this.log(`✅ Obra ${obraId} salva no ${dayName}!`);
@@ -2680,6 +2705,8 @@ class EquipeFase2 {
                         }
                     }
                     
+                    // Atualizar contador do dia
+                    this.updateDayCounter(i);
                     this.clearRollbackState();
                 } else {
                     this.log(`❌ Erro ao salvar obra ${obraId} no ${dayName} - executando rollback`);
@@ -3003,8 +3030,8 @@ class EquipeFase2 {
                             // Toast de loading
                             const loadingToast = this.showToast(`Salvando obra no ${dayName}...`, 'loading', 0);
                             
-                            // Salvar via API
-                            const success = await this.salvarAlocacao(obraId, i);
+                            // CORREÇÃO: Salvar via API com local_trabalho padrão
+                            const success = await this.salvarAlocacao(obraId, i, 'campo');
                             
                             // Remover loading
                             this.hideOperationLoading(loadingOverlay);
@@ -3016,12 +3043,12 @@ class EquipeFase2 {
                                 // Toast de sucesso
                                 this.showToast(`✅ Obra salva no ${dayName}!`, 'success', 2000);
                                 
-                                // Remover o item arrastado (será substituído pela renderização correta)
+                                // Remover o item arrastado (já será renderizado pela salvarAlocacao)
                                 evt.item.remove();
                                 
                                 // Limpar placeholder
-                                if (dayElement.querySelector('.text-muted')) {
-                                    const placeholder = dayElement.querySelector('.text-muted');
+                                if (oldDayElement.querySelector('.text-muted')) {
+                                    const placeholder = oldDayElement.querySelector('.text-muted');
                                     if (placeholder.textContent.includes('Arraste')) {
                                         placeholder.remove();
                                     }
@@ -4079,13 +4106,14 @@ class EquipeFase2 {
             this.hideOperationLoading(loadingOverlay);
             loadingToast.remove();
             
-            if (result.success) {
+            if (result.success && result.allocation) {
                 this.log(`✅ Obra ${obraId} salva no ${dayName} (${localDisplay})!`);
+                this.log(`📦 Dados da nova alocação:`, result.allocation);
                 
                 // Toast de sucesso
                 this.showToast(`✅ Obra salva no ${dayName} (${localDisplay})!`, 'success', 2000);
                 
-                // Remover o item arrastado (será substituído pela renderização correta)
+                // Remover o item arrastado
                 evt.item.remove();
                 
                 // Remover placeholder se existir
@@ -4094,8 +4122,12 @@ class EquipeFase2 {
                     placeholder.remove();
                 }
                 
-                // Recarregar alocações para atualizar interface
-                await this.carregarAlocacoes();
+                // CORREÇÃO CRÍTICA: Renderizar card imediatamente com dados da API
+                // ao invés de recarregar tudo via carregarAlocacoes()
+                this.renderAllocationItem(evt.to, result.allocation, dayIndex);
+                
+                // Atualizar contador do dia
+                this.updateDayCounter(dayIndex);
                 
                 // Limpar estado de rollback
                 this.clearRollbackState();
