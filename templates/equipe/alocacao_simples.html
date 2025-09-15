@@ -79,16 +79,40 @@
                             <h5 class="mb-1">📅 Gestão Semanal</h5>
                             <small id="week-title" class="text-muted">Carregando semana...</small>
                         </div>
-                        <div class="btn-group" role="group">
-                            <button class="btn btn-outline-primary" id="btn-prev-week" onclick="window.equipeFase2.navegarSemana(-1)">
-                                <i class="fas fa-chevron-left"></i> Semana Anterior
-                            </button>
-                            <button class="btn btn-outline-secondary" id="btn-current-week" onclick="window.equipeFase2.irParaSemanaAtual()">
-                                Hoje
-                            </button>
-                            <button class="btn btn-outline-primary" id="btn-next-week" onclick="window.equipeFase2.navegarSemana(1)">
-                                Próxima Semana <i class="fas fa-chevron-right"></i>
-                            </button>
+                        <div class="d-flex gap-2">
+                            <!-- Navegação de Semana -->
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-outline-primary" id="btn-prev-week" onclick="window.equipeFase2.navegarSemana(-1)">
+                                    <i class="fas fa-chevron-left"></i> Semana Anterior
+                                </button>
+                                <button class="btn btn-outline-secondary" id="btn-current-week" onclick="window.equipeFase2.irParaSemanaAtual()">
+                                    Hoje
+                                </button>
+                                <button class="btn btn-outline-primary" id="btn-next-week" onclick="window.equipeFase2.navegarSemana(1)">
+                                    Próxima Semana <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Exportação PDF -->
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-outline-info btn-sm" onclick="window.equipeFase2.exportarPDFSemana()" title="Exportar semana completa em PDF (paisagem)">
+                                    <i class="fas fa-file-pdf"></i> PDF Semana
+                                </button>
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-info btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Exportar dia específico em PDF (retrato)">
+                                        <i class="fas fa-calendar-day"></i> PDF Dia
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" onclick="window.equipeFase2.exportarPDFDia(0)">Domingo</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="window.equipeFase2.exportarPDFDia(1)">Segunda</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="window.equipeFase2.exportarPDFDia(2)">Terça</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="window.equipeFase2.exportarPDFDia(3)">Quarta</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="window.equipeFase2.exportarPDFDia(4)">Quinta</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="window.equipeFase2.exportarPDFDia(5)">Sexta</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="window.equipeFase2.exportarPDFDia(6)">Sábado</a></li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2044,6 +2068,10 @@
 
 <!-- SortableJS - CDN confiável -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<!-- jsPDF e html2canvas para exportação PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
 // CLASSE FASE 2 - FOCO EM DEBUG E CORREÇÕES + INTEGRAÇÃO COMPLETA
