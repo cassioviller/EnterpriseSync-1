@@ -149,6 +149,68 @@ def allocation_funcionarios(allocation_id):
         return redirect(url_for('equipe.alocacao_semanal'))
 
 
+@equipe_bp.route('/api/allocations/<int:allocation_id>/funcionarios', methods=['GET'])
+@login_required
+def get_funcionarios_allocation_json(allocation_id):
+    """API JSON para funcionários de uma alocação específica (para os cards)"""
+    try:
+        admin_id = get_admin_id()
+        
+        # Validar que a alocação pertence ao admin
+        allocation = Allocation.query.filter_by(id=allocation_id, admin_id=admin_id).first()
+        if not allocation:
+            return jsonify({
+                'success': False,
+                'error': 'Alocação não encontrada',
+                'funcionarios': []
+            }), 404
+        
+        # Buscar funcionários alocados
+        funcionarios_list = []
+        try:
+            allocation_employees = AllocationEmployee.query.filter_by(allocation_id=allocation_id).all()
+            
+            for ae in allocation_employees:
+                funcionario = Funcionario.query.filter_by(
+                    id=ae.funcionario_id, 
+                    admin_id=admin_id, 
+                    ativo=True
+                ).first()
+                
+                if funcionario:  # Validação adicional
+                    funcionarios_list.append({
+                        'id': funcionario.id,
+                        'nome': funcionario.nome,
+                        'nome_curto': ' '.join(funcionario.nome.split()[:2]),  # Primeiros 2 nomes
+                        'codigo': funcionario.codigo,
+                        'papel': ae.papel or 'Sem função',
+                        'entrada': ae.turno_inicio.strftime('%H:%M') if ae.turno_inicio else '08:00',
+                        'saida': ae.turno_fim.strftime('%H:%M') if ae.turno_fim else '17:00',
+                        'almoco_saida': ae.hora_almoco_saida.strftime('%H:%M') if ae.hora_almoco_saida else '12:00',
+                        'almoco_retorno': ae.hora_almoco_retorno.strftime('%H:%M') if ae.hora_almoco_retorno else '13:00',
+                        'percentual_extras': ae.percentual_extras if hasattr(ae, 'percentual_extras') else 0.0,
+                        'tipo_lancamento': ae.tipo_lancamento if hasattr(ae, 'tipo_lancamento') else 'trabalho_normal'
+                    })
+        
+        except Exception as e:
+            logging.error(f"Erro ao buscar funcionários da alocação {allocation_id}: {e}")
+        
+        return jsonify({
+            'success': True,
+            'allocation_id': allocation_id,
+            'count': len(funcionarios_list),
+            'funcionarios': funcionarios_list
+        })
+        
+    except Exception as e:
+        logging.error(f"API FUNCIONARIOS ERROR para allocation {allocation_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Erro interno do servidor',
+            'funcionarios': []
+        }), 500
+
+
 @equipe_bp.route('/api/obras-simples', methods=['GET'])
 @login_required
 def get_obras_simples():

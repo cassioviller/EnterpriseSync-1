@@ -3558,7 +3558,7 @@ class EquipeFase2 {
         try {
             this.log(`📡 MODAL: Carregando dados da alocação ${allocationId}...`);
             
-            const response = await fetch(`/equipe/api/allocation/${allocationId}/funcionarios`);
+            const response = await fetch(`/equipe/api/allocations/${allocationId}/funcionarios`);
             
             if (!response.ok) {
                 throw new Error(`API retornou ${response.status}: ${response.statusText}`);
@@ -4433,7 +4433,7 @@ class EquipeFase2 {
         try {
             this.log(`🔄 BADGE: Carregando contador para alocação ${allocationId}...`);
             
-            const response = await fetch(`/equipe/api/allocation/${allocationId}/funcionarios`);
+            const response = await fetch(`/equipe/api/allocations/${allocationId}/funcionarios`);
             
             if (!response.ok) {
                 throw new Error(`API retornou ${response.status}: ${response.statusText}`);
