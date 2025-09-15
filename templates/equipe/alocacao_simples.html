@@ -2064,8 +2064,8 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <!-- jsPDF e html2canvas para exportação PDF -->
-<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
 // CLASSE FASE 2 - FOCO EM DEBUG E CORREÇÕES + INTEGRAÇÃO COMPLETA
@@ -4898,9 +4898,8 @@ class EquipeFase2 {
         while (tentativas < maxTentativas) {
             // Verificar multiple formas de como o jsPDF pode estar disponível
             const jsPDFDisponivel = (
-                (typeof window.jsPDF !== 'undefined' && window.jsPDF.jsPDF) ||
-                (typeof window.jspdf !== 'undefined') ||
-                (typeof jsPDF !== 'undefined')
+                typeof window.jsPDF !== 'undefined' &&
+                typeof window.jsPDF.jsPDF === 'function'
             );
             
             const html2canvasDisponivel = (
@@ -4938,16 +4937,6 @@ class EquipeFase2 {
         try {
             // Aguardar bibliotecas carregarem se necessário
             await this.aguardarBibliotecasPDF();
-
-            // Debug temporário - verificar estrutura
-            this.log('🔍 DEBUG jsPDF Structure:');
-            this.log('window.jsPDF:', typeof window.jsPDF);
-            this.log('window.jsPDF.jsPDF:', typeof window.jsPDF?.jsPDF);
-            this.log('window.jspdf:', typeof window.jspdf);
-            this.log('global jsPDF:', typeof jsPDF);
-            if (window.jsPDF) {
-                this.log('window.jsPDF keys:', Object.keys(window.jsPDF));
-            }
 
             // Preparando PDF da semana
             
