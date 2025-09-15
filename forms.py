@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, TextAreaField, FloatField, DateField, SelectField, BooleanField, TimeField, IntegerField, HiddenField
-from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional
+from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional, ValidationError
 from datetime import date
 
 class DepartamentoForm(FlaskForm):
@@ -229,10 +229,10 @@ class AlimentacaoMultiplaForm(FlaskForm):
 
 
 class UsoVeiculoForm(FlaskForm):
-    """Formulário para registro de uso de veículo"""
+    """Formulário aprimorado para registro de uso de veículo"""
     veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
     funcionario_id = SelectField('Funcionário', coerce=int, validators=[DataRequired()])
-    obra_id = SelectField('Obra', coerce=int, validators=[DataRequired()])
+    obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()])
     data_uso = DateField('Data de Uso', validators=[DataRequired()], default=date.today)
     km_inicial = IntegerField('KM Inicial', validators=[Optional(), NumberRange(min=0)])
     km_final = IntegerField('KM Final', validators=[Optional(), NumberRange(min=0)])
@@ -240,24 +240,132 @@ class UsoVeiculoForm(FlaskForm):
     horario_chegada = TimeField('Horário de Chegada', validators=[Optional()])
     finalidade = StringField('Finalidade', validators=[Optional(), Length(max=200)])
     observacoes = TextAreaField('Observações')
+    
+    # Novos campos
+    local_destino = StringField('Local de Destino', validators=[Optional(), Length(max=200)])
+    tipo_uso = SelectField('Tipo de Uso', choices=[
+        ('trabalho', 'Trabalho'),
+        ('emergencia', 'Emergência'),
+        ('manutencao', 'Manutenção'),
+        ('transporte_materiais', 'Transporte de Materiais'),
+        ('reuniao_cliente', 'Reunião Cliente'),
+        ('outros', 'Outros')
+    ], default='trabalho', validators=[DataRequired()])
+    status_uso = SelectField('Status', choices=[
+        ('ativo', 'Em Uso'),
+        ('finalizado', 'Finalizado'),
+        ('cancelado', 'Cancelado')
+    ], default='ativo', validators=[DataRequired()])
+    
+    # Validações customizadas
+    def validate_km_inicial(form, field):
+        if field.data and hasattr(form, 'veiculo_id') and form.veiculo_id.data:
+            try:
+                from models import Veiculo
+                veiculo = Veiculo.query.get(form.veiculo_id.data)
+                if veiculo and veiculo.km_atual and field.data < veiculo.km_atual:
+                    raise ValidationError(f'KM inicial ({field.data}) não pode ser menor que KM atual do veículo ({veiculo.km_atual}).')
+            except Exception:
+                # Se não conseguir validar, apenas prosseguir
+                pass
+    
+    def validate_km_final(form, field):
+        if field.data and form.km_inicial.data:
+            if field.data <= form.km_inicial.data:
+                raise ValidationError('KM final deve ser maior que KM inicial.')
+            
+            # Validar diferença razoável de KM (máximo 2000km por dia)
+            if (field.data - form.km_inicial.data) > 2000:
+                raise ValidationError('Diferença de KM muito alta para um dia (máximo 2000km).')
+    
+    def validate_horario_chegada(form, field):
+        if field.data and form.horario_saida.data:
+            from datetime import datetime, date, timedelta
+            
+            # Converter horários para datetime para comparação
+            inicio = datetime.combine(date.today(), form.horario_saida.data)
+            fim = datetime.combine(date.today(), field.data)
+            
+            # Se chegada é anterior à saída, assumir que é no dia seguinte
+            if fim < inicio:
+                fim += timedelta(days=1)
+            
+            # Validar duração máxima (24 horas)
+            delta = fim - inicio
+            if delta.total_seconds() > 86400:  # 24 horas em segundos
+                raise ValidationError('Uso do veículo não pode exceder 24 horas.')
+            
+            # Validar duração mínima (15 minutos)
+            if delta.total_seconds() < 900:  # 15 minutos em segundos
+                raise ValidationError('Duração mínima de uso é 15 minutos.')
 
 
 class CustoVeiculoForm(FlaskForm):
-    """Formulário para registro de custo de veículo"""
+    """Formulário aprimorado para registro de custo de veículo"""
     veiculo_id = HiddenField('Veículo')
+    obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()])
     data_custo = DateField('Data do Custo', validators=[DataRequired()], default=date.today)
-    valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
+    valor = FloatField('Valor Total (R$)', validators=[DataRequired(), NumberRange(min=0)])
     tipo_custo = SelectField('Tipo de Custo', choices=[
         ('combustivel', 'Combustível'),
         ('manutencao', 'Manutenção'),
         ('seguro', 'Seguro'),
         ('multa', 'Multa'),
         ('lavagem', 'Lavagem'),
+        ('ipva', 'IPVA'),
+        ('licenciamento', 'Licenciamento'),
+        ('pneus', 'Pneus'),
         ('outros', 'Outros')
     ], validators=[DataRequired()])
     descricao = TextAreaField('Descrição')
     km_atual = IntegerField('KM Atual', validators=[Optional(), NumberRange(min=0)])
-    fornecedor = StringField('Fornecedor', validators=[Optional(), Length(max=100)])
+    fornecedor = StringField('Fornecedor/Posto', validators=[Optional(), Length(max=100)])
+    
+    # Campos específicos para combustível
+    litros_combustivel = FloatField('Litros Abastecidos', validators=[Optional(), NumberRange(min=0)])
+    preco_por_litro = FloatField('Preço por Litro (R$)', validators=[Optional(), NumberRange(min=0)])
+    posto_combustivel = StringField('Nome do Posto', validators=[Optional(), Length(max=100)])
+    tipo_combustivel = SelectField('Tipo de Combustível', choices=[
+        ('', 'Selecione...'),
+        ('gasolina', 'Gasolina'),
+        ('etanol', 'Etanol'),
+        ('diesel', 'Diesel'),
+        ('gnv', 'GNV')
+    ], validators=[Optional()])
+    tanque_cheio = BooleanField('Tanque Cheio?', default=False)
+    
+    # Campos para manutenção
+    numero_nota_fiscal = StringField('Número da NF', validators=[Optional(), Length(max=50)])
+    categoria_manutencao = SelectField('Categoria da Manutenção', choices=[
+        ('', 'Selecione...'),
+        ('preventiva', 'Preventiva'),
+        ('corretiva', 'Corretiva'),
+        ('emergencial', 'Emergencial'),
+        ('revisao', 'Revisão')
+    ], validators=[Optional()])
+    proxima_manutencao_km = IntegerField('Próxima Manutenção (KM)', validators=[Optional(), NumberRange(min=0)])
+    proxima_manutencao_data = DateField('Próxima Manutenção (Data)', validators=[Optional()])
+    
+    # Controle financeiro
+    centro_custo = StringField('Centro de Custo', validators=[Optional(), Length(max=50)])
+    
+    # Validações customizadas
+    def validate_litros_combustivel(form, field):
+        if form.tipo_custo.data == 'combustivel':
+            if not field.data or field.data <= 0:
+                raise ValidationError('Litros de combustível é obrigatório para tipo combustível.')
+    
+    def validate_preco_por_litro(form, field):
+        if form.tipo_custo.data == 'combustivel' and form.litros_combustivel.data:
+            if not field.data or field.data <= 0:
+                raise ValidationError('Preço por litro é obrigatório para abastecimentos.')
+            # Validar se o total confere
+            if form.valor.data and abs(form.valor.data - (field.data * form.litros_combustivel.data)) > 0.02:
+                raise ValidationError('Valor total não confere com litros × preço por litro.')
+    
+    def validate_categoria_manutencao(form, field):
+        if form.tipo_custo.data == 'manutencao' and not field.data:
+            raise ValidationError('Categoria da manutenção é obrigatória para tipo manutenção.')
 
 
 class FiltroDataForm(FlaskForm):

@@ -2824,7 +2824,11 @@ def novo_uso_veiculo(id):
     
     # Carregar opções do formulário
     form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()]
-    form.obra_id.choices = [('', 'Selecione uma obra...')] + [(o.id, o.nome) for o in Obra.query.filter_by(admin_id=admin_id).all()]
+    form.obra_id.choices = [('', 'Selecione uma obra (opcional)...')] + [(o.id, o.nome) for o in Obra.query.filter_by(admin_id=admin_id, ativo=True).all()]
+    
+    # Auto-completar KM inicial com KM atual do veículo
+    if not form.km_inicial.data:
+        form.km_inicial.data = veiculo.km_atual
     
     if form.validate_on_submit():
         try:
@@ -2846,10 +2850,10 @@ def novo_uso_veiculo(id):
                     flash(f'Aviso: KM inicial ({form.km_inicial.data}km) é menor que a quilometragem atual do veículo ({veiculo.km_atual}km).', 'warning')
             
             # Verificar disponibilidade do veículo
-            if veiculo.status != 'Disponível':
+            if veiculo.status != 'Disponível' and form.status_uso.data == 'ativo':
                 flash('Veículo não está disponível para uso.', 'warning')
             
-            # Criar registro de uso
+            # Criar registro de uso com novos campos
             uso = UsoVeiculo(
                 veiculo_id=veiculo.id,
                 funcionario_id=form.funcionario_id.data,
@@ -2860,15 +2864,25 @@ def novo_uso_veiculo(id):
                 horario_saida=form.horario_saida.data,
                 horario_chegada=form.horario_chegada.data,
                 finalidade=form.finalidade.data,
-                observacoes=form.observacoes.data
+                observacoes=form.observacoes.data,
+                local_destino=form.local_destino.data,
+                tipo_uso=form.tipo_uso.data,
+                status_uso=form.status_uso.data,
+                admin_id=admin_id
             )
+            
+            # Calcular campos automáticos
+            uso.calcular_campos_automaticos()
             
             db.session.add(uso)
             
             # Atualizar status e KM do veículo
             if form.km_final.data:
                 veiculo.km_atual = form.km_final.data
-                veiculo.status = 'Disponível'
+                if form.status_uso.data == 'finalizado':
+                    veiculo.status = 'Disponível'
+                else:
+                    veiculo.status = 'Em uso'
             else:
                 veiculo.status = 'Em uso'
             
@@ -2912,21 +2926,50 @@ def novo_custo_veiculo(id):
                     return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
             
             # Validar tipo de custo
-            tipos_validos = ['combustivel', 'manutencao', 'seguro', 'multa', 'licenciamento', 'outros']
+            tipos_validos = ['combustivel', 'manutencao', 'seguro', 'multa', 'ipva', 'licenciamento', 'pneus', 'outros']
             if form.tipo_custo.data not in tipos_validos:
                 flash(f'Tipo de custo inválido. Use: {", ".join(tipos_validos)}', 'error')
                 return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
             
-            # Criar registro de custo
+            # Validações específicas para combustível
+            if form.tipo_custo.data == 'combustivel':
+                if not form.litros_combustivel.data or form.litros_combustivel.data <= 0:
+                    flash('Litros de combustível é obrigatório para abastecimentos.', 'error')
+                    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+                
+                if not form.preco_por_litro.data or form.preco_por_litro.data <= 0:
+                    flash('Preço por litro é obrigatório para abastecimentos.', 'error')
+                    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+            
+            # Criar registro de custo com novos campos
             custo = CustoVeiculo(
                 veiculo_id=veiculo.id,
+                obra_id=form.obra_id.data if form.obra_id.data else None,
                 data_custo=form.data_custo.data,
                 valor=form.valor.data,
                 tipo_custo=form.tipo_custo.data,
                 descricao=form.descricao.data,
                 km_atual=form.km_atual.data or veiculo.km_atual,
-                fornecedor=form.fornecedor.data
+                fornecedor=form.fornecedor.data,
+                # Campos específicos para combustível
+                litros_combustivel=form.litros_combustivel.data if form.tipo_custo.data == 'combustivel' else None,
+                preco_por_litro=form.preco_por_litro.data if form.tipo_custo.data == 'combustivel' else None,
+                posto_combustivel=form.posto_combustivel.data if form.tipo_custo.data == 'combustivel' else None,
+                tipo_combustivel=form.tipo_combustivel.data if form.tipo_custo.data == 'combustivel' else None,
+                tanque_cheio=form.tanque_cheio.data if form.tipo_custo.data == 'combustivel' else False,
+                # Campos para manutenção
+                numero_nota_fiscal=form.numero_nota_fiscal.data if form.tipo_custo.data == 'manutencao' else None,
+                categoria_manutencao=form.categoria_manutencao.data if form.tipo_custo.data == 'manutencao' else None,
+                proxima_manutencao_km=form.proxima_manutencao_km.data if form.tipo_custo.data == 'manutencao' else None,
+                proxima_manutencao_data=form.proxima_manutencao_data.data if form.tipo_custo.data == 'manutencao' else None,
+                # Controle financeiro
+                centro_custo=form.centro_custo.data,
+                admin_id=admin_id
             )
+            
+            # Calcular próxima manutenção automaticamente se for manutenção
+            if form.tipo_custo.data == 'manutencao':
+                custo.calcular_proxima_manutencao()
             
             db.session.add(custo)
             
@@ -2960,6 +3003,352 @@ def novo_custo_veiculo(id):
             flash('Erro ao registrar custo do veículo. Tente novamente.', 'error')
     
     return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+
+
+# ===== NOVAS ROTAS AVANÇADAS PARA SISTEMA DE VEÍCULOS =====
+
+@main_bp.route('/veiculos/<int:id>/dashboard')
+@admin_required
+def dashboard_veiculo(id):
+    """Dashboard completo com KPIs e gráficos de um veículo específico"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        from models import Veiculo, UsoVeiculo, CustoVeiculo
+        from datetime import datetime, timedelta
+        from sqlalchemy import func, extract
+        
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        # Período para análises (últimos 6 meses)
+        data_limite = datetime.now() - timedelta(days=180)
+        
+        # 1. KPIs PRINCIPAIS
+        # Total de KMs percorridos (últimos 6 meses)
+        usos_periodo = UsoVeiculo.query.filter(
+            UsoVeiculo.veiculo_id == id,
+            UsoVeiculo.data_uso >= data_limite.date()
+        ).all()
+        
+        total_km = sum([uso.km_percorrido for uso in usos_periodo if uso.km_percorrido])
+        total_horas = sum([uso.horas_uso for uso in usos_periodo if uso.horas_uso])
+        total_usos = len(usos_periodo)
+        
+        # Custos por categoria (últimos 6 meses)
+        custos_periodo = CustoVeiculo.query.filter(
+            CustoVeiculo.veiculo_id == id,
+            CustoVeiculo.data_custo >= data_limite.date()
+        ).all()
+        
+        custos_por_tipo = {}
+        total_litros = 0
+        custo_total = 0
+        
+        for custo in custos_periodo:
+            tipo = custo.tipo_custo
+            custos_por_tipo[tipo] = custos_por_tipo.get(tipo, 0) + custo.valor
+            custo_total += custo.valor
+            
+            if tipo == 'combustivel' and custo.litros_combustivel:
+                total_litros += custo.litros_combustivel
+        
+        # Cálculos de eficiência
+        consumo_medio = round(total_km / total_litros, 2) if total_litros > 0 else 0
+        custo_por_km = round(custo_total / total_km, 2) if total_km > 0 else 0
+        horas_por_uso = round(total_horas / total_usos, 2) if total_usos > 0 else 0
+        
+        # 2. DADOS PARA GRÁFICOS
+        # Uso mensal (últimos 6 meses)
+        uso_mensal = db.session.query(
+            extract('year', UsoVeiculo.data_uso).label('ano'),
+            extract('month', UsoVeiculo.data_uso).label('mes'),
+            func.sum(UsoVeiculo.km_percorrido).label('total_km'),
+            func.count(UsoVeiculo.id).label('total_usos')
+        ).filter(
+            UsoVeiculo.veiculo_id == id,
+            UsoVeiculo.data_uso >= data_limite.date()
+        ).group_by('ano', 'mes').order_by('ano', 'mes').all()
+        
+        # Custos mensais por tipo
+        custos_mensais = db.session.query(
+            extract('year', CustoVeiculo.data_custo).label('ano'),
+            extract('month', CustoVeiculo.data_custo).label('mes'),
+            CustoVeiculo.tipo_custo,
+            func.sum(CustoVeiculo.valor).label('total_valor')
+        ).filter(
+            CustoVeiculo.veiculo_id == id,
+            CustoVeiculo.data_custo >= data_limite.date()
+        ).group_by('ano', 'mes', CustoVeiculo.tipo_custo).all()
+        
+        # 3. ÚLTIMOS USOS (10 mais recentes)
+        ultimos_usos = UsoVeiculo.query.filter_by(veiculo_id=id).order_by(UsoVeiculo.data_uso.desc()).limit(10).all()
+        
+        # 4. PRÓXIMAS MANUTENÇÕES
+        proximas_manutencoes = CustoVeiculo.query.filter(
+            CustoVeiculo.veiculo_id == id,
+            CustoVeiculo.proxima_manutencao_km.isnot(None),
+            CustoVeiculo.proxima_manutencao_km > veiculo.km_atual
+        ).order_by(CustoVeiculo.proxima_manutencao_km).all()
+        
+        kpis = {
+            'total_km': total_km,
+            'total_horas': total_horas,
+            'total_usos': total_usos,
+            'consumo_medio': consumo_medio,
+            'custo_por_km': custo_por_km,
+            'horas_por_uso': horas_por_uso,
+            'custo_total': custo_total,
+            'custos_por_tipo': custos_por_tipo
+        }
+        
+        return render_template('veiculos/dashboard_veiculo.html',
+                             veiculo=veiculo,
+                             kpis=kpis,
+                             uso_mensal=uso_mensal,
+                             custos_mensais=custos_mensais,
+                             ultimos_usos=ultimos_usos,
+                             proximas_manutencoes=proximas_manutencoes)
+        
+    except Exception as e:
+        print(f"ERRO DASHBOARD VEÍCULO: {str(e)}")
+        flash('Erro ao carregar dashboard do veículo.', 'error')
+        return redirect(url_for('main.detalhes_veiculo', id=id))
+
+
+@main_bp.route('/veiculos/<int:id>/historico')
+@admin_required
+def historico_veiculo(id):
+    """Histórico completo de uso e custos do veículo com filtros avançados"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        from models import Veiculo, UsoVeiculo, CustoVeiculo, Funcionario, Obra
+        from datetime import datetime, timedelta
+        
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        # Filtros da query string
+        filtros = {
+            'tipo': request.args.get('tipo', ''),  # uso, custo ou todos
+            'data_inicio': request.args.get('data_inicio'),
+            'data_fim': request.args.get('data_fim'),
+            'funcionario_id': request.args.get('funcionario_id'),
+            'obra_id': request.args.get('obra_id'),
+            'tipo_custo': request.args.get('tipo_custo')
+        }
+        
+        # Query base para usos
+        query_usos = UsoVeiculo.query.filter_by(veiculo_id=id)
+        
+        # Query base para custos
+        query_custos = CustoVeiculo.query.filter_by(veiculo_id=id)
+        
+        # Aplicar filtros de data
+        if filtros['data_inicio']:
+            data_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d').date()
+            query_usos = query_usos.filter(UsoVeiculo.data_uso >= data_inicio)
+            query_custos = query_custos.filter(CustoVeiculo.data_custo >= data_inicio)
+        
+        if filtros['data_fim']:
+            data_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d').date()
+            query_usos = query_usos.filter(UsoVeiculo.data_uso <= data_fim)
+            query_custos = query_custos.filter(CustoVeiculo.data_custo <= data_fim)
+        
+        # Filtros específicos
+        if filtros['funcionario_id']:
+            query_usos = query_usos.filter(UsoVeiculo.funcionario_id == int(filtros['funcionario_id']))
+        
+        if filtros['obra_id']:
+            query_usos = query_usos.filter(UsoVeiculo.obra_id == int(filtros['obra_id']))
+            query_custos = query_custos.filter(CustoVeiculo.obra_id == int(filtros['obra_id']))
+        
+        if filtros['tipo_custo']:
+            query_custos = query_custos.filter(CustoVeiculo.tipo_custo == filtros['tipo_custo'])
+        
+        # Executar queries baseado no tipo
+        usos = []
+        custos = []
+        
+        if filtros['tipo'] in ['', 'todos', 'uso']:
+            usos = query_usos.order_by(UsoVeiculo.data_uso.desc()).limit(100).all()
+        
+        if filtros['tipo'] in ['', 'todos', 'custo']:
+            custos = query_custos.order_by(CustoVeiculo.data_custo.desc()).limit(100).all()
+        
+        # Criar linha do tempo combinada
+        eventos = []
+        for uso in usos:
+            eventos.append({
+                'tipo': 'uso',
+                'data': uso.data_uso,
+                'objeto': uso
+            })
+        
+        for custo in custos:
+            eventos.append({
+                'tipo': 'custo',
+                'data': custo.data_custo,
+                'objeto': custo
+            })
+        
+        # Ordenar eventos por data
+        eventos.sort(key=lambda x: x['data'], reverse=True)
+        
+        # Opções para filtros
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+        obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
+        
+        return render_template('veiculos/historico_veiculo.html',
+                             veiculo=veiculo,
+                             eventos=eventos,
+                             filtros=filtros,
+                             funcionarios=funcionarios,
+                             obras=obras)
+        
+    except Exception as e:
+        print(f"ERRO HISTÓRICO VEÍCULO: {str(e)}")
+        flash('Erro ao carregar histórico do veículo.', 'error')
+        return redirect(url_for('main.detalhes_veiculo', id=id))
+
+
+@main_bp.route('/veiculos/<int:id>/custos')
+@admin_required  
+def lista_custos_veiculo(id):
+    """Lista completa de custos do veículo com filtros e paginação"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        from models import Veiculo, CustoVeiculo
+        from datetime import datetime, timedelta
+        
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        # Filtros da query string
+        filtros = {
+            'tipo': request.args.get('tipo', ''),
+            'data_inicio': request.args.get('data_inicio'),
+            'data_fim': request.args.get('data_fim')
+        }
+        
+        # Query base
+        query = CustoVeiculo.query.filter_by(veiculo_id=id)
+        
+        # Aplicar filtros
+        if filtros['tipo']:
+            query = query.filter(CustoVeiculo.tipo_custo == filtros['tipo'])
+        
+        if filtros['data_inicio']:
+            data_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d').date()
+            query = query.filter(CustoVeiculo.data_custo >= data_inicio)
+        
+        if filtros['data_fim']:
+            data_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d').date()
+            query = query.filter(CustoVeiculo.data_custo <= data_fim)
+        
+        # Paginação
+        page = request.args.get('page', 1, type=int)
+        custos = query.order_by(CustoVeiculo.data_custo.desc()).paginate(
+            page=page, per_page=20, error_out=False
+        )
+        
+        # Calcular totais
+        total_gasto = db.session.query(func.sum(CustoVeiculo.valor)).filter_by(veiculo_id=id).scalar() or 0
+        
+        # Custo do mês atual
+        inicio_mes = datetime.now().replace(day=1).date()
+        custo_mes = db.session.query(func.sum(CustoVeiculo.valor)).filter(
+            CustoVeiculo.veiculo_id == id,
+            CustoVeiculo.data_custo >= inicio_mes
+        ).scalar() or 0
+        
+        return render_template('veiculos/lista_custos.html',
+                             veiculo=veiculo,
+                             custos=custos,
+                             filtros=filtros,
+                             total_gasto=total_gasto,
+                             custo_mes=custo_mes)
+        
+    except Exception as e:
+        print(f"ERRO LISTA CUSTOS: {str(e)}")
+        flash('Erro ao carregar custos do veículo.', 'error')
+        return redirect(url_for('main.detalhes_veiculo', id=id))
+
+
+@main_bp.route('/veiculos/<int:id>/exportar')
+@admin_required
+def exportar_dados_veiculo(id):
+    """Exportar dados do veículo para Excel"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        from models import Veiculo, UsoVeiculo, CustoVeiculo
+        import io
+        import csv
+        from flask import Response
+        
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        # Criar CSV em memória
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        tipo_export = request.args.get('tipo', 'completo')
+        
+        if tipo_export in ['completo', 'usos']:
+            # Cabeçalho para usos
+            writer.writerow(['=== HISTÓRICO DE USOS ==='])
+            writer.writerow(['Data', 'Funcionário', 'Obra', 'KM Inicial', 'KM Final', 'KM Percorrido', 
+                           'Horário Saída', 'Horário Chegada', 'Horas Uso', 'Finalidade', 'Tipo Uso', 'Status'])
+            
+            usos = UsoVeiculo.query.filter_by(veiculo_id=id).order_by(UsoVeiculo.data_uso.desc()).all()
+            for uso in usos:
+                writer.writerow([
+                    uso.data_uso.strftime('%d/%m/%Y'),
+                    uso.funcionario.nome if uso.funcionario else '',
+                    uso.obra.nome if uso.obra else '',
+                    uso.km_inicial or '',
+                    uso.km_final or '',
+                    uso.km_percorrido or '',
+                    uso.horario_saida.strftime('%H:%M') if uso.horario_saida else '',
+                    uso.horario_chegada.strftime('%H:%M') if uso.horario_chegada else '',
+                    uso.tempo_uso_str,
+                    uso.finalidade or '',
+                    uso.tipo_uso or '',
+                    uso.status_uso or ''
+                ])
+            writer.writerow([])  # Linha vazia
+        
+        if tipo_export in ['completo', 'custos']:
+            # Cabeçalho para custos
+            writer.writerow(['=== HISTÓRICO DE CUSTOS ==='])
+            writer.writerow(['Data', 'Tipo', 'Valor', 'Descrição', 'Fornecedor', 'KM Atual', 
+                           'Litros', 'Preço/Litro', 'Consumo', 'Categoria Manutenção'])
+            
+            custos = CustoVeiculo.query.filter_by(veiculo_id=id).order_by(CustoVeiculo.data_custo.desc()).all()
+            for custo in custos:
+                writer.writerow([
+                    custo.data_custo.strftime('%d/%m/%Y'),
+                    custo.tipo_custo,
+                    f"R$ {custo.valor:.2f}",
+                    custo.descricao or '',
+                    custo.fornecedor or '',
+                    custo.km_atual or '',
+                    custo.litros_combustivel or '',
+                    f"R$ {custo.preco_por_litro:.2f}" if custo.preco_por_litro else '',
+                    f"{custo.consumo_medio} km/l" if custo.consumo_medio else '',
+                    custo.categoria_manutencao or ''
+                ])
+        
+        # Preparar resposta
+        output.seek(0)
+        filename = f"veiculo_{veiculo.placa}_{datetime.now().strftime('%Y%m%d')}.csv"
+        
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+        
+    except Exception as e:
+        print(f"ERRO EXPORTAR DADOS: {str(e)}")
+        flash('Erro ao exportar dados do veículo.', 'error')
+        return redirect(url_for('main.detalhes_veiculo', id=id))
 
 # Rotas vazias removidas - estavam só fazendo redirect sem funcionalidade
 

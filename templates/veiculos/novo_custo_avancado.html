@@ -1,0 +1,566 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Novo Custo - {{ veiculo.placa }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-coins me-2 text-warning"></i>
+                        Registrar Custo do Veículo
+                    </h2>
+                    <p class="text-muted mb-0">{{ veiculo.placa }} - {{ veiculo.marca }} {{ veiculo.modelo }}</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('main.detalhes_veiculo', id=veiculo.id) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Voltar
+                    </a>
+                    <a href="{{ url_for('main.lista_custos_veiculo', id=veiculo.id) }}" class="btn btn-outline-info">
+                        <i class="fas fa-list me-1"></i> Ver Custos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário de registro -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-plus-circle"></i> Dados do Custo
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="formCusto">
+                        {{ form.hidden_tag() }}
+                        {{ form.veiculo_id() }}
+                        
+                        <!-- Informações Básicas -->
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.data_custo.label(class="form-label") }}
+                                {{ form.data_custo(class="form-control") }}
+                                {% for error in form.data_custo.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.tipo_custo.label(class="form-label") }}
+                                {{ form.tipo_custo(class="form-select", id="tipoCusto") }}
+                                {% for error in form.tipo_custo.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.obra_id.label(class="form-label") }}
+                                {{ form.obra_id(class="form-select") }}
+                                {% for error in form.obra_id.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Campos Comuns -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.valor.label(class="form-label") }}
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    {{ form.valor(class="form-control", id="valorTotal", placeholder="0,00") }}
+                                </div>
+                                {% for error in form.valor.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                                <div class="valor-info mt-1"></div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.km_atual.label(class="form-label") }}
+                                {{ form.km_atual(class="form-control", placeholder=veiculo.km_atual or 0) }}
+                                {% for error in form.km_atual.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                                <small class="form-text text-muted">Atualiza a quilometragem do veículo</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.fornecedor.label(class="form-label") }}
+                                {{ form.fornecedor(class="form-control", placeholder="Ex: Posto XYZ, Oficina ABC") }}
+                                {% for error in form.fornecedor.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.centro_custo.label(class="form-label") }}
+                                {{ form.centro_custo(class="form-control", placeholder="Ex: VEIC001, OBRA02") }}
+                                {% for error in form.centro_custo.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Campos Específicos para Combustível -->
+                        <div id="camposCombustivel" class="d-none">
+                            <div class="card bg-light mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-gas-pump me-2 text-success"></i>
+                                        Detalhes do Abastecimento
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            {{ form.litros_combustivel.label(class="form-label") }}
+                                            <div class="input-group">
+                                                {{ form.litros_combustivel(class="form-control", id="litrosCombustivel", placeholder="0,00") }}
+                                                <span class="input-group-text">L</span>
+                                            </div>
+                                            {% for error in form.litros_combustivel.errors %}
+                                                <div class="text-danger small">{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            {{ form.preco_por_litro.label(class="form-label") }}
+                                            <div class="input-group">
+                                                <span class="input-group-text">R$</span>
+                                                {{ form.preco_por_litro(class="form-control", id="precoPorLitro", placeholder="0,00") }}
+                                            </div>
+                                            {% for error in form.preco_por_litro.errors %}
+                                                <div class="text-danger small">{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            {{ form.tipo_combustivel.label(class="form-label") }}
+                                            {{ form.tipo_combustivel(class="form-select") }}
+                                            {% for error in form.tipo_combustivel.errors %}
+                                                <div class="text-danger small">{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            {{ form.posto_combustivel.label(class="form-label") }}
+                                            {{ form.posto_combustivel(class="form-control", placeholder="Ex: Shell, Petrobras") }}
+                                            {% for error in form.posto_combustivel.errors %}
+                                                <div class="text-danger small">{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">&nbsp;</label>
+                                            <div class="form-check">
+                                                {{ form.tanque_cheio(class="form-check-input") }}
+                                                {{ form.tanque_cheio.label(class="form-check-label") }}
+                                            </div>
+                                            <small class="form-text text-muted">Marque se encheu o tanque completamente</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Cálculos Automáticos -->
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div class="bg-info bg-opacity-10 p-3 rounded">
+                                                <h6 class="text-info mb-2">
+                                                    <i class="fas fa-calculator me-2"></i>Cálculos Automáticos
+                                                </h6>
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted d-block">Valor Total</small>
+                                                        <span class="fw-bold" id="valorCalculado">R$ 0,00</span>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted d-block">Preço Médio</small>
+                                                        <span class="fw-bold" id="precoMedio">R$ 0,00/L</span>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <small class="text-muted d-block">Consumo Estimado</small>
+                                                        <span class="fw-bold" id="consumoEstimado">-- km/L</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Campos Específicos para Manutenção -->
+                        <div id="camposManutencao" class="d-none">
+                            <div class="card bg-light mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-wrench me-2 text-warning"></i>
+                                        Detalhes da Manutenção
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            {{ form.categoria_manutencao.label(class="form-label") }}
+                                            {{ form.categoria_manutencao(class="form-select") }}
+                                            {% for error in form.categoria_manutencao.errors %}
+                                                <div class="text-danger small">{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            {{ form.numero_nota_fiscal.label(class="form-label") }}
+                                            {{ form.numero_nota_fiscal(class="form-control", placeholder="Ex: 123456") }}
+                                            {% for error in form.numero_nota_fiscal.errors %}
+                                                <div class="text-danger small">{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            {{ form.proxima_manutencao_km.label(class="form-label") }}
+                                            {{ form.proxima_manutencao_km(class="form-control", placeholder="Ex: 65000") }}
+                                            {% for error in form.proxima_manutencao_km.errors %}
+                                                <div class="text-danger small">{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            {{ form.proxima_manutencao_data.label(class="form-label") }}
+                                            {{ form.proxima_manutencao_data(class="form-control") }}
+                                            {% for error in form.proxima_manutencao_data.errors %}
+                                                <div class="text-danger small">{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Descrição -->
+                        <div class="mb-3">
+                            {{ form.descricao.label(class="form-label") }}
+                            {{ form.descricao(class="form-control", rows="3", placeholder="Detalhes sobre o custo, serviços realizados, etc...") }}
+                            {% for error in form.descricao.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Botões de Ação -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('main.detalhes_veiculo', id=veiculo.id) }}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="button" class="btn btn-outline-primary me-md-2" id="btnSalvarRascunho">
+                                <i class="fas fa-save"></i> Salvar Rascunho
+                            </button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check"></i> Registrar Custo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar com Informações -->
+        <div class="col-lg-4">
+            <!-- Dados do Veículo -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-car"></i> Dados do Veículo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border rounded p-2 mb-2">
+                                <small class="text-muted d-block">KM Atual</small>
+                                <strong class="text-primary">{{ "{:,}".format(veiculo.km_atual or 0).replace(',', '.') }} km</strong>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-2 mb-2">
+                                <small class="text-muted d-block">Status</small>
+                                <strong class="text-{% if veiculo.status == 'Disponível' %}success{% elif veiculo.status == 'Em uso' %}warning{% else %}danger{% endif %}">
+                                    {{ veiculo.status }}
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <ul class="list-unstyled small">
+                            <li><i class="fas fa-calendar text-muted me-2"></i>Ano: {{ veiculo.ano or 'N/A' }}</li>
+                            <li><i class="fas fa-cogs text-muted me-2"></i>Tipo: {{ veiculo.tipo }}</li>
+                            {% if veiculo.data_ultima_manutencao %}
+                            <li><i class="fas fa-wrench text-muted me-2"></i>Última Manutenção: {{ veiculo.data_ultima_manutencao.strftime('%d/%m/%Y') }}</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tipos de Custo -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-tags"></i> Tipos de Custo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-success btn-sm" onclick="selecionarTipo('combustivel')">
+                                    <i class="fas fa-gas-pump me-2"></i>Combustível
+                                </button>
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="selecionarTipo('manutencao')">
+                                    <i class="fas fa-wrench me-2"></i>Manutenção
+                                </button>
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="selecionarTipo('seguro')">
+                                    <i class="fas fa-shield-alt me-2"></i>Seguro
+                                </button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="selecionarTipo('multa')">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>Multa
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selecionarTipo('outros')">
+                                    <i class="fas fa-ellipsis-h me-2"></i>Outros
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dicas e Ações Rápidas -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-lightbulb"></i> Dicas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled small mb-0">
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Registre custos imediatamente</li>
+                        <li class="mb-2"><i class="fas fa-receipt text-info me-2"></i>Guarde notas fiscais</li>
+                        <li class="mb-2"><i class="fas fa-tachometer-alt text-warning me-2"></i>Atualize a quilometragem</li>
+                        <li class="mb-2"><i class="fas fa-calculator text-primary me-2"></i>Use auto-cálculos</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Ações Rápidas -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-bolt"></i> Ações Rápidas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('main.novo_uso_veiculo', id=veiculo.id) }}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-route me-1"></i> Registrar Uso
+                        </a>
+                        <a href="{{ url_for('main.dashboard_veiculo', id=veiculo.id) }}" class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-chart-bar me-1"></i> Dashboard
+                        </a>
+                        <a href="{{ url_for('main.historico_veiculo', id=veiculo.id) }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-history me-1"></i> Histórico
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts para Funcionalidades Avançadas -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoCusto = document.getElementById('tipoCusto');
+    const camposCombustivel = document.getElementById('camposCombustivel');
+    const camposManutencao = document.getElementById('camposManutencao');
+    const litrosCombustivel = document.getElementById('litrosCombustivel');
+    const precoPorLitro = document.getElementById('precoPorLitro');
+    const valorTotal = document.getElementById('valorTotal');
+    
+    // Mostrar/ocultar campos específicos baseado no tipo
+    function toggleCamposEspecificos() {
+        const tipo = tipoCusto.value;
+        
+        // Ocultar todos os campos específicos
+        camposCombustivel.classList.add('d-none');
+        camposManutencao.classList.add('d-none');
+        
+        // Mostrar campos específicos baseado no tipo
+        if (tipo === 'combustivel') {
+            camposCombustivel.classList.remove('d-none');
+        } else if (tipo === 'manutencao') {
+            camposManutencao.classList.remove('d-none');
+        }
+    }
+    
+    // Calcular valor total automaticamente para combustível
+    function calcularValorTotal() {
+        if (tipoCusto.value === 'combustivel' && litrosCombustivel.value && precoPorLitro.value) {
+            const litros = parseFloat(litrosCombustivel.value);
+            const preco = parseFloat(precoPorLitro.value);
+            const total = litros * preco;
+            
+            valorTotal.value = total.toFixed(2);
+            document.getElementById('valorCalculado').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+            document.getElementById('precoMedio').textContent = 'R$ ' + preco.toFixed(2).replace('.', ',') + '/L';
+            
+            // Calcular consumo estimado baseado no último abastecimento
+            calcularConsumoEstimado(litros);
+        }
+    }
+    
+    // Calcular consumo estimado
+    function calcularConsumoEstimado(litros) {
+        // Este seria um cálculo mais complexo baseado no histórico
+        // Por agora, apenas uma estimativa baseada na média geral
+        const consumoMedio = 12; // km/L estimado
+        const autonomia = litros * consumoMedio;
+        document.getElementById('consumoEstimado').textContent = consumoMedio + ' km/L';
+    }
+    
+    // Event listeners
+    tipoCusto.addEventListener('change', toggleCamposEspecificos);
+    litrosCombustivel.addEventListener('input', calcularValorTotal);
+    precoPorLitro.addEventListener('input', calcularValorTotal);
+    
+    // Auto-completar fornecedor baseado no tipo
+    tipoCusto.addEventListener('change', function() {
+        const fornecedor = document.querySelector('input[name="fornecedor"]');
+        const tipo = this.value;
+        
+        if (tipo === 'combustivel') {
+            fornecedor.placeholder = 'Ex: Posto Shell, Petrobras';
+        } else if (tipo === 'manutencao') {
+            fornecedor.placeholder = 'Ex: Oficina XYZ, Mecânico ABC';
+        } else if (tipo === 'seguro') {
+            fornecedor.placeholder = 'Ex: Seguradora XYZ';
+        } else {
+            fornecedor.placeholder = 'Ex: Fornecedor XYZ';
+        }
+    });
+    
+    // Validações em tempo real
+    function validarFormulario() {
+        let valid = true;
+        const tipo = tipoCusto.value;
+        
+        if (tipo === 'combustivel') {
+            if (!litrosCombustivel.value || parseFloat(litrosCombustivel.value) <= 0) {
+                litrosCombustivel.setCustomValidity('Litros de combustível é obrigatório');
+                valid = false;
+            } else {
+                litrosCombustivel.setCustomValidity('');
+            }
+            
+            if (!precoPorLitro.value || parseFloat(precoPorLitro.value) <= 0) {
+                precoPorLitro.setCustomValidity('Preço por litro é obrigatório');
+                valid = false;
+            } else {
+                precoPorLitro.setCustomValidity('');
+            }
+        }
+        
+        return valid;
+    }
+    
+    // Salvar rascunho (localStorage)
+    document.getElementById('btnSalvarRascunho').addEventListener('click', function() {
+        const formData = new FormData(document.getElementById('formCusto'));
+        const rascunho = {};
+        for (let [key, value] of formData.entries()) {
+            rascunho[key] = value;
+        }
+        
+        localStorage.setItem('rascunho_custo_veiculo_{{ veiculo.id }}', JSON.stringify(rascunho));
+        
+        // Mostrar feedback
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check text-success"></i> Salvo!';
+        btn.disabled = true;
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 2000);
+    });
+    
+    // Recuperar rascunho ao carregar página
+    const rascunhoSalvo = localStorage.getItem('rascunho_custo_veiculo_{{ veiculo.id }}');
+    if (rascunhoSalvo) {
+        const rascunho = JSON.parse(rascunhoSalvo);
+        for (let [key, value] of Object.entries(rascunho)) {
+            const campo = document.querySelector(`[name="${key}"]`);
+            if (campo) {
+                campo.value = value;
+                if (campo.type === 'checkbox') {
+                    campo.checked = value === 'on';
+                }
+            }
+        }
+        toggleCamposEspecificos();
+        calcularValorTotal();
+    }
+    
+    // Limpar rascunho após envio bem-sucedido
+    document.getElementById('formCusto').addEventListener('submit', function(e) {
+        if (validarFormulario()) {
+            localStorage.removeItem('rascunho_custo_veiculo_{{ veiculo.id }}');
+        } else {
+            e.preventDefault();
+            alert('Por favor, corrija os erros no formulário.');
+        }
+    });
+    
+    // Inicializar
+    toggleCamposEspecificos();
+});
+
+// Função para botões de seleção rápida de tipo
+function selecionarTipo(tipo) {
+    document.getElementById('tipoCusto').value = tipo;
+    document.getElementById('tipoCusto').dispatchEvent(new Event('change'));
+}
+</script>
+
+<style>
+.card-header h6 {
+    font-weight: 600;
+}
+
+.btn-outline-success:hover,
+.btn-outline-warning:hover,
+.btn-outline-info:hover,
+.btn-outline-danger:hover,
+.btn-outline-secondary:hover {
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+.timeline-marker {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .col-lg-4 .card {
+        margin-bottom: 1rem;
+    }
+}
+</style>
+{% endblock %}

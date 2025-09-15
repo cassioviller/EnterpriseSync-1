@@ -1,0 +1,403 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Histórico - {{ veiculo.placa }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-history me-2 text-info"></i>
+                        Histórico - {{ veiculo.placa }}
+                    </h2>
+                    <p class="text-muted mb-0">{{ veiculo.marca }} {{ veiculo.modelo }} - Linha do tempo completa</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('main.detalhes_veiculo', id=veiculo.id) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Voltar
+                    </a>
+                    <a href="{{ url_for('main.exportar_dados_veiculo', id=veiculo.id, tipo='completo') }}" class="btn btn-success">
+                        <i class="fas fa-download me-1"></i> Exportar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros Avançados -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-filter me-2"></i>
+                Filtros
+                <button class="btn btn-outline-primary btn-sm ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosAvancados">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" id="formFiltros">
+                <div class="row align-items-end">
+                    <div class="col-md-2">
+                        <label class="form-label">Tipo</label>
+                        <select name="tipo" class="form-select">
+                            <option value="">Todos</option>
+                            <option value="uso" {% if filtros.tipo == 'uso' %}selected{% endif %}>Apenas Usos</option>
+                            <option value="custo" {% if filtros.tipo == 'custo' %}selected{% endif %}>Apenas Custos</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Data Início</label>
+                        <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Data Fim</label>
+                        <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Funcionário</label>
+                        <select name="funcionario_id" class="form-select">
+                            <option value="">Todos</option>
+                            {% for funcionario in funcionarios %}
+                            <option value="{{ funcionario.id }}" {% if filtros.funcionario_id == funcionario.id|string %}selected{% endif %}>
+                                {{ funcionario.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Obra</label>
+                        <select name="obra_id" class="form-select">
+                            <option value="">Todas</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if filtros.obra_id == obra.id|string %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search me-1"></i> Filtrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filtros Avançados (Colapsível) -->
+                <div class="collapse mt-3" id="filtrosAvancados">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo de Custo</label>
+                            <select name="tipo_custo" class="form-select">
+                                <option value="">Todos os custos</option>
+                                <option value="combustivel" {% if filtros.tipo_custo == 'combustivel' %}selected{% endif %}>Combustível</option>
+                                <option value="manutencao" {% if filtros.tipo_custo == 'manutencao' %}selected{% endif %}>Manutenção</option>
+                                <option value="seguro" {% if filtros.tipo_custo == 'seguro' %}selected{% endif %}>Seguro</option>
+                                <option value="multa" {% if filtros.tipo_custo == 'multa' %}selected{% endif %}>Multa</option>
+                                <option value="outros" {% if filtros.tipo_custo == 'outros' %}selected{% endif %}>Outros</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <a href="{{ url_for('main.historico_veiculo', id=veiculo.id) }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i> Limpar Filtros
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Timeline de Eventos -->
+    <div class="row">
+        <div class="col-12">
+            {% if eventos %}
+            <div class="timeline">
+                {% for evento in eventos %}
+                <div class="timeline-item">
+                    <div class="timeline-marker 
+                        {% if evento.tipo == 'uso' %}
+                            bg-primary
+                        {% else %}
+                            {% if evento.objeto.tipo_custo == 'combustivel' %}bg-success
+                            {% elif evento.objeto.tipo_custo == 'manutencao' %}bg-warning
+                            {% elif evento.objeto.tipo_custo == 'multa' %}bg-danger
+                            {% else %}bg-info{% endif %}
+                        {% endif %}
+                    ">
+                        <i class="fas 
+                            {% if evento.tipo == 'uso' %}fa-route
+                            {% else %}
+                                {% if evento.objeto.tipo_custo == 'combustivel' %}fa-gas-pump
+                                {% elif evento.objeto.tipo_custo == 'manutencao' %}fa-wrench
+                                {% elif evento.objeto.tipo_custo == 'multa' %}fa-exclamation-triangle
+                                {% else %}fa-coins{% endif %}
+                            {% endif %}
+                        "></i>
+                    </div>
+                    
+                    <div class="timeline-content">
+                        <div class="card">
+                            <div class="card-body">
+                                {% if evento.tipo == 'uso' %}
+                                <!-- Card de Uso -->
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-route text-primary me-2"></i>
+                                        Uso do Veículo
+                                    </h6>
+                                    <small class="text-muted">{{ evento.data.strftime('%d/%m/%Y') }}</small>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled mb-0">
+                                            <li><strong>Funcionário:</strong> {{ evento.objeto.funcionario.nome if evento.objeto.funcionario else 'N/A' }}</li>
+                                            {% if evento.objeto.obra %}
+                                            <li><strong>Obra:</strong> {{ evento.objeto.obra.nome }}</li>
+                                            {% endif %}
+                                            <li><strong>Finalidade:</strong> {{ evento.objeto.finalidade or 'N/A' }}</li>
+                                            {% if evento.objeto.local_destino %}
+                                            <li><strong>Destino:</strong> {{ evento.objeto.local_destino }}</li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled mb-0">
+                                            {% if evento.objeto.km_inicial and evento.objeto.km_final %}
+                                            <li>
+                                                <strong>Quilometragem:</strong> 
+                                                {{ evento.objeto.km_inicial }} → {{ evento.objeto.km_final }} km
+                                                <span class="badge bg-success ms-1">+{{ evento.objeto.km_percorrido }}km</span>
+                                            </li>
+                                            {% endif %}
+                                            {% if evento.objeto.horario_saida and evento.objeto.horario_chegada %}
+                                            <li>
+                                                <strong>Horário:</strong> 
+                                                {{ evento.objeto.horario_saida.strftime('%H:%M') }} → {{ evento.objeto.horario_chegada.strftime('%H:%M') }}
+                                                {% if evento.objeto.horas_uso %}
+                                                <span class="badge bg-info ms-1">{{ evento.objeto.tempo_uso_str }}</span>
+                                                {% endif %}
+                                            </li>
+                                            {% endif %}
+                                            <li>
+                                                <strong>Status:</strong>
+                                                {% set status_colors = {'ativo': 'warning', 'finalizado': 'success', 'cancelado': 'danger'} %}
+                                                <span class="badge bg-{{ status_colors.get(evento.objeto.status_uso, 'secondary') }}">
+                                                    {{ evento.objeto.status_uso or 'ativo' }}
+                                                </span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                {% if evento.objeto.observacoes %}
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <strong>Observações:</strong> {{ evento.objeto.observacoes }}
+                                    </small>
+                                </div>
+                                {% endif %}
+                                
+                                {% else %}
+                                <!-- Card de Custo -->
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0">
+                                        {% set tipo_icons = {
+                                            'combustivel': 'fas fa-gas-pump text-success',
+                                            'manutencao': 'fas fa-wrench text-warning',
+                                            'seguro': 'fas fa-shield-alt text-info',
+                                            'multa': 'fas fa-exclamation-triangle text-danger',
+                                            'outros': 'fas fa-coins text-secondary'
+                                        } %}
+                                        <i class="{{ tipo_icons.get(evento.objeto.tipo_custo, 'fas fa-coins text-secondary') }} me-2"></i>
+                                        {{ evento.objeto.tipo_custo.title() }}
+                                    </h6>
+                                    <div class="text-end">
+                                        <div class="fw-bold text-primary">R$ {{ "{:.2f}".format(evento.objeto.valor) }}</div>
+                                        <small class="text-muted">{{ evento.data.strftime('%d/%m/%Y') }}</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled mb-0">
+                                            {% if evento.objeto.fornecedor %}
+                                            <li><strong>Fornecedor:</strong> {{ evento.objeto.fornecedor }}</li>
+                                            {% endif %}
+                                            {% if evento.objeto.km_atual %}
+                                            <li><strong>KM Atual:</strong> {{ "{:,}".format(evento.objeto.km_atual).replace(',', '.') }}</li>
+                                            {% endif %}
+                                            {% if evento.objeto.obra %}
+                                            <li><strong>Obra:</strong> {{ evento.objeto.obra.nome }}</li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        {% if evento.objeto.tipo_custo == 'combustivel' %}
+                                        <ul class="list-unstyled mb-0">
+                                            {% if evento.objeto.litros_combustivel %}
+                                            <li><strong>Litros:</strong> {{ evento.objeto.litros_combustivel }}L</li>
+                                            {% endif %}
+                                            {% if evento.objeto.preco_por_litro %}
+                                            <li><strong>Preço/L:</strong> R$ {{ "{:.2f}".format(evento.objeto.preco_por_litro) }}</li>
+                                            {% endif %}
+                                            {% if evento.objeto.tipo_combustivel %}
+                                            <li><strong>Tipo:</strong> {{ evento.objeto.tipo_combustivel.title() }}</li>
+                                            {% endif %}
+                                            {% if evento.objeto.consumo_medio %}
+                                            <li><strong>Consumo:</strong> {{ evento.objeto.consumo_medio }} km/L</li>
+                                            {% endif %}
+                                        </ul>
+                                        {% elif evento.objeto.tipo_custo == 'manutencao' %}
+                                        <ul class="list-unstyled mb-0">
+                                            {% if evento.objeto.categoria_manutencao %}
+                                            <li><strong>Categoria:</strong> {{ evento.objeto.categoria_manutencao.title() }}</li>
+                                            {% endif %}
+                                            {% if evento.objeto.numero_nota_fiscal %}
+                                            <li><strong>NF:</strong> {{ evento.objeto.numero_nota_fiscal }}</li>
+                                            {% endif %}
+                                            {% if evento.objeto.proxima_manutencao_km %}
+                                            <li><strong>Próxima:</strong> {{ "{:,}".format(evento.objeto.proxima_manutencao_km).replace(',', '.') }} km</li>
+                                            {% endif %}
+                                        </ul>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                {% if evento.objeto.descricao %}
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <strong>Descrição:</strong> {{ evento.objeto.descricao }}
+                                    </small>
+                                </div>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Paginação seria implementada aqui se necessário -->
+            
+            {% else %}
+            <!-- Estado Vazio -->
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-history fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">Nenhum evento encontrado</h4>
+                    <p class="text-muted mb-4">
+                        {% if filtros.data_inicio or filtros.data_fim or filtros.funcionario_id or filtros.obra_id or filtros.tipo_custo %}
+                            Tente ajustar os filtros para encontrar mais resultados.
+                        {% else %}
+                            Este veículo ainda não possui histórico de uso ou custos registrados.
+                        {% endif %}
+                    </p>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <a href="{{ url_for('main.novo_uso_veiculo', id=veiculo.id) }}" class="btn btn-primary">
+                            <i class="fas fa-route me-1"></i> Registrar Uso
+                        </a>
+                        <a href="{{ url_for('main.novo_custo_veiculo', id=veiculo.id) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-gas-pump me-1"></i> Registrar Custo
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    top: 10px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.timeline-content {
+    margin-left: 20px;
+}
+
+@media (max-width: 768px) {
+    .timeline {
+        padding-left: 20px;
+    }
+    
+    .timeline-marker {
+        left: -17px;
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
+    
+    .timeline-content {
+        margin-left: 15px;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-submit do formulário quando filtros mudam
+    const form = document.getElementById('formFiltros');
+    const selects = form.querySelectorAll('select, input[type="date"]');
+    
+    selects.forEach(element => {
+        element.addEventListener('change', function() {
+            // Pequeno delay para melhor UX
+            setTimeout(() => {
+                form.submit();
+            }, 300);
+        });
+    });
+    
+    // Indicador de loading
+    form.addEventListener('submit', function() {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Filtrando...';
+        submitBtn.disabled = true;
+    });
+});
+</script>
+{% endblock %}

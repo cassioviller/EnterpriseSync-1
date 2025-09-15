@@ -19,13 +19,22 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 # Database configuration - v10.0 Digital Mastery
 database_url = os.environ.get("DATABASE_URL", "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable")
 
-# Auto-detectar ambiente
+# Auto-detectar ambiente - CREDENTIALS MASCARADAS POR SEGURANÇA
+def mask_database_url(url):
+    """Mascara credenciais em URLs de banco para logs seguros"""
+    if not url:
+        return "None"
+    import re
+    # Mascarar senha: user:password@host -> user:****@host
+    masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', url)
+    return masked
+
 if "neon" in database_url or "localhost" in database_url:
     # DESENVOLVIMENTO
-    logger.info(f"🔧 DESENVOLVIMENTO DATABASE: {database_url}")
+    logger.info(f"🔧 DESENVOLVIMENTO DATABASE: {mask_database_url(database_url)}")
 else:
     # PRODUÇÃO - EasyPanel
-    logger.info(f"🔧 PRODUÇÃO DATABASE: postgresql://sige:sige@viajey_sige:5432/sige")
+    logger.info(f"🔧 PRODUÇÃO DATABASE: {mask_database_url(database_url)}")
 
 # Convert postgres:// to postgresql:// for SQLAlchemy compatibility
 if database_url and database_url.startswith("postgres://"):

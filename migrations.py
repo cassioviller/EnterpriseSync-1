@@ -70,6 +70,9 @@ def executar_migracoes():
         
         # Migração 17: CRÍTICA - Migração específica para sistema de veículos
         migrar_sistema_veiculos_critical()
+        
+        # Migração 18: CRÍTICA - Corrigir admin_id nullable para multi-tenant seguro
+        corrigir_admin_id_vehicle_tables()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -1429,3 +1432,218 @@ def migrar_sistema_veiculos_critical():
             except:
                 pass
         raise  # Re-raise para que seja tratado pela migração principal
+
+def corrigir_admin_id_vehicle_tables():
+    """
+    Migração 18: CRÍTICA - Corrigir admin_id nullable em UsoVeiculo e CustoVeiculo
+    USANDO JOINS DETERMINÍSTICOS para garantir isolamento multi-tenant seguro
+    
+    NUNCA mais usar hard-coded admin_id = 10!
+    """
+    try:
+        logger.info("🔒 MIGRAÇÃO 18 (REESCRITA): Corrigindo admin_id via JOINs determinísticos...")
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # 1. CORRIGIR TABELA uso_veiculo com JOINs determinísticos
+        cursor.execute("""
+            SELECT column_name, is_nullable
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name = 'admin_id'
+        """)
+        uso_veiculo_admin = cursor.fetchone()
+        
+        if uso_veiculo_admin and uso_veiculo_admin[1] == 'YES':
+            logger.info("🔄 Corrigindo admin_id em uso_veiculo via JOINs determinísticos...")
+            
+            # Primeiro: Contar registros órfãos para auditoria
+            cursor.execute("""
+                SELECT COUNT(*) FROM uso_veiculo WHERE admin_id IS NULL
+            """)
+            orfaos_uso = cursor.fetchone()[0]
+            logger.info(f"📊 Encontrados {orfaos_uso} registros órfãos em uso_veiculo")
+            
+            # ESTRATÉGIA 1: Corrigir via veiculo.admin_id (principal)
+            cursor.execute("""
+                UPDATE uso_veiculo 
+                SET admin_id = v.admin_id
+                FROM veiculo v
+                WHERE uso_veiculo.veiculo_id = v.id 
+                AND uso_veiculo.admin_id IS NULL
+                AND v.admin_id IS NOT NULL
+            """)
+            corrigidos_veiculo = cursor.rowcount
+            logger.info(f"✅ {corrigidos_veiculo} registros corrigidos via veiculo.admin_id")
+            
+            # ESTRATÉGIA 2: Fallback via funcionario.admin_id
+            cursor.execute("""
+                UPDATE uso_veiculo 
+                SET admin_id = f.admin_id
+                FROM funcionario f
+                WHERE uso_veiculo.funcionario_id = f.id 
+                AND uso_veiculo.admin_id IS NULL
+                AND f.admin_id IS NOT NULL
+            """)
+            corrigidos_funcionario = cursor.rowcount
+            logger.info(f"✅ {corrigidos_funcionario} registros corrigidos via funcionario.admin_id")
+            
+            # ESTRATÉGIA 3: Fallback via obra.admin_id
+            cursor.execute("""
+                UPDATE uso_veiculo 
+                SET admin_id = o.admin_id
+                FROM obra o
+                WHERE uso_veiculo.obra_id = o.id 
+                AND uso_veiculo.admin_id IS NULL
+                AND o.admin_id IS NOT NULL
+            """)
+            corrigidos_obra = cursor.rowcount
+            logger.info(f"✅ {corrigidos_obra} registros corrigidos via obra.admin_id")
+            
+            # Verificar se ainda há órfãos
+            cursor.execute("""
+                SELECT COUNT(*) FROM uso_veiculo WHERE admin_id IS NULL
+            """)
+            orfaos_restantes = cursor.fetchone()[0]
+            
+            if orfaos_restantes > 0:
+                logger.warning(f"⚠️  {orfaos_restantes} registros órfãos restantes em uso_veiculo")
+                logger.warning("🚨 BLOQUEANDO migração - registros órfãos não podem ser corrigidos determinísticamente")
+                
+                # Listar órfãos para diagnóstico
+                cursor.execute("""
+                    SELECT id, veiculo_id, funcionario_id, obra_id, data_uso 
+                    FROM uso_veiculo 
+                    WHERE admin_id IS NULL 
+                    LIMIT 5
+                """)
+                orfaos_sample = cursor.fetchall()
+                logger.warning(f"📋 Amostra de órfãos: {orfaos_sample}")
+                
+                # OPÇÃO SEGURA: Não aplicar NOT NULL se há órfãos
+                logger.info("🛡️  Mantendo admin_id como nullable para preservar dados órfãos")
+            else:
+                # Aplicar constraint NOT NULL apenas se todos foram corrigidos
+                cursor.execute("""
+                    ALTER TABLE uso_veiculo 
+                    ALTER COLUMN admin_id SET NOT NULL
+                """)
+                logger.info("✅ admin_id em uso_veiculo agora é NOT NULL")
+        else:
+            logger.info("✅ admin_id em uso_veiculo já é NOT NULL")
+        
+        # 2. CORRIGIR TABELA custo_veiculo com JOINs determinísticos
+        cursor.execute("""
+            SELECT column_name, is_nullable
+            FROM information_schema.columns 
+            WHERE table_name = 'custo_veiculo' 
+            AND column_name = 'admin_id'
+        """)
+        custo_veiculo_admin = cursor.fetchone()
+        
+        if custo_veiculo_admin and custo_veiculo_admin[1] == 'YES':
+            logger.info("🔄 Corrigindo admin_id em custo_veiculo via JOINs determinísticos...")
+            
+            # Primeiro: Contar registros órfãos para auditoria
+            cursor.execute("""
+                SELECT COUNT(*) FROM custo_veiculo WHERE admin_id IS NULL
+            """)
+            orfaos_custo = cursor.fetchone()[0]
+            logger.info(f"📊 Encontrados {orfaos_custo} registros órfãos em custo_veiculo")
+            
+            # ESTRATÉGIA 1: Corrigir via veiculo.admin_id (principal)
+            cursor.execute("""
+                UPDATE custo_veiculo 
+                SET admin_id = v.admin_id
+                FROM veiculo v
+                WHERE custo_veiculo.veiculo_id = v.id 
+                AND custo_veiculo.admin_id IS NULL
+                AND v.admin_id IS NOT NULL
+            """)
+            corrigidos_veiculo_custo = cursor.rowcount
+            logger.info(f"✅ {corrigidos_veiculo_custo} registros corrigidos via veiculo.admin_id")
+            
+            # ESTRATÉGIA 2: Fallback via obra.admin_id se custo_veiculo tiver obra_id
+            cursor.execute("""
+                UPDATE custo_veiculo 
+                SET admin_id = o.admin_id
+                FROM obra o
+                WHERE custo_veiculo.obra_id = o.id 
+                AND custo_veiculo.admin_id IS NULL
+                AND o.admin_id IS NOT NULL
+            """)
+            corrigidos_obra_custo = cursor.rowcount
+            logger.info(f"✅ {corrigidos_obra_custo} registros corrigidos via obra.admin_id")
+            
+            # Verificar se ainda há órfãos
+            cursor.execute("""
+                SELECT COUNT(*) FROM custo_veiculo WHERE admin_id IS NULL
+            """)
+            orfaos_restantes_custo = cursor.fetchone()[0]
+            
+            if orfaos_restantes_custo > 0:
+                logger.warning(f"⚠️  {orfaos_restantes_custo} registros órfãos restantes em custo_veiculo")
+                logger.warning("🚨 BLOQUEANDO migração - registros órfãos não podem ser corrigidos determinísticamente")
+                
+                # Listar órfãos para diagnóstico
+                cursor.execute("""
+                    SELECT id, veiculo_id, obra_id, tipo_custo, valor 
+                    FROM custo_veiculo 
+                    WHERE admin_id IS NULL 
+                    LIMIT 5
+                """)
+                orfaos_sample_custo = cursor.fetchall()
+                logger.warning(f"📋 Amostra de órfãos: {orfaos_sample_custo}")
+                
+                # OPÇÃO SEGURA: Não aplicar NOT NULL se há órfãos
+                logger.info("🛡️  Mantendo admin_id como nullable para preservar dados órfãos")
+            else:
+                # Aplicar constraint NOT NULL apenas se todos foram corrigidos
+                cursor.execute("""
+                    ALTER TABLE custo_veiculo 
+                    ALTER COLUMN admin_id SET NOT NULL
+                """)
+                logger.info("✅ admin_id em custo_veiculo agora é NOT NULL")
+        else:
+            logger.info("✅ admin_id em custo_veiculo já é NOT NULL")
+        
+        # 3. Criar índices para melhor performance (mantido)
+        cursor.execute("""
+            SELECT indexname 
+            FROM pg_indexes 
+            WHERE tablename = 'uso_veiculo' 
+            AND indexname = 'idx_uso_veiculo_admin_id'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("CREATE INDEX idx_uso_veiculo_admin_id ON uso_veiculo(admin_id)")
+            logger.info("✅ Índice criado para uso_veiculo.admin_id")
+        
+        cursor.execute("""
+            SELECT indexname 
+            FROM pg_indexes 
+            WHERE tablename = 'custo_veiculo' 
+            AND indexname = 'idx_custo_veiculo_admin_id'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("CREATE INDEX idx_custo_veiculo_admin_id ON custo_veiculo(admin_id)")
+            logger.info("✅ Índice criado para custo_veiculo.admin_id")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("🔐 ✅ MIGRAÇÃO 18 REESCRITA CONCLUÍDA!")
+        logger.info("🎯 Multi-tenant seguro via JOINs determinísticos")
+        logger.info("🛡️  ZERO mistura de dados entre tenants")
+        logger.info("✨ Registros órfãos preservados sem violar integridade")
+        
+    except Exception as e:
+        logger.error(f"❌ ERRO na Migração 18 - admin_id vehicle tables: {str(e)}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass

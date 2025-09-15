@@ -649,13 +649,13 @@ class Restaurante(db.Model):
 
 
 class UsoVeiculo(db.Model):
-    """Modelo para registro de uso de veículos"""
+    """Modelo aprimorado para registro de uso de veículos"""
     __tablename__ = 'uso_veiculo'
     
     id = db.Column(db.Integer, primary_key=True)
     veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # Opcional
     data_uso = db.Column(db.Date, nullable=False)
     km_inicial = db.Column(db.Integer)
     km_final = db.Column(db.Integer)
@@ -663,38 +663,170 @@ class UsoVeiculo(db.Model):
     horario_chegada = db.Column(db.Time)
     finalidade = db.Column(db.String(200))
     observacoes = db.Column(db.Text)
+    
+    # Novos campos para controle avançado
+    status_uso = db.Column(db.String(20), default='ativo')  # ativo, finalizado, cancelado
+    km_percorrido = db.Column(db.Integer)  # Calculado automaticamente
+    horas_uso = db.Column(db.Float)  # Calculado automaticamente
+    custo_estimado = db.Column(db.Float, default=0.0)  # Baseado no combustível e desgaste
+    local_destino = db.Column(db.String(200))  # Destino principal da viagem
+    tipo_uso = db.Column(db.String(50), default='trabalho')  # trabalho, emergencia, manutencao
+    
+    # Multi-tenant - OBRIGATÓRIO para isolamento de segurança
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
     veiculo = db.relationship('Veiculo', backref='usos', overlaps="usos")
     funcionario = db.relationship('Funcionario', backref='usos_veiculo', overlaps="usos_veiculo")
     obra = db.relationship('Obra', backref='usos_veiculo', overlaps="usos_veiculo")
+    admin = db.relationship('Usuario', backref='usos_veiculo_criados', overlaps="usos_veiculo_criados")
+    
+    @property
+    def tempo_uso_str(self):
+        """Retorna tempo de uso formatado"""
+        if self.horas_uso:
+            horas = int(self.horas_uso)
+            minutos = int((self.horas_uso - horas) * 60)
+            return f"{horas}h{minutos:02d}min"
+        return "N/A"
+    
+    @property
+    def eficiencia_combustivel(self):
+        """Calcula km por litro baseado nos custos de combustível"""
+        if self.km_percorrido and self.km_percorrido > 0:
+            # Buscar custos de combustível do mesmo dia
+            custos_combustivel = CustoVeiculo.query.filter_by(
+                veiculo_id=self.veiculo_id,
+                data_custo=self.data_uso,
+                tipo_custo='combustivel'
+            ).all()
+            
+            total_litros = sum([c.litros_combustivel for c in custos_combustivel if hasattr(c, 'litros_combustivel') and c.litros_combustivel])
+            if total_litros > 0:
+                return round(self.km_percorrido / total_litros, 2)
+        return None
+    
+    def calcular_campos_automaticos(self):
+        """Calcula campos automáticos baseados nos dados inseridos"""
+        # Calcular KM percorrido
+        if self.km_inicial and self.km_final:
+            self.km_percorrido = self.km_final - self.km_inicial
+        
+        # Calcular horas de uso
+        if self.horario_saida and self.horario_chegada:
+            inicio = datetime.combine(date.today(), self.horario_saida)
+            fim = datetime.combine(date.today(), self.horario_chegada)
+            
+            # Lidar com casos onde o retorno é no dia seguinte
+            if fim < inicio:
+                fim += timedelta(days=1)
+            
+            delta = fim - inicio
+            self.horas_uso = round(delta.total_seconds() / 3600, 2)
+        
+        # Estimativa de custo (R$ 0.50 por km + R$ 15 por hora)
+        if self.km_percorrido and self.horas_uso:
+            self.custo_estimado = (self.km_percorrido * 0.50) + (self.horas_uso * 15.0)
     
     def __repr__(self):
-        return f'<UsoVeiculo {self.veiculo_id} - {self.funcionario_id}>'
+        return f'<UsoVeiculo {self.veiculo_id} - {self.funcionario_id} - {self.data_uso}>'
 
 
 class CustoVeiculo(db.Model):
-    """Modelo para custos de veículos"""
+    """Modelo aprimorado para custos de veículos com controle de combustível"""
     __tablename__ = 'custo_veiculo'
     
     id = db.Column(db.Integer, primary_key=True)
     veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)  # Obra associada ao custo
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # Obra associada (opcional)
     data_custo = db.Column(db.Date, nullable=False)
     valor = db.Column(db.Float, nullable=False)
-    tipo_custo = db.Column(db.String(50), nullable=False)  # 'combustivel', 'manutencao', 'seguro', 'outros'
+    tipo_custo = db.Column(db.String(50), nullable=False)  # combustivel, manutencao, seguro, outros
     descricao = db.Column(db.Text)
     km_atual = db.Column(db.Integer)
     fornecedor = db.Column(db.String(100))
+    
+    # Campos específicos para combustível
+    litros_combustivel = db.Column(db.Float)  # Quantidade de litros abastecidos
+    preco_por_litro = db.Column(db.Float)  # Preço por litro
+    posto_combustivel = db.Column(db.String(100))  # Nome do posto
+    tipo_combustivel = db.Column(db.String(20))  # gasolina, etanol, diesel, gnv
+    tanque_cheio = db.Column(db.Boolean, default=False)  # Se foi enchido o tanque
+    
+    # Campos para outros tipos de custo
+    numero_nota_fiscal = db.Column(db.String(50))  # NF da manutenção/seguro
+    categoria_manutencao = db.Column(db.String(50))  # preventiva, corretiva, emergencial
+    proxima_manutencao_km = db.Column(db.Integer)  # Para manutenções preventivas
+    proxima_manutencao_data = db.Column(db.Date)  # Para manutenções preventivas
+    
+    # Controle financeiro avançado
+    aprovado = db.Column(db.Boolean, default=False)
+    aprovado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    data_aprovacao = db.Column(db.DateTime)
+    centro_custo = db.Column(db.String(50))  # Para categorização contábil
+    
+    # Multi-tenant - OBRIGATÓRIO para isolamento de segurança
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
     veiculo = db.relationship('Veiculo', backref='custos_veiculo', overlaps="custos_veiculo")
     obra = db.relationship('Obra', backref='custos_veiculo', overlaps="custos_veiculo")
+    aprovado_por = db.relationship('Usuario', foreign_keys=[aprovado_por_id], backref='custos_aprovados')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='custos_veiculo_criados')
+    
+    @property
+    def consumo_medio(self):
+        """Calcula consumo médio baseado nos últimos abastecimentos"""
+        if self.tipo_custo == 'combustivel' and self.litros_combustivel:
+            # Buscar último abastecimento anterior para calcular consumo
+            ultimo_abastecimento = CustoVeiculo.query.filter(
+                CustoVeiculo.veiculo_id == self.veiculo_id,
+                CustoVeiculo.tipo_custo == 'combustivel',
+                CustoVeiculo.data_custo < self.data_custo,
+                CustoVeiculo.km_atual.isnot(None)
+            ).order_by(CustoVeiculo.data_custo.desc()).first()
+            
+            if ultimo_abastecimento and ultimo_abastecimento.km_atual and self.km_atual:
+                km_percorrido = self.km_atual - ultimo_abastecimento.km_atual
+                if km_percorrido > 0:
+                    return round(km_percorrido / self.litros_combustivel, 2)
+        return None
+    
+    @property
+    def custo_por_km(self):
+        """Calcula custo por quilômetro para combustível"""
+        if self.consumo_medio:
+            return round(self.preco_por_litro / self.consumo_medio, 3)
+        return None
+    
+    def calcular_proxima_manutencao(self):
+        """Calcula próxima manutenção baseada no tipo de serviço"""
+        if self.tipo_custo == 'manutencao' and self.km_atual:
+            # Intervalos padrão por tipo de manutenção
+            intervalos = {
+                'oleo': 10000,      # Troca de óleo a cada 10.000km
+                'filtros': 15000,   # Filtros a cada 15.000km
+                'pneus': 40000,     # Pneus a cada 40.000km
+                'freios': 30000,    # Freios a cada 30.000km
+                'revisao': 20000    # Revisão geral a cada 20.000km
+            }
+            
+            # Identificar tipo de manutenção pela descrição
+            descricao_lower = (self.descricao or '').lower()
+            for tipo, intervalo in intervalos.items():
+                if tipo in descricao_lower:
+                    self.proxima_manutencao_km = self.km_atual + intervalo
+                    # Estimativa de data baseada em 1000km/mês
+                    meses_estimados = intervalo / 1000
+                    self.proxima_manutencao_data = self.data_custo + timedelta(days=int(meses_estimados * 30))
+                    break
     
     def __repr__(self):
-        return f'<CustoVeiculo {self.veiculo_id} - {self.valor}>'
+        return f'<CustoVeiculo {self.veiculo_id} - {self.tipo_custo} - R${self.valor}>'
 
 class OutroCusto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
