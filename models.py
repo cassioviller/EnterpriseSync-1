@@ -199,7 +199,7 @@ class ServicoObraReal(db.Model):
 
 class Veiculo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    placa = db.Column(db.String(10), unique=True, nullable=False)
+    placa = db.Column(db.String(10), nullable=False)  # Removido unique=True para permitir multi-tenant
     marca = db.Column(db.String(50), nullable=False)
     modelo = db.Column(db.String(50), nullable=False)
     ano = db.Column(db.Integer)
@@ -209,8 +209,11 @@ class Veiculo(db.Model):
     data_ultima_manutencao = db.Column(db.Date)
     data_proxima_manutencao = db.Column(db.Date)
     ativo = db.Column(db.Boolean, default=True)  # Campo para controle de veículos ativos
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # Multi-tenant obrigatório
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Constraint unique por admin para isolamento multi-tenant
+    __table_args__ = (db.UniqueConstraint('admin_id', 'placa', name='_veiculo_admin_placa_uc'),)
 
 
 

@@ -7,6 +7,7 @@ from auth import super_admin_required, admin_required, funcionario_required
 # API RDO Refatorada integrada inline na função salvar_rdo_flexivel
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, or_, and_, text
+from sqlalchemy.exc import IntegrityError
 import os
 import json
 
@@ -2628,6 +2629,337 @@ def detalhes_veiculo(id):
         print(f"ERRO DETALHES VEÍCULO: {str(e)}")
         # Redirecionar para lista de veículos em caso de erro
         return redirect(url_for('main.veiculos'))
+
+# ===== ROTAS CRUD DE VEÍCULOS =====
+
+# 1. ROTA CADASTRO - /veiculos/novo (GET/POST)
+@main_bp.route('/veiculos/novo', methods=['GET', 'POST'])
+@admin_required
+def novo_veiculo():
+    from forms import VeiculoForm
+    from models import Veiculo
+    
+    form = VeiculoForm()
+    
+    if form.validate_on_submit():
+        try:
+            admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+            
+            # CRÍTICO: Verificar se placa já existe no mesmo admin (multi-tenant scoped)
+            # Alinhado com constraint DB: veiculo_admin_placa_uc (admin_id, placa)
+            veiculo_existente = Veiculo.query.filter(
+                Veiculo.placa == form.placa.data,
+                Veiculo.admin_id == admin_id
+            ).first()
+            if veiculo_existente:
+                status_msg = "ativo" if veiculo_existente.ativo else "inativo"
+                flash(f'Já existe um veículo ({status_msg}) com esta placa em sua empresa.', 'error')
+                return render_template('veiculos/novo_veiculo.html', form=form)
+            
+            # Criar novo veículo
+            veiculo = Veiculo(
+                placa=form.placa.data,
+                marca=form.marca.data,
+                modelo=form.modelo.data,
+                ano=form.ano.data,
+                tipo=form.tipo.data,
+                status=form.status.data,
+                km_atual=form.km_atual.data or 0,
+                data_ultima_manutencao=form.data_ultima_manutencao.data,
+                data_proxima_manutencao=form.data_proxima_manutencao.data,
+                admin_id=admin_id
+            )
+            
+            db.session.add(veiculo)
+            db.session.commit()
+            
+            # 📝 AUDIT LOG: Log vehicle creation for security
+            logger.info(f"✅ VEHICLE CREATE: Admin {admin_id} created vehicle {veiculo.placa} (ID: {veiculo.id})")
+            
+            flash(f'Veículo {veiculo.placa} cadastrado com sucesso!', 'success')
+            return redirect(url_for('main.veiculos'))
+            
+        except IntegrityError as e:
+            db.session.rollback()
+            if 'duplicate key value violates unique constraint' in str(e).lower():
+                if 'veiculo_admin_placa_uc' in str(e):
+                    flash('Já existe um veículo com esta placa em sua empresa.', 'error')
+                elif 'veiculo_placa_key' in str(e):
+                    flash('Esta placa já está cadastrada no sistema.', 'error')
+                else:
+                    flash('Dados duplicados encontrados. Verifique as informações.', 'error')
+            else:
+                flash('Erro de integridade dos dados. Verifique as informações.', 'error')
+            print(f"INTEGRITY ERROR AO CADASTRAR VEÍCULO: {str(e)}")
+        except Exception as e:
+            db.session.rollback()
+            print(f"ERRO AO CADASTRAR VEÍCULO: {str(e)}")
+            flash('Erro ao cadastrar veículo. Tente novamente.', 'error')
+    
+    return render_template('veiculos/novo_veiculo.html', form=form)
+
+
+# 2. ROTA EDIÇÃO - /veiculos/<id>/editar (GET/POST)
+@main_bp.route('/veiculos/<int:id>/editar', methods=['GET', 'POST'])
+@admin_required
+def editar_veiculo(id):
+    from forms import VeiculoForm
+    from models import Veiculo
+    
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    
+    form = VeiculoForm(obj=veiculo)
+    
+    if form.validate_on_submit():
+        try:
+            # CRÍTICO: Verificar se placa já existe no mesmo admin (multi-tenant scoped)
+            # Alinhado com constraint DB: veiculo_admin_placa_uc (admin_id, placa)
+            veiculo_existente = Veiculo.query.filter(
+                Veiculo.placa == form.placa.data,
+                Veiculo.admin_id == admin_id,  # Scoped por admin
+                Veiculo.id != id
+            ).first()
+            if veiculo_existente:
+                status_msg = "ativo" if veiculo_existente.ativo else "inativo"
+                flash(f'Já existe outro veículo ({status_msg}) com esta placa em sua empresa.', 'error')
+                return render_template('veiculos/editar_veiculo.html', form=form, veiculo=veiculo)
+            
+            # CRÍTICO: Validação de odômetro - km não pode diminuir
+            novo_km = form.km_atual.data or 0
+            km_anterior = veiculo.km_atual or 0
+            if novo_km < km_anterior:
+                flash(f'Erro: Quilometragem não pode diminuir. Atual: {km_anterior}km, Tentativa: {novo_km}km', 'error')
+                return render_template('veiculos/editar_veiculo.html', form=form, veiculo=veiculo)
+            
+            # Validação de status transitions válidas
+            status_validos = ['Disponível', 'Em uso', 'Manutenção', 'Indisponível']
+            if form.status.data not in status_validos:
+                flash(f'Status inválido. Use: {", ".join(status_validos)}', 'error')
+                return render_template('veiculos/editar_veiculo.html', form=form, veiculo=veiculo)
+            
+            # Atualizar dados do veículo
+            veiculo.placa = form.placa.data
+            veiculo.marca = form.marca.data
+            veiculo.modelo = form.modelo.data
+            veiculo.ano = form.ano.data
+            veiculo.tipo = form.tipo.data
+            veiculo.status = form.status.data
+            veiculo.km_atual = novo_km  # Usar valor validado
+            veiculo.data_ultima_manutencao = form.data_ultima_manutencao.data
+            veiculo.data_proxima_manutencao = form.data_proxima_manutencao.data
+            
+            db.session.commit()
+            
+            flash(f'Veículo {veiculo.placa} atualizado com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_veiculo', id=veiculo.id))
+            
+        except IntegrityError as e:
+            db.session.rollback()
+            if 'duplicate key value violates unique constraint' in str(e).lower():
+                if 'veiculo_admin_placa_uc' in str(e):
+                    flash('Já existe outro veículo com esta placa em sua empresa.', 'error')
+                elif 'veiculo_placa_key' in str(e):
+                    flash('Esta placa já está cadastrada no sistema.', 'error')
+                else:
+                    flash('Dados duplicados encontrados. Verifique as informações.', 'error')
+            else:
+                flash('Erro de integridade dos dados. Verifique as informações.', 'error')
+            print(f"INTEGRITY ERROR AO EDITAR VEÍCULO: {str(e)}")
+        except Exception as e:
+            db.session.rollback()
+            print(f"ERRO AO EDITAR VEÍCULO: {str(e)}")
+            flash('Erro ao atualizar veículo. Tente novamente.', 'error')
+    
+    return render_template('veiculos/editar_veiculo.html', form=form, veiculo=veiculo)
+
+
+# 3. ROTA EXCLUSÃO - /veiculos/<id>/excluir (POST)
+@main_bp.route('/veiculos/<int:id>/excluir', methods=['POST'])
+@admin_required
+def excluir_veiculo(id):
+    from models import Veiculo
+    
+    # 🛡️ PROBLEM 4 SECURITY: Route hardening for destructive operation
+    # Verify Referrer to prevent CSRF attacks
+    referrer = request.headers.get('Referer', '')
+    if not referrer or 'veiculos' not in referrer:
+        flash('⚠️ Operação não permitida: origem inválida', 'danger')
+        return redirect(url_for('main.veiculos'))
+    
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    # 🔒 Enhanced admin_id verification
+    veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    
+    try:
+        # 📝 AUDIT LOG: Log destructive operation for security
+        logger.info(f"🗑️ VEHICLE DELETE: Admin {admin_id} deleted vehicle {veiculo.placa} (ID: {id})")
+        
+        # Marcar como inativo (não deletar fisicamente) - SAFE DELETE
+        veiculo.ativo = False
+        veiculo.updated_at = datetime.utcnow() if hasattr(veiculo, 'updated_at') else None
+        db.session.commit()
+        
+        flash(f'Veículo {veiculo.placa} removido com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO AO EXCLUIR VEÍCULO: {str(e)}")
+        flash('Erro ao remover veículo. Tente novamente.', 'error')
+    
+    return redirect(url_for('main.veiculos'))
+
+
+# 4. ROTA REGISTRO USO - /veiculos/<id>/uso (GET/POST)
+@main_bp.route('/veiculos/<int:id>/uso', methods=['GET', 'POST'])
+@admin_required
+def novo_uso_veiculo(id):
+    from forms import UsoVeiculoForm
+    from models import Veiculo, UsoVeiculo, Funcionario, Obra
+    
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    
+    form = UsoVeiculoForm()
+    form.veiculo_id.data = veiculo.id
+    
+    # Carregar opções do formulário
+    form.funcionario_id.choices = [(f.id, f.nome) for f in Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()]
+    form.obra_id.choices = [('', 'Selecione uma obra...')] + [(o.id, o.nome) for o in Obra.query.filter_by(admin_id=admin_id).all()]
+    
+    if form.validate_on_submit():
+        try:
+            # Validações de negócio críticas
+            if form.km_final.data and form.km_inicial.data:
+                if form.km_final.data <= form.km_inicial.data:
+                    flash('KM final deve ser maior que KM inicial.', 'error')
+                    return render_template('veiculos/novo_uso.html', form=form, veiculo=veiculo)
+            
+            # CRÍTICO: Validação de odômetro - km_final não pode ser menor que km_atual do veículo
+            if form.km_final.data and veiculo.km_atual:
+                if form.km_final.data < veiculo.km_atual:
+                    flash(f'Erro: KM final não pode ser menor que a quilometragem atual do veículo ({veiculo.km_atual}km).', 'error')
+                    return render_template('veiculos/novo_uso.html', form=form, veiculo=veiculo)
+            
+            # Validar se km_inicial é consistente com km_atual
+            if form.km_inicial.data and veiculo.km_atual:
+                if form.km_inicial.data < veiculo.km_atual:
+                    flash(f'Aviso: KM inicial ({form.km_inicial.data}km) é menor que a quilometragem atual do veículo ({veiculo.km_atual}km).', 'warning')
+            
+            # Verificar disponibilidade do veículo
+            if veiculo.status != 'Disponível':
+                flash('Veículo não está disponível para uso.', 'warning')
+            
+            # Criar registro de uso
+            uso = UsoVeiculo(
+                veiculo_id=veiculo.id,
+                funcionario_id=form.funcionario_id.data,
+                obra_id=form.obra_id.data if form.obra_id.data else None,
+                data_uso=form.data_uso.data,
+                km_inicial=form.km_inicial.data,
+                km_final=form.km_final.data,
+                horario_saida=form.horario_saida.data,
+                horario_chegada=form.horario_chegada.data,
+                finalidade=form.finalidade.data,
+                observacoes=form.observacoes.data
+            )
+            
+            db.session.add(uso)
+            
+            # Atualizar status e KM do veículo
+            if form.km_final.data:
+                veiculo.km_atual = form.km_final.data
+                veiculo.status = 'Disponível'
+            else:
+                veiculo.status = 'Em uso'
+            
+            db.session.commit()
+            
+            flash('Uso do veículo registrado com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_veiculo', id=veiculo.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"ERRO AO REGISTRAR USO DE VEÍCULO: {str(e)}")
+            flash('Erro ao registrar uso do veículo. Tente novamente.', 'error')
+    
+    return render_template('veiculos/novo_uso.html', form=form, veiculo=veiculo)
+
+
+# 5. ROTA REGISTRO CUSTO - /veiculos/<id>/custo (GET/POST)
+@main_bp.route('/veiculos/<int:id>/custo', methods=['GET', 'POST'])
+@admin_required
+def novo_custo_veiculo(id):
+    from forms import CustoVeiculoForm
+    from models import Veiculo, CustoVeiculo, FluxoCaixa
+    
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    
+    form = CustoVeiculoForm()
+    form.veiculo_id.data = veiculo.id
+    
+    if form.validate_on_submit():
+        try:
+            # CRÍTICO: Validar valor positivo
+            if form.valor.data is None or form.valor.data <= 0:
+                flash('Erro: O valor do custo deve ser maior que zero.', 'error')
+                return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+            
+            # CRÍTICO: Validação de odômetro - km não pode diminuir
+            if form.km_atual.data and veiculo.km_atual:
+                if form.km_atual.data < veiculo.km_atual:
+                    flash(f'Erro: Quilometragem não pode diminuir. Atual: {veiculo.km_atual}km, Tentativa: {form.km_atual.data}km', 'error')
+                    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+            
+            # Validar tipo de custo
+            tipos_validos = ['combustivel', 'manutencao', 'seguro', 'multa', 'licenciamento', 'outros']
+            if form.tipo_custo.data not in tipos_validos:
+                flash(f'Tipo de custo inválido. Use: {", ".join(tipos_validos)}', 'error')
+                return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
+            
+            # Criar registro de custo
+            custo = CustoVeiculo(
+                veiculo_id=veiculo.id,
+                data_custo=form.data_custo.data,
+                valor=form.valor.data,
+                tipo_custo=form.tipo_custo.data,
+                descricao=form.descricao.data,
+                km_atual=form.km_atual.data or veiculo.km_atual,
+                fornecedor=form.fornecedor.data
+            )
+            
+            db.session.add(custo)
+            
+            # Atualizar KM atual do veículo se informado (já validado acima)
+            if form.km_atual.data and form.km_atual.data > veiculo.km_atual:
+                veiculo.km_atual = form.km_atual.data
+            
+            # Integrar com fluxo de caixa (se tabela existir)
+            try:
+                fluxo = FluxoCaixa(
+                    data_movimento=form.data_custo.data,
+                    tipo_movimento='SAIDA',
+                    categoria='custo_veiculo',
+                    valor=form.valor.data,
+                    descricao=f'{form.tipo_custo.data.title()} - {veiculo.placa} - {form.descricao.data}',
+                    referencia_id=custo.id,
+                    referencia_tabela='custo_veiculo'
+                )
+                db.session.add(fluxo)
+            except Exception as fluxo_error:
+                print(f"AVISO: Não foi possível integrar com fluxo de caixa: {fluxo_error}")
+            
+            db.session.commit()
+            
+            flash(f'Custo de {form.tipo_custo.data} registrado com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_veiculo', id=veiculo.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"ERRO AO REGISTRAR CUSTO DE VEÍCULO: {str(e)}")
+            flash('Erro ao registrar custo do veículo. Tente novamente.', 'error')
+    
+    return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
 
 # Rotas vazias removidas - estavam só fazendo redirect sem funcionalidade
 

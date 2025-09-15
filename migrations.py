@@ -67,6 +67,9 @@ def executar_migracoes():
         
         # Migração 16: NOVA - Adicionar campos faltantes na tabela allocation_employee
         adicionar_campos_allocation_employee()
+        
+        # Migração 17: CRÍTICA - Migração específica para sistema de veículos
+        migrar_sistema_veiculos_critical()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -91,7 +94,7 @@ def garantir_usuarios_producao():
             db.engine.execute(text("""
                 INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo, admin_id)
                 VALUES (10, 'valeverde_admin', 'admin@valeverde.com.br', 'Administrador Vale Verde', 
-                        'scrypt:32768:8:1$o8T5NlEWKHiEXE2Q$46c1dd2f6a3d0f0c3e2e8e1a1a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7a8a8a9a5a7', 
+                        'scrypt:32768:8:1$PLACEHOLDER_HASH_TO_BE_CHANGED', 
                         'admin', TRUE, NULL)
                 ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, nome = EXCLUDED.nome
             """))
@@ -109,7 +112,7 @@ def garantir_usuarios_producao():
             cursor.execute("""
                 INSERT INTO usuario (id, username, email, nome, password_hash, tipo_usuario, ativo, admin_id)
                 VALUES (10, 'valeverde_admin', 'admin@valeverde.com.br', 'Administrador Vale Verde', 
-                        'scrypt:32768:8:1$password_hash', 'admin', TRUE, NULL)
+                        'scrypt:32768:8:1$PLACEHOLDER_HASH_TO_BE_CHANGED', 'admin', TRUE, NULL)
                 ON CONFLICT (id) DO NOTHING
             """)
             connection.commit()
@@ -1208,3 +1211,221 @@ def adicionar_campos_allocation_employee():
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar campos na tabela allocation_employee: {e}")
         db.session.rollback()
+
+def migrar_sistema_veiculos_critical():
+    """
+    MIGRAÇÃO CRÍTICA: Sistema de Veículos Multi-Tenant
+    Aplica constraints e campos obrigatórios que estão faltando no banco de dados
+    """
+    try:
+        logger.info("🚗 MIGRAÇÃO CRÍTICA: Sistema de Veículos Multi-Tenant")
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # 1. Verificar se a tabela veiculo existe
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'veiculo'
+        """)
+        tabela_existe = cursor.fetchone()[0] > 0
+        
+        if not tabela_existe:
+            logger.info("📝 Tabela veiculo não existe, criando completa...")
+            
+            # Criar tabela completa com todas as constraints
+            cursor.execute("""
+                CREATE TABLE veiculo (
+                    id SERIAL PRIMARY KEY,
+                    placa VARCHAR(10) NOT NULL,
+                    marca VARCHAR(50) NOT NULL,
+                    modelo VARCHAR(50) NOT NULL,
+                    ano INTEGER,
+                    tipo VARCHAR(20) NOT NULL,
+                    status VARCHAR(20) DEFAULT 'Disponível',
+                    km_atual INTEGER DEFAULT 0,
+                    data_ultima_manutencao DATE,
+                    data_proxima_manutencao DATE,
+                    ativo BOOLEAN DEFAULT TRUE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
+                    -- Constraint unique por admin para isolamento multi-tenant
+                    CONSTRAINT veiculo_admin_placa_uc UNIQUE(admin_id, placa)
+                )
+            """)
+            
+            # Criar índices para performance
+            cursor.execute("CREATE INDEX idx_veiculo_admin_id ON veiculo(admin_id)")
+            cursor.execute("CREATE INDEX idx_veiculo_ativo ON veiculo(ativo)")
+            
+            connection.commit()
+            logger.info("✅ Tabela veiculo criada com todas as constraints!")
+            
+        else:
+            logger.info("🔍 Tabela veiculo existe, verificando constraints...")
+            
+            # 2. Verificar se admin_id existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'veiculo' 
+                AND column_name = 'admin_id'
+            """)
+            admin_id_existe = cursor.fetchone()
+            
+            if not admin_id_existe:
+                logger.info("🔄 Adicionando coluna admin_id...")
+                cursor.execute("ALTER TABLE veiculo ADD COLUMN admin_id INTEGER")
+                logger.info("✅ Coluna admin_id adicionada")
+            
+            # 3. Verificar se há registros sem admin_id e corrigir
+            cursor.execute("SELECT COUNT(*) FROM veiculo WHERE admin_id IS NULL")
+            registros_sem_admin = cursor.fetchone()[0]
+            
+            if registros_sem_admin > 0:
+                logger.info(f"🔄 Corrigindo {registros_sem_admin} registros sem admin_id...")
+                
+                # Tentar usar ID 10 como padrão (admin principal)
+                cursor.execute("SELECT id FROM usuario WHERE tipo_usuario = 'admin' LIMIT 1")
+                admin_padrao = cursor.fetchone()
+                
+                if admin_padrao:
+                    admin_id_padrao = admin_padrao[0]
+                    cursor.execute(
+                        "UPDATE veiculo SET admin_id = %s WHERE admin_id IS NULL",
+                        (admin_id_padrao,)
+                    )
+                    logger.info(f"✅ Registros atualizados com admin_id = {admin_id_padrao}")
+                else:
+                    logger.warning("⚠️ Nenhum admin encontrado, usando ID 1 como padrão")
+                    cursor.execute("UPDATE veiculo SET admin_id = 1 WHERE admin_id IS NULL")
+            
+            # 4. Verificar se admin_id é NOT NULL
+            cursor.execute("""
+                SELECT is_nullable 
+                FROM information_schema.columns 
+                WHERE table_name = 'veiculo' 
+                AND column_name = 'admin_id'
+            """)
+            admin_nullable = cursor.fetchone()
+            
+            if admin_nullable and admin_nullable[0] == 'YES':
+                logger.info("🔄 Aplicando constraint NOT NULL em admin_id...")
+                cursor.execute("ALTER TABLE veiculo ALTER COLUMN admin_id SET NOT NULL")
+                logger.info("✅ admin_id agora é NOT NULL")
+            
+            # 5. Verificar se foreign key existe
+            cursor.execute("""
+                SELECT constraint_name 
+                FROM information_schema.table_constraints 
+                WHERE table_name = 'veiculo' 
+                AND constraint_type = 'FOREIGN KEY'
+                AND constraint_name LIKE '%admin%'
+            """)
+            fk_admin_existe = cursor.fetchone()
+            
+            if not fk_admin_existe:
+                logger.info("🔄 Adicionando foreign key admin_id...")
+                cursor.execute("""
+                    ALTER TABLE veiculo 
+                    ADD CONSTRAINT fk_veiculo_admin 
+                    FOREIGN KEY (admin_id) REFERENCES usuario(id)
+                """)
+                logger.info("✅ Foreign key admin_id adicionada")
+            
+            # 6. Verificar se constraint unique existe
+            cursor.execute("""
+                SELECT constraint_name 
+                FROM information_schema.table_constraints 
+                WHERE table_name = 'veiculo' 
+                AND constraint_type = 'UNIQUE'
+                AND constraint_name LIKE '%admin%placa%'
+            """)
+            unique_constraint_existe = cursor.fetchone()
+            
+            if not unique_constraint_existe:
+                logger.info("🔄 Adicionando constraint unique (admin_id, placa)...")
+                
+                # Primeiro remover duplicatas se existirem
+                cursor.execute("""
+                    DELETE FROM veiculo 
+                    WHERE id NOT IN (
+                        SELECT DISTINCT ON (admin_id, placa) id 
+                        FROM veiculo 
+                        ORDER BY admin_id, placa, id
+                    )
+                """)
+                
+                # Adicionar constraint unique
+                cursor.execute("""
+                    ALTER TABLE veiculo 
+                    ADD CONSTRAINT veiculo_admin_placa_uc 
+                    UNIQUE(admin_id, placa)
+                """)
+                logger.info("✅ Constraint unique (admin_id, placa) adicionada")
+            
+            # 7. Verificar se updated_at existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'veiculo' 
+                AND column_name = 'updated_at'
+            """)
+            updated_at_existe = cursor.fetchone()
+            
+            if not updated_at_existe:
+                logger.info("🔄 Adicionando coluna updated_at...")
+                cursor.execute("""
+                    ALTER TABLE veiculo 
+                    ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                """)
+                logger.info("✅ Coluna updated_at adicionada")
+            
+            # 8. Criar índices se não existirem
+            cursor.execute("""
+                SELECT indexname 
+                FROM pg_indexes 
+                WHERE tablename = 'veiculo' 
+                AND indexname = 'idx_veiculo_admin_id'
+            """)
+            indice_admin_existe = cursor.fetchone()
+            
+            if not indice_admin_existe:
+                logger.info("🔄 Criando índice para admin_id...")
+                cursor.execute("CREATE INDEX idx_veiculo_admin_id ON veiculo(admin_id)")
+                logger.info("✅ Índice admin_id criado")
+            
+            cursor.execute("""
+                SELECT indexname 
+                FROM pg_indexes 
+                WHERE tablename = 'veiculo' 
+                AND indexname = 'idx_veiculo_ativo'
+            """)
+            indice_ativo_existe = cursor.fetchone()
+            
+            if not indice_ativo_existe:
+                logger.info("🔄 Criando índice para ativo...")
+                cursor.execute("CREATE INDEX idx_veiculo_ativo ON veiculo(ativo)")
+                logger.info("✅ Índice ativo criado")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("🚗 ✅ MIGRAÇÃO CRÍTICA DE VEÍCULOS CONCLUÍDA COM SUCESSO!")
+        logger.info("🔒 Sistema multi-tenant agora totalmente protegido")
+        logger.info("🎯 Constraints aplicadas: unique(admin_id, placa), admin_id NOT NULL")
+        
+    except Exception as e:
+        logger.error(f"❌ ERRO CRÍTICO na migração de veículos: {str(e)}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        raise  # Re-raise para que seja tratado pela migração principal
