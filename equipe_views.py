@@ -198,8 +198,18 @@ def get_funcionarios_allocation_json(allocation_id):
         return jsonify({
             'success': True,
             'allocation_id': allocation_id,
-            'count': len(funcionarios_list),
-            'funcionarios': funcionarios_list
+            'total_alocados': len(funcionarios_list),  # Para os badges
+            'count': len(funcionarios_list),  # Mantém compatibilidade
+            'funcionarios': funcionarios_list,  # Para lista detalhada
+            'funcionarios_alocados': funcionarios_list,  # Para o modal
+            'funcionarios_disponiveis': [],  # Modal espera isso também
+            'allocation': {  # Dados da alocação para o modal
+                'id': allocation.id,
+                'obra_codigo': allocation.obra.codigo if allocation.obra else f"#{allocation.obra_id}",
+                'obra_nome': allocation.obra.nome if allocation.obra else "Obra não encontrada",
+                'data_alocacao': allocation.data_alocacao.isoformat(),
+                'local_trabalho': allocation.local_trabalho
+            }
         })
         
     except Exception as e:
