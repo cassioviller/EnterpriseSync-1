@@ -167,6 +167,7 @@ def get_funcionarios_allocation_json(allocation_id):
         
         # Buscar funcionários alocados
         funcionarios_list = []
+        funcionarios_alocados_ids = []  # Para excluir dos disponíveis
         try:
             allocation_employees = AllocationEmployee.query.filter_by(allocation_id=allocation_id).all()
             
@@ -178,6 +179,7 @@ def get_funcionarios_allocation_json(allocation_id):
                 ).first()
                 
                 if funcionario:  # Validação adicional
+                    funcionarios_alocados_ids.append(funcionario.id)
                     funcionarios_list.append({
                         'id': funcionario.id,
                         'nome': funcionario.nome,
@@ -194,6 +196,29 @@ def get_funcionarios_allocation_json(allocation_id):
         
         except Exception as e:
             logging.error(f"Erro ao buscar funcionários da alocação {allocation_id}: {e}")
+
+        # Buscar funcionários disponíveis (não alocados nesta alocação)
+        funcionarios_disponiveis = []
+        try:
+            # Buscar todos os funcionários ativos do admin
+            todos_funcionarios = Funcionario.query.filter_by(
+                admin_id=admin_id, 
+                ativo=True
+            ).order_by(Funcionario.nome).all()
+            
+            # Filtrar apenas os não alocados
+            for funcionario in todos_funcionarios:
+                if funcionario.id not in funcionarios_alocados_ids:
+                    funcionarios_disponiveis.append({
+                        'id': funcionario.id,
+                        'nome': funcionario.nome,
+                        'codigo': funcionario.codigo,
+                        'nome_curto': ' '.join(funcionario.nome.split()[:2])
+                    })
+        
+        except Exception as e:
+            logging.error(f"Erro ao buscar funcionários disponíveis para alocação {allocation_id}: {e}")
+            funcionarios_disponiveis = []
         
         return jsonify({
             'success': True,
@@ -203,7 +228,7 @@ def get_funcionarios_allocation_json(allocation_id):
             'data': funcionarios_list,  # Para lista detalhada (cards)
             'funcionarios': funcionarios_list,  # Para lista detalhada
             'funcionarios_alocados': funcionarios_list,  # Para o modal
-            'funcionarios_disponiveis': [],  # Modal espera isso também
+            'funcionarios_disponiveis': funcionarios_disponiveis,  # Lista de funcionários para alocar
             'allocation': {  # Dados da alocação para o modal
                 'id': allocation.id,
                 'obra_codigo': allocation.obra.codigo if allocation.obra else f"#{allocation.obra_id}",
