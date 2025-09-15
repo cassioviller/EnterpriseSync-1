@@ -4963,18 +4963,8 @@ class EquipeFase2 {
             });
 
             // Criar PDF em modo paisagem (A4)
-            let jsPDFConstructor;
-            if (window.jsPDF && window.jsPDF.jsPDF) {
-                jsPDFConstructor = window.jsPDF.jsPDF;
-            } else if (window.jspdf) {
-                jsPDFConstructor = window.jspdf;
-            } else if (typeof jsPDF !== 'undefined') {
-                jsPDFConstructor = jsPDF;
-            } else {
-                throw new Error('jsPDF não encontrado');
-            }
-            
-            const pdf = new jsPDFConstructor({
+            const { jsPDF } = window.jsPDF || window;
+            const pdf = new jsPDF({
                 orientation: 'landscape',
                 unit: 'mm',
                 format: 'a4'
@@ -5064,18 +5054,8 @@ class EquipeFase2 {
             });
 
             // Criar PDF em modo retrato (A4)
-            let jsPDFConstructor;
-            if (window.jsPDF && window.jsPDF.jsPDF) {
-                jsPDFConstructor = window.jsPDF.jsPDF;
-            } else if (window.jspdf) {
-                jsPDFConstructor = window.jspdf;
-            } else if (typeof jsPDF !== 'undefined') {
-                jsPDFConstructor = jsPDF;
-            } else {
-                throw new Error('jsPDF não encontrado');
-            }
-            
-            const pdf = new jsPDFConstructor({
+            const { jsPDF } = window.jsPDF || window;
+            const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
