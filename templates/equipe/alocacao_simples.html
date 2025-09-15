@@ -2070,8 +2070,8 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <!-- jsPDF e html2canvas para exportação PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <script>
 // CLASSE FASE 2 - FOCO EM DEBUG E CORREÇÕES + INTEGRAÇÃO COMPLETA
@@ -4902,12 +4902,56 @@ class EquipeFase2 {
     // ===================================
 
     /**
+     * Aguarda as bibliotecas PDF carregarem completamente
+     */
+    async aguardarBibliotecasPDF() {
+        const maxTentativas = 15;
+        let tentativas = 0;
+        
+        while (tentativas < maxTentativas) {
+            // Verificar multiple formas de como o jsPDF pode estar disponível
+            const jsPDFDisponivel = (
+                (typeof window.jsPDF !== 'undefined' && window.jsPDF.jsPDF) ||
+                (typeof window.jspdf !== 'undefined') ||
+                (typeof jsPDF !== 'undefined')
+            );
+            
+            const html2canvasDisponivel = (
+                typeof html2canvas !== 'undefined'
+            );
+            
+            this.log(`🔍 Verificação PDF: jsPDF=${jsPDFDisponivel}, html2canvas=${html2canvasDisponivel}`);
+            
+            if (jsPDFDisponivel && html2canvasDisponivel) {
+                this.log('✅ Bibliotecas PDF carregadas com sucesso');
+                return;
+            }
+            
+            this.log(`⏳ Aguardando bibliotecas PDF... tentativa ${tentativas + 1}/${maxTentativas}`);
+            
+            // Aguardar 800ms antes da próxima tentativa
+            await new Promise(resolve => setTimeout(resolve, 800));
+            tentativas++;
+        }
+        
+        // Informações detalhadas para debug
+        this.log(`❌ DEBUG: window.jsPDF = ${typeof window.jsPDF}`);
+        this.log(`❌ DEBUG: window.jspdf = ${typeof window.jspdf}`);
+        this.log(`❌ DEBUG: html2canvas = ${typeof html2canvas}`);
+        
+        throw new Error('Timeout: Bibliotecas PDF não carregaram no tempo esperado');
+    }
+
+    /**
      * Exporta a semana completa em PDF (modo paisagem)
      */
     async exportarPDFSemana() {
         this.log('📄 Iniciando exportação PDF da semana completa...');
         
         try {
+            // Aguardar bibliotecas carregarem se necessário
+            await this.aguardarBibliotecasPDF();
+            
             // Verificar se as bibliotecas estão carregadas
             if (typeof window.jsPDF === 'undefined' || typeof html2canvas === 'undefined') {
                 throw new Error('Bibliotecas PDF não carregadas');
@@ -4937,8 +4981,22 @@ class EquipeFase2 {
             });
 
             // Criar PDF em modo paisagem (A4)
-            const { jsPDF } = window.jsPDF;
-            const pdf = new jsPDF('landscape', 'mm', 'a4');
+            let jsPDFConstructor;
+            if (window.jsPDF && window.jsPDF.jsPDF) {
+                jsPDFConstructor = window.jsPDF.jsPDF;
+            } else if (window.jspdf) {
+                jsPDFConstructor = window.jspdf;
+            } else if (typeof jsPDF !== 'undefined') {
+                jsPDFConstructor = jsPDF;
+            } else {
+                throw new Error('jsPDF não encontrado');
+            }
+            
+            const pdf = new jsPDFConstructor({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
             
             // Dimensões A4 paisagem: 297 x 210 mm
             const pdfWidth = 297;
@@ -4998,6 +5056,9 @@ class EquipeFase2 {
         this.log(`📄 Iniciando exportação PDF do ${nomeDia}...`);
         
         try {
+            // Aguardar bibliotecas carregarem se necessário
+            await this.aguardarBibliotecasPDF();
+            
             // Verificar se as bibliotecas estão carregadas
             if (typeof window.jsPDF === 'undefined' || typeof html2canvas === 'undefined') {
                 throw new Error('Bibliotecas PDF não carregadas');
@@ -5027,8 +5088,22 @@ class EquipeFase2 {
             });
 
             // Criar PDF em modo retrato (A4)
-            const { jsPDF } = window.jsPDF;
-            const pdf = new jsPDF('portrait', 'mm', 'a4');
+            let jsPDFConstructor;
+            if (window.jsPDF && window.jsPDF.jsPDF) {
+                jsPDFConstructor = window.jsPDF.jsPDF;
+            } else if (window.jspdf) {
+                jsPDFConstructor = window.jspdf;
+            } else if (typeof jsPDF !== 'undefined') {
+                jsPDFConstructor = jsPDF;
+            } else {
+                throw new Error('jsPDF não encontrado');
+            }
+            
+            const pdf = new jsPDFConstructor({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
             
             // Dimensões A4 retrato: 210 x 297 mm
             const pdfWidth = 210;
