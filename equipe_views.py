@@ -200,6 +200,7 @@ def get_funcionarios_allocation_json(allocation_id):
             'allocation_id': allocation_id,
             'total_alocados': len(funcionarios_list),  # Para os badges
             'count': len(funcionarios_list),  # Mantém compatibilidade
+            'data': funcionarios_list,  # Para lista detalhada (cards)
             'funcionarios': funcionarios_list,  # Para lista detalhada
             'funcionarios_alocados': funcionarios_list,  # Para o modal
             'funcionarios_disponiveis': [],  # Modal espera isso também
