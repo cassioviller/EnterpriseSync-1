@@ -4139,7 +4139,7 @@ def atualizar_rdo(id):
         flash('Erro ao atualizar RDO.', 'error')
         return redirect(url_for('main.editar_rdo', id=id))
 
-@main_bp.route('/rdo/<int:id>/editar')
+@main_bp.route('/rdo/<int:id>/editar', methods=['GET', 'POST'])
 @admin_required
 def editar_rdo(id):
     """Interface administrativa para editar RDO"""
@@ -5222,7 +5222,7 @@ def funcionario_visualizar_rdo(id):
     """Redirect para nova interface unificada"""
     return redirect(url_for('main.rdo_visualizar_unificado', id=id))
 
-@main_bp.route('/funcionario/rdo/<int:id>/editar')
+@main_bp.route('/funcionario/rdo/<int:id>/editar', methods=['GET', 'POST'])
 @funcionario_required
 def funcionario_editar_rdo(id):
     """Funcionário editar RDO específico"""
