@@ -5,13 +5,7 @@
 {% block content %}
 <div class="container-fluid p-0">
     <div style="margin: 0 4px;">
-        <h3>📋 Gestão de Equipe - FASE 2 CORREÇÕES</h3>
-        <p class="text-muted">Implementação gradual - "FUNCIONA PRIMEIRO, OTIMIZA DEPOIS"</p>
-    </div>
-    
-    <!-- STATUS DE DEBUG -->
-    <div class="alert alert-info" id="status-debug" style="margin: 0 4px 1rem 4px;">
-        <strong>Status:</strong> Carregando sistema...
+        <h3>📅 Gestão de Equipe</h3>
     </div>
     
     <!-- BARRA HORIZONTAL DE OBRAS OTIMIZADA PARA TABLETS -->
@@ -2421,8 +2415,7 @@ class EquipeFase2 {
             
             div.innerHTML = `
                 <div class="card-body p-2">
-                    <h6 class="card-title mb-1 text-primary">${obra.codigo}</h6>
-                    <small class="text-muted">${obra.nome.length > 30 ? obra.nome.substring(0, 30) + '...' : obra.nome}</small>
+                    <h6 class="card-title mb-1 text-primary">${obra.nome.length > 25 ? obra.nome.substring(0, 25) + '...' : obra.nome}</h6>
                 </div>
             `;
             
@@ -3497,24 +3490,18 @@ class EquipeFase2 {
     
     highlightSearchTermInElement(element, searchTerm, obra) {
         const titleElement = element.querySelector('.card-title');
-        const nameElement = element.querySelector('small.text-muted');
         
-        if (!titleElement || !nameElement) return;
+        if (!titleElement) return;
         
-        // Restaurar texto original
-        titleElement.innerHTML = obra.codigo;
-        nameElement.innerHTML = obra.nome.length > 30 ? obra.nome.substring(0, 30) + '...' : obra.nome;
+        // Restaurar texto original (só nome agora)
+        const displayName = obra.nome.length > 25 ? obra.nome.substring(0, 25) + '...' : obra.nome;
+        titleElement.innerHTML = displayName;
         
         // Aplicar highlight
         const normalizedTerm = this.normalizeString(searchTerm);
         
-        if (this.normalizeString(obra.codigo).includes(normalizedTerm)) {
-            titleElement.innerHTML = this.highlightSearchTerm(obra.codigo, searchTerm);
-        }
-        
         if (this.normalizeString(obra.nome).includes(normalizedTerm)) {
-            const displayName = obra.nome.length > 30 ? obra.nome.substring(0, 30) + '...' : obra.nome;
-            nameElement.innerHTML = this.highlightSearchTerm(displayName, searchTerm);
+            titleElement.innerHTML = this.highlightSearchTerm(displayName, searchTerm);
         }
     }
     
@@ -4951,13 +4938,8 @@ class EquipeFase2 {
         try {
             // Aguardar bibliotecas carregarem se necessário
             await this.aguardarBibliotecasPDF();
-            
-            // Verificar se as bibliotecas estão carregadas
-            if (typeof window.jsPDF === 'undefined' || typeof html2canvas === 'undefined') {
-                throw new Error('Bibliotecas PDF não carregadas');
-            }
 
-            this.updateStatus('Preparando exportação PDF da semana...', 'info');
+            // Preparando PDF da semana
             
             // Ocultar botões de ação temporariamente
             this.ocultarBotoesParaExportacao(true);
@@ -5034,7 +5016,6 @@ class EquipeFase2 {
             const nomeArquivo = `gestao-equipe-semana-${this.currentWeek}.pdf`;
             pdf.save(nomeArquivo);
 
-            this.updateStatus('✅ PDF da semana exportado com sucesso!', 'success');
             this.log(`✅ PDF exportado: ${nomeArquivo}`);
 
         } catch (error) {
@@ -5058,13 +5039,8 @@ class EquipeFase2 {
         try {
             // Aguardar bibliotecas carregarem se necessário
             await this.aguardarBibliotecasPDF();
-            
-            // Verificar se as bibliotecas estão carregadas
-            if (typeof window.jsPDF === 'undefined' || typeof html2canvas === 'undefined') {
-                throw new Error('Bibliotecas PDF não carregadas');
-            }
 
-            this.updateStatus(`Preparando exportação PDF do ${nomeDia}...`, 'info');
+            // Preparando PDF do dia
             
             // Ocultar botões de ação temporariamente
             this.ocultarBotoesParaExportacao(true);
@@ -5142,7 +5118,6 @@ class EquipeFase2 {
             const nomeArquivo = `gestao-equipe-${nomeDia.toLowerCase()}-${dataFormatada}.pdf`;
             pdf.save(nomeArquivo);
 
-            this.updateStatus(`✅ PDF do ${nomeDia} exportado com sucesso!`, 'success');
             this.log(`✅ PDF exportado: ${nomeArquivo}`);
 
         } catch (error) {
