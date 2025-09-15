@@ -1874,6 +1874,69 @@
             transform: translateY(0);
         }
     }
+
+    /* MELHORIAS DOS CARDS */
+    .improved-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        border-color: #2E86AB !important;
+    }
+
+    .improved-card .action-buttons-improved .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .funcionario-item-improved:hover {
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .funcionario-item-improved:last-child {
+        border-bottom: none !important;
+    }
+
+    .funcionarios-list-improved::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .funcionarios-list-improved::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 2px;
+    }
+
+    .funcionarios-list-improved::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 2px;
+    }
+
+    .funcionarios-list-improved::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+
+    /* ESTADOS VISUAIS */
+    .no-funcionarios-improved {
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        border: 1px dashed #dee2e6;
+        border-radius: 6px;
+    }
+
+    /* RESPONSIVIDADE MELHORADA */
+    @media (max-width: 768px) {
+        .improved-card .card-body {
+            padding: 10px !important;
+        }
+        
+        .improved-card .action-buttons-improved {
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .improved-card .action-buttons-improved .btn {
+            font-size: 10px;
+            padding: 4px 6px;
+        }
+    }
     
     /* INDICADORES VISUAIS MELHORADOS */
     .status-debug {
@@ -2482,42 +2545,52 @@ class EquipeFase2 {
     
     renderAllocationItem(container, allocation, dayOfWeek) {
         const div = document.createElement('div');
-        div.className = 'card mb-2 allocation-item optimized-card simplified-card';
+        div.className = 'card mb-2 allocation-item improved-card';
         div.dataset.obraId = allocation.obra_id;
         div.dataset.allocationId = allocation.id;
-        div.style.border = '1px solid #28a745';
-        div.style.backgroundColor = '#f8fff8';
+        div.style.border = '1px solid #dee2e6';
+        div.style.backgroundColor = '#ffffff';
         div.style.position = 'relative';
-        div.style.cursor = 'pointer'; // Indicar que é clicável
+        div.style.cursor = 'pointer';
+        div.style.borderRadius = '8px';
+        div.style.transition = 'all 0.2s ease';
+        div.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
         
         div.innerHTML = `
-            <div class="card-body p-2" style="position: relative;">
-                <!-- Botões de ação no canto superior direito - OTIMIZADOS -->
-                <div class="action-buttons-optimized" style="position: absolute; top: 2px; right: 2px; z-index: 10; display: flex; gap: 1px; opacity: 0.7; transition: opacity 0.2s;">
-                    <button class="btn btn-action-micro btn-outline-primary" 
-                            onclick="event.stopPropagation(); window.equipeFase2.openFuncionariosModal(${allocation.id})"
-                            title="Gerenciar funcionários" 
-                            style="width: 16px; height: 16px; padding: 0; font-size: 9px; border-radius: 3px; border-width: 1px; min-width: 16px; line-height: 1;">
-                        👥
-                    </button>
-                    <button class="btn btn-action-micro btn-outline-danger" 
-                            onclick="event.stopPropagation(); window.equipeFase2.removerAlocacaoManual(${allocation.obra_id}, ${dayOfWeek})"
-                            title="Remover alocação"
-                            style="width: 16px; height: 16px; padding: 0; font-size: 9px; border-radius: 3px; border-width: 1px; min-width: 16px; line-height: 1;">
-                        🗑️
-                    </button>
-                </div>
-                
-                <!-- Nome da obra - OTIMIZADO com menos padding -->
-                <div class="obra-nome-optimized" style="font-size: 14px; font-weight: 600; color: #2c3e50; margin-bottom: 8px; padding-right: 36px; line-height: 1.3; word-wrap: break-word;">
-                    ${allocation.obra_nome}
+            <div class="card-body" style="padding: 12px;">
+                <!-- Cabeçalho: Nome da obra com ícone -->
+                <div class="card-header-improved" style="display: flex; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f1f3f4;">
+                    <div class="obra-icon" style="margin-right: 8px; color: #2E86AB; font-size: 16px;">
+                        🏗️
+                    </div>
+                    <div class="obra-nome-improved" style="font-size: 14px; font-weight: 600; color: #2D3748; line-height: 1.4; flex: 1;">
+                        ${allocation.obra_nome}
+                    </div>
                 </div>
                 
                 <!-- Área de funcionários alocados -->
-                <div class="funcionarios-section-simplified" id="funcionarios-${allocation.id}">
-                    <div class="funcionarios-loading" style="font-size: 11px; color: #6c757d;">
-                        <i class="fas fa-spinner fa-spin me-1"></i>Carregando funcionários...
+                <div class="funcionarios-section-improved" id="funcionarios-${allocation.id}" style="min-height: 40px; margin-bottom: 12px;">
+                    <div class="funcionarios-loading" style="font-size: 11px; color: #A0AEC0; display: flex; align-items: center;">
+                        <i class="fas fa-spinner fa-spin" style="margin-right: 6px;"></i>
+                        Carregando funcionários...
                     </div>
+                </div>
+                
+                <!-- Botões de ação na base do card -->
+                <div class="action-buttons-improved" style="display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid #f1f3f4;">
+                    <button class="btn btn-sm btn-outline-primary flex-1" 
+                            onclick="event.stopPropagation(); window.equipeFase2.openFuncionariosModal(${allocation.id})"
+                            title="Gerenciar funcionários" 
+                            style="flex: 1; font-size: 11px; padding: 6px 8px; border-radius: 4px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <i class="fas fa-users" style="font-size: 10px;"></i>
+                        Gerenciar
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" 
+                            onclick="event.stopPropagation(); window.equipeFase2.removerAlocacaoManual(${allocation.obra_id}, ${dayOfWeek})"
+                            title="Remover alocação"
+                            style="font-size: 11px; padding: 6px 8px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-trash" style="font-size: 10px;"></i>
+                    </button>
                 </div>
             </div>
         `;
@@ -4542,19 +4615,45 @@ class EquipeFase2 {
                 
                 if (count === 0) {
                     funcionariosSection.innerHTML = `
-                        <div class="no-funcionarios" style="font-size: 11px; color: #6c757d; font-style: italic;">
+                        <div class="no-funcionarios-improved" style="display: flex; align-items: center; justify-content: center; padding: 12px; color: #A0AEC0; font-size: 11px; font-style: italic; min-height: 40px;">
+                            <i class="fas fa-user-slash" style="margin-right: 6px; opacity: 0.5;"></i>
                             Nenhum funcionário alocado
                         </div>
                     `;
                 } else {
-                    // Criar lista simplificada de funcionários com bullets
+                    // Layout melhorado: cada funcionário em linha separada
                     const funcionariosList = funcionarios.map(func => {
-                        const isLider = func.is_lider ? ' 👑' : '';
-                        return `• ${func.funcionario_nome}${isLider}`;
-                    }).join('  ');
+                        const nomeCompleto = func.funcionario_nome || func.nome || 'Sem nome';
+                        const nomeShort = this.generateShortName(nomeCompleto);
+                        const papel = func.papel && func.papel !== 'Sem função' ? func.papel : '';
+                        
+                        // Determinar ícone baseado no papel
+                        let icon = '👤';
+                        if (papel.toLowerCase().includes('líder') || papel.toLowerCase().includes('lider')) {
+                            icon = '👑';
+                        } else if (papel.toLowerCase().includes('operador') || papel.toLowerCase().includes('operário')) {
+                            icon = '👷';
+                        } else if (papel.toLowerCase().includes('engenheiro')) {
+                            icon = '👨‍💼';
+                        }
+                        
+                        return `
+                            <div class="funcionario-item-improved" style="display: flex; align-items: center; padding: 4px 0; border-bottom: 1px solid #f8f9fa;">
+                                <div class="funcionario-icon" style="margin-right: 8px; font-size: 14px;">
+                                    ${icon}
+                                </div>
+                                <div class="funcionario-details" style="flex: 1;">
+                                    <div class="funcionario-name" style="font-size: 12px; font-weight: 500; color: #2D3748; line-height: 1.2;" title="${nomeCompleto}">
+                                        ${nomeShort}
+                                    </div>
+                                    ${papel ? `<div class="funcionario-role" style="font-size: 10px; color: #718096; line-height: 1;">${papel}</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
                     
                     funcionariosSection.innerHTML = `
-                        <div class="funcionarios-list-simplified" style="font-size: 12px; color: #495057; line-height: 1.3;">
+                        <div class="funcionarios-list-improved" style="max-height: 120px; overflow-y: auto;">
                             ${funcionariosList}
                         </div>
                     `;
@@ -4583,6 +4682,24 @@ class EquipeFase2 {
     /**
      * Renderiza funcionários diretamente no card usando dados da alocação
      */
+    /**
+     * Gera nome curto (primeiro + último sobrenome)
+     */
+    generateShortName(fullName) {
+        if (!fullName || fullName.trim() === '') return 'Sem nome';
+        
+        const parts = fullName.trim().split(' ').filter(part => part.length > 0);
+        
+        if (parts.length === 1) {
+            return parts[0];
+        } else if (parts.length === 2) {
+            return `${parts[0]} ${parts[1]}`;
+        } else {
+            // Primeiro + último sobrenome
+            return `${parts[0]} ${parts[parts.length - 1]}`;
+        }
+    }
+
     renderFuncionariosInCard(allocationId, funcionarios) {
         this.log(`👥 FUNCIONARIOS: Renderizando ${funcionarios.length} funcionários para alocação ${allocationId}`);
         
@@ -4594,19 +4711,45 @@ class EquipeFase2 {
         
         if (!funcionarios || funcionarios.length === 0) {
             funcionariosSection.innerHTML = `
-                <div class="no-funcionarios" style="font-size: 11px; color: #6c757d; font-style: italic;">
+                <div class="no-funcionarios-improved" style="display: flex; align-items: center; justify-content: center; padding: 12px; color: #A0AEC0; font-size: 11px; font-style: italic; min-height: 40px;">
+                    <i class="fas fa-user-slash" style="margin-right: 6px; opacity: 0.5;"></i>
                     Nenhum funcionário alocado
                 </div>
             `;
         } else {
-            // Criar lista simplificada de funcionários com bullets
+            // Layout melhorado: cada funcionário em linha separada
             const funcionariosList = funcionarios.map(func => {
-                const papel = func.papel && func.papel !== 'Sem função' ? ` (${func.papel})` : '';
-                return `• ${func.nome_curto || func.nome}${papel}`;
-            }).join('  ');
+                const nomeCompleto = func.funcionario_nome || func.nome || 'Sem nome';
+                const nomeShort = this.generateShortName(nomeCompleto);
+                const papel = func.papel && func.papel !== 'Sem função' ? func.papel : '';
+                
+                // Determinar ícone baseado no papel
+                let icon = '👤';
+                if (papel.toLowerCase().includes('líder') || papel.toLowerCase().includes('lider')) {
+                    icon = '👑';
+                } else if (papel.toLowerCase().includes('operador') || papel.toLowerCase().includes('operário')) {
+                    icon = '👷';
+                } else if (papel.toLowerCase().includes('engenheiro')) {
+                    icon = '👨‍💼';
+                }
+                
+                return `
+                    <div class="funcionario-item-improved" style="display: flex; align-items: center; padding: 4px 0; border-bottom: 1px solid #f8f9fa; last-child:border-bottom: none;">
+                        <div class="funcionario-icon" style="margin-right: 8px; font-size: 14px;">
+                            ${icon}
+                        </div>
+                        <div class="funcionario-details" style="flex: 1;">
+                            <div class="funcionario-name" style="font-size: 12px; font-weight: 500; color: #2D3748; line-height: 1.2;" title="${nomeCompleto}">
+                                ${nomeShort}
+                            </div>
+                            ${papel ? `<div class="funcionario-role" style="font-size: 10px; color: #718096; line-height: 1;">${papel}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
             
             funcionariosSection.innerHTML = `
-                <div class="funcionarios-list-simplified" style="font-size: 12px; color: #495057; line-height: 1.3;">
+                <div class="funcionarios-list-improved" style="max-height: 120px; overflow-y: auto;">
                     ${funcionariosList}
                 </div>
             `;
