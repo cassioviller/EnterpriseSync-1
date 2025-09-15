@@ -4906,24 +4906,18 @@ class EquipeFase2 {
                 typeof html2canvas !== 'undefined'
             );
             
-            this.log(`🔍 Verificação PDF: jsPDF=${jsPDFDisponivel}, html2canvas=${html2canvasDisponivel}`);
             
             if (jsPDFDisponivel && html2canvasDisponivel) {
                 this.log('✅ Bibliotecas PDF carregadas com sucesso');
                 return;
             }
             
-            this.log(`⏳ Aguardando bibliotecas PDF... tentativa ${tentativas + 1}/${maxTentativas}`);
             
             // Aguardar 800ms antes da próxima tentativa
             await new Promise(resolve => setTimeout(resolve, 800));
             tentativas++;
         }
         
-        // Informações detalhadas para debug
-        this.log(`❌ DEBUG: window.jsPDF = ${typeof window.jsPDF}`);
-        this.log(`❌ DEBUG: window.jspdf = ${typeof window.jspdf}`);
-        this.log(`❌ DEBUG: html2canvas = ${typeof html2canvas}`);
         
         throw new Error('Timeout: Bibliotecas PDF não carregaram no tempo esperado');
     }
