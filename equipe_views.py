@@ -182,16 +182,20 @@ def get_funcionarios_allocation_json(allocation_id):
                     funcionarios_alocados_ids.append(funcionario.id)
                     funcionarios_list.append({
                         'id': funcionario.id,
+                        'funcionario_nome': funcionario.nome,  # Para o modal
                         'nome': funcionario.nome,
                         'nome_curto': ' '.join(funcionario.nome.split()[:2]),  # Primeiros 2 nomes
                         'codigo': funcionario.codigo,
                         'papel': ae.papel or 'Sem função',
                         'entrada': ae.turno_inicio.strftime('%H:%M') if ae.turno_inicio else '08:00',
                         'saida': ae.turno_fim.strftime('%H:%M') if ae.turno_fim else '17:00',
+                        'turno_inicio': ae.turno_inicio.strftime('%H:%M') if ae.turno_inicio else '08:00',  # Para o modal
+                        'turno_fim': ae.turno_fim.strftime('%H:%M') if ae.turno_fim else '17:00',  # Para o modal
                         'almoco_saida': ae.hora_almoco_saida.strftime('%H:%M') if ae.hora_almoco_saida else '12:00',
                         'almoco_retorno': ae.hora_almoco_retorno.strftime('%H:%M') if ae.hora_almoco_retorno else '13:00',
                         'percentual_extras': ae.percentual_extras if hasattr(ae, 'percentual_extras') else 0.0,
-                        'tipo_lancamento': ae.tipo_lancamento if hasattr(ae, 'tipo_lancamento') else 'trabalho_normal'
+                        'tipo_lancamento': ae.tipo_lancamento if hasattr(ae, 'tipo_lancamento') else 'trabalho_normal',
+                        'allocation_employee_id': ae.id  # Para remoção
                     })
         
         except Exception as e:
