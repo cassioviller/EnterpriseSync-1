@@ -4896,6 +4896,238 @@ class EquipeFase2 {
      * REMOVIDO: addClickListenersToAllocations()
      * Substituído por botões dedicados com stopPropagation para evitar conflito com drag & drop
      */
+
+    // ===================================
+    // FUNÇÕES DE EXPORTAÇÃO PDF
+    // ===================================
+
+    /**
+     * Exporta a semana completa em PDF (modo paisagem)
+     */
+    async exportarPDFSemana() {
+        this.log('📄 Iniciando exportação PDF da semana completa...');
+        
+        try {
+            // Verificar se as bibliotecas estão carregadas
+            if (typeof window.jsPDF === 'undefined' || typeof html2canvas === 'undefined') {
+                throw new Error('Bibliotecas PDF não carregadas');
+            }
+
+            this.updateStatus('Preparando exportação PDF da semana...', 'info');
+            
+            // Ocultar botões de ação temporariamente
+            this.ocultarBotoesParaExportacao(true);
+            
+            // Aguardar um pouco para o DOM atualizar
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Capturar o elemento principal do calendário
+            const elemento = document.getElementById('weekly-grid');
+            if (!elemento) {
+                throw new Error('Elemento do calendário não encontrado');
+            }
+
+            // Gerar canvas com alta resolução
+            const canvas = await html2canvas(elemento, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                width: elemento.scrollWidth,
+                height: elemento.scrollHeight
+            });
+
+            // Criar PDF em modo paisagem (A4)
+            const { jsPDF } = window.jsPDF;
+            const pdf = new jsPDF('landscape', 'mm', 'a4');
+            
+            // Dimensões A4 paisagem: 297 x 210 mm
+            const pdfWidth = 297;
+            const pdfHeight = 210;
+            
+            // Calcular dimensões da imagem para caber no PDF
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+            
+            const finalWidth = imgWidth * ratio;
+            const finalHeight = imgHeight * ratio;
+            
+            // Centralizar a imagem
+            const x = (pdfWidth - finalWidth) / 2;
+            const y = (pdfHeight - finalHeight) / 2;
+
+            // Adicionar imagem ao PDF
+            const imgData = canvas.toDataURL('image/png');
+            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+
+            // Adicionar cabeçalho com informações
+            pdf.setFontSize(16);
+            pdf.setTextColor(40, 40, 40);
+            const titulo = `Gestão de Equipe - ${this.getWeekTitle()}`;
+            pdf.text(titulo, pdfWidth / 2, 15, { align: 'center' });
+
+            // Adicionar rodapé
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 100, 100);
+            const rodape = `Gerado em ${new Date().toLocaleString('pt-BR')} - SIGE Sistema de Gestão`;
+            pdf.text(rodape, pdfWidth / 2, pdfHeight - 5, { align: 'center' });
+
+            // Download do PDF
+            const nomeArquivo = `gestao-equipe-semana-${this.currentWeek}.pdf`;
+            pdf.save(nomeArquivo);
+
+            this.updateStatus('✅ PDF da semana exportado com sucesso!', 'success');
+            this.log(`✅ PDF exportado: ${nomeArquivo}`);
+
+        } catch (error) {
+            this.log(`❌ Erro na exportação PDF: ${error.message}`);
+            this.updateStatus(`❌ Erro na exportação: ${error.message}`, 'danger');
+        } finally {
+            // Restaurar botões
+            this.ocultarBotoesParaExportacao(false);
+        }
+    }
+
+    /**
+     * Exporta um dia específico em PDF (modo retrato)
+     */
+    async exportarPDFDia(dayIndex) {
+        const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+        const nomeDia = diasSemana[dayIndex];
+        
+        this.log(`📄 Iniciando exportação PDF do ${nomeDia}...`);
+        
+        try {
+            // Verificar se as bibliotecas estão carregadas
+            if (typeof window.jsPDF === 'undefined' || typeof html2canvas === 'undefined') {
+                throw new Error('Bibliotecas PDF não carregadas');
+            }
+
+            this.updateStatus(`Preparando exportação PDF do ${nomeDia}...`, 'info');
+            
+            // Ocultar botões de ação temporariamente
+            this.ocultarBotoesParaExportacao(true);
+            
+            // Aguardar um pouco para o DOM atualizar
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Capturar apenas a coluna do dia específico
+            const colunaElemento = document.querySelector(`[data-day="${dayIndex}"]`).closest('.col');
+            if (!colunaElemento) {
+                throw new Error(`Coluna do ${nomeDia} não encontrada`);
+            }
+
+            // Gerar canvas com alta resolução
+            const canvas = await html2canvas(colunaElemento, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                width: colunaElemento.scrollWidth,
+                height: colunaElemento.scrollHeight
+            });
+
+            // Criar PDF em modo retrato (A4)
+            const { jsPDF } = window.jsPDF;
+            const pdf = new jsPDF('portrait', 'mm', 'a4');
+            
+            // Dimensões A4 retrato: 210 x 297 mm
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+            
+            // Calcular dimensões da imagem para caber no PDF
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = Math.min((pdfWidth - 20) / imgWidth, (pdfHeight - 40) / imgHeight);
+            
+            const finalWidth = imgWidth * ratio;
+            const finalHeight = imgHeight * ratio;
+            
+            // Centralizar a imagem
+            const x = (pdfWidth - finalWidth) / 2;
+            const y = 25;
+
+            // Adicionar imagem ao PDF
+            const imgData = canvas.toDataURL('image/png');
+            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+
+            // Adicionar cabeçalho com informações
+            pdf.setFontSize(16);
+            pdf.setTextColor(40, 40, 40);
+            const titulo = `${nomeDia} - ${this.getDateForDay(dayIndex)}`;
+            pdf.text(titulo, pdfWidth / 2, 15, { align: 'center' });
+
+            // Adicionar rodapé
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 100, 100);
+            const rodape = `Gerado em ${new Date().toLocaleString('pt-BR')} - SIGE Sistema de Gestão`;
+            pdf.text(rodape, pdfWidth / 2, pdfHeight - 5, { align: 'center' });
+
+            // Download do PDF
+            const dataFormatada = this.getDateForDay(dayIndex);
+            const nomeArquivo = `gestao-equipe-${nomeDia.toLowerCase()}-${dataFormatada}.pdf`;
+            pdf.save(nomeArquivo);
+
+            this.updateStatus(`✅ PDF do ${nomeDia} exportado com sucesso!`, 'success');
+            this.log(`✅ PDF exportado: ${nomeArquivo}`);
+
+        } catch (error) {
+            this.log(`❌ Erro na exportação PDF do ${nomeDia}: ${error.message}`);
+            this.updateStatus(`❌ Erro na exportação: ${error.message}`, 'danger');
+        } finally {
+            // Restaurar botões
+            this.ocultarBotoesParaExportacao(false);
+        }
+    }
+
+    /**
+     * Oculta ou mostra botões de ação durante exportação PDF
+     */
+    ocultarBotoesParaExportacao(ocultar) {
+        const seletores = [
+            '.action-buttons-improved',
+            '.btn-action-micro',
+            '.obras-horizontal-card .btn',
+            '#btn-prev-week',
+            '#btn-next-week',
+            '#btn-current-week'
+        ];
+
+        seletores.forEach(seletor => {
+            const elementos = document.querySelectorAll(seletor);
+            elementos.forEach(elemento => {
+                if (ocultar) {
+                    elemento.style.visibility = 'hidden';
+                } else {
+                    elemento.style.visibility = 'visible';
+                }
+            });
+        });
+    }
+
+    /**
+     * Obter título da semana atual para o PDF
+     */
+    getWeekTitle() {
+        const element = document.getElementById('week-title');
+        return element ? element.textContent : 'Semana Atual';
+    }
+
+    /**
+     * Obter data formatada para um dia específico
+     */
+    getDateForDay(dayIndex) {
+        if (!this.currentWeek) return '';
+        
+        const sunday = this.parseYMDToLocal(this.currentWeek);
+        const targetDate = new Date(sunday);
+        targetDate.setDate(sunday.getDate() + dayIndex);
+        
+        return targetDate.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    }
 }
 
 
