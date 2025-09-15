@@ -1,0 +1,267 @@
+# 🔧 PROMPT - CORREÇÃO URGENTE EXPORTAÇÃO PDF
+**PROBLEMA ESPECÍFICO: jsPDFConstructor is not a constructor**
+
+## 🎯 SITUAÇÃO ATUAL
+
+### ✅ O QUE ESTÁ FUNCIONANDO:
+- **html2canvas**: Criando canvas perfeitamente
+- **Interface**: Botões PDF Semana e PDF Dia funcionais
+- **Bibliotecas**: Carregando corretamente via CDN
+- **Detecção**: Sistema aguarda bibliotecas antes de executar
+- **Elementos**: Captura correta do weekly-grid e colunas específicas
+
+### ❌ PROBLEMA ESPECÍFICO:
+**Erro:** `jsPDFConstructor is not a constructor`
+**Causa:** Forma incorreta de instanciar jsPDF 2.5.1 UMD
+**Local:** Linha onde cria `new jsPDF({...})`
+
+## 🔧 CORREÇÃO IMEDIATA
+
+### **PROBLEMA IDENTIFICADO:**
+```javascript
+// ❌ CÓDIGO ATUAL (INCORRETO)
+const { jsPDF } = window.jsPDF || window;
+const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4'
+});
+```
+
+### **SOLUÇÃO CORRETA:**
+```javascript
+// ✅ CÓDIGO CORRETO para jsPDF 2.5.1 UMD
+const pdf = new window.jsPDF.jsPDF({
+    orientation: 'landscape',  // ou 'portrait' para dia específico
+    unit: 'mm',
+    format: 'a4'
+});
+```
+
+## 📋 IMPLEMENTAÇÃO ESPECÍFICA
+
+### **1. Corrigir Função exportarPDFSemana()**
+```javascript
+async exportarPDFSemana() {
+    try {
+        console.log('🔄 Iniciando exportação PDF da semana...');
+        
+        // Aguardar bibliotecas (já funciona)
+        await this.aguardarBibliotecasPDF();
+        
+        // Ocultar botões (já funciona)
+        this.ocultarBotoesParaExportacao(true);
+        
+        // Capturar elemento (já funciona)
+        const elemento = document.getElementById('weekly-grid');
+        if (!elemento) {
+            throw new Error('Elemento weekly-grid não encontrado');
+        }
+        
+        // html2canvas (já funciona)
+        console.log('📸 Gerando canvas...');
+        const canvas = await html2canvas(elemento, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false
+        });
+        console.log('✅ Canvas gerado:', canvas.width, 'x', canvas.height);
+        
+        // ✅ CORREÇÃO AQUI - Instanciar jsPDF corretamente
+        console.log('📄 Criando PDF...');
+        const pdf = new window.jsPDF.jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a4'
+        });
+        
+        // Dimensões A4 paisagem
+        const pdfWidth = 297;  // A4 paisagem largura
+        const pdfHeight = 210; // A4 paisagem altura
+        const margin = 10;
+        
+        // Calcular dimensões da imagem
+        const imgWidth = pdfWidth - (margin * 2);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        // Adicionar imagem
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', margin, margin + 15, imgWidth, imgHeight);
+        
+        // Cabeçalho
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Gestão de Equipe - Semana', margin, margin + 5);
+        
+        // Data atual
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        const dataAtual = new Date().toLocaleDateString('pt-BR');
+        pdf.text(`Gerado em: ${dataAtual}`, pdfWidth - 60, margin + 5);
+        
+        // Download
+        const nomeArquivo = `gestao-equipe-semana-${new Date().toISOString().split('T')[0]}.pdf`;
+        pdf.save(nomeArquivo);
+        
+        console.log('✅ PDF da semana exportado com sucesso!');
+        
+    } catch (error) {
+        console.error('❌ Erro na exportação PDF da semana:', error);
+        alert(`Erro ao exportar PDF: ${error.message}`);
+    } finally {
+        // Mostrar botões novamente
+        this.ocultarBotoesParaExportacao(false);
+    }
+}
+```
+
+### **2. Corrigir Função exportarPDFDia(dayIndex)**
+```javascript
+async exportarPDFDia(dayIndex) {
+    try {
+        console.log(`🔄 Iniciando exportação PDF do dia ${dayIndex}...`);
+        
+        // Aguardar bibliotecas (já funciona)
+        await this.aguardarBibliotecasPDF();
+        
+        // Ocultar botões (já funciona)
+        this.ocultarBotoesParaExportacao(true);
+        
+        // Capturar coluna específica (já funciona)
+        const colunaElemento = document.querySelector(`[data-day="${dayIndex}"]`).closest('.col');
+        if (!colunaElemento) {
+            throw new Error(`Coluna do dia ${dayIndex} não encontrada`);
+        }
+        
+        // html2canvas (já funciona)
+        console.log('📸 Gerando canvas do dia...');
+        const canvas = await html2canvas(colunaElemento, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false
+        });
+        console.log('✅ Canvas do dia gerado:', canvas.width, 'x', canvas.height);
+        
+        // ✅ CORREÇÃO AQUI - Instanciar jsPDF corretamente
+        console.log('📄 Criando PDF do dia...');
+        const pdf = new window.jsPDF.jsPDF({
+            orientation: 'portrait',  // Retrato para dia específico
+            unit: 'mm',
+            format: 'a4'
+        });
+        
+        // Dimensões A4 retrato
+        const pdfWidth = 210;  // A4 retrato largura
+        const pdfHeight = 297; // A4 retrato altura
+        const margin = 10;
+        
+        // Calcular dimensões da imagem
+        const imgWidth = pdfWidth - (margin * 2);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        // Adicionar imagem
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', margin, margin + 15, imgWidth, imgHeight);
+        
+        // Cabeçalho
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+        pdf.text(`Gestão de Equipe - ${diasSemana[dayIndex]}`, margin, margin + 5);
+        
+        // Data atual
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        const dataAtual = new Date().toLocaleDateString('pt-BR');
+        pdf.text(`Gerado em: ${dataAtual}`, pdfWidth - 60, margin + 5);
+        
+        // Download
+        const nomeArquivo = `gestao-equipe-${diasSemana[dayIndex].toLowerCase()}-${new Date().toISOString().split('T')[0]}.pdf`;
+        pdf.save(nomeArquivo);
+        
+        console.log(`✅ PDF do ${diasSemana[dayIndex]} exportado com sucesso!`);
+        
+    } catch (error) {
+        console.error(`❌ Erro na exportação PDF do dia ${dayIndex}:`, error);
+        alert(`Erro ao exportar PDF: ${error.message}`);
+    } finally {
+        // Mostrar botões novamente
+        this.ocultarBotoesParaExportacao(false);
+    }
+}
+```
+
+### **3. Atualizar Função de Verificação (Opcional - Melhorar Debug)**
+```javascript
+async aguardarBibliotecasPDF() {
+    const maxTentativas = 15;
+    let tentativas = 0;
+    
+    while (tentativas < maxTentativas) {
+        // Verificar jsPDF de forma mais específica
+        const jsPDFDisponivel = (
+            typeof window.jsPDF !== 'undefined' && 
+            typeof window.jsPDF.jsPDF === 'function'  // Verificar se é função
+        );
+        
+        const html2canvasDisponivel = (
+            typeof html2canvas !== 'undefined'
+        );
+        
+        console.log(`Tentativa ${tentativas + 1}: jsPDF=${jsPDFDisponivel}, html2canvas=${html2canvasDisponivel}`);
+        
+        if (jsPDFDisponivel && html2canvasDisponivel) {
+            console.log('✅ Bibliotecas PDF carregadas com sucesso!');
+            return;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 800));
+        tentativas++;
+    }
+    
+    throw new Error('Timeout: Bibliotecas PDF não carregaram no tempo esperado');
+}
+```
+
+## 🧪 TESTE RÁPIDO
+
+### **Adicionar Debug Temporário:**
+```javascript
+// Adicionar antes da criação do PDF para debug
+console.log('🔍 Debug jsPDF:');
+console.log('window.jsPDF:', typeof window.jsPDF);
+console.log('window.jsPDF.jsPDF:', typeof window.jsPDF.jsPDF);
+console.log('Estrutura completa:', window.jsPDF);
+
+// Então criar o PDF
+const pdf = new window.jsPDF.jsPDF({...});
+```
+
+## ✅ CHECKLIST DE IMPLEMENTAÇÃO
+
+### **Correção Imediata:**
+- [ ] Substituir `new jsPDF({...})` por `new window.jsPDF.jsPDF({...})`
+- [ ] Testar exportação da semana (paisagem)
+- [ ] Testar exportação de dia específico (retrato)
+- [ ] Verificar se downloads funcionam corretamente
+
+### **Validação:**
+- [ ] Abrir PDF gerado e verificar qualidade
+- [ ] Testar em diferentes navegadores se possível
+- [ ] Confirmar que botões voltam a aparecer após exportação
+
+## 🎯 RESULTADO ESPERADO
+
+Após implementação:
+1. **Botão "PDF Semana"** → Gera PDF paisagem da semana completa
+2. **Dropdown "PDF Dia"** → Gera PDF retrato do dia selecionado
+3. **Downloads automáticos** com nomes descritivos
+4. **Qualidade alta** (scale: 2 no html2canvas)
+5. **Sem erros no console**
+
+**TEMPO ESTIMADO:** 15-30 minutos para implementar e testar
+
+**PRIORIDADE:** ALTA - Funcionalidade crítica para usuários finais
+

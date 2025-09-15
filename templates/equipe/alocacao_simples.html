@@ -4939,6 +4939,16 @@ class EquipeFase2 {
             // Aguardar bibliotecas carregarem se necessário
             await this.aguardarBibliotecasPDF();
 
+            // Debug temporário - verificar estrutura
+            this.log('🔍 DEBUG jsPDF Structure:');
+            this.log('window.jsPDF:', typeof window.jsPDF);
+            this.log('window.jsPDF.jsPDF:', typeof window.jsPDF?.jsPDF);
+            this.log('window.jspdf:', typeof window.jspdf);
+            this.log('global jsPDF:', typeof jsPDF);
+            if (window.jsPDF) {
+                this.log('window.jsPDF keys:', Object.keys(window.jsPDF));
+            }
+
             // Preparando PDF da semana
             
             // Ocultar botões de ação temporariamente
@@ -4963,8 +4973,7 @@ class EquipeFase2 {
             });
 
             // Criar PDF em modo paisagem (A4)
-            const { jsPDF } = window.jsPDF || window;
-            const pdf = new jsPDF({
+            const pdf = new window.jsPDF.jsPDF({
                 orientation: 'landscape',
                 unit: 'mm',
                 format: 'a4'
@@ -5054,8 +5063,7 @@ class EquipeFase2 {
             });
 
             // Criar PDF em modo retrato (A4)
-            const { jsPDF } = window.jsPDF || window;
-            const pdf = new jsPDF({
+            const pdf = new window.jsPDF.jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
