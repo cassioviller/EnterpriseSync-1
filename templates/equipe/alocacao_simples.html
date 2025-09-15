@@ -412,20 +412,8 @@
         </div>
         <div class="card-body">
             <div class="row">
-                <div class="col-md-4">
-                    <button class="btn btn-info w-100" onclick="testarAPI()">
-                        🔍 Testar API Básica
-                    </button>
-                </div>
-                <div class="col-md-4">
-                    <button class="btn btn-warning w-100" onclick="testarObras()">
-                        🏗️ Recarregar Obras
-                    </button>
-                </div>
-                <div class="col-md-4">
-                    <button class="btn btn-success w-100" onclick="testarDragDrop()">
-                        🎯 Reconfigurar Drag & Drop
-                    </button>
+                <div class="col-12">
+                    <p class="text-muted mb-0">Ferramentas de desenvolvimento removidas - use o console do navegador para debug.</p>
                 </div>
             </div>
             
@@ -2047,7 +2035,7 @@ class EquipeFase2 {
             this.updateWeekDisplay();
             
             // Carregar dados automaticamente
-            await this.testarObras();
+            await this.carregarObras();
             await this.carregarAlocacoes();
             
             this.updateStatus('Sistema inicializado - pronto para uso', 'success');
@@ -2296,41 +2284,13 @@ class EquipeFase2 {
         this.log(`🔗 URL atualizada: ${url.toString()}`);
     }
     
-    // TESTE 1: API BÁSICA
-    async testarAPI() {
-        this.log('=== TESTANDO API BÁSICA ===');
-        
-        try {
-            // Teste 1: API sem autenticação
-            this.log('Testando /equipe/debug/test-direct...');
-            const response1 = await fetch('/equipe/debug/test-direct');
-            const data1 = await response1.json();
-            this.log(`✅ API direta: ${JSON.stringify(data1)}`);
-            
-            // Teste 2: API com autenticação
-            this.log('Testando /equipe/debug/obras-count...');
-            const response2 = await fetch('/equipe/debug/obras-count');
-            const data2 = await response2.json();
-            this.log(`✅ API obras: ${JSON.stringify(data2)}`);
-            
-            this.updateStatus('APIs funcionando corretamente', 'success');
-            
-        } catch (error) {
-            this.log(`❌ ERRO na API: ${error.message}`);
-            this.updateStatus(`Erro na API: ${error.message}`, 'danger');
-        }
-    }
-    
-    // TESTE 2: CARREGAMENTO DE OBRAS
-    async testarObras() {
-        this.log('=== TESTANDO CARREGAMENTO DE OBRAS ===');
+    // CARREGAMENTO DE OBRAS - VERSÃO LIMPA
+    async carregarObras() {
+        this.log('=== CARREGANDO OBRAS ===');
         
         try {
             const response = await fetch('/equipe/api/obras-simples');
             const result = await response.json();
-            
-            this.log(`Response status: ${response.status}`);
-            this.log(`Response data: ${JSON.stringify(result)}`);
             
             if (result.success && result.data) {
                 this.obras = result.data;
@@ -2413,7 +2373,6 @@ class EquipeFase2 {
             }
             
             const result = await response.json();
-            this.log(`📡 CRUD: Response data: ${JSON.stringify(result, null, 2).substring(0, 300)}...`);
             
             if (!result.success) {
                 throw new Error(result.error || 'Erro desconhecido da API');
@@ -2765,34 +2724,6 @@ class EquipeFase2 {
         }
     }
     
-    // TESTE 3: DRAG & DROP
-    testarDragDrop() {
-        this.log('=== TESTANDO DRAG & DROP ===');
-        
-        try {
-            // Verificar se SortableJS está disponível
-            if (typeof Sortable === 'undefined') {
-                this.log('❌ SortableJS não está carregado');
-                this.updateStatus('SortableJS não carregado', 'danger');
-                return;
-            }
-            
-            // Testar se obras estão carregadas
-            if (this.obras.length === 0) {
-                this.log('⚠️ Nenhuma obra carregada. Execute "Testar Carregamento Obras" primeiro');
-                this.updateStatus('Carregue obras primeiro', 'warning');
-                return;
-            }
-            
-            this.setupDragDrop();
-            this.log('✅ Drag & Drop configurado com sucesso');
-            this.updateStatus('Drag & Drop ativo - arraste obras para os dias', 'success');
-            
-        } catch (error) {
-            this.log(`❌ ERRO no Drag & Drop: ${error.message}`);
-            this.updateStatus(`Erro no Drag & Drop: ${error.message}`, 'danger');
-        }
-    }
     
     // ====================================
     // MÉTODOS DE ROLLBACK ROBUSTO
@@ -4024,13 +3955,6 @@ class EquipeFase2 {
         const tipoLancamento = document.getElementById('input-tipo-lancamento').value;
         const papel = document.getElementById('input-papel').value.trim();
         
-        this.log(`➕ CRUD: Iniciando adição de funcionário FASE 2B - alocação ${allocationId}`);
-        this.log(`📝 CRUD: Dados COMPLETOS do formulário:`);
-        this.log(`   - Funcionário ID: ${funcionarioId}`);
-        this.log(`   - Horários: ${entrada} → ${inicioAlmoco} | ${fimAlmoco} → ${saida}`);
-        this.log(`   - % Extras: ${percentualExtras}%`);
-        this.log(`   - Tipo: ${tipoLancamento}`);
-        this.log(`   - Papel: '${papel}'`);
         
         // VALIDAÇÕES COMPLETAS FASE 2B
         if (!funcionarioId) {
@@ -4086,7 +4010,6 @@ class EquipeFase2 {
             return;
         }
         
-        this.log(`✅ CRUD: Todas validações FASE 2B aprovadas - prosseguindo com requisição`);
         
         // Declarar variáveis antes do try/catch
         let originalHtml = '';
@@ -4115,8 +4038,6 @@ class EquipeFase2 {
                 turno_fim: saida      // Para backward compatibility
             };
             
-            this.log(`📡 CRUD: Enviando POST FASE 2B para /equipe/api/allocation-employee`);
-            this.log(`📡 CRUD: Payload COMPLETO: ${JSON.stringify(payload, null, 2)}`);
             
             const response = await fetch('/equipe/api/allocation-employee', {
                 method: 'POST',
@@ -4169,7 +4090,6 @@ class EquipeFase2 {
                 addBtn.innerHTML = originalHtml;
                 addBtn.disabled = false;
             }
-            this.log(`🔧 CRUD: Botão de adição restaurado`);
         }
     }
     
@@ -4198,7 +4118,6 @@ class EquipeFase2 {
      * Remove funcionário via API - VERSÃO COM LOGS DETALHADOS
      */
     async removeFuncionario(allocationEmployeeId) {
-        this.log(`🗑️ CRUD: Iniciando remoção de funcionário - allocation_employee_id: ${allocationEmployeeId}`);
         
         if (!confirm('Remover este funcionário da alocação?')) {
             this.log(`❌ CRUD: Remoção cancelada pelo usuário`);
@@ -4206,7 +4125,6 @@ class EquipeFase2 {
         }
         
         try {
-            this.log(`📡 CRUD: Enviando DELETE para /equipe/api/allocation-employee/${allocationEmployeeId}`);
             
             const response = await fetch(`/equipe/api/allocation-employee/${allocationEmployeeId}`, {
                 method: 'DELETE'
@@ -4233,17 +4151,13 @@ class EquipeFase2 {
             this.showToast(`✅ ${data.funcionario_nome || 'Funcionário'} removido!`, 'success', 2000);
             
             // Recarregar dados do modal
-            this.log(`🔄 CRUD: Recarregando dados do modal...`);
             await this.loadModalData(this.currentModalData.allocationId);
             
             // Atualizar calendário principal
-            this.log(`🔄 CRUD: Atualizando calendário principal...`);
             await this.carregarAlocacoes();
             
-            this.log(`✅ CRUD: Operação de remoção concluída com sucesso`);
-            
         } catch (error) {
-            this.log(`❌ CRUD: ERRO CRÍTICO ao remover funcionário - ${error.message}`);
+            console.error('Erro ao remover funcionário:', error.message);
             this.showToast(`❌ Erro: ${error.message}`, 'error', 4000);
         }
     }
@@ -4252,8 +4166,6 @@ class EquipeFase2 {
      * FUNÇÕES AUXILIARES PARA GRID
      */
     limparGridSemanal() {
-        this.log('🧹 GRID: Limpando grid semanal (dual zones)...');
-        
         for (let i = 0; i < 7; i++) {
             // Limpar zona Campo
             const campoElement = document.getElementById(`day-${i}-campo`);
@@ -4267,8 +4179,6 @@ class EquipeFase2 {
                 oficinaElement.innerHTML = '<small class="text-muted">Arraste obras para a oficina</small>';
             }
         }
-        
-        this.log('✅ GRID: Grid semanal limpo (14 zonas)');
     }
     
     mostrarErroNoGrid(errorMessage) {
@@ -4315,8 +4225,6 @@ class EquipeFase2 {
             }, 200);
         }
         
-        this.log(`👆 MODAL: Funcionário ${funcionarioId} selecionado`);
-        
         // FASE 4: Auto-preenchimento de horários
         if (this.currentModalData && this.currentModalData.allocationId) {
             await this.loadHorariosFuncionario(funcionarioId, this.currentModalData.allocationId);
@@ -4328,8 +4236,6 @@ class EquipeFase2 {
      */
     async loadHorariosFuncionario(funcionarioId, allocationId) {
         try {
-            this.log(`🕐 HORARIOS: Carregando horários para funcionário ${funcionarioId}...`);
-            
             // Calcular dia da semana baseado na data da alocação
             const allocation = this.currentModalData?.allocation;
             let diaSemana = null;
@@ -4337,12 +4243,10 @@ class EquipeFase2 {
             if (allocation && allocation.data_alocacao) {
                 const dataAlocacao = new Date(allocation.data_alocacao);
                 diaSemana = dataAlocacao.getDay(); // 0=Domingo, 1=Segunda, etc.
-                this.log(`🕐 HORARIOS: Data da alocação: ${allocation.data_alocacao}, dia da semana: ${diaSemana}`);
             }
             
             // Buscar horários via API
             const url = `/equipe/api/funcionario/${funcionarioId}/horarios${diaSemana !== null ? `?dia_semana=${diaSemana}` : ''}`;
-            this.log(`📡 HORARIOS: Fazendo requisição para ${url}`);
             
             // Mostrar loading visual nos campos de horário
             this.showHorariosLoading(true);
@@ -4823,33 +4727,6 @@ class EquipeFase2 {
      */
 }
 
-// ===================================
-// FUNÇÕES GLOBAIS PARA OS BOTÕES
-// ===================================
-
-function testarAPI() {
-    if (window.equipeFase2) {
-        window.equipeFase2.testarAPI();
-    } else {
-        console.error('EquipeFase2 não inicializada');
-    }
-}
-
-function testarObras() {
-    if (window.equipeFase2) {
-        window.equipeFase2.testarObras();
-    } else {
-        console.error('EquipeFase2 não inicializada');
-    }
-}
-
-function testarDragDrop() {
-    if (window.equipeFase2) {
-        window.equipeFase2.testarDragDrop();
-    } else {
-        console.error('EquipeFase2 não inicializada');
-    }
-}
 
 // ===================================
 // INICIALIZAÇÃO AUTOMÁTICA

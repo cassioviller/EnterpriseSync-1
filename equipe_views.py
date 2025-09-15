@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from auth import admin_required
 from datetime import datetime, date, timedelta, time
 from app import db
-from models import Allocation, AllocationEmployee, Funcionario, Obra, Servico, Usuario, TipoUsuario, WeeklyPlan
+from models import Allocation, AllocationEmployee, Funcionario, Obra, TipoUsuario
 from sqlalchemy.exc import IntegrityError
 import logging
 
@@ -47,12 +47,12 @@ def convert_to_sunday_weekday(python_weekday):
 @login_required
 def alocacao_semanal():
     """Redirecionar para alocação principal"""
-    return redirect(url_for('equipe.alocacao_teste_fase1'))
+    return redirect(url_for('equipe.alocacao_principal'))
 
-@equipe_bp.route('/teste-fase1')
-@login_required
-def alocacao_teste_fase1():
-    """Rota principal de alocação"""
+@equipe_bp.route('/alocacao-principal')
+@login_required  
+def alocacao_principal():
+    """Rota principal de alocação - FASE 2B"""
     try:
         # Debug de usuário
         user_info = {
@@ -115,10 +115,28 @@ def allocation_funcionarios(allocation_id):
             ativo=True
         ).order_by(Funcionario.nome).all()
         
-        # Funcionários já alocados
+        # Funcionários já alocados (através do relacionamento AllocationEmployee)
         funcionarios_alocados = []
-        if hasattr(allocation, 'funcionarios_alocados'):
-            funcionarios_alocados = allocation.funcionarios_alocados
+        try:
+            allocation_employees = AllocationEmployee.query.filter_by(allocation_id=allocation_id).all()
+            for ae in allocation_employees:
+                funcionario = Funcionario.query.filter_by(id=ae.funcionario_id, admin_id=admin_id, ativo=True).first()
+                if funcionario:  # Validação adicional de segurança
+                    funcionarios_alocados.append({
+                        'allocation_employee_id': ae.id,
+                        'funcionario': funcionario,
+                        'papel': ae.papel or 'Sem função',
+                        'turno_inicio': ae.turno_inicio.strftime('%H:%M') if ae.turno_inicio else '08:00',
+                        'turno_fim': ae.turno_fim.strftime('%H:%M') if ae.turno_fim else '17:00',
+                        'hora_almoco_saida': ae.hora_almoco_saida.strftime('%H:%M') if ae.hora_almoco_saida else '12:00',
+                        'hora_almoco_retorno': ae.hora_almoco_retorno.strftime('%H:%M') if ae.hora_almoco_retorno else '13:00',
+                        'percentual_extras': ae.percentual_extras if hasattr(ae, 'percentual_extras') else 0.0,
+                        'tipo_lancamento': ae.tipo_lancamento if hasattr(ae, 'tipo_lancamento') else 'trabalho_normal',
+                        'observacao': ae.observacao or ''
+                    })
+        except Exception as e:
+            logging.error(f"Erro ao buscar funcionários alocados para allocation {allocation_id}: {e}")
+            funcionarios_alocados = []
         
         return render_template('equipe/allocation_funcionarios.html',
                              allocation=allocation,
@@ -207,9 +225,15 @@ def get_allocations_simples():
                             'nome_curto': ' '.join(funcionario.nome.split()[:2]),  # Primeiros 2 nomes
                             'codigo': funcionario.codigo,
                             'papel': emp.papel or 'Sem função',
+                            'entrada': emp.turno_inicio.strftime('%H:%M') if emp.turno_inicio else '08:00',
+                            'saida': emp.turno_fim.strftime('%H:%M') if emp.turno_fim else '17:00',
+                            # LEGACY: Manter compatibilidade temporária
                             'turno_inicio': emp.turno_inicio.strftime('%H:%M') if emp.turno_inicio else '08:00',
                             'turno_fim': emp.turno_fim.strftime('%H:%M') if emp.turno_fim else '17:00',
-                            # FASE 2B: Campos lunch para frontend
+                            # FASE 2B: Campos lunch padronizados
+                            'almoco_saida': emp.hora_almoco_saida.strftime('%H:%M') if emp.hora_almoco_saida else '12:00',
+                            'almoco_retorno': emp.hora_almoco_retorno.strftime('%H:%M') if emp.hora_almoco_retorno else '13:00',
+                            # LEGACY: Compatibilidade temporária
                             'inicio_almoco': emp.hora_almoco_saida.strftime('%H:%M') if emp.hora_almoco_saida else '12:00',
                             'fim_almoco': emp.hora_almoco_retorno.strftime('%H:%M') if emp.hora_almoco_retorno else '13:00',
                             'percentual_extras': emp.percentual_extras if hasattr(emp, 'percentual_extras') else 0.0,
@@ -227,6 +251,9 @@ def get_allocations_simples():
                 'obra_nome': obra_nome,
                 'data_alocacao': alloc.data_alocacao.isoformat(),
                 'day_of_week': convert_to_sunday_weekday(alloc.data_alocacao.weekday()),  # 0=Domingo
+                'entrada': alloc.turno_inicio.strftime('%H:%M') if alloc.turno_inicio else '08:00',
+                'saida': alloc.turno_fim.strftime('%H:%M') if alloc.turno_fim else '17:00',
+                # LEGACY: Manter compatibilidade temporária
                 'turno_inicio': alloc.turno_inicio.strftime('%H:%M') if alloc.turno_inicio else '08:00',
                 'turno_fim': alloc.turno_fim.strftime('%H:%M') if alloc.turno_fim else '17:00',
                 'local_trabalho': alloc.local_trabalho or 'campo',  # Campo requerido para renderização correta
@@ -291,6 +318,9 @@ def api_get_funcionario_horarios(funcionario_id):
                     'codigo': funcionario.codigo
                 },
                 'horarios': {
+                    'entrada': '08:00',
+                    'saida': '17:00',
+                    # LEGACY: Compatibilidade temporária
                     'turno_inicio': '08:00',
                     'turno_fim': '17:00',
                     'tipo_lancamento': 'trabalho_normal',
@@ -334,6 +364,11 @@ def api_get_funcionario_horarios(funcionario_id):
                 'codigo': funcionario.codigo
             },
             'horarios': {
+                'entrada': horario_trabalho.entrada.strftime('%H:%M'),
+                'saida': horario_trabalho.saida.strftime('%H:%M'),
+                'almoco_saida': horario_trabalho.saida_almoco.strftime('%H:%M'),
+                'almoco_retorno': horario_trabalho.retorno_almoco.strftime('%H:%M'),
+                # LEGACY: Compatibilidade temporária
                 'turno_inicio': horario_trabalho.entrada.strftime('%H:%M'),
                 'turno_fim': horario_trabalho.saida.strftime('%H:%M'),
                 'saida_almoco': horario_trabalho.saida_almoco.strftime('%H:%M'),
@@ -998,6 +1033,9 @@ def api_update_allocation_employee(allocation_employee_id):
             'funcionario_codigo': funcionario.codigo if funcionario else '',
             'obra_codigo': obra.codigo if obra else f"#{allocation.obra_id}",
             'data_alocacao': allocation.data_alocacao.isoformat(),
+            'entrada': alloc_emp.turno_inicio.strftime('%H:%M'),
+            'saida': alloc_emp.turno_fim.strftime('%H:%M'),
+            # LEGACY: Compatibilidade temporária
             'turno_inicio': alloc_emp.turno_inicio.strftime('%H:%M'),
             'turno_fim': alloc_emp.turno_fim.strftime('%H:%M'),
             'papel': alloc_emp.papel or '',
@@ -1159,6 +1197,9 @@ def api_sincronizar_horario_funcionario(allocation_employee_id):
             if alloc_emp_updated:
                 return jsonify({
                     'success': True,
+                    'entrada': alloc_emp_updated.turno_inicio.strftime('%H:%M'),
+                    'saida': alloc_emp_updated.turno_fim.strftime('%H:%M'),
+                    # LEGACY: Compatibilidade temporária
                     'turno_inicio': alloc_emp_updated.turno_inicio.strftime('%H:%M'),
                     'turno_fim': alloc_emp_updated.turno_fim.strftime('%H:%M'),
                     'tipo_lancamento': alloc_emp_updated.tipo_lancamento,
