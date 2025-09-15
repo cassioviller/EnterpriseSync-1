@@ -4898,8 +4898,8 @@ class EquipeFase2 {
         while (tentativas < maxTentativas) {
             // Verificar multiple formas de como o jsPDF pode estar disponível
             const jsPDFDisponivel = (
-                typeof window.jsPDF !== 'undefined' &&
-                typeof window.jsPDF.jsPDF === 'function'
+                (typeof window.jsPDF !== 'undefined' && typeof window.jsPDF.jsPDF === 'function') ||
+                (typeof window.jspdf !== 'undefined' && typeof window.jspdf.jsPDF === 'function')
             );
             
             const html2canvasDisponivel = (
@@ -4962,7 +4962,8 @@ class EquipeFase2 {
             });
 
             // Criar PDF em modo paisagem (A4)
-            const pdf = new window.jsPDF.jsPDF({
+            const jsPDFConstructor = window.jsPDF?.jsPDF || window.jspdf?.jsPDF;
+            const pdf = new jsPDFConstructor({
                 orientation: 'landscape',
                 unit: 'mm',
                 format: 'a4'
@@ -5052,7 +5053,8 @@ class EquipeFase2 {
             });
 
             // Criar PDF em modo retrato (A4)
-            const pdf = new window.jsPDF.jsPDF({
+            const jsPDFConstructor = window.jsPDF?.jsPDF || window.jspdf?.jsPDF;
+            const pdf = new jsPDFConstructor({
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
