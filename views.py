@@ -2618,7 +2618,6 @@ def detalhes_veiculo(id):
             'status_atual': veiculo.status if hasattr(veiculo, 'status') else 'Disponível'
         }
         
-        print(f"DEBUG VEÍCULO {id}: {len(usos_veiculo)} usos, {len(custos_veiculo)} custos")
         
         return render_template('veiculos/detalhes_veiculo.html', 
                              veiculo=veiculo, 
@@ -2630,19 +2629,7 @@ def detalhes_veiculo(id):
         # Redirecionar para lista de veículos em caso de erro
         return redirect(url_for('main.veiculos'))
 
-# Rota para novo uso de veículo
-@main_bp.route('/veiculos/novo-uso', methods=['POST'])
-@admin_required
-def novo_uso_veiculo_lista():
-    # Implementação futura
-    return redirect(url_for('main.veiculos'))
-
-# Rota para novo custo de veículo
-@main_bp.route('/veiculos/novo-custo', methods=['POST'])
-@admin_required
-def novo_custo_veiculo_lista():
-    # Implementação futura
-    return redirect(url_for('main.veiculos'))
+# Rotas vazias removidas - estavam só fazendo redirect sem funcionalidade
 
 # ===== APIs PARA FRONTEND =====
 @main_bp.route('/api/funcionarios')
