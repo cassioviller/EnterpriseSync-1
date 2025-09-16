@@ -3658,9 +3658,9 @@ def lancamentos_veiculos():
         lancamentos_pagina = lancamentos[start_idx:end_idx]
         
         # Dados para filtros
-        veiculos = Veiculo.query.filter_by(admin_id=admin_id, ativo=True).all()
-        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-        obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
+        veiculos = Veiculo.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
+        funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
+        obras = Obra.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
         
         # KPIs do período
         kpis = {
