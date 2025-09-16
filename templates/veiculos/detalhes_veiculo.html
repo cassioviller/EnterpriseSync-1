@@ -75,32 +75,66 @@
     <div class="col-md-6">
         <div class="card border-info">
             <div class="card-header bg-info text-white">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-bar"></i> KPIs do Veículo
-                </h5>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar"></i> KPIs do Veículo
+                    </h5>
+                    <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse" data-bs-target="#filtroKpis">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+                </div>
+                <!-- Filtros de Período -->
+                <div class="collapse mt-3" id="filtroKpis">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small text-white">Data Inicial</label>
+                            <input type="date" class="form-control form-control-sm" id="data_inicial_kpi">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-white">Data Final</label>
+                            <input type="date" class="form-control form-control-sm" id="data_final_kpi">
+                        </div>
+                    </div>
+                    <div class="text-center mt-2">
+                        <button class="btn btn-sm btn-light" onclick="atualizarKpis()">
+                            <i class="fas fa-sync"></i> Atualizar
+                        </button>
+                        <button class="btn btn-sm btn-outline-light" onclick="resetarFiltroMesAtual()">
+                            Mês Atual
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-12 mb-3">
-                        <div class="bg-light p-3 rounded">
-                            <h4 class="text-primary mb-1">{{ kpis_veiculo.quilometragem_total }}</h4>
-                            <small class="text-muted">Quilometragem Total</small>
+                <div id="kpis-container">
+                    <div class="row text-center">
+                        <div class="col-12 mb-3">
+                            <div class="bg-light p-3 rounded">
+                                <h4 class="text-primary mb-1" id="quilometragem-total">{{ kpis_veiculo.quilometragem_total }}</h4>
+                                <small class="text-muted">Quilometragem Total</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="bg-light p-2 rounded">
+                                <h5 class="text-warning mb-1" id="custos-manutencao">R$ {{ "%.2f"|format(kpis_veiculo.custos_manutencao) }}</h5>
+                                <small class="text-muted">Custos Manutenção</small>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="bg-light p-2 rounded">
+                                <h5 class="text-success mb-1" id="combustivel-gasto">R$ {{ "%.2f"|format(kpis_veiculo.combustivel_gasto) }}</h5>
+                                <small class="text-muted">Combustível</small>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="row text-center">
-                    <div class="col-6 mb-3">
-                        <div class="bg-light p-2 rounded">
-                            <h5 class="text-warning mb-1">R$ {{ "%.2f"|format(kpis_veiculo.custos_manutencao) }}</h5>
-                            <small class="text-muted">Custos Manutenção</small>
-                        </div>
+                <div id="loading-kpis" class="text-center" style="display: none;">
+                    <div class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">Carregando...</span>
                     </div>
-                    <div class="col-6 mb-3">
-                        <div class="bg-light p-2 rounded">
-                            <h5 class="text-success mb-1">R$ {{ "%.2f"|format(kpis_veiculo.combustivel_gasto) }}</h5>
-                            <small class="text-muted">Combustível</small>
-                        </div>
-                    </div>
+                    <small class="text-muted ms-2">Atualizando KPIs...</small>
                 </div>
             </div>
         </div>
@@ -431,6 +465,22 @@
 
 <script>
 $(document).ready(function() {
+    // Definir datas padrão (mês atual) nos filtros de KPIs
+    const hoje = new Date();
+    const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const dataInicialFormatada = primeiroDiaDoMes.getFullYear() + '-' + 
+                               String(primeiroDiaDoMes.getMonth() + 1).padStart(2, '0') + '-' + 
+                               String(primeiroDiaDoMes.getDate()).padStart(2, '0');
+    const dataFinalFormatada = hoje.getFullYear() + '-' + 
+                             String(hoje.getMonth() + 1).padStart(2, '0') + '-' + 
+                             String(hoje.getDate()).padStart(2, '0');
+    
+    $('#data_inicial_kpi').val(dataInicialFormatada);
+    $('#data_final_kpi').val(dataFinalFormatada);
+    
+    // Carregar KPIs do mês atual automaticamente
+    atualizarKpis();
+    
     // Inicializar autocomplete para funcionários
     $('.autocomplete-funcionario').select2({
         theme: 'bootstrap-5',
@@ -507,6 +557,66 @@ $(document).ready(function() {
         $('#usoModal form')[0].reset();
     });
 });
+
+// Função para atualizar KPIs baseado no período selecionado
+function atualizarKpis() {
+    const dataInicial = $('#data_inicial_kpi').val();
+    const dataFinal = $('#data_final_kpi').val();
+    const veiculoId = {{ veiculo.id }};
+    
+    if (!dataInicial || !dataFinal) {
+        alert('Por favor, selecione ambas as datas.');
+        return;
+    }
+    
+    // Mostrar loading
+    $('#kpis-container').hide();
+    $('#loading-kpis').show();
+    
+    $.ajax({
+        url: `/veiculos/${veiculoId}/kpis`,
+        type: 'GET',
+        data: {
+            data_inicial: dataInicial,
+            data_final: dataFinal
+        },
+        success: function(response) {
+            // Atualizar valores nas KPIs
+            $('#quilometragem-total').text(response.quilometragem_total);
+            $('#custos-manutencao').text('R$ ' + parseFloat(response.custos_manutencao).toFixed(2));
+            $('#combustivel-gasto').text('R$ ' + parseFloat(response.combustivel_gasto).toFixed(2));
+            
+            // Esconder loading e mostrar resultado
+            $('#loading-kpis').hide();
+            $('#kpis-container').show();
+        },
+        error: function(xhr, status, error) {
+            console.log('Erro ao atualizar KPIs:', error);
+            alert('Erro ao atualizar KPIs. Tente novamente.');
+            
+            // Esconder loading e mostrar container
+            $('#loading-kpis').hide();
+            $('#kpis-container').show();
+        }
+    });
+}
+
+// Função para resetar filtro para mês atual
+function resetarFiltroMesAtual() {
+    const hoje = new Date();
+    const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const dataInicialFormatada = primeiroDiaDoMes.getFullYear() + '-' + 
+                               String(primeiroDiaDoMes.getMonth() + 1).padStart(2, '0') + '-' + 
+                               String(primeiroDiaDoMes.getDate()).padStart(2, '0');
+    const dataFinalFormatada = hoje.getFullYear() + '-' + 
+                             String(hoje.getMonth() + 1).padStart(2, '0') + '-' + 
+                             String(hoje.getDate()).padStart(2, '0');
+    
+    $('#data_inicial_kpi').val(dataInicialFormatada);
+    $('#data_final_kpi').val(dataFinalFormatada);
+    
+    atualizarKpis();
+}
 
 function editarVeiculo(id) {
     // Implementar modal de edição

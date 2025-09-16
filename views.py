@@ -2749,6 +2749,92 @@ def ultima_km_veiculo(id):
         print(f"ERRO ÚLTIMA KM VEÍCULO: {str(e)}")
         return jsonify({'error': 'Erro ao carregar última quilometragem', 'ultima_km': 0}), 500
 
+# Rota para calcular KPIs do veículo por período
+@main_bp.route('/veiculos/<int:id>/kpis')
+@login_required
+def kpis_veiculo_periodo(id):
+    """Retorna KPIs do veículo filtradas por período"""
+    try:
+        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            return jsonify({'error': 'Acesso negado. Usuário não autenticado.'}), 403
+        
+        from models import Veiculo
+        from sqlalchemy import text
+        from datetime import datetime, date
+        
+        # Verificar se o veículo pertence ao usuário
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first_or_404()
+        
+        # Obter parâmetros de data
+        data_inicial = request.args.get('data_inicial')
+        data_final = request.args.get('data_final')
+        
+        # Se não informado, usar mês atual
+        if not data_inicial or not data_final:
+            hoje = date.today()
+            data_inicial = hoje.replace(day=1).strftime('%Y-%m-%d')  # Primeiro dia do mês
+            data_final = hoje.strftime('%Y-%m-%d')  # Hoje
+        
+        # Calcular KPIs do período
+        quilometragem_total = 0
+        custos_manutencao = 0
+        combustivel_gasto = 0
+        
+        try:
+            # Buscar usos no período
+            usos_periodo = db.session.execute(
+                text("""
+                    SELECT km_inicial, km_final 
+                    FROM uso_veiculo 
+                    WHERE veiculo_id = :veiculo_id 
+                    AND data_uso BETWEEN :data_inicial AND :data_final
+                    AND km_inicial IS NOT NULL 
+                    AND km_final IS NOT NULL
+                """),
+                {'veiculo_id': id, 'data_inicial': data_inicial, 'data_final': data_final}
+            ).fetchall()
+            
+            # Calcular quilometragem total do período
+            for uso in usos_periodo:
+                if uso.km_inicial and uso.km_final:
+                    quilometragem_total += (uso.km_final - uso.km_inicial)
+            
+            # Buscar custos no período
+            custos_periodo = db.session.execute(
+                text("""
+                    SELECT tipo_custo, valor 
+                    FROM custo_veiculo 
+                    WHERE veiculo_id = :veiculo_id 
+                    AND data_custo BETWEEN :data_inicial AND :data_final
+                """),
+                {'veiculo_id': id, 'data_inicial': data_inicial, 'data_final': data_final}
+            ).fetchall()
+            
+            # Calcular custos por tipo
+            for custo in custos_periodo:
+                if custo.tipo_custo == 'combustivel':
+                    combustivel_gasto += custo.valor
+                elif custo.tipo_custo in ['manutencao', 'seguro', 'outros']:
+                    custos_manutencao += custo.valor
+                    
+        except Exception as e:
+            print(f"Erro ao calcular KPIs: {str(e)}")
+        
+        kpis = {
+            'quilometragem_total': quilometragem_total,
+            'custos_manutencao': custos_manutencao,
+            'combustivel_gasto': combustivel_gasto,
+            'periodo': f"{data_inicial} a {data_final}"
+        }
+        
+        return jsonify(kpis)
+        
+    except Exception as e:
+        print(f"ERRO KPIs VEÍCULO PERÍODO: {str(e)}")
+        return jsonify({'error': 'Erro ao calcular KPIs do período'}), 500
+
 # 1. ROTA CADASTRO - /veiculos/novo (GET/POST)
 @main_bp.route('/veiculos/novo', methods=['GET', 'POST'])
 @admin_required
