@@ -2881,6 +2881,60 @@ def novo_uso_veiculo_lista():
     return redirect(url_for('main.veiculos'))
 
 
+# ROTA PARA MODAL DE CUSTO (SEM PARÂMETRO ID NA URL)
+@main_bp.route('/veiculos/custo', methods=['POST'])
+@admin_required
+def novo_custo_veiculo_lista():
+    from forms import CustoVeiculoForm
+    from models import Veiculo, CustoVeiculo
+    
+    # Obter veiculo_id do form (hidden field)
+    veiculo_id = request.form.get('veiculo_id')
+    if not veiculo_id:
+        flash('Erro: ID do veículo não fornecido.', 'error')
+        return redirect(url_for('main.veiculos'))
+    
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=admin_id).first_or_404()
+    
+    try:
+        # Validações de negócio
+        valor = float(request.form.get('valor', 0))
+        if valor <= 0:
+            flash('Valor deve ser maior que zero.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        # Campos opcionais específicos por tipo de custo
+        tipo_custo = request.form.get('tipo_custo')
+        km_custo = request.form.get('km_custo')
+        litros = request.form.get('litros')
+        
+        # Criar registro de custo
+        custo = CustoVeiculo(
+            veiculo_id=veiculo.id,
+            data_custo=datetime.strptime(request.form.get('data_custo'), '%Y-%m-%d').date(),
+            tipo_custo=tipo_custo,
+            valor=valor,
+            descricao=request.form.get('descricao', ''),
+            fornecedor=request.form.get('fornecedor', ''),
+            km_custo=int(km_custo) if km_custo else None,
+            litros=float(litros) if litros else None,
+            admin_id=admin_id,
+            created_at=datetime.utcnow()
+        )
+        
+        db.session.add(custo)
+        db.session.commit()
+        flash(f'Custo do veículo {veiculo.placa} registrado com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO AO REGISTRAR CUSTO: {str(e)}")
+        flash('Erro ao registrar custo do veículo. Tente novamente.', 'error')
+    
+    return redirect(url_for('main.veiculos'))
+
+
 @main_bp.route('/veiculos/<int:id>/uso', methods=['GET', 'POST'])
 @admin_required
 def novo_uso_veiculo(id):
