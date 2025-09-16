@@ -828,6 +828,291 @@ class CustoVeiculo(db.Model):
     def __repr__(self):
         return f'<CustoVeiculo {self.veiculo_id} - {self.tipo_custo} - R${self.valor}>'
 
+class ManutencaoVeiculo(db.Model):
+    """Modelo especializado para controle detalhado de manutenções"""
+    __tablename__ = 'manutencao_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    custo_veiculo_id = db.Column(db.Integer, db.ForeignKey('custo_veiculo.id'), nullable=True)  # Vinculação com custo
+    
+    # Classificação da manutenção
+    tipo_manutencao = db.Column(db.String(20), nullable=False)  # preventiva, corretiva, emergencial, recall
+    categoria = db.Column(db.String(50), nullable=False)  # motor, freios, eletrica, carroceria, pneus, etc.
+    prioridade = db.Column(db.String(10), default='media')  # baixa, media, alta, urgente
+    
+    # Dados da execução
+    data_manutencao = db.Column(db.Date, nullable=False)
+    km_manutencao = db.Column(db.Integer)
+    descricao = db.Column(db.Text, nullable=False)
+    pecas_utilizadas = db.Column(db.Text)  # JSON string com lista de peças
+    servicos_executados = db.Column(db.Text)  # JSON string com lista de serviços
+    
+    # Dados financeiros
+    valor_pecas = db.Column(db.Float, default=0.0)
+    valor_mao_obra = db.Column(db.Float, default=0.0)
+    valor_total = db.Column(db.Float, nullable=False)
+    
+    # Fornecedor/Oficina
+    oficina = db.Column(db.String(200))
+    mecanico_responsavel = db.Column(db.String(100))
+    numero_os = db.Column(db.String(50))  # Número da Ordem de Serviço
+    garantia_meses = db.Column(db.Integer, default=3)  # Garantia em meses
+    garantia_km = db.Column(db.Integer, default=10000)  # Garantia em KM
+    
+    # Planejamento próxima manutenção
+    proxima_manutencao_km = db.Column(db.Integer)
+    proxima_manutencao_data = db.Column(db.Date)
+    intervalo_km = db.Column(db.Integer)  # Intervalo padrão em KM
+    intervalo_meses = db.Column(db.Integer)  # Intervalo padrão em meses
+    
+    # Status e controle
+    status = db.Column(db.String(20), default='concluida')  # agendada, em_andamento, concluida, cancelada
+    observacoes = db.Column(db.Text)
+    
+    # Aprovação e controle financeiro
+    aprovado = db.Column(db.Boolean, default=False)
+    aprovado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    data_aprovacao = db.Column(db.DateTime)
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    veiculo = db.relationship('Veiculo', backref='manutencoes', overlaps="manutencoes")
+    custo_veiculo = db.relationship('CustoVeiculo', backref='manutencao_detalhada', overlaps="manutencao_detalhada")
+    aprovado_por = db.relationship('Usuario', foreign_keys=[aprovado_por_id], backref='manutencoes_aprovadas')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='manutencoes_criadas')
+    
+    @property
+    def garantia_vigente(self):
+        """Verifica se a garantia ainda está vigente"""
+        if not self.data_manutencao:
+            return False
+            
+        from datetime import date
+        hoje = date.today()
+        
+        # Verificar garantia por tempo
+        if self.garantia_meses:
+            limite_data = self.data_manutencao.replace(month=self.data_manutencao.month + self.garantia_meses)
+            if hoje > limite_data:
+                return False
+        
+        # Verificar garantia por quilometragem (precisa do KM atual do veículo)
+        if self.garantia_km and self.km_manutencao and self.veiculo.km_atual:
+            km_limite = self.km_manutencao + self.garantia_km
+            if self.veiculo.km_atual > km_limite:
+                return False
+                
+        return True
+    
+    @property
+    def dias_ate_proxima(self):
+        """Calcula dias até próxima manutenção"""
+        if self.proxima_manutencao_data:
+            from datetime import date
+            delta = self.proxima_manutencao_data - date.today()
+            return delta.days
+        return None
+    
+    @property
+    def km_ate_proxima(self):
+        """Calcula KM até próxima manutenção"""
+        if self.proxima_manutencao_km and self.veiculo.km_atual:
+            return self.proxima_manutencao_km - self.veiculo.km_atual
+        return None
+    
+    def calcular_proxima_manutencao(self):
+        """Calcula automaticamente a próxima manutenção"""
+        if not self.km_manutencao:
+            return
+            
+        # Intervalos padrão por categoria
+        intervalos_categoria = {
+            'motor': {'km': 10000, 'meses': 6},
+            'oleo': {'km': 5000, 'meses': 3},
+            'filtros': {'km': 15000, 'meses': 12},
+            'freios': {'km': 30000, 'meses': 24},
+            'pneus': {'km': 40000, 'meses': 36},
+            'eletrica': {'km': 20000, 'meses': 12},
+            'suspensao': {'km': 25000, 'meses': 18},
+            'revisao_geral': {'km': 20000, 'meses': 12}
+        }
+        
+        intervalo = intervalos_categoria.get(self.categoria, {'km': 15000, 'meses': 12})
+        
+        # Usar intervalo personalizado se definido
+        km_intervalo = self.intervalo_km or intervalo['km']
+        meses_intervalo = self.intervalo_meses or intervalo['meses']
+        
+        # Calcular próxima manutenção
+        self.proxima_manutencao_km = self.km_manutencao + km_intervalo
+        
+        from datetime import timedelta
+        self.proxima_manutencao_data = self.data_manutencao + timedelta(days=meses_intervalo * 30)
+    
+    def __repr__(self):
+        return f'<ManutencaoVeiculo {self.veiculo_id} - {self.categoria} - {self.tipo_manutencao}>'
+
+class DocumentoFiscal(db.Model):
+    """Controle de documentos fiscais relacionados a veículos"""
+    __tablename__ = 'documento_fiscal'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    custo_veiculo_id = db.Column(db.Integer, db.ForeignKey('custo_veiculo.id'), nullable=True)
+    manutencao_id = db.Column(db.Integer, db.ForeignKey('manutencao_veiculo.id'), nullable=True)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    
+    # Dados do documento
+    tipo_documento = db.Column(db.String(20), nullable=False)  # nf, nfce, recibo, cupom, outros
+    numero_documento = db.Column(db.String(50), nullable=False)
+    serie = db.Column(db.String(10))
+    data_emissao = db.Column(db.Date, nullable=False)
+    valor_documento = db.Column(db.Float, nullable=False)
+    
+    # Dados do emissor
+    cnpj_emissor = db.Column(db.String(18))
+    nome_emissor = db.Column(db.String(200), nullable=False)
+    endereco_emissor = db.Column(db.Text)
+    
+    # Dados fiscais
+    valor_icms = db.Column(db.Float, default=0.0)
+    valor_pis = db.Column(db.Float, default=0.0)
+    valor_cofins = db.Column(db.Float, default=0.0)
+    valor_iss = db.Column(db.Float, default=0.0)
+    valor_desconto = db.Column(db.Float, default=0.0)
+    
+    # Arquivo digitalizado
+    arquivo_digitalizado = db.Column(db.String(500))  # Caminho para o arquivo
+    arquivo_nome_original = db.Column(db.String(200))  # Nome original do arquivo
+    arquivo_tamanho = db.Column(db.Integer)  # Tamanho em bytes
+    
+    # Controle e validação
+    validado = db.Column(db.Boolean, default=False)
+    validado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    data_validacao = db.Column(db.DateTime)
+    observacoes_validacao = db.Column(db.Text)
+    
+    # Status contábil
+    lancado_contabilidade = db.Column(db.Boolean, default=False)
+    data_lancamento = db.Column(db.DateTime)
+    numero_lancamento = db.Column(db.String(50))
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    custo_veiculo = db.relationship('CustoVeiculo', backref='documentos_fiscais', overlaps="documentos_fiscais")
+    manutencao = db.relationship('ManutencaoVeiculo', backref='documentos_fiscais', overlaps="documentos_fiscais")
+    veiculo = db.relationship('Veiculo', backref='documentos_fiscais', overlaps="documentos_fiscais")
+    validado_por = db.relationship('Usuario', foreign_keys=[validado_por_id], backref='documentos_validados')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='documentos_criados')
+    
+    @property
+    def valor_impostos_total(self):
+        """Calcula total de impostos"""
+        return (self.valor_icms or 0) + (self.valor_pis or 0) + (self.valor_cofins or 0) + (self.valor_iss or 0)
+    
+    @property
+    def valor_liquido(self):
+        """Calcula valor líquido (valor total - descontos)"""
+        return self.valor_documento - (self.valor_desconto or 0)
+    
+    @property
+    def percentual_impostos(self):
+        """Calcula percentual de impostos sobre o valor total"""
+        if self.valor_documento > 0:
+            return round((self.valor_impostos_total / self.valor_documento) * 100, 2)
+        return 0
+    
+    def __repr__(self):
+        return f'<DocumentoFiscal {self.tipo_documento} - {self.numero_documento} - R${self.valor_documento}>'
+
+class AlertaVeiculo(db.Model):
+    """Sistema de alertas para veículos (manutenções, documentos, etc.)"""
+    __tablename__ = 'alerta_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    
+    # Tipo de alerta
+    tipo_alerta = db.Column(db.String(30), nullable=False)  # manutencao_vencida, documento_vencendo, gasto_excessivo, etc.
+    categoria = db.Column(db.String(20), nullable=False)  # urgente, importante, informativo
+    
+    # Dados do alerta
+    titulo = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text)
+    data_alerta = db.Column(db.Date, nullable=False)
+    data_vencimento = db.Column(db.Date)  # Para alertas com prazo
+    
+    # Valores de referência
+    valor_limite = db.Column(db.Float)  # Para alertas de gastos
+    km_limite = db.Column(db.Integer)   # Para alertas de quilometragem
+    dias_antecedencia = db.Column(db.Integer, default=30)  # Dias de antecedência do alerta
+    
+    # Status e controle
+    ativo = db.Column(db.Boolean, default=True)
+    visualizado = db.Column(db.Boolean, default=False)
+    data_visualizacao = db.Column(db.DateTime)
+    resolvido = db.Column(db.Boolean, default=False)
+    data_resolucao = db.Column(db.DateTime)
+    resolvido_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    
+    # Ações automatizadas
+    acao_automatica = db.Column(db.String(50))  # email, sms, push_notification
+    acao_executada = db.Column(db.Boolean, default=False)
+    data_acao = db.Column(db.DateTime)
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    veiculo = db.relationship('Veiculo', backref='alertas', overlaps="alertas")
+    resolvido_por = db.relationship('Usuario', foreign_keys=[resolvido_por_id], backref='alertas_resolvidos')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='alertas_criados')
+    
+    @property
+    def dias_restantes(self):
+        """Calcula dias restantes até o vencimento"""
+        if self.data_vencimento:
+            from datetime import date
+            delta = self.data_vencimento - date.today()
+            return delta.days
+        return None
+    
+    @property
+    def cor_prioridade(self):
+        """Retorna cor baseada na categoria"""
+        cores = {
+            'urgente': '#dc3545',     # vermelho
+            'importante': '#fd7e14',  # laranja
+            'informativo': '#20c997'  # verde
+        }
+        return cores.get(self.categoria, '#6c757d')
+    
+    @property
+    def icone_tipo(self):
+        """Retorna ícone baseado no tipo de alerta"""
+        icones = {
+            'manutencao_vencida': 'fas fa-wrench',
+            'documento_vencendo': 'fas fa-file-invoice',
+            'gasto_excessivo': 'fas fa-exclamation-triangle',
+            'km_excessivo': 'fas fa-tachometer-alt',
+            'seguro_vencendo': 'fas fa-shield-alt',
+            'licenciamento_vencendo': 'fas fa-id-card'
+        }
+        return icones.get(self.tipo_alerta, 'fas fa-bell')
+    
+    def __repr__(self):
+        return f'<AlertaVeiculo {self.veiculo_id} - {self.tipo_alerta} - {self.categoria}>'
+
 class OutroCusto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)

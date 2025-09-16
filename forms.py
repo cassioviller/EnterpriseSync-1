@@ -458,3 +458,232 @@ class FluxoCaixaFiltroForm(FlaskForm):
     ], validators=[Optional()])
     obra_id = SelectField('Obra', coerce=int, validators=[Optional()])
     centro_custo_id = SelectField('Centro de Custo', coerce=int, validators=[Optional()])
+    
+    def validate_data_fim(form, field):
+        if field.data and form.data_inicio.data:
+            if field.data < form.data_inicio.data:
+                raise ValidationError('Data de fim deve ser posterior à data de início.')
+
+# =============================================
+# FORMULÁRIOS AVANÇADOS PARA GESTÃO DE VEÍCULOS
+# =============================================
+
+class ManutencaoVeiculoForm(FlaskForm):
+    """Formulário especializado para registro de manutenções"""
+    veiculo_id = HiddenField('Veículo')
+    custo_veiculo_id = HiddenField('Custo Veículo ID')
+    
+    # Classificação da manutenção
+    tipo_manutencao = SelectField('Tipo de Manutenção', choices=[
+        ('preventiva', 'Preventiva'),
+        ('corretiva', 'Corretiva'),
+        ('emergencial', 'Emergencial'),
+        ('recall', 'Recall/Campanha')
+    ], validators=[DataRequired()])
+    
+    categoria = SelectField('Categoria', choices=[
+        ('motor', 'Motor'),
+        ('oleo', 'Óleo e Filtros'),
+        ('freios', 'Sistema de Freios'),
+        ('pneus', 'Pneus'),
+        ('eletrica', 'Sistema Elétrico'),
+        ('suspensao', 'Suspensão'),
+        ('carroceria', 'Carroceria'),
+        ('ar_condicionado', 'Ar Condicionado'),
+        ('revisao_geral', 'Revisão Geral'),
+        ('outros', 'Outros')
+    ], validators=[DataRequired()])
+    
+    prioridade = SelectField('Prioridade', choices=[
+        ('baixa', 'Baixa'),
+        ('media', 'Média'),
+        ('alta', 'Alta'),
+        ('urgente', 'Urgente')
+    ], default='media', validators=[DataRequired()])
+    
+    # Dados da execução
+    data_manutencao = DateField('Data da Manutenção', validators=[DataRequired()], default=date.today)
+    km_manutencao = IntegerField('KM na Manutenção', validators=[Optional(), NumberRange(min=0)])
+    descricao = TextAreaField('Descrição dos Serviços', validators=[DataRequired()], 
+                             render_kw={"rows": 4, "placeholder": "Descreva detalhadamente os serviços executados..."})
+    
+    pecas_utilizadas = TextAreaField('Peças Utilizadas', 
+                                   render_kw={"rows": 3, "placeholder": "Liste as peças substituídas (uma por linha)"})
+    servicos_executados = TextAreaField('Serviços Executados', 
+                                      render_kw={"rows": 3, "placeholder": "Liste os serviços realizados (um por linha)"})
+    
+    # Dados financeiros
+    valor_pecas = FloatField('Valor das Peças (R$)', validators=[Optional(), NumberRange(min=0)], default=0.0)
+    valor_mao_obra = FloatField('Valor da Mão de Obra (R$)', validators=[Optional(), NumberRange(min=0)], default=0.0)
+    valor_total = FloatField('Valor Total (R$)', validators=[DataRequired(), NumberRange(min=0)])
+    
+    # Fornecedor/Oficina
+    oficina = StringField('Oficina/Fornecedor', validators=[Optional(), Length(max=200)])
+    mecanico_responsavel = StringField('Mecânico Responsável', validators=[Optional(), Length(max=100)])
+    numero_os = StringField('Número da OS', validators=[Optional(), Length(max=50)])
+    
+    # Garantia
+    garantia_meses = IntegerField('Garantia (Meses)', validators=[Optional(), NumberRange(min=0, max=60)], default=3)
+    garantia_km = IntegerField('Garantia (KM)', validators=[Optional(), NumberRange(min=0)], default=10000)
+    
+    # Planejamento próxima manutenção
+    proxima_manutencao_km = IntegerField('Próxima Manutenção (KM)', validators=[Optional(), NumberRange(min=0)])
+    proxima_manutencao_data = DateField('Próxima Manutenção (Data)', validators=[Optional()])
+    intervalo_km = IntegerField('Intervalo Padrão (KM)', validators=[Optional(), NumberRange(min=0)])
+    intervalo_meses = IntegerField('Intervalo Padrão (Meses)', validators=[Optional(), NumberRange(min=0)])
+    
+    # Status e observações
+    status = SelectField('Status', choices=[
+        ('agendada', 'Agendada'),
+        ('em_andamento', 'Em Andamento'),
+        ('concluida', 'Concluída'),
+        ('cancelada', 'Cancelada')
+    ], default='concluida', validators=[DataRequired()])
+    
+    observacoes = TextAreaField('Observações Gerais', 
+                               render_kw={"rows": 2, "placeholder": "Observações adicionais sobre a manutenção..."})
+    
+    # Validações customizadas
+    def validate_valor_total(form, field):
+        if field.data:
+            valor_soma = (form.valor_pecas.data or 0) + (form.valor_mao_obra.data or 0)
+            if valor_soma > 0 and abs(field.data - valor_soma) > 0.01:
+                raise ValidationError('Valor total deve ser igual à soma de peças + mão de obra.')
+    
+    def validate_proxima_manutencao_km(form, field):
+        if field.data and form.km_manutencao.data:
+            if field.data <= form.km_manutencao.data:
+                raise ValidationError('Próxima manutenção deve ser superior ao KM atual.')
+    
+    def validate_proxima_manutencao_data(form, field):
+        if field.data and form.data_manutencao.data:
+            if field.data <= form.data_manutencao.data:
+                raise ValidationError('Data da próxima manutenção deve ser posterior à data atual.')
+
+class DocumentoFiscalForm(FlaskForm):
+    """Formulário para controle de documentos fiscais"""
+    custo_veiculo_id = HiddenField('Custo Veículo ID')
+    manutencao_id = HiddenField('Manutenção ID')
+    veiculo_id = HiddenField('Veículo ID')
+    
+    # Dados do documento
+    tipo_documento = SelectField('Tipo de Documento', choices=[
+        ('nf', 'Nota Fiscal'),
+        ('nfce', 'NFC-e'),
+        ('nfse', 'NFS-e'),
+        ('recibo', 'Recibo'),
+        ('cupom', 'Cupom Fiscal'),
+        ('outros', 'Outros')
+    ], validators=[DataRequired()])
+    
+    numero_documento = StringField('Número do Documento', validators=[DataRequired(), Length(max=50)])
+    serie = StringField('Série', validators=[Optional(), Length(max=10)])
+    data_emissao = DateField('Data de Emissão', validators=[DataRequired()])
+    valor_documento = FloatField('Valor do Documento (R$)', validators=[DataRequired(), NumberRange(min=0)])
+    
+    # Dados do emissor
+    cnpj_emissor = StringField('CNPJ do Emissor', validators=[Optional(), Length(max=18)])
+    nome_emissor = StringField('Nome do Emissor', validators=[DataRequired(), Length(max=200)])
+    endereco_emissor = TextAreaField('Endereço do Emissor', 
+                                   render_kw={"rows": 2, "placeholder": "Endereço completo do fornecedor"})
+    
+    # Dados fiscais (opcionais)
+    valor_icms = FloatField('ICMS (R$)', validators=[Optional(), NumberRange(min=0)], default=0.0)
+    valor_pis = FloatField('PIS (R$)', validators=[Optional(), NumberRange(min=0)], default=0.0)
+    valor_cofins = FloatField('COFINS (R$)', validators=[Optional(), NumberRange(min=0)], default=0.0)
+    valor_iss = FloatField('ISS (R$)', validators=[Optional(), NumberRange(min=0)], default=0.0)
+    valor_desconto = FloatField('Desconto (R$)', validators=[Optional(), NumberRange(min=0)], default=0.0)
+    
+    # Arquivo digitalizado
+    arquivo_digitalizado = FileField('Arquivo Digitalizado', 
+                                   validators=[Optional(), FileAllowed(['pdf', 'jpg', 'jpeg', 'png'], 
+                                   'Apenas arquivos PDF, JPG, JPEG e PNG são permitidos!')])
+    
+    # Observações
+    observacoes_validacao = TextAreaField('Observações', 
+                                        render_kw={"rows": 2, "placeholder": "Observações sobre o documento"})
+
+class AlertaVeiculoForm(FlaskForm):
+    """Formulário para criação de alertas personalizados"""
+    veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
+    
+    # Tipo de alerta
+    tipo_alerta = SelectField('Tipo de Alerta', choices=[
+        ('manutencao_vencida', 'Manutenção Vencida'),
+        ('documento_vencendo', 'Documento Vencendo'),
+        ('gasto_excessivo', 'Gasto Excessivo'),
+        ('km_excessivo', 'Quilometragem Excessiva'),
+        ('seguro_vencendo', 'Seguro Vencendo'),
+        ('licenciamento_vencendo', 'Licenciamento Vencendo'),
+        ('personalizado', 'Personalizado')
+    ], validators=[DataRequired()])
+    
+    categoria = SelectField('Categoria', choices=[
+        ('urgente', 'Urgente'),
+        ('importante', 'Importante'),
+        ('informativo', 'Informativo')
+    ], default='importante', validators=[DataRequired()])
+    
+    # Dados do alerta
+    titulo = StringField('Título do Alerta', validators=[DataRequired(), Length(max=200)])
+    descricao = TextAreaField('Descrição', 
+                            render_kw={"rows": 3, "placeholder": "Descreva detalhadamente o alerta..."})
+    data_alerta = DateField('Data do Alerta', validators=[DataRequired()], default=date.today)
+    data_vencimento = DateField('Data de Vencimento', validators=[Optional()])
+    
+    # Valores de referência
+    valor_limite = FloatField('Valor Limite (R$)', validators=[Optional(), NumberRange(min=0)])
+    km_limite = IntegerField('KM Limite', validators=[Optional(), NumberRange(min=0)])
+    dias_antecedencia = IntegerField('Dias de Antecedência', validators=[Optional(), NumberRange(min=1, max=365)], default=30)
+
+class FiltroVeiculosForm(FlaskForm):
+    """Formulário para filtros avançados de veículos"""
+    veiculo_id = SelectField('Veículo Específico', coerce=int, validators=[Optional()])
+    tipo_custo = SelectField('Tipo de Custo', choices=[
+        ('', 'Todos os tipos'),
+        ('combustivel', 'Combustível'),
+        ('manutencao', 'Manutenção'),
+        ('seguro', 'Seguro'),
+        ('multa', 'Multa'),
+        ('lavagem', 'Lavagem'),
+        ('ipva', 'IPVA'),
+        ('licenciamento', 'Licenciamento'),
+        ('pneus', 'Pneus'),
+        ('outros', 'Outros')
+    ], validators=[Optional()])
+    
+    data_inicio = DateField('Data de Início', validators=[Optional()])
+    data_fim = DateField('Data de Fim', validators=[Optional()])
+    valor_min = FloatField('Valor Mínimo (R$)', validators=[Optional(), NumberRange(min=0)])
+    valor_max = FloatField('Valor Máximo (R$)', validators=[Optional(), NumberRange(min=0)])
+    obra_id = SelectField('Obra', coerce=int, validators=[Optional()])
+    fornecedor = StringField('Fornecedor', validators=[Optional(), Length(max=100)])
+
+class RelatorioTCOForm(FlaskForm):
+    """Formulário para relatório de TCO (Total Cost of Ownership)"""
+    veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
+    periodo_analise = SelectField('Período de Análise', choices=[
+        ('3_meses', 'Últimos 3 Meses'),
+        ('6_meses', 'Últimos 6 Meses'),
+        ('1_ano', 'Último Ano'),
+        ('2_anos', 'Últimos 2 Anos'),
+        ('personalizado', 'Período Personalizado')
+    ], default='1_ano', validators=[DataRequired()])
+    
+    data_inicio = DateField('Data de Início', validators=[Optional()])
+    data_fim = DateField('Data de Fim', validators=[Optional()])
+    
+    incluir_depreciacao = BooleanField('Incluir Depreciação', default=True)
+    valor_depreciacao_anual = FloatField('Depreciação Anual (R$)', validators=[Optional(), NumberRange(min=0)])
+    
+    incluir_seguro = BooleanField('Incluir Seguro', default=True)
+    valor_seguro_anual = FloatField('Seguro Anual (R$)', validators=[Optional(), NumberRange(min=0)])
+    
+    incluir_ipva = BooleanField('Incluir IPVA', default=True)
+    valor_ipva_anual = FloatField('IPVA Anual (R$)', validators=[Optional(), NumberRange(min=0)])
+    
+    formato_relatorio = SelectField('Formato do Relatório', choices=[
+        ('pdf', 'PDF'),
+        ('excel', 'Excel'),
+        ('web', 'Visualizar na Tela')
+    ], default='web', validators=[DataRequired()])

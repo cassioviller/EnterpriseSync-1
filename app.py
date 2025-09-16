@@ -328,6 +328,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint EQUIPE: {e}")
     
+    # Registrar blueprint SISTEMA AVANÇADO DE VEÍCULOS - Gestão Completa de Custos
+    try:
+        from views_veiculos_avancado import veiculos_avancado_bp
+        app.register_blueprint(veiculos_avancado_bp)
+        logging.info("✅ Blueprint SISTEMA AVANÇADO DE VEÍCULOS registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint Sistema Avançado de Veículos não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint Sistema Avançado de Veículos: {e}")
+    
     # Photo migration moved to migrations.py for cleaner app initialization
     
     # Development authentication bypass (PERMANENTEMENTE DESABILITADO)

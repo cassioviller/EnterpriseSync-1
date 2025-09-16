@@ -1,0 +1,340 @@
+{% extends "veiculos_avancado/base_veiculos.html" %}
+
+{% block title %}Dashboard Financeiro - Veículos{% endblock %}
+
+{% block breadcrumb_items %}
+    <li class="breadcrumb-item active">Dashboard Financeiro</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">
+                <i class="fas fa-chart-pie text-primary me-2"></i>
+                Dashboard Financeiro - Veículos
+            </h2>
+            <p class="text-muted mb-0">Visão completa dos custos da frota</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary btn-custom me-2" onclick="window.print()">
+                <i class="fas fa-print me-1"></i>Imprimir
+            </button>
+            <button class="btn btn-primary btn-custom" onclick="location.reload()">
+                <i class="fas fa-sync me-1"></i>Atualizar
+            </button>
+        </div>
+    </div>
+
+    <!-- KPIs Principais -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card kpi-card h-100">
+                <div class="card-body text-center">
+                    <div class="kpi-value">{{ kpis.total_veiculos }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-truck me-1"></i>Veículos Ativos
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card kpi-card h-100">
+                <div class="card-body text-center">
+                    <div class="kpi-value">{{ "%.2f"|format(kpis.custos_totais) | replace('.', ',') }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-money-bill-wave me-1"></i>Custos Totais (R$)
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card kpi-card h-100">
+                <div class="card-body text-center">
+                    <div class="kpi-value">{{ "%.2f"|format(kpis.custos_mes) | replace('.', ',') }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-calendar-month me-1"></i>Custos do Mês (R$)
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card kpi-card h-100">
+                <div class="card-body text-center">
+                    <div class="kpi-value">{{ "%.2f"|format(kpis.custo_por_veiculo) | replace('.', ',') }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-calculator me-1"></i>Custo por Veículo (R$)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas e Status -->
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Alertas Críticos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h3 class="text-danger">{{ kpis.alertas_criticos }}</h3>
+                            <p class="text-muted mb-0">Alertas Urgentes</p>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="text-warning">{{ kpis.manutencoes_vencidas }}</h3>
+                            <p class="text-muted mb-0">Manutenções Vencidas</p>
+                        </div>
+                    </div>
+                    {% if kpis.alertas_criticos > 0 or kpis.manutencoes_vencidas > 0 %}
+                    <div class="mt-3 text-center">
+                        <a href="{{ url_for('veiculos_avancado.lista_alertas') }}" class="btn btn-warning btn-sm">
+                            <i class="fas fa-eye me-1"></i>Ver Alertas
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Resumo Mensal
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h3 class="text-success">{{ "%.2f"|format(kpis.media_mensal) | replace('.', ',') }}</h3>
+                            <p class="text-muted mb-0">Média Mensal (R$)</p>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="text-primary">
+                                {% if kpis.custos_mes > kpis.media_mensal %}
+                                    <i class="fas fa-arrow-up"></i>
+                                    {{ "%.1f"|format(((kpis.custos_mes / kpis.media_mensal - 1) * 100) if kpis.media_mensal > 0 else 0) }}%
+                                {% else %}
+                                    <i class="fas fa-arrow-down"></i>
+                                    {{ "%.1f"|format(((1 - kpis.custos_mes / kpis.media_mensal) * 100) if kpis.media_mensal > 0 else 0) }}%
+                                {% endif %}
+                            </h3>
+                            <p class="text-muted mb-0">vs Média</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-pie-chart me-2"></i>Distribuição por Tipo de Custo
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="graficoTipos"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-line-chart me-2"></i>Evolução Mensal de Custos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="graficoEvolucao"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Veículos Mais Caros -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-trophy me-2"></i>Top 5 - Veículos com Maiores Custos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if top_veiculos %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Placa</th>
+                                    <th>Modelo</th>
+                                    <th>Total de Custos</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for loop_index, veiculo in top_veiculos | list | enumerate(1) %}
+                                <tr>
+                                    <td>
+                                        {% if loop_index == 1 %}
+                                            <i class="fas fa-trophy text-warning"></i>
+                                        {% elif loop_index == 2 %}
+                                            <i class="fas fa-medal text-secondary"></i>
+                                        {% elif loop_index == 3 %}
+                                            <i class="fas fa-award text-warning"></i>
+                                        {% else %}
+                                            {{ loop_index }}
+                                        {% endif %}
+                                    </td>
+                                    <td><strong>{{ veiculo.placa }}</strong></td>
+                                    <td>{{ veiculo.modelo }}</td>
+                                    <td>
+                                        <span class="badge bg-danger fs-6">
+                                            R$ {{ "%.2f"|format(veiculo.total_custos) | replace('.', ',') }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('veiculos_avancado.relatorio_tco', veiculo_id=veiculo.id) }}" 
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-chart-bar me-1"></i>Ver TCO
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                        <p class="text-muted">Nenhum dado de custo encontrado.</p>
+                        <a href="{{ url_for('main.novo_custo_veiculo_form', veiculo_id=1) }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Registrar Primeiro Custo
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Configuração dos gráficos
+const dadosGraficoTipos = {{ dados_grafico_tipos | tojson | safe }};
+const dadosGraficoEvolucao = {{ dados_grafico_evolucao | tojson | safe }};
+
+// Gráfico de Pizza - Distribuição por Tipo
+if (dadosGraficoTipos && dadosGraficoTipos.labels.length > 0) {
+    const ctxTipos = document.getElementById('graficoTipos').getContext('2d');
+    new Chart(ctxTipos, {
+        type: 'doughnut',
+        data: {
+            labels: dadosGraficoTipos.labels,
+            datasets: [{
+                data: dadosGraficoTipos.values,
+                backgroundColor: [
+                    '#FF6384',
+                    '#36A2EB',
+                    '#FFCE56',
+                    '#4BC0C0',
+                    '#9966FF',
+                    '#FF9F40',
+                    '#FF6384',
+                    '#C9CBCF'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return context.label + ': R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Linha - Evolução Mensal
+if (dadosGraficoEvolucao && dadosGraficoEvolucao.labels.length > 0) {
+    const ctxEvolucao = document.getElementById('graficoEvolucao').getContext('2d');
+    new Chart(ctxEvolucao, {
+        type: 'line',
+        data: {
+            labels: dadosGraficoEvolucao.labels,
+            datasets: [{
+                label: 'Custos Mensais (R$)',
+                data: dadosGraficoEvolucao.values,
+                borderColor: '#36A2EB',
+                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#36A2EB',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Custos: R$ ' + context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Atualização automática a cada 5 minutos
+setInterval(function() {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}

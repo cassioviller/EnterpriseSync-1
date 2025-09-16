@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Gestão de Veículos{% endblock %} - SIGE</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: {{ empresa_cores.primaria if empresa_cores else '#007bff' }};
+            --secondary-color: {{ empresa_cores.secundaria if empresa_cores else '#6c757d' }};
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .kpi-card {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+        }
+        
+        .kpi-card .card-body {
+            padding: 1.5rem;
+        }
+        
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .kpi-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 20px;
+        }
+        
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .btn-custom {
+            border-radius: 25px;
+            padding: 0.5rem 1.5rem;
+            font-weight: 500;
+        }
+        
+        .alert-custom {
+            border-left: 4px solid;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .alert-urgente {
+            border-left-color: var(--danger-color);
+            background-color: #f8d7da;
+        }
+        
+        .alert-importante {
+            border-left-color: var(--warning-color);
+            background-color: #fff3cd;
+        }
+        
+        .alert-informativo {
+            border-left-color: var(--info-color);
+            background-color: #d1ecf1;
+        }
+        
+        .sidebar {
+            background: linear-gradient(180deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            border-radius: 8px;
+            margin: 0.2rem 0;
+            transition: all 0.3s;
+        }
+        
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255,255,255,0.1);
+        }
+        
+        .main-content {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 1rem 0;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .kpi-value {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navbar Superior -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: var(--primary-color);">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">
+                <i class="fas fa-truck me-2"></i>
+                SIGE - Gestão de Veículos
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-1"></i>{{ current_user.nome }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('main.index') }}">
+                                <i class="fas fa-home me-2"></i>Dashboard Principal
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Sair
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid p-0">
+        <div class="row g-0">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 sidebar">
+                <div class="p-3">
+                    <h6 class="text-uppercase fw-bold mb-3">
+                        <i class="fas fa-car me-2"></i>Menu Veículos
+                    </h6>
+                    
+                    <nav class="nav flex-column">
+                        <a class="nav-link" href="{{ url_for('veiculos_avancado.dashboard_financeiro') }}">
+                            <i class="fas fa-chart-pie me-2"></i>Dashboard Financeiro
+                        </a>
+                        <a class="nav-link" href="{{ url_for('main.veiculos') }}">
+                            <i class="fas fa-truck me-2"></i>Meus Veículos
+                        </a>
+                        
+                        <hr class="text-white-50">
+                        
+                        <h6 class="text-uppercase fw-bold mt-3 mb-2" style="font-size: 0.8rem;">
+                            Manutenções
+                        </h6>
+                        <a class="nav-link" href="{{ url_for('veiculos_avancado.lista_manutencoes') }}">
+                            <i class="fas fa-wrench me-2"></i>Manutenções
+                        </a>
+                        
+                        <h6 class="text-uppercase fw-bold mt-3 mb-2" style="font-size: 0.8rem;">
+                            Documentos
+                        </h6>
+                        <a class="nav-link" href="{{ url_for('veiculos_avancado.lista_documentos') }}">
+                            <i class="fas fa-file-invoice me-2"></i>Documentos Fiscais
+                        </a>
+                        
+                        <h6 class="text-uppercase fw-bold mt-3 mb-2" style="font-size: 0.8rem;">
+                            Alertas
+                        </h6>
+                        <a class="nav-link" href="{{ url_for('veiculos_avancado.lista_alertas') }}">
+                            <i class="fas fa-bell me-2"></i>Alertas
+                        </a>
+                    </nav>
+                </div>
+            </div>
+            
+            <!-- Conteúdo Principal -->
+            <div class="col-md-9 col-lg-10 main-content">
+                <!-- Alerts -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'check' if category == 'success' else 'info-circle' }} me-2"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <!-- Breadcrumb -->
+                {% block breadcrumb %}
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('main.veiculos') }}">Veículos</a></li>
+                        {% block breadcrumb_items %}{% endblock %}
+                    </ol>
+                </nav>
+                {% endblock %}
+                
+                <!-- Conteúdo da Página -->
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Scripts personalizados -->
+    <script>
+        // Função para formatar valores monetários
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(value);
+        }
+        
+        // Função para formatar datas
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('pt-BR');
+        }
+        
+        // Função para calcular dias restantes
+        function diasRestantes(dataVencimento) {
+            const hoje = new Date();
+            const vencimento = new Date(dataVencimento);
+            const diffTime = vencimento - hoje;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays;
+        }
+        
+        // Auto-refresh para alertas críticos
+        function verificarAlertas() {
+            // Implementar verificação automática de alertas
+            console.log('Verificando alertas...');
+        }
+        
+        // Verificar alertas a cada 5 minutos
+        setInterval(verificarAlertas, 300000);
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
