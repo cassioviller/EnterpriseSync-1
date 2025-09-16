@@ -2636,6 +2636,37 @@ def detalhes_veiculo(id):
 
 # ===== ROTAS CRUD DE VEÍCULOS =====
 
+# ✅ ROTA CRÍTICA: Dados do veículo para edição via AJAX
+@main_bp.route('/veiculos/<int:id>/dados')
+@admin_required
+def dados_veiculo(id):
+    """Retorna dados do veículo em JSON para preenchimento do modal de edição"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        from models import Veiculo
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        # Converter para dicionário JSON
+        dados = {
+            'id': veiculo.id,
+            'placa': veiculo.placa,
+            'marca': veiculo.marca,
+            'modelo': veiculo.modelo,
+            'ano': veiculo.ano,
+            'tipo': veiculo.tipo,
+            'km_atual': veiculo.km_atual,
+            'status': getattr(veiculo, 'status', 'Disponível'),
+            'data_ultima_manutencao': veiculo.data_ultima_manutencao.strftime('%Y-%m-%d') if veiculo.data_ultima_manutencao else '',
+            'data_proxima_manutencao': veiculo.data_proxima_manutencao.strftime('%Y-%m-%d') if veiculo.data_proxima_manutencao else ''
+        }
+        
+        return jsonify(dados)
+        
+    except Exception as e:
+        print(f"ERRO DADOS VEÍCULO: {str(e)}")
+        return jsonify({'error': 'Erro ao carregar dados do veículo'}), 500
+
 # 1. ROTA CADASTRO - /veiculos/novo (GET/POST)
 @main_bp.route('/veiculos/novo', methods=['GET', 'POST'])
 @admin_required

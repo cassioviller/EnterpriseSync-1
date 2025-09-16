@@ -501,43 +501,10 @@ function editarVeiculo(id) {
 }
 
 function gerenciarVeiculo(veiculoId, placa) {
-    console.log('DEBUG: gerenciarVeiculo chamada com ID:', veiculoId, 'Placa:', placa);
-    
-    // Verificar se os elementos existem
-    const usoVeiculoId = document.getElementById('uso_veiculo_id');
-    const custoVeiculoId = document.getElementById('custo_veiculo_id');
-    const placaSpan = document.getElementById('gerenciarVeiculoPlaca');
-    const modal = document.getElementById('gerenciarVeiculoModal');
-    
-    console.log('DEBUG: Elementos encontrados:', {
-        usoVeiculoId: !!usoVeiculoId,
-        custoVeiculoId: !!custoVeiculoId, 
-        placaSpan: !!placaSpan,
-        modal: !!modal,
-        bootstrap: typeof bootstrap !== 'undefined'
-    });
-    
-    if (usoVeiculoId) usoVeiculoId.value = veiculoId;
-    if (custoVeiculoId) custoVeiculoId.value = veiculoId;
-    if (placaSpan) placaSpan.textContent = placa;
-    
-    try {
-        if (modal && typeof bootstrap !== 'undefined') {
-            const bootstrapModal = new bootstrap.Modal(modal);
-            bootstrapModal.show();
-            console.log('DEBUG: Modal aberto com sucesso!');
-        } else {
-            console.error('DEBUG: Bootstrap ou modal não encontrado');
-            // Fallback usando jQuery se disponível
-            if (typeof $ !== 'undefined') {
-                $('#gerenciarVeiculoModal').modal('show');
-                console.log('DEBUG: Modal aberto via jQuery');
-            }
-        }
-    } catch (error) {
-        console.error('DEBUG: Erro ao abrir modal:', error);
-        alert('Erro ao abrir modal: ' + error.message);
-    }
+    document.getElementById('uso_veiculo_id').value = veiculoId;
+    document.getElementById('custo_veiculo_id').value = veiculoId;
+    document.getElementById('gerenciarVeiculoPlaca').textContent = placa;
+    new bootstrap.Modal(document.getElementById('gerenciarVeiculoModal')).show();
 }
 
 function excluirVeiculo(id) {
