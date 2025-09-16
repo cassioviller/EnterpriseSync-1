@@ -473,6 +473,32 @@ $(document).ready(function() {
         }
     });
 
+    // Preencher automaticamente ao abrir o modal
+    $('#usoModal').on('show.bs.modal', function() {
+        // Preencher data atual automaticamente
+        const hoje = new Date();
+        const dataFormatada = hoje.getFullYear() + '-' + 
+                            String(hoje.getMonth() + 1).padStart(2, '0') + '-' + 
+                            String(hoje.getDate()).padStart(2, '0');
+        $('#data_uso').val(dataFormatada);
+        
+        // Buscar e preencher última quilometragem do veículo
+        const veiculoId = {{ veiculo.id }};
+        $.ajax({
+            url: `/veiculos/${veiculoId}/ultima-km`,
+            type: 'GET',
+            success: function(response) {
+                if (response.ultima_km) {
+                    $('#km_inicial').val(response.ultima_km);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.log('Erro ao buscar última KM:', error);
+                // Não mostrar erro para o usuário, apenas não preencher
+            }
+        });
+    });
+
     // Resetar selects quando modal fechar
     $('#usoModal').on('hidden.bs.modal', function() {
         $('.autocomplete-funcionario').val(null).trigger('change');

@@ -2699,6 +2699,56 @@ def dados_veiculo(id):
         print(f"ERRO DADOS VEÍCULO: {str(e)}")
         return jsonify({'error': 'Erro ao carregar dados do veículo'}), 500
 
+# Rota para buscar última quilometragem do veículo
+@main_bp.route('/veiculos/<int:id>/ultima-km')
+@login_required
+def ultima_km_veiculo(id):
+    """Retorna a última quilometragem registrada do veículo"""
+    try:
+        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            return jsonify({'error': 'Acesso negado. Usuário não autenticado.'}), 403
+        
+        from models import Veiculo
+        from sqlalchemy import text
+        
+        # Verificar se o veículo pertence ao usuário
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first_or_404()
+        
+        # Buscar a última quilometragem registrada (último uso ou km_atual do veículo)
+        ultima_km = 0
+        
+        try:
+            # Buscar último uso do veículo ordenado por data
+            ultimo_uso = db.session.execute(
+                text("""
+                    SELECT km_final 
+                    FROM uso_veiculo 
+                    WHERE veiculo_id = :veiculo_id 
+                    AND km_final IS NOT NULL 
+                    ORDER BY data_uso DESC, id DESC 
+                    LIMIT 1
+                """),
+                {'veiculo_id': id}
+            ).fetchone()
+            
+            if ultimo_uso and ultimo_uso.km_final:
+                ultima_km = ultimo_uso.km_final
+            elif veiculo.km_atual:
+                ultima_km = veiculo.km_atual
+                
+        except Exception as e:
+            print(f"Erro ao buscar última KM: {str(e)}")
+            # Fallback para km_atual do veículo
+            ultima_km = veiculo.km_atual or 0
+        
+        return jsonify({'ultima_km': ultima_km})
+        
+    except Exception as e:
+        print(f"ERRO ÚLTIMA KM VEÍCULO: {str(e)}")
+        return jsonify({'error': 'Erro ao carregar última quilometragem', 'ultima_km': 0}), 500
+
 # 1. ROTA CADASTRO - /veiculos/novo (GET/POST)
 @main_bp.route('/veiculos/novo', methods=['GET', 'POST'])
 @admin_required
