@@ -3548,11 +3548,17 @@ def exportar_dados_veiculo(id):
 # ===== SISTEMA COMPLETO DE HISTÓRICO E LANÇAMENTOS DE VEÍCULOS =====
 
 @main_bp.route('/veiculos/lancamentos')
-@admin_required
+@login_required  # 🔒 MUDANÇA: Funcionários podem acessar lançamentos de veículos
 def lancamentos_veiculos():
     """Página principal de lançamentos de veículos com filtros avançados"""
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        from utils.tenant import get_tenant_admin_id
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+            
         from models import Veiculo, UsoVeiculo, CustoVeiculo, Funcionario, Obra
         from sqlalchemy import func, desc, or_, and_
         from datetime import datetime, timedelta
@@ -3570,10 +3576,10 @@ def lancamentos_veiculos():
         }
         
         # Query base para usos
-        query_usos = UsoVeiculo.query.filter(UsoVeiculo.admin_id == admin_id)
+        query_usos = UsoVeiculo.query.filter(UsoVeiculo.admin_id == tenant_admin_id)
         
         # Query base para custos
-        query_custos = CustoVeiculo.query.filter(CustoVeiculo.admin_id == admin_id)
+        query_custos = CustoVeiculo.query.filter(CustoVeiculo.admin_id == tenant_admin_id)
         
         # Aplicar filtros de data (últimos 30 dias por padrão se não especificado)
         if not filtros['data_inicio']:
@@ -3723,11 +3729,17 @@ def aprovar_lancamento_veiculo(tipo, id):
 
 
 @main_bp.route('/veiculos/relatorios')
-@admin_required
+@login_required  # 🔒 MUDANÇA: Funcionários podem acessar relatórios de veículos
 def relatorios_veiculos():
     """Página de relatórios consolidados de veículos"""
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        from utils.tenant import get_tenant_admin_id
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+            
         from models import Veiculo, UsoVeiculo, CustoVeiculo
         from sqlalchemy import func, extract
         from datetime import datetime, timedelta
@@ -3745,7 +3757,7 @@ def relatorios_veiculos():
         data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
         
         # Relatório por veículo
-        veiculos = Veiculo.query.filter_by(admin_id=admin_id, ativo=True).all()
+        veiculos = Veiculo.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
         relatorio_veiculos = []
         
         for veiculo in veiculos:
