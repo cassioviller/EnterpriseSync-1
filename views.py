@@ -3,6 +3,7 @@ from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre
 from auth import super_admin_required, admin_required, funcionario_required
+from utils.tenant import get_tenant_admin_id
 
 # API RDO Refatorada integrada inline na função salvar_rdo_flexivel
 from datetime import datetime, date, timedelta
@@ -98,6 +99,7 @@ def safe_db_operation(operation, default_value=None):
         except:
             pass
         return default_value
+
 
 def _calcular_funcionarios_departamento(admin_id):
     """Calcula funcionários por departamento com proteção de transação"""
@@ -2572,27 +2574,35 @@ def test():
     return jsonify({'status': 'ok', 'message': 'SIGE v8.0 funcionando!'})
 
 @main_bp.route('/veiculos')
-@admin_required
+@login_required  # 🔒 MUDANÇA: Agora funcionários também podem acessar
 def veiculos():
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+    tenant_admin_id = get_tenant_admin_id()
+    if not tenant_admin_id:
+        flash('Acesso negado. Faça login novamente.', 'error')
+        return redirect(url_for('auth.login'))
     
-    # Buscar veículos do admin
+    # Buscar veículos APENAS da empresa do usuário (admin ou funcionário)
     from models import Veiculo
-    veiculos = Veiculo.query.filter_by(admin_id=admin_id).all()
+    veiculos = Veiculo.query.filter_by(admin_id=tenant_admin_id).all()
     
     return render_template('veiculos.html', veiculos=veiculos)
 
 # Detalhes de um veículo específico
 @main_bp.route('/veiculos/<int:id>')
-@admin_required
+@login_required  # 🔒 MUDANÇA: Agora funcionários também podem acessar
 def detalhes_veiculo(id):
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado  
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
         
-        # Buscar o veículo
+        # Buscar o veículo APENAS da empresa do usuário
         from models import Veiculo, UsoVeiculo, CustoVeiculo
         from sqlalchemy import text
-        veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first_or_404()
         
         # Buscar histórico de uso do veículo (sem admin_id que não existe)
         try:
@@ -2651,14 +2661,17 @@ def detalhes_veiculo(id):
 
 # ✅ ROTA CRÍTICA: Dados do veículo para edição via AJAX
 @main_bp.route('/veiculos/<int:id>/dados')
-@admin_required
+@login_required  # 🔒 MUDANÇA: Funcionários podem acessar dados para visualização
 def dados_veiculo(id):
     """Retorna dados do veículo em JSON para preenchimento do modal de edição"""
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            return jsonify({'error': 'Acesso negado. Usuário não autenticado.'}), 403
         
         from models import Veiculo
-        veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first_or_404()
         
         # Converter para dicionário JSON
         dados = {
@@ -2860,7 +2873,7 @@ def excluir_veiculo(id):
 # 4. ROTA REGISTRO USO - /veiculos/<id>/uso (GET/POST)
 # ROTA PARA MODAL DE USO (SEM PARÂMETRO ID NA URL)
 @main_bp.route('/veiculos/uso', methods=['POST'])
-@admin_required
+@login_required  # 🔒 MUDANÇA: Funcionários podem registrar uso de veículos
 def novo_uso_veiculo_lista():
     from forms import UsoVeiculoForm
     from models import Veiculo, UsoVeiculo, Funcionario, Obra
@@ -2871,8 +2884,13 @@ def novo_uso_veiculo_lista():
         flash('Erro: ID do veículo não fornecido.', 'error')
         return redirect(url_for('main.veiculos'))
     
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-    veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=admin_id).first_or_404()
+    # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+    tenant_admin_id = get_tenant_admin_id()
+    if not tenant_admin_id:
+        flash('Acesso negado. Faça login novamente.', 'error')
+        return redirect(url_for('auth.login'))
+    
+    veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first_or_404()
     
     try:
         # Validações de negócio críticas
@@ -2903,7 +2921,7 @@ def novo_uso_veiculo_lista():
             km_percorrido=km_final - km_inicial if km_final and km_inicial else 0,
             finalidade=request.form.get('finalidade', 'Operacional'),
             observacoes=request.form.get('observacoes'),
-            admin_id=admin_id,
+            admin_id=tenant_admin_id,
             created_at=datetime.utcnow()
         )
         
@@ -2927,7 +2945,7 @@ def novo_uso_veiculo_lista():
 
 # ROTA PARA MODAL DE CUSTO (SEM PARÂMETRO ID NA URL)
 @main_bp.route('/veiculos/custo', methods=['POST'])
-@admin_required
+@login_required  # 🔒 MUDANÇA: Funcionários podem registrar custos de veículos
 def novo_custo_veiculo_lista():
     from forms import CustoVeiculoForm
     from models import Veiculo, CustoVeiculo
@@ -2938,8 +2956,13 @@ def novo_custo_veiculo_lista():
         flash('Erro: ID do veículo não fornecido.', 'error')
         return redirect(url_for('main.veiculos'))
     
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-    veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=admin_id).first_or_404()
+    # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+    tenant_admin_id = get_tenant_admin_id()
+    if not tenant_admin_id:
+        flash('Acesso negado. Faça login novamente.', 'error')
+        return redirect(url_for('auth.login'))
+    
+    veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first_or_404()
     
     try:
         # Validações de negócio
@@ -2963,7 +2986,7 @@ def novo_custo_veiculo_lista():
             fornecedor=request.form.get('fornecedor', ''),
             km_custo=int(km_custo) if km_custo else None,
             litros=float(litros) if litros else None,
-            admin_id=admin_id,
+            admin_id=tenant_admin_id,
             created_at=datetime.utcnow()
         )
         
@@ -6036,7 +6059,7 @@ def rdo_visualizar_unificado(id):
         
         # Buscar funcionários para dropdown de mão de obra
         funcionarios = Funcionario.query.filter_by(
-            admin_id=admin_id, 
+            admin_id=tenant_admin_id, 
             ativo=True
         ).order_by(Funcionario.nome).all()
         
@@ -6233,7 +6256,7 @@ def api_funcionario_funcionarios_alias():
     try:
         # Buscar funcionários diretamente (compatibilidade total)
         funcionarios = Funcionario.query.filter_by(
-            admin_id=admin_id,
+            admin_id=tenant_admin_id,
             ativo=True
         ).order_by(Funcionario.nome).all()
         
@@ -6504,7 +6527,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
             if servico_id not in servicos_dict:
                 servico = Servico.query.filter_by(
                     id=servico_id, 
-                    admin_id=admin_id, 
+                    admin_id=tenant_admin_id, 
                     ativo=True
                 ).first()
                 
@@ -6517,7 +6540,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
                 servico_obra_ativo = ServicoObraReal.query.filter_by(
                     obra_id=obra_id,
                     servico_id=servico_id,
-                    admin_id=admin_id,
+                    admin_id=tenant_admin_id,
                     ativo=True
                 ).first()
                 
@@ -6640,7 +6663,7 @@ def api_servicos_obra_primeira_rdo(obra_id):
             # Buscar subatividades do serviço
             subatividades = SubatividadeMestre.query.filter_by(
                 servico_id=servico.id,
-                admin_id=admin_id,
+                admin_id=tenant_admin_id,
                 ativo=True
             ).order_by(SubatividadeMestre.ordem_padrao).all()
             
@@ -6956,7 +6979,7 @@ def salvar_rdo_flexivel():
                     nome_subatividade=sub_data['nome'],
                     percentual_conclusao=sub_data['percentual'],
                     observacoes_tecnicas=sub_data['observacoes'],
-                    admin_id=admin_id,
+                    admin_id=tenant_admin_id,
                     ativo=True
                 )
                 

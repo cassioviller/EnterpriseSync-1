@@ -444,10 +444,16 @@ def mobile_usar_veiculo():
         if not all([veiculo_id, km_inicial, destino]):
             return jsonify({'error': 'Dados obrigatórios: veiculo_id, km_inicial, destino'}), 400
         
-        # Verificar se veículo existe
-        veiculo = Veiculo.query.get(veiculo_id)
+        # 🔒 SEGURANÇA MULTITENANT: Verificar se veículo pertence à empresa do usuário
+        from utils.tenant import get_tenant_admin_id
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            return jsonify({'error': 'Acesso negado. Usuário não autenticado.'}), 403
+        
+        # Verificar se veículo existe E pertence à empresa
+        veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
         if not veiculo:
-            return jsonify({'error': 'Veículo não encontrado'}), 404
+            return jsonify({'error': 'Veículo não encontrado ou acesso negado'}), 404
         
         # Criar registro de uso
         uso = UsoVeiculo(
