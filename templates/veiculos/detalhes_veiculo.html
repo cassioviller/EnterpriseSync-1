@@ -10,6 +10,12 @@
                 <i class="fas fa-car"></i> {{ veiculo.placa }} - {{ veiculo.marca }} {{ veiculo.modelo }}
             </h1>
             <div class="btn-group">
+                <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#usoModal">
+                    <i class="fas fa-route"></i> Novo Uso
+                </button>
+                <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#custoModal">
+                    <i class="fas fa-dollar-sign"></i> Novo Custo
+                </button>
                 <a href="{{ url_for('main.veiculos') }}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left"></i> Voltar
                 </a>
@@ -217,6 +223,90 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Novo Uso -->
+<div class="modal fade" id="usoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-route"></i> Novo Uso
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="#" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="data_uso" class="form-label">Data do Uso</label>
+                        <input type="date" class="form-control" id="data_uso" name="data_uso" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="funcionario_id" class="form-label">Funcionário</label>
+                        <select class="form-select" id="funcionario_id" name="funcionario_id" required>
+                            <option value="">Selecione o funcionário...</option>
+                            {% for funcionario in funcionarios %}
+                            <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="obra_id" class="form-label">Obra (Opcional)</label>
+                        <select class="form-select" id="obra_id" name="obra_id">
+                            <option value="">Selecione a obra...</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="km_inicial" class="form-label">KM Inicial</label>
+                                <input type="number" class="form-control" id="km_inicial" name="km_inicial" min="0" placeholder="Ex: 45000">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="km_final" class="form-label">KM Final</label>
+                                <input type="number" class="form-control" id="km_final" name="km_final" min="0" placeholder="Ex: 45150">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="horario_saida" class="form-label">Horário de Saída</label>
+                                <input type="time" class="form-control" id="horario_saida" name="horario_saida">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="horario_chegada" class="form-label">Horário de Chegada</label>
+                                <input type="time" class="form-control" id="horario_chegada" name="horario_chegada">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="finalidade" class="form-label">Finalidade do Uso</label>
+                        <input type="text" class="form-control" id="finalidade" name="finalidade" placeholder="Ex: Transporte para obra, Entrega de material...">
+                    </div>
+                    <div class="mb-3">
+                        <label for="observacoes" class="form-label">Observações</label>
+                        <textarea class="form-control" id="observacoes" name="observacoes" rows="3" placeholder="Observações adicionais sobre o uso do veículo..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Salvar Uso
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
