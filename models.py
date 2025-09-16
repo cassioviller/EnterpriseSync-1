@@ -214,6 +214,328 @@ class Veiculo(db.Model):
     
     # Constraint unique por admin para isolamento multi-tenant
     __table_args__ = (db.UniqueConstraint('admin_id', 'placa', name='_veiculo_admin_placa_uc'),)
+    
+    # Relacionamentos para integração obra-veículos
+    alocacoes = db.relationship('AlocacaoVeiculo', backref='veiculo', lazy=True, cascade='all, delete-orphan')
+    usos = db.relationship('UsoVeiculo', backref='veiculo_rel', lazy=True, overlaps="veiculo,usos")
+    custos = db.relationship('CustoVeiculo', backref='veiculo_rel', lazy=True, overlaps="veiculo,custos_veiculo")
+    
+    @property
+    def alocacao_atual(self):
+        """Retorna a alocação ativa atual do veículo"""
+        return AlocacaoVeiculo.query.filter_by(
+            veiculo_id=self.id,
+            ativo=True,
+            data_fim=None
+        ).first()
+    
+    @property
+    def obra_atual(self):
+        """Retorna a obra onde o veículo está atualmente alocado"""
+        alocacao = self.alocacao_atual
+        return alocacao.obra if alocacao else None
+    
+    @property
+    def status_inteligente(self):
+        """Status calculado baseado na alocação atual"""
+        if not self.ativo:
+            return 'Inativo'
+        
+        alocacao = self.alocacao_atual
+        if alocacao:
+            if alocacao.em_manutencao:
+                return 'Manutenção'
+            return f'Alocado - {alocacao.obra.nome}'
+        
+        return self.status or 'Disponível'
+    
+    def pode_ser_alocado(self):
+        """Verifica se o veículo pode ser alocado a uma obra"""
+        if not self.ativo:
+            return False, "Veículo inativo"
+        
+        if self.alocacao_atual:
+            return False, f"Já alocado à obra {self.alocacao_atual.obra.nome}"
+        
+        if self.status == 'Manutenção':
+            return False, "Veículo em manutenção"
+        
+        return True, "Disponível para alocação"
+
+class AlocacaoVeiculo(db.Model):
+    """Sistema avançado de alocação de veículos por obra com controle operacional"""
+    __tablename__ = 'alocacao_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    
+    # Controle temporal da alocação
+    data_inicio = db.Column(db.Date, nullable=False, default=date.today)
+    data_fim = db.Column(db.Date)  # Null = alocação ativa
+    data_prevista_retorno = db.Column(db.Date)  # Previsão de fim da alocação
+    
+    # Responsabilidade e autorização
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    autorizado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle operacional
+    km_inicial = db.Column(db.Integer, nullable=False)  # KM no momento da alocação
+    km_final = db.Column(db.Integer)  # KM no momento da desalocação
+    proposito = db.Column(db.String(200), nullable=False)  # Finalidade da alocação
+    prioridade = db.Column(db.Integer, default=3)  # 1=Urgente, 2=Alta, 3=Normal, 4=Baixa
+    
+    # Status e controle
+    status = db.Column(db.String(30), default='Ativo')  # Ativo, Transferindo, Finalizado, Cancelado
+    em_manutencao = db.Column(db.Boolean, default=False)  # Se está em manutenção na obra
+    local_especifico = db.Column(db.String(100))  # Localização específica na obra
+    
+    # Observações e notas
+    observacoes_inicio = db.Column(db.Text)  # Observações na alocação
+    observacoes_fim = db.Column(db.Text)  # Observações na desalocação
+    condicoes_veiculo_inicio = db.Column(db.Text)  # Estado do veículo na alocação
+    condicoes_veiculo_fim = db.Column(db.Text)  # Estado do veículo na desalocação
+    
+    # Controle de custos estimados
+    orcamento_combustivel = db.Column(db.Float, default=0.0)  # Orçamento previsto para combustível
+    orcamento_manutencao = db.Column(db.Float, default=0.0)  # Orçamento previsto para manutenção
+    limite_km_periodo = db.Column(db.Integer)  # Limite de KM para o período
+    
+    # Multi-tenant e auditoria
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='alocacoes_veiculo', lazy=True)
+    responsavel = db.relationship('Funcionario', foreign_keys=[responsavel_id], backref='veiculos_responsavel', lazy=True)
+    autorizado_por = db.relationship('Usuario', foreign_keys=[autorizado_por_id], backref='alocacoes_autorizadas', lazy=True)
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='alocacoes_veiculo_criadas', lazy=True)
+    equipe = db.relationship('EquipeVeiculo', backref='alocacao', lazy=True, cascade='all, delete-orphan')
+    transferencias = db.relationship('TransferenciaVeiculo', 
+                                   foreign_keys='TransferenciaVeiculo.alocacao_origem_id', 
+                                   backref='alocacao_origem', lazy=True)
+    
+    # Constraint para evitar alocações duplas
+    __table_args__ = (
+        db.Index('idx_alocacao_veiculo_ativo', 'veiculo_id', 'data_fim'),
+        db.Index('idx_alocacao_obra_periodo', 'obra_id', 'data_inicio', 'data_fim'),
+    )
+    
+    def __repr__(self):
+        return f'<AlocacaoVeiculo {self.veiculo.placa} → {self.obra.nome}>'
+    
+    @property
+    def dias_alocado(self):
+        """Calcula dias que o veículo está alocado"""
+        fim = self.data_fim or date.today()
+        return (fim - self.data_inicio).days + 1
+    
+    @property
+    def km_rodado(self):
+        """Calcula KM rodado durante a alocação"""
+        if self.km_final and self.km_inicial:
+            return self.km_final - self.km_inicial
+        elif not self.km_final:
+            # Se ainda ativo, usar KM atual do veículo
+            return max(0, (self.veiculo.km_atual or 0) - self.km_inicial)
+        return 0
+    
+    @property
+    def custo_total_periodo(self):
+        """Calcula custo total de veículos no período da alocação"""
+        custos = CustoVeiculo.query.filter(
+            CustoVeiculo.veiculo_id == self.veiculo_id,
+            CustoVeiculo.obra_id == self.obra_id,
+            CustoVeiculo.data_custo >= self.data_inicio,
+            CustoVeiculo.data_custo <= (self.data_fim or date.today())
+        ).all()
+        return sum(c.valor for c in custos)
+    
+    @property
+    def eficiencia_km_custo(self):
+        """Calcula eficiência KM por real gasto"""
+        custo = self.custo_total_periodo
+        km = self.km_rodado
+        if custo > 0 and km > 0:
+            return round(km / custo, 2)
+        return 0
+    
+    @property
+    def status_prazo(self):
+        """Status da alocação em relação ao prazo"""
+        if not self.data_prevista_retorno:
+            return 'sem_prazo'
+        
+        hoje = date.today()
+        if self.data_fim:
+            return 'finalizada'
+        elif hoje > self.data_prevista_retorno:
+            return 'atrasada'
+        elif (self.data_prevista_retorno - hoje).days <= 3:
+            return 'vencendo'
+        return 'no_prazo'
+    
+    def finalizar_alocacao(self, km_final=None, observacoes="", condicoes_veiculo=""):
+        """Finaliza a alocação com dados de retorno"""
+        self.data_fim = date.today()
+        self.km_final = km_final or self.veiculo.km_atual
+        self.observacoes_fim = observacoes
+        self.condicoes_veiculo_fim = condicoes_veiculo
+        self.status = 'Finalizado'
+        
+        # Atualizar status do veículo para disponível
+        self.veiculo.status = 'Disponível'
+        
+        return True
+    
+    def transferir_para_obra(self, nova_obra_id, responsavel_id, motivo):
+        """Inicia transferência para outra obra"""
+        # Criar registro de transferência
+        transferencia = TransferenciaVeiculo(
+            alocacao_origem_id=self.id,
+            obra_destino_id=nova_obra_id,
+            responsavel_transferencia_id=responsavel_id,
+            motivo=motivo,
+            admin_id=self.admin_id
+        )
+        
+        self.status = 'Transferindo'
+        db.session.add(transferencia)
+        return transferencia
+    
+    def validar_alocacao(self):
+        """Valida se a alocação pode ser criada"""
+        errors = []
+        
+        # Verificar se o veículo está disponível
+        pode_alocar, motivo = self.veiculo.pode_ser_alocado()
+        if not pode_alocar:
+            errors.append(f"Veículo não disponível: {motivo}")
+        
+        # Verificar se já existe alocação ativa para este veículo
+        alocacao_ativa = AlocacaoVeiculo.query.filter(
+            AlocacaoVeiculo.veiculo_id == self.veiculo_id,
+            AlocacaoVeiculo.data_fim.is_(None),
+            AlocacaoVeiculo.id != (self.id or 0),
+            AlocacaoVeiculo.ativo == True
+        ).first()
+        
+        if alocacao_ativa:
+            errors.append(f"Veículo já alocado à obra {alocacao_ativa.obra.nome}")
+        
+        # Verificar datas
+        if self.data_prevista_retorno and self.data_prevista_retorno < self.data_inicio:
+            errors.append("Data prevista de retorno não pode ser anterior à data de início")
+        
+        return errors
+
+class EquipeVeiculo(db.Model):
+    """Equipe autorizada a usar um veículo específico na obra"""
+    __tablename__ = 'equipe_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    alocacao_id = db.Column(db.Integer, db.ForeignKey('alocacao_veiculo.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    
+    # Controle de permissões
+    pode_dirigir = db.Column(db.Boolean, default=False)
+    pode_abastecer = db.Column(db.Boolean, default=False)
+    pode_levar_manutencao = db.Column(db.Boolean, default=False)
+    eh_responsavel_principal = db.Column(db.Boolean, default=False)
+    
+    # Período de autorização
+    data_inicio_autorizacao = db.Column(db.Date, default=date.today)
+    data_fim_autorizacao = db.Column(db.Date)
+    
+    # Observações
+    observacoes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='autorizacoes_veiculo', lazy=True)
+    
+    # Constraint para evitar duplicatas
+    __table_args__ = (db.UniqueConstraint('alocacao_id', 'funcionario_id', name='_equipe_veiculo_uc'),)
+    
+    def __repr__(self):
+        return f'<EquipeVeiculo {self.funcionario.nome} - {self.alocacao.veiculo.placa}>'
+
+class TransferenciaVeiculo(db.Model):
+    """Controle de transferências de veículos entre obras"""
+    __tablename__ = 'transferencia_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    alocacao_origem_id = db.Column(db.Integer, db.ForeignKey('alocacao_veiculo.id'), nullable=False)
+    obra_destino_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    
+    # Responsáveis pela transferência
+    responsavel_transferencia_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    responsavel_recebimento_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    
+    # Controle temporal
+    data_saida = db.Column(db.DateTime, default=datetime.utcnow)
+    data_chegada = db.Column(db.DateTime)
+    data_prevista_chegada = db.Column(db.DateTime)
+    
+    # Dados da transferência
+    km_saida = db.Column(db.Integer, nullable=False)
+    km_chegada = db.Column(db.Integer)
+    motivo = db.Column(db.String(200), nullable=False)
+    urgencia = db.Column(db.String(20), default='Normal')  # Urgente, Alta, Normal, Baixa
+    
+    # Status da transferência
+    status = db.Column(db.String(30), default='Em Trânsito')  # Em Trânsito, Chegou, Cancelada
+    
+    # Observações e problemas
+    observacoes_saida = db.Column(db.Text)
+    observacoes_chegada = db.Column(db.Text)
+    problemas_encontrados = db.Column(db.Text)
+    
+    # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    obra_destino = db.relationship('Obra', backref='transferencias_recebidas', lazy=True)
+    responsavel_transferencia = db.relationship('Funcionario', foreign_keys=[responsavel_transferencia_id], backref='transferencias_enviadas', lazy=True)
+    responsavel_recebimento = db.relationship('Funcionario', foreign_keys=[responsavel_recebimento_id], backref='transferencias_recebidas', lazy=True)
+    admin = db.relationship('Usuario', backref='transferencias_veiculo_criadas', lazy=True)
+    
+    def __repr__(self):
+        return f'<TransferenciaVeiculo {self.alocacao_origem.veiculo.placa} → {self.obra_destino.nome}>'
+    
+    def confirmar_chegada(self, km_chegada, responsavel_recebimento_id, observacoes=""):
+        """Confirma a chegada do veículo na obra de destino"""
+        self.data_chegada = datetime.utcnow()
+        self.km_chegada = km_chegada
+        self.responsavel_recebimento_id = responsavel_recebimento_id
+        self.observacoes_chegada = observacoes
+        self.status = 'Chegou'
+        
+        # Finalizar alocação atual e criar nova
+        self.alocacao_origem.finalizar_alocacao(
+            km_final=km_chegada,
+            observacoes=f"Transferido para {self.obra_destino.nome}",
+            condicoes_veiculo=observacoes
+        )
+        
+        # Criar nova alocação na obra de destino
+        nova_alocacao = AlocacaoVeiculo(
+            veiculo_id=self.alocacao_origem.veiculo_id,
+            obra_id=self.obra_destino_id,
+            responsavel_id=responsavel_recebimento_id,
+            autorizado_por_id=self.admin_id,
+            km_inicial=km_chegada,
+            proposito=f"Transferido de {self.alocacao_origem.obra.nome}",
+            observacoes_inicio=f"Recebido via transferência. {observacoes}",
+            admin_id=self.admin_id
+        )
+        
+        db.session.add(nova_alocacao)
+        return nova_alocacao
 
 
 

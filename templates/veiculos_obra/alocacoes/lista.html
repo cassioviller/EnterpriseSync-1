@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Alocações de Veículos - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">
+                        <i class="fas fa-map-marked-alt"></i>
+                        Alocações de Veículos
+                    </h4>
+                    <small>Controle de veículos por obra</small>
+                </div>
+                <a href="{{ url_for('veiculos_obra.nova_alocacao') }}" class="btn btn-light">
+                    <i class="fas fa-plus"></i>
+                    Nova Alocação
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="todas">Todas</option>
+                        <option value="ativas" {{ 'selected' if request.args.get('status') == 'ativas' }}>Ativas</option>
+                        <option value="finalizadas" {{ 'selected' if request.args.get('status') == 'finalizadas' }}>Finalizadas</option>
+                        <option value="atrasadas" {{ 'selected' if request.args.get('status') == 'atrasadas' }}>Atrasadas</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label">Obra</label>
+                    <select name="obra_id" class="form-select">
+                        <option value="">Todas as obras</option>
+                        {% for obra in obras %}
+                        <option value="{{ obra.id }}" {{ 'selected' if request.args.get('obra_id')|int == obra.id }}>
+                            {{ obra.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" name="data_inicio" class="form-control" 
+                           value="{{ request.args.get('data_inicio', '') }}">
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" name="data_fim" class="form-control" 
+                           value="{{ request.args.get('data_fim', '') }}">
+                </div>
+                
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-filter"></i>
+                        Filtrar
+                    </button>
+                    <a href="{{ url_for('veiculos_obra.listar_alocacoes') }}" class="btn btn-outline-secondary">
+                        Limpar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Alocações -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Veículo</th>
+                            <th>Obra</th>
+                            <th>Responsável</th>
+                            <th>Período</th>
+                            <th>KM</th>
+                            <th>Status</th>
+                            <th>Custo</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alocacao in alocacoes %}
+                        <tr>
+                            <td>
+                                <div>
+                                    <strong>{{ alocacao.veiculo.placa }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        {{ alocacao.veiculo.marca }} {{ alocacao.veiculo.modelo }}
+                                    </small>
+                                </div>
+                            </td>
+                            <td>
+                                <strong>{{ alocacao.obra.nome }}</strong>
+                                {% if alocacao.local_especifico %}
+                                <br><small class="text-muted">{{ alocacao.local_especifico }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ alocacao.responsavel.nome }}</td>
+                            <td>
+                                <div>
+                                    <strong>{{ alocacao.data_inicio.strftime('%d/%m/%Y') }}</strong>
+                                    {% if alocacao.data_fim %}
+                                    <br>até {{ alocacao.data_fim.strftime('%d/%m/%Y') }}
+                                    {% else %}
+                                    <br><small class="text-success">Em andamento</small>
+                                    {% endif %}
+                                    {% if alocacao.data_prevista_retorno and not alocacao.data_fim %}
+                                    <br><small class="text-muted">Prev: {{ alocacao.data_prevista_retorno.strftime('%d/%m/%Y') }}</small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <small>Inicial: {{ alocacao.km_inicial }}</small>
+                                    {% if alocacao.km_final %}
+                                    <br><small>Final: {{ alocacao.km_final }}</small>
+                                    {% endif %}
+                                    <br><strong>{{ alocacao.km_rodado }} km</strong>
+                                </div>
+                            </td>
+                            <td>
+                                {% set status_class = {
+                                    'Ativo': 'success',
+                                    'Finalizado': 'secondary',
+                                    'Transferindo': 'warning',
+                                    'Cancelado': 'danger'
+                                } %}
+                                <span class="badge bg-{{ status_class.get(alocacao.status, 'secondary') }}">
+                                    {{ alocacao.status }}
+                                </span>
+                                {% if alocacao.status_prazo == 'atrasada' %}
+                                <br><span class="badge bg-danger mt-1">Atrasada</span>
+                                {% elif alocacao.status_prazo == 'vencendo' %}
+                                <br><span class="badge bg-warning mt-1">Vencendo</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>R$ {{ "%.2f"|format(alocacao.custo_total_periodo) }}</strong>
+                                {% if alocacao.eficiencia_km_custo > 0 %}
+                                <br><small class="text-muted">{{ alocacao.eficiencia_km_custo }} km/R$</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group-vertical" role="group">
+                                    <a href="{{ url_for('veiculos_obra.detalhes_alocacao', id=alocacao.id) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if not alocacao.data_fim %}
+                                    <a href="{{ url_for('veiculos_obra.transferir_veiculo', id=alocacao.id) }}" 
+                                       class="btn btn-sm btn-outline-warning">
+                                        <i class="fas fa-exchange-alt"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                <i class="fas fa-info-circle fa-2x mb-2"></i>
+                                <br>Nenhuma alocação encontrada
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-group-vertical > .btn {
+    margin-bottom: 2px;
+}
+</style>
+{% endblock %}

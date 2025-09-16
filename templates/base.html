@@ -814,9 +814,31 @@
                         
                         <!-- Segunda Linha -->
                         <div class="d-flex flex-wrap align-items-center justify-content-center nav-spacing">
-                            <a class="nav-link px-3 py-2" href="{{ url_for('main.veiculos') }}" style="white-space: nowrap;">
-                                <i class="fas fa-truck me-2"></i> Veículos
-                            </a>
+                            <!-- Dropdown de Veículos -->
+                            <div class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle px-3 py-2" href="#" id="veiculosDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="white-space: nowrap;">
+                                    <i class="fas fa-truck me-2"></i> Veículos
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="veiculosDropdown">
+                                    <li><a class="dropdown-item" href="{{ url_for('main.veiculos') }}">
+                                        <i class="fas fa-list me-2"></i> Gestão Básica
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><h6 class="dropdown-header">Sistema Avançado</h6></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_obra.dashboard_integrado') }}">
+                                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard Integrado
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_obra.listar_alocacoes') }}">
+                                        <i class="fas fa-map-marked-alt me-2"></i> Alocações por Obra
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_obra.nova_alocacao') }}">
+                                        <i class="fas fa-plus-circle me-2"></i> Nova Alocação
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_relatorios.index_relatorios') }}">
+                                        <i class="fas fa-chart-bar me-2"></i> Relatórios Avançados
+                                    </a></li>
+                                </ul>
+                            </div>
                             
                             <a class="nav-link px-3 py-2" href="{{ url_for('alimentacao.listar_alimentacao') }}" style="white-space: nowrap;">
                                 <i class="fas fa-utensils me-2"></i> Alimentação

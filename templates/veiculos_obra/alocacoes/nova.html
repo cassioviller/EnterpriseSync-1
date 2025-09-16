@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Nova Alocação de Veículo - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">
+                <i class="fas fa-plus-circle"></i>
+                Nova Alocação de Veículo
+            </h4>
+            <small>Alocar veículo para obra específica</small>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Dados da Alocação</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="formAlocacao">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="veiculo_id" class="form-label">Veículo *</label>
+                                <select name="veiculo_id" id="veiculo_id" class="form-select" required onchange="atualizarInfoVeiculo()">
+                                    <option value="">Selecione um veículo</option>
+                                    {% for veiculo in veiculos %}
+                                    <option value="{{ veiculo.id }}" data-placa="{{ veiculo.placa }}" 
+                                            data-marca="{{ veiculo.marca }}" data-modelo="{{ veiculo.modelo }}"
+                                            data-km="{{ veiculo.km_atual }}">
+                                        {{ veiculo.placa }} - {{ veiculo.marca }} {{ veiculo.modelo }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div id="info-veiculo" class="mt-2" style="display: none;">
+                                    <small class="text-muted">
+                                        <strong>KM Atual:</strong> <span id="km-atual">0</span>
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="obra_id" class="form-label">Obra *</label>
+                                <select name="obra_id" id="obra_id" class="form-select" required>
+                                    <option value="">Selecione uma obra</option>
+                                    {% for obra in obras %}
+                                    <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="responsavel_id" class="form-label">Responsável *</label>
+                                <select name="responsavel_id" id="responsavel_id" class="form-select" required>
+                                    <option value="">Selecione um responsável</option>
+                                    {% for funcionario in funcionarios %}
+                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="prioridade" class="form-label">Prioridade</label>
+                                <select name="prioridade" id="prioridade" class="form-select">
+                                    <option value="1">🔴 Urgente</option>
+                                    <option value="2">🟡 Alta</option>
+                                    <option value="3" selected>🟢 Normal</option>
+                                    <option value="4">🔵 Baixa</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="data_prevista_retorno" class="form-label">Data Prevista de Retorno</label>
+                                <input type="date" name="data_prevista_retorno" id="data_prevista_retorno" 
+                                       class="form-control" min="{{ date.today().isoformat() }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="proposito" class="form-label">Finalidade da Alocação *</label>
+                            <input type="text" name="proposito" id="proposito" class="form-control" 
+                                   placeholder="Ex: Transporte de materiais, fiscalização de obra..." required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="observacoes_inicio" class="form-label">Observações</label>
+                            <textarea name="observacoes_inicio" id="observacoes_inicio" class="form-control" 
+                                      rows="3" placeholder="Observações sobre a alocação..."></textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('veiculos_obra.listar_alocacoes') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i>
+                                Voltar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                Criar Alocação
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Informações auxiliares -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle"></i>
+                        Informações
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Sobre Alocações:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Um veículo só pode estar alocado a uma obra por vez</li>
+                            <li>O responsável será notificado da alocação</li>
+                            <li>KM será registrado automaticamente</li>
+                            <li>Custos serão vinculados à obra</li>
+                        </ul>
+                    </div>
+
+                    {% if veiculos|length == 0 %}
+                    <div class="alert alert-warning">
+                        <strong>Atenção!</strong><br>
+                        Não há veículos disponíveis para alocação.
+                    </div>
+                    {% endif %}
+
+                    {% if obras|length == 0 %}
+                    <div class="alert alert-warning">
+                        <strong>Atenção!</strong><br>
+                        Não há obras ativas para receber veículos.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Status atual dos veículos -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Status da Frota</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <div class="mb-2">
+                            <span class="badge bg-success">{{ veiculos|length }}</span>
+                            <small class="text-muted">Disponíveis</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function atualizarInfoVeiculo() {
+    const select = document.getElementById('veiculo_id');
+    const infoDiv = document.getElementById('info-veiculo');
+    const kmSpan = document.getElementById('km-atual');
+    
+    if (select.value) {
+        const option = select.options[select.selectedIndex];
+        const km = option.getAttribute('data-km') || '0';
+        
+        kmSpan.textContent = new Intl.NumberFormat('pt-BR').format(km);
+        infoDiv.style.display = 'block';
+    } else {
+        infoDiv.style.display = 'none';
+    }
+}
+
+// Validação do formulário
+document.getElementById('formAlocacao').addEventListener('submit', function(e) {
+    const veiculo = document.getElementById('veiculo_id').value;
+    const obra = document.getElementById('obra_id').value;
+    const responsavel = document.getElementById('responsavel_id').value;
+    const proposito = document.getElementById('proposito').value.trim();
+    
+    if (!veiculo || !obra || !responsavel || !proposito) {
+        e.preventDefault();
+        alert('Por favor, preencha todos os campos obrigatórios.');
+        return false;
+    }
+    
+    return true;
+});
+
+// Auto-definir data mínima como hoje
+document.addEventListener('DOMContentLoaded', function() {
+    const hoje = new Date().toISOString().split('T')[0];
+    document.getElementById('data_prevista_retorno').setAttribute('min', hoje);
+});
+</script>
+{% endblock %}

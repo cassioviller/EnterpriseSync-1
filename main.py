@@ -117,5 +117,21 @@ try:
 except Exception as e:
     print(f"❌ Erro ao registrar cadastro serviço-obra: {e}")
 
+# Registrar sistema avançado de integração veículos-obras
+try:
+    from veiculos_obra_views import veiculos_obra_bp
+    app.register_blueprint(veiculos_obra_bp)
+    print("✅ Sistema avançado de integração veículos-obras registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar sistema veículos-obras: {e}")
+
+# Registrar sistema de relatórios veículos-obras  
+try:
+    from veiculos_obra_relatorios import relatorios_bp
+    app.register_blueprint(relatorios_bp)
+    print("✅ Sistema de relatórios veículos-obras registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar relatórios veículos-obras: {e}")
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
