@@ -986,8 +986,7 @@ class UsoVeiculo(db.Model):
     finalidade = db.Column(db.String(200))
     observacoes = db.Column(db.Text)
     
-    # Campos básicos calculados
-    km_percorrido = db.Column(db.Integer)  # Calculado automaticamente
+    # Campos básicos - sem colunas inexistentes
     
     # Multi-tenant - OBRIGATÓRIO para isolamento de segurança
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
