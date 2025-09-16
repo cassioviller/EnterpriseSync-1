@@ -986,13 +986,8 @@ class UsoVeiculo(db.Model):
     finalidade = db.Column(db.String(200))
     observacoes = db.Column(db.Text)
     
-    # Novos campos para controle avançado
-    status_uso = db.Column(db.String(20), default='ativo')  # ativo, finalizado, cancelado
+    # Campos básicos calculados
     km_percorrido = db.Column(db.Integer)  # Calculado automaticamente
-    horas_uso = db.Column(db.Float)  # Calculado automaticamente
-    custo_estimado = db.Column(db.Float, default=0.0)  # Baseado no combustível e desgaste
-    local_destino = db.Column(db.String(200))  # Destino principal da viagem
-    tipo_uso = db.Column(db.String(50), default='trabalho')  # trabalho, emergencia, manutencao
     
     # Multi-tenant - OBRIGATÓRIO para isolamento de segurança
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)

@@ -208,10 +208,13 @@
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary" onclick="editarVeiculo({{ veiculo.id }})">
+                                <button class="btn btn-outline-success" onclick="gerenciarVeiculo({{ veiculo.id }}, '{{ veiculo.placa }}')" title="Gerenciar Veículo">
+                                    <i class="fas fa-cogs"></i>
+                                </button>
+                                <button class="btn btn-outline-primary" onclick="editarVeiculo({{ veiculo.id }})" title="Editar Veículo">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" onclick="excluirVeiculo({{ veiculo.id }})">
+                                <button class="btn btn-outline-danger" onclick="excluirVeiculo({{ veiculo.id }})" title="Excluir Veículo">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
