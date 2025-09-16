@@ -243,14 +243,66 @@
                         <label for="data_uso" class="form-label">Data do Uso</label>
                         <input type="date" class="form-control" id="data_uso" name="data_uso" required>
                     </div>
+                    <!-- Motorista (Obrigatório) -->
                     <div class="mb-3">
-                        <label for="funcionario_id" class="form-label">Funcionário</label>
-                        <select class="form-select autocomplete-funcionario" id="funcionario_id" name="funcionario_id" required>
-                            <option value="">Digite para pesquisar funcionário...</option>
+                        <label for="motorista_id" class="form-label">
+                            <i class="fas fa-steering-wheel me-1"></i>Motorista <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select autocomplete-funcionario" id="motorista_id" name="motorista_id" required>
+                            <option value="">Digite para pesquisar motorista...</option>
                             {% for funcionario in funcionarios %}
                             <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    
+                    <!-- Passageiro da Frente (Opcional) -->
+                    <div class="mb-3">
+                        <label for="passageiro_frente_id" class="form-label">
+                            <i class="fas fa-user me-1"></i>Passageiro da Frente
+                        </label>
+                        <select class="form-select autocomplete-funcionario" id="passageiro_frente_id" name="passageiro_frente_id">
+                            <option value="">Digite para pesquisar passageiro...</option>
+                            {% for funcionario in funcionarios %}
+                            <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Passageiros de Trás -->
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-users me-1"></i>Passageiros de Trás
+                        </label>
+                        <div class="row">
+                            <div class="col-md-4 mb-2">
+                                <label for="passageiro_tras1_id" class="form-label small">Posição 1</label>
+                                <select class="form-select autocomplete-funcionario" id="passageiro_tras1_id" name="passageiro_tras1_id">
+                                    <option value="">Pesquisar...</option>
+                                    {% for funcionario in funcionarios %}
+                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <label for="passageiro_tras2_id" class="form-label small">Posição 2</label>
+                                <select class="form-select autocomplete-funcionario" id="passageiro_tras2_id" name="passageiro_tras2_id">
+                                    <option value="">Pesquisar...</option>
+                                    {% for funcionario in funcionarios %}
+                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <label for="passageiro_tras3_id" class="form-label small">Posição 3</label>
+                                <select class="form-select autocomplete-funcionario" id="passageiro_tras3_id" name="passageiro_tras3_id">
+                                    <option value="">Pesquisar...</option>
+                                    {% for funcionario in funcionarios %}
+                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="obra_id" class="form-label">Obra (Opcional)</label>
@@ -425,6 +477,8 @@ $(document).ready(function() {
     $('#usoModal').on('hidden.bs.modal', function() {
         $('.autocomplete-funcionario').val(null).trigger('change');
         $('.autocomplete-obra').val(null).trigger('change');
+        // Limpar também os campos de formulário
+        $('#usoModal form')[0].reset();
     });
 });
 
