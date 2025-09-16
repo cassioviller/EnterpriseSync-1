@@ -999,8 +999,8 @@ class UsoVeiculo(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relacionamentos
-    veiculo = db.relationship('Veiculo', backref='usos', overlaps="usos")
+    # Relacionamentos - sem backref conflitante
+    veiculo = db.relationship('Veiculo', overlaps="usos,veiculo_rel")
     funcionario = db.relationship('Funcionario', backref='usos_veiculo', overlaps="usos_veiculo")
     obra = db.relationship('Obra', backref='usos_veiculo', overlaps="usos_veiculo")
     admin = db.relationship('Usuario', backref='usos_veiculo_criados', overlaps="usos_veiculo_criados")
