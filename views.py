@@ -2591,13 +2591,26 @@ def detalhes_veiculo(id):
         
         # Buscar o veículo
         from models import Veiculo, UsoVeiculo, CustoVeiculo
+        from sqlalchemy import text
         veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         
-        # Buscar histórico de uso do veículo
-        usos_veiculo = UsoVeiculo.query.filter_by(veiculo_id=id).order_by(UsoVeiculo.data_uso.desc()).all()
+        # Buscar histórico de uso do veículo (sem admin_id que não existe)
+        try:
+            usos_veiculo = db.session.execute(
+                text("SELECT * FROM uso_veiculo WHERE veiculo_id = :veiculo_id ORDER BY data_uso DESC"),
+                {'veiculo_id': id}
+            ).fetchall()
+        except Exception:
+            usos_veiculo = []
         
-        # Buscar custos/manutenções do veículo
-        custos_veiculo = CustoVeiculo.query.filter_by(veiculo_id=id).order_by(CustoVeiculo.data_custo.desc()).all()
+        # Buscar custos/manutenções do veículo (sem admin_id que não existe)  
+        try:
+            custos_veiculo = db.session.execute(
+                text("SELECT * FROM custo_veiculo WHERE veiculo_id = :veiculo_id ORDER BY data_custo DESC"),
+                {'veiculo_id': id}
+            ).fetchall()
+        except Exception:
+            custos_veiculo = []
         
         # Calcular KPIs do veículo
         quilometragem_total = 0
@@ -3170,6 +3183,7 @@ def dashboard_veiculo(id):
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         from models import Veiculo, UsoVeiculo, CustoVeiculo
+        from sqlalchemy import text
         from datetime import datetime, timedelta
         from sqlalchemy import func, extract
         
@@ -3276,7 +3290,8 @@ def historico_veiculo(id):
     """Histórico completo de uso e custos do veículo com filtros avançados"""
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        from models import Veiculo, UsoVeiculo, CustoVeiculo, Funcionario, Obra
+        from models import Veiculo, UsoVeiculo, CustoVeiculo
+        from sqlalchemy import text, Funcionario, Obra
         from datetime import datetime, timedelta
         
         veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
@@ -3434,6 +3449,7 @@ def exportar_dados_veiculo(id):
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         from models import Veiculo, UsoVeiculo, CustoVeiculo
+        from sqlalchemy import text
         import io
         import csv
         from flask import Response
