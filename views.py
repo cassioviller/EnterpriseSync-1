@@ -2814,6 +2814,73 @@ def excluir_veiculo(id):
 
 
 # 4. ROTA REGISTRO USO - /veiculos/<id>/uso (GET/POST)
+# ROTA PARA MODAL DE USO (SEM PARÂMETRO ID NA URL)
+@main_bp.route('/veiculos/uso', methods=['POST'])
+@admin_required
+def novo_uso_veiculo_lista():
+    from forms import UsoVeiculoForm
+    from models import Veiculo, UsoVeiculo, Funcionario, Obra
+    
+    # Obter veiculo_id do form (hidden field)
+    veiculo_id = request.form.get('veiculo_id')
+    if not veiculo_id:
+        flash('Erro: ID do veículo não fornecido.', 'error')
+        return redirect(url_for('main.veiculos'))
+    
+    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+    veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=admin_id).first_or_404()
+    
+    try:
+        # Validações de negócio críticas
+        km_inicial = float(request.form.get('km_inicial', 0))
+        km_final = float(request.form.get('km_final', 0))
+        
+        if km_final and km_inicial:
+            if km_final <= km_inicial:
+                flash('KM final deve ser maior que KM inicial.', 'error')
+                return redirect(url_for('main.veiculos'))
+        
+        # CRÍTICO: Validação de odômetro
+        if km_final and veiculo.km_atual:
+            if km_final < veiculo.km_atual:
+                flash(f'Erro: KM final não pode ser menor que a quilometragem atual do veículo ({veiculo.km_atual}km).', 'error')
+                return redirect(url_for('main.veiculos'))
+        
+        # Criar registro de uso
+        uso = UsoVeiculo(
+            veiculo_id=veiculo.id,
+            funcionario_id=request.form.get('funcionario_id'),
+            obra_id=request.form.get('obra_id') if request.form.get('obra_id') else None,
+            data_uso=datetime.strptime(request.form.get('data_uso'), '%Y-%m-%d').date(),
+            horario_saida=datetime.strptime(request.form.get('horario_saida'), '%H:%M').time() if request.form.get('horario_saida') else None,
+            horario_chegada=datetime.strptime(request.form.get('horario_chegada'), '%H:%M').time() if request.form.get('horario_chegada') else None,
+            km_inicial=km_inicial,
+            km_final=km_final,
+            km_percorrido=km_final - km_inicial if km_final and km_inicial else 0,
+            finalidade=request.form.get('finalidade', 'Operacional'),
+            observacoes=request.form.get('observacoes'),
+            admin_id=admin_id,
+            created_at=datetime.utcnow()
+        )
+        
+        db.session.add(uso)
+        
+        # Atualizar KM atual do veículo se fornecido
+        if km_final:
+            veiculo.km_atual = km_final
+            veiculo.updated_at = datetime.utcnow() if hasattr(veiculo, 'updated_at') else None
+        
+        db.session.commit()
+        flash(f'Uso do veículo {veiculo.placa} registrado com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO AO REGISTRAR USO: {str(e)}")
+        flash('Erro ao registrar uso do veículo. Tente novamente.', 'error')
+    
+    return redirect(url_for('main.veiculos'))
+
+
 @main_bp.route('/veiculos/<int:id>/uso', methods=['GET', 'POST'])
 @admin_required
 def novo_uso_veiculo(id):
