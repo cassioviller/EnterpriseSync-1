@@ -33,4 +33,6 @@ dependencies = [
     "cryptography>=45.0.6",
     "beautifulsoup4>=4.13.5",
     "flask-cors>=6.0.1",
+    "matplotlib>=3.10.6",
+    "seaborn>=0.13.2",
 ]

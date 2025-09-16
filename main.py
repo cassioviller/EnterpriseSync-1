@@ -133,5 +133,75 @@ try:
 except Exception as e:
     print(f"❌ Erro ao registrar relatórios veículos-obras: {e}")
 
+# CORREÇÃO CRÍTICA: Registrar blueprints de relatórios e dashboards não integrados
+
+# Registrar Dashboard Executivo de Veículos
+try:
+    from dashboard_veiculos_executivo import dashboard_executive_bp
+    app.register_blueprint(dashboard_executive_bp)
+    print("✅ Dashboard Executivo de Veículos registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar Dashboard Executivo: {e}")
+
+# Registrar Analytics Preditivos
+try:
+    from analytics_preditivos import analytics_bp
+    app.register_blueprint(analytics_bp)
+    print("✅ Analytics Preditivos registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar Analytics Preditivos: {e}")
+
+# Registrar Alertas Veículos Avançados
+try:
+    from alertas_veiculos_avancados import alertas_veiculos_bp
+    app.register_blueprint(alertas_veiculos_bp)
+    print("✅ Alertas Veículos Avançados registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar Alertas Veículos: {e}")
+
+# Registrar Relatórios de Produtividade
+try:
+    from relatorios_produtividade import produtividade_bp
+    app.register_blueprint(produtividade_bp)
+    print("✅ Relatórios de Produtividade registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar Relatórios Produtividade: {e}")
+
+# Registrar Dashboards Específicos
+try:
+    from dashboards_especificos import dashboards_bp
+    app.register_blueprint(dashboards_bp)
+    print("✅ Dashboards Específicos registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar Dashboards Específicos: {e}")
+
+# Registrar Exportação de Relatórios
+try:
+    from exportacao_relatorios import exportacao_bp
+    app.register_blueprint(exportacao_bp)
+    print("✅ Exportação de Relatórios registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar Exportação de Relatórios: {e}")
+
+# Registrar Relatórios Financeiros Avançados
+try:
+    from relatorios_financeiros_avancados import financeiros_bp
+    app.register_blueprint(financeiros_bp)
+    print("✅ Relatórios Financeiros Avançados registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar Relatórios Financeiros: {e}")
+
+# Registrar Relatórios de Uso Detalhado
+try:
+    from relatorios_uso_detalhado import uso_detalhado_bp
+    app.register_blueprint(uso_detalhado_bp)
+    print("✅ Relatórios de Uso Detalhado registrado")
+except Exception as e:
+    print(f"❌ Erro ao registrar Relatórios de Uso: {e}")
+
+# Alimentação CRUD já registrado em app.py - removendo duplicação
+
+print("🔥 SISTEMA INICIADO - Todos os blueprints críticos foram carregados")
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)

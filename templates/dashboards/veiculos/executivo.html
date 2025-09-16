@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Executivo - Gestão de Veículos | SIGE</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Date picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --info-color: #17a2b8;
+            --light-bg: #f8f9fa;
+            --card-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            box-shadow: var(--card-shadow);
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        .kpi-card {
+            background: linear-gradient(135deg, var(--secondary-color), #5dade2);
+            color: white;
+            text-align: center;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .kpi-trend {
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        .kpi-trend.positive {
+            color: #d4edda;
+        }
+
+        .kpi-trend.negative {
+            color: #f8d7da;
+        }
+
+        .alert-card {
+            border-left: 4px solid;
+            margin-bottom: 0.5rem;
+            padding: 0.75rem;
+        }
+
+        .alert-card.nivel-1 {
+            border-left-color: var(--info-color);
+            background-color: #d1ecf1;
+        }
+
+        .alert-card.nivel-2 {
+            border-left-color: var(--warning-color);
+            background-color: #fff3cd;
+        }
+
+        .alert-card.nivel-3 {
+            border-left-color: var(--danger-color);
+            background-color: #f8d7da;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 1rem 0;
+        }
+
+        .chart-container-small {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+
+        .filter-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin: 0.2rem;
+        }
+
+        .status-disponivel {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .status-alocado {
+            background-color: var(--info-color);
+            color: white;
+        }
+
+        .status-manutencao {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .insight-box {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+
+        .insight-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .insight-text {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .kpi-value {
+                font-size: 1.8rem;
+            }
+            
+            .chart-container, .chart-container-small {
+                height: 250px;
+            }
+        }
+
+        .refresh-button {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 1.5rem;
+            box-shadow: var(--card-shadow);
+            transition: all 0.3s ease;
+        }
+
+        .refresh-button:hover {
+            background: var(--primary-color);
+            transform: scale(1.1);
+        }
+
+        .performance-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .performance-bar {
+            flex: 1;
+            height: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin: 0 1rem;
+            overflow: hidden;
+        }
+
+        .performance-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
+                <i class="fas fa-truck me-2"></i>SIGE - Dashboard Veículos
+            </a>
+            
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">
+                    <i class="fas fa-user me-1"></i>{{ current_user.nome or current_user.username }}
+                </span>
+                <a class="nav-link" href="{{ url_for('main.logout') }}">
+                    <i class="fas fa-sign-out-alt"></i> Sair
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <!-- Filtros -->
+        <div class="filter-section">
+            <div class="row align-items-end">
+                <div class="col-md-3">
+                    <label for="data_inicio" class="form-label">
+                        <i class="fas fa-calendar-alt me-1"></i>Data Início
+                    </label>
+                    <input type="date" class="form-control" id="data_inicio" 
+                           value="{{ data_inicio.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="data_fim" class="form-label">
+                        <i class="fas fa-calendar-alt me-1"></i>Data Fim
+                    </label>
+                    <input type="date" class="form-control" id="data_fim" 
+                           value="{{ data_fim.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100" onclick="atualizarDashboard()">
+                        <i class="fas fa-sync-alt me-1"></i>Atualizar
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-success w-100" onclick="exportarRelatorio()">
+                        <i class="fas fa-file-pdf me-1"></i>Exportar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPIs Principais -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card kpi-card">
+                    <div class="kpi-value" id="kpi-frota">{{ kpis.frota_ativa }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-truck me-1"></i>Veículos Ativos
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card kpi-card">
+                    <div class="kpi-value" id="kpi-custo">R$ {{ "%.2f"|format(kpis.custo_mensal) }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-money-bill-wave me-1"></i>Custos do Período
+                    </div>
+                    {% if comparativo.variacao_custo %}
+                    <div class="kpi-trend {{ 'negative' if comparativo.variacao_custo > 0 else 'positive' }}">
+                        <i class="fas fa-arrow-{{ 'up' if comparativo.variacao_custo > 0 else 'down' }} me-1"></i>
+                        {{ "%.1f"|format(abs(comparativo.variacao_custo)) }}% vs período anterior
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card kpi-card">
+                    <div class="kpi-value" id="kpi-km">{{ "{:,}".format(kpis.km_rodados).replace(',', '.') }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-route me-1"></i>KM Rodados
+                    </div>
+                    {% if comparativo.variacao_km %}
+                    <div class="kpi-trend {{ 'positive' if comparativo.variacao_km > 0 else 'negative' }}">
+                        <i class="fas fa-arrow-{{ 'up' if comparativo.variacao_km > 0 else 'down' }} me-1"></i>
+                        {{ "%.1f"|format(abs(comparativo.variacao_km)) }}% vs período anterior
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card kpi-card">
+                    <div class="kpi-value" id="kpi-alertas">{{ kpis.alertas_ativos }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-exclamation-triangle me-1"></i>Alertas Ativos
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Segunda linha de KPIs -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card kpi-card">
+                    <div class="kpi-value">{{ kpis.veiculos_alocados }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-map-marker-alt me-1"></i>Veículos Alocados
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card kpi-card">
+                    <div class="kpi-value">{{ kpis.obras_com_veiculos }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-building me-1"></i>Obras com Veículos
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card kpi-card">
+                    <div class="kpi-value">{{ "%.1f"|format(kpis.utilizacao_media) }}%</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-percentage me-1"></i>Utilização Média
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card kpi-card">
+                    <div class="kpi-value">R$ {{ "%.2f"|format(kpis.custo_por_km) }}</div>
+                    <div class="kpi-label">
+                        <i class="fas fa-calculator me-1"></i>Custo por KM
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Status da Frota -->
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>Status da Frota
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container-small">
+                            <canvas id="chartStatusFrota"></canvas>
+                        </div>
+                        <div class="text-center mt-3">
+                            <span class="status-badge status-disponivel">
+                                {{ graficos.status_frota.disponivel }} Disponíveis
+                            </span>
+                            <span class="status-badge status-alocado">
+                                {{ graficos.status_frota.alocado }} Alocados
+                            </span>
+                            <span class="status-badge status-manutencao">
+                                {{ graficos.status_frota.manutencao }} Manutenção
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alertas Críticos -->
+            <div class="col-lg-8 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Alertas Críticos
+                        </h5>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                        {% if alertas %}
+                            {% for alerta in alertas[:10] %}
+                            <div class="alert-card nivel-{{ alerta.nivel }}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>{{ alerta.titulo }}</strong>
+                                        <p class="mb-1">{{ alerta.mensagem }}</p>
+                                        {% if alerta.veiculo_placa %}
+                                        <small class="text-muted">
+                                            <i class="fas fa-truck me-1"></i>{{ alerta.veiculo_placa }}
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                    {% if alerta.get('data_criacao') %}
+                                    <small class="text-muted">{{ alerta.data_criacao }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-check-circle fa-3x mb-3"></i>
+                                <p>Nenhum alerta crítico no momento!</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos Principais -->
+        <div class="row">
+            <!-- Custos por Categoria -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Custos por Categoria
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartCustosCategoria"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Evolução de Custos -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Evolução de Custos (12 meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartEvolucaoCustos"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Eficiência e Uso -->
+        <div class="row">
+            <!-- Top Veículos por Custo -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Top 10 - Maiores Custos
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartTopVeiculosCusto"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Eficiência dos Veículos -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tachometer-alt me-2"></i>Ranking de Eficiência
+                        </h5>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                        {% if graficos.eficiencia_veiculos %}
+                            {% for veiculo in graficos.eficiencia_veiculos[:10] %}
+                            <div class="performance-indicator">
+                                <div style="min-width: 120px;">
+                                    <strong>{{ veiculo.veiculo.split('(')[0].strip() }}</strong>
+                                    <small class="d-block text-muted">{{ veiculo.veiculo.split('(')[1].replace(')', '') if '(' in veiculo.veiculo else '' }}</small>
+                                </div>
+                                <div class="performance-bar">
+                                    <div class="performance-fill bg-{{ 'success' if veiculo.score_eficiencia > 70 else 'warning' if veiculo.score_eficiencia > 40 else 'danger' }}" 
+                                         style="width: {{ veiculo.score_eficiencia }}%"></div>
+                                </div>
+                                <div style="min-width: 60px; text-align: right;">
+                                    <strong>{{ veiculo.score_eficiencia }}%</strong>
+                                    <small class="d-block text-muted">R$ {{ "%.2f"|format(veiculo.custo_por_km) }}/km</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                                <p>Sem dados de eficiência disponíveis</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Uso Mensal e Utilização Diária -->
+        <div class="row">
+            <!-- Uso Mensal -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-alt me-2"></i>Uso Mensal (12 meses)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartUsoMensal"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Utilização Diária -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-area me-2"></i>Utilização Diária
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="chartUtilizacaoDiaria"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Insights e Tendências -->
+        {% if tendencias %}
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="insight-box">
+                    <div class="insight-title">
+                        <i class="fas fa-lightbulb me-2"></i>Insights e Tendências
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="insight-text">
+                                <strong>Tendência de Custos:</strong> 
+                                {% if tendencias.custo_tendencia > 0 %}
+                                    <span class="text-warning">
+                                        <i class="fas fa-arrow-up me-1"></i>
+                                        Aumento de {{ "%.1f"|format(tendencias.custo_tendencia) }}% em relação aos últimos 3 meses
+                                    </span>
+                                {% elif tendencias.custo_tendencia < 0 %}
+                                    <span class="text-success">
+                                        <i class="fas fa-arrow-down me-1"></i>
+                                        Redução de {{ "%.1f"|format(abs(tendencias.custo_tendencia)) }}% em relação aos últimos 3 meses
+                                    </span>
+                                {% else %}
+                                    <span class="text-info">Custos estáveis em relação aos últimos 3 meses</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="insight-text">
+                                <strong>Tendência de Uso:</strong>
+                                {% if tendencias.uso_tendencia > 0 %}
+                                    <span class="text-success">
+                                        <i class="fas fa-arrow-up me-1"></i>
+                                        Aumento de {{ "%.1f"|format(tendencias.uso_tendencia) }}% no uso da frota
+                                    </span>
+                                {% elif tendencias.uso_tendencia < 0 %}
+                                    <span class="text-warning">
+                                        <i class="fas fa-arrow-down me-1"></i>
+                                        Redução de {{ "%.1f"|format(abs(tendencias.uso_tendencia)) }}% no uso da frota
+                                    </span>
+                                {% else %}
+                                    <span class="text-info">Uso da frota estável</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loadingSpinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Carregando...</span>
+        </div>
+        <p class="mt-2">Atualizando dados...</p>
+    </div>
+
+    <!-- Botão de Refresh -->
+    <button class="refresh-button" onclick="atualizarDashboard()" title="Atualizar Dashboard">
+        <i class="fas fa-sync-alt"></i>
+    </button>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    
+    <script>
+        // Dados dos gráficos (passados do backend)
+        const dadosGraficos = {
+            statusFrota: {{ graficos.status_frota | tojson }},
+            custosCategoria: {{ graficos.custos_categoria | tojson }},
+            evolucaoCustos: {{ graficos.evolucao_custos | tojson }},
+            topVeiculosCusto: {{ graficos.top_veiculos_custo | tojson }},
+            usoMensal: {{ graficos.uso_mensal | tojson }},
+            utilizacaoDiaria: {{ graficos.utilizacao_diaria | tojson }}
+        };
+
+        // Configurações dos gráficos
+        const configGraficos = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        };
+
+        // Inicializar gráficos
+        document.addEventListener('DOMContentLoaded', function() {
+            inicializarGraficos();
+            configurarDatePickers();
+        });
+
+        function inicializarGraficos() {
+            // Gráfico Status da Frota
+            const ctxStatus = document.getElementById('chartStatusFrota').getContext('2d');
+            new Chart(ctxStatus, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Disponíveis', 'Alocados', 'Manutenção', 'Inativos'],
+                    datasets: [{
+                        data: [
+                            dadosGraficos.statusFrota.disponivel,
+                            dadosGraficos.statusFrota.alocado,
+                            dadosGraficos.statusFrota.manutencao,
+                            dadosGraficos.statusFrota.inativo
+                        ],
+                        backgroundColor: ['#27ae60', '#17a2b8', '#f39c12', '#6c757d'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    ...configGraficos,
+                    plugins: {
+                        ...configGraficos.plugins,
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Gráfico Custos por Categoria
+            if (dadosGraficos.custosCategoria.length > 0) {
+                const ctxCustos = document.getElementById('chartCustosCategoria').getContext('2d');
+                new Chart(ctxCustos, {
+                    type: 'pie',
+                    data: {
+                        labels: dadosGraficos.custosCategoria.map(d => d.categoria),
+                        datasets: [{
+                            data: dadosGraficos.custosCategoria.map(d => d.valor),
+                            backgroundColor: dadosGraficos.custosCategoria.map(d => d.cor),
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: configGraficos
+                });
+            }
+
+            // Gráfico Evolução de Custos
+            if (dadosGraficos.evolucaoCustos.dados.length > 0) {
+                const ctxEvolucao = document.getElementById('chartEvolucaoCustos').getContext('2d');
+                new Chart(ctxEvolucao, {
+                    type: 'line',
+                    data: {
+                        labels: dadosGraficos.evolucaoCustos.dados.map(d => d.periodo),
+                        datasets: [{
+                            label: 'Total',
+                            data: dadosGraficos.evolucaoCustos.dados.map(d => d.total),
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        ...configGraficos,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value.toLocaleString('pt-BR');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Gráfico Top Veículos por Custo
+            if (dadosGraficos.topVeiculosCusto.length > 0) {
+                const ctxTop = document.getElementById('chartTopVeiculosCusto').getContext('2d');
+                new Chart(ctxTop, {
+                    type: 'bar',
+                    data: {
+                        labels: dadosGraficos.topVeiculosCusto.map(d => d.veiculo.split('(')[0].trim()),
+                        datasets: [{
+                            label: 'Custo Total',
+                            data: dadosGraficos.topVeiculosCusto.map(d => d.custo_total),
+                            backgroundColor: '#e74c3c',
+                            borderColor: '#c0392b',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        ...configGraficos,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value.toLocaleString('pt-BR');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Gráfico Uso Mensal
+            if (dadosGraficos.usoMensal.length > 0) {
+                const ctxUso = document.getElementById('chartUsoMensal').getContext('2d');
+                new Chart(ctxUso, {
+                    type: 'bar',
+                    data: {
+                        labels: dadosGraficos.usoMensal.map(d => d.periodo),
+                        datasets: [{
+                            label: 'KM Total',
+                            data: dadosGraficos.usoMensal.map(d => d.km_total),
+                            backgroundColor: '#3498db',
+                            borderColor: '#2980b9',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        }, {
+                            label: 'Horas Total',
+                            data: dadosGraficos.usoMensal.map(d => d.horas_total),
+                            type: 'line',
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        }]
+                    },
+                    options: {
+                        ...configGraficos,
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'KM'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Horas'
+                                },
+                                grid: {
+                                    drawOnChartArea: false,
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Gráfico Utilização Diária
+            if (dadosGraficos.utilizacaoDiaria.length > 0) {
+                const ctxUtilizacao = document.getElementById('chartUtilizacaoDiaria').getContext('2d');
+                new Chart(ctxUtilizacao, {
+                    type: 'line',
+                    data: {
+                        labels: dadosGraficos.utilizacaoDiaria.map(d => new Date(d.data).toLocaleDateString('pt-BR')),
+                        datasets: [{
+                            label: 'Veículos Utilizados',
+                            data: dadosGraficos.utilizacaoDiaria.map(d => d.veiculos_utilizados),
+                            borderColor: '#17a2b8',
+                            backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        ...configGraficos,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                stepSize: 1
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function configurarDatePickers() {
+            flatpickr("#data_inicio", {
+                dateFormat: "Y-m-d",
+                locale: "pt"
+            });
+            
+            flatpickr("#data_fim", {
+                dateFormat: "Y-m-d",
+                locale: "pt"
+            });
+        }
+
+        function atualizarDashboard() {
+            const dataInicio = document.getElementById('data_inicio').value;
+            const dataFim = document.getElementById('data_fim').value;
+            
+            if (!dataInicio || !dataFim) {
+                alert('Por favor, selecione as datas de início e fim.');
+                return;
+            }
+            
+            if (new Date(dataInicio) > new Date(dataFim)) {
+                alert('A data de início deve ser menor que a data de fim.');
+                return;
+            }
+            
+            // Mostrar loading
+            document.getElementById('loadingSpinner').style.display = 'block';
+            
+            // Recarregar página com novos parâmetros
+            const url = new URL(window.location);
+            url.searchParams.set('data_inicio', dataInicio);
+            url.searchParams.set('data_fim', dataFim);
+            window.location.href = url.toString();
+        }
+
+        function exportarRelatorio() {
+            const dataInicio = document.getElementById('data_inicio').value;
+            const dataFim = document.getElementById('data_fim').value;
+            
+            const url = `{{ url_for('dashboard_executive.exportar_pdf') }}?data_inicio=${dataInicio}&data_fim=${dataFim}`;
+            window.open(url, '_blank');
+        }
+
+        // Auto-refresh a cada 5 minutos
+        setInterval(() => {
+            // Atualizar apenas KPIs via AJAX para não recarregar a página
+            atualizarKPIs();
+        }, 300000); // 5 minutos
+
+        function atualizarKPIs() {
+            const dataInicio = document.getElementById('data_inicio').value;
+            const dataFim = document.getElementById('data_fim').value;
+            
+            fetch(`{{ url_for('dashboard_executive.api_kpis_atualizados') }}?data_inicio=${dataInicio}&data_fim=${dataFim}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Atualizar KPIs na tela
+                        document.getElementById('kpi-frota').textContent = data.kpis.frota_ativa;
+                        document.getElementById('kpi-custo').textContent = 'R$ ' + data.kpis.custo_mensal.toFixed(2);
+                        document.getElementById('kpi-km').textContent = data.kpis.km_rodados.toLocaleString('pt-BR');
+                        document.getElementById('kpi-alertas').textContent = data.kpis.alertas_ativos;
+                    }
+                })
+                .catch(error => console.error('Erro ao atualizar KPIs:', error));
+        }
+    </script>
+</body>
+</html>
