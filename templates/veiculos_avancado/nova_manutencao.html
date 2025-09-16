@@ -1,0 +1,296 @@
+{% extends "veiculos_avancado/base_veiculos.html" %}
+
+{% block title %}Nova Manutenção{% endblock %}
+
+{% block breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{{ url_for('veiculos_avancado.lista_manutencoes') }}">Manutenções</a></li>
+    <li class="breadcrumb-item active">Nova Manutenção</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">
+                <i class="fas fa-wrench text-primary me-2"></i>
+                Nova Manutenção
+            </h2>
+            <p class="text-muted mb-0">Registrar nova manutenção preventiva ou corretiva</p>
+        </div>
+        <div>
+            <a href="{{ url_for('veiculos_avancado.lista_manutencoes') }}" class="btn btn-outline-secondary btn-custom me-2">
+                <i class="fas fa-arrow-left me-1"></i>Voltar
+            </a>
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-plus me-2"></i>Dados da Manutenção
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Informações Básicas -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.tipo_manutencao.label(class="form-label fw-bold") }}
+                                    {{ form.tipo_manutencao(class="form-select") }}
+                                    {% if form.tipo_manutencao.errors %}
+                                        <div class="text-danger small">{{ form.tipo_manutencao.errors[0] }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.categoria_manutencao.label(class="form-label fw-bold") }}
+                                    {{ form.categoria_manutencao(class="form-select") }}
+                                    {% if form.categoria_manutencao.errors %}
+                                        <div class="text-danger small">{{ form.categoria_manutencao.errors[0] }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.data_manutencao.label(class="form-label fw-bold") }}
+                                    {{ form.data_manutencao(class="form-control") }}
+                                    {% if form.data_manutencao.errors %}
+                                        <div class="text-danger small">{{ form.data_manutencao.errors[0] }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.km_manutencao.label(class="form-label fw-bold") }}
+                                    {{ form.km_manutencao(class="form-control") }}
+                                    <small class="text-muted">KM atual do veículo no momento da manutenção</small>
+                                    {% if form.km_manutencao.errors %}
+                                        <div class="text-danger small">{{ form.km_manutencao.errors[0] }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Descrição dos Serviços -->
+                        <div class="mb-4">
+                            {{ form.descricao_servicos.label(class="form-label fw-bold") }}
+                            {{ form.descricao_servicos(class="form-control", rows="4", placeholder="Descreva detalhadamente os serviços realizados...") }}
+                            {% if form.descricao_servicos.errors %}
+                                <div class="text-danger small">{{ form.descricao_servicos.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Custos -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="fas fa-money-bill-wave me-2"></i>Custos da Manutenção</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            {{ form.custo_pecas.label(class="form-label fw-bold") }}
+                                            <div class="input-group">
+                                                <span class="input-group-text">R$</span>
+                                                {{ form.custo_pecas(class="form-control") }}
+                                            </div>
+                                            {% if form.custo_pecas.errors %}
+                                                <div class="text-danger small">{{ form.custo_pecas.errors[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            {{ form.custo_mao_obra.label(class="form-label fw-bold") }}
+                                            <div class="input-group">
+                                                <span class="input-group-text">R$</span>
+                                                {{ form.custo_mao_obra(class="form-control") }}
+                                            </div>
+                                            {% if form.custo_mao_obra.errors %}
+                                                <div class="text-danger small">{{ form.custo_mao_obra.errors[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            {{ form.custo_total.label(class="form-label fw-bold") }}
+                                            <div class="input-group">
+                                                <span class="input-group-text">R$</span>
+                                                {{ form.custo_total(class="form-control", readonly="readonly") }}
+                                            </div>
+                                            <small class="text-muted">Calculado automaticamente</small>
+                                            {% if form.custo_total.errors %}
+                                                <div class="text-danger small">{{ form.custo_total.errors[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dados do Fornecedor -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="fas fa-building me-2"></i>Fornecedor</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.nome_fornecedor.label(class="form-label fw-bold") }}
+                                            {{ form.nome_fornecedor(class="form-control", placeholder="Nome da oficina/fornecedor") }}
+                                            {% if form.nome_fornecedor.errors %}
+                                                <div class="text-danger small">{{ form.nome_fornecedor.errors[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.cnpj_fornecedor.label(class="form-label fw-bold") }}
+                                            {{ form.cnpj_fornecedor(class="form-control", placeholder="XX.XXX.XXX/XXXX-XX") }}
+                                            {% if form.cnpj_fornecedor.errors %}
+                                                <div class="text-danger small">{{ form.cnpj_fornecedor.errors[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    {{ form.telefone_fornecedor.label(class="form-label fw-bold") }}
+                                    {{ form.telefone_fornecedor(class="form-control", placeholder="(XX) XXXXX-XXXX") }}
+                                    {% if form.telefone_fornecedor.errors %}
+                                        <div class="text-danger small">{{ form.telefone_fornecedor.errors[0] }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Garantia e Próxima Manutenção -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Garantia e Próxima Manutenção</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.garantia_meses.label(class="form-label fw-bold") }}
+                                            <div class="input-group">
+                                                {{ form.garantia_meses(class="form-control") }}
+                                                <span class="input-group-text">meses</span>
+                                            </div>
+                                            {% if form.garantia_meses.errors %}
+                                                <div class="text-danger small">{{ form.garantia_meses.errors[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.garantia_km.label(class="form-label fw-bold") }}
+                                            <div class="input-group">
+                                                {{ form.garantia_km(class="form-control") }}
+                                                <span class="input-group-text">km</span>
+                                            </div>
+                                            {% if form.garantia_km.errors %}
+                                                <div class="text-danger small">{{ form.garantia_km.errors[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.proxima_manutencao_data.label(class="form-label fw-bold") }}
+                                            {{ form.proxima_manutencao_data(class="form-control") }}
+                                            {% if form.proxima_manutencao_data.errors %}
+                                                <div class="text-danger small">{{ form.proxima_manutencao_data.errors[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.proxima_manutencao_km.label(class="form-label fw-bold") }}
+                                            <div class="input-group">
+                                                {{ form.proxima_manutencao_km(class="form-control") }}
+                                                <span class="input-group-text">km</span>
+                                            </div>
+                                            {% if form.proxima_manutencao_km.errors %}
+                                                <div class="text-danger small">{{ form.proxima_manutencao_km.errors[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Observações -->
+                        <div class="mb-4">
+                            {{ form.observacoes.label(class="form-label fw-bold") }}
+                            {{ form.observacoes(class="form-control", rows="3", placeholder="Observações adicionais sobre a manutenção...") }}
+                            {% if form.observacoes.errors %}
+                                <div class="text-danger small">{{ form.observacoes.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Botões de Ação -->
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{{ url_for('veiculos_avancado.lista_manutencoes') }}" 
+                               class="btn btn-outline-secondary btn-custom">
+                                <i class="fas fa-times me-1"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-custom">
+                                <i class="fas fa-save me-1"></i>Salvar Manutenção
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Calcular custo total automaticamente
+function calcularCustoTotal() {
+    const custoPecas = parseFloat(document.getElementById('custo_pecas').value) || 0;
+    const custoMaoObra = parseFloat(document.getElementById('custo_mao_obra').value) || 0;
+    const custoTotal = custoPecas + custoMaoObra;
+    
+    document.getElementById('custo_total').value = custoTotal.toFixed(2);
+}
+
+// Aplicar cálculo quando os campos mudarem
+document.getElementById('custo_pecas').addEventListener('input', calcularCustoTotal);
+document.getElementById('custo_mao_obra').addEventListener('input', calcularCustoTotal);
+
+// Máscara para CNPJ
+document.getElementById('cnpj_fornecedor').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+    value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+    value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+    e.target.value = value;
+});
+
+// Máscara para telefone
+document.getElementById('telefone_fornecedor').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    value = value.replace(/^(\d{2})(\d)/, '($1) $2');
+    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+    e.target.value = value;
+});
+</script>
+{% endblock %}

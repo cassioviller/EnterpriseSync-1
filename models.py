@@ -825,6 +825,164 @@ class CustoVeiculo(db.Model):
                     self.proxima_manutencao_data = self.data_custo + timedelta(days=int(meses_estimados * 30))
                     break
     
+    def validate_data(self):
+        """Valida dados do custo antes de salvar"""
+        errors = []
+        
+        # Validações específicas por tipo de custo
+        if self.tipo_custo == 'combustivel':
+            if not self.litros_combustivel or self.litros_combustivel <= 0:
+                errors.append("Litros de combustível é obrigatório para abastecimentos")
+            if not self.preco_por_litro or self.preco_por_litro <= 0:
+                errors.append("Preço por litro é obrigatório para abastecimentos")
+            if self.preco_por_litro and self.litros_combustivel:
+                valor_calculado = self.preco_por_litro * self.litros_combustivel
+                if abs(self.valor - valor_calculado) > 0.02:
+                    errors.append(f"Valor total ({self.valor}) não confere com litros × preço ({valor_calculado:.2f})")
+        
+        # Validação de KM
+        if self.km_atual and self.veiculo and self.veiculo.km_atual:
+            if self.km_atual < self.veiculo.km_atual:
+                errors.append(f"KM atual ({self.km_atual}) não pode ser menor que KM do veículo ({self.veiculo.km_atual})")
+        
+        return errors
+    
+    def calcular_economia_combustivel(self):
+        """Calcula economia/gasto extra baseado na média histórica"""
+        if self.tipo_custo != 'combustivel' or not self.consumo_medio:
+            return None
+            
+        # Buscar média dos últimos 6 meses
+        from sqlalchemy import func
+        seis_meses_atras = self.data_custo - timedelta(days=180)
+        
+        media_consumo = db.session.query(func.avg(CustoVeiculo.preco_por_litro / CustoVeiculo.litros_combustivel * 
+                                                 (CustoVeiculo.km_atual - func.lag(CustoVeiculo.km_atual).over(
+                                                     partition_by=CustoVeiculo.veiculo_id,
+                                                     order_by=CustoVeiculo.data_custo))))\
+            .filter(
+                CustoVeiculo.veiculo_id == self.veiculo_id,
+                CustoVeiculo.tipo_custo == 'combustivel',
+                CustoVeiculo.data_custo >= seis_meses_atras,
+                CustoVeiculo.data_custo < self.data_custo,
+                CustoVeiculo.litros_combustivel.isnot(None),
+                CustoVeiculo.preco_por_litro.isnot(None)
+            ).scalar()
+        
+        if media_consumo and self.custo_por_km:
+            diferenca = self.custo_por_km - media_consumo
+            percentual = (diferenca / media_consumo) * 100 if media_consumo > 0 else 0
+            return {
+                'diferenca_absoluta': round(diferenca, 3),
+                'diferenca_percentual': round(percentual, 1),
+                'acima_media': diferenca > 0
+            }
+        return None
+    
+    def gerar_alertas_automaticos(self):
+        """Gera alertas automáticos baseados no custo registrado"""
+        alertas = []
+        
+        # Alerta para gastos excessivos
+        if self.valor > 1000:  # Valor alto configurável
+            alertas.append({
+                'tipo': 'gasto_alto',
+                'titulo': f'Gasto Alto - {self.tipo_custo.title()}',
+                'descricao': f'Custo de R$ {self.valor:.2f} registrado para {self.tipo_custo}',
+                'categoria': 'importante'
+            })
+        
+        # Alerta para manutenção próxima
+        if self.tipo_custo == 'manutencao' and self.proxima_manutencao_km and self.veiculo:
+            km_restantes = self.proxima_manutencao_km - (self.veiculo.km_atual or 0)
+            if km_restantes <= 1000:  # Próximo da manutenção
+                alertas.append({
+                    'tipo': 'manutencao_proxima',
+                    'titulo': 'Manutenção Próxima',
+                    'descricao': f'Faltam {km_restantes} km para próxima manutenção',
+                    'categoria': 'urgente' if km_restantes <= 500 else 'importante'
+                })
+        
+        # Alerta para consumo alto de combustível
+        economia = self.calcular_economia_combustivel()
+        if economia and economia['acima_media'] and economia['diferenca_percentual'] > 20:
+            alertas.append({
+                'tipo': 'consumo_alto',
+                'titulo': 'Consumo de Combustível Alto',
+                'descricao': f'Consumo {economia["diferenca_percentual"]:.1f}% acima da média',
+                'categoria': 'importante'
+            })
+        
+        return alertas
+    
+    @staticmethod
+    def calcular_depreciacao_veiculo(veiculo, data_inicio=None, data_fim=None):
+        """Calcula depreciação do veículo no período"""
+        if not data_inicio:
+            data_inicio = date.today() - timedelta(days=365)
+        if not data_fim:
+            data_fim = date.today()
+            
+        # Fórmula simples: 20% ao ano para veículos comerciais
+        anos_periodo = (data_fim - data_inicio).days / 365.25
+        valor_inicial = 50000  # Valor padrão, deveria vir de um campo do veículo
+        taxa_depreciacao = 0.20  # 20% ao ano
+        
+        depreciacao_periodo = valor_inicial * taxa_depreciacao * anos_periodo
+        return round(depreciacao_periodo, 2)
+    
+    @staticmethod
+    def gerar_relatorio_tco(veiculo_id, data_inicio, data_fim, incluir_depreciacao=True):
+        """Gera relatório completo de TCO (Total Cost of Ownership)"""
+        veiculo = Veiculo.query.get(veiculo_id)
+        if not veiculo:
+            return None
+        
+        # Buscar todos os custos no período
+        custos = CustoVeiculo.query.filter(
+            CustoVeiculo.veiculo_id == veiculo_id,
+            CustoVeiculo.data_custo >= data_inicio,
+            CustoVeiculo.data_custo <= data_fim
+        ).all()
+        
+        # Agrupar custos por categoria
+        custos_por_categoria = {}
+        custo_total = 0
+        
+        for custo in custos:
+            categoria = custo.tipo_custo
+            if categoria not in custos_por_categoria:
+                custos_por_categoria[categoria] = 0
+            custos_por_categoria[categoria] += custo.valor
+            custo_total += custo.valor
+        
+        # Calcular depreciação se solicitado
+        if incluir_depreciacao:
+            depreciacao = CustoVeiculo.calcular_depreciacao_veiculo(veiculo, data_inicio, data_fim)
+            custos_por_categoria['depreciacao'] = depreciacao
+            custo_total += depreciacao
+        
+        # Calcular KM rodados no período
+        km_inicial = custos[0].km_atual if custos else veiculo.km_atual or 0
+        km_final = custos[-1].km_atual if custos else veiculo.km_atual or 0
+        km_rodados = max(0, km_final - km_inicial)
+        
+        # Calcular métricas
+        dias_periodo = (data_fim - data_inicio).days
+        meses_periodo = dias_periodo / 30.44
+        
+        return {
+            'veiculo': veiculo,
+            'periodo': f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}",
+            'custo_total': custo_total,
+            'custos_por_categoria': custos_por_categoria,
+            'km_rodados': km_rodados,
+            'custo_por_km': round(custo_total / km_rodados, 3) if km_rodados > 0 else 0,
+            'custo_mensal': round(custo_total / meses_periodo, 2) if meses_periodo > 0 else 0,
+            'dias_periodo': dias_periodo,
+            'total_custos': len(custos)
+        }
+    
     def __repr__(self):
         return f'<CustoVeiculo {self.veiculo_id} - {self.tipo_custo} - R${self.valor}>'
 

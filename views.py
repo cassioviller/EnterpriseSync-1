@@ -99,6 +99,87 @@ def safe_db_operation(operation, default_value=None):
             pass
         return default_value
 
+def _calcular_funcionarios_departamento(admin_id):
+    """Calcula funcionários por departamento com proteção de transação"""
+    try:
+        from models import Departamento
+        funcionarios_por_departamento = {}
+        
+        # Query corrigida com JOIN explícito
+        departamentos = db.session.execute(text("""
+            SELECT d.nome as nome, COALESCE(COUNT(f.id), 0) as total
+            FROM departamento d 
+            LEFT JOIN funcionario f ON f.departamento_id = d.id 
+                AND f.ativo = true 
+                AND f.admin_id = :admin_id
+            GROUP BY d.nome 
+            ORDER BY total DESC
+        """), {'admin_id': admin_id}).fetchall()
+        
+        funcionarios_por_departamento = {
+            dept[0]: dept[1] for dept in departamentos if dept[1] > 0
+        }
+        
+        # Adicionar funcionários sem departamento
+        sem_dept = Funcionario.query.filter_by(
+            admin_id=admin_id, 
+            ativo=True, 
+            departamento_id=None
+        ).count()
+        if sem_dept > 0:
+            funcionarios_por_departamento['Sem Departamento'] = sem_dept
+            
+        return funcionarios_por_departamento
+    except Exception as e:
+        print(f"Erro funcionários por departamento: {e}")
+        db.session.rollback()
+        return {}
+
+def _calcular_custos_obra(admin_id, data_inicio, data_fim):
+    """Calcula custos por obra com proteção de transação"""
+    try:
+        from models import CustoVeiculo, RegistroPonto, RegistroAlimentacao
+        custos_por_obra = {}
+        
+        obras_admin = Obra.query.filter_by(admin_id=admin_id).all()
+        
+        for obra in obras_admin:
+            custo_total_obra = 0
+            
+            # Somar custos de mão de obra (registros de ponto)
+            registros_obra = RegistroPonto.query.filter(
+                RegistroPonto.obra_id == obra.id,
+                RegistroPonto.data >= data_inicio,
+                RegistroPonto.data <= data_fim
+            ).all()
+            
+            for registro in registros_obra:
+                funcionario = Funcionario.query.get(registro.funcionario_id)
+                if funcionario and funcionario.salario:
+                    valor_hora = funcionario.salario / 220
+                    horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
+                    custo_total_obra += horas * valor_hora
+            
+            # Somar custos de veículos da obra
+            try:
+                veiculos_obra = CustoVeiculo.query.filter(
+                    CustoVeiculo.obra_id == obra.id,
+                    CustoVeiculo.data_custo >= data_inicio,
+                    CustoVeiculo.data_custo <= data_fim
+                ).all()
+                custo_total_obra += sum(v.valor or 0 for v in veiculos_obra)
+            except:
+                pass
+            
+            if custo_total_obra > 0:
+                custos_por_obra[obra.nome] = round(custo_total_obra, 2)
+                
+        return custos_por_obra
+    except Exception as e:
+        print(f"Erro custos por obra: {e}")
+        db.session.rollback()
+        return {}
+
 # Health check endpoint para EasyPanel
 @main_bp.route('/health')
 def health_check():
@@ -486,31 +567,20 @@ def dashboard():
         print(f"DEBUG DASHBOARD: Extras totais: {total_extras_real}")
         
         # Calcular KPIs específicos corretamente
-        # 1. Custos de Transporte (veículos) - usar campo data_custo para filtrar
-        custo_transporte_real = 0
-        # Importar modelos necessários
-        try:
+        # 1. Custos de Transporte (veículos) - usar safe_db_operation para evitar transaction abort
+        def calcular_custos_veiculo():
             from models import CustoVeiculo
             custos_veiculo = CustoVeiculo.query.filter(
                 CustoVeiculo.data_custo >= data_inicio,
                 CustoVeiculo.data_custo <= data_fim
             ).all()
-            custo_transporte_real = sum(c.valor or 0 for c in custos_veiculo)
-            print(f"DEBUG Custos veículo: R$ {custo_transporte_real:.2f}")
-        except Exception as e:
-            print(f"Erro custos veículo: {e}")
-            # Fallback: usar todos os registros se filtro falhar
-            try:
-                from models import CustoVeiculo
-                custos_veiculo = CustoVeiculo.query.all()
-                custo_transporte_real = sum(c.valor or 0 for c in custos_veiculo)
-            except:
-                custo_transporte_real = 0
+            return sum(c.valor or 0 for c in custos_veiculo)
         
-        # 2. Faltas Justificadas (quantidade e valor em R$)
-        quantidade_faltas_justificadas = 0
-        custo_faltas_justificadas = 0
-        try:
+        custo_transporte_real = safe_db_operation(calcular_custos_veiculo, 0)
+        print(f"DEBUG Custos veículo: R$ {custo_transporte_real:.2f}")
+        
+        # 2. Faltas Justificadas (quantidade e valor em R$) - usar safe_db_operation
+        def calcular_faltas_justificadas():
             # Buscar todas as faltas justificadas no período
             faltas_justificadas = RegistroPonto.query.filter(
                 RegistroPonto.data >= data_inicio,
@@ -518,113 +588,47 @@ def dashboard():
                 RegistroPonto.tipo_registro == 'falta_justificada'
             ).all()
             
-            quantidade_faltas_justificadas = len(faltas_justificadas)
+            quantidade = len(faltas_justificadas)
+            custo = 0
             
             for falta in faltas_justificadas:
                 funcionario = Funcionario.query.get(falta.funcionario_id)
                 if funcionario and funcionario.salario:
                     # Valor por dia baseado em 22 dias úteis
                     valor_dia = (funcionario.salario / 22)
-                    custo_faltas_justificadas += valor_dia
+                    custo += valor_dia
             
-            print(f"DEBUG Faltas Justificadas: {quantidade_faltas_justificadas} faltas, R$ {custo_faltas_justificadas:.2f}")
-        except Exception as e:
-            print(f"Erro faltas justificadas: {e}")
+            return quantidade, custo
         
-        # 3. Outros Custos (não transporte nem alimentação)
-        custo_outros_real = 0
-        try:
+        resultado_faltas = safe_db_operation(calcular_faltas_justificadas, (0, 0))
+        quantidade_faltas_justificadas, custo_faltas_justificadas = resultado_faltas
+        print(f"DEBUG Faltas Justificadas: {quantidade_faltas_justificadas} faltas, R$ {custo_faltas_justificadas:.2f}")
+        
+        # 3. Outros Custos (não transporte nem alimentação) - usar safe_db_operation
+        def calcular_outros_custos():
             from models import OutroCusto
             outros_custos = OutroCusto.query.filter(
                 OutroCusto.data >= data_inicio,
                 OutroCusto.data <= data_fim,
                 ~OutroCusto.tipo.in_(['transporte', 'alimentacao'])
             ).all()
-            custo_outros_real = sum(o.valor or 0 for o in outros_custos)
-        except Exception as e:
-            print(f"Erro outros custos: {e}")
+            return sum(o.valor or 0 for o in outros_custos)
         
-        # 4. Funcionários por Departamento
-        funcionarios_por_departamento = {}
-        try:
-            from models import Departamento
-            
-            # Query corrigida com JOIN explícito
-            departamentos = db.session.execute(text("""
-                SELECT d.nome as nome, COALESCE(COUNT(f.id), 0) as total
-                FROM departamento d 
-                LEFT JOIN funcionario f ON f.departamento_id = d.id 
-                    AND f.ativo = true 
-                    AND f.admin_id = :admin_id
-                GROUP BY d.nome 
-                ORDER BY total DESC
-            """), {'admin_id': admin_id}).fetchall()
-            
-            funcionarios_por_departamento = {
-                dept[0]: dept[1] for dept in departamentos if dept[1] > 0
-            }
-            
-            # Adicionar funcionários sem departamento
-            sem_dept = Funcionario.query.filter_by(
-                admin_id=admin_id, 
-                ativo=True, 
-                departamento_id=None
-            ).count()
-            if sem_dept > 0:
-                funcionarios_por_departamento['Sem Departamento'] = sem_dept
-                
-            print(f"DEBUG Funcionários por dept: {funcionarios_por_departamento}")
-                
-        except Exception as e:
-            print(f"Erro funcionários por departamento: {e}")
+        custo_outros_real = safe_db_operation(calcular_outros_custos, 0)
         
-        # 5. Custos por Obra (agregação de diferentes fontes)
-        custos_por_obra = {}
-        try:
-            obras_admin = Obra.query.filter_by(admin_id=admin_id).all()
-            
-            for obra in obras_admin:
-                custo_total_obra = 0
-                
-                # Somar custos de mão de obra (registros de ponto)
-                registros_obra = RegistroPonto.query.filter(
-                    RegistroPonto.obra_id == obra.id,
-                    RegistroPonto.data >= data_inicio,
-                    RegistroPonto.data <= data_fim
-                ).all()
-                
-                for registro in registros_obra:
-                    funcionario = Funcionario.query.get(registro.funcionario_id)
-                    if funcionario and funcionario.salario:
-                        valor_hora = funcionario.salario / 220
-                        horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
-                        custo_total_obra += horas * valor_hora
-                
-                # NÃO somar custos de alimentação por obra para evitar contar duas vezes
-                # (já contamos no total geral de alimentação acima)
-                # alimentacao_obra = RegistroAlimentacao.query.filter(
-                #     RegistroAlimentacao.obra_id == obra.id,
-                #     RegistroAlimentacao.data >= data_inicio,
-                #     RegistroAlimentacao.data <= data_fim
-                # ).all()
-                # custo_total_obra += sum(a.valor or 0 for a in alimentacao_obra)
-                
-                # Somar custos de veículos da obra
-                try:
-                    veiculos_obra = CustoVeiculo.query.filter(
-                        CustoVeiculo.obra_id == obra.id,
-                        CustoVeiculo.data_custo >= data_inicio,
-                        CustoVeiculo.data_custo <= data_fim
-                    ).all()
-                    custo_total_obra += sum(v.valor or 0 for v in veiculos_obra)
-                except:
-                    pass
-                
-                if custo_total_obra > 0:
-                    custos_por_obra[obra.nome] = round(custo_total_obra, 2)
-                    
-        except Exception as e:
-            print(f"Erro custos por obra: {e}")
+        # 4. Funcionários por Departamento - com proteção de transação
+        funcionarios_por_departamento = safe_db_operation(
+            lambda: _calcular_funcionarios_departamento(admin_id), 
+            {}
+        )
+        print(f"DEBUG FINAL - Funcionários por dept: {funcionarios_por_departamento}")
+        
+        # 5. Custos por Obra - com proteção de transação
+        custos_por_obra = safe_db_operation(
+            lambda: _calcular_custos_obra(admin_id, data_inicio, data_fim), 
+            {}
+        )
+        print(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
         
         # Dados calculados reais
         # Inicializar admin_id se não definido

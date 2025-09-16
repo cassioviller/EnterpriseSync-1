@@ -1,0 +1,486 @@
+{% extends "veiculos_avancado/base_veiculos.html" %}
+
+{% block title %}Novo Documento Fiscal{% endblock %}
+
+{% block breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{{ url_for('veiculos_avancado.lista_documentos') }}">Documentos</a></li>
+    <li class="breadcrumb-item active">Novo Documento</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">
+                <i class="fas fa-file-invoice text-primary me-2"></i>
+                Novo Documento Fiscal
+            </h2>
+            <p class="text-muted mb-0">Registrar nota fiscal, recibo ou documento de veículo</p>
+        </div>
+        <div>
+            <a href="{{ url_for('veiculos_avancado.lista_documentos') }}" class="btn btn-outline-secondary btn-custom">
+                <i class="fas fa-arrow-left me-1"></i>Voltar
+            </a>
+        </div>
+    </div>
+
+    <!-- Assistente de Registro -->
+    <div class="row">
+        <div class="col-lg-9 mx-auto">
+            <!-- Progresso do Assistente -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" 
+                             style="width: 33%" id="progressoAssistente"></div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="step active" id="step1">
+                                <div class="step-icon">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                                <small>Tipo de Documento</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="step" id="step2">
+                                <div class="step-icon">
+                                    <i class="fas fa-info-circle"></i>
+                                </div>
+                                <small>Dados Fiscais</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="step" id="step3">
+                                <div class="step-icon">
+                                    <i class="fas fa-upload"></i>
+                                </div>
+                                <small>Arquivo & Finalização</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulário -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-plus me-2"></i>Registrar Documento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="formDocumento">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Passo 1: Tipo de Documento -->
+                        <div class="step-content active" id="content-step1">
+                            <h6 class="mb-3 text-primary">
+                                <i class="fas fa-file-alt me-2"></i>Tipo de Documento
+                            </h6>
+                            
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.tipo_documento.label(class="form-label fw-bold") }}
+                                        {{ form.tipo_documento(class="form-select", id="tipoDocumento") }}
+                                        {% if form.tipo_documento.errors %}
+                                            <div class="text-danger small">{{ form.tipo_documento.errors[0] }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Veículo Relacionado</label>
+                                        <select name="veiculo_id" class="form-select" required>
+                                            <option value="">Selecione o veículo...</option>
+                                            {% for veiculo in veiculos %}
+                                            <option value="{{ veiculo.id }}">{{ veiculo.placa }} - {{ veiculo.modelo }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.numero_documento.label(class="form-label fw-bold") }}
+                                        {{ form.numero_documento(class="form-control", placeholder="Ex: 12345") }}
+                                        {% if form.numero_documento.errors %}
+                                            <div class="text-danger small">{{ form.numero_documento.errors[0] }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.serie.label(class="form-label fw-bold") }}
+                                        {{ form.serie(class="form-control", placeholder="Ex: 1, 001") }}
+                                        <small class="text-muted">Opcional para recibos</small>
+                                        {% if form.serie.errors %}
+                                            <div class="text-danger small">{{ form.serie.errors[0] }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-end">
+                                <button type="button" class="btn btn-primary" onclick="proximoPasso(2)">
+                                    Próximo <i class="fas fa-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Passo 2: Dados Fiscais -->
+                        <div class="step-content" id="content-step2">
+                            <h6 class="mb-3 text-primary">
+                                <i class="fas fa-info-circle me-2"></i>Dados Fiscais
+                            </h6>
+
+                            <!-- Dados Básicos -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.data_emissao.label(class="form-label fw-bold") }}
+                                        {{ form.data_emissao(class="form-control") }}
+                                        {% if form.data_emissao.errors %}
+                                            <div class="text-danger small">{{ form.data_emissao.errors[0] }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.valor_documento.label(class="form-label fw-bold") }}
+                                        <div class="input-group">
+                                            <span class="input-group-text">R$</span>
+                                            {{ form.valor_documento(class="form-control", step="0.01") }}
+                                        </div>
+                                        {% if form.valor_documento.errors %}
+                                            <div class="text-danger small">{{ form.valor_documento.errors[0] }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Dados do Emissor -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0"><i class="fas fa-building me-2"></i>Emissor do Documento</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="mb-3">
+                                                {{ form.nome_emissor.label(class="form-label fw-bold") }}
+                                                {{ form.nome_emissor(class="form-control", placeholder="Nome da empresa/pessoa") }}
+                                                {% if form.nome_emissor.errors %}
+                                                    <div class="text-danger small">{{ form.nome_emissor.errors[0] }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                {{ form.cnpj_emissor.label(class="form-label fw-bold") }}
+                                                {{ form.cnpj_emissor(class="form-control", placeholder="XX.XXX.XXX/XXXX-XX") }}
+                                                {% if form.cnpj_emissor.errors %}
+                                                    <div class="text-danger small">{{ form.cnpj_emissor.errors[0] }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.endereco_emissor.label(class="form-label fw-bold") }}
+                                        {{ form.endereco_emissor(class="form-control", placeholder="Endereço completo do emissor") }}
+                                        {% if form.endereco_emissor.errors %}
+                                            <div class="text-danger small">{{ form.endereco_emissor.errors[0] }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Impostos (Opcional) -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0"><i class="fas fa-calculator me-2"></i>Informações Fiscais</h6>
+                                    <small class="text-muted">Opcional</small>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                {{ form.valor_icms.label(class="form-label") }}
+                                                <div class="input-group">
+                                                    <span class="input-group-text">R$</span>
+                                                    {{ form.valor_icms(class="form-control", step="0.01") }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                {{ form.valor_pis.label(class="form-label") }}
+                                                <div class="input-group">
+                                                    <span class="input-group-text">R$</span>
+                                                    {{ form.valor_pis(class="form-control", step="0.01") }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                {{ form.valor_cofins.label(class="form-label") }}
+                                                <div class="input-group">
+                                                    <span class="input-group-text">R$</span>
+                                                    {{ form.valor_cofins(class="form-control", step="0.01") }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                {{ form.valor_desconto.label(class="form-label") }}
+                                                <div class="input-group">
+                                                    <span class="input-group-text">R$</span>
+                                                    {{ form.valor_desconto(class="form-control", step="0.01") }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" onclick="anteriorPasso(1)">
+                                    <i class="fas fa-arrow-left me-1"></i> Anterior
+                                </button>
+                                <button type="button" class="btn btn-primary" onclick="proximoPasso(3)">
+                                    Próximo <i class="fas fa-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Passo 3: Arquivo e Finalização -->
+                        <div class="step-content" id="content-step3">
+                            <h6 class="mb-3 text-primary">
+                                <i class="fas fa-upload me-2"></i>Arquivo Digital e Finalização
+                            </h6>
+
+                            <!-- Upload de Arquivo -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0"><i class="fas fa-file-pdf me-2"></i>Digitalização</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        {{ form.arquivo_digitalizado.label(class="form-label fw-bold") }}
+                                        {{ form.arquivo_digitalizado(class="form-control", accept=".pdf,.jpg,.jpeg,.png") }}
+                                        <small class="text-muted">Formatos aceitos: PDF, JPG, JPEG, PNG. Tamanho máximo: 10MB</small>
+                                        {% if form.arquivo_digitalizado.errors %}
+                                            <div class="text-danger small">{{ form.arquivo_digitalizado.errors[0] }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Preview do arquivo -->
+                                    <div id="previewArquivo" class="d-none">
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-file me-2"></i>
+                                            <span id="nomeArquivo"></span>
+                                            <span id="tamanhoArquivo" class="text-muted ms-2"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Observações -->
+                            <div class="mb-4">
+                                {{ form.observacoes_validacao.label(class="form-label fw-bold") }}
+                                {{ form.observacoes_validacao(class="form-control", placeholder="Observações sobre o documento, categoria de custo, etc...") }}
+                                {% if form.observacoes_validacao.errors %}
+                                    <div class="text-danger small">{{ form.observacoes_validacao.errors[0] }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Resumo do Documento -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-check-circle me-2"></i>Resumo do Documento</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>Tipo:</strong> <span id="resumoTipo">-</span></p>
+                                            <p><strong>Número:</strong> <span id="resumoNumero">-</span></p>
+                                            <p><strong>Emissor:</strong> <span id="resumoEmissor">-</span></p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p><strong>Data:</strong> <span id="resumoData">-</span></p>
+                                            <p><strong>Valor:</strong> <span id="resumoValor">-</span></p>
+                                            <p><strong>Arquivo:</strong> <span id="resumoArquivo">Não anexado</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" onclick="anteriorPasso(2)">
+                                    <i class="fas fa-arrow-left me-1"></i> Anterior
+                                </button>
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="fas fa-save me-1"></i>Salvar Documento
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.step {
+    opacity: 0.5;
+    transition: opacity 0.3s;
+}
+
+.step.active {
+    opacity: 1;
+}
+
+.step-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    transition: background 0.3s;
+}
+
+.step.active .step-icon {
+    background: var(--primary-color);
+    color: white;
+}
+
+.step-content {
+    display: none;
+}
+
+.step-content.active {
+    display: block;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let passoAtual = 1;
+
+function proximoPasso(passo) {
+    // Validar passo atual antes de prosseguir
+    if (validarPasso(passoAtual)) {
+        mostrarPasso(passo);
+    }
+}
+
+function anteriorPasso(passo) {
+    mostrarPasso(passo);
+}
+
+function mostrarPasso(passo) {
+    // Ocultar todos os passos
+    document.querySelectorAll('.step-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.querySelectorAll('.step').forEach(step => {
+        step.classList.remove('active');
+    });
+    
+    // Mostrar passo atual
+    document.getElementById(`content-step${passo}`).classList.add('active');
+    document.getElementById(`step${passo}`).classList.add('active');
+    
+    // Atualizar progresso
+    const progresso = (passo / 3) * 100;
+    document.getElementById('progressoAssistente').style.width = progresso + '%';
+    
+    passoAtual = passo;
+    
+    // Atualizar resumo no passo 3
+    if (passo === 3) {
+        atualizarResumo();
+    }
+}
+
+function validarPasso(passo) {
+    if (passo === 1) {
+        const tipo = document.getElementById('tipoDocumento').value;
+        const numero = document.querySelector('input[name="numero_documento"]').value;
+        const veiculo = document.querySelector('select[name="veiculo_id"]').value;
+        
+        if (!tipo || !numero || !veiculo) {
+            alert('Por favor, preencha todos os campos obrigatórios.');
+            return false;
+        }
+    } else if (passo === 2) {
+        const data = document.querySelector('input[name="data_emissao"]').value;
+        const valor = document.querySelector('input[name="valor_documento"]').value;
+        const emissor = document.querySelector('input[name="nome_emissor"]').value;
+        
+        if (!data || !valor || !emissor) {
+            alert('Por favor, preencha data, valor e nome do emissor.');
+            return false;
+        }
+    }
+    return true;
+}
+
+function atualizarResumo() {
+    const tipo = document.getElementById('tipoDocumento');
+    const numero = document.querySelector('input[name="numero_documento"]');
+    const emissor = document.querySelector('input[name="nome_emissor"]');
+    const data = document.querySelector('input[name="data_emissao"]');
+    const valor = document.querySelector('input[name="valor_documento"]');
+    const arquivo = document.querySelector('input[name="arquivo_digitalizado"]');
+    
+    document.getElementById('resumoTipo').textContent = tipo.options[tipo.selectedIndex]?.text || '-';
+    document.getElementById('resumoNumero').textContent = numero.value || '-';
+    document.getElementById('resumoEmissor').textContent = emissor.value || '-';
+    document.getElementById('resumoData').textContent = data.value ? new Date(data.value).toLocaleDateString('pt-BR') : '-';
+    document.getElementById('resumoValor').textContent = valor.value ? `R$ ${parseFloat(valor.value).toFixed(2).replace('.', ',')}` : '-';
+    document.getElementById('resumoArquivo').textContent = arquivo.files.length > 0 ? arquivo.files[0].name : 'Não anexado';
+}
+
+// Preview do arquivo
+document.querySelector('input[name="arquivo_digitalizado"]').addEventListener('change', function(e) {
+    const arquivo = e.target.files[0];
+    const preview = document.getElementById('previewArquivo');
+    
+    if (arquivo) {
+        document.getElementById('nomeArquivo').textContent = arquivo.name;
+        document.getElementById('tamanhoArquivo').textContent = `(${(arquivo.size / 1024 / 1024).toFixed(2)} MB)`;
+        preview.classList.remove('d-none');
+    } else {
+        preview.classList.add('d-none');
+    }
+});
+
+// Máscara para CNPJ
+document.querySelector('input[name="cnpj_emissor"]').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+    value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+    value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+    e.target.value = value;
+});
+
+// Inicializar
+document.addEventListener('DOMContentLoaded', function() {
+    mostrarPasso(1);
+});
+</script>
+{% endblock %}
