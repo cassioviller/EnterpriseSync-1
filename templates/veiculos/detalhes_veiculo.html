@@ -245,8 +245,8 @@
                     </div>
                     <div class="mb-3">
                         <label for="funcionario_id" class="form-label">Funcionário</label>
-                        <select class="form-select" id="funcionario_id" name="funcionario_id" required>
-                            <option value="">Selecione o funcionário...</option>
+                        <select class="form-select autocomplete-funcionario" id="funcionario_id" name="funcionario_id" required>
+                            <option value="">Digite para pesquisar funcionário...</option>
                             {% for funcionario in funcionarios %}
                             <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
                             {% endfor %}
@@ -254,8 +254,8 @@
                     </div>
                     <div class="mb-3">
                         <label for="obra_id" class="form-label">Obra (Opcional)</label>
-                        <select class="form-select" id="obra_id" name="obra_id">
-                            <option value="">Selecione a obra...</option>
+                        <select class="form-select autocomplete-obra" id="obra_id" name="obra_id">
+                            <option value="">Digite para pesquisar obra...</option>
                             {% for obra in obras %}
                             <option value="{{ obra.id }}">{{ obra.nome }}</option>
                             {% endfor %}
@@ -369,7 +369,65 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<!-- Select2 CSS e JS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script>
+$(document).ready(function() {
+    // Inicializar autocomplete para funcionários
+    $('.autocomplete-funcionario').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Digite para pesquisar funcionário...',
+        allowClear: false,
+        dropdownParent: $('#usoModal'),
+        width: '100%',
+        minimumInputLength: 0,
+        language: {
+            noResults: function() {
+                return "Nenhum funcionário encontrado";
+            },
+            searching: function() {
+                return "Pesquisando...";
+            },
+            inputTooShort: function() {
+                return "Digite para pesquisar";
+            }
+        }
+    });
+
+    // Inicializar autocomplete para obras  
+    $('.autocomplete-obra').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Digite para pesquisar obra...',
+        allowClear: true,
+        dropdownParent: $('#usoModal'),
+        width: '100%',
+        minimumInputLength: 0,
+        language: {
+            noResults: function() {
+                return "Nenhuma obra encontrada";
+            },
+            searching: function() {
+                return "Pesquisando...";
+            },
+            inputTooShort: function() {
+                return "Digite para pesquisar";
+            }
+        }
+    });
+
+    // Resetar selects quando modal fechar
+    $('#usoModal').on('hidden.bs.modal', function() {
+        $('.autocomplete-funcionario').val(null).trigger('change');
+        $('.autocomplete-obra').val(null).trigger('change');
+    });
+});
+
 function editarVeiculo(id) {
     // Implementar modal de edição
     alert('Edição de veículo a ser implementada para ID: ' + id);
