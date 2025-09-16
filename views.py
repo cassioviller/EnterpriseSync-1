@@ -2646,12 +2646,18 @@ def detalhes_veiculo(id):
             'status_atual': veiculo.status if hasattr(veiculo, 'status') else 'Disponível'
         }
         
+        # Buscar funcionários e obras para os dropdowns do modal
+        from models import Funcionario, Obra
+        funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id).all()
+        obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
         
         return render_template('veiculos/detalhes_veiculo.html', 
                              veiculo=veiculo, 
                              kpis_veiculo=kpis_veiculo,
                              usos_veiculo=usos_veiculo,
-                             custos_veiculo=custos_veiculo)
+                             custos_veiculo=custos_veiculo,
+                             funcionarios=funcionarios,
+                             obras=obras)
     except Exception as e:
         print(f"ERRO DETALHES VEÍCULO: {str(e)}")
         # Redirecionar para lista de veículos em caso de erro
