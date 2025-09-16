@@ -3545,7 +3545,389 @@ def exportar_dados_veiculo(id):
         flash('Erro ao exportar dados do veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=id))
 
-# Rotas vazias removidas - estavam só fazendo redirect sem funcionalidade
+# ===== SISTEMA COMPLETO DE HISTÓRICO E LANÇAMENTOS DE VEÍCULOS =====
+
+@main_bp.route('/veiculos/lancamentos')
+@admin_required
+def lancamentos_veiculos():
+    """Página principal de lançamentos de veículos com filtros avançados"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        from models import Veiculo, UsoVeiculo, CustoVeiculo, Funcionario, Obra
+        from sqlalchemy import func, desc, or_, and_
+        from datetime import datetime, timedelta
+        
+        # Parâmetros de filtro
+        filtros = {
+            'veiculo_id': request.args.get('veiculo_id'),
+            'funcionario_id': request.args.get('funcionario_id'),
+            'obra_id': request.args.get('obra_id'),
+            'data_inicio': request.args.get('data_inicio'),
+            'data_fim': request.args.get('data_fim'),
+            'tipo_lancamento': request.args.get('tipo_lancamento', 'todos'),  # 'uso', 'custo', 'todos'
+            'status': request.args.get('status', 'todos'),  # 'aprovado', 'pendente', 'todos'
+            'page': request.args.get('page', 1, type=int)
+        }
+        
+        # Query base para usos
+        query_usos = UsoVeiculo.query.filter(UsoVeiculo.admin_id == admin_id)
+        
+        # Query base para custos
+        query_custos = CustoVeiculo.query.filter(CustoVeiculo.admin_id == admin_id)
+        
+        # Aplicar filtros de data (últimos 30 dias por padrão se não especificado)
+        if not filtros['data_inicio']:
+            filtros['data_inicio'] = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        if not filtros['data_fim']:
+            filtros['data_fim'] = datetime.now().strftime('%Y-%m-%d')
+            
+        data_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d').date()
+        data_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d').date()
+        
+        query_usos = query_usos.filter(UsoVeiculo.data_uso >= data_inicio, UsoVeiculo.data_uso <= data_fim)
+        query_custos = query_custos.filter(CustoVeiculo.data_custo >= data_inicio, CustoVeiculo.data_custo <= data_fim)
+        
+        # Aplicar outros filtros
+        if filtros['veiculo_id']:
+            veiculo_id = int(filtros['veiculo_id'])
+            query_usos = query_usos.filter(UsoVeiculo.veiculo_id == veiculo_id)
+            query_custos = query_custos.filter(CustoVeiculo.veiculo_id == veiculo_id)
+            
+        if filtros['funcionario_id']:
+            query_usos = query_usos.filter(UsoVeiculo.funcionario_id == int(filtros['funcionario_id']))
+            
+        if filtros['obra_id']:
+            obra_id = int(filtros['obra_id'])
+            query_usos = query_usos.filter(UsoVeiculo.obra_id == obra_id)
+            query_custos = query_custos.filter(CustoVeiculo.obra_id == obra_id)
+        
+        # Filtro por status de aprovação
+        if filtros['status'] == 'aprovado':
+            query_usos = query_usos.filter(UsoVeiculo.aprovado == True)
+            query_custos = query_custos.filter(CustoVeiculo.aprovado == True)
+        elif filtros['status'] == 'pendente':
+            query_usos = query_usos.filter(UsoVeiculo.aprovado == False)
+            query_custos = query_custos.filter(CustoVeiculo.aprovado == False)
+        
+        # Executar queries baseado no tipo de lançamento
+        lancamentos = []
+        
+        if filtros['tipo_lancamento'] in ['todos', 'uso']:
+            usos = query_usos.order_by(desc(UsoVeiculo.data_uso)).all()
+            for uso in usos:
+                lancamentos.append({
+                    'tipo': 'uso',
+                    'data': uso.data_uso,
+                    'veiculo': uso.veiculo,
+                    'funcionario': uso.funcionario,
+                    'obra': uso.obra,
+                    'objeto': uso,
+                    'approved': uso.aprovado,
+                    'created_at': uso.created_at
+                })
+        
+        if filtros['tipo_lancamento'] in ['todos', 'custo']:
+            custos = query_custos.order_by(desc(CustoVeiculo.data_custo)).all()
+            for custo in custos:
+                lancamentos.append({
+                    'tipo': 'custo',
+                    'data': custo.data_custo,
+                    'veiculo': custo.veiculo,
+                    'funcionario': None,  # Custos não têm funcionário associado
+                    'obra': custo.obra,
+                    'objeto': custo,
+                    'approved': custo.aprovado,
+                    'created_at': custo.created_at
+                })
+        
+        # Ordenar lançamentos por data
+        lancamentos.sort(key=lambda x: (x['data'], x['created_at']), reverse=True)
+        
+        # Paginação manual
+        per_page = 20
+        total_items = len(lancamentos)
+        total_pages = (total_items + per_page - 1) // per_page
+        start_idx = (filtros['page'] - 1) * per_page
+        end_idx = start_idx + per_page
+        lancamentos_pagina = lancamentos[start_idx:end_idx]
+        
+        # Dados para filtros
+        veiculos = Veiculo.query.filter_by(admin_id=admin_id, ativo=True).all()
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
+        obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
+        
+        # KPIs do período
+        kpis = {
+            'total_usos': len([l for l in lancamentos if l['tipo'] == 'uso']),
+            'total_custos': len([l for l in lancamentos if l['tipo'] == 'custo']),
+            'valor_total_custos': sum([l['objeto'].valor for l in lancamentos if l['tipo'] == 'custo']),
+            'km_total': sum([l['objeto'].km_percorrido or 0 for l in lancamentos if l['tipo'] == 'uso']),
+            'pendente_aprovacao': len([l for l in lancamentos if not l['approved']])
+        }
+        
+        paginacao = {
+            'page': filtros['page'],
+            'total_pages': total_pages,
+            'per_page': per_page,
+            'total_items': total_items,
+            'has_prev': filtros['page'] > 1,
+            'has_next': filtros['page'] < total_pages,
+            'prev_num': filtros['page'] - 1 if filtros['page'] > 1 else None,
+            'next_num': filtros['page'] + 1 if filtros['page'] < total_pages else None
+        }
+        
+        return render_template('veiculos/lancamentos.html',
+                             lancamentos=lancamentos_pagina,
+                             filtros=filtros,
+                             veiculos=veiculos,
+                             funcionarios=funcionarios,
+                             obras=obras,
+                             kpis=kpis,
+                             paginacao=paginacao)
+        
+    except Exception as e:
+        print(f"ERRO LANÇAMENTOS VEÍCULOS: {str(e)}")
+        flash('Erro ao carregar lançamentos de veículos.', 'error')
+        return redirect(url_for('main.veiculos'))
+
+
+@main_bp.route('/veiculos/lancamentos/aprovar/<tipo>/<int:id>', methods=['POST'])
+@admin_required  
+def aprovar_lancamento_veiculo(tipo, id):
+    """Aprovar lançamento de uso ou custo de veículo"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        from models import UsoVeiculo, CustoVeiculo
+        
+        if tipo == 'uso':
+            item = UsoVeiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        elif tipo == 'custo':
+            item = CustoVeiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        else:
+            flash('Tipo de lançamento inválido.', 'error')
+            return redirect(url_for('main.lancamentos_veiculos'))
+        
+        item.aprovado = True
+        item.aprovado_por_id = current_user.id
+        item.data_aprovacao = datetime.utcnow()
+        
+        db.session.commit()
+        flash(f'Lançamento de {tipo} aprovado com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO APROVAR LANÇAMENTO: {str(e)}")
+        flash('Erro ao aprovar lançamento.', 'error')
+    
+    return redirect(url_for('main.lancamentos_veiculos'))
+
+
+@main_bp.route('/veiculos/relatorios')
+@admin_required
+def relatorios_veiculos():
+    """Página de relatórios consolidados de veículos"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        from models import Veiculo, UsoVeiculo, CustoVeiculo
+        from sqlalchemy import func, extract
+        from datetime import datetime, timedelta
+        
+        # Período do relatório (últimos 3 meses por padrão)
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        if not data_inicio:
+            data_inicio = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+        if not data_fim:
+            data_fim = datetime.now().strftime('%Y-%m-%d')
+        
+        data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        
+        # Relatório por veículo
+        veiculos = Veiculo.query.filter_by(admin_id=admin_id, ativo=True).all()
+        relatorio_veiculos = []
+        
+        for veiculo in veiculos:
+            # Usos no período
+            usos = UsoVeiculo.query.filter(
+                UsoVeiculo.veiculo_id == veiculo.id,
+                UsoVeiculo.data_uso >= data_inicio_obj,
+                UsoVeiculo.data_uso <= data_fim_obj
+            ).all()
+            
+            # Custos no período
+            custos = CustoVeiculo.query.filter(
+                CustoVeiculo.veiculo_id == veiculo.id,
+                CustoVeiculo.data_custo >= data_inicio_obj,
+                CustoVeiculo.data_custo <= data_fim_obj
+            ).all()
+            
+            # Calcular métricas
+            total_km = sum([uso.km_percorrido or 0 for uso in usos])
+            total_horas = sum([uso.horas_uso or 0 for uso in usos])
+            total_custos = sum([custo.valor for custo in custos])
+            total_usos = len(usos)
+            
+            # Custos por tipo
+            custos_por_tipo = {}
+            for custo in custos:
+                if custo.tipo_custo not in custos_por_tipo:
+                    custos_por_tipo[custo.tipo_custo] = 0
+                custos_por_tipo[custo.tipo_custo] += custo.valor
+            
+            # Cálculo de eficiência
+            custo_por_km = total_custos / total_km if total_km > 0 else 0
+            media_km_por_uso = total_km / total_usos if total_usos > 0 else 0
+            
+            relatorio_veiculos.append({
+                'veiculo': veiculo,
+                'total_km': total_km,
+                'total_horas': total_horas,
+                'total_custos': total_custos,
+                'total_usos': total_usos,
+                'custos_por_tipo': custos_por_tipo,
+                'custo_por_km': custo_por_km,
+                'media_km_por_uso': media_km_por_uso,
+                'dias_periodo': (data_fim_obj - data_inicio_obj).days + 1
+            })
+        
+        # Ordenar por total de KM
+        relatorio_veiculos.sort(key=lambda x: x['total_km'], reverse=True)
+        
+        # Dados consolidados da frota
+        consolidado = {
+            'total_km_frota': sum([r['total_km'] for r in relatorio_veiculos]),
+            'total_custos_frota': sum([r['total_custos'] for r in relatorio_veiculos]),
+            'total_usos_frota': sum([r['total_usos'] for r in relatorio_veiculos]),
+            'total_horas_frota': sum([r['total_horas'] for r in relatorio_veiculos]),
+            'media_custo_por_km': 0,
+            'veiculo_mais_usado': None,
+            'veiculo_mais_caro': None
+        }
+        
+        if consolidado['total_km_frota'] > 0:
+            consolidado['media_custo_por_km'] = consolidado['total_custos_frota'] / consolidado['total_km_frota']
+        
+        if relatorio_veiculos:
+            consolidado['veiculo_mais_usado'] = max(relatorio_veiculos, key=lambda x: x['total_km'])
+            consolidado['veiculo_mais_caro'] = max(relatorio_veiculos, key=lambda x: x['total_custos'])
+        
+        return render_template('veiculos/relatorios.html',
+                             relatorio_veiculos=relatorio_veiculos,
+                             consolidado=consolidado,
+                             data_inicio=data_inicio,
+                             data_fim=data_fim)
+        
+    except Exception as e:
+        print(f"ERRO RELATÓRIOS VEÍCULOS: {str(e)}")
+        flash('Erro ao carregar relatórios de veículos.', 'error')
+        return redirect(url_for('main.veiculos'))
+
+
+@main_bp.route('/veiculos/relatorios/exportar')
+@admin_required
+def exportar_relatorio_veiculos():
+    """Exportar relatório de veículos em PDF"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        from models import Veiculo, UsoVeiculo, CustoVeiculo
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        import io
+        from datetime import datetime, timedelta
+        
+        # Parâmetros
+        data_inicio = request.args.get('data_inicio', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+        data_fim = request.args.get('data_fim', datetime.now().strftime('%Y-%m-%d'))
+        
+        data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        
+        # Criar buffer em memória
+        buffer = io.BytesIO()
+        
+        # Criar documento PDF
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+        
+        # Estilos
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], alignment=1, spaceAfter=30)
+        
+        # Conteúdo do PDF
+        story = []
+        
+        # Título
+        story.append(Paragraph("Relatório de Utilização de Veículos", title_style))
+        story.append(Paragraph(f"Período: {data_inicio_obj.strftime('%d/%m/%Y')} a {data_fim_obj.strftime('%d/%m/%Y')}", styles['Normal']))
+        story.append(Spacer(1, 20))
+        
+        # Buscar dados dos veículos
+        veiculos = Veiculo.query.filter_by(admin_id=admin_id, ativo=True).all()
+        
+        # Tabela de resumo por veículo
+        data_table = [['Veículo', 'Total KM', 'Total Usos', 'Total Custos', 'Custo/KM']]
+        
+        for veiculo in veiculos:
+            usos = UsoVeiculo.query.filter(
+                UsoVeiculo.veiculo_id == veiculo.id,
+                UsoVeiculo.data_uso >= data_inicio_obj,
+                UsoVeiculo.data_uso <= data_fim_obj
+            ).all()
+            
+            custos = CustoVeiculo.query.filter(
+                CustoVeiculo.veiculo_id == veiculo.id,
+                CustoVeiculo.data_custo >= data_inicio_obj,
+                CustoVeiculo.data_custo <= data_fim_obj
+            ).all()
+            
+            total_km = sum([uso.km_percorrido or 0 for uso in usos])
+            total_custos = sum([custo.valor for custo in custos])
+            custo_por_km = total_custos / total_km if total_km > 0 else 0
+            
+            data_table.append([
+                f"{veiculo.placa} - {veiculo.marca} {veiculo.modelo}",
+                f"{total_km} km",
+                f"{len(usos)} usos",
+                f"R$ {total_custos:.2f}",
+                f"R$ {custo_por_km:.2f}"
+            ])
+        
+        # Criar tabela
+        table = Table(data_table)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        story.append(table)
+        
+        # Construir PDF
+        doc.build(story)
+        
+        # Preparar resposta
+        buffer.seek(0)
+        filename = f"relatorio_veiculos_{data_inicio}_{data_fim}.pdf"
+        
+        return Response(
+            buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+        
+    except Exception as e:
+        print(f"ERRO EXPORTAR RELATÓRIO PDF: {str(e)}")
+        flash('Erro ao exportar relatório. Verifique se o ReportLab está instalado.', 'error')
+        return redirect(url_for('main.relatorios_veiculos'))
 
 # ===== APIs PARA FRONTEND =====
 @main_bp.route('/api/funcionarios')

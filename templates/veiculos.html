@@ -16,6 +16,12 @@
                     <p class="text-muted mb-0">Controle da frota e custos operacionais</p>
                 </div>
                 <div class="d-flex gap-2">
+                    <a href="{{ url_for('main.lancamentos_veiculos') }}" class="btn btn-info">
+                        <i class="fas fa-clipboard-list me-1"></i> Lançamentos
+                    </a>
+                    <a href="{{ url_for('main.relatorios_veiculos') }}" class="btn btn-warning">
+                        <i class="fas fa-chart-bar me-1"></i> Relatórios
+                    </a>
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#veiculoModal">
                         <i class="fas fa-plus me-1"></i> Novo Veículo
                     </button>

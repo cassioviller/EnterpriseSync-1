@@ -986,7 +986,15 @@ class UsoVeiculo(db.Model):
     finalidade = db.Column(db.String(200))
     observacoes = db.Column(db.Text)
     
-    # Campos básicos - sem colunas inexistentes
+    # Campos calculados automaticamente
+    km_percorrido = db.Column(db.Integer, default=0)  # Calculado automaticamente (km_final - km_inicial)
+    horas_uso = db.Column(db.Float, default=0.0)  # Calculado automaticamente (diferença entre horários)
+    custo_estimado = db.Column(db.Float, default=0.0)  # Calculado automaticamente baseado em KM e horas
+    
+    # Campos adicionais para controle avançado
+    aprovado = db.Column(db.Boolean, default=False)
+    aprovado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    data_aprovacao = db.Column(db.DateTime)
     
     # Multi-tenant - OBRIGATÓRIO para isolamento de segurança
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
@@ -997,7 +1005,8 @@ class UsoVeiculo(db.Model):
     veiculo = db.relationship('Veiculo', overlaps="usos,veiculo_rel")
     funcionario = db.relationship('Funcionario', backref='usos_veiculo', overlaps="usos_veiculo")
     obra = db.relationship('Obra', backref='usos_veiculo', overlaps="usos_veiculo")
-    admin = db.relationship('Usuario', backref='usos_veiculo_criados', overlaps="usos_veiculo_criados")
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='usos_veiculo_criados', overlaps="usos_veiculo_criados")
+    aprovado_por = db.relationship('Usuario', foreign_keys=[aprovado_por_id], backref='usos_aprovados', overlaps="aprovado_por")
     
     @property
     def tempo_uso_str(self):
@@ -1025,26 +1034,91 @@ class UsoVeiculo(db.Model):
         return None
     
     def calcular_campos_automaticos(self):
-        """Calcula campos automáticos baseados nos dados inseridos"""
-        # Calcular KM percorrido
+        """Calcula campos automáticos baseados nos dados inseridos com validações robustas"""
+        try:
+            # Calcular KM percorrido com validações
+            if self.km_inicial and self.km_final:
+                if self.km_final >= self.km_inicial:
+                    self.km_percorrido = self.km_final - self.km_inicial
+                else:
+                    # Log do erro mas não interrompe o processamento
+                    print(f"Aviso: KM final ({self.km_final}) menor que inicial ({self.km_inicial}) para veículo {self.veiculo_id}")
+                    self.km_percorrido = 0
+            else:
+                self.km_percorrido = 0
+            
+            # Calcular horas de uso com validações robustas
+            if self.horario_saida and self.horario_chegada:
+                # Usar data do uso em vez de hoje para cálculos mais precisos
+                data_base = self.data_uso if self.data_uso else date.today()
+                inicio = datetime.combine(data_base, self.horario_saida)
+                fim = datetime.combine(data_base, self.horario_chegada)
+                
+                # Lidar com casos onde o retorno é no dia seguinte
+                if fim < inicio:
+                    fim += timedelta(days=1)
+                
+                delta = fim - inicio
+                horas_calculadas = delta.total_seconds() / 3600
+                
+                # Validar se as horas são razoáveis (máximo 24 horas)
+                if horas_calculadas <= 24:
+                    self.horas_uso = round(horas_calculadas, 2)
+                else:
+                    print(f"Aviso: Horas de uso muito altas ({horas_calculadas:.2f}h) para veículo {self.veiculo_id}")
+                    self.horas_uso = round(horas_calculadas, 2)  # Mantém o valor mas registra o aviso
+            else:
+                self.horas_uso = 0.0
+            
+            # Cálculo de custo estimado mais sofisticado
+            custo_km = 0.0
+            custo_horas = 0.0
+            
+            if self.km_percorrido and self.km_percorrido > 0:
+                # Custo baseado em tipo de veículo se disponível
+                if hasattr(self, 'veiculo') and self.veiculo:
+                    if 'diesel' in str(self.veiculo.tipo).lower():
+                        custo_km = self.km_percorrido * 0.45  # Diesel mais barato
+                    elif 'moto' in str(self.veiculo.tipo).lower():
+                        custo_km = self.km_percorrido * 0.30  # Motos mais econômicas
+                    else:
+                        custo_km = self.km_percorrido * 0.55  # Gasolina/etanol
+                else:
+                    custo_km = self.km_percorrido * 0.50  # Padrão
+            
+            if self.horas_uso and self.horas_uso > 0:
+                # Custo de depreciação e mão de obra por hora
+                custo_horas = self.horas_uso * 12.0
+            
+            self.custo_estimado = round(custo_km + custo_horas, 2)
+            
+        except Exception as e:
+            print(f"Erro ao calcular campos automáticos para UsoVeiculo {self.id}: {e}")
+            # Em caso de erro, definir valores padrão seguros
+            self.km_percorrido = 0
+            self.horas_uso = 0.0
+            self.custo_estimado = 0.0
+    
+    def validar_dados(self):
+        """Valida os dados do uso de veículo"""
+        erros = []
+        
+        # Validar KM
         if self.km_inicial and self.km_final:
-            self.km_percorrido = self.km_final - self.km_inicial
+            if self.km_final < self.km_inicial:
+                erros.append("KM final não pode ser menor que KM inicial")
         
-        # Calcular horas de uso
+        # Validar horários
         if self.horario_saida and self.horario_chegada:
-            inicio = datetime.combine(date.today(), self.horario_saida)
-            fim = datetime.combine(date.today(), self.horario_chegada)
+            if self.horario_chegada < self.horario_saida:
+                # Permitir horários que passam da meia-noite
+                pass
             
-            # Lidar com casos onde o retorno é no dia seguinte
-            if fim < inicio:
-                fim += timedelta(days=1)
-            
-            delta = fim - inicio
-            self.horas_uso = round(delta.total_seconds() / 3600, 2)
+        # Validar data
+        if self.data_uso and self.data_uso > date.today():
+            erros.append("Data de uso não pode ser no futuro")
         
-        # Estimativa de custo (R$ 0.50 por km + R$ 15 por hora)
-        if self.km_percorrido and self.horas_uso:
-            self.custo_estimado = (self.km_percorrido * 0.50) + (self.horas_uso * 15.0)
+        return erros
     
     def __repr__(self):
         return f'<UsoVeiculo {self.veiculo_id} - {self.funcionario_id} - {self.data_uso}>'
