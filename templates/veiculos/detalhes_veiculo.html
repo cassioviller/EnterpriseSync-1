@@ -653,8 +653,8 @@ function abrirModalDetalhesUso(usoId) {
         url: `/veiculos/uso/${usoId}/detalhes`,
         type: 'GET',
         success: function(response) {
-            // Preencher modal com os dados
-            $('#modalDetalhesUso .modal-body').html(response.html);
+            // Preencher modal com os dados (response já é HTML direto)
+            $('#modalDetalhesUso .modal-body').html(response);
             $('#modalDetalhesUso').modal('show');
         },
         error: function(xhr, status, error) {

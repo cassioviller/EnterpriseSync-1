@@ -3078,6 +3078,19 @@ def novo_uso_veiculo_lista():
             flash('Erro: Motorista é obrigatório.', 'error')
             return redirect(url_for('main.veiculos'))
         
+        # Processar porcentagem de combustível
+        porcentagem_str = request.form.get('porcentagem_combustivel')
+        porcentagem_combustivel = None
+        if porcentagem_str:
+            try:
+                porcentagem = int(porcentagem_str)
+                if 0 <= porcentagem <= 100:
+                    porcentagem_combustivel = porcentagem
+                else:
+                    flash('Porcentagem de combustível deve estar entre 0 e 100%.', 'warning')
+            except (ValueError, TypeError):
+                flash('Porcentagem de combustível inválida.', 'warning')
+        
         # Criar registro de uso
         uso = UsoVeiculo(
             veiculo_id=veiculo.id,
@@ -3091,6 +3104,7 @@ def novo_uso_veiculo_lista():
             km_percorrido=km_final - km_inicial if km_final and km_inicial else 0,
             finalidade=request.form.get('finalidade', 'Operacional'),
             observacoes=request.form.get('observacoes'),
+            porcentagem_combustivel=porcentagem_combustivel,
             admin_id=tenant_admin_id,
             created_at=datetime.utcnow()
         )
@@ -3111,6 +3125,135 @@ def novo_uso_veiculo_lista():
         flash('Erro ao registrar uso do veículo. Tente novamente.', 'error')
     
     return redirect(url_for('main.veiculos'))
+
+
+# ROTA DETALHES USO - /veiculos/uso/<int:uso_id>/detalhes (GET)
+@main_bp.route('/veiculos/uso/<int:uso_id>/detalhes', methods=['GET'])
+@login_required
+def detalhes_uso_veiculo(uso_id):
+    """Fornecer dados detalhados de um uso específico via AJAX"""
+    from models import UsoVeiculo, Funcionario, Obra, Veiculo
+    
+    # 🔒 SEGURANÇA MULTITENANT
+    tenant_admin_id = get_tenant_admin_id()
+    if not tenant_admin_id:
+        return jsonify({'error': 'Acesso negado'}), 403
+    
+    # Buscar uso com relacionamentos
+    uso = UsoVeiculo.query.options(
+        db.joinedload(UsoVeiculo.veiculo),
+        db.joinedload(UsoVeiculo.funcionario),
+        db.joinedload(UsoVeiculo.obra)
+    ).filter_by(id=uso_id, admin_id=tenant_admin_id).first()
+    
+    if not uso:
+        return jsonify({'error': 'Uso não encontrado'}), 404
+    
+    # Buscar passageiros se existirem campos específicos
+    # (assumindo que já existe estrutura de passageiros)
+    passageiros = []
+    
+    # Montar HTML dos detalhes
+    html_content = f"""
+    <div class="row">
+        <div class="col-md-6">
+            <h6><i class="fas fa-info-circle"></i> Informações Gerais</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Data:</strong></td>
+                        <td>{uso.data_uso.strftime('%d/%m/%Y') if uso.data_uso else '-'}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Veículo:</strong></td>
+                        <td>{uso.veiculo.placa} - {uso.veiculo.marca} {uso.veiculo.modelo}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Condutor:</strong></td>
+                        <td>{uso.funcionario.nome if uso.funcionario else '-'}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Obra:</strong></td>
+                        <td>{uso.obra.nome if uso.obra else 'Não vinculado'}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h6><i class="fas fa-tachometer-alt"></i> Dados Técnicos</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>KM Inicial:</strong></td>
+                        <td>{f"{uso.km_inicial:,}".replace(",", ".") if uso.km_inicial else '-'} km</td>
+                    </tr>
+                    <tr>
+                        <td><strong>KM Final:</strong></td>
+                        <td>{f"{uso.km_final:,}".replace(",", ".") if uso.km_final else '-'} km</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Distância:</strong></td>
+                        <td>{f"{uso.km_percorrido:,}".replace(",", ".") if uso.km_percorrido else '-'} km</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Combustível:</strong></td>
+                        <td>
+                            {'<span class="badge bg-info"><i class="fas fa-gas-pump"></i> ' + str(uso.porcentagem_combustivel) + '%</span>' if uso.porcentagem_combustivel is not None else '-'}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <h6><i class="fas fa-clock"></i> Horários</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Saída:</strong></td>
+                        <td>{uso.horario_saida.strftime('%H:%M') if uso.horario_saida else '-'}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Chegada:</strong></td>
+                        <td>{uso.horario_chegada.strftime('%H:%M') if uso.horario_chegada else '-'}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Duração:</strong></td>
+                        <td>{uso.tempo_uso_str if hasattr(uso, 'tempo_uso_str') else 'N/A'}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h6><i class="fas fa-users"></i> Passageiros</h6>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> 
+                Funcionalidade em desenvolvimento
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-3">
+        <div class="col-12">
+            <h6><i class="fas fa-sticky-note"></i> Observações</h6>
+            <div class="card">
+                <div class="card-body">
+                    {uso.observacoes if uso.observacoes else '<em class="text-muted">Nenhuma observação registrada</em>'}
+                </div>
+            </div>
+            <h6 class="mt-3"><i class="fas fa-bullseye"></i> Finalidade</h6>
+            <div class="card">
+                <div class="card-body">
+                    {uso.finalidade if uso.finalidade else '<em class="text-muted">Não especificada</em>'}
+                </div>
+            </div>
+        </div>
+    </div>
+    """
+    
+    return html_content
 
 
 # ROTA PARA MODAL DE CUSTO (SEM PARÂMETRO ID NA URL)
