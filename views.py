@@ -2921,13 +2921,18 @@ def novo_veiculo():
 
 # 2. ROTA EDIÇÃO - /veiculos/<id>/editar (GET/POST)
 @main_bp.route('/veiculos/<int:id>/editar', methods=['GET', 'POST'])
-@admin_required
+@login_required  # 🔒 MUDANÇA: Funcionários podem editar veículos também
 def editar_veiculo(id):
     from forms import VeiculoForm
     from models import Veiculo
     
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-    veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+    tenant_admin_id = get_tenant_admin_id()
+    if not tenant_admin_id:
+        flash('Acesso negado. Faça login novamente.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first_or_404()
     
     form = VeiculoForm(obj=veiculo)
     
@@ -3037,15 +3042,9 @@ def novo_uso_veiculo_lista():
     from forms import UsoVeiculoForm
     from models import Veiculo, UsoVeiculo, Funcionario, Obra
     
-    print(f"🔍 DEBUG USO VEÍCULO: Iniciando registro")
-    print(f"🔍 DEBUG FORM DATA: {dict(request.form)}")
-    
     # Obter veiculo_id do form (hidden field)
     veiculo_id = request.form.get('veiculo_id')
-    print(f"🔍 DEBUG VEICULO_ID: {veiculo_id}")
-    
     if not veiculo_id:
-        print("❌ DEBUG: veiculo_id não fornecido")
         flash('Erro: ID do veículo não fornecido.', 'error')
         return redirect(url_for('main.veiculos'))
     
@@ -3075,10 +3074,7 @@ def novo_uso_veiculo_lista():
         
         # Obter dados dos campos do formulário
         motorista_id = request.form.get('motorista_id')
-        print(f"🔍 DEBUG MOTORISTA_ID: {motorista_id}")
-        
         if not motorista_id:
-            print("❌ DEBUG: motorista_id não fornecido")
             flash('Erro: Motorista é obrigatório.', 'error')
             return redirect(url_for('main.veiculos'))
         
