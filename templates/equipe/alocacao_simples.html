@@ -5077,7 +5077,7 @@ class EquipeFase2 {
             // Adicionar cabeçalho com informações
             pdf.setFontSize(16);
             pdf.setTextColor(40, 40, 40);
-            const titulo = `${nomeDia} - ${this.getDateForDay(dayIndex)}`;
+            const titulo = `${nomeDia} - ${this.getDateForDayBrazilian(dayIndex)}`;
             pdf.text(titulo, pdfWidth / 2, 15, { align: 'center' });
 
             // Adicionar rodapé
@@ -5087,7 +5087,7 @@ class EquipeFase2 {
             pdf.text(rodape, pdfWidth / 2, pdfHeight - 5, { align: 'center' });
 
             // Download do PDF
-            const dataFormatada = this.getDateForDay(dayIndex);
+            const dataFormatada = this.getDateForDayBrazilian(dayIndex);
             const nomeArquivo = `gestao-equipe-${nomeDia.toLowerCase()}-${dataFormatada}.pdf`;
             pdf.save(nomeArquivo);
 
@@ -5136,9 +5136,23 @@ class EquipeFase2 {
     }
 
     /**
-     * Obter data formatada para um dia específico
+     * Obter data formatada para um dia específico (formato ISO para APIs)
      */
     getDateForDay(dayIndex) {
+        if (!this.currentWeek) return '';
+        
+        const sunday = this.parseYMDToLocal(this.currentWeek);
+        const targetDate = new Date(sunday);
+        targetDate.setDate(sunday.getDate() + dayIndex);
+        
+        // Retornar formato ISO (YYYY-MM-DD) para APIs
+        return targetDate.toISOString().split('T')[0];
+    }
+    
+    /**
+     * Obter data formatada brasileira para exibição
+     */
+    getDateForDayBrazilian(dayIndex) {
         if (!this.currentWeek) return '';
         
         const sunday = this.parseYMDToLocal(this.currentWeek);
