@@ -3037,9 +3037,15 @@ def novo_uso_veiculo_lista():
     from forms import UsoVeiculoForm
     from models import Veiculo, UsoVeiculo, Funcionario, Obra
     
+    print(f"🔍 DEBUG USO VEÍCULO: Iniciando registro")
+    print(f"🔍 DEBUG FORM DATA: {dict(request.form)}")
+    
     # Obter veiculo_id do form (hidden field)
     veiculo_id = request.form.get('veiculo_id')
+    print(f"🔍 DEBUG VEICULO_ID: {veiculo_id}")
+    
     if not veiculo_id:
+        print("❌ DEBUG: veiculo_id não fornecido")
         flash('Erro: ID do veículo não fornecido.', 'error')
         return redirect(url_for('main.veiculos'))
     
@@ -3067,10 +3073,19 @@ def novo_uso_veiculo_lista():
                 flash(f'Erro: KM final não pode ser menor que a quilometragem atual do veículo ({veiculo.km_atual}km).', 'error')
                 return redirect(url_for('main.veiculos'))
         
+        # Obter dados dos campos do formulário
+        motorista_id = request.form.get('motorista_id')
+        print(f"🔍 DEBUG MOTORISTA_ID: {motorista_id}")
+        
+        if not motorista_id:
+            print("❌ DEBUG: motorista_id não fornecido")
+            flash('Erro: Motorista é obrigatório.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
         # Criar registro de uso
         uso = UsoVeiculo(
             veiculo_id=veiculo.id,
-            funcionario_id=request.form.get('funcionario_id'),
+            funcionario_id=motorista_id,  # Usar motorista como funcionário principal
             obra_id=request.form.get('obra_id') if request.form.get('obra_id') else None,
             data_uso=datetime.strptime(request.form.get('data_uso'), '%Y-%m-%d').date(),
             horario_saida=datetime.strptime(request.form.get('horario_saida'), '%H:%M').time() if request.form.get('horario_saida') else None,
