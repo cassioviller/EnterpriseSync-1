@@ -4331,6 +4331,9 @@ class EquipeFase2 {
             if (allocation && allocation.data_alocacao) {
                 const dataAlocacao = new Date(allocation.data_alocacao);
                 diaSemana = dataAlocacao.getDay(); // 0=Domingo, 1=Segunda, etc.
+                
+                const diasNomes = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                this.log(`🗓️ HORARIOS: Data ${allocation.data_alocacao} = ${diasNomes[diaSemana]} (${diaSemana})`);
             }
             
             // Buscar horários via API
@@ -4385,6 +4388,7 @@ class EquipeFase2 {
             // Se não trabalha no dia, mostrar aviso
             if (!horarios.trabalha_no_dia) {
                 const tipoMsg = this.getTipoLancamentoMessage(horarios.tipo_lancamento);
+                this.log(`⚠️ HORARIOS: ${data.funcionario.nome} - tipo: ${horarios.tipo_lancamento}, msg: ${tipoMsg}`);
                 this.showToast(`⚠️ ${data.funcionario.nome} ${tipoMsg}`, 'warning', 4000);
             }
             
