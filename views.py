@@ -2671,13 +2671,26 @@ def detalhes_veiculo(id):
 def dados_veiculo(id):
     """Retorna dados do veículo em JSON para preenchimento do modal de edição"""
     try:
+        print(f"🔍 DEBUG DADOS VEÍCULO: Iniciando para ID {id}")
+        print(f"🔍 DEBUG USUÁRIO: {current_user.email if current_user.is_authenticated else 'NÃO AUTENTICADO'}")
+        
         # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
         tenant_admin_id = get_tenant_admin_id()
+        print(f"🔍 DEBUG TENANT: tenant_admin_id={tenant_admin_id}")
+        
         if not tenant_admin_id:
+            print("❌ DEBUG: tenant_admin_id é None - usuário não autenticado")
             return jsonify({'error': 'Acesso negado. Usuário não autenticado.'}), 403
         
         from models import Veiculo
-        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first_or_404()
+        print(f"🔍 DEBUG: Buscando veículo ID {id} com admin_id {tenant_admin_id}")
+        
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
+        if not veiculo:
+            print(f"❌ DEBUG: Veículo ID {id} não encontrado para admin_id {tenant_admin_id}")
+            return jsonify({'error': 'Veículo não encontrado'}), 404
+        
+        print(f"✅ DEBUG: Veículo encontrado: {veiculo.placa}")
         
         # Converter para dicionário JSON
         dados = {
@@ -2693,11 +2706,15 @@ def dados_veiculo(id):
             'data_proxima_manutencao': veiculo.data_proxima_manutencao.strftime('%Y-%m-%d') if veiculo.data_proxima_manutencao else ''
         }
         
+        print(f"✅ DEBUG: Dados preparados com sucesso")
         return jsonify(dados)
         
     except Exception as e:
-        print(f"ERRO DADOS VEÍCULO: {str(e)}")
-        return jsonify({'error': 'Erro ao carregar dados do veículo'}), 500
+        print(f"❌ ERRO DADOS VEÍCULO: {str(e)}")
+        print(f"❌ ERRO TIPO: {type(e).__name__}")
+        import traceback
+        print(f"❌ TRACEBACK: {traceback.format_exc()}")
+        return jsonify({'error': f'Erro ao carregar dados do veículo: {str(e)}'}), 500
 
 # Rota para buscar última quilometragem do veículo
 @main_bp.route('/veiculos/<int:id>/ultima-km')

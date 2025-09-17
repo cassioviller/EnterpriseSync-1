@@ -271,8 +271,10 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="{{ url_for('main.novo_uso_veiculo', id=veiculo.id) }}" method="POST">
+            <form action="{{ url_for('main.novo_uso_veiculo_lista') }}" method="POST">
                 <div class="modal-body">
+                    <!-- Campo hidden para identificar o veículo -->
+                    <input type="hidden" name="veiculo_id" value="{{ veiculo.id }}">
                     <div class="mb-3">
                         <label for="data_uso" class="form-label">Data do Uso</label>
                         <input type="date" class="form-control" id="data_uso" name="data_uso" required>
@@ -407,8 +409,10 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="{{ url_for('main.novo_custo_veiculo', id=veiculo.id) }}" method="POST">
+            <form action="{{ url_for('main.novo_custo_veiculo_lista') }}" method="POST">
                 <div class="modal-body">
+                    <!-- Campo hidden para identificar o veículo -->
+                    <input type="hidden" name="veiculo_id" value="{{ veiculo.id }}">
                     <div class="mb-3">
                         <label for="data_custo" class="form-label">Data do Custo</label>
                         <input type="date" class="form-control" id="data_custo" name="data_custo" required>
