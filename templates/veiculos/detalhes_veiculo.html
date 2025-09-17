@@ -223,13 +223,13 @@
                                 <th>Condutor</th>
                                 <th>Quilometragem</th>
                                 <th>Combustível</th>
-                                <th>Finalidade</th>
+                                <th>Observações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% if usos_veiculo %}
                                 {% for uso in usos_veiculo %}
-                                <tr>
+                                <tr style="cursor: pointer;" onclick="abrirModalDetalhesUso({{ uso.id }})">
                                     <td>{{ uso.data_uso.strftime('%d/%m/%Y') if uso.data_uso else '-' }}</td>
                                     <td>{{ uso.obra.nome if uso.obra else '-' }}</td>
                                     <td>{{ uso.funcionario.nome if uso.funcionario else '-' }}</td>
@@ -241,8 +241,16 @@
                                             -
                                         {% endif %}
                                     </td>
-                                    <td>-</td>
-                                    <td>{{ uso.finalidade or '-' }}</td>
+                                    <td>
+                                        {% if uso.porcentagem_combustivel is not none %}
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-gas-pump"></i> {{ uso.porcentagem_combustivel }}%
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ uso.observacoes[:30] + '...' if uso.observacoes and uso.observacoes|length > 30 else (uso.observacoes or '-') }}</td>
                                 </tr>
                                 {% endfor %}
                             {% else %}
@@ -380,6 +388,17 @@
                     <div class="mb-3">
                         <label for="finalidade" class="form-label">Finalidade do Uso</label>
                         <input type="text" class="form-control" id="finalidade" name="finalidade" placeholder="Ex: Transporte para obra, Entrega de material...">
+                    </div>
+                    <div class="mb-3">
+                        <label for="porcentagem_combustivel" class="form-label">
+                            <i class="fas fa-gas-pump"></i> Porcentagem de Combustível
+                        </label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="porcentagem_combustivel" name="porcentagem_combustivel" 
+                                   min="0" max="100" placeholder="Ex: 75">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <small class="form-text text-muted">Porcentagem de combustível no tanque (0-100%)</small>
                     </div>
                     <div class="mb-3">
                         <label for="observacoes" class="form-label">Observações</label>
@@ -626,5 +645,51 @@ function editarVeiculo(id) {
     // Redirecionar para página de edição
     window.location.href = `/veiculos/${id}/editar`;
 }
+
+// Função para abrir modal de detalhes do uso
+function abrirModalDetalhesUso(usoId) {
+    // Buscar dados detalhados do uso via AJAX
+    $.ajax({
+        url: `/veiculos/uso/${usoId}/detalhes`,
+        type: 'GET',
+        success: function(response) {
+            // Preencher modal com os dados
+            $('#modalDetalhesUso .modal-body').html(response.html);
+            $('#modalDetalhesUso').modal('show');
+        },
+        error: function(xhr, status, error) {
+            console.log('Erro ao carregar detalhes do uso:', error);
+            alert('Erro ao carregar detalhes. Tente novamente.');
+        }
+    });
+}
 </script>
+
+<!-- Modal Detalhes do Uso -->
+<div class="modal fade" id="modalDetalhesUso" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-route"></i> Detalhes do Uso do Veículo
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Conteúdo será carregado via AJAX -->
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

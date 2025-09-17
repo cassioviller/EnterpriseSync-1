@@ -985,6 +985,7 @@ class UsoVeiculo(db.Model):
     horario_chegada = db.Column(db.Time)
     finalidade = db.Column(db.String(200))
     observacoes = db.Column(db.Text)
+    porcentagem_combustivel = db.Column(db.Integer, nullable=True)  # Porcentagem de combustível (0-100)
     
     # Campos calculados automaticamente
     km_percorrido = db.Column(db.Integer, default=0)  # Calculado automaticamente (km_final - km_inicial)

@@ -94,6 +94,18 @@
                         </div>
                         
                         <div class="mb-3">
+                            <label for="porcentagem_combustivel" class="form-label">
+                                <i class="fas fa-gas-pump"></i> Porcentagem de Combustível
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="porcentagem_combustivel" name="porcentagem_combustivel" 
+                                       min="0" max="100" placeholder="Ex: 75">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="form-text text-muted">Porcentagem de combustível no tanque (0-100%)</small>
+                        </div>
+                        
+                        <div class="mb-3">
                             {{ form.observacoes.label(class="form-label") }}
                             {{ form.observacoes(class="form-control", rows="3", placeholder="Observações adicionais sobre o uso do veículo...") }}
                             {% for error in form.observacoes.errors %}
