@@ -3040,7 +3040,7 @@ def excluir_veiculo(id):
 @login_required  # 🔒 MUDANÇA: Funcionários podem registrar uso de veículos
 def novo_uso_veiculo_lista():
     from forms import UsoVeiculoForm
-    from models import Veiculo, UsoVeiculo, Funcionario, Obra
+    from models import Veiculo, UsoVeiculo, Funcionario, Obra, PassageiroVeiculo
     
     # Obter veiculo_id do form (hidden field)
     veiculo_id = request.form.get('veiculo_id')
@@ -3110,6 +3110,48 @@ def novo_uso_veiculo_lista():
         )
         
         db.session.add(uso)
+        db.session.flush()  # Obter ID do uso para criar passageiros
+        
+        # Processar passageiros selecionados
+        passageiros_ids = request.form.getlist('passageiros[]')
+        passageiros_criados = 0
+        
+        if passageiros_ids:
+            for passageiro_id in passageiros_ids:
+                try:
+                    passageiro_id = int(passageiro_id)
+                    
+                    # Validar se o passageiro não é o mesmo que o motorista
+                    if passageiro_id == int(motorista_id):
+                        continue  # Pular motorista - ele já está registrado como condutor
+                    
+                    # Verificar se o funcionário existe e pertence ao mesmo admin
+                    funcionario_passageiro = Funcionario.query.filter_by(
+                        id=passageiro_id, 
+                        admin_id=tenant_admin_id, 
+                        ativo=True
+                    ).first()
+                    
+                    if funcionario_passageiro:
+                        # Verificar se já não existe registro (evitar duplicação)
+                        passageiro_existente = PassageiroVeiculo.query.filter_by(
+                            uso_veiculo_id=uso.id,
+                            funcionario_id=passageiro_id
+                        ).first()
+                        
+                        if not passageiro_existente:
+                            passageiro = PassageiroVeiculo(
+                                uso_veiculo_id=uso.id,
+                                funcionario_id=passageiro_id,
+                                admin_id=tenant_admin_id,
+                                created_at=datetime.utcnow()
+                            )
+                            db.session.add(passageiro)
+                            passageiros_criados += 1
+                        
+                except (ValueError, TypeError):
+                    # ID inválido, continuar com próximo
+                    continue
         
         # Atualizar KM atual do veículo se fornecido
         if km_final:
@@ -3117,7 +3159,12 @@ def novo_uso_veiculo_lista():
             veiculo.updated_at = datetime.utcnow() if hasattr(veiculo, 'updated_at') else None
         
         db.session.commit()
-        flash(f'Uso do veículo {veiculo.placa} registrado com sucesso!', 'success')
+        
+        # Mensagem de sucesso com informações sobre passageiros
+        if passageiros_criados > 0:
+            flash(f'Uso do veículo {veiculo.placa} registrado com sucesso! {passageiros_criados} passageiro(s) adicionado(s).', 'success')
+        else:
+            flash(f'Uso do veículo {veiculo.placa} registrado com sucesso!', 'success')
         
     except Exception as e:
         db.session.rollback()
@@ -3132,7 +3179,7 @@ def novo_uso_veiculo_lista():
 @login_required
 def detalhes_uso_veiculo(uso_id):
     """Fornecer dados detalhados de um uso específico via AJAX"""
-    from models import UsoVeiculo, Funcionario, Obra, Veiculo
+    from models import UsoVeiculo, Funcionario, Obra, Veiculo, PassageiroVeiculo
     
     # 🔒 SEGURANÇA MULTITENANT
     tenant_admin_id = get_tenant_admin_id()
@@ -3149,9 +3196,13 @@ def detalhes_uso_veiculo(uso_id):
     if not uso:
         return jsonify({'error': 'Uso não encontrado'}), 404
     
-    # Buscar passageiros se existirem campos específicos
-    # (assumindo que já existe estrutura de passageiros)
-    passageiros = []
+    # Buscar passageiros do uso com informações dos funcionários
+    passageiros = PassageiroVeiculo.query.options(
+        db.joinedload(PassageiroVeiculo.funcionario)
+    ).filter_by(
+        uso_veiculo_id=uso.id,
+        admin_id=tenant_admin_id
+    ).all()
     
     # Montar HTML dos detalhes
     html_content = f"""
@@ -3228,9 +3279,24 @@ def detalhes_uso_veiculo(uso_id):
         </div>
         <div class="col-md-6">
             <h6><i class="fas fa-users"></i> Passageiros</h6>
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> 
-                Funcionalidade em desenvolvimento
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    {''.join([f'''
+                    <tr>
+                        <td><strong>{passageiro.funcionario.nome if passageiro.funcionario else 'N/A'}</strong></td>
+                        <td class="text-muted small">
+                            {passageiro.funcionario.funcao_ref.nome if passageiro.funcionario and passageiro.funcionario.funcao_ref else 'Sem função'}
+                        </td>
+                    </tr>
+                    ''' for passageiro in passageiros]) if passageiros else '''
+                    <tr>
+                        <td colspan="2" class="text-center text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            Nenhum passageiro registrado
+                        </td>
+                    </tr>
+                    '''}
+                </table>
             </div>
         </div>
     </div>

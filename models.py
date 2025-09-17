@@ -1125,6 +1125,30 @@ class UsoVeiculo(db.Model):
         return f'<UsoVeiculo {self.veiculo_id} - {self.funcionario_id} - {self.data_uso}>'
 
 
+class PassageiroVeiculo(db.Model):
+    """Modelo para registro de passageiros em usos de veículos"""
+    __tablename__ = 'passageiro_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    uso_veiculo_id = db.Column(db.Integer, db.ForeignKey('uso_veiculo.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    
+    # Multi-tenant - OBRIGATÓRIO para isolamento de segurança
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    uso_veiculo = db.relationship('UsoVeiculo', backref='passageiros_rel', overlaps="passageiros_rel")
+    funcionario = db.relationship('Funcionario', backref='viagens_passageiro', overlaps="viagens_passageiro")
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='passageiros_criados', overlaps="passageiros_criados")
+    
+    # Constraint único para evitar duplicação de passageiros no mesmo uso
+    __table_args__ = (db.UniqueConstraint('uso_veiculo_id', 'funcionario_id', name='_uso_funcionario_passageiro_uc'),)
+    
+    def __repr__(self):
+        return f'<PassageiroVeiculo UsoID:{self.uso_veiculo_id} FuncID:{self.funcionario_id}>'
+
+
 class CustoVeiculo(db.Model):
     """Modelo aprimorado para custos de veículos com controle de combustível"""
     __tablename__ = 'custo_veiculo'

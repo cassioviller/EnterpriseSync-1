@@ -113,6 +113,32 @@
                             {% endfor %}
                         </div>
                         
+                        <!-- Campo de seleção múltipla de passageiros -->
+                        <div class="mb-3">
+                            <label for="passageiros" class="form-label">
+                                <i class="fas fa-users"></i> Passageiros
+                            </label>
+                            <select class="form-select autocomplete-passageiros" 
+                                    id="passageiros" 
+                                    name="passageiros[]" 
+                                    multiple="multiple"
+                                    data-placeholder="Selecione os passageiros (opcional)">
+                                {% if funcionarios %}
+                                    {% for funcionario in funcionarios %}
+                                        <option value="{{ funcionario.id }}">
+                                            {{ funcionario.nome }}
+                                            {% if funcionario.funcao_ref %}
+                                                - {{ funcionario.funcao_ref.nome }}
+                                            {% endif %}
+                                        </option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                            <small class="form-text text-muted">
+                                Selecione os funcionários que viajaram como passageiros. O condutor não precisa ser incluído.
+                            </small>
+                        </div>
+                        
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <a href="{{ url_for('main.detalhes_veiculo', id=veiculo.id) }}" class="btn btn-secondary me-md-2">
                                 <i class="fas fa-times"></i> Cancelar

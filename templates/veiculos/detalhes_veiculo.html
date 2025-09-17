@@ -300,53 +300,28 @@
                         </select>
                     </div>
                     
-                    <!-- Passageiro da Frente (Opcional) -->
+                    <!-- Passageiros (Seleção Múltipla) -->
                     <div class="mb-3">
-                        <label for="passageiro_frente_id" class="form-label">
-                            <i class="fas fa-user me-1"></i>Passageiro da Frente
+                        <label for="passageiros_modal" class="form-label">
+                            <i class="fas fa-users me-1"></i>Passageiros
                         </label>
-                        <select class="form-select autocomplete-funcionario" id="passageiro_frente_id" name="passageiro_frente_id">
-                            <option value="">Digite para pesquisar passageiro...</option>
+                        <select class="form-select autocomplete-passageiros-modal" 
+                                id="passageiros_modal" 
+                                name="passageiros[]" 
+                                multiple="multiple"
+                                data-placeholder="Selecione os passageiros (opcional)">
                             {% for funcionario in funcionarios %}
-                            <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                            <option value="{{ funcionario.id }}">
+                                {{ funcionario.nome }}
+                                {% if funcionario.funcao_ref %}
+                                    - {{ funcionario.funcao_ref.nome }}
+                                {% endif %}
+                            </option>
                             {% endfor %}
                         </select>
-                    </div>
-                    
-                    <!-- Passageiros de Trás -->
-                    <div class="mb-3">
-                        <label class="form-label">
-                            <i class="fas fa-users me-1"></i>Passageiros de Trás
-                        </label>
-                        <div class="row">
-                            <div class="col-md-4 mb-2">
-                                <label for="passageiro_tras1_id" class="form-label small">Posição 1</label>
-                                <select class="form-select autocomplete-funcionario" id="passageiro_tras1_id" name="passageiro_tras1_id">
-                                    <option value="">Pesquisar...</option>
-                                    {% for funcionario in funcionarios %}
-                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4 mb-2">
-                                <label for="passageiro_tras2_id" class="form-label small">Posição 2</label>
-                                <select class="form-select autocomplete-funcionario" id="passageiro_tras2_id" name="passageiro_tras2_id">
-                                    <option value="">Pesquisar...</option>
-                                    {% for funcionario in funcionarios %}
-                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4 mb-2">
-                                <label for="passageiro_tras3_id" class="form-label small">Posição 3</label>
-                                <select class="form-select autocomplete-funcionario" id="passageiro_tras3_id" name="passageiro_tras3_id">
-                                    <option value="">Pesquisar...</option>
-                                    {% for funcionario in funcionarios %}
-                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
+                        <small class="form-text text-muted">
+                            Selecione os funcionários que viajaram como passageiros. O motorista não precisa ser incluído.
+                        </small>
                     </div>
                     <div class="mb-3">
                         <label for="obra_id" class="form-label">Obra (Opcional)</label>
@@ -546,6 +521,28 @@ $(document).ready(function() {
         }
     });
 
+    // Inicializar autocomplete para passageiros (seleção múltipla)
+    $('.autocomplete-passageiros-modal').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Selecione os passageiros (opcional)',
+        allowClear: true,
+        dropdownParent: $('#usoModal'),
+        width: '100%',
+        multiple: true,
+        maximumSelectionLength: 10, // Limitar a 10 passageiros
+        language: {
+            noResults: function() {
+                return "Nenhum funcionário encontrado";
+            },
+            searching: function() {
+                return "Pesquisando...";
+            },
+            maximumSelected: function(e) {
+                return "Máximo de " + e.maximum + " passageiros permitidos";
+            }
+        }
+    });
+
     // Preencher automaticamente ao abrir o modal
     $('#usoModal').on('show.bs.modal', function() {
         // Preencher data atual automaticamente
@@ -576,6 +573,7 @@ $(document).ready(function() {
     $('#usoModal').on('hidden.bs.modal', function() {
         $('.autocomplete-funcionario').val(null).trigger('change');
         $('.autocomplete-obra').val(null).trigger('change');
+        $('.autocomplete-passageiros-modal').val(null).trigger('change');
         // Limpar também os campos de formulário
         $('#usoModal form')[0].reset();
     });
