@@ -3055,27 +3055,41 @@ def processar_passageiro_veiculo(passageiro_id, motorista_id, uso_veiculo_id, ad
         ).first()
         
         if funcionario_passageiro:
-            # Verificar se já não existe registro (evitar duplicação)
+            # CORREÇÃO CRÍTICA: Verificar se já não existe registro (evitar duplicação) COM admin_id
             passageiro_existente = PassageiroVeiculo.query.filter_by(
                 uso_veiculo_id=uso_veiculo_id,
-                funcionario_id=passageiro_id
+                funcionario_id=passageiro_id,
+                admin_id=admin_id  # ISOLAMENTO MULTI-TENANT OBRIGATÓRIO
             ).first()
             
             if not passageiro_existente:
-                passageiro = PassageiroVeiculo(
-                    uso_veiculo_id=uso_veiculo_id,
-                    funcionario_id=passageiro_id,
-                    posicao=posicao,  # Novo campo de posição
-                    admin_id=admin_id,
-                    created_at=datetime.utcnow()
-                )
-                db.session.add(passageiro)
-                return 1
+                try:
+                    passageiro = PassageiroVeiculo(
+                        uso_veiculo_id=uso_veiculo_id,
+                        funcionario_id=passageiro_id,
+                        posicao=posicao,  # Novo campo de posição
+                        admin_id=admin_id,
+                        created_at=datetime.utcnow()
+                    )
+                    db.session.add(passageiro)
+                    return 1
+                except IntegrityError as e:
+                    db.session.rollback()
+                    print(f"ERRO INTEGRIDADE PASSAGEIRO: {str(e)}")
+                    return -1  # Sinalizar erro de integridade
         
         return 0
     except (ValueError, TypeError):
         # ID inválido
         return 0
+    except IntegrityError as e:
+        db.session.rollback()
+        print(f"ERRO INTEGRIDADE PASSAGEIRO (Global): {str(e)}")
+        return -1
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO INESPERADO PASSAGEIRO: {str(e)}")
+        return -1
 
 
 # 4. ROTA REGISTRO USO - /veiculos/<id>/uso (GET/POST)
@@ -3100,7 +3114,9 @@ def novo_uso_veiculo_lista():
     
     veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first_or_404()
     
+    # TRANSAÇÃO ATÔMICA: Iniciar transação para uso + passageiros
     try:
+        db.session.begin()
         # Validações de negócio críticas
         km_inicial = float(request.form.get('km_inicial', 0))
         km_final = float(request.form.get('km_final', 0))
@@ -3170,25 +3186,43 @@ def novo_uso_veiculo_lista():
             flash('Máximo de 5 passageiros permitidos na parte traseira do veículo.', 'error')
             return redirect(url_for('main.veiculos'))
         
+        # VALIDAÇÃO CRÍTICA: Contar erros de integridade
+        erros_integridade = 0
+        
         # Processar passageiros da frente
         if passageiros_frente_ids:
             for passageiro_id in passageiros_frente_ids:
-                passageiros_criados += processar_passageiro_veiculo(
+                resultado = processar_passageiro_veiculo(
                     passageiro_id, motorista_id, uso.id, tenant_admin_id, 'frente'
                 )
+                if resultado == -1:
+                    erros_integridade += 1
+                elif resultado == 1:
+                    passageiros_criados += 1
         
         # Processar passageiros de trás
         if passageiros_tras_ids:
             for passageiro_id in passageiros_tras_ids:
-                passageiros_criados += processar_passageiro_veiculo(
+                resultado = processar_passageiro_veiculo(
                     passageiro_id, motorista_id, uso.id, tenant_admin_id, 'tras'
                 )
+                if resultado == -1:
+                    erros_integridade += 1
+                elif resultado == 1:
+                    passageiros_criados += 1
+        
+        # ROLLBACK SE HOUVER ERROS DE INTEGRIDADE
+        if erros_integridade > 0:
+            db.session.rollback()
+            flash(f'Erro: {erros_integridade} funcionário(s) já estavam registrados como passageiros neste uso. Operação cancelada.', 'error')
+            return redirect(url_for('main.veiculos'))
         
         # Atualizar KM atual do veículo se fornecido
         if km_final:
             veiculo.km_atual = km_final
             veiculo.updated_at = datetime.utcnow() if hasattr(veiculo, 'updated_at') else None
         
+        # COMMIT ATÔMICO - Tudo ou nada
         db.session.commit()
         
         # Mensagem de sucesso com informações sobre passageiros
@@ -3197,6 +3231,13 @@ def novo_uso_veiculo_lista():
         else:
             flash(f'Uso do veículo {veiculo.placa} registrado com sucesso!', 'success')
         
+    except IntegrityError as e:
+        db.session.rollback()
+        print(f"ERRO INTEGRIDADE USO VEÍCULO: {str(e)}")
+        if 'unique constraint' in str(e).lower():
+            flash('Erro: Este funcionário já está registrado como passageiro neste uso de veículo.', 'error')
+        else:
+            flash('Erro de integridade ao registrar uso. Verifique os dados e tente novamente.', 'error')
     except Exception as e:
         db.session.rollback()
         print(f"ERRO AO REGISTRAR USO: {str(e)}")
