@@ -3114,9 +3114,8 @@ def novo_uso_veiculo_lista():
     
     veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first_or_404()
     
-    # TRANSAÇÃO ATÔMICA: Iniciar transação para uso + passageiros
+    # TRANSAÇÃO ATÔMICA: Flask-SQLAlchemy gerencia transação automaticamente
     try:
-        db.session.begin()
         # Validações de negócio críticas
         km_inicial = float(request.form.get('km_inicial', 0))
         km_final = float(request.form.get('km_final', 0))
@@ -3264,7 +3263,7 @@ def organizar_passageiros_por_posicao(passageiros):
         <div class="card border-primary mb-2">
             <div class="card-header bg-light border-primary py-1">
                 <h6 class="card-title mb-0 text-primary">
-                    🚗 Frente ({})
+                    Frente ({})
                 </h6>
             </div>
             <div class="card-body py-2">
@@ -3290,7 +3289,7 @@ def organizar_passageiros_por_posicao(passageiros):
         <div class="card border-success mb-2">
             <div class="card-header bg-light border-success py-1">
                 <h6 class="card-title mb-0 text-success">
-                    🚌 Trás ({})
+                    Trás ({})
                 </h6>
             </div>
             <div class="card-body py-2">
