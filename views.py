@@ -7928,7 +7928,7 @@ def salvar_rdo_flexivel():
                     nome_subatividade=sub_data['nome'],
                     percentual_conclusao=sub_data['percentual'],
                     observacoes_tecnicas=sub_data['observacoes'],
-                    admin_id=tenant_admin_id,
+                    admin_id=admin_id,
                     ativo=True
                 )
                 
