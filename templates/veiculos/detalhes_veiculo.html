@@ -300,28 +300,83 @@
                         </select>
                     </div>
                     
-                    <!-- Passageiros (Seleção Múltipla) -->
-                    <div class="mb-3">
-                        <label for="passageiros_modal" class="form-label">
-                            <i class="fas fa-users me-1"></i>Passageiros
-                        </label>
-                        <select class="form-select autocomplete-passageiros-modal" 
-                                id="passageiros_modal" 
-                                name="passageiros[]" 
-                                multiple="multiple"
-                                data-placeholder="Selecione os passageiros (opcional)">
-                            {% for funcionario in funcionarios %}
-                            <option value="{{ funcionario.id }}">
-                                {{ funcionario.nome }}
-                                {% if funcionario.funcao_ref %}
-                                    - {{ funcionario.funcao_ref.nome }}
-                                {% endif %}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <small class="form-text text-muted">
-                            Selecione os funcionários que viajaram como passageiros. O motorista não precisa ser incluído.
-                        </small>
+                    <!-- Seção de Passageiros por Posição -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-users"></i> Distribuição de Passageiros
+                        </h6>
+                        
+                        <!-- Passageiros da Frente -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card border-success">
+                                    <div class="card-header bg-light border-success">
+                                        <h6 class="card-title mb-0 text-success">
+                                            🚗 Passageiros da Frente
+                                        </h6>
+                                        <small class="text-muted">Máximo 3 passageiros</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <select class="form-select autocomplete-passageiros-frente-modal" 
+                                                id="passageiros_frente_modal" 
+                                                name="passageiros_frente[]" 
+                                                multiple="multiple"
+                                                data-placeholder="Selecione até 3 passageiros da frente"
+                                                data-maximum-selection-length="3">
+                                            {% for funcionario in funcionarios %}
+                                                <option value="{{ funcionario.id }}">
+                                                    {{ funcionario.nome }}
+                                                    {% if funcionario.funcao_ref %}
+                                                        - {{ funcionario.funcao_ref.nome }}
+                                                    {% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <small class="form-text text-muted mt-1">
+                                            Banco do passageiro e traseiro direito
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Passageiros de Trás -->
+                            <div class="col-md-6 mb-3">
+                                <div class="card border-primary">
+                                    <div class="card-header bg-light border-primary">
+                                        <h6 class="card-title mb-0 text-primary">
+                                            🚌 Passageiros de Trás
+                                        </h6>
+                                        <small class="text-muted">Máximo 5 passageiros</small>
+                                    </div>
+                                    <div class="card-body">
+                                        <select class="form-select autocomplete-passageiros-tras-modal" 
+                                                id="passageiros_tras_modal" 
+                                                name="passageiros_tras[]" 
+                                                multiple="multiple"
+                                                data-placeholder="Selecione até 5 passageiros de trás"
+                                                data-maximum-selection-length="5">
+                                            {% for funcionario in funcionarios %}
+                                                <option value="{{ funcionario.id }}">
+                                                    {{ funcionario.nome }}
+                                                    {% if funcionario.funcao_ref %}
+                                                        - {{ funcionario.funcao_ref.nome }}
+                                                    {% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <small class="form-text text-muted mt-1">
+                                            Bancos traseiros e terceira fileira
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info" role="alert">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Importante:</strong> O condutor não precisa ser incluído nas listas de passageiros. 
+                            Organize os passageiros conforme a posição real no veículo para melhor controle de segurança.
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="obra_id" class="form-label">Obra (Opcional)</label>
@@ -521,15 +576,15 @@ $(document).ready(function() {
         }
     });
 
-    // Inicializar autocomplete para passageiros (seleção múltipla)
-    $('.autocomplete-passageiros-modal').select2({
+    // Inicializar autocomplete para passageiros da frente
+    $('.autocomplete-passageiros-frente-modal').select2({
         theme: 'bootstrap-5',
-        placeholder: 'Selecione os passageiros (opcional)',
+        placeholder: 'Selecione até 3 passageiros da frente',
         allowClear: true,
         dropdownParent: $('#usoModal'),
         width: '100%',
         multiple: true,
-        maximumSelectionLength: 10, // Limitar a 10 passageiros
+        maximumSelectionLength: 3,
         language: {
             noResults: function() {
                 return "Nenhum funcionário encontrado";
@@ -538,7 +593,29 @@ $(document).ready(function() {
                 return "Pesquisando...";
             },
             maximumSelected: function(e) {
-                return "Máximo de " + e.maximum + " passageiros permitidos";
+                return "Máximo de 3 passageiros da frente";
+            }
+        }
+    });
+
+    // Inicializar autocomplete para passageiros de trás
+    $('.autocomplete-passageiros-tras-modal').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Selecione até 5 passageiros de trás',
+        allowClear: true,
+        dropdownParent: $('#usoModal'),
+        width: '100%',
+        multiple: true,
+        maximumSelectionLength: 5,
+        language: {
+            noResults: function() {
+                return "Nenhum funcionário encontrado";
+            },
+            searching: function() {
+                return "Pesquisando...";
+            },
+            maximumSelected: function(e) {
+                return "Máximo de 5 passageiros de trás";
             }
         }
     });
@@ -573,7 +650,8 @@ $(document).ready(function() {
     $('#usoModal').on('hidden.bs.modal', function() {
         $('.autocomplete-funcionario').val(null).trigger('change');
         $('.autocomplete-obra').val(null).trigger('change');
-        $('.autocomplete-passageiros-modal').val(null).trigger('change');
+        $('.autocomplete-passageiros-frente-modal').val(null).trigger('change');
+        $('.autocomplete-passageiros-tras-modal').val(null).trigger('change');
         // Limpar também os campos de formulário
         $('#usoModal form')[0].reset();
     });
