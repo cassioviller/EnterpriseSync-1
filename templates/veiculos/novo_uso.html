@@ -133,7 +133,7 @@
                                                     id="passageiros_frente" 
                                                     name="passageiros_frente[]" 
                                                     multiple="multiple"
-                                                    data-placeholder="Selecione até 3 passageiros da frente"
+                                                    data-placeholder="Selecione"
                                                     data-maximum-selection-length="3">
                                                 {% if funcionarios %}
                                                     {% for funcionario in funcionarios %}
@@ -166,7 +166,7 @@
                                                     id="passageiros_tras" 
                                                     name="passageiros_tras[]" 
                                                     multiple="multiple"
-                                                    data-placeholder="Selecione até 5 passageiros de trás"
+                                                    data-placeholder="Selecione"
                                                     data-maximum-selection-length="5">
                                                 {% if funcionarios %}
                                                     {% for funcionario in funcionarios %}
@@ -187,11 +187,6 @@
                                 </div>
                             </div>
                             
-                            <div class="alert alert-info" role="alert">
-                                <i class="fas fa-info-circle me-2"></i>
-                                <strong>Importante:</strong> O condutor não precisa ser incluído nas listas de passageiros. 
-                                Organize os passageiros conforme a posição real no veículo para melhor controle de segurança.
-                            </div>
                         </div>
                         
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">

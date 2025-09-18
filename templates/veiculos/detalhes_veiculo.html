@@ -320,7 +320,7 @@
                                                 id="passageiros_frente_modal" 
                                                 name="passageiros_frente[]" 
                                                 multiple="multiple"
-                                                data-placeholder="Selecione até 3 passageiros da frente"
+                                                data-placeholder="Selecione"
                                                 data-maximum-selection-length="3">
                                             {% for funcionario in funcionarios %}
                                                 <option value="{{ funcionario.id }}">
@@ -351,7 +351,7 @@
                                                 id="passageiros_tras_modal" 
                                                 name="passageiros_tras[]" 
                                                 multiple="multiple"
-                                                data-placeholder="Selecione até 5 passageiros de trás"
+                                                data-placeholder="Selecione"
                                                 data-maximum-selection-length="5">
                                             {% for funcionario in funcionarios %}
                                                 <option value="{{ funcionario.id }}">
@@ -370,11 +370,6 @@
                             </div>
                         </div>
                         
-                        <div class="alert alert-info" role="alert">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>Importante:</strong> O condutor não precisa ser incluído nas listas de passageiros. 
-                            Organize os passageiros conforme a posição real no veículo para melhor controle de segurança.
-                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="obra_id" class="form-label">Obra (Opcional)</label>
@@ -577,7 +572,7 @@ $(document).ready(function() {
     // Inicializar autocomplete para passageiros da frente
     $('.autocomplete-passageiros-frente-modal').select2({
         theme: 'bootstrap-5',
-        placeholder: 'Selecione até 3 passageiros da frente',
+        placeholder: 'Selecione',
         allowClear: true,
         dropdownParent: $('#usoModal'),
         width: '100%',
@@ -599,7 +594,7 @@ $(document).ready(function() {
     // Inicializar autocomplete para passageiros de trás
     $('.autocomplete-passageiros-tras-modal').select2({
         theme: 'bootstrap-5',
-        placeholder: 'Selecione até 5 passageiros de trás',
+        placeholder: 'Selecione',
         allowClear: true,
         dropdownParent: $('#usoModal'),
         width: '100%',

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre
+from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, PassageiroVeiculo
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
 
@@ -3098,7 +3098,7 @@ def processar_passageiro_veiculo(passageiro_id, motorista_id, uso_veiculo_id, ad
 @login_required  # 🔒 MUDANÇA: Funcionários podem registrar uso de veículos
 def novo_uso_veiculo_lista():
     from forms import UsoVeiculoForm
-    from models import Veiculo, UsoVeiculo, Funcionario, Obra, PassageiroVeiculo
+    from models import Veiculo, UsoVeiculo, Funcionario, Obra
     
     # Obter veiculo_id do form (hidden field)
     veiculo_id = request.form.get('veiculo_id')
@@ -3328,7 +3328,7 @@ def organizar_passageiros_por_posicao(passageiros):
 @login_required
 def detalhes_uso_veiculo(uso_id):
     """Fornecer dados detalhados de um uso específico via AJAX"""
-    from models import UsoVeiculo, Funcionario, Obra, Veiculo, PassageiroVeiculo
+    from models import UsoVeiculo, Funcionario, Obra, Veiculo
     
     # 🔒 SEGURANÇA MULTITENANT
     tenant_admin_id = get_tenant_admin_id()
