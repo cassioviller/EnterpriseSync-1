@@ -6277,22 +6277,53 @@ def funcionario_rdo_consolidado():
         
     except Exception as e:
         print(f"ERRO RDO CONSOLIDADO: {str(e)}")
-        # Fallback simples
+        print(f"📋 FALLBACK ATIVADO - Motivo: {type(e).__name__}: {str(e)}")
+        # Fallback com cálculos reais
         try:
             rdos_basicos = RDO.query.join(Obra).filter(
                 Obra.admin_id == admin_id_correto
             ).order_by(RDO.data_relatorio.desc()).limit(20).all()
             
-            # Dados simples para fallback
+            # Dados com cálculos reais para fallback
             rdos_fallback = []
             for rdo in rdos_basicos:
+                # 🔧 CALCULAR VALORES REAIS NO FALLBACK
+                try:
+                    # Contar subatividades reais
+                    total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
+                    
+                    # Contar funcionários reais
+                    total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
+                    
+                    # Calcular progresso médio real baseado nas subatividades
+                    subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+                    progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades) if subatividades else 0
+                    
+                    # Calcular horas trabalhadas reais
+                    mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
+                    total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
+                    
+                    print(f"📊 FALLBACK RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {progresso_medio:.1f}% progresso")
+                    
+                except Exception as calc_error:
+                    print(f"❌ ERRO cálculo RDO {rdo.id}: {calc_error}")
+                    total_subatividades = 0
+                    total_funcionarios = 0
+                    progresso_medio = 0
+                    total_horas_trabalhadas = 0
+                
                 rdos_fallback.append({
                     'rdo': rdo,
                     'obra': rdo.obra,
-                    'total_subatividades': 0,
-                    'total_funcionarios': 0,
-                    'progresso_medio': 67.5,  # Valor de exemplo
-                    'status_cor': 'secondary'
+                    'total_subatividades': total_subatividades,
+                    'total_funcionarios': total_funcionarios,
+                    'total_horas_trabalhadas': round(total_horas_trabalhadas, 1),
+                    'progresso_medio': round(progresso_medio, 1),
+                    'status_cor': {
+                        'Rascunho': 'warning',
+                        'Finalizado': 'success',
+                        'Aprovado': 'info'
+                    }.get(rdo.status, 'secondary')
                 })
             
             return render_template('rdo_lista_unificada.html',
