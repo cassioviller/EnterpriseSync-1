@@ -3,6 +3,28 @@
 {% block title %}{{ veiculo.placa }} - Detalhes do Veículo - SIGE{% endblock %}
 
 {% block content %}
+<!-- Alerta de identificação do veículo -->
+<div class="alert alert-info border-0 shadow-sm mb-3">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h6 class="alert-heading mb-1">
+                <i class="fas fa-info-circle"></i> 
+                <strong>Veículo Atual:</strong> {{ veiculo.placa }}
+            </h6>
+            <small class="text-muted">
+                {{ veiculo.marca }} {{ veiculo.modelo }} 
+                {% if veiculo.ano %} • Ano {{ veiculo.ano }}{% endif %}
+                • ID: {{ veiculo.id }}
+            </small>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <span class="badge bg-primary fs-6">
+                <i class="fas fa-car"></i> {{ veiculo.placa }}
+            </span>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">

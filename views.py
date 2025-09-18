@@ -2604,13 +2604,24 @@ def detalhes_veiculo(id):
         from sqlalchemy import text
         veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first_or_404()
         
+        # 🔍 DEBUG: Log detalhado do veículo acessado
+        print(f"🚗 DEBUG DETALHES VEÍCULO: Acessando veículo ID {id}")
+        print(f"   📋 Placa: {veiculo.placa}")
+        print(f"   🏷️ Marca/Modelo: {veiculo.marca} {veiculo.modelo}")
+        print(f"   👤 Admin ID: {tenant_admin_id}")
+        print(f"   👤 Usuário: {current_user.email if current_user.is_authenticated else 'NÃO AUTENTICADO'}")
+        
         # Buscar histórico de uso do veículo (sem admin_id que não existe)
         try:
             usos_veiculo = db.session.execute(
                 text("SELECT * FROM uso_veiculo WHERE veiculo_id = :veiculo_id ORDER BY data_uso DESC"),
                 {'veiculo_id': id}
             ).fetchall()
-        except Exception:
+            print(f"   📊 Total usos encontrados: {len(usos_veiculo)}")
+            if usos_veiculo:
+                print(f"   📅 Último uso: {usos_veiculo[0].data_uso if hasattr(usos_veiculo[0], 'data_uso') else 'N/A'}")
+        except Exception as e:
+            print(f"   ❌ ERRO ao buscar usos: {str(e)}")
             usos_veiculo = []
         
         # Buscar custos/manutenções do veículo (sem admin_id que não existe)  
