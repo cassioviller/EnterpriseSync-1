@@ -3034,6 +3034,50 @@ def excluir_veiculo(id):
     return redirect(url_for('main.veiculos'))
 
 
+# Helper function para processar passageiros por posição
+def processar_passageiro_veiculo(passageiro_id, motorista_id, uso_veiculo_id, admin_id, posicao):
+    """
+    Processa um passageiro individual do veículo com validações
+    Retorna 1 se criado com sucesso, 0 caso contrário
+    """
+    try:
+        passageiro_id = int(passageiro_id)
+        
+        # Validar se o passageiro não é o mesmo que o motorista
+        if passageiro_id == int(motorista_id):
+            return 0  # Pular motorista - ele já está registrado como condutor
+        
+        # Verificar se o funcionário existe e pertence ao mesmo admin
+        funcionario_passageiro = Funcionario.query.filter_by(
+            id=passageiro_id, 
+            admin_id=admin_id, 
+            ativo=True
+        ).first()
+        
+        if funcionario_passageiro:
+            # Verificar se já não existe registro (evitar duplicação)
+            passageiro_existente = PassageiroVeiculo.query.filter_by(
+                uso_veiculo_id=uso_veiculo_id,
+                funcionario_id=passageiro_id
+            ).first()
+            
+            if not passageiro_existente:
+                passageiro = PassageiroVeiculo(
+                    uso_veiculo_id=uso_veiculo_id,
+                    funcionario_id=passageiro_id,
+                    posicao=posicao,  # Novo campo de posição
+                    admin_id=admin_id,
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(passageiro)
+                return 1
+        
+        return 0
+    except (ValueError, TypeError):
+        # ID inválido
+        return 0
+
+
 # 4. ROTA REGISTRO USO - /veiculos/<id>/uso (GET/POST)
 # ROTA PARA MODAL DE USO (SEM PARÂMETRO ID NA URL)
 @main_bp.route('/veiculos/uso', methods=['POST'])
@@ -3112,46 +3156,33 @@ def novo_uso_veiculo_lista():
         db.session.add(uso)
         db.session.flush()  # Obter ID do uso para criar passageiros
         
-        # Processar passageiros selecionados
-        passageiros_ids = request.form.getlist('passageiros[]')
+        # Processar passageiros por posição com validações de limite
+        passageiros_frente_ids = request.form.getlist('passageiros_frente[]')
+        passageiros_tras_ids = request.form.getlist('passageiros_tras[]')
         passageiros_criados = 0
         
-        if passageiros_ids:
-            for passageiro_id in passageiros_ids:
-                try:
-                    passageiro_id = int(passageiro_id)
-                    
-                    # Validar se o passageiro não é o mesmo que o motorista
-                    if passageiro_id == int(motorista_id):
-                        continue  # Pular motorista - ele já está registrado como condutor
-                    
-                    # Verificar se o funcionário existe e pertence ao mesmo admin
-                    funcionario_passageiro = Funcionario.query.filter_by(
-                        id=passageiro_id, 
-                        admin_id=tenant_admin_id, 
-                        ativo=True
-                    ).first()
-                    
-                    if funcionario_passageiro:
-                        # Verificar se já não existe registro (evitar duplicação)
-                        passageiro_existente = PassageiroVeiculo.query.filter_by(
-                            uso_veiculo_id=uso.id,
-                            funcionario_id=passageiro_id
-                        ).first()
-                        
-                        if not passageiro_existente:
-                            passageiro = PassageiroVeiculo(
-                                uso_veiculo_id=uso.id,
-                                funcionario_id=passageiro_id,
-                                admin_id=tenant_admin_id,
-                                created_at=datetime.utcnow()
-                            )
-                            db.session.add(passageiro)
-                            passageiros_criados += 1
-                        
-                except (ValueError, TypeError):
-                    # ID inválido, continuar com próximo
-                    continue
+        # Validações de limite
+        if len(passageiros_frente_ids) > 3:
+            flash('Máximo de 3 passageiros permitidos na frente do veículo.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        if len(passageiros_tras_ids) > 5:
+            flash('Máximo de 5 passageiros permitidos na parte traseira do veículo.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        # Processar passageiros da frente
+        if passageiros_frente_ids:
+            for passageiro_id in passageiros_frente_ids:
+                passageiros_criados += processar_passageiro_veiculo(
+                    passageiro_id, motorista_id, uso.id, tenant_admin_id, 'frente'
+                )
+        
+        # Processar passageiros de trás
+        if passageiros_tras_ids:
+            for passageiro_id in passageiros_tras_ids:
+                passageiros_criados += processar_passageiro_veiculo(
+                    passageiro_id, motorista_id, uso.id, tenant_admin_id, 'tras'
+                )
         
         # Atualizar KM atual do veículo se fornecido
         if km_final:
@@ -3172,6 +3203,84 @@ def novo_uso_veiculo_lista():
         flash('Erro ao registrar uso do veículo. Tente novamente.', 'error')
     
     return redirect(url_for('main.veiculos'))
+
+
+# Helper function para organizar passageiros por posição no modal
+def organizar_passageiros_por_posicao(passageiros):
+    """
+    Organiza passageiros por posição (frente/trás) com ícones e contadores
+    Retorna HTML formatado para exibição no modal
+    """
+    # Separar passageiros por posição
+    passageiros_frente = [p for p in passageiros if p.posicao == 'frente']
+    passageiros_tras = [p for p in passageiros if p.posicao == 'tras']
+    
+    html = '<div class="row">'
+    
+    # Passageiros da Frente
+    html += '''
+    <div class="col-12 mb-2">
+        <div class="card border-primary mb-2">
+            <div class="card-header bg-light border-primary py-1">
+                <h6 class="card-title mb-0 text-primary">
+                    🚗 Frente ({})
+                </h6>
+            </div>
+            <div class="card-body py-2">
+    '''.format(len(passageiros_frente))
+    
+    if passageiros_frente:
+        for passageiro in passageiros_frente:
+            nome = passageiro.funcionario.nome if passageiro.funcionario else 'N/A'
+            funcao = passageiro.funcionario.funcao_ref.nome if passageiro.funcionario and passageiro.funcionario.funcao_ref else 'Sem função'
+            html += f'<div class="mb-1"><strong>{nome}</strong> <small class="text-muted">- {funcao}</small></div>'
+    else:
+        html += '<small class="text-muted">Nenhum passageiro na frente</small>'
+    
+    html += '''
+            </div>
+        </div>
+    </div>
+    '''
+    
+    # Passageiros de Trás
+    html += '''
+    <div class="col-12 mb-2">
+        <div class="card border-success mb-2">
+            <div class="card-header bg-light border-success py-1">
+                <h6 class="card-title mb-0 text-success">
+                    🚌 Trás ({})
+                </h6>
+            </div>
+            <div class="card-body py-2">
+    '''.format(len(passageiros_tras))
+    
+    if passageiros_tras:
+        for passageiro in passageiros_tras:
+            nome = passageiro.funcionario.nome if passageiro.funcionario else 'N/A'
+            funcao = passageiro.funcionario.funcao_ref.nome if passageiro.funcionario and passageiro.funcionario.funcao_ref else 'Sem função'
+            html += f'<div class="mb-1"><strong>{nome}</strong> <small class="text-muted">- {funcao}</small></div>'
+    else:
+        html += '<small class="text-muted">Nenhum passageiro atrás</small>'
+    
+    html += '''
+            </div>
+        </div>
+    </div>
+    '''
+    
+    html += '</div>'
+    
+    # Se não há passageiros em nenhuma posição
+    if not passageiros_frente and not passageiros_tras:
+        html = '''
+        <div class="text-center text-muted">
+            <i class="fas fa-info-circle"></i>
+            Nenhum passageiro registrado
+        </div>
+        '''
+    
+    return html
 
 
 # ROTA DETALHES USO - /veiculos/uso/<int:uso_id>/detalhes (GET)
@@ -3278,26 +3387,8 @@ def detalhes_uso_veiculo(uso_id):
             </div>
         </div>
         <div class="col-md-6">
-            <h6><i class="fas fa-users"></i> Passageiros</h6>
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    {''.join([f'''
-                    <tr>
-                        <td><strong>{passageiro.funcionario.nome if passageiro.funcionario else 'N/A'}</strong></td>
-                        <td class="text-muted small">
-                            {passageiro.funcionario.funcao_ref.nome if passageiro.funcionario and passageiro.funcionario.funcao_ref else 'Sem função'}
-                        </td>
-                    </tr>
-                    ''' for passageiro in passageiros]) if passageiros else '''
-                    <tr>
-                        <td colspan="2" class="text-center text-muted">
-                            <i class="fas fa-info-circle"></i>
-                            Nenhum passageiro registrado
-                        </td>
-                    </tr>
-                    '''}
-                </table>
-            </div>
+            <h6><i class="fas fa-users"></i> Passageiros por Posição</h6>
+            {organizar_passageiros_por_posicao(passageiros)}
         </div>
     </div>
     

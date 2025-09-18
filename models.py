@@ -1133,6 +1133,10 @@ class PassageiroVeiculo(db.Model):
     uso_veiculo_id = db.Column(db.Integer, db.ForeignKey('uso_veiculo.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     
+    # Campo para diferenciação de posição no veículo
+    posicao = db.Column(db.String(10), nullable=False, 
+                       server_default='tras')  # Default para compatibilidade com dados existentes
+    
     # Multi-tenant - OBRIGATÓRIO para isolamento de segurança
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -1142,11 +1146,14 @@ class PassageiroVeiculo(db.Model):
     funcionario = db.relationship('Funcionario', backref='viagens_passageiro', overlaps="viagens_passageiro")
     admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='passageiros_criados', overlaps="passageiros_criados")
     
-    # Constraint único para evitar duplicação de passageiros no mesmo uso
-    __table_args__ = (db.UniqueConstraint('uso_veiculo_id', 'funcionario_id', name='_uso_funcionario_passageiro_uc'),)
+    # Constraints e validações
+    __table_args__ = (
+        db.UniqueConstraint('uso_veiculo_id', 'funcionario_id', name='_uso_funcionario_passageiro_uc'),
+        db.CheckConstraint("posicao IN ('frente', 'tras')", name='_check_posicao_valida')
+    )
     
     def __repr__(self):
-        return f'<PassageiroVeiculo UsoID:{self.uso_veiculo_id} FuncID:{self.funcionario_id}>'
+        return f'<PassageiroVeiculo UsoID:{self.uso_veiculo_id} FuncID:{self.funcionario_id} Pos:{self.posicao}>'
 
 
 class CustoVeiculo(db.Model):
