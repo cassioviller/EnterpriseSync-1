@@ -109,7 +109,7 @@
                                              alt="Foto {{ item.funcionario.nome }}" 
                                              class="rounded-circle" 
                                              width="40" height="40"
-                                             onerror="this.src='data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"40\" viewBox=\"0 0 40 40\"><rect width=\"40\" height=\"40\" fill=\"%23007bff\"/><text x=\"20\" y=\"25\" font-family=\"Arial\" font-size=\"14\" font-weight=\"bold\" text-anchor=\"middle\" fill=\"white\">{{ item.funcionario.nome[:1] }}</text></svg>'">
+                                             onerror="this.src='data:image/svg+xml;charset=utf-8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"40\" viewBox=\"0 0 40 40\"><rect width=\"40\" height=\"40\" fill=\"%23007bff\"/><text x=\"20\" y=\"25\" font-family=\"Arial\" font-size=\"14\" font-weight=\"bold\" text-anchor=\"middle\" fill=\"white\">{{ (item.funcionario.nome[:1] if item.funcionario.nome else 'F') | urlencode }}</text></svg>'">
                                     </td>
                                     <td>
                                         <strong>{{ item.funcionario.nome }}</strong>

@@ -101,7 +101,7 @@
                                          alt="Foto {{ func.nome }}" 
                                          class="rounded-circle me-3" 
                                          width="40" height="40"
-                                         onerror="this.src='data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"40\" viewBox=\"0 0 40 40\"><rect width=\"40\" height=\"40\" fill=\"%23007bff\"/><text x=\"20\" y=\"25\" font-family=\"Arial\" font-size=\"14\" font-weight=\"bold\" text-anchor=\"middle\" fill=\"white\">{{ func.nome[:1] }}</text></svg>'">
+                                         onerror="this.src='data:image/svg+xml;charset=utf-8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"40\" viewBox=\"0 0 40 40\"><rect width=\"40\" height=\"40\" fill=\"%23007bff\"/><text x=\"20\" y=\"25\" font-family=\"Arial\" font-size=\"14\" font-weight=\"bold\" text-anchor=\"middle\" fill=\"white\">{{ (func.nome[:1] if func.nome else 'F') | urlencode }}</text></svg>'">
                                     <div>
                                         <h6 class="mb-0">{{ func.nome }}</h6>
                                         <small class="text-muted">{{ func.funcao.nome if func.funcao else 'Função não definida' }}</small>
