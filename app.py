@@ -109,7 +109,7 @@ migrate.init_app(app, db)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'main.login'
+login_manager.login_view = 'auth.login'  # Corrigido para apontar para blueprint auth
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
 
 # Context processor para configurações da empresa

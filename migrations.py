@@ -600,10 +600,19 @@ def migrar_campos_completos_templates():
         
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar campos completos de templates: {str(e)}")
-        if 'connection' in locals():
-            connection.rollback()
-            cursor.close()
-            connection.close()
+        if 'connection' in locals() and connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+            try:
+                cursor.close() if 'cursor' in locals() and cursor else None
+            except:
+                pass
+            try:
+                connection.close()
+            except:
+                pass
 
 
 def migrar_campos_rdo_ocorrencia():
@@ -985,7 +994,8 @@ def corrigir_admin_id_servicos_existentes():
         
         # Verificar quantos serviços estão sem admin_id
         cursor.execute("SELECT COUNT(*) FROM servico WHERE admin_id IS NULL")
-        servicos_sem_admin = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        servicos_sem_admin = result[0] if result else 0
         
         if servicos_sem_admin > 0:
             logger.info(f"🔧 Corrigindo {servicos_sem_admin} serviços sem admin_id...")

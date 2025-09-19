@@ -74,20 +74,24 @@ def execute_connectivity_test():
         
         # Verificar versão PostgreSQL
         cursor.execute("SELECT version()")
-        pg_version = cursor.fetchone()[0]
+        result_version = cursor.fetchone()
+        pg_version = result_version[0] if result_version else "Desconhecido"
         logger.info(f"✅ PostgreSQL: {pg_version}")
         
         # Verificar usuário e database
         cursor.execute("SELECT current_user, current_database()")
-        user, db = cursor.fetchone()
-        logger.info(f"✅ Conectado como: {user}@{db}")
+        result_user = cursor.fetchone()
+        if result_user:
+            user, db = result_user
+            logger.info(f"✅ Conectado como: {user}@{db}")
         
         # Contar tabelas existentes
         cursor.execute("""
             SELECT COUNT(*) FROM information_schema.tables 
             WHERE table_schema = 'public'
         """)
-        table_count = cursor.fetchone()[0]
+        result_count = cursor.fetchone()
+        table_count = result_count[0] if result_count else 0
         logger.info(f"📊 Total de tabelas: {table_count}")
         
         cursor.close()
