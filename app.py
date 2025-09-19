@@ -109,7 +109,7 @@ migrate.init_app(app, db)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'auth.login'  # Corrigido para apontar para blueprint auth
+setattr(login_manager, 'login_view', 'auth.login')  # Corrigido para apontar para blueprint auth
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
 
 # Context processor para configurações da empresa
@@ -375,6 +375,8 @@ with app.app_context():
         logging.info("✅ Blueprint API organizer registrado")
     except ImportError as e:
         logging.warning(f"⚠️ Blueprint API organizer não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint API organizer: {e}")
     
     # Registrar blueprint de categorias de serviços
     try:
@@ -385,8 +387,6 @@ with app.app_context():
         logging.warning(f"⚠️ Blueprint categorias de serviços não encontrado: {e}")
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint categorias de serviços: {e}")
-    except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint API organizer: {e}")
     
     # Registrar blueprint de configurações
     try:

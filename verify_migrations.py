@@ -180,11 +180,16 @@ class MigrationVerifier:
             with self.engine.connect() as conn:
                 # Versão do PostgreSQL
                 result = conn.execute(text("SELECT version();"))
-                version = result.fetchone()[0]
+                version_row = result.fetchone()
+                if not version_row:
+                    return None
+                version = version_row[0]
                 
                 # Informações do banco atual
                 result = conn.execute(text("SELECT current_database(), current_user;"))
                 db_info = result.fetchone()
+                if not db_info:
+                    return None
                 
                 return {
                     'version': version,
