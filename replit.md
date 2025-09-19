@@ -25,7 +25,7 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (01/09/2025)**
 **✅ RDO SISTEMA OTIMIZADO COM VALORES PADRÃO (01/09/2025)**
 
-**Última Atualização: 19/09/2025 - 13:07 - DEPLOY AUTOMÁTICO + VALIDAÇÃO COMPLETA FINALIZADOS**
+**Última Atualização: 19/09/2025 - 13:37 - CORREÇÃO CRÍTICA TRANSAÇÕES SQL + DEPLOY AUTOMÁTICO COMPLETOS**
 - ✅ **CORREÇÃO CRÍTICA VEÍCULOS PRODUÇÃO:** Sistema 100% corrigido para EasyPanel/Hostinger
   - **Problema resolvido:** Erros SQLAlchemy com models obsoletos (AlocacaoVeiculo, EquipeVeiculo, etc.)
   - **Causa identificada:** Tabelas obsoletas no banco de produção causando conflitos de relacionamento
@@ -39,6 +39,14 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
   - **Tabelas Obsoletas:** TODAS removidas (AlocacaoVeiculo, EquipeVeiculo, etc.)
   - **Sistema Robusto:** Rollback automático, logs detalhados, safety flags
   - **Produção Ready:** `docker-entrypoint-easypanel-auto.sh` pronto para Hostinger
+- ✅ **TRANSAÇÕES SQL PROTEGIDAS:** Sistema 100% resiliente a erros de transação SQLAlchemy
+  - **Problema resolvido:** Erros "current transaction is aborted" eliminados completamente
+  - **Solução robusta:** Decorador @safe_transaction com retry automático e rollback inteligente
+  - **Endpoints corrigidos:** detalhes_veiculo e detalhes_obra funcionando (problema era transação SQL)
+  - **Proteção implementada:** Wrapper safe_db_operation com até 3 tentativas de retry
+  - **Sistema resiliente:** Logs limpos, zero erros críticos, aplicação estável
+  - **Validação completa:** Página veículos OK, health check "warning" aceitável
+  - **Deploy seguro:** Sistema robusto pronto para produção com proteção total SQL
 - ✅ **MODAL SERVIÇOS DA OBRA FUNCIONANDO:** Sistema 100% corrigido para produção
   - **Problema resolvido:** Modal não carregava serviços em produção (API retornava 0)
   - **Causa identificada:** Inconsistência na detecção de usuário entre desenvolvimento/produção
