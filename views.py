@@ -188,9 +188,122 @@ def health_check():
     try:
         # Verificar conexão com banco
         db.session.execute(text('SELECT 1'))
-        return {'status': 'healthy', 'database': 'connected'}, 200
+        return {'status': 'healthy', 'database': 'connected', 'veiculos_check': '/health/veiculos'}, 200
     except Exception as e:
         return {'status': 'unhealthy', 'error': str(e)}, 500
+
+# Health check específico para veículos
+@main_bp.route('/health/veiculos')
+def health_check_veiculos():
+    """Health check detalhado do sistema de veículos para produção"""
+    start_time = datetime.now()
+    resultado = {
+        'timestamp': start_time.isoformat(),
+        'status': 'unknown',
+        'checks': {},
+        'errors': [],
+        'warnings': [],
+        'duracao_ms': 0
+    }
+    
+    try:
+        # 1. Verificar conexão com banco
+        try:
+            db.session.execute(text("SELECT 1"))
+            resultado['checks']['database_connection'] = 'OK'
+        except Exception as e:
+            resultado['checks']['database_connection'] = 'FAIL'
+            resultado['errors'].append(f"Conexão banco: {str(e)}")
+            
+        # 2. Verificar tabelas essenciais
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tabelas_existentes = inspector.get_table_names()
+            
+            tabelas_essenciais = ['veiculo', 'uso_veiculo', 'custo_veiculo', 'passageiro_veiculo']
+            tabelas_obsoletas = ['alocacao_veiculo', 'equipe_veiculo', 'transferencia_veiculo', 'manutencao_veiculo', 'alerta_veiculo']
+            
+            # Verificar tabelas essenciais
+            for tabela in tabelas_essenciais:
+                if tabela in tabelas_existentes:
+                    resultado['checks'][f'tabela_{tabela}'] = 'OK'
+                else:
+                    resultado['checks'][f'tabela_{tabela}'] = 'MISSING'
+                    resultado['errors'].append(f"Tabela essencial ausente: {tabela}")
+            
+            # Verificar se tabelas obsoletas foram removidas
+            for tabela in tabelas_obsoletas:
+                if tabela in tabelas_existentes:
+                    resultado['checks'][f'obsoleta_{tabela}'] = 'PRESENT'
+                    resultado['warnings'].append(f"Tabela obsoleta ainda presente: {tabela}")
+                else:
+                    resultado['checks'][f'obsoleta_{tabela}'] = 'REMOVED'
+                    
+        except Exception as e:
+            resultado['errors'].append(f"Erro ao verificar tabelas: {str(e)}")
+            
+        # 3. Verificar contagem de dados
+        try:
+            # Contar veículos
+            if 'veiculo' in tabelas_existentes:
+                from models import Veiculo
+                count_veiculos = Veiculo.query.count()
+                resultado['checks']['count_veiculos'] = count_veiculos
+                
+            # Contar usos
+            if 'uso_veiculo' in tabelas_existentes:
+                from models import UsoVeiculo
+                count_usos = UsoVeiculo.query.count()
+                resultado['checks']['count_usos'] = count_usos
+                
+            # Contar custos
+            if 'custo_veiculo' in tabelas_existentes:
+                from models import CustoVeiculo
+                count_custos = CustoVeiculo.query.count()
+                resultado['checks']['count_custos'] = count_custos
+                
+        except Exception as e:
+            resultado['errors'].append(f"Erro ao contar dados: {str(e)}")
+            
+        # 4. Teste de tenant isolation
+        try:
+            tenant_admin_id = get_tenant_admin_id()
+            if tenant_admin_id:
+                resultado['checks']['tenant_admin_id'] = tenant_admin_id
+                
+                # Testar query específica de tenant
+                from models import Veiculo
+                veiculos_tenant = Veiculo.query.filter_by(admin_id=tenant_admin_id).count()
+                resultado['checks']['veiculos_tenant'] = veiculos_tenant
+            else:
+                resultado['warnings'].append("Tenant admin_id não detectado")
+                
+        except Exception as e:
+            resultado['warnings'].append(f"Erro no teste de tenant: {str(e)}")
+            
+        # 5. Determinar status final
+        if resultado['errors']:
+            resultado['status'] = 'error'
+            status_code = 500
+        elif resultado['warnings']:
+            resultado['status'] = 'warning'
+            status_code = 200
+        else:
+            resultado['status'] = 'healthy'
+            status_code = 200
+            
+        # Calcular duração
+        end_time = datetime.now()
+        duracao = (end_time - start_time).total_seconds() * 1000
+        resultado['duracao_ms'] = round(duracao, 2)
+        
+        return resultado, status_code
+        
+    except Exception as e:
+        resultado['status'] = 'error'
+        resultado['errors'].append(f"Erro crítico: {str(e)}")
+        return resultado, 500
 
 # ===== ROTAS DE AUTENTICAÇÃO =====
 @main_bp.route('/login', methods=['GET', 'POST'])
