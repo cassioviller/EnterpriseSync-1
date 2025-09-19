@@ -507,10 +507,83 @@ function editarVeiculo(id) {
 }
 
 function gerenciarVeiculo(veiculoId, placa) {
-    document.getElementById('uso_veiculo_id').value = veiculoId;
-    document.getElementById('custo_veiculo_id').value = veiculoId;
-    document.getElementById('gerenciarVeiculoPlaca').textContent = placa;
-    new bootstrap.Modal(document.getElementById('gerenciarVeiculoModal')).show();
+    console.log('🚗 DEBUG: Tentando abrir modal gerenciar veículo', {veiculoId, placa});
+    
+    // Verificações de segurança para produção
+    const usoVeiculoElement = document.getElementById('uso_veiculo_id');
+    const custoVeiculoElement = document.getElementById('custo_veiculo_id');
+    const placaElement = document.getElementById('gerenciarVeiculoPlaca');
+    const modalElement = document.getElementById('gerenciarVeiculoModal');
+    
+    // Logs de debug detalhados
+    console.log('🔍 DEBUG: Elementos encontrados:', {
+        usoVeiculoElement: !!usoVeiculoElement,
+        custoVeiculoElement: !!custoVeiculoElement, 
+        placaElement: !!placaElement,
+        modalElement: !!modalElement,
+        bootstrap: typeof bootstrap !== 'undefined'
+    });
+    
+    // Verificar se todos os elementos existem
+    if (!usoVeiculoElement) {
+        console.error('❌ ERRO: Elemento uso_veiculo_id não encontrado');
+        alert('Erro: Formulário de uso não carregado. Recarregue a página.');
+        return;
+    }
+    
+    if (!custoVeiculoElement) {
+        console.error('❌ ERRO: Elemento custo_veiculo_id não encontrado');
+        alert('Erro: Formulário de custo não carregado. Recarregue a página.');
+        return;
+    }
+    
+    if (!modalElement) {
+        console.error('❌ ERRO: Modal gerenciarVeiculoModal não encontrado');
+        alert('Erro: Modal não carregado. Recarregue a página.');
+        return;
+    }
+    
+    // Verificar se Bootstrap está disponível
+    if (typeof bootstrap === 'undefined') {
+        console.error('❌ ERRO: Bootstrap JavaScript não carregado');
+        alert('Erro: Bootstrap não carregado. Verifique sua conexão.');
+        return;
+    }
+    
+    try {
+        // Definir valores nos campos
+        usoVeiculoElement.value = veiculoId;
+        custoVeiculoElement.value = veiculoId;
+        
+        if (placaElement) {
+            placaElement.textContent = placa;
+        }
+        
+        // Abrir modal com fallback para jQuery se Bootstrap falhar
+        try {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+            console.log('✅ Modal aberto com Bootstrap');
+        } catch (bootstrapError) {
+            console.warn('⚠️ Bootstrap Modal falhou, tentando jQuery fallback:', bootstrapError);
+            // Fallback para jQuery se disponível
+            if (typeof $ !== 'undefined') {
+                $(modalElement).modal('show');
+                console.log('✅ Modal aberto com jQuery fallback');
+            } else {
+                throw new Error('Nem Bootstrap nem jQuery disponíveis');
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ ERRO ao abrir modal:', error);
+        console.log('🔄 Redirecionando para página de detalhes como fallback...');
+        
+        // Fallback: redirecionar para página de detalhes do veículo
+        const detalhesUrl = `/veiculos/${veiculoId}/detalhes`;
+        console.log('🔗 URL de redirecionamento:', detalhesUrl);
+        window.location.href = detalhesUrl;
+    }
 }
 
 function excluirVeiculo(id) {
