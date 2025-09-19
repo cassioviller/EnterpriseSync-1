@@ -8,7 +8,16 @@ Data: 2025-09-08
 
 import os
 import logging
+import re
 from urllib.parse import urlparse
+
+def mask_database_url(url):
+    """Mascara credenciais em URLs de banco para logs seguros"""
+    if not url:
+        return "None"
+    # Mascarar senha: user:password@host -> user:****@host
+    masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', url)
+    return masked
 
 class ProductionConfig:
     """Configurações específicas para produção"""
@@ -179,5 +188,5 @@ if __name__ == "__main__":
     setup_production_environment()
     config_class = get_config()
     print(f"📊 Configuração ativa: {config_class.__name__}")
-    print(f"🔗 Banco de dados: {config_class.DATABASE_URL}")
+    print(f"🔗 Banco de dados: {mask_database_url(config_class.DATABASE_URL)}")
     print(f"🎯 Digital Mastery: {config_class.DIGITAL_MASTERY_MODE}")

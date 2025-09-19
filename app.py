@@ -222,6 +222,21 @@ with app.app_context():
             # Não interromper o app, apenas logar erro
     else:
         logger.info("🔇 Migrações automáticas desabilitadas (RUN_MIGRATIONS não definido)")
+    
+    # 🗑️ SISTEMA DE LIMPEZA DE VEÍCULOS - CRITICAL INTEGRATION
+    # Executa limpeza de tabelas obsoletas de veículos quando RUN_CLEANUP_VEICULOS=1
+    try:
+        from migration_cleanup_veiculos_production import run_migration_if_needed
+        cleanup_success = run_migration_if_needed()
+        if cleanup_success:
+            logger.info("✅ Migration de limpeza de veículos processada com sucesso")
+        else:
+            logger.warning("⚠️ Migration de limpeza de veículos falhou ou não foi necessária")
+    except ImportError:
+        logger.warning("⚠️ Migration de limpeza de veículos não disponível")
+    except Exception as e:
+        logger.error(f"❌ Erro na migration de limpeza de veículos: {e}")
+        # Não interromper o app, apenas logar erro
         logger.info("📝 Para executar migrações: RUN_MIGRATIONS=1 gunicorn --bind 0.0.0.0:5000 main:app")
     
     # Register additional blueprints

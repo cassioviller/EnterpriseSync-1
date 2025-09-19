@@ -5,8 +5,18 @@ Executadas automaticamente na inicialização da aplicação
 import logging
 from sqlalchemy import text
 from models import db
+import os
+import re
 
 logger = logging.getLogger(__name__)
+
+def mask_database_url(url):
+    """Mascara credenciais em URLs de banco para logs seguros"""
+    if not url:
+        return "None"
+    # Mascarar senha: user:password@host -> user:****@host
+    masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', url)
+    return masked
 
 def executar_migracoes():
     """
@@ -15,7 +25,9 @@ def executar_migracoes():
     """
     try:
         logger.info("🔄 Iniciando migrações automáticas COMPLETAS do banco EasyPanel...")
-        logger.info("🎯 TARGET DATABASE: postgresql://sige:sige@viajey_sige:5432/sige")
+        # Mascarar credenciais por segurança
+        database_url = os.environ.get('DATABASE_URL', 'postgresql://sige:sige@viajey_sige:5432/sige')
+        logger.info(f"🎯 TARGET DATABASE: {mask_database_url(database_url)}")
         
         # Verificar se a tabela existe, se não existir, criar completa
         garantir_tabela_proposta_templates_existe()

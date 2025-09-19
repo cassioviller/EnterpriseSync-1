@@ -197,6 +197,8 @@ def health_check():
 def health_check_veiculos():
     """Health check detalhado do sistema de veículos para produção"""
     start_time = datetime.now()
+    
+    # Inicializar resultado e variáveis críticas ANTES dos try blocks
     resultado = {
         'timestamp': start_time.isoformat(),
         'status': 'unknown',
@@ -206,6 +208,11 @@ def health_check_veiculos():
         'duracao_ms': 0
     }
     
+    # Inicializar tabelas_existentes como lista vazia para evitar NameError
+    tabelas_existentes = []
+    tabelas_essenciais = ['veiculo', 'uso_veiculo', 'custo_veiculo', 'passageiro_veiculo']
+    tabelas_obsoletas = ['alocacao_veiculo', 'equipe_veiculo', 'transferencia_veiculo', 'manutencao_veiculo', 'alerta_veiculo']
+    
     try:
         # 1. Verificar conexão com banco
         try:
@@ -213,16 +220,13 @@ def health_check_veiculos():
             resultado['checks']['database_connection'] = 'OK'
         except Exception as e:
             resultado['checks']['database_connection'] = 'FAIL'
-            resultado['errors'].append(f"Conexão banco: {str(e)}")
+            resultado['errors'].append(f"Conexão banco: {str(e)[:200]}")  # Limitar tamanho da mensagem
             
         # 2. Verificar tabelas essenciais
         try:
             from sqlalchemy import inspect
             inspector = inspect(db.engine)
             tabelas_existentes = inspector.get_table_names()
-            
-            tabelas_essenciais = ['veiculo', 'uso_veiculo', 'custo_veiculo', 'passageiro_veiculo']
-            tabelas_obsoletas = ['alocacao_veiculo', 'equipe_veiculo', 'transferencia_veiculo', 'manutencao_veiculo', 'alerta_veiculo']
             
             # Verificar tabelas essenciais
             for tabela in tabelas_essenciais:
@@ -241,69 +245,107 @@ def health_check_veiculos():
                     resultado['checks'][f'obsoleta_{tabela}'] = 'REMOVED'
                     
         except Exception as e:
-            resultado['errors'].append(f"Erro ao verificar tabelas: {str(e)}")
+            resultado['errors'].append(f"Erro ao verificar tabelas: {str(e)[:200]}")
             
-        # 3. Verificar contagem de dados
+        # 3. Verificar contagem de dados usando SQL RAW (mais robusto)
         try:
-            # Contar veículos
+            # Contar veículos usando SQL raw
             if 'veiculo' in tabelas_existentes:
-                from models import Veiculo
-                count_veiculos = Veiculo.query.count()
-                resultado['checks']['count_veiculos'] = count_veiculos
+                try:
+                    result = db.session.execute(text("SELECT COUNT(*) FROM veiculo"))
+                    count_veiculos = result.scalar()
+                    resultado['checks']['count_veiculos'] = count_veiculos
+                except Exception as e:
+                    resultado['warnings'].append(f"Erro ao contar veículos: {str(e)[:100]}")
+                    resultado['checks']['count_veiculos'] = 'ERROR'
                 
-            # Contar usos
+            # Contar usos usando SQL raw
             if 'uso_veiculo' in tabelas_existentes:
-                from models import UsoVeiculo
-                count_usos = UsoVeiculo.query.count()
-                resultado['checks']['count_usos'] = count_usos
+                try:
+                    result = db.session.execute(text("SELECT COUNT(*) FROM uso_veiculo"))
+                    count_usos = result.scalar()
+                    resultado['checks']['count_usos'] = count_usos
+                except Exception as e:
+                    resultado['warnings'].append(f"Erro ao contar usos: {str(e)[:100]}")
+                    resultado['checks']['count_usos'] = 'ERROR'
                 
-            # Contar custos
+            # Contar custos usando SQL raw
             if 'custo_veiculo' in tabelas_existentes:
-                from models import CustoVeiculo
-                count_custos = CustoVeiculo.query.count()
-                resultado['checks']['count_custos'] = count_custos
+                try:
+                    result = db.session.execute(text("SELECT COUNT(*) FROM custo_veiculo"))
+                    count_custos = result.scalar()
+                    resultado['checks']['count_custos'] = count_custos
+                except Exception as e:
+                    resultado['warnings'].append(f"Erro ao contar custos: {str(e)[:100]}")
+                    resultado['checks']['count_custos'] = 'ERROR'
                 
         except Exception as e:
-            resultado['errors'].append(f"Erro ao contar dados: {str(e)}")
+            resultado['errors'].append(f"Erro ao contar dados: {str(e)[:200]}")
             
-        # 4. Teste de tenant isolation
+        # 4. Teste de tenant isolation usando SQL raw
         try:
             tenant_admin_id = get_tenant_admin_id()
             if tenant_admin_id:
-                resultado['checks']['tenant_admin_id'] = tenant_admin_id
+                resultado['checks']['tenant_admin_id'] = str(tenant_admin_id)  # Convert to string para JSON
                 
-                # Testar query específica de tenant
-                from models import Veiculo
-                veiculos_tenant = Veiculo.query.filter_by(admin_id=tenant_admin_id).count()
-                resultado['checks']['veiculos_tenant'] = veiculos_tenant
+                # Testar query específica de tenant usando SQL raw
+                if 'veiculo' in tabelas_existentes:
+                    try:
+                        result = db.session.execute(text("SELECT COUNT(*) FROM veiculo WHERE admin_id = :admin_id"), 
+                                                  {"admin_id": tenant_admin_id})
+                        veiculos_tenant = result.scalar()
+                        resultado['checks']['veiculos_tenant'] = veiculos_tenant
+                    except Exception as e:
+                        resultado['warnings'].append(f"Erro no count tenant: {str(e)[:100]}")
             else:
                 resultado['warnings'].append("Tenant admin_id não detectado")
                 
         except Exception as e:
-            resultado['warnings'].append(f"Erro no teste de tenant: {str(e)}")
+            resultado['warnings'].append(f"Erro no teste de tenant: {str(e)[:200]}")
             
         # 5. Determinar status final
         if resultado['errors']:
             resultado['status'] = 'error'
             status_code = 500
         elif resultado['warnings']:
-            resultado['status'] = 'warning'
+            resultado['status'] = 'warning' 
             status_code = 200
         else:
             resultado['status'] = 'healthy'
             status_code = 200
             
-        # Calcular duração
-        end_time = datetime.now()
-        duracao = (end_time - start_time).total_seconds() * 1000
-        resultado['duracao_ms'] = round(duracao, 2)
-        
-        return resultado, status_code
-        
     except Exception as e:
+        # Capturar qualquer erro crítico não previsto
         resultado['status'] = 'error'
-        resultado['errors'].append(f"Erro crítico: {str(e)}")
-        return resultado, 500
+        resultado['errors'].append(f"Erro crítico não tratado: {str(e)[:200]}")
+        status_code = 500
+        
+    finally:
+        # SEMPRE calcular duração e retornar JSON válido
+        try:
+            end_time = datetime.now()
+            duracao = (end_time - start_time).total_seconds() * 1000
+            resultado['duracao_ms'] = round(duracao, 2)
+        except:
+            resultado['duracao_ms'] = 0
+        
+        # Garantir que sempre retorna JSON válido
+        try:
+            # Verificar se resultado pode ser serializado para JSON
+            import json
+            json.dumps(resultado)
+            return resultado, status_code
+        except Exception as json_error:
+            # Em caso de erro de serialização, retornar estrutura mínima válida
+            fallback_result = {
+                'timestamp': start_time.isoformat(),
+                'status': 'error',
+                'errors': [f'Erro de serialização JSON: {str(json_error)[:100]}'],
+                'checks': {},
+                'warnings': [],
+                'duracao_ms': 0
+            }
+            return fallback_result, 500
 
 # ===== ROTAS DE AUTENTICAÇÃO =====
 @main_bp.route('/login', methods=['GET', 'POST'])

@@ -110,7 +110,7 @@ def setup_production_database():
                 )
                 db.session.add(super_admin)
                 db.session.commit()
-                print("✅ Super Admin criado: admin@sige.com / admin123")
+                print("✅ Super Admin criado: admin@sige.com / [senha padrão]")
             else:
                 print("✅ Super Admin já existe")
             
@@ -176,7 +176,7 @@ def setup_production_database():
             print("\\n🎯 SETUP CONCLUÍDO COM SUCESSO!")
             print("=" * 50)
             print("🔑 CREDENCIAIS:")
-            print("   Super Admin: admin@sige.com / admin123")
+            print("   Super Admin: admin@sige.com / [senha padrão]")
             print("   Admin Demo:  valeverde / admin123")
             print("\\n📊 DADOS:")
             print(f"   • {Usuario.query.count()} usuários")

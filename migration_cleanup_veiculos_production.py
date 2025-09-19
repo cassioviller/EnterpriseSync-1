@@ -47,7 +47,7 @@ TABELAS_ESSENCIAIS = [
 ]
 
 class VeiculosMigrationCleaner:
-    def __init__(self, database_url=None):
+    def __init__(self, database_url=None, dry_run=False):
         self.database_url = database_url or os.environ.get('DATABASE_URL')
         if not self.database_url:
             raise ValueError("❌ DATABASE_URL não encontrada")
@@ -59,6 +59,11 @@ class VeiculosMigrationCleaner:
         self.engine = create_engine(self.database_url)
         self.backup_data = {}
         self.migration_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.dry_run = dry_run
+        self.executed_actions = []  # Para idempotência
+        
+        if dry_run:
+            logger.info("🔍 MODO DRY-RUN ATIVADO - Apenas simulação")
         
     def verificar_ambiente(self):
         """Verificações de segurança antes da migration"""
@@ -76,11 +81,19 @@ class VeiculosMigrationCleaner:
                 logger.warning("⚠️ DETECTADO AMBIENTE DE DESENVOLVIMENTO!")
                 logger.warning("⚠️ Esta migration é destinada APENAS para produção EasyPanel")
                 
-                # Em desenvolvimento, só simular
-                response = input("Continuar com SIMULAÇÃO em desenvolvimento? (s/N): ")
-                if response.lower() != 's':
-                    logger.info("🛑 Migration cancelada pelo usuário")
-                    return False
+                # Em desenvolvimento, verificar se força execução
+                force_dev = os.environ.get('FORCE_DEV_MIGRATION', '').lower() in ['1', 'true', 'yes']
+                if not force_dev:
+                    try:
+                        response = input("Continuar com SIMULAÇÃO em desenvolvimento? (s/N): ")
+                        if response.lower() != 's':
+                            logger.info("🛑 Migration cancelada pelo usuário")
+                            return False
+                    except EOFError:
+                        logger.info("🛑 Ambiente não interativo - use FORCE_DEV_MIGRATION=1 para forçar")
+                        return False
+                else:
+                    logger.info("🚀 FORCE_DEV_MIGRATION=1 detectada - executando em desenvolvimento")
                     
             return True
             
@@ -178,28 +191,81 @@ class VeiculosMigrationCleaner:
         logger.info("🔗 Removendo constraints obsoletas...")
         
         try:
-            with self.engine.connect() as conn:
-                # Lista de constraints conhecidas que precisam ser removidas
-                constraints_obsoletas = [
-                    "_equipe_veiculo_uc",  # Constraint da tabela equipe_veiculo
-                    # Adicionar outras constraints conforme necessário
-                ]
+            with self.engine.begin() as trans:
+                conn = trans.connection
                 
-                for constraint in constraints_obsoletas:
+                # Buscar todas as constraints das tabelas obsoletas
+                constraints_sql = """
+                SELECT 
+                    tc.constraint_name,
+                    tc.table_name,
+                    tc.constraint_type
+                FROM information_schema.table_constraints tc
+                WHERE tc.table_name = ANY(:tabelas_obsoletas)
+                    AND tc.constraint_type IN ('FOREIGN KEY', 'UNIQUE', 'CHECK')
+                ORDER BY 
+                    CASE tc.constraint_type 
+                        WHEN 'FOREIGN KEY' THEN 1
+                        WHEN 'UNIQUE' THEN 2 
+                        WHEN 'CHECK' THEN 3
+                    END
+                """
+                
+                result = conn.execute(text(constraints_sql), 
+                                    {"tabelas_obsoletas": self.obsoletas_presentes})
+                constraints = result.fetchall()
+                
+                if not constraints:
+                    logger.info("✅ Nenhuma constraint obsoleta encontrada")
+                    return True
+                
+                # Remover constraints encontradas
+                for constraint_row in constraints:
+                    constraint_name = constraint_row[0]
+                    table_name = constraint_row[1]
+                    constraint_type = constraint_row[2]
+                    
+                    action_key = f"drop_constraint_{constraint_name}"
+                    if action_key in self.executed_actions:
+                        logger.info(f"⏭️ Constraint {constraint_name} já removida (idempotência)")
+                        continue
+                    
                     try:
-                        # Verificar se constraint existe antes de tentar remover
+                        # Verificar se constraint ainda existe (dupla verificação)
                         check_sql = """
-                        SELECT constraint_name 
-                        FROM information_schema.table_constraints 
+                        SELECT 1 FROM information_schema.table_constraints 
                         WHERE constraint_name = :constraint_name
+                            AND table_name = :table_name
                         """
-                        result = conn.execute(text(check_sql), {"constraint_name": constraint})
-                        if result.rowcount > 0:
-                            logger.info(f"🗑️ Removendo constraint: {constraint}")
-                            # Comando específico será executado conforme necessário
-                    except Exception as e:
-                        logger.warning(f"⚠️ Erro ao remover constraint {constraint}: {e}")
+                        check_result = conn.execute(text(check_sql), {
+                            "constraint_name": constraint_name,
+                            "table_name": table_name
+                        })
                         
+                        if check_result.fetchone() is None:
+                            logger.info(f"✅ Constraint {constraint_name} já não existe")
+                            self.executed_actions.append(action_key)
+                            continue
+                        
+                        drop_sql = f"ALTER TABLE {table_name} DROP CONSTRAINT {constraint_name}"
+                        
+                        if self.dry_run:
+                            logger.info(f"🔍 DRY-RUN: {drop_sql}")
+                        else:
+                            logger.info(f"🗑️ Removendo constraint {constraint_type}: {constraint_name} da tabela {table_name}")
+                            conn.execute(text(drop_sql))
+                            logger.info(f"✅ Constraint {constraint_name} removida com sucesso")
+                        
+                        self.executed_actions.append(action_key)
+                        
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao remover constraint {constraint_name}: {e}")
+                        # Não falha por uma constraint - continua com as outras
+                
+                if not self.dry_run:
+                    trans.commit()
+                    logger.info("✅ Transação de remoção de constraints commitada")
+                
                 return True
                 
         except Exception as e:
@@ -211,16 +277,46 @@ class VeiculosMigrationCleaner:
         logger.info("🗑️ Removendo tabelas obsoletas...")
         
         try:
-            with self.engine.connect() as conn:
+            with self.engine.begin() as trans:
+                conn = trans.connection
+                
                 for tabela in self.obsoletas_presentes:
+                    action_key = f"drop_table_{tabela}"
+                    if action_key in self.executed_actions:
+                        logger.info(f"⏭️ Tabela {tabela} já removida (idempotência)")
+                        continue
+                        
                     try:
-                        logger.info(f"🗑️ Removendo tabela: {tabela}")
-                        conn.execute(text(f"DROP TABLE IF EXISTS {tabela} CASCADE"))
-                        conn.commit()
-                        logger.info(f"✅ Tabela {tabela} removida com sucesso")
+                        # Verificar se tabela ainda existe
+                        check_sql = """
+                        SELECT 1 FROM information_schema.tables 
+                        WHERE table_name = :table_name
+                        """
+                        check_result = conn.execute(text(check_sql), {"table_name": tabela})
+                        
+                        if check_result.fetchone() is None:
+                            logger.info(f"✅ Tabela {tabela} já não existe")
+                            self.executed_actions.append(action_key)
+                            continue
+                        
+                        drop_sql = f"DROP TABLE IF EXISTS {tabela} CASCADE"
+                        
+                        if self.dry_run:
+                            logger.info(f"🔍 DRY-RUN: {drop_sql}")
+                        else:
+                            logger.info(f"🗑️ Removendo tabela: {tabela}")
+                            conn.execute(text(drop_sql))
+                            logger.info(f"✅ Tabela {tabela} removida com sucesso")
+                        
+                        self.executed_actions.append(action_key)
+                        
                     except Exception as e:
                         logger.error(f"❌ Erro ao remover tabela {tabela}: {e}")
                         # Continuar com as próximas tabelas
+                
+                if not self.dry_run:
+                    trans.commit()
+                    logger.info("✅ Transação de remoção de tabelas commitada")
                         
                 return True
                 
@@ -292,13 +388,34 @@ class VeiculosMigrationCleaner:
             logger.error(f"❌ Erro crítico na migration: {e}")
             return False
 
+def run_migration_if_needed():
+    """Executa migration se flag RUN_CLEANUP_VEICULOS estiver ativada"""
+    if not os.environ.get('RUN_CLEANUP_VEICULOS', '').lower() in ['1', 'true', 'yes']:
+        logger.info("ℹ️ Migration não solicitada (RUN_CLEANUP_VEICULOS não definida)")
+        return True
+    
+    logger.info("🚀 RUN_CLEANUP_VEICULOS=1 detectada - executando migration")
+    
+    try:
+        dry_run = os.environ.get('DRY_RUN', '').lower() in ['1', 'true', 'yes']
+        migrator = VeiculosMigrationCleaner(dry_run=dry_run)
+        return migrator.executar_migration()
+    except Exception as e:
+        logger.error(f"❌ Erro na migration automática: {e}")
+        return False
+
 def main():
     """Função principal para execução da migration"""
     print("🚀 SIGE - Migration de Limpeza de Veículos")
     print("=" * 50)
     
     try:
-        migrator = VeiculosMigrationCleaner()
+        # Verificar se é execução manual ou automática
+        if len(sys.argv) > 1 and sys.argv[1] == '--dry-run':
+            migrator = VeiculosMigrationCleaner(dry_run=True)
+        else:
+            migrator = VeiculosMigrationCleaner()
+            
         sucesso = migrator.executar_migration()
         
         if sucesso:
