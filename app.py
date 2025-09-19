@@ -254,6 +254,43 @@ with app.app_context():
     else:
         logger.info(f"🔇 Migrações não necessárias para ambiente '{env_name}'")
     
+    # 🚀 SISTEMA DE MIGRAÇÕES FORÇADAS DE VEÍCULOS - CRÍTICO
+    logger.info("🔧 VERIFICANDO NECESSIDADE DE MIGRAÇÕES FORÇADAS DE VEÍCULOS...")
+    logger.info("-" * 60)
+    
+    # Sempre executar verificação de migrações forçadas se houver migrações habilitadas
+    # Isso resolve o problema crítico de colunas faltantes em produção
+    if should_migrate or is_production():
+        logger.info("🎯 EXECUTANDO MIGRAÇÕES FORÇADAS DE VEÍCULOS - RESOLVER COLUNAS FALTANTES")
+        try:
+            from migration_force_veiculos import VeiculoMigrationForcer
+            
+            # Usar a mesma DATABASE_URL que o app
+            database_url = app.config["SQLALCHEMY_DATABASE_URI"]
+            
+            if database_url:
+                migrator = VeiculoMigrationForcer(database_url)
+                migration_success = migrator.run_all_migrations()
+                
+                if migration_success:
+                    logger.info("🎉 MIGRAÇÕES FORÇADAS DE VEÍCULOS EXECUTADAS COM SUCESSO!")
+                    logger.info("✅ Problema de colunas faltantes RESOLVIDO definitivamente")
+                else:
+                    logger.error("❌ MIGRAÇÕES FORÇADAS DE VEÍCULOS FALHARAM - Verificar logs")
+                    # Não interromper o app, apenas logar erro
+            else:
+                logger.error("❌ DATABASE_URL não disponível para migrações forçadas")
+                
+        except ImportError:
+            logger.warning("⚠️ Sistema de migrações forçadas não disponível")
+        except Exception as e:
+            logger.error(f"❌ Erro nas migrações forçadas de veículos: {e}")
+            # Não interromper o app, apenas logar erro
+    else:
+        logger.info("🔇 Migrações forçadas de veículos não necessárias para ambiente atual")
+    
+    logger.info("=" * 60)
+    
     # 🗑️ SISTEMA DE LIMPEZA DE VEÍCULOS - AUTOMÁTICO
     if should_cleanup:
         logger.info("🗑️ Executando limpeza de veículos automaticamente...")
