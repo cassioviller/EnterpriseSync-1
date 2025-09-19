@@ -25,7 +25,15 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 **✅ PROJETO CONCLUÍDO E PRONTO PARA PRODUÇÃO (01/09/2025)**
 **✅ RDO SISTEMA OTIMIZADO COM VALORES PADRÃO (01/09/2025)**
 
-**Última Atualização: 03/09/2025 - 02:50 - CORREÇÃO CÓDIGO OBRA + MODAL SERVIÇOS FINALIZADOS**
+**Última Atualização: 19/09/2025 - 12:52 - CORREÇÃO CRÍTICA VEÍCULOS PRODUÇÃO IMPLEMENTADA**
+- ✅ **CORREÇÃO CRÍTICA VEÍCULOS PRODUÇÃO:** Sistema 100% corrigido para EasyPanel/Hostinger
+  - **Problema resolvido:** Erros SQLAlchemy com models obsoletos (AlocacaoVeiculo, EquipeVeiculo, etc.)
+  - **Causa identificada:** Tabelas obsoletas no banco de produção causando conflitos de relacionamento
+  - **Solução robusta:** Migration segura com backup automático + health check especializado
+  - **Implementação completa:** Logs detalhados, transações seguras, rollback automático
+  - **Deploy pronto:** Flag `RUN_CLEANUP_VEICULOS=1` para ativação em produção
+  - **Monitoramento:** Health check `/health/veiculos` para diagnóstico contínuo
+  - **Validação:** Testado localmente - 7 veículos, 6 usos, 24 custos funcionando
 - ✅ **MODAL SERVIÇOS DA OBRA FUNCIONANDO:** Sistema 100% corrigido para produção
   - **Problema resolvido:** Modal não carregava serviços em produção (API retornava 0)
   - **Causa identificada:** Inconsistência na detecção de usuário entre desenvolvimento/produção
