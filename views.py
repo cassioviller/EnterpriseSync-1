@@ -8,9 +8,12 @@ from utils.tenant import get_tenant_admin_id
 # API RDO Refatorada integrada inline na função salvar_rdo_flexivel
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, or_, and_, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 import os
 import json
+from functools import wraps
+import logging
+import time
 
 # SISTEMA DE LOG DETALHADO PARA MÓDULOS
 import sys
@@ -88,17 +91,122 @@ except ImportError as e:
 
 main_bp = Blueprint('main', __name__)
 
-def safe_db_operation(operation, default_value=None):
-    """Executa operação no banco com tratamento seguro de transação"""
-    try:
-        return operation()
-    except Exception as e:
-        print(f"ERRO DB OPERATION: {str(e)}")
+# SISTEMA DE PROTEÇÃO ROBUSTA DE TRANSAÇÕES SQLAlchemy
+logger = logging.getLogger(__name__)
+
+def safe_transaction(max_retries=3, rollback_on_error=True, commit_on_success=True):
+    """
+    Decorador para proteção robusta de transações SQLAlchemy.
+    Resolve problemas de "current transaction is aborted" automaticamente.
+    
+    Args:
+        max_retries: Número máximo de tentativas
+        rollback_on_error: Se deve fazer rollback automático em caso de erro
+        commit_on_success: Se deve fazer commit automático em caso de sucesso
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    # Garantir que não há transação abortada
+                    if db.session.is_active:
+                        try:
+                            # Testar conexão com query simples
+                            db.session.execute(text("SELECT 1"))
+                        except (OperationalError, IntegrityError):
+                            logger.warning(f"🔄 Transação abortada detectada, fazendo rollback (tentativa {attempt + 1})")
+                            db.session.rollback()
+                    
+                    # Executar função
+                    result = func(*args, **kwargs)
+                    
+                    # Commit automático se solicitado
+                    if commit_on_success and db.session.dirty:
+                        db.session.commit()
+                        logger.debug(f"✅ Transação commitada automaticamente: {func.__name__}")
+                    
+                    return result
+                    
+                except (OperationalError, IntegrityError) as e:
+                    last_error = e
+                    logger.error(f"❌ Erro de transação em {func.__name__} (tentativa {attempt + 1}): {str(e)}")
+                    
+                    if rollback_on_error:
+                        try:
+                            db.session.rollback()
+                            logger.info(f"🔄 Rollback executado para {func.__name__}")
+                        except Exception as rollback_error:
+                            logger.error(f"⚠️ Erro no rollback: {rollback_error}")
+                    
+                    if attempt < max_retries - 1:
+                        time.sleep(0.1 * (attempt + 1))  # Backoff exponencial
+                        continue
+                    else:
+                        # Última tentativa falhou
+                        break
+                        
+                except Exception as e:
+                    last_error = e
+                    logger.error(f"❌ Erro geral em {func.__name__}: {str(e)}")
+                    
+                    if rollback_on_error:
+                        try:
+                            db.session.rollback()
+                        except:
+                            pass
+                    
+                    break
+            
+            # Se chegou aqui, todas as tentativas falharam
+            logger.error(f"💥 Todas as tentativas falharam para {func.__name__}: {last_error}")
+            if rollback_on_error:
+                try:
+                    db.session.rollback()
+                except:
+                    pass
+            raise last_error
+            
+        return wrapper
+    return decorator
+
+def safe_db_operation(operation, default_value=None, retries=2):
+    """Executa operação no banco com tratamento seguro de transação (versão legacy)"""
+    for attempt in range(retries + 1):
         try:
-            db.session.rollback()
-        except:
-            pass
-        return default_value
+            # Verificar se transação está abortada
+            if db.session.is_active:
+                try:
+                    db.session.execute(text("SELECT 1"))
+                except (OperationalError, IntegrityError):
+                    logger.warning(f"🔄 Transação abortada, fazendo rollback (tentativa {attempt + 1})")
+                    db.session.rollback()
+            
+            return operation()
+            
+        except (OperationalError, IntegrityError) as e:
+            logger.error(f"❌ Erro DB OPERATION (tentativa {attempt + 1}): {str(e)}")
+            try:
+                db.session.rollback()
+            except:
+                pass
+            
+            if attempt < retries:
+                time.sleep(0.1)
+                continue
+            else:
+                return default_value
+        except Exception as e:
+            logger.error(f"❌ Erro geral DB OPERATION: {str(e)}")
+            try:
+                db.session.rollback()
+            except:
+                pass
+            return default_value
+    
+    return default_value
 
 
 def _calcular_funcionarios_departamento(admin_id):
@@ -902,6 +1010,7 @@ def usuarios():
 @main_bp.route('/usuarios/novo', methods=['GET', 'POST'])
 @login_required
 @admin_required
+@safe_transaction(max_retries=3, rollback_on_error=True, commit_on_success=True)
 def novo_usuario():
     """Criar novo usuário"""
     if request.method == 'POST':
@@ -1624,6 +1733,7 @@ def obras():
 # CRUD OBRAS - Nova Obra
 @main_bp.route('/obras/nova', methods=['GET', 'POST'])
 @login_required
+@safe_transaction(max_retries=3, rollback_on_error=True, commit_on_success=True)
 def nova_obra():
     """Criar nova obra"""
     if request.method == 'POST':
@@ -2264,6 +2374,7 @@ def excluir_obra(id):
 # Detalhes de uma obra específica
 @main_bp.route('/obras/<int:id>')
 @main_bp.route('/obras/detalhes/<int:id>')
+@safe_transaction(max_retries=2, rollback_on_error=True, commit_on_success=False)
 def detalhes_obra(id):
     try:
         # DEFINIR DATAS PRIMEIRO - CRÍTICO
@@ -2789,6 +2900,7 @@ def veiculos():
 # Detalhes de um veículo específico
 @main_bp.route('/veiculos/<int:id>')
 @login_required  # 🔒 MUDANÇA: Agora funcionários também podem acessar
+@safe_transaction(max_retries=2, rollback_on_error=True, commit_on_success=False)
 def detalhes_veiculo(id):
     try:
         # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado  
