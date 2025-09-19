@@ -160,6 +160,8 @@ def garantir_usuarios_producao():
     except Exception as e:
         logger.warning(f"⚠️ Erro ao garantir usuários de produção: {e}")
         # Tentar com método alternativo se SQLAlchemy 2.0
+        connection = None
+        cursor = None
         try:
             connection = db.engine.raw_connection()
             cursor = connection.cursor()
@@ -171,16 +173,23 @@ def garantir_usuarios_producao():
                 ON CONFLICT (id) DO NOTHING
             """)
             connection.commit()
-            cursor.close()
-            connection.close()
             logger.info("✅ Usuário admin ID=10 criado via conexão direta!")
         except Exception as e2:
             logger.error(f"❌ Falha ao criar usuário admin: {e2}")
+            if connection:
+                connection.rollback()
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
 
 def migrar_campos_opcionais_propostas():
     """
     Torna os campos assunto e objeto opcionais na tabela propostas_comerciais
     """
+    connection = None
+    cursor = None
     try:
         # Usar conexão direta para verificar constraints
         connection = db.engine.raw_connection()
@@ -212,16 +221,22 @@ def migrar_campos_opcionais_propostas():
         else:
             logger.info("✅ Campos assunto e objeto já são opcionais")
             
-        cursor.close()
-        connection.close()
-            
     except Exception as e:
         logger.error(f"❌ Erro ao atualizar campos opcionais: {str(e)}")
+        if connection:
+            connection.rollback()
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 def migrar_personalizacao_visual_empresa():
     """
     Adiciona colunas de personalização visual na tabela configuracao_empresa
     """
+    connection = None
+    cursor = None
     try:
         connection = db.engine.raw_connection()
         cursor = connection.cursor()
@@ -255,16 +270,15 @@ def migrar_personalizacao_visual_empresa():
                 logger.info(f"✅ Coluna '{nome_coluna}' já existe na tabela configuracao_empresa")
         
         connection.commit()
-        cursor.close()
-        connection.close()
         
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar colunas de personalização visual: {str(e)}")
-        if 'connection' in locals():
+        if connection:
             connection.rollback()
+    finally:
+        if cursor:
             cursor.close()
-            connection.close()
-            cursor.close()
+        if connection:
             connection.close()
 
 def garantir_tabela_proposta_templates_existe():
@@ -481,6 +495,8 @@ def migrar_campos_organizacao_propostas():
     """
     Adiciona campos de organização avançada para proposta_itens
     """
+    connection = None
+    cursor = None
     try:
         connection = db.engine.raw_connection()
         cursor = connection.cursor()
@@ -513,20 +529,23 @@ def migrar_campos_organizacao_propostas():
                 logger.info(f"✅ Coluna '{nome_coluna}' já existe na tabela proposta_itens")
         
         connection.commit()
-        cursor.close()
-        connection.close()
         
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar campos de organização: {str(e)}")
-        if 'connection' in locals():
+        if connection:
             connection.rollback()
+    finally:
+        if cursor:
             cursor.close()
+        if connection:
             connection.close()
 
 def migrar_campos_completos_templates():
     """
     Migração 7: Adicionar campos completos para templates (dados do cliente, engenheiro, seções)
     """
+    connection = None
+    cursor = None
     try:
         connection = db.engine.raw_connection()
         cursor = connection.cursor()
