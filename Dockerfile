@@ -1,6 +1,5 @@
 # SIGE v10.0 - Dockerfile Otimizado para Produção EasyPanel
-# Versão com correções automáticas para deploy rápido e confiável
-# Inclui correção automática da coluna porcentagem_combustivel
+# Versão simplificada para deploy rápido e confiável
 FROM python:3.11-slim
 
 # Variáveis de ambiente básicas
@@ -36,12 +35,8 @@ RUN mkdir -p \
     /app/uploads \
     /app/logs
 
-# Copiar scripts de correção de produção
-COPY fix_porcentagem_combustivel_production.py /app/
-RUN chmod +x /app/fix_porcentagem_combustivel_production.py
-
-# Copiar e configurar entrypoint otimizado com correções automáticas
-COPY docker-entrypoint-easypanel-auto.sh /app/docker-entrypoint.sh
+# Copiar e configurar entrypoint otimizado
+COPY docker-entrypoint-production-simple.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Expor porta

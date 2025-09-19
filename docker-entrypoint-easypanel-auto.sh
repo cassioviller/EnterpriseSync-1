@@ -51,9 +51,9 @@ DB_MASKED=$(echo "$DATABASE_URL" | sed 's/:\/\/[^:]*:[^@]*@/:\/\/****:****@/g' 2
 echo "🔗 Database: $DB_MASKED"
 echo
 
-# FASE 3: Aguardar banco de dados e correções críticas
-echo "⏳ FASE 3: CONECTIVIDADE E CORREÇÕES CRÍTICAS"
-echo "=============================================="
+# FASE 3: Aguardar banco de dados (básico)
+echo "⏳ FASE 3: AGUARDANDO CONECTIVIDADE"
+echo "=================================="
 
 if [ -n "$DATABASE_URL" ]; then
     # Aguardar um tempo básico para o banco estar disponível
@@ -78,24 +78,6 @@ except Exception as e:
     sys.exit(0)  # Não falhar aqui, deixar app.py gerenciar
 " 2>/dev/null; then
         echo "✅ Conectividade verificada"
-        
-        # CORREÇÃO CRÍTICA: Porcentagem Combustível
-        echo ""
-        echo "🔧 EXECUTANDO CORREÇÕES CRÍTICAS DE PRODUÇÃO"
-        echo "============================================"
-        if [ -f "/app/fix_porcentagem_combustivel_production.py" ]; then
-            echo "🔧 Executando correção: porcentagem_combustivel..."
-            python3 /app/fix_porcentagem_combustivel_production.py
-            if [ $? -eq 0 ]; then
-                echo "✅ Correção porcentagem_combustivel concluída"
-            else
-                echo "⚠️ Correção porcentagem_combustivel falhou - continuando"
-            fi
-        else
-            echo "ℹ️ Script de correção não encontrado - pulando"
-        fi
-        echo ""
-        
     else
         echo "⚠️ Conectividade limitada - app.py fará detecção inteligente"
     fi
