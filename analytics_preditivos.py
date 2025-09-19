@@ -33,8 +33,7 @@ warnings.filterwarnings('ignore')
 
 # Importar modelos
 from models import (
-    db, Veiculo, CustoVeiculo, UsoVeiculo, AlocacaoVeiculo, ManutencaoVeiculo,
-    AlertaVeiculo, Obra, Funcionario, Usuario
+    db, Veiculo, CustoVeiculo, UsoVeiculo, Obra, Funcionario, Usuario
 )
 from auth import admin_required
 
