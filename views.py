@@ -2576,17 +2576,60 @@ def test():
 @main_bp.route('/veiculos')
 @login_required  # 🔒 MUDANÇA: Agora funcionários também podem acessar
 def veiculos():
-    # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
-    tenant_admin_id = get_tenant_admin_id()
-    if not tenant_admin_id:
-        flash('Acesso negado. Faça login novamente.', 'error')
-        return redirect(url_for('auth.login'))
-    
-    # Buscar veículos APENAS da empresa do usuário (admin ou funcionário)
-    from models import Veiculo
-    veiculos = Veiculo.query.filter_by(admin_id=tenant_admin_id).all()
-    
-    return render_template('veiculos.html', veiculos=veiculos)
+    try:
+        # 🔍 LOGS DETALHADOS PARA PRODUÇÃO
+        print(f"🚗 [VEICULOS] Iniciando listagem de veículos...")
+        
+        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        tenant_admin_id = get_tenant_admin_id()
+        print(f"🔑 [VEICULOS] Admin ID detectado: {tenant_admin_id}")
+        
+        if not tenant_admin_id:
+            print(f"❌ [VEICULOS] Admin ID não encontrado - acesso negado")
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Verificar conexão com banco
+        try:
+            from sqlalchemy import text
+            db.session.execute(text('SELECT 1'))
+            print(f"✅ [VEICULOS] Conexão com banco OK")
+        except Exception as db_error:
+            print(f"❌ [VEICULOS] ERRO DE CONEXÃO: {db_error}")
+            raise
+        
+        # Verificar se tabela veiculo existe
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            print(f"📋 [VEICULOS] Tabelas disponíveis: {len(tables)} tabelas")
+            if 'veiculo' in tables:
+                print(f"✅ [VEICULOS] Tabela 'veiculo' encontrada")
+            else:
+                print(f"❌ [VEICULOS] Tabela 'veiculo' NÃO encontrada!")
+                print(f"📋 [VEICULOS] Tabelas: {sorted(tables)}")
+        except Exception as inspect_error:
+            print(f"⚠️ [VEICULOS] Erro ao inspecionar tabelas: {inspect_error}")
+        
+        # Buscar veículos APENAS da empresa do usuário (admin ou funcionário)
+        from models import Veiculo
+        print(f"🔍 [VEICULOS] Executando query para admin_id={tenant_admin_id}")
+        veiculos = Veiculo.query.filter_by(admin_id=tenant_admin_id).all()
+        print(f"📊 [VEICULOS] Encontrados {len(veiculos)} veículos")
+        
+        for i, veiculo in enumerate(veiculos):
+            print(f"🚗 [VEICULOS] {i+1}. {veiculo.placa} - {veiculo.modelo} (ID: {veiculo.id})")
+        
+        print(f"✅ [VEICULOS] Renderizando template com {len(veiculos)} veículos")
+        return render_template('veiculos.html', veiculos=veiculos)
+        
+    except Exception as e:
+        print(f"❌ [VEICULOS] ERRO CRÍTICO: {str(e)}")
+        import traceback
+        print(f"📋 [VEICULOS] TRACEBACK: {traceback.format_exc()}")
+        flash('Erro ao carregar veículos. Contate o administrador.', 'error')
+        return redirect(url_for('funcionario.dashboard'))
 
 # Detalhes de um veículo específico
 @main_bp.route('/veiculos/<int:id>')
