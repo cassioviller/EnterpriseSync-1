@@ -117,31 +117,9 @@ try:
 except Exception as e:
     print(f"❌ Erro ao registrar cadastro serviço-obra: {e}")
 
-# Registrar sistema avançado de integração veículos-obras
-try:
-    from veiculos_obra_views import veiculos_obra_bp
-    app.register_blueprint(veiculos_obra_bp)
-    print("✅ Sistema avançado de integração veículos-obras registrado")
-except Exception as e:
-    print(f"❌ Erro ao registrar sistema veículos-obras: {e}")
+# Sistema de veículos-obras removido (código obsoleto limpo)
 
-# Registrar sistema de relatórios veículos-obras  
-try:
-    from veiculos_obra_relatorios import relatorios_bp
-    app.register_blueprint(relatorios_bp)
-    print("✅ Sistema de relatórios veículos-obras registrado")
-except Exception as e:
-    print(f"❌ Erro ao registrar relatórios veículos-obras: {e}")
-
-# CORREÇÃO CRÍTICA: Registrar blueprints de relatórios e dashboards não integrados
-
-# Registrar Dashboard Executivo de Veículos
-try:
-    from dashboard_veiculos_executivo import dashboard_executive_bp
-    app.register_blueprint(dashboard_executive_bp)
-    print("✅ Dashboard Executivo de Veículos registrado")
-except Exception as e:
-    print(f"❌ Erro ao registrar Dashboard Executivo: {e}")
+# Dashboard executivo removido (código obsoleto limpo)
 
 # Registrar Analytics Preditivos
 try:
@@ -151,21 +129,9 @@ try:
 except Exception as e:
     print(f"❌ Erro ao registrar Analytics Preditivos: {e}")
 
-# Registrar Alertas Veículos Avançados
-try:
-    from alertas_veiculos_avancados import alertas_veiculos_bp
-    app.register_blueprint(alertas_veiculos_bp)
-    print("✅ Alertas Veículos Avançados registrado")
-except Exception as e:
-    print(f"❌ Erro ao registrar Alertas Veículos: {e}")
+# Sistema de alertas avançados removido (código obsoleto limpo)
 
-# Registrar Relatórios de Produtividade
-try:
-    from relatorios_produtividade import produtividade_bp
-    app.register_blueprint(produtividade_bp)
-    print("✅ Relatórios de Produtividade registrado")
-except Exception as e:
-    print(f"❌ Erro ao registrar Relatórios Produtividade: {e}")
+# Relatórios de produtividade removido (código obsoleto limpo)
 
 # Registrar Dashboards Específicos
 try:
@@ -191,13 +157,7 @@ try:
 except Exception as e:
     print(f"❌ Erro ao registrar Relatórios Financeiros: {e}")
 
-# Registrar Relatórios de Uso Detalhado
-try:
-    from relatorios_uso_detalhado import uso_detalhado_bp
-    app.register_blueprint(uso_detalhado_bp)
-    print("✅ Relatórios de Uso Detalhado registrado")
-except Exception as e:
-    print(f"❌ Erro ao registrar Relatórios de Uso: {e}")
+# Relatórios de uso detalhado removido (código obsoleto limpo)
 
 # Alimentação CRUD já registrado em app.py - removendo duplicação
 
