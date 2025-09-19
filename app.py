@@ -7,6 +7,9 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+# 🤖 SISTEMA DE DETECÇÃO AUTOMÁTICA DE AMBIENTE - SIGE v10.0
+from environment_detector import auto_configure_environment, get_environment_info, is_production
+
 # Configure logging for production
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,10 +19,25 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "sige-v10-digital-mastery-production-key-2025")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Database configuration - v10.0 Digital Mastery
-database_url = os.environ.get("DATABASE_URL", "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable")
+# 🤖 DETECÇÃO E CONFIGURAÇÃO AUTOMÁTICA DE AMBIENTE
+logger.info("🚀 SIGE v10.0 - INICIANDO DETECÇÃO AUTOMÁTICA DE AMBIENTE")
+logger.info("=" * 60)
 
-# Auto-detectar ambiente - CREDENTIALS MASCARADAS POR SEGURANÇA
+# Configurar ambiente automaticamente baseado na detecção inteligente
+env_info = auto_configure_environment()
+
+# Database configuration - v10.0 Digital Mastery com detecção automática
+database_url = os.environ.get("DATABASE_URL")
+if not database_url:
+    # Se não houver DATABASE_URL, usar padrão baseado no ambiente detectado
+    if is_production():
+        database_url = "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable"
+        os.environ['DATABASE_URL'] = database_url
+        logger.info("🔧 DATABASE_URL de produção configurada automaticamente")
+    else:
+        logger.info("🔧 DATABASE_URL de desenvolvimento mantida")
+
+# Função para mascarar credenciais nos logs
 def mask_database_url(url):
     """Mascara credenciais em URLs de banco para logs seguros"""
     if not url:
@@ -29,12 +47,13 @@ def mask_database_url(url):
     masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', url)
     return masked
 
-if "neon" in database_url or "localhost" in database_url:
-    # DESENVOLVIMENTO
-    logger.info(f"🔧 DESENVOLVIMENTO DATABASE: {mask_database_url(database_url)}")
-else:
-    # PRODUÇÃO - EasyPanel
-    logger.info(f"🔧 PRODUÇÃO DATABASE: {mask_database_url(database_url)}")
+# Log da detecção automática
+logger.info(f"🌍 AMBIENTE DETECTADO: {env_info['environment'].upper()}")
+logger.info(f"🖥️ PLATAFORMA: {env_info['platform'].upper()}")
+logger.info(f"📊 CONFIANÇA: {env_info['confidence']:.1%}")
+logger.info(f"🔗 DATABASE: {mask_database_url(database_url)}")
+logger.info(f"🔄 AUTO-MIGRAÇÕES: {env_info['auto_migrations']}")
+logger.info(f"🗑️ AUTO-LIMPEZA: {env_info['auto_cleanup']}")
 
 # Convert postgres:// to postgresql:// for SQLAlchemy compatibility
 if database_url and database_url.startswith("postgres://"):
@@ -56,11 +75,22 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['WTF_CSRF_ENABLED'] = False
 
-# Configurações v10.0 Digital Mastery
+# Configurações v10.0 Digital Mastery - Automáticas baseadas no ambiente
 app.config['DIGITAL_MASTERY_MODE'] = True
 app.config['OBSERVABILITY_ENABLED'] = True
-app.config['RUN_MIGRATIONS_FLAG'] = os.environ.get('RUN_MIGRATIONS', '').lower() in ['1', 'true', 'yes']
+app.config['RUN_MIGRATIONS_FLAG'] = env_info['auto_migrations']  # Automático baseado na detecção
+app.config['RUN_CLEANUP_FLAG'] = env_info['auto_cleanup']  # Automático baseado na detecção
 app.config['RDO_MASTERY_ENABLED'] = True
+app.config['ENVIRONMENT_INFO'] = env_info  # Armazenar info do ambiente para uso posterior
+
+# Configurações específicas por ambiente
+if is_production():
+    app.config['DEBUG'] = False
+    app.config['TESTING'] = False
+    logger.info("🏭 Configurações de produção aplicadas")
+else:
+    app.config['DEBUG'] = True
+    logger.info("🔧 Configurações de desenvolvimento mantidas")
 
 # Configurações específicas para resolver erro SERVER_NAME  
 app.config['SERVER_NAME'] = None  # Permite qualquer host
@@ -199,20 +229,21 @@ with app.app_context():
     db.create_all()
     logging.info("Database tables created/verified")
     
-    # MIGRAÇÕES DESABILITADAS novamente após aplicar mudanças críticas de veículos
-    print("🔇 Migrações automáticas DESABILITADAS novamente para evitar loops infinitos")
-    print("📋 DOCS MIGRAÇÕES:")
-    print("   Para novo deployment: RUN_MIGRATIONS=1 <start_command>")
-    print("   Ex: RUN_MIGRATIONS=1 gunicorn --bind 0.0.0.0:5000 main:app")
-    print("   ⚠️  Use apenas em deployments NOVOS ou com schema changes")
-    print("   ✅ Desenvolvimento: migrações são executadas automaticamente")
-    print("✅ SISTEMA DE VEÍCULOS MULTI-TENANT já foi corrigido com sucesso!")
-    print("🔒 Constraints aplicadas: unique(admin_id, placa), admin_id NOT NULL")
-    # 🔄 SISTEMA DE MIGRAÇÕES COM FLAG - PROBLEM 1 RESOLVED
-    # Executa migrações apenas quando RUN_MIGRATIONS=1 ou RUN_MIGRATIONS=true
-    run_migrations = os.environ.get('RUN_MIGRATIONS', '').lower() in ['1', 'true', 'yes']
-    if run_migrations:
-        logger.info("🔄 RUN_MIGRATIONS=1 detectado - executando migrações automáticas...")
+    # 🤖 SISTEMA DE MIGRAÇÕES TOTALMENTE AUTOMÁTICO - SIGE v10.0
+    logger.info("🚀 INICIANDO SISTEMA DE MIGRAÇÕES AUTOMÁTICAS")
+    logger.info("=" * 50)
+    
+    # Obter informações de configuração automática
+    should_migrate = app.config['RUN_MIGRATIONS_FLAG']
+    should_cleanup = app.config['RUN_CLEANUP_FLAG']
+    env_name = env_info['environment']
+    
+    logger.info(f"🌍 Ambiente: {env_name.upper()}")
+    logger.info(f"🔄 Auto-migração: {should_migrate}")
+    logger.info(f"🗑️ Auto-limpeza: {should_cleanup}")
+    
+    if should_migrate:
+        logger.info("🔄 Executando migrações automaticamente baseado na detecção de ambiente...")
         try:
             from migrations import executar_migracoes
             executar_migracoes()
@@ -221,23 +252,30 @@ with app.app_context():
             logger.error(f"❌ Erro ao executar migrações: {e}")
             # Não interromper o app, apenas logar erro
     else:
-        logger.info("🔇 Migrações automáticas desabilitadas (RUN_MIGRATIONS não definido)")
+        logger.info(f"🔇 Migrações não necessárias para ambiente '{env_name}'")
     
-    # 🗑️ SISTEMA DE LIMPEZA DE VEÍCULOS - CRITICAL INTEGRATION
-    # Executa limpeza de tabelas obsoletas de veículos quando RUN_CLEANUP_VEICULOS=1
-    try:
-        from migration_cleanup_veiculos_production import run_migration_if_needed
-        cleanup_success = run_migration_if_needed()
-        if cleanup_success:
-            logger.info("✅ Migration de limpeza de veículos processada com sucesso")
-        else:
-            logger.warning("⚠️ Migration de limpeza de veículos falhou ou não foi necessária")
-    except ImportError:
-        logger.warning("⚠️ Migration de limpeza de veículos não disponível")
-    except Exception as e:
-        logger.error(f"❌ Erro na migration de limpeza de veículos: {e}")
-        # Não interromper o app, apenas logar erro
-        logger.info("📝 Para executar migrações: RUN_MIGRATIONS=1 gunicorn --bind 0.0.0.0:5000 main:app")
+    # 🗑️ SISTEMA DE LIMPEZA DE VEÍCULOS - AUTOMÁTICO
+    if should_cleanup:
+        logger.info("🗑️ Executando limpeza de veículos automaticamente...")
+        try:
+            from migration_cleanup_veiculos_production import run_migration_if_needed
+            cleanup_success = run_migration_if_needed()
+            if cleanup_success:
+                logger.info("✅ Migration de limpeza de veículos processada com sucesso")
+            else:
+                logger.warning("⚠️ Migration de limpeza de veículos falhou ou não foi necessária")
+        except ImportError:
+            logger.warning("⚠️ Migration de limpeza de veículos não disponível")
+        except Exception as e:
+            logger.error(f"❌ Erro na migration de limpeza de veículos: {e}")
+            # Não interromper o app, apenas logar erro
+    else:
+        logger.info(f"🔇 Limpeza de veículos não necessária para ambiente '{env_name}'")
+    
+    # Log final do sistema
+    logger.info("✅ SISTEMA AUTOMÁTICO DE MIGRAÇÕES INICIALIZADO")
+    logger.info(f"📋 Resumo: Ambiente={env_name}, Migrações={should_migrate}, Limpeza={should_cleanup}")
+    logger.info("💡 Sistema funcionando em modo TOTALMENTE AUTOMÁTICO - zero intervenção manual!")
     
     # Register additional blueprints
     try:

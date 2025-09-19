@@ -1,6 +1,10 @@
 """
-Migrações automáticas do banco de dados
-Executadas automaticamente na inicialização da aplicação
+🤖 MIGRAÇÕES AUTOMÁTICAS DO BANCO DE DADOS - SIGE v10.0
+=======================================================
+Sistema inteligente de migrações que se adapta automaticamente ao ambiente:
+- EasyPanel/Produção: Executa todas as migrações automaticamente
+- Desenvolvimento: Executa migrações seguras conforme necessário
+- Detecção automática de ambiente e configuração inteligente
 """
 import logging
 from sqlalchemy import text
@@ -18,16 +22,52 @@ def mask_database_url(url):
     masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', url)
     return masked
 
-def executar_migracoes():
+def detectar_ambiente_migration():
     """
-    Execute todas as migrações necessárias automaticamente
-    REATIVADO PARA DEPLOY EASYPANEL COMPLETO
+    Detecta automaticamente o ambiente para as migrações
+    Integra com o sistema de detecção do environment_detector.py
     """
     try:
-        logger.info("🔄 Iniciando migrações automáticas COMPLETAS do banco EasyPanel...")
+        from environment_detector import get_environment_info
+        env_info = get_environment_info()
+        return env_info['environment'], env_info['platform'], env_info['confidence']
+    except ImportError:
+        # Fallback se environment_detector não disponível
+        database_url = os.environ.get('DATABASE_URL', '')
+        if 'neon' in database_url or 'localhost' in database_url:
+            return 'development', 'unknown', 0.8
+        else:
+            return 'production', 'unknown', 0.7
+
+def executar_migracoes():
+    """
+    🤖 Execute migrações automaticamente baseado na detecção inteligente de ambiente
+    Sistema totalmente automático - zero configuração manual necessária
+    """
+    try:
+        # Detectar ambiente automaticamente
+        ambiente, plataforma, confianca = detectar_ambiente_migration()
+        
+        logger.info("🚀 SISTEMA DE MIGRAÇÕES AUTOMÁTICAS - SIGE v10.0")
+        logger.info("=" * 55)
+        logger.info(f"🌍 Ambiente detectado: {ambiente.upper()}")
+        logger.info(f"🖥️ Plataforma: {plataforma.upper()}")
+        logger.info(f"📊 Confiança: {confianca:.1%}")
+        
         # Mascarar credenciais por segurança
         database_url = os.environ.get('DATABASE_URL', 'postgresql://sige:sige@viajey_sige:5432/sige')
         logger.info(f"🎯 TARGET DATABASE: {mask_database_url(database_url)}")
+        
+        # Configurar estratégia baseada no ambiente
+        if ambiente == 'production':
+            logger.info("🔄 MODO PRODUÇÃO: Executando TODAS as migrações automaticamente")
+            estrategia = 'completa'
+        else:
+            logger.info("🔧 MODO DESENVOLVIMENTO: Executando migrações seguras")
+            estrategia = 'segura'
+        
+        logger.info(f"📋 Estratégia de migração: {estrategia}")
+        logger.info("-" * 55)
         
         # Verificar se a tabela existe, se não existir, criar completa
         garantir_tabela_proposta_templates_existe()
