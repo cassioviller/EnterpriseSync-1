@@ -3547,27 +3547,27 @@ def detalhes_uso_veiculo(uso_id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             return jsonify({'error': 'Acesso negado'}), 403
-    
-    # Buscar uso com relacionamentos
-    uso = UsoVeiculo.query.options(
-        db.joinedload(UsoVeiculo.veiculo),
-        db.joinedload(UsoVeiculo.funcionario),
-        db.joinedload(UsoVeiculo.obra)
-    ).filter_by(id=uso_id, admin_id=tenant_admin_id).first()
-    
-    if not uso:
-        return jsonify({'error': 'Uso não encontrado'}), 404
-    
-    # Buscar passageiros do uso com informações dos funcionários
-    passageiros = PassageiroVeiculo.query.options(
-        db.joinedload(PassageiroVeiculo.funcionario)
-    ).filter_by(
-        uso_veiculo_id=uso.id,
-        admin_id=tenant_admin_id
-    ).all()
-    
-    # Montar HTML dos detalhes
-    html_content = f"""
+        
+        # Buscar uso com relacionamentos
+        uso = UsoVeiculo.query.options(
+            db.joinedload(UsoVeiculo.veiculo),
+            db.joinedload(UsoVeiculo.funcionario),
+            db.joinedload(UsoVeiculo.obra)
+        ).filter_by(id=uso_id, admin_id=tenant_admin_id).first()
+        
+        if not uso:
+            return jsonify({'error': 'Uso não encontrado'}), 404
+        
+        # Buscar passageiros do uso com informações dos funcionários
+        passageiros = PassageiroVeiculo.query.options(
+            db.joinedload(PassageiroVeiculo.funcionario)
+        ).filter_by(
+            uso_veiculo_id=uso.id,
+            admin_id=tenant_admin_id
+        ).all()
+        
+        # Montar HTML dos detalhes
+        html_content = f"""
     <div class="row">
         <div class="col-md-6">
             <h6><i class="fas fa-info-circle"></i> Informações Gerais</h6>
