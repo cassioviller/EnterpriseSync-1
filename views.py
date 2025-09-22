@@ -3542,10 +3542,11 @@ def detalhes_uso_veiculo(uso_id):
     """Fornecer dados detalhados de um uso específico via AJAX"""
     from models import UsoVeiculo, Funcionario, Obra, Veiculo, PassageiroVeiculo
     
-    # 🔒 SEGURANÇA MULTITENANT
-    tenant_admin_id = get_tenant_admin_id()
-    if not tenant_admin_id:
-        return jsonify({'error': 'Acesso negado'}), 403
+    try:
+        # 🔒 SEGURANÇA MULTITENANT
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            return jsonify({'error': 'Acesso negado'}), 403
     
     # Buscar uso com relacionamentos
     uso = UsoVeiculo.query.options(
@@ -3661,8 +3662,12 @@ def detalhes_uso_veiculo(uso_id):
         </div>
     </div>
     """
-    
-    return html_content
+        
+        return html_content
+        
+    except Exception as e:
+        print(f"ERRO DETALHES USO: {str(e)}")
+        return f'<div class="alert alert-danger">Erro ao carregar detalhes: {str(e)}</div>', 500
 
 
 # ROTA PARA MODAL DE CUSTO (SEM PARÂMETRO ID NA URL)
