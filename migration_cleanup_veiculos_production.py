@@ -66,8 +66,8 @@ class VeiculosMigrationCleaner:
             logger.info("🔍 MODO DRY-RUN ATIVADO - Apenas simulação")
         
     def verificar_ambiente(self):
-        """🤖 Verificações automáticas de ambiente com detecção inteligente"""
-        logger.info("🔍 Iniciando verificações automáticas de ambiente...")
+        """Verificações de segurança antes da migration"""
+        logger.info("🔍 Iniciando verificações de ambiente...")
         
         try:
             # Verificar conexão
@@ -75,50 +75,25 @@ class VeiculosMigrationCleaner:
                 result = conn.execute(text("SELECT version()"))
                 version = result.scalar()
                 logger.info(f"✅ Conexão PostgreSQL OK: {version}")
-            
-            # Usar detecção automática de ambiente se disponível
-            try:
-                from environment_detector import get_environment_info, is_production
-                env_info = get_environment_info()
                 
-                logger.info("🤖 USANDO DETECÇÃO AUTOMÁTICA DE AMBIENTE:")
-                logger.info(f"   🌍 Ambiente: {env_info['environment'].upper()}")
-                logger.info(f"   🖥️ Plataforma: {env_info['platform'].upper()}")
-                logger.info(f"   📊 Confiança: {env_info['confidence']:.1%}")
+            # Verificar se estamos em produção (EasyPanel/Hostinger)
+            if 'localhost' in self.database_url or 'neon' in self.database_url:
+                logger.warning("⚠️ DETECTADO AMBIENTE DE DESENVOLVIMENTO!")
+                logger.warning("⚠️ Esta migration é destinada APENAS para produção EasyPanel")
                 
-                if is_production():
-                    logger.info("✅ PRODUÇÃO DETECTADA - Limpeza será executada automaticamente")
-                    return True
-                else:
-                    logger.info("🔧 DESENVOLVIMENTO DETECTADO - Aplicando regras de segurança")
-                    # Em desenvolvimento, executar apenas se forçado ou em modo dry-run
-                    force_dev = os.environ.get('FORCE_DEV_MIGRATION', '').lower() in ['1', 'true', 'yes']
-                    run_cleanup = os.environ.get('RUN_CLEANUP_VEICULOS', '').lower() in ['1', 'true', 'yes']
-                    
-                    if force_dev or run_cleanup or self.dry_run:
-                        logger.info("🚀 Execução autorizada em desenvolvimento")
-                        return True
-                    else:
-                        logger.info("🛡️ Limpeza bloqueada em desenvolvimento (use RUN_CLEANUP_VEICULOS=1 ou FORCE_DEV_MIGRATION=1)")
+                # Em desenvolvimento, verificar se força execução
+                force_dev = os.environ.get('FORCE_DEV_MIGRATION', '').lower() in ['1', 'true', 'yes']
+                if not force_dev:
+                    try:
+                        response = input("Continuar com SIMULAÇÃO em desenvolvimento? (s/N): ")
+                        if response.lower() != 's':
+                            logger.info("🛑 Migration cancelada pelo usuário")
+                            return False
+                    except EOFError:
+                        logger.info("🛑 Ambiente não interativo - use FORCE_DEV_MIGRATION=1 para forçar")
                         return False
-                        
-            except ImportError:
-                # Fallback para detecção manual se environment_detector não disponível
-                logger.warning("⚠️ Sistema de detecção automática não disponível - usando detecção manual")
-                
-                if 'localhost' in self.database_url or 'neon' in self.database_url:
-                    logger.warning("⚠️ DETECTADO AMBIENTE DE DESENVOLVIMENTO!")
-                    logger.warning("⚠️ Esta migration é destinada APENAS para produção EasyPanel")
-                    
-                    # Em desenvolvimento, verificar se força execução
-                    force_dev = os.environ.get('FORCE_DEV_MIGRATION', '').lower() in ['1', 'true', 'yes']
-                    if not force_dev:
-                        logger.info("🛑 Migration bloqueada em desenvolvimento - use FORCE_DEV_MIGRATION=1 para forçar")
-                        return False
-                    else:
-                        logger.info("🚀 FORCE_DEV_MIGRATION=1 detectada - executando em desenvolvimento")
                 else:
-                    logger.info("✅ Ambiente de produção detectado - continuando")
+                    logger.info("🚀 FORCE_DEV_MIGRATION=1 detectada - executando em desenvolvimento")
                     
             return True
             

@@ -1,10 +1,6 @@
 """
-🤖 MIGRAÇÕES AUTOMÁTICAS DO BANCO DE DADOS - SIGE v10.0
-=======================================================
-Sistema inteligente de migrações que se adapta automaticamente ao ambiente:
-- EasyPanel/Produção: Executa todas as migrações automaticamente
-- Desenvolvimento: Executa migrações seguras conforme necessário
-- Detecção automática de ambiente e configuração inteligente
+Migrações automáticas do banco de dados
+Executadas automaticamente na inicialização da aplicação
 """
 import logging
 from sqlalchemy import text
@@ -22,52 +18,16 @@ def mask_database_url(url):
     masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', url)
     return masked
 
-def detectar_ambiente_migration():
-    """
-    Detecta automaticamente o ambiente para as migrações
-    Integra com o sistema de detecção do environment_detector.py
-    """
-    try:
-        from environment_detector import get_environment_info
-        env_info = get_environment_info()
-        return env_info['environment'], env_info['platform'], env_info['confidence']
-    except ImportError:
-        # Fallback se environment_detector não disponível
-        database_url = os.environ.get('DATABASE_URL', '')
-        if 'neon' in database_url or 'localhost' in database_url:
-            return 'development', 'unknown', 0.8
-        else:
-            return 'production', 'unknown', 0.7
-
 def executar_migracoes():
     """
-    🤖 Execute migrações automaticamente baseado na detecção inteligente de ambiente
-    Sistema totalmente automático - zero configuração manual necessária
+    Execute todas as migrações necessárias automaticamente
+    REATIVADO PARA DEPLOY EASYPANEL COMPLETO
     """
     try:
-        # Detectar ambiente automaticamente
-        ambiente, plataforma, confianca = detectar_ambiente_migration()
-        
-        logger.info("🚀 SISTEMA DE MIGRAÇÕES AUTOMÁTICAS - SIGE v10.0")
-        logger.info("=" * 55)
-        logger.info(f"🌍 Ambiente detectado: {ambiente.upper()}")
-        logger.info(f"🖥️ Plataforma: {plataforma.upper()}")
-        logger.info(f"📊 Confiança: {confianca:.1%}")
-        
+        logger.info("🔄 Iniciando migrações automáticas COMPLETAS do banco EasyPanel...")
         # Mascarar credenciais por segurança
         database_url = os.environ.get('DATABASE_URL', 'postgresql://sige:sige@viajey_sige:5432/sige')
         logger.info(f"🎯 TARGET DATABASE: {mask_database_url(database_url)}")
-        
-        # Configurar estratégia baseada no ambiente
-        if ambiente == 'production':
-            logger.info("🔄 MODO PRODUÇÃO: Executando TODAS as migrações automaticamente")
-            estrategia = 'completa'
-        else:
-            logger.info("🔧 MODO DESENVOLVIMENTO: Executando migrações seguras")
-            estrategia = 'segura'
-        
-        logger.info(f"📋 Estratégia de migração: {estrategia}")
-        logger.info("-" * 55)
         
         # Verificar se a tabela existe, se não existir, criar completa
         garantir_tabela_proposta_templates_existe()
@@ -160,8 +120,6 @@ def garantir_usuarios_producao():
     except Exception as e:
         logger.warning(f"⚠️ Erro ao garantir usuários de produção: {e}")
         # Tentar com método alternativo se SQLAlchemy 2.0
-        connection = None
-        cursor = None
         try:
             connection = db.engine.raw_connection()
             cursor = connection.cursor()
@@ -173,23 +131,16 @@ def garantir_usuarios_producao():
                 ON CONFLICT (id) DO NOTHING
             """)
             connection.commit()
+            cursor.close()
+            connection.close()
             logger.info("✅ Usuário admin ID=10 criado via conexão direta!")
         except Exception as e2:
             logger.error(f"❌ Falha ao criar usuário admin: {e2}")
-            if connection:
-                connection.rollback()
-        finally:
-            if cursor:
-                cursor.close()
-            if connection:
-                connection.close()
 
 def migrar_campos_opcionais_propostas():
     """
     Torna os campos assunto e objeto opcionais na tabela propostas_comerciais
     """
-    connection = None
-    cursor = None
     try:
         # Usar conexão direta para verificar constraints
         connection = db.engine.raw_connection()
@@ -221,22 +172,16 @@ def migrar_campos_opcionais_propostas():
         else:
             logger.info("✅ Campos assunto e objeto já são opcionais")
             
+        cursor.close()
+        connection.close()
+            
     except Exception as e:
         logger.error(f"❌ Erro ao atualizar campos opcionais: {str(e)}")
-        if connection:
-            connection.rollback()
-    finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
 
 def migrar_personalizacao_visual_empresa():
     """
     Adiciona colunas de personalização visual na tabela configuracao_empresa
     """
-    connection = None
-    cursor = None
     try:
         connection = db.engine.raw_connection()
         cursor = connection.cursor()
@@ -270,15 +215,16 @@ def migrar_personalizacao_visual_empresa():
                 logger.info(f"✅ Coluna '{nome_coluna}' já existe na tabela configuracao_empresa")
         
         connection.commit()
+        cursor.close()
+        connection.close()
         
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar colunas de personalização visual: {str(e)}")
-        if connection:
+        if 'connection' in locals():
             connection.rollback()
-    finally:
-        if cursor:
             cursor.close()
-        if connection:
+            connection.close()
+            cursor.close()
             connection.close()
 
 def garantir_tabela_proposta_templates_existe():
@@ -495,8 +441,6 @@ def migrar_campos_organizacao_propostas():
     """
     Adiciona campos de organização avançada para proposta_itens
     """
-    connection = None
-    cursor = None
     try:
         connection = db.engine.raw_connection()
         cursor = connection.cursor()
@@ -529,23 +473,20 @@ def migrar_campos_organizacao_propostas():
                 logger.info(f"✅ Coluna '{nome_coluna}' já existe na tabela proposta_itens")
         
         connection.commit()
+        cursor.close()
+        connection.close()
         
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar campos de organização: {str(e)}")
-        if connection:
+        if 'connection' in locals():
             connection.rollback()
-    finally:
-        if cursor:
             cursor.close()
-        if connection:
             connection.close()
 
 def migrar_campos_completos_templates():
     """
     Migração 7: Adicionar campos completos para templates (dados do cliente, engenheiro, seções)
     """
-    connection = None
-    cursor = None
     try:
         connection = db.engine.raw_connection()
         cursor = connection.cursor()
@@ -600,19 +541,10 @@ def migrar_campos_completos_templates():
         
     except Exception as e:
         logger.error(f"❌ Erro ao adicionar campos completos de templates: {str(e)}")
-        if 'connection' in locals() and connection:
-            try:
-                connection.rollback()
-            except:
-                pass
-            try:
-                cursor.close() if 'cursor' in locals() and cursor else None
-            except:
-                pass
-            try:
-                connection.close()
-            except:
-                pass
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
 
 
 def migrar_campos_rdo_ocorrencia():
@@ -994,8 +926,7 @@ def corrigir_admin_id_servicos_existentes():
         
         # Verificar quantos serviços estão sem admin_id
         cursor.execute("SELECT COUNT(*) FROM servico WHERE admin_id IS NULL")
-        result = cursor.fetchone()
-        servicos_sem_admin = result[0] if result else 0
+        servicos_sem_admin = cursor.fetchone()[0]
         
         if servicos_sem_admin > 0:
             logger.info(f"🔧 Corrigindo {servicos_sem_admin} serviços sem admin_id...")

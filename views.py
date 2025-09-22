@@ -8,12 +8,9 @@ from utils.tenant import get_tenant_admin_id
 # API RDO Refatorada integrada inline na função salvar_rdo_flexivel
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, desc, or_, and_, text
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError
 import os
 import json
-from functools import wraps
-import logging
-import time
 
 # SISTEMA DE LOG DETALHADO PARA MÓDULOS
 import sys
@@ -91,122 +88,17 @@ except ImportError as e:
 
 main_bp = Blueprint('main', __name__)
 
-# SISTEMA DE PROTEÇÃO ROBUSTA DE TRANSAÇÕES SQLAlchemy
-logger = logging.getLogger(__name__)
-
-def safe_transaction(max_retries=3, rollback_on_error=True, commit_on_success=True):
-    """
-    Decorador para proteção robusta de transações SQLAlchemy.
-    Resolve problemas de "current transaction is aborted" automaticamente.
-    
-    Args:
-        max_retries: Número máximo de tentativas
-        rollback_on_error: Se deve fazer rollback automático em caso de erro
-        commit_on_success: Se deve fazer commit automático em caso de sucesso
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            last_error = None
-            
-            for attempt in range(max_retries):
-                try:
-                    # Garantir que não há transação abortada
-                    if db.session.is_active:
-                        try:
-                            # Testar conexão com query simples
-                            db.session.execute(text("SELECT 1"))
-                        except (OperationalError, IntegrityError):
-                            logger.warning(f"🔄 Transação abortada detectada, fazendo rollback (tentativa {attempt + 1})")
-                            db.session.rollback()
-                    
-                    # Executar função
-                    result = func(*args, **kwargs)
-                    
-                    # Commit automático se solicitado
-                    if commit_on_success and db.session.dirty:
-                        db.session.commit()
-                        logger.debug(f"✅ Transação commitada automaticamente: {func.__name__}")
-                    
-                    return result
-                    
-                except (OperationalError, IntegrityError) as e:
-                    last_error = e
-                    logger.error(f"❌ Erro de transação em {func.__name__} (tentativa {attempt + 1}): {str(e)}")
-                    
-                    if rollback_on_error:
-                        try:
-                            db.session.rollback()
-                            logger.info(f"🔄 Rollback executado para {func.__name__}")
-                        except Exception as rollback_error:
-                            logger.error(f"⚠️ Erro no rollback: {rollback_error}")
-                    
-                    if attempt < max_retries - 1:
-                        time.sleep(0.1 * (attempt + 1))  # Backoff exponencial
-                        continue
-                    else:
-                        # Última tentativa falhou
-                        break
-                        
-                except Exception as e:
-                    last_error = e
-                    logger.error(f"❌ Erro geral em {func.__name__}: {str(e)}")
-                    
-                    if rollback_on_error:
-                        try:
-                            db.session.rollback()
-                        except:
-                            pass
-                    
-                    break
-            
-            # Se chegou aqui, todas as tentativas falharam
-            logger.error(f"💥 Todas as tentativas falharam para {func.__name__}: {last_error}")
-            if rollback_on_error:
-                try:
-                    db.session.rollback()
-                except:
-                    pass
-            raise last_error
-            
-        return wrapper
-    return decorator
-
-def safe_db_operation(operation, default_value=None, retries=2):
-    """Executa operação no banco com tratamento seguro de transação (versão legacy)"""
-    for attempt in range(retries + 1):
+def safe_db_operation(operation, default_value=None):
+    """Executa operação no banco com tratamento seguro de transação"""
+    try:
+        return operation()
+    except Exception as e:
+        print(f"ERRO DB OPERATION: {str(e)}")
         try:
-            # Verificar se transação está abortada
-            if db.session.is_active:
-                try:
-                    db.session.execute(text("SELECT 1"))
-                except (OperationalError, IntegrityError):
-                    logger.warning(f"🔄 Transação abortada, fazendo rollback (tentativa {attempt + 1})")
-                    db.session.rollback()
-            
-            return operation()
-            
-        except (OperationalError, IntegrityError) as e:
-            logger.error(f"❌ Erro DB OPERATION (tentativa {attempt + 1}): {str(e)}")
-            try:
-                db.session.rollback()
-            except:
-                pass
-            
-            if attempt < retries:
-                time.sleep(0.1)
-                continue
-            else:
-                return default_value
-        except Exception as e:
-            logger.error(f"❌ Erro geral DB OPERATION: {str(e)}")
-            try:
-                db.session.rollback()
-            except:
-                pass
-            return default_value
-    
-    return default_value
+            db.session.rollback()
+        except:
+            pass
+        return default_value
 
 
 def _calcular_funcionarios_departamento(admin_id):
@@ -653,7 +545,6 @@ def dashboard():
             data_fim = date.today()
         
         # Garantir que admin_id está definido - usar valor do usuário atual
-        admin_id = None
         if 'admin_id' not in locals() or admin_id is None:
             # Usar sistema automático de detecção
             if current_user.is_authenticated:
@@ -1011,7 +902,6 @@ def usuarios():
 @main_bp.route('/usuarios/novo', methods=['GET', 'POST'])
 @login_required
 @admin_required
-@safe_transaction(max_retries=3, rollback_on_error=True, commit_on_success=True)
 def novo_usuario():
     """Criar novo usuário"""
     if request.method == 'POST':
@@ -1024,13 +914,14 @@ def novo_usuario():
             email = request.form.get('email') or f"{request.form['username']}@sige.local"  # Email padrão
             tipo_usuario = request.form.get('tipo_usuario') or 'FUNCIONARIO'  # Tipo padrão
             
-            usuario = Usuario()
-            usuario.nome = nome
-            usuario.email = email
-            usuario.username = request.form['username']
-            usuario.password_hash = generate_password_hash(request.form['password'])
-            usuario.tipo_usuario = TipoUsuario[tipo_usuario]
-            usuario.admin_id = admin_id if tipo_usuario != 'ADMIN' else None
+            usuario = Usuario(
+                nome=nome,
+                email=email,
+                username=request.form['username'],
+                password_hash=generate_password_hash(request.form['password']),
+                tipo_usuario=TipoUsuario[tipo_usuario],
+                admin_id=admin_id if tipo_usuario != 'ADMIN' else None
+            )
             
             db.session.add(usuario)
             db.session.commit()
@@ -1137,30 +1028,21 @@ def funcionarios():
                 return redirect(url_for('main.funcionarios'))
             
             # Criar novo funcionário
-            novo_funcionario = Funcionario()
-            novo_funcionario.nome = nome
-            novo_funcionario.cpf = cpf
-            novo_funcionario.codigo = codigo
-            novo_funcionario.email = request.form.get('email', '')
-            novo_funcionario.telefone = request.form.get('telefone', '')
-            novo_funcionario.endereco = request.form.get('endereco', '')
-            data_admissao_str = request.form.get('data_admissao', datetime.now().strftime('%Y-%m-%d'))
-            novo_funcionario.data_admissao = datetime.strptime(data_admissao_str, '%Y-%m-%d').date()
-            
-            salario_str = request.form.get('salario')
-            novo_funcionario.salario = float(salario_str) if salario_str else None
-            
-            departamento_id_str = request.form.get('departamento_id')
-            novo_funcionario.departamento_id = int(departamento_id_str) if departamento_id_str else None
-            
-            funcao_id_str = request.form.get('funcao_id')
-            novo_funcionario.funcao_id = int(funcao_id_str) if funcao_id_str else None
-            
-            horario_id_str = request.form.get('horario_id')
-            novo_funcionario.horario_trabalho_id = int(horario_id_str) if horario_id_str else None
-            
-            novo_funcionario.admin_id = admin_id
-            novo_funcionario.ativo = True
+            novo_funcionario = Funcionario(
+                nome=nome,
+                cpf=cpf,
+                codigo=codigo,
+                email=request.form.get('email', ''),
+                telefone=request.form.get('telefone', ''),
+                endereco=request.form.get('endereco', ''),
+                data_admissao=datetime.strptime(request.form.get('data_admissao', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date(),
+                salario=float(request.form.get('salario', 0)) if request.form.get('salario') else None,
+                departamento_id=int(request.form.get('departamento_id')) if request.form.get('departamento_id') else None,
+                funcao_id=int(request.form.get('funcao_id')) if request.form.get('funcao_id') else None,
+                horario_trabalho_id=int(request.form.get('horario_id')) if request.form.get('horario_id') else None,
+                admin_id=admin_id,
+                ativo=True
+            )
             
             # Processar foto se enviada
             if 'foto' in request.files and request.files['foto'].filename:
@@ -1742,7 +1624,6 @@ def obras():
 # CRUD OBRAS - Nova Obra
 @main_bp.route('/obras/nova', methods=['GET', 'POST'])
 @login_required
-@safe_transaction(max_retries=3, rollback_on_error=True, commit_on_success=True)
 def nova_obra():
     """Criar nova obra"""
     if request.method == 'POST':
@@ -1762,16 +1643,10 @@ def nova_obra():
             portal_ativo = request.form.get('portal_ativo') == '1'
             
             # Datas
-            data_inicio_str = request.form.get('data_inicio')
-            if not data_inicio_str:
-                flash('Data de início é obrigatória.', 'error')
-                return redirect(url_for('main.nova_obra'))
-            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-            
+            data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
             data_previsao_fim = None
-            data_previsao_fim_str = request.form.get('data_previsao_fim')
-            if data_previsao_fim_str:
-                data_previsao_fim = datetime.strptime(data_previsao_fim_str, '%Y-%m-%d').date()
+            if request.form.get('data_previsao_fim'):
+                data_previsao_fim = datetime.strptime(request.form.get('data_previsao_fim'), '%Y-%m-%d').date()
             
             # Valores
             orcamento = float(request.form.get('orcamento', 0)) if request.form.get('orcamento') else None
@@ -1992,12 +1867,9 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
                 servicos_removidos += 1
                 
                 # EXCLUSÃO CASCATA - Remover RDOs relacionados AUTOMATICAMENTE
-                # Buscar obra para obter admin_id ou usar sistema robusto
-                obra_ref = Obra.query.get(obra_id) if obra_id else None
-                current_admin_id = obra_ref.admin_id if obra_ref and obra_ref.admin_id else get_admin_id_robusta()
                 rdos_deletados = RDOServicoSubatividade.query.filter_by(
                     servico_id=servico_atual.servico_id,
-                    admin_id=current_admin_id
+                    admin_id=admin_id
                 ).delete()
                 
                 print(f"🧹 LIMPEZA AUTOMÁTICA: {rdos_deletados} registros de RDO removidos para serviço {servico_atual.servico_id}")
@@ -2230,14 +2102,10 @@ def editar_obra(id):
             obra.nome = request.form.get('nome')
             obra.endereco = request.form.get('endereco', '')
             obra.status = request.form.get('status', 'Em andamento')
+            obra.data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
             
-            data_inicio_str = request.form.get('data_inicio')
-            if data_inicio_str:
-                obra.data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-            
-            data_previsao_fim_str = request.form.get('data_previsao_fim')
-            if data_previsao_fim_str:
-                obra.data_previsao_fim = datetime.strptime(data_previsao_fim_str, '%Y-%m-%d').date()
+            if request.form.get('data_previsao_fim'):
+                obra.data_previsao_fim = datetime.strptime(request.form.get('data_previsao_fim'), '%Y-%m-%d').date()
             else:
                 obra.data_previsao_fim = None
             
@@ -2396,7 +2264,6 @@ def excluir_obra(id):
 # Detalhes de uma obra específica
 @main_bp.route('/obras/<int:id>')
 @main_bp.route('/obras/detalhes/<int:id>')
-@safe_transaction(max_retries=2, rollback_on_error=True, commit_on_success=False)
 def detalhes_obra(id):
     try:
         # DEFINIR DATAS PRIMEIRO - CRÍTICO
@@ -2922,7 +2789,6 @@ def veiculos():
 # Detalhes de um veículo específico
 @main_bp.route('/veiculos/<int:id>')
 @login_required  # 🔒 MUDANÇA: Agora funcionários também podem acessar
-@safe_transaction(max_retries=2, rollback_on_error=True, commit_on_success=False)
 def detalhes_veiculo(id):
     try:
         # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado  
@@ -3223,17 +3089,18 @@ def novo_veiculo():
                 return render_template('veiculos/novo_veiculo.html', form=form)
             
             # Criar novo veículo
-            veiculo = Veiculo()
-            veiculo.placa = form.placa.data
-            veiculo.marca = form.marca.data
-            veiculo.modelo = form.modelo.data
-            veiculo.ano = form.ano.data
-            veiculo.tipo = form.tipo.data
-            veiculo.status = form.status.data
-            veiculo.km_atual = form.km_atual.data or 0
-            veiculo.data_ultima_manutencao = form.data_ultima_manutencao.data
-            veiculo.data_proxima_manutencao = form.data_proxima_manutencao.data
-            veiculo.admin_id = admin_id
+            veiculo = Veiculo(
+                placa=form.placa.data,
+                marca=form.marca.data,
+                modelo=form.modelo.data,
+                ano=form.ano.data,
+                tipo=form.tipo.data,
+                status=form.status.data,
+                km_atual=form.km_atual.data or 0,
+                data_ultima_manutencao=form.data_ultima_manutencao.data,
+                data_proxima_manutencao=form.data_proxima_manutencao.data,
+                admin_id=admin_id
+            )
             
             db.session.add(veiculo)
             db.session.commit()
@@ -3287,7 +3154,7 @@ def editar_veiculo(id):
             # Alinhado com constraint DB: veiculo_admin_placa_uc (admin_id, placa)
             veiculo_existente = Veiculo.query.filter(
                 Veiculo.placa == form.placa.data,
-                Veiculo.admin_id == tenant_admin_id,  # Usar tenant_admin_id já definido
+                Veiculo.admin_id == admin_id,  # Scoped por admin
                 Veiculo.id != id
             ).first()
             if veiculo_existente:
@@ -3495,23 +3362,14 @@ def novo_uso_veiculo_lista():
             except (ValueError, TypeError):
                 flash('Porcentagem de combustível inválida.', 'warning')
         
-        # Validar e processar datas/horários
-        data_uso_str = request.form.get('data_uso')
-        if not data_uso_str:
-            flash('Data de uso é obrigatória.', 'error')
-            return redirect(url_for('main.veiculos'))
-        
-        horario_saida_str = request.form.get('horario_saida')
-        horario_chegada_str = request.form.get('horario_chegada')
-        
         # Criar registro de uso
         uso = UsoVeiculo(
             veiculo_id=veiculo.id,
             funcionario_id=motorista_id,  # Usar motorista como funcionário principal
             obra_id=request.form.get('obra_id') if request.form.get('obra_id') else None,
-            data_uso=datetime.strptime(data_uso_str, '%Y-%m-%d').date(),
-            horario_saida=datetime.strptime(horario_saida_str, '%H:%M').time() if horario_saida_str else None,
-            horario_chegada=datetime.strptime(horario_chegada_str, '%H:%M').time() if horario_chegada_str else None,
+            data_uso=datetime.strptime(request.form.get('data_uso'), '%Y-%m-%d').date(),
+            horario_saida=datetime.strptime(request.form.get('horario_saida'), '%H:%M').time() if request.form.get('horario_saida') else None,
+            horario_chegada=datetime.strptime(request.form.get('horario_chegada'), '%H:%M').time() if request.form.get('horario_chegada') else None,
             km_inicial=km_inicial,
             km_final=km_final,
             km_percorrido=km_final - km_inicial if km_final and km_inicial else 0,
@@ -5560,11 +5418,7 @@ def criar_rdo():
         
         # Dados básicos
         obra_id = request.form.get('obra_id', type=int)
-        data_relatorio_str = request.form.get('data_relatorio')
-        if not data_relatorio_str:
-            flash('Data do relatório é obrigatória.', 'error')
-            return redirect(url_for('main.rdo_novo_unificado'))
-        data_relatorio = datetime.strptime(data_relatorio_str, '%Y-%m-%d').date()
+        data_relatorio = datetime.strptime(request.form.get('data_relatorio'), '%Y-%m-%d').date()
         
         # Buscar obra do admin atual (manter multi-tenant)
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
@@ -5584,11 +5438,7 @@ def criar_rdo():
             return redirect(url_for('main.editar_rdo', id=rdo_existente.id))
         
         # Gerar número do RDO
-        try:
-            numero_rdo = gerar_numero_rdo(obra_id, data_relatorio)
-        except NameError:
-            # Função não definida, usar fallback
-            numero_rdo = f"RDO-{obra_id}-{data_relatorio.strftime('%Y%m%d')}"
+        numero_rdo = gerar_numero_rdo(obra_id, data_relatorio)
         
         # Criar RDO
         rdo = RDO()
