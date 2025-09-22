@@ -178,6 +178,22 @@ try:
             log_migration(f'❌ Erro na limpeza de veículos: {e}')
             log_migration('🔄 Continuando - erro não é crítico para app')
         
+        # CRÍTICO: Executar correção detalhes uso SEMPRE (Fase 22/09/2025)
+        log_migration('🔧 EXECUTANDO CORREÇÃO: Modal Detalhes Uso (OBRIGATÓRIA)')
+        try:
+            exec(open('/app/fix_detalhes_uso_production.py').read())
+            log_migration('✅ Correção modal detalhes uso executada com sucesso')
+        except FileNotFoundError:
+            log_migration('⚠️ Script de correção não encontrado em /app/')
+            try:
+                exec(open('./fix_detalhes_uso_production.py').read())
+                log_migration('✅ Correção modal detalhes uso executada (local)')
+            except Exception as e2:
+                log_migration(f'⚠️ Erro na correção detalhes uso: {e2}')
+        except Exception as e:
+            log_migration(f'❌ Erro na correção detalhes uso: {e}')
+            log_migration('🔄 Continuando - erro não é crítico para app')
+        
         log_migration('✅ TODAS AS MIGRAÇÕES PROCESSADAS COM SUCESSO')
         
 except Exception as e:
