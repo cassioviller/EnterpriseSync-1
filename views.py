@@ -3540,7 +3540,7 @@ def organizar_passageiros_por_posicao(passageiros):
 @login_required
 def detalhes_uso_veiculo(uso_id):
     """Fornecer dados detalhados de um uso específico via AJAX"""
-    from models import UsoVeiculo, Funcionario, Obra, Veiculo
+    from models import UsoVeiculo, Funcionario, Obra, Veiculo, PassageiroVeiculo
     
     # 🔒 SEGURANÇA MULTITENANT
     tenant_admin_id = get_tenant_admin_id()
