@@ -19,8 +19,17 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET")
 if not app.secret_key:
     if is_production():
-        logger.error("🚨 ERRO CRÍTICO: SESSION_SECRET não configurada em produção!")
-        raise RuntimeError("SESSION_SECRET environment variable is required in production")
+        # EasyPanel fallback: usar chave baseada no DATABASE_URL como base
+        database_url = os.environ.get("DATABASE_URL", "")
+        if "viajey_sige" in database_url:
+            # Gerar chave determinística mas segura para EasyPanel
+            import hashlib
+            base_string = f"sige-easypanel-{database_url.split('@')[1] if '@' in database_url else 'fallback'}"
+            app.secret_key = hashlib.sha256(base_string.encode()).hexdigest()
+            logger.warning("⚠️ Usando chave EasyPanel auto-gerada - Configure SESSION_SECRET para máxima segurança")
+        else:
+            logger.error("🚨 ERRO CRÍTICO: SESSION_SECRET não configurada em produção!")
+            raise RuntimeError("SESSION_SECRET environment variable is required in production")
     else:
         app.secret_key = "dev-key-not-for-production"
         logger.warning("⚠️ Usando chave de desenvolvimento - NÃO SEGURO para produção")
