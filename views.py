@@ -3670,6 +3670,182 @@ def detalhes_uso_veiculo(uso_id):
         return f'<div class="alert alert-danger">Erro ao carregar detalhes: {str(e)}</div>', 500
 
 
+# ========================
+# CRUD DE USO DE VEÍCULOS  
+# ========================
+
+# EDITAR USO DE VEÍCULO
+@main_bp.route('/veiculos/uso/<int:uso_id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_uso_veiculo(uso_id):
+    """Editar uso de veículo existente"""
+    from forms import UsoVeiculoForm
+    from models import UsoVeiculo, Veiculo, Funcionario, Obra
+    
+    try:
+        # 🔒 SEGURANÇA MULTITENANT
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        # Buscar uso com verificação de propriedade
+        uso = UsoVeiculo.query.join(Veiculo).filter(
+            UsoVeiculo.id == uso_id,
+            Veiculo.admin_id == tenant_admin_id
+        ).first_or_404()
+        
+        form = UsoVeiculoForm(obj=uso)
+        
+        # Carregamento das opções do formulário
+        form.veiculo_id.choices = [(v.id, f"{v.placa} - {v.marca} {v.modelo}") 
+                                  for v in Veiculo.query.filter_by(admin_id=tenant_admin_id).all()]
+        form.funcionario_id.choices = [(f.id, f.nome) 
+                                      for f in Funcionario.query.filter_by(admin_id=tenant_admin_id).all()]
+        form.obra_id.choices = [(0, "Nenhuma obra")] + [(o.id, o.nome) 
+                                                       for o in Obra.query.filter_by(admin_id=tenant_admin_id).all()]
+        
+        if form.validate_on_submit():
+            # Atualizar dados
+            uso.veiculo_id = form.veiculo_id.data
+            uso.funcionario_id = form.funcionario_id.data
+            uso.obra_id = form.obra_id.data if form.obra_id.data != 0 else None
+            uso.data_uso = form.data_uso.data
+            uso.km_inicial = form.km_inicial.data
+            uso.km_final = form.km_final.data
+            uso.porcentagem_combustivel = form.porcentagem_combustivel.data
+            uso.finalidade = form.finalidade.data
+            uso.observacoes = form.observacoes.data
+            
+            db.session.commit()
+            flash('Uso de veículo atualizado com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_veiculo', veiculo_id=uso.veiculo_id))
+        
+        return render_template('veiculos/editar_uso.html', form=form, uso=uso)
+        
+    except Exception as e:
+        print(f"ERRO EDITAR USO: {str(e)}")
+        flash(f'Erro ao editar uso: {str(e)}', 'error')
+        return redirect(url_for('main.veiculos'))
+
+# DELETAR USO DE VEÍCULO
+@main_bp.route('/veiculos/uso/<int:uso_id>/deletar', methods=['POST'])
+@login_required
+def deletar_uso_veiculo(uso_id):
+    """Deletar uso de veículo"""
+    from models import UsoVeiculo, Veiculo, PassageiroVeiculo
+    
+    try:
+        # 🔒 SEGURANÇA MULTITENANT
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        # Buscar uso com verificação de propriedade
+        uso = UsoVeiculo.query.join(Veiculo).filter(
+            UsoVeiculo.id == uso_id,
+            Veiculo.admin_id == tenant_admin_id
+        ).first_or_404()
+        
+        veiculo_id = uso.veiculo_id
+        
+        # Deletar passageiros relacionados primeiro
+        PassageiroVeiculo.query.filter_by(uso_id=uso_id).delete()
+        
+        # Deletar uso
+        db.session.delete(uso)
+        db.session.commit()
+        
+        flash('Uso de veículo excluído com sucesso!', 'success')
+        return redirect(url_for('main.detalhes_veiculo', veiculo_id=veiculo_id))
+        
+    except Exception as e:
+        print(f"ERRO DELETAR USO: {str(e)}")
+        flash(f'Erro ao excluir uso: {str(e)}', 'error')
+        return redirect(url_for('main.veiculos'))
+
+# ===========================
+# CRUD DE CUSTO DE VEÍCULOS  
+# ===========================
+
+# EDITAR CUSTO DE VEÍCULO
+@main_bp.route('/veiculos/custo/<int:custo_id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_custo_veiculo(custo_id):
+    """Editar custo de veículo existente"""
+    from forms import CustoVeiculoForm
+    from models import CustoVeiculo, Veiculo
+    
+    try:
+        # 🔒 SEGURANÇA MULTITENANT
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        # Buscar custo com verificação de propriedade
+        custo = CustoVeiculo.query.join(Veiculo).filter(
+            CustoVeiculo.id == custo_id,
+            Veiculo.admin_id == tenant_admin_id
+        ).first_or_404()
+        
+        form = CustoVeiculoForm(obj=custo)
+        
+        if form.validate_on_submit():
+            # Atualizar dados
+            custo.data_custo = form.data_custo.data
+            custo.tipo_custo = form.tipo_custo.data
+            custo.valor = form.valor.data
+            custo.km_custo = form.km_custo.data
+            custo.litros = form.litros.data
+            custo.observacoes = form.observacoes.data
+            
+            db.session.commit()
+            flash('Custo de veículo atualizado com sucesso!', 'success')
+            return redirect(url_for('main.detalhes_veiculo', veiculo_id=custo.veiculo_id))
+        
+        return render_template('veiculos/editar_custo.html', form=form, custo=custo)
+        
+    except Exception as e:
+        print(f"ERRO EDITAR CUSTO: {str(e)}")
+        flash(f'Erro ao editar custo: {str(e)}', 'error')
+        return redirect(url_for('main.veiculos'))
+
+# DELETAR CUSTO DE VEÍCULO
+@main_bp.route('/veiculos/custo/<int:custo_id>/deletar', methods=['POST'])
+@login_required
+def deletar_custo_veiculo(custo_id):
+    """Deletar custo de veículo"""
+    from models import CustoVeiculo, Veiculo
+    
+    try:
+        # 🔒 SEGURANÇA MULTITENANT
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        # Buscar custo com verificação de propriedade
+        custo = CustoVeiculo.query.join(Veiculo).filter(
+            CustoVeiculo.id == custo_id,
+            Veiculo.admin_id == tenant_admin_id
+        ).first_or_404()
+        
+        veiculo_id = custo.veiculo_id
+        
+        # Deletar custo
+        db.session.delete(custo)
+        db.session.commit()
+        
+        flash('Custo de veículo excluído com sucesso!', 'success')
+        return redirect(url_for('main.detalhes_veiculo', veiculo_id=veiculo_id))
+        
+    except Exception as e:
+        print(f"ERRO DELETAR CUSTO: {str(e)}")
+        flash(f'Erro ao excluir custo: {str(e)}', 'error')
+        return redirect(url_for('main.veiculos'))
+
 # ROTA PARA MODAL DE CUSTO (SEM PARÂMETRO ID NA URL)
 @main_bp.route('/veiculos/custo', methods=['POST'])
 @login_required  # 🔒 MUDANÇA: Funcionários podem registrar custos de veículos

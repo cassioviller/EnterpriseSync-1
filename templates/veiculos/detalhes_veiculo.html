@@ -187,6 +187,7 @@
                                 <th>Descrição</th>
                                 <th>Custo</th>
                                 <th>Fornecedor</th>
+                                <th width="120">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -208,11 +209,21 @@
                                     <td>{{ custo.descricao or '-' }}</td>
                                     <td>R$ {{ "%.2f"|format(custo.valor) }}</td>
                                     <td>{{ custo.fornecedor or '-' }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('main.editar_custo_veiculo', custo_id=custo.id) }}" class="btn btn-outline-warning btn-sm" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmarDeleteCusto({{ custo.id }})" title="Excluir">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted">
+                                    <td colspan="6" class="text-center text-muted">
                                         <i class="fas fa-info-circle"></i>
                                         Nenhum custo registrado
                                     </td>
@@ -246,12 +257,13 @@
                                 <th>Quilometragem</th>
                                 <th>Combustível</th>
                                 <th>Observações</th>
+                                <th width="120">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% if usos_veiculo %}
                                 {% for uso in usos_veiculo %}
-                                <tr style="cursor: pointer;" onclick="abrirModalDetalhesUso({{ uso.id }})">
+                                <tr>
                                     <td>{{ uso.data_uso.strftime('%d/%m/%Y') if uso.data_uso else '-' }}</td>
                                     <td>{{ uso.obra.nome if uso.obra else '-' }}</td>
                                     <td>{{ uso.funcionario.nome if uso.funcionario else '-' }}</td>
@@ -273,11 +285,24 @@
                                         {% endif %}
                                     </td>
                                     <td>{{ uso.observacoes[:30] + '...' if uso.observacoes and uso.observacoes|length > 30 else (uso.observacoes or '-') }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-info btn-sm" onclick="abrirModalDetalhesUso({{ uso.id }})" title="Ver Detalhes">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <a href="{{ url_for('main.editar_uso_veiculo', uso_id=uso.id) }}" class="btn btn-outline-warning btn-sm" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmarDeleteUso({{ uso.id }})" title="Excluir">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted">
+                                    <td colspan="7" class="text-center text-muted">
                                         <i class="fas fa-info-circle"></i>
                                         Nenhum registro de uso disponível
                                     </td>
@@ -735,6 +760,52 @@ function resetarFiltroMesAtual() {
 function editarVeiculo(id) {
     // Redirecionar para página de edição
     window.location.href = `/veiculos/${id}/editar`;
+}
+
+// Função para confirmar exclusão de uso
+function confirmarDeleteUso(usoId) {
+    if (confirm('Tem certeza que deseja excluir este registro de uso? Esta ação não pode ser desfeita.')) {
+        // Criar e submeter form via POST
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/veiculos/uso/${usoId}/deletar`;
+        
+        // Adicionar CSRF token
+        const csrfToken = document.querySelector('meta[name=csrf-token]');
+        if (csrfToken) {
+            const tokenInput = document.createElement('input');
+            tokenInput.type = 'hidden';
+            tokenInput.name = 'csrf_token';
+            tokenInput.value = csrfToken.getAttribute('content');
+            form.appendChild(tokenInput);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Função para confirmar exclusão de custo
+function confirmarDeleteCusto(custoId) {
+    if (confirm('Tem certeza que deseja excluir este registro de custo? Esta ação não pode ser desfeita.')) {
+        // Criar e submeter form via POST
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/veiculos/custo/${custoId}/deletar`;
+        
+        // Adicionar CSRF token
+        const csrfToken = document.querySelector('meta[name=csrf-token]');
+        if (csrfToken) {
+            const tokenInput = document.createElement('input');
+            tokenInput.type = 'hidden';
+            tokenInput.name = 'csrf_token';
+            tokenInput.value = csrfToken.getAttribute('content');
+            form.appendChild(tokenInput);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
 }
 
 // Função para abrir modal de detalhes do uso
