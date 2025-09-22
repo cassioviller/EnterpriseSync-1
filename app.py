@@ -16,23 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Create app instance
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET")
-if not app.secret_key:
-    if is_production():
-        # EasyPanel fallback: usar chave baseada no DATABASE_URL como base
-        database_url = os.environ.get("DATABASE_URL", "")
-        if "viajey_sige" in database_url:
-            # Gerar chave determinística mas segura para EasyPanel
-            import hashlib
-            base_string = f"sige-easypanel-{database_url.split('@')[1] if '@' in database_url else 'fallback'}"
-            app.secret_key = hashlib.sha256(base_string.encode()).hexdigest()
-            logger.warning("⚠️ Usando chave EasyPanel auto-gerada - Configure SESSION_SECRET para máxima segurança")
-        else:
-            logger.error("🚨 ERRO CRÍTICO: SESSION_SECRET não configurada em produção!")
-            raise RuntimeError("SESSION_SECRET environment variable is required in production")
-    else:
-        app.secret_key = "dev-key-not-for-production"
-        logger.warning("⚠️ Usando chave de desenvolvimento - NÃO SEGURO para produção")
+app.secret_key = os.environ.get("SECRET_KEY", "sige-v10-digital-mastery-production-key-2025")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # 🤖 DETECÇÃO E CONFIGURAÇÃO AUTOMÁTICA DE AMBIENTE
@@ -125,7 +109,7 @@ migrate.init_app(app, db)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-setattr(login_manager, 'login_view', 'auth.login')  # Corrigido para apontar para blueprint auth
+login_manager.login_view = 'auth.login'  # Corrigido para apontar para blueprint auth
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
 
 # Context processor para configurações da empresa
@@ -240,247 +224,58 @@ def obter_foto_funcionario(funcionario):
         </svg>'''
         return svg_avatar
 
-def run_intelligent_migrations():
-    """
-    🚀 SISTEMA DE MIGRAÇÕES INTELIGENTE OTIMIZADO - SIGE v10.0
-    =========================================================
-    Sistema inteligente com marker de migrações para evitar re-execução desnecessária.
-    
-    DETECÇÃO DE PRODUÇÃO:
-    - 'viajey_sige' em DATABASE_URL
-    - FORCE_MIGRATIONS=1 (também força re-execução)
-    - EASYPANEL_PROJECT_ID definido
-    - 'render.com' ou 'railway.app' em DATABASE_URL
-    
-    OTIMIZAÇÃO:
-    - Verifica markers para evitar re-execução desnecessária
-    - FORCE_MIGRATIONS=1 bypassa markers e força execução
-    - Lightweight migrations_meta table para tracking
-    
-    COMPORTAMENTO:
-    - PRODUÇÃO: Usa CompleteDatabaseMigrator (sistema robusto)
-    - DESENVOLVIMENTO: Mantém db.create_all() (sistema simples)
-    
-    SEGURANÇA:
-    - Não falha o startup em caso de erro
-    - Fallback seguro para db.create_all()
-    - Logging detalhado para debugging
-    """
-    
-    # Máscara para URLs de banco em logs seguros
-    def mask_db_url(url):
-        if not url:
-            return "None"
-        import re
-        return re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', url)
-    
-    # 🚀 SISTEMA DE MARKERS PARA OTIMIZAÇÃO DE MIGRAÇÕES
-    def check_migrations_marker():
-        """
-        Verifica se migrações já foram executadas usando marker lightweight.
-        Retorna True se migrações já foram executadas recentemente.
-        """
-        try:
-            from sqlalchemy import text
-            
-            # Tentar verificar se existe tabela migrations_meta
-            with db.engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_schema = 'public' 
-                        AND table_name = 'migrations_meta'
-                    );
-                """)).scalar()
-                
-                if not result:
-                    logger.debug("📍 Tabela migrations_meta não existe - primeira execução")
-                    return False
-                
-                # Verificar marker recente (últimas 24h)
-                marker_result = conn.execute(text("""
-                    SELECT executed_at FROM migrations_meta 
-                    WHERE marker_type = 'intelligent_migrations'
-                    AND executed_at > NOW() - INTERVAL '24 hours'
-                    ORDER BY executed_at DESC 
-                    LIMIT 1;
-                """)).fetchone()
-                
-                if marker_result:
-                    logger.info(f"⚡ Marker encontrado: migrações executadas em {marker_result[0]}")
-                    logger.info("⏭️ Pulando re-execução desnecessária (use FORCE_MIGRATIONS=1 para forçar)")
-                    return True
-                
-                logger.debug("📍 Nenhum marker recente encontrado")
-                return False
-                
-        except Exception as e:
-            logger.debug(f"📍 Erro ao verificar marker (normal na primeira execução): {e}")
-            return False
-    
-    def create_migrations_marker():
-        """
-        Cria marker de execução de migrações para otimização futura.
-        """
-        try:
-            from sqlalchemy import text
-            
-            with db.engine.connect() as conn:
-                # Criar tabela se não existir
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS migrations_meta (
-                        id SERIAL PRIMARY KEY,
-                        marker_type VARCHAR(50) NOT NULL,
-                        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        environment VARCHAR(20),
-                        notes TEXT
-                    );
-                """))
-                
-                # Inserir novo marker
-                conn.execute(text("""
-                    INSERT INTO migrations_meta (marker_type, environment, notes)
-                    VALUES ('intelligent_migrations', :env, 'Sistema inteligente de migrações executado');
-                """), {"env": "PRODUÇÃO" if detect_production_environment()[0] else "DESENVOLVIMENTO"})
-                
-                conn.commit()
-                logger.info("✅ Marker de migração criado com sucesso")
-                
-        except Exception as e:
-            logger.warning(f"⚠️ Erro ao criar marker (não crítico): {e}")
-    
-    # Detecção inteligente de ambiente
-    def detect_production_environment():
-        """
-        Detecta se estamos em produção baseado nos critérios especificados
-        """
-        database_url = app.config.get("SQLALCHEMY_DATABASE_URI", "")
-        
-        # Critério 1: 'viajey_sige' em DATABASE_URL
-        if 'viajey_sige' in database_url:
-            return True, "'viajey_sige' detectado em DATABASE_URL"
-        
-        # Critério 2: FORCE_MIGRATIONS=1
-        if os.environ.get('FORCE_MIGRATIONS') == '1':
-            return True, "FORCE_MIGRATIONS=1 detectado"
-        
-        # Critério 3: EASYPANEL_PROJECT_ID definido
-        if os.environ.get('EASYPANEL_PROJECT_ID'):
-            return True, "EASYPANEL_PROJECT_ID detectado"
-        
-        # Critério 4: render.com ou railway.app em DATABASE_URL
-        if any(provider in database_url for provider in ['render.com', 'railway.app']):
-            return True, "Provedor de produção (render.com/railway.app) detectado"
-        
-        return False, "Ambiente de desenvolvimento detectado"
-    
-    logger.info("🚀 INICIANDO SISTEMA DE MIGRAÇÕES INTELIGENTE OTIMIZADO - SIGE v10.0")
-    logger.info("=" * 60)
-    
-    try:
-        # Verificar override forçado
-        force_migrations = os.environ.get('FORCE_MIGRATIONS') == '1'
-        if force_migrations:
-            logger.info("🔄 FORCE_MIGRATIONS=1 detectado - forçando execução das migrações")
-        
-        # Detectar ambiente
-        is_production, detection_reason = detect_production_environment()
-        env_type = "PRODUÇÃO" if is_production else "DESENVOLVIMENTO"
-        
-        logger.info(f"🌍 AMBIENTE DETECTADO: {env_type}")
-        logger.info(f"🔍 RAZÃO: {detection_reason}")
-        logger.info(f"🔗 DATABASE: {mask_db_url(app.config.get('SQLALCHEMY_DATABASE_URI'))}")
-        
-        # ⚡ OTIMIZAÇÃO: Verificar markers para evitar re-execução desnecessária
-        if not force_migrations and check_migrations_marker():
-            logger.info("⚡ OTIMIZAÇÃO ATIVADA: Pulando migrações desnecessárias")
-            logger.info("💡 Use FORCE_MIGRATIONS=1 para forçar re-execução se necessário")
-            return
-        
-        if is_production:
-            logger.info("🏭 MODO PRODUÇÃO: Usando CompleteDatabaseMigrator")
-            logger.info("-" * 40)
-            
-            try:
-                # Tentar importar o sistema robusto de migrações
-                from database_migrator_complete import CompleteDatabaseMigrator
-                
-                database_url = app.config.get("SQLALCHEMY_DATABASE_URI")
-                if not database_url:
-                    raise ValueError("DATABASE_URL não configurada")
-                
-                # Inicializar e executar migrador robusto
-                migrator = CompleteDatabaseMigrator(database_url)
-                
-                logger.info("🔧 Conectando ao banco de dados...")
-                if migrator.connect_to_database():
-                    logger.info("✅ Conexão estabelecida com sucesso")
-                    
-                    logger.info("🔄 Executando migrações robustas...")
-                    success = migrator.run_complete_migration()
-                    
-                    if success:
-                        logger.info("🎉 MIGRAÇÕES ROBUSTAS EXECUTADAS COM SUCESSO!")
-                        logger.info("✅ Sistema de banco totalmente atualizado")
-                        
-                        # Estatísticas do migrador
-                        stats = migrator.migration_stats
-                        logger.info(f"📊 Estatísticas: {stats['tables_analyzed']} tabelas, "
-                                  f"{stats['columns_added']} colunas adicionadas, "
-                                  f"{stats['admin_ids_fixed']} admin_ids corrigidos")
-                        
-                        # Criar marker para otimização futura
-                        create_migrations_marker()
-                    else:
-                        logger.warning("⚠️ Migrações retornaram falha - verificar logs detalhados")
-                        logger.info("🔄 Executando fallback: db.create_all()")
-                        db.create_all()
-                else:
-                    logger.error("❌ Falha na conexão - executando fallback")
-                    logger.info("🔄 Executando fallback: db.create_all()")
-                    db.create_all()
-                    
-            except ImportError as e:
-                logger.error(f"❌ Erro ao importar database_migrator_complete: {e}")
-                logger.info("🔄 Executando fallback: db.create_all()")
-                db.create_all()
-                
-            except Exception as e:
-                logger.error(f"❌ Erro no sistema robusto de migrações: {e}")
-                logger.info("🔄 Executando fallback: db.create_all()")
-                db.create_all()
-        
-        else:
-            logger.info("🔧 MODO DESENVOLVIMENTO: Usando db.create_all()")
-            logger.info("-" * 40)
-            
-            # Em desenvolvimento, usar o método simples
-            db.create_all()
-            logger.info("✅ Tabelas criadas/verificadas em modo desenvolvimento")
-            
-            # Criar marker para otimização futura
-            create_migrations_marker()
-    except Exception as e:
-        logger.error(f"❌ ERRO CRÍTICO no sistema de migrações: {e}")
-        logger.info("🆘 Executando fallback de emergência: db.create_all()")
-        
-        try:
-            db.create_all()
-            logger.info("✅ Fallback de emergência executado com sucesso")
-        except Exception as fallback_error:
-            logger.error(f"💥 FALHA TOTAL: Nem fallback funcionou: {fallback_error}")
-            # Não reraise - permitir que app continue
-    
-    logger.info("=" * 60)
-    logger.info("✅ SISTEMA DE MIGRAÇÕES INTELIGENTE CONCLUÍDO")
-    logger.info("💡 App pronto para uso - migrações processadas com segurança")
-
 # Create tables and initialize
 with app.app_context():
-    # Executar sistema inteligente de migrações
-    run_intelligent_migrations()
-    
+    db.create_all()
     logging.info("Database tables created/verified")
+    
+    # 🤖 SISTEMA DE MIGRAÇÕES TOTALMENTE AUTOMÁTICO - SIGE v10.0
+    logger.info("🚀 INICIANDO SISTEMA DE MIGRAÇÕES AUTOMÁTICAS")
+    logger.info("=" * 50)
+    
+    # Obter informações de configuração automática
+    should_migrate = app.config['RUN_MIGRATIONS_FLAG']
+    should_cleanup = app.config['RUN_CLEANUP_FLAG']
+    env_name = env_info['environment']
+    
+    logger.info(f"🌍 Ambiente: {env_name.upper()}")
+    logger.info(f"🔄 Auto-migração: {should_migrate}")
+    logger.info(f"🗑️ Auto-limpeza: {should_cleanup}")
+    
+    if should_migrate:
+        logger.info("🔄 Executando migrações automaticamente baseado na detecção de ambiente...")
+        try:
+            from migrations import executar_migracoes
+            executar_migracoes()
+            logger.info("✅ Migrações executadas com sucesso!")
+        except Exception as e:
+            logger.error(f"❌ Erro ao executar migrações: {e}")
+            # Não interromper o app, apenas logar erro
+    else:
+        logger.info(f"🔇 Migrações não necessárias para ambiente '{env_name}'")
+    
+    # 🗑️ SISTEMA DE LIMPEZA DE VEÍCULOS - AUTOMÁTICO
+    if should_cleanup:
+        logger.info("🗑️ Executando limpeza de veículos automaticamente...")
+        try:
+            from migration_cleanup_veiculos_production import run_migration_if_needed
+            cleanup_success = run_migration_if_needed()
+            if cleanup_success:
+                logger.info("✅ Migration de limpeza de veículos processada com sucesso")
+            else:
+                logger.warning("⚠️ Migration de limpeza de veículos falhou ou não foi necessária")
+        except ImportError:
+            logger.warning("⚠️ Migration de limpeza de veículos não disponível")
+        except Exception as e:
+            logger.error(f"❌ Erro na migration de limpeza de veículos: {e}")
+            # Não interromper o app, apenas logar erro
+    else:
+        logger.info(f"🔇 Limpeza de veículos não necessária para ambiente '{env_name}'")
+    
+    # Log final do sistema
+    logger.info("✅ SISTEMA AUTOMÁTICO DE MIGRAÇÕES INICIALIZADO")
+    logger.info(f"📋 Resumo: Ambiente={env_name}, Migrações={should_migrate}, Limpeza={should_cleanup}")
+    logger.info("💡 Sistema funcionando em modo TOTALMENTE AUTOMÁTICO - zero intervenção manual!")
     
     # Register additional blueprints
     try:
@@ -543,8 +338,6 @@ with app.app_context():
         logging.info("✅ Blueprint API organizer registrado")
     except ImportError as e:
         logging.warning(f"⚠️ Blueprint API organizer não encontrado: {e}")
-    except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint API organizer: {e}")
     
     # Registrar blueprint de categorias de serviços
     try:
@@ -555,6 +348,8 @@ with app.app_context():
         logging.warning(f"⚠️ Blueprint categorias de serviços não encontrado: {e}")
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint categorias de serviços: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint API organizer: {e}")
     
     # Registrar blueprint de configurações
     try:

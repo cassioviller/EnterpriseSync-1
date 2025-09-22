@@ -67,17 +67,15 @@ class EnvironmentDetector:
         confidence_points = 0
         max_confidence = 10
         
-        # DETECÇÃO 1: EasyPanel/Hostinger por hostname OU database_url
-        if ('viajey_sige' in self.hostname.lower() or 
-            'viajey_sige' in self.database_url.lower() or
-            'postgres://sige:sige@viajey_sige:5432' in self.database_url.lower()):
+        # DETECÇÃO 1: EasyPanel/Hostinger por hostname
+        if 'viajey_sige' in self.hostname.lower():
             result['environment'] = 'production'
             result['platform'] = 'easypanel'
             result['auto_migrations'] = True
             result['auto_cleanup'] = True
             confidence_points += 4
-            result['detection_reasons'].append("EasyPanel detectado por viajey_sige (hostname ou DATABASE_URL)")
-            logger.info("✅ PRODUÇÃO EASYPANEL detectada por viajey_sige")
+            result['detection_reasons'].append("Hostname 'viajey_sige' detectado - EasyPanel")
+            logger.info("✅ PRODUÇÃO EASYPANEL detectada por hostname")
         
         # DETECÇÃO 2: EasyPanel por características do DATABASE_URL
         elif self._is_easypanel_database():

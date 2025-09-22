@@ -2,7 +2,7 @@
 # Arquivo único para eliminar dependências circulares
 
 from flask_login import UserMixin
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time
 from sqlalchemy import func, JSON, Column, Integer, String, Text, Float, Boolean, DateTime, Date, Time, Numeric, ForeignKey, Enum as SQLEnum
 from enum import Enum
 from flask_sqlalchemy import SQLAlchemy
@@ -529,12 +529,10 @@ class RDO(db.Model):
     
     @property
     def progresso_geral(self):
-        """Calcula progresso geral baseado nas atividades (atualizado para usar mao_obra)"""
-        if not self.mao_obra:
+        """Calcula progresso geral baseado nas atividades"""
+        if not self.atividades:
             return 0
-        # Calcula progresso baseado nas horas trabalhadas vs planejadas
-        total_horas = sum(m.horas_trabalhadas for m in self.mao_obra)
-        return min(round(total_horas / 8.0 * 100, 2), 100) if total_horas > 0 else 0
+        return round(sum(a.percentual_conclusao for a in self.atividades) / len(self.atividades), 2)
     
     @property
     def total_horas_trabalhadas(self):
@@ -564,6 +562,9 @@ class RDO(db.Model):
                 RDO.obra_id == self.obra_id
             ).scalar() or 0
             self.numero_rdo = f"RDO-{ano}-{count + 1:03d}"
+    
+    def __repr__(self):
+        return f'<RDO {self.numero_rdo}>'
 
 
 class RDOMaoObra(db.Model):
@@ -2381,7 +2382,7 @@ class ServicoMestre(db.Model):
     @property
     def preco_final(self):
         """Calcula preço final com margem de lucro"""
-        if self.preco_base is not None and self.margem_lucro is not None:
+        if self.preco_base:
             return float(self.preco_base) * (1 + float(self.margem_lucro) / 100)
         return 0.0
     
@@ -2427,9 +2428,7 @@ class SubServico(db.Model):
     @property
     def valor_total_base(self):
         """Calcula valor total baseado na quantidade base"""
-        if self.quantidade_base is not None and self.preco_unitario is not None:
-            return float(self.quantidade_base) * float(self.preco_unitario)
-        return 0.0
+        return float(self.quantidade_base) * float(self.preco_unitario)
 
 class TabelaComposicao(db.Model):
     """Tabelas de composição de custos por tipo de estrutura"""
@@ -2494,16 +2493,12 @@ class ItemTabelaComposicao(db.Model):
     @property
     def valor_unitario_ajustado(self):
         """Preço unitário com fator multiplicador"""
-        if self.servico_mestre and self.fator_multiplicador is not None:
-            return self.servico_mestre.preco_final * float(self.fator_multiplicador)
-        return 0.0
+        return self.servico_mestre.preco_final * float(self.fator_multiplicador)
     
     @property
     def valor_total(self):
         """Valor total do item na composição"""
-        if self.quantidade is not None and self.percentual_aplicacao is not None:
-            return float(self.quantidade) * self.valor_unitario_ajustado * (float(self.percentual_aplicacao) / 100)
-        return 0.0
+        return float(self.quantidade) * self.valor_unitario_ajustado * (float(self.percentual_aplicacao) / 100)
 
 class ItemServicoPropostaDinamica(db.Model):
     """Itens de serviço dinamicamente adicionados à proposta"""
@@ -2544,17 +2539,13 @@ class ItemServicoPropostaDinamica(db.Model):
     @property
     def valor_com_desconto(self):
         """Valor unitário com desconto aplicado"""
-        if self.desconto_percentual is not None and self.preco_unitario is not None:
-            desconto = float(self.desconto_percentual) / 100
-            return float(self.preco_unitario) * (1 - desconto)
-        return 0.0
+        desconto = float(self.desconto_percentual) / 100
+        return float(self.preco_unitario) * (1 - desconto)
     
     @property
     def valor_total(self):
         """Valor total do item"""
-        if self.quantidade is not None:
-            return float(self.quantidade) * self.valor_com_desconto
-        return 0.0
+        return float(self.quantidade) * self.valor_com_desconto
 
 # MODELS DE PROPOSTAS
 class PropostaComercialSIGE(db.Model):
@@ -2841,18 +2832,19 @@ Por conta do contratante o fornecimento de água e energia elétrica durante o p
     
     def duplicar(self, nome_novo, admin_id, criado_por):
         """Cria uma cópia do template"""
-        novo_template = PropostaTemplate()
-        novo_template.nome = nome_novo
-        novo_template.descricao = f"Cópia de: {self.descricao}" if self.descricao else None
-        novo_template.categoria = self.categoria
-        novo_template.itens_padrao = self.itens_padrao.copy() if self.itens_padrao else []
-        novo_template.prazo_entrega_dias = self.prazo_entrega_dias
-        novo_template.validade_dias = self.validade_dias
-        novo_template.percentual_nota_fiscal = self.percentual_nota_fiscal
-        novo_template.condicoes_pagamento = self.condicoes_pagamento
-        novo_template.garantias = self.garantias
-        novo_template.admin_id = admin_id
-        novo_template.criado_por = criado_por
+        novo_template = PropostaTemplate(
+            nome=nome_novo,
+            descricao=f"Cópia de: {self.descricao}" if self.descricao else None,
+            categoria=self.categoria,
+            itens_padrao=self.itens_padrao.copy() if self.itens_padrao else [],
+            prazo_entrega_dias=self.prazo_entrega_dias,
+            validade_dias=self.validade_dias,
+            percentual_nota_fiscal=self.percentual_nota_fiscal,
+            condicoes_pagamento=self.condicoes_pagamento,
+            garantias=self.garantias,
+            admin_id=admin_id,
+            criado_por=criado_por
+        )
         
         db.session.add(novo_template)
         return novo_template
@@ -2968,8 +2960,42 @@ class ConfiguracaoEmpresa(db.Model):
             'percentual_nota_fiscal_padrao': float(self.percentual_nota_fiscal_padrao) if self.percentual_nota_fiscal_padrao else 13.5
         }
     
-    # Duplicate to_dict method removed - this was causing LSP errors
-    # Incorrect methods removed - these belonged to a different model
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'codigo': self.codigo,
+            'nome': self.nome,
+            'categoria': self.categoria,
+            'subcategoria': self.subcategoria,
+            'unidade_padrao': self.unidade_padrao,
+            'preco_referencia': float(self.preco_referencia) if self.preco_referencia else 0,
+            'descricao_tecnica': self.descricao_tecnica,
+            'especificacoes': self.especificacoes,
+            'tags': self.tags.split(',') if self.tags else [],
+            'ativo': self.ativo
+        }
+    
+    @classmethod
+    def buscar_por_texto(cls, texto, admin_id):
+        """Busca serviços por texto em nome, descrição e tags"""
+        return cls.query.filter(
+            cls.admin_id == admin_id,
+            cls.ativo == True,
+            db.or_(
+                cls.nome.ilike(f'%{texto}%'),
+                cls.descricao_tecnica.ilike(f'%{texto}%'),
+                cls.tags.ilike(f'%{texto}%')
+            )
+        ).all()
+    
+    @classmethod
+    def por_categoria(cls, categoria, admin_id):
+        """Retorna serviços por categoria"""
+        return cls.query.filter(
+            cls.admin_id == admin_id,
+            cls.categoria == categoria,
+            cls.ativo == True
+        ).order_by(cls.nome).all()
 
 # ================================
 # MÓDULO DE GESTÃO DE EQUIPE - LEAN & EFICIENTE
@@ -3046,7 +3072,6 @@ class AllocationEmployee(db.Model):
     
     # Relacionamentos
     funcionario = db.relationship('Funcionario', backref='allocations')
-    allocation = db.relationship('Allocation', backref='employees')
     
     # CONSTRAINT ÚNICO CRÍTICO PARA SEGURANÇA - EVITA DUPLICAÇÃO
     __table_args__ = (db.UniqueConstraint('allocation_id', 'funcionario_id', name='_allocation_employee_uc'),)
