@@ -3751,7 +3751,7 @@ def deletar_uso_veiculo(uso_id):
         veiculo_id = uso.veiculo_id
         
         # Deletar passageiros relacionados primeiro
-        PassageiroVeiculo.query.filter_by(uso_id=uso_id).delete()
+        PassageiroVeiculo.query.filter_by(uso_veiculo_id=uso_id).delete()
         
         # Deletar uso
         db.session.delete(uso)
