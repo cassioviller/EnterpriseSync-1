@@ -24,6 +24,14 @@ class VehicleUsageService:
         
         if not admin_id:
             return None
+        
+        # 🔧 CORREÇÃO CRÍTICA: Garantir conversão de tipo
+        try:
+            veiculo_id = int(veiculo_id)
+            admin_id = int(admin_id)
+        except (ValueError, TypeError) as e:
+            current_app.logger.error(f"Erro conversão tipo veiculo_id={veiculo_id}, admin_id={admin_id}: {e}")
+            return None
             
         return Veiculo.query.filter_by(
             id=veiculo_id, 
@@ -38,6 +46,14 @@ class VehicleUsageService:
             admin_id = get_tenant_admin_id()
         
         if not admin_id:
+            return None
+        
+        # 🔧 CORREÇÃO CRÍTICA: Garantir conversão de tipo
+        try:
+            uso_id = int(uso_id)
+            admin_id = int(admin_id)
+        except (ValueError, TypeError) as e:
+            current_app.logger.error(f"Erro conversão tipo uso_id={uso_id}, admin_id={admin_id}: {e}")
             return None
             
         # Query otimizada com eager loading
@@ -78,6 +94,16 @@ class VehicleUsageService:
         
         if not admin_id:
             return None
+        
+        # 🔧 CORREÇÃO CRÍTICA: Garantir conversão de tipo
+        try:
+            veiculo_id = int(veiculo_id)
+            admin_id = int(admin_id)
+            page = int(page)
+            per_page = int(per_page)
+        except (ValueError, TypeError) as e:
+            current_app.logger.error(f"Erro conversão tipo: veiculo_id={veiculo_id}, admin_id={admin_id}, page={page}: {e}")
+            return None
             
         # Verificar se veículo pertence ao admin
         veiculo = VehicleUsageService.get_vehicle_with_security(veiculo_id, admin_id)
@@ -117,6 +143,14 @@ class VehicleUsageService:
         
         try:
             # Estatísticas gerais usando SQL otimizado
+            # 🔧 CORREÇÃO CRÍTICA: Garantir conversão de tipo para query SQL
+            try:
+                veiculo_id = int(veiculo_id)
+                admin_id = int(admin_id)
+            except (ValueError, TypeError) as e:
+                current_app.logger.error(f"Erro conversão tipo stats: veiculo_id={veiculo_id}, admin_id={admin_id}: {e}")
+                return {}
+            
             stats_result = db.session.execute(text("""
                 SELECT 
                     COUNT(*) as total_usos,
@@ -181,6 +215,14 @@ class VehicleUsageService:
             return {}
             
         try:
+            # 🔧 CORREÇÃO CRÍTICA: Garantir conversão de tipo para query SQL
+            try:
+                veiculo_id = int(veiculo_id)
+                admin_id = int(admin_id)
+            except (ValueError, TypeError) as e:
+                current_app.logger.error(f"Erro conversão tipo costs: veiculo_id={veiculo_id}, admin_id={admin_id}: {e}")
+                return {}
+            
             costs_result = db.session.execute(text("""
                 SELECT 
                     tipo_custo,
