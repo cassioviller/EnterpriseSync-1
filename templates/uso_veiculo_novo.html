@@ -783,104 +783,54 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
 
-            <!-- Seção 4: CUSTOS UNIFICADOS (NOVIDADE v2.0) -->
+            <!-- Seção 4: Passageiros -->
             <div class="form-section">
                 <div class="section-title">
-                    <i class="fas fa-money-bill-wave"></i>
-                    <span>Custos deste Uso</span>
-                    <span class="unified-badge">Novidade v2.0</span>
+                    <i class="fas fa-users"></i>
+                    <span>Passageiros</span>
                 </div>
                 
-                <div class="alert-custom alert-warning">
-                    <i class="fas fa-lightbulb"></i>
+                <div class="alert-custom alert-info">
+                    <i class="fas fa-info-circle"></i>
                     <div>
-                        <strong>Formulário Unificado:</strong> Registre os custos relacionados especificamente a este uso. 
-                        Custos gerais (seguro, IPVA) devem ser registrados separadamente.
+                        <strong>Registre os passageiros:</strong> Informe quem utilizou o veículo durante este uso.
                     </div>
                 </div>
                 
                 <div class="form-grid form-grid-2">
                     <div class="form-group">
-                        <label for="valor_combustivel">Valor Combustível</label>
-                        <div class="currency-input">
-                            <input type="number" 
-                                   id="valor_combustivel" 
-                                   name="valor_combustivel" 
-                                   class="modern-input" 
-                                   placeholder="0,00"
-                                   step="0.01"
-                                   min="0"
-                                   value="{{ request.form.valor_combustivel or '' }}">
-                        </div>
-                        <div class="input-help">Valor gasto com combustível neste uso</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="litros_combustivel">Litros Abastecidos</label>
-                        <input type="number" 
-                               id="litros_combustivel" 
-                               name="litros_combustivel" 
+                        <label for="motorista">Motorista <span class="required">*</span></label>
+                        <input type="text" 
+                               id="motorista" 
+                               name="motorista" 
                                class="modern-input" 
-                               placeholder="0,000"
-                               step="0.001"
+                               placeholder="Nome do motorista"
+                               required
+                               value="{{ request.form.motorista or '' }}">
+                        <div class="input-help">Responsável pela condução</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="total_passageiros">Total de Passageiros</label>
+                        <input type="number" 
+                               id="total_passageiros" 
+                               name="total_passageiros" 
+                               class="modern-input" 
+                               placeholder="0"
                                min="0"
-                               value="{{ request.form.litros_combustivel or '' }}">
-                        <div class="input-help">Quantidade em litros</div>
-                    </div>
-                </div>
-                
-                <div class="form-grid form-grid-3">
-                    <div class="form-group">
-                        <label for="valor_pedagio">Valor Pedágio</label>
-                        <div class="currency-input">
-                            <input type="number" 
-                                   id="valor_pedagio" 
-                                   name="valor_pedagio" 
-                                   class="modern-input" 
-                                   placeholder="0,00"
-                                   step="0.01"
-                                   min="0"
-                                   value="{{ request.form.valor_pedagio or '' }}">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="valor_manutencao">Manutenção</label>
-                        <div class="currency-input">
-                            <input type="number" 
-                                   id="valor_manutencao" 
-                                   name="valor_manutencao" 
-                                   class="modern-input" 
-                                   placeholder="0,00"
-                                   step="0.01"
-                                   min="0"
-                                   value="{{ request.form.valor_manutencao or '' }}">
-                        </div>
-                        <div class="input-help">Manutenção durante o uso</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="valor_outros">Outros Custos</label>
-                        <div class="currency-input">
-                            <input type="number" 
-                                   id="valor_outros" 
-                                   name="valor_outros" 
-                                   class="modern-input" 
-                                   placeholder="0,00"
-                                   step="0.01"
-                                   min="0"
-                                   value="{{ request.form.valor_outros or '' }}">
-                        </div>
-                        <div class="input-help">Estacionamento, lavagem, etc.</div>
+                               max="50"
+                               value="{{ request.form.total_passageiros or '' }}">
+                        <div class="input-help">Incluindo o motorista</div>
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label>Total Estimado de Custos</label>
-                    <div style="background: var(--light-green); padding: 1rem; border-radius: var(--border-radius); border: 2px solid var(--primary-green);">
-                        <div id="total_custos" style="font-size: 1.5rem; font-weight: 700; color: var(--dark-green);">R$ 0,00</div>
-                        <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 0.25rem;">Soma de todos os custos informados</div>
-                    </div>
+                    <label for="lista_passageiros">Lista de Passageiros</label>
+                    <textarea id="lista_passageiros" 
+                              name="lista_passageiros" 
+                              class="modern-textarea" 
+                              placeholder="Ex: João Silva, Maria Santos, Pedro Costa...">{{ request.form.lista_passageiros or '' }}</textarea>
+                    <div class="input-help">Separe os nomes por vírgula (opcional)</div>
                 </div>
             </div>
 
