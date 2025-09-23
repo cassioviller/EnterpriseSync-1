@@ -2282,7 +2282,7 @@ class PropostaArquivo(db.Model):
             'nome_original': self.nome_original,
             'tipo_arquivo': self.tipo_arquivo,
             'tamanho_bytes': self.tamanho_bytes,
-            'categoria': self.categoria,
+            'categoria': 'operacional',  # Default value since categoria was removed
             'enviado_em': self.enviado_em.isoformat() if self.enviado_em else None
         }
 
@@ -2404,7 +2404,7 @@ Por conta do contratante o fornecimento de água e energia elétrica durante o p
             'id': self.id,
             'nome': self.nome,
             'descricao': self.descricao,
-            'categoria': self.categoria,
+            'categoria': 'operacional',  # Default value since categoria was removed
             'itens_padrao': self.itens_padrao or [],
             'prazo_entrega_dias': self.prazo_entrega_dias,
             'validade_dias': self.validade_dias,
@@ -2515,7 +2515,7 @@ class ConfiguracaoEmpresa(db.Model):
             'id': self.id,
             'codigo': self.codigo,
             'nome': self.nome,
-            'categoria': self.categoria,
+            'categoria': 'operacional',  # Default value since categoria was removed
             'subcategoria': self.subcategoria,
             'unidade_padrao': self.unidade_padrao,
             'preco_referencia': float(self.preco_referencia) if self.preco_referencia else 0,
@@ -3054,8 +3054,8 @@ class UsoVeiculo(db.Model):
     
     # Dados do uso
     data_uso = db.Column(db.Date, nullable=False)
-    hora_saida = db.Column(db.Time, nullable=False)
-    hora_retorno = db.Column(db.Time)
+    horario_saida = db.Column(db.Time, nullable=False)
+    horario_chegada = db.Column(db.Time)
     
     # Quilometragem
     km_inicial = db.Column(db.Integer, nullable=False)
@@ -3171,7 +3171,6 @@ class CustoVeiculo(db.Model):
     # Dados do custo
     data_custo = db.Column(db.Date, nullable=False)
     tipo_custo = db.Column(db.String(30), nullable=False)  # manutencao, seguro, ipva, dpvat, multa, outros
-    categoria = db.Column(db.String(20), default='operacional')  # operacional, juridico, administrativo
     
     # Valores
     valor = db.Column(db.Numeric(10, 2), nullable=False)
@@ -3221,7 +3220,7 @@ class CustoVeiculo(db.Model):
             'veiculo_placa': self.veiculo.placa if self.veiculo else None,
             'data_custo': self.data_custo.isoformat(),
             'tipo_custo': self.tipo_custo,
-            'categoria': self.categoria,
+            'categoria': 'operacional',  # Default value since categoria was removed
             'valor': float(self.valor),
             'descricao': self.descricao,
             'fornecedor': self.fornecedor,

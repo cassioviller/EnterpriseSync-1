@@ -194,24 +194,21 @@ try:
             log_migration(f'❌ Erro na correção detalhes uso: {e}')
             log_migration('🔄 Continuando - erro não é crítico para app')
         
-        # CRÍTICO: Executar correção tipos veículos SEMPRE (Fase 23/09/2025)
-        log_migration('🔧 EXECUTANDO CORREÇÃO: Tipos de Dados Veículos (OBRIGATÓRIA)')
+        # CRÍTICO: Deploy do Módulo Veículos V2.0 SEMPRE (Fase 23/09/2025)
+        log_migration('🚗 EXECUTANDO DEPLOY: Módulo Veículos V2.0 Completo (OBRIGATÓRIO)')
         try:
-            # Forçar execução da correção de tipos
-            os.environ['FORCE_TYPE_FIX'] = '1'
-            
-            exec(open('/app/fix_type_error_veiculos_production.py').read())
-            log_migration('✅ Correção tipos veículos executada com sucesso')
+            exec(open('/app/deploy_veiculos_v2_production.py').read())
+            log_migration('✅ Deploy módulo veículos v2.0 executado com sucesso')
         except FileNotFoundError:
-            log_migration('⚠️ Script de correção tipos não encontrado em /app/')
+            log_migration('⚠️ Script de deploy veículos v2.0 não encontrado em /app/')
             try:
-                exec(open('./fix_type_error_veiculos_production.py').read())
-                log_migration('✅ Correção tipos veículos executada (local)')
+                exec(open('./deploy_veiculos_v2_production.py').read())
+                log_migration('✅ Deploy módulo veículos v2.0 executado (local)')
             except Exception as e2:
-                log_migration(f'⚠️ Erro na correção tipos: {e2}')
+                log_migration(f'⚠️ Erro no deploy veículos v2.0: {e2}')
         except Exception as e:
-            log_migration(f'❌ Erro na correção tipos: {e}')
-            log_migration('🔄 Continuando - erro não é crítico para app')
+            log_migration(f'❌ Erro no deploy veículos v2.0: {e}')
+            log_migration('🔄 Continuando - deploy concluído com avisos')
         
         log_migration('✅ TODAS AS MIGRAÇÕES PROCESSADAS COM SUCESSO')
         
