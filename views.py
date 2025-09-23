@@ -8710,7 +8710,7 @@ def novo_veiculo():
         
         if sucesso:
             flash(mensagem, 'success')
-            return redirect(url_for('main.veiculos_lista'))
+            return redirect(url_for('main.veiculos'))
         else:
             flash(mensagem, 'error')
             return render_template('veiculos_novo.html')
