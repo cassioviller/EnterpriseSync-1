@@ -608,7 +608,7 @@ console.log('Initializing Uso Veículo with light theme...');
             <h2>Registro de Uso</h2>
         </div>
 
-        <form method="POST" action="{{ url_for('main.criar_uso_veiculo') }}" id="formUsoVeiculo">
+        <form method="POST" action="{{ url_for('main.novo_uso_veiculo', veiculo_id=veiculo.id if veiculo else request.args.get('veiculo_id')) }}" id="formUsoVeiculo">
             <input type="hidden" name="csrf_token" value=""/>
             <input type="hidden" name="veiculo_id" value="{{ veiculo.id if veiculo else request.args.get('veiculo_id') }}">
             

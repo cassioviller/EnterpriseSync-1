@@ -1,0 +1,257 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+// Garantir light theme para Detalhes de Veículo
+console.log('Initializing Detalhes Veículo with light theme...');
+</script>
+{% endblock %}
+
+{% block title %}Detalhes do Veículo - {{ veiculo.placa }} - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA DETALHES DE VEÍCULO ===== */
+.veiculo-detalhes-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+    color: #212529 !important;
+}
+
+/* Herdando CSS do template de veículos para consistência visual */
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 16px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
+}
+
+.veiculo-info-card {
+    background: #ffffff !important;
+    padding: 2rem;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 6px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid #e5e7eb !important;
+    margin: 0 2rem 2rem 2rem;
+    color: #374151 !important;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.info-item {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+}
+
+.info-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.info-value {
+    font-size: 1.1rem;
+    color: #374151;
+    font-weight: 600;
+}
+
+.actions-card {
+    background: #ffffff !important;
+    padding: 2rem;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    margin: 0 2rem 2rem 2rem;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.btn-action-large {
+    padding: 1.5rem 2rem;
+    border-radius: 16px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary-large {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    color: white;
+    border: none;
+}
+
+.btn-secondary-large {
+    background: #6c757d;
+    color: white;
+    border: none;
+}
+
+.btn-action-large:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+    text-decoration: none;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .veiculo-info-card,
+    .actions-card {
+        margin: 0 1rem 2rem 1rem;
+    }
+    
+    .info-grid,
+    .actions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 2rem;
+        text-align: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="veiculo-detalhes-container">
+    <!-- Header com Informações do Veículo -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>🚗 {{ veiculo.placa }}</h1>
+                <p>{{ veiculo.marca }} {{ veiculo.modelo }} - {{ veiculo.ano }}</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('main.veiculos') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar à Lista
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações Detalhadas do Veículo -->
+    <div class="veiculo-info-card">
+        <h2><i class="fas fa-info-circle"></i> Informações do Veículo</h2>
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Placa</div>
+                <div class="info-value">{{ veiculo.placa }}</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Marca/Modelo</div>
+                <div class="info-value">{{ veiculo.marca }} {{ veiculo.modelo }}</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Ano</div>
+                <div class="info-value">{{ veiculo.ano }}</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Tipo</div>
+                <div class="info-value">{{ veiculo.tipo }}</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Status</div>
+                <div class="info-value">
+                    <span class="badge bg-{{ 'success' if veiculo.status == 'Disponível' else 'warning' if veiculo.status == 'Em Uso' else 'danger' }}">
+                        {{ veiculo.status }}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">KM Atual</div>
+                <div class="info-value">{{ "{:,}".format(veiculo.km_atual).replace(',', '.') }} km</div>
+            </div>
+            
+            {% if veiculo.cor %}
+            <div class="info-item">
+                <div class="info-label">Cor</div>
+                <div class="info-value">{{ veiculo.cor }}</div>
+            </div>
+            {% endif %}
+            
+            <div class="info-item">
+                <div class="info-label">Combustível</div>
+                <div class="info-value">{{ veiculo.combustivel }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="actions-card">
+        <h2><i class="fas fa-tools"></i> Ações</h2>
+        
+        <div class="actions-grid">
+            <a href="{{ url_for('main.novo_uso_veiculo', veiculo_id=veiculo.id) }}" class="btn-action-large btn-primary-large">
+                <i class="fas fa-road"></i>
+                Registrar Uso
+            </a>
+            
+            <a href="{{ url_for('main.editar_veiculo', id=veiculo.id) }}" class="btn-action-large btn-secondary-large">
+                <i class="fas fa-edit"></i>
+                Editar Dados
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
