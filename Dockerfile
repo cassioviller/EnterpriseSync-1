@@ -36,7 +36,7 @@ RUN mkdir -p \
     /app/logs
 
 # Copiar e configurar entrypoint otimizado
-COPY docker-entrypoint-production-simple.sh /app/docker-entrypoint.sh
+COPY docker-entrypoint-easypanel-auto.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Expor porta

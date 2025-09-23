@@ -194,6 +194,25 @@ try:
             log_migration(f'❌ Erro na correção detalhes uso: {e}')
             log_migration('🔄 Continuando - erro não é crítico para app')
         
+        # CRÍTICO: Executar correção tipos veículos SEMPRE (Fase 23/09/2025)
+        log_migration('🔧 EXECUTANDO CORREÇÃO: Tipos de Dados Veículos (OBRIGATÓRIA)')
+        try:
+            # Forçar execução da correção de tipos
+            os.environ['FORCE_TYPE_FIX'] = '1'
+            
+            exec(open('/app/fix_type_error_veiculos_production.py').read())
+            log_migration('✅ Correção tipos veículos executada com sucesso')
+        except FileNotFoundError:
+            log_migration('⚠️ Script de correção tipos não encontrado em /app/')
+            try:
+                exec(open('./fix_type_error_veiculos_production.py').read())
+                log_migration('✅ Correção tipos veículos executada (local)')
+            except Exception as e2:
+                log_migration(f'⚠️ Erro na correção tipos: {e2}')
+        except Exception as e:
+            log_migration(f'❌ Erro na correção tipos: {e}')
+            log_migration('🔄 Continuando - erro não é crítico para app')
+        
         log_migration('✅ TODAS AS MIGRAÇÕES PROCESSADAS COM SUCESSO')
         
 except Exception as e:
