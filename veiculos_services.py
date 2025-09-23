@@ -123,8 +123,8 @@ class VeiculoService:
                 renavam=dados.get('renavam', '').strip() if dados.get('renavam') else None,
                 combustivel=dados.get('combustivel', 'Gasolina'),
                 status=dados.get('status', 'Disponível'),
-                data_ultima_manutencao=dados.get('data_ultima_manutencao'),
-                data_proxima_manutencao=dados.get('data_proxima_manutencao'),
+                data_ultima_manutencao=dados.get('data_ultima_manutencao') if dados.get('data_ultima_manutencao') else None,
+                data_proxima_manutencao=dados.get('data_proxima_manutencao') if dados.get('data_proxima_manutencao') else None,
                 km_proxima_manutencao=int(dados['km_proxima_manutencao']) if dados.get('km_proxima_manutencao') else None,
                 admin_id=admin_id
             )
