@@ -4,6 +4,16 @@
 <script>
 // Garantir light theme para Uso de Veículo (idêntico ao RDO)
 console.log('Initializing Uso Veículo with light theme...');
+
+// Definir data atual automaticamente quando a página carregar
+document.addEventListener('DOMContentLoaded', function() {
+    const dataUsoInput = document.getElementById('data_uso');
+    if (dataUsoInput && !dataUsoInput.value) {
+        const hoje = new Date();
+        const dataFormatada = hoje.toISOString().split('T')[0]; // YYYY-MM-DD
+        dataUsoInput.value = dataFormatada;
+    }
+});
 </script>
 {% endblock %}
 
@@ -636,7 +646,7 @@ console.log('Initializing Uso Veículo with light theme...');
                                name="data_uso" 
                                class="modern-input" 
                                required
-                               value="{{ request.form.data_uso or date.today() }}">
+                               value="{{ request.form.data_uso or '' }}">
                     </div>
                     
                     <div class="form-group">
