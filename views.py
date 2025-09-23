@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, PassageiroVeiculo
+from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
 
@@ -2791,189 +2791,31 @@ def veiculos():
 # ===========================
 
 # Importar serviço de uso de veículos
-from vehicle_usage_service import VehicleUsageService
+# VEHICLE SERVICE REMOVIDO - SERÁ REIMPLEMENTADO NA VERSÃO 2.0
 
-# Página dedicada para lista de usos de um veículo
-@main_bp.route('/veiculos/<int:veiculo_id>/usos')
-@login_required
-def vehicle_usage_list(veiculo_id):
-    """Lista dedicada de usos de um veículo específico"""
-    try:
-        # 🔒 SEGURANÇA MULTITENANT
-        tenant_admin_id = get_tenant_admin_id()
-        if not tenant_admin_id:
-            flash('Acesso negado.', 'error')
-            return redirect(url_for('main.veiculos'))
-        
-        # Obter página da query string
-        page = request.args.get('page', 1, type=int)
-        
-        # Buscar dados usando o serviço
-        data = VehicleUsageService.get_vehicle_usage_list(
-            veiculo_id=veiculo_id,
-            page=page,
-            per_page=15,
-            admin_id=tenant_admin_id
-        )
-        
-        if not data:
-            flash('Veículo não encontrado ou acesso negado.', 'error')
-            return redirect(url_for('main.veiculos'))
-        
-        # Obter estatísticas do veículo
-        stats = VehicleUsageService.get_vehicle_usage_stats(
-            veiculo_id=veiculo_id,
-            admin_id=tenant_admin_id
-        )
-        
-        return render_template('veiculos/usage_list.html',
-                             veiculo=data['veiculo'],
-                             usos=data['usos'],
-                             pagination=data['pagination'],
-                             stats=stats,
-                             page_title=f"Usos - {data['veiculo'].placa}")
-        
-    except Exception as e:
-        print(f"ERRO LISTA USOS: {str(e)}")
-        flash(f'Erro ao carregar usos: {str(e)}', 'error')
-        return redirect(url_for('main.veiculos'))
+# FUNÇÃO VEHICLE_USAGE_LIST REMOVIDA - SERÁ REIMPLEMENTADA NA VERSÃO 2.0
+# @main_bp.route('/veiculos/<int:veiculo_id>/usos')
+# @login_required
+# def vehicle_usage_list(veiculo_id): ...
 
-# Página dedicada para detalhes de um uso específico
-@main_bp.route('/veiculos/<int:veiculo_id>/usos/<int:uso_id>')
-@login_required
-def vehicle_usage_details(veiculo_id, uso_id):
-    """Página dedicada para detalhes completos de um uso"""
-    try:
-        # 🔒 SEGURANÇA MULTITENANT
-        tenant_admin_id = get_tenant_admin_id()
-        if not tenant_admin_id:
-            flash('Acesso negado.', 'error')
-            return redirect(url_for('main.veiculos'))
-        
-        # Buscar uso com detalhes
-        uso = VehicleUsageService.get_usage_with_details(
-            uso_id=uso_id,
-            admin_id=tenant_admin_id
-        )
-        
-        if not uso or uso.veiculo_id != veiculo_id:
-            flash('Uso não encontrado ou acesso negado.', 'error')
-            return redirect(url_for('main.vehicle_usage_list', veiculo_id=veiculo_id))
-        
-        # Buscar passageiros
-        passageiros = VehicleUsageService.get_usage_passengers(
-            uso_id=uso_id,
-            admin_id=tenant_admin_id
-        )
-        
-        # Organizar passageiros por posição
-        passageiros_organizados = VehicleUsageService.organize_passengers_by_position(passageiros)
-        
-        return render_template('veiculos/usage_details.html',
-                             uso=uso,
-                             passageiros=passageiros_organizados,
-                             page_title=f"Uso {uso.veiculo.placa} - {uso.data_uso.strftime('%d/%m/%Y')}")
-        
-    except Exception as e:
-        print(f"ERRO DETALHES USO: {str(e)}")
-        flash(f'Erro ao carregar detalhes: {str(e)}', 'error')
-        return redirect(url_for('main.vehicle_usage_list', veiculo_id=veiculo_id))
+# FUNÇÃO VEHICLE_USAGE_DETAILS REMOVIDA - SERÁ REIMPLEMENTADA NA VERSÃO 2.0
+# @main_bp.route('/veiculos/<int:veiculo_id>/usos/<int:uso_id>')
+# @login_required
+# def vehicle_usage_details(veiculo_id, uso_id): ...
 
-# Detalhes de um veículo específico (MELHORADO com abas)
-@main_bp.route('/veiculos/<int:id>')
-@login_required  # 🔒 MUDANÇA: Agora funcionários também podem acessar
-def detalhes_veiculo(id):
-    try:
-        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado  
-        tenant_admin_id = get_tenant_admin_id()
-        if not tenant_admin_id:
-            flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
-        
-        # Buscar o veículo APENAS da empresa do usuário
-        from models import Veiculo, UsoVeiculo, CustoVeiculo
-        from sqlalchemy import text
-        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first_or_404()
-        
-        # 🔍 DEBUG: Log detalhado do veículo acessado
-        print(f"🚗 DEBUG DETALHES VEÍCULO: Acessando veículo ID {id}")
-        print(f"   📋 Placa: {veiculo.placa}")
-        print(f"   🏷️ Marca/Modelo: {veiculo.marca} {veiculo.modelo}")
-        print(f"   👤 Admin ID: {tenant_admin_id}")
-        print(f"   👤 Usuário: {current_user.email if current_user.is_authenticated else 'NÃO AUTENTICADO'}")
-        
-        # Buscar histórico de uso do veículo com relacionamentos carregados
-        try:
-            usos_veiculo = UsoVeiculo.query.options(
-                db.joinedload(UsoVeiculo.funcionario),
-                db.joinedload(UsoVeiculo.obra)
-            ).filter_by(veiculo_id=id).order_by(UsoVeiculo.data_uso.desc()).all()
-            
-            print(f"   📊 Total usos encontrados: {len(usos_veiculo)}")
-            if usos_veiculo:
-                print(f"   📅 Último uso: {usos_veiculo[0].data_uso}")
-                print(f"   👤 Condutor último uso: {usos_veiculo[0].funcionario.nome if usos_veiculo[0].funcionario else 'N/A'}")
-                print(f"   🏗️ Obra último uso: {usos_veiculo[0].obra.nome if usos_veiculo[0].obra else 'N/A'}")
-        except Exception as e:
-            print(f"   ❌ ERRO ao buscar usos: {str(e)}")
-            usos_veiculo = []
-        
-        # Buscar custos/manutenções do veículo (sem admin_id que não existe)  
-        try:
-            custos_veiculo = db.session.execute(
-                text("SELECT * FROM custo_veiculo WHERE veiculo_id = :veiculo_id ORDER BY data_custo DESC"),
-                {'veiculo_id': id}
-            ).fetchall()
-        except Exception:
-            custos_veiculo = []
-        
-        # Calcular KPIs do veículo
-        quilometragem_total = 0
-        custos_manutencao = 0
-        combustivel_gasto = 0
-        
-        # Calcular quilometragem total a partir dos usos
-        for uso in usos_veiculo:
-            if uso.km_inicial and uso.km_final:
-                quilometragem_total += (uso.km_final - uso.km_inicial)
-        
-        # Calcular custos por tipo
-        for custo in custos_veiculo:
-            if custo.tipo_custo == 'combustivel':
-                combustivel_gasto += custo.valor
-            elif custo.tipo_custo in ['manutencao', 'seguro', 'outros']:
-                custos_manutencao += custo.valor
-        
-        kpis_veiculo = {
-            'quilometragem_total': quilometragem_total,
-            'custos_manutencao': custos_manutencao,
-            'combustivel_gasto': combustivel_gasto,
-            'status_atual': veiculo.status if hasattr(veiculo, 'status') else 'Disponível'
-        }
-        
-        # Buscar funcionários e obras para os dropdowns do modal
-        from models import Funcionario, Obra
-        funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id).all()
-        obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
-        
-        return render_template('veiculos/detalhes_veiculo.html', 
-                             veiculo=veiculo, 
-                             kpis_veiculo=kpis_veiculo,
-                             usos_veiculo=usos_veiculo,
-                             custos_veiculo=custos_veiculo,
-                             funcionarios=funcionarios,
-                             obras=obras)
-    except Exception as e:
-        print(f"ERRO DETALHES VEÍCULO: {str(e)}")
-        # Redirecionar para lista de veículos em caso de erro
-        return redirect(url_for('main.veiculos'))
+# FUNÇÃO DETALHES_VEICULO REMOVIDA - SERÁ REIMPLEMENTADA NA VERSÃO 2.0
+# @main_bp.route('/veiculos/<int:id>')
+# @login_required
+# def detalhes_veiculo(id):
+#     CÓDIGO DA FUNÇÃO DETALHES_VEICULO COMENTADO - SERÁ REIMPLEMENTADO
+    pass
 
-# ===== ROTAS CRUD DE VEÍCULOS =====
+# ===== ROTAS CRUD DE VEÍCULOS REMOVIDAS - SERÃO REIMPLEMENTADAS =====
 
-# ✅ ROTA CRÍTICA: Dados do veículo para edição via AJAX
-@main_bp.route('/veiculos/<int:id>/dados')
-@login_required  # 🔒 MUDANÇA: Funcionários podem acessar dados para visualização
-def dados_veiculo(id):
+# FUNÇÃO DADOS_VEICULO REMOVIDA - SERÁ REIMPLEMENTADA NA VERSÃO 2.0
+# @main_bp.route('/veiculos/<int:id>/dados')
+# @login_required
+# def dados_veiculo(id):
     """Retorna dados do veículo em JSON para preenchimento do modal de edição"""
     try:
         print(f"🔍 DEBUG DADOS VEÍCULO: Iniciando para ID {id}")
