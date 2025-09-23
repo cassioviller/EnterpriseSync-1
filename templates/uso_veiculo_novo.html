@@ -797,40 +797,57 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
                 
+                <div class="form-group">
+                    <label for="funcionario_id">Motorista (Funcionário Responsável) <span class="required">*</span></label>
+                    <select id="funcionario_id" 
+                            name="funcionario_id" 
+                            class="modern-select" 
+                            required>
+                        <option value="">Selecione o motorista</option>
+                        {% for funcionario in funcionarios %}
+                        <option value="{{ funcionario.id }}" 
+                                {% if request.form.funcionario_id|string == funcionario.id|string %}selected{% endif %}>
+                            {{ funcionario.nome }} - {{ funcionario.funcao or 'Sem função' }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="input-help">Funcionário responsável pela condução do veículo</div>
+                </div>
+                
                 <div class="form-grid form-grid-2">
                     <div class="form-group">
-                        <label for="motorista">Motorista <span class="required">*</span></label>
-                        <input type="text" 
-                               id="motorista" 
-                               name="motorista" 
-                               class="modern-input" 
-                               placeholder="Nome do motorista"
-                               required
-                               value="{{ request.form.motorista or '' }}">
-                        <div class="input-help">Responsável pela condução</div>
+                        <label for="passageiros_frente">Passageiros da Frente</label>
+                        <select id="passageiros_frente" 
+                                name="passageiros_frente" 
+                                class="modern-select" 
+                                multiple>
+                            {% for funcionario in funcionarios %}
+                            <option value="{{ funcionario.id }}">{{ funcionario.nome }} - {{ funcionario.funcao or 'Sem função' }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="input-help">Selecione os passageiros do banco da frente</div>
                     </div>
                     
                     <div class="form-group">
-                        <label for="total_passageiros">Total de Passageiros</label>
-                        <input type="number" 
-                               id="total_passageiros" 
-                               name="total_passageiros" 
-                               class="modern-input" 
-                               placeholder="0"
-                               min="0"
-                               max="50"
-                               value="{{ request.form.total_passageiros or '' }}">
-                        <div class="input-help">Incluindo o motorista</div>
+                        <label for="passageiros_tras">Passageiros de Trás</label>
+                        <select id="passageiros_tras" 
+                                name="passageiros_tras" 
+                                class="modern-select" 
+                                multiple>
+                            {% for funcionario in funcionarios %}
+                            <option value="{{ funcionario.id }}">{{ funcionario.nome }} - {{ funcionario.funcao or 'Sem função' }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="input-help">Selecione os passageiros do banco de trás</div>
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label for="lista_passageiros">Lista de Passageiros</label>
-                    <textarea id="lista_passageiros" 
-                              name="lista_passageiros" 
-                              class="modern-textarea" 
-                              placeholder="Ex: João Silva, Maria Santos, Pedro Costa...">{{ request.form.lista_passageiros or '' }}</textarea>
-                    <div class="input-help">Separe os nomes por vírgula (opcional)</div>
+                    <label>Resumo dos Passageiros</label>
+                    <div id="resumo_passageiros" style="background: #f8f9fa; padding: 1rem; border-radius: var(--border-radius); border: 1px solid #dee2e6;">
+                        <div id="total_pessoas" style="font-weight: 600; color: #198754;">Total: 1 pessoa (motorista)</div>
+                        <div id="distribuicao" style="font-size: 0.875rem; color: #6c757d; margin-top: 0.25rem;">Frente: 1 | Trás: 0</div>
+                    </div>
                 </div>
             </div>
 
@@ -896,6 +913,36 @@ document.addEventListener('DOMContentLoaded', function() {
         const hoje = new Date().toISOString().split('T')[0];
         dataUsoInput.value = hoje;
     }
+    
+    // Calcular resumo dos passageiros automaticamente
+    const motoristaSelect = document.getElementById('funcionario_id');
+    const passageirosFrenteSelect = document.getElementById('passageiros_frente');
+    const passageirosTraSelect = document.getElementById('passageiros_tras');
+    const totalPessoasDiv = document.getElementById('total_pessoas');
+    const distribuicaoDiv = document.getElementById('distribuicao');
+    
+    function calcularResumoPassageiros() {
+        const temMotorista = motoristaSelect.value ? 1 : 0;
+        const totalFrente = passageirosFrenteSelect.selectedOptions.length + temMotorista;
+        const totalTras = passageirosTraSelect.selectedOptions.length;
+        const totalPessoas = totalFrente + totalTras;
+        
+        if (totalPessoas > 0) {
+            totalPessoasDiv.textContent = `Total: ${totalPessoas} pessoa${totalPessoas > 1 ? 's' : ''} ${temMotorista ? '(incluindo motorista)' : ''}`;
+            distribuicaoDiv.textContent = `Frente: ${totalFrente} | Trás: ${totalTras}`;
+        } else {
+            totalPessoasDiv.textContent = 'Total: 0 pessoas';
+            distribuicaoDiv.textContent = 'Selecione o motorista e passageiros';
+        }
+    }
+    
+    // Adicionar listeners para atualizar resumo
+    motoristaSelect.addEventListener('change', calcularResumoPassageiros);
+    passageirosFrenteSelect.addEventListener('change', calcularResumoPassageiros);
+    passageirosTraSelect.addEventListener('change', calcularResumoPassageiros);
+    
+    // Calcular resumo inicial
+    calcularResumoPassageiros();
     
     // Validação do formulário
     const form = document.getElementById('formUsoVeiculo');
