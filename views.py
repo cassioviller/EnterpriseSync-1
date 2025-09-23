@@ -2777,14 +2777,14 @@ def veiculos():
             print(f"🚗 [VEICULOS] {i+1}. {veiculo.placa} - {veiculo.modelo} (ID: {veiculo.id})")
         
         print(f"✅ [VEICULOS] Renderizando template com {len(veiculos)} veículos")
-        return render_template('veiculos.html', veiculos=veiculos)
+        return render_template('veiculos_lista.html', veiculos=veiculos)
         
     except Exception as e:
         print(f"❌ [VEICULOS] ERRO CRÍTICO: {str(e)}")
         import traceback
         print(f"📋 [VEICULOS] TRACEBACK: {traceback.format_exc()}")
         flash('Erro ao carregar veículos. Contate o administrador.', 'error')
-        return redirect(url_for('funcionario.dashboard'))
+        return redirect(url_for('main.funcionario_dashboard'))
 
 # ===========================
 # 🆕 NOVA IMPLEMENTAÇÃO: Visualização Robusta de Veículos

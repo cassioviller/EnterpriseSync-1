@@ -1,0 +1,91 @@
+ERRO: Could not build url for endpoint &#39;funcionario.dashboard&#39;. Did you mean &#39;main.funcionario_dashboard&#39; instead?
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 951, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column veiculo.chassi does not exist
+LINE 1: ... AS veiculo_km_atual, veiculo.cor AS veiculo_cor, veiculo.ch...
+                                                             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File &#34;/app/views.py&#34;, line 2773, in veiculos
+    veiculos = Veiculo.query.filter_by(admin_id=tenant_admin_id).all()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2365, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2251, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/context.py&#34;, line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1419, in execute
+    return meth(
+           ^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py&#34;, line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 951, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column veiculo.chassi does not exist
+LINE 1: ... AS veiculo_km_atual, veiculo.cor AS veiculo_cor, veiculo.ch...
+                                                             ^
+
+[SQL: SELECT veiculo.id AS veiculo_id, veiculo.placa AS veiculo_placa, veiculo.marca AS veiculo_marca, veiculo.modelo AS veiculo_modelo, veiculo.ano AS veiculo_ano, veiculo.tipo AS veiculo_tipo, veiculo.km_atual AS veiculo_km_atual, veiculo.cor AS veiculo_cor, veiculo.chassi AS veiculo_chassi, veiculo.renavam AS veiculo_renavam, veiculo.combustivel AS veiculo_combustivel, veiculo.status AS veiculo_status, veiculo.ativo AS veiculo_ativo, veiculo.data_ultima_manutencao AS veiculo_data_ultima_manutencao, veiculo.data_proxima_manutencao AS veiculo_data_proxima_manutencao, veiculo.km_proxima_manutencao AS veiculo_km_proxima_manutencao, veiculo.admin_id AS veiculo_admin_id, veiculo.created_at AS veiculo_created_at, veiculo.updated_at AS veiculo_updated_at 
+FROM veiculo 
+WHERE veiculo.admin_id = %(admin_id_1)s]
+[parameters: {&#39;admin_id_1&#39;: 2}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask_login/utils.py&#34;, line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/views.py&#34;, line 2787, in veiculos
+    return redirect(url_for(&#39;funcionario.dashboard&#39;))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/helpers.py&#34;, line 239, in url_for
+    return current_app.url_for(
+           ^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 1121, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 1110, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/werkzeug/routing/map.py&#34;, line 924, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint &#39;funcionario.dashboard&#39;. Did you mean &#39;main.funcionario_dashboard&#39; instead?
