@@ -2999,10 +2999,10 @@ def kpis_veiculo_periodo(id):
         print(f"ERRO KPIs VEÍCULO PERÍODO: {str(e)}")
         return jsonify({'error': 'Erro ao calcular KPIs do período'}), 500
 
-# 1. ROTA CADASTRO - /veiculos/novo (GET/POST)
-@main_bp.route('/veiculos/novo', methods=['GET', 'POST'])
-@admin_required
-def novo_veiculo():
+# 1. ROTA CADASTRO - /veiculos/novo (GET/POST) - REMOVIDA - CONFLITO COM V2.0
+# @main_bp.route('/veiculos/novo', methods=['GET', 'POST'])
+# @admin_required
+def novo_veiculo_legacy():
     from forms import VeiculoForm
     from models import Veiculo
     
@@ -3066,10 +3066,10 @@ def novo_veiculo():
     return render_template('veiculos/novo_veiculo.html', form=form)
 
 
-# 2. ROTA EDIÇÃO - /veiculos/<id>/editar (GET/POST)
-@main_bp.route('/veiculos/<int:id>/editar', methods=['GET', 'POST'])
-@login_required  # 🔒 MUDANÇA: Funcionários podem editar veículos também
-def editar_veiculo(id):
+# 2. ROTA EDIÇÃO - LEGACY REMOVIDA - CONFLITO COM V2.0
+# @main_bp.route('/veiculos/<int:id>/editar', methods=['GET', 'POST'])
+# @login_required  # 🔒 MUDANÇA: Funcionários podem editar veículos também
+def editar_veiculo_legacy(id):
     from forms import VeiculoForm
     from models import Veiculo
     
@@ -3840,9 +3840,10 @@ def novo_custo_veiculo_lista():
     return redirect(url_for('main.veiculos'))
 
 
-@main_bp.route('/veiculos/<int:id>/uso', methods=['GET', 'POST'])
-@admin_required
-def novo_uso_veiculo(id):
+# ROTA LEGACY REMOVIDA - CONFLITO COM V2.0
+# @main_bp.route('/veiculos/<int:id>/uso', methods=['GET', 'POST'])
+# @admin_required
+def novo_uso_veiculo_legacy(id):
     from forms import UsoVeiculoForm
     from models import Veiculo, UsoVeiculo, Funcionario, Obra
     
@@ -8550,4 +8551,350 @@ def novo_ponto():
         return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
 
 # CONTINUAÇÃO DO SISTEMA ANTIGO (TEMPORÁRIO PARA COMPATIBILITY)
+
+# ========================================
+# 🚗 ROTAS COMPLETAS DE VEÍCULOS V2.0 
+# ========================================
+# Implementação completa com design idêntico aos RDOs
+# Formulários unificados, proteção multi-tenant, circuit breakers
+
+# Importar services de veículos
+try:
+    from veiculos_services import VeiculoService, UsoVeiculoService, CustoVeiculoService
+    print("✅ [VEICULOS] Services importados com sucesso")
+except ImportError as e:
+    print(f"⚠️ [VEICULOS] Erro ao importar services: {e}")
+    # Criar fallbacks básicos
+    class VeiculoService:
+        @staticmethod
+        def listar_veiculos(admin_id, filtros=None, page=1, per_page=20):
+            return {'veiculos': [], 'pagination': None, 'stats': {}}
+        @staticmethod
+        def criar_veiculo(dados, admin_id):
+            return False, None, "Service não disponível"
+    
+    class UsoVeiculoService:
+        @staticmethod
+        def criar_uso_veiculo(dados, admin_id):
+            return False, None, "Service não disponível"
+    
+    class CustoVeiculoService:
+        @staticmethod
+        def criar_custo_veiculo(dados, admin_id):
+            return False, None, "Service não disponível"
+
+# ===== ATUALIZAR ROTA PRINCIPAL DE VEÍCULOS =====
+@main_bp.route('/veiculos')
+@login_required
+def veiculos_lista():
+    """Lista principal de veículos com filtros e estatísticas"""
+    try:
+        print(f"🚗 [VEICULOS_LISTA] Iniciando listagem...")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Capturar filtros da URL
+        filtros = {
+            'status': request.args.get('status'),
+            'tipo': request.args.get('tipo'),
+            'placa': request.args.get('placa'),
+            'marca': request.args.get('marca')
+        }
+        # Remover filtros vazios
+        filtros = {k: v for k, v in filtros.items() if v}
+        
+        # Paginação
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        # Usar service para listar veículos
+        resultado = VeiculoService.listar_veiculos(
+            admin_id=tenant_admin_id,
+            filtros=filtros,
+            page=page,
+            per_page=per_page
+        )
+        
+        print(f"✅ [VEICULOS_LISTA] Encontrados {len(resultado.get('veiculos', []))} veículos")
+        
+        return render_template('veiculos_lista.html',
+                             veiculos=resultado.get('veiculos', []),
+                             pagination=resultado.get('pagination'),
+                             stats=resultado.get('stats', {}),
+                             filtros_aplicados=resultado.get('filtros_aplicados', {}))
+        
+    except Exception as e:
+        print(f"❌ [VEICULOS_LISTA] Erro: {str(e)}")
+        flash('Erro ao carregar veículos. Tente novamente.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+# ===== NOVA ROTA: NOVO VEÍCULO =====
+@main_bp.route('/veiculos/novo', methods=['GET', 'POST'])
+@login_required
+def novo_veiculo():
+    """Formulário para cadastrar novo veículo"""
+    try:
+        print(f"🚗 [NOVO_VEICULO] Iniciando...")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        if request.method == 'GET':
+            return render_template('veiculos_novo.html')
+        
+        # POST - Processar cadastro
+        dados = request.form.to_dict()
+        print(f"🔍 [NOVO_VEICULO] Dados recebidos: {dados.keys()}")
+        
+        # Validações básicas
+        campos_obrigatorios = ['placa', 'marca', 'modelo', 'ano', 'tipo']
+        for campo in campos_obrigatorios:
+            if not dados.get(campo):
+                flash(f'Campo {campo.title()} é obrigatório.', 'error')
+                return render_template('veiculos_novo.html')
+        
+        # Usar service para criar veículo
+        sucesso, veiculo, mensagem = VeiculoService.criar_veiculo(dados, tenant_admin_id)
+        
+        if sucesso:
+            flash(mensagem, 'success')
+            return redirect(url_for('main.veiculos_lista'))
+        else:
+            flash(mensagem, 'error')
+            return render_template('veiculos_novo.html')
+        
+    except Exception as e:
+        print(f"❌ [NOVO_VEICULO] Erro: {str(e)}")
+        flash('Erro ao cadastrar veículo. Tente novamente.', 'error')
+        return render_template('veiculos_novo.html')
+
+# ===== NOVA ROTA: DETALHES DO VEÍCULO =====
+@main_bp.route('/veiculos/<int:id>')
+@login_required  
+def detalhes_veiculo(id):
+    """Página de detalhes do veículo com abas de uso e custos"""
+    try:
+        print(f"🚗 [DETALHES_VEICULO] Iniciando para ID {id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar veículo
+        from models import Veiculo
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
+        if not veiculo:
+            flash('Veículo não encontrado.', 'error')
+            return redirect(url_for('main.veiculos_lista'))
+        
+        # Buscar usos recentes (últimos 20)
+        usos_resultado = UsoVeiculoService.listar_usos_veiculo(
+            veiculo_id=id,
+            admin_id=tenant_admin_id,
+            page=1,
+            per_page=20
+        )
+        
+        # Buscar custos recentes
+        custos_resultado = CustoVeiculoService.listar_custos_veiculo(
+            veiculo_id=id,
+            admin_id=tenant_admin_id,
+            page=1,
+            per_page=20
+        )
+        
+        return render_template('veiculos_detalhes.html',
+                             veiculo=veiculo,
+                             usos=usos_resultado.get('usos', []),
+                             stats_uso=usos_resultado.get('stats', {}),
+                             custos=custos_resultado.get('custos', []),
+                             stats_custos=custos_resultado.get('stats', {}))
+        
+    except Exception as e:
+        print(f"❌ [DETALHES_VEICULO] Erro: {str(e)}")
+        flash('Erro ao carregar detalhes do veículo.', 'error')
+        return redirect(url_for('main.veiculos_lista'))
+
+# ===== NOVA ROTA: NOVO USO DE VEÍCULO (FORMULÁRIO UNIFICADO) =====
+@main_bp.route('/veiculos/<int:veiculo_id>/uso/novo', methods=['GET', 'POST'])
+@login_required
+def novo_uso_veiculo(veiculo_id):
+    """Formulário unificado para novo uso de veículo (uso + custos)"""
+    try:
+        print(f"🚗 [NOVO_USO] Iniciando para veículo {veiculo_id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar veículo
+        from models import Veiculo, Funcionario, Obra
+        veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
+        if not veiculo:
+            flash('Veículo não encontrado.', 'error')
+            return redirect(url_for('main.veiculos_lista'))
+        
+        if request.method == 'GET':
+            # Buscar funcionários e obras para os selects
+            funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
+            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+            
+            return render_template('uso_veiculo_novo.html',
+                                 veiculo=veiculo,
+                                 funcionarios=funcionarios,
+                                 obras=obras)
+        
+        # POST - Processar criação do uso
+        dados = request.form.to_dict()
+        dados['veiculo_id'] = veiculo_id  # Garantir que o ID está nos dados
+        
+        print(f"🔍 [NOVO_USO] Dados recebidos: {dados.keys()}")
+        
+        # Validações básicas
+        campos_obrigatorios = ['data_uso', 'hora_saida', 'funcionario_id', 'km_inicial', 'finalidade']
+        for campo in campos_obrigatorios:
+            if not dados.get(campo):
+                flash(f'Campo {campo.replace("_", " ").title()} é obrigatório.', 'error')
+                funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
+                obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+                return render_template('uso_veiculo_novo.html',
+                                     veiculo=veiculo,
+                                     funcionarios=funcionarios,
+                                     obras=obras)
+        
+        # Usar service para criar uso
+        sucesso, uso, mensagem = UsoVeiculoService.criar_uso_veiculo(dados, tenant_admin_id)
+        
+        if sucesso:
+            flash(mensagem, 'success')
+            return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
+        else:
+            flash(mensagem, 'error')
+            funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
+            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+            return render_template('uso_veiculo_novo.html',
+                                 veiculo=veiculo,
+                                 funcionarios=funcionarios,
+                                 obras=obras)
+        
+    except Exception as e:
+        print(f"❌ [NOVO_USO] Erro: {str(e)}")
+        flash('Erro ao registrar uso do veículo.', 'error')
+        return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
+
+# ===== NOVA ROTA: EDITAR VEÍCULO =====
+@main_bp.route('/veiculos/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_veiculo(id):
+    """Formulário para editar dados do veículo"""
+    try:
+        print(f"🚗 [EDITAR_VEICULO] Iniciando para ID {id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar veículo
+        from models import Veiculo
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
+        if not veiculo:
+            flash('Veículo não encontrado.', 'error')
+            return redirect(url_for('main.veiculos_lista'))
+        
+        if request.method == 'GET':
+            return render_template('veiculos_editar.html', veiculo=veiculo)
+        
+        # POST - Processar edição
+        dados = request.form.to_dict()
+        print(f"🔍 [EDITAR_VEICULO] Dados recebidos: {dados.keys()}")
+        
+        # Usar service para atualizar veículo
+        sucesso, veiculo_atualizado, mensagem = VeiculoService.atualizar_veiculo(id, dados, tenant_admin_id)
+        
+        if sucesso:
+            flash(mensagem, 'success')
+            return redirect(url_for('main.detalhes_veiculo', id=id))
+        else:
+            flash(mensagem, 'error')
+            return render_template('veiculos_editar.html', veiculo=veiculo)
+        
+    except Exception as e:
+        print(f"❌ [EDITAR_VEICULO] Erro: {str(e)}")
+        flash('Erro ao editar veículo.', 'error')
+        return redirect(url_for('main.detalhes_veiculo', id=id))
+
+# ===== API: DADOS DO VEÍCULO ===== 
+@main_bp.route('/api/veiculos/<int:id>')
+@login_required
+def api_dados_veiculo(id):
+    """API para obter dados do veículo em JSON"""
+    try:
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            return jsonify({'error': 'Acesso negado'}), 403
+        
+        from models import Veiculo
+        veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
+        if not veiculo:
+            return jsonify({'error': 'Veículo não encontrado'}), 404
+        
+        dados = {
+            'id': veiculo.id,
+            'placa': veiculo.placa,
+            'marca': veiculo.marca,
+            'modelo': veiculo.modelo,
+            'ano': veiculo.ano,
+            'tipo': veiculo.tipo,
+            'km_atual': veiculo.km_atual,
+            'status': veiculo.status,
+            'cor': veiculo.cor,
+            'combustivel': veiculo.combustivel,
+            'chassi': veiculo.chassi,
+            'renavam': veiculo.renavam
+        }
+        
+        return jsonify(dados)
+        
+    except Exception as e:
+        print(f"❌ [API_DADOS_VEICULO] Erro: {str(e)}")
+        return jsonify({'error': 'Erro interno'}), 500
+
+# ===== API: FINALIZAR USO DE VEÍCULO =====
+@main_bp.route('/api/veiculos/uso/<int:uso_id>/finalizar', methods=['POST'])
+@login_required
+def api_finalizar_uso(uso_id):
+    """API para finalizar uso de veículo"""
+    try:
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            return jsonify({'error': 'Acesso negado'}), 403
+        
+        dados = request.json or {}
+        
+        # Usar service para finalizar uso
+        sucesso, uso, mensagem = UsoVeiculoService.finalizar_uso_veiculo(uso_id, dados, tenant_admin_id)
+        
+        if sucesso:
+            return jsonify({'success': True, 'message': mensagem})
+        else:
+            return jsonify({'success': False, 'error': mensagem}), 400
+        
+    except Exception as e:
+        print(f"❌ [API_FINALIZAR_USO] Erro: {str(e)}")
+        return jsonify({'success': False, 'error': 'Erro interno'}), 500
 

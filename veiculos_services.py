@@ -17,7 +17,7 @@ class VeiculoService:
     """Serviço principal para gestão de veículos"""
     
     @staticmethod
-    @circuit_breaker('veiculo_list_query', failure_threshold=3, timeout=60)
+    @circuit_breaker('veiculo_list_query', failure_threshold=3, recovery_timeout=60)
     def listar_veiculos(admin_id, filtros=None, page=1, per_page=20):
         """
         Lista veículos com filtros e paginação
