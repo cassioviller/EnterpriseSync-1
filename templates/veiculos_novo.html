@@ -442,7 +442,7 @@ console.log('Initializing Novo Veículo with light theme...');
         </div>
 
         <form method="POST" action="{{ url_for('main.novo_veiculo') }}" id="formVeiculo">
-            {{ csrf_token() }}
+            <input type="hidden" name="csrf_token" value=""/>
             
             <!-- Alerta Informativo -->
             <div class="alert-custom alert-info">

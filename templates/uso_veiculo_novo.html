@@ -609,7 +609,7 @@ console.log('Initializing Uso Veículo with light theme...');
         </div>
 
         <form method="POST" action="{{ url_for('main.criar_uso_veiculo') }}" id="formUsoVeiculo">
-            {{ csrf_token() }}
+            <input type="hidden" name="csrf_token" value=""/>
             <input type="hidden" name="veiculo_id" value="{{ veiculo.id if veiculo else request.args.get('veiculo_id') }}">
             
             <!-- Alerta da Novidade v2.0 -->
