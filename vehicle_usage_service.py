@@ -56,10 +56,10 @@ class VehicleUsageService:
             current_app.logger.error(f"Erro conversão tipo uso_id={uso_id}, admin_id={admin_id}: {e}")
             return None
             
-        # Query otimizada com eager loading
+        # Query otimizada com eager loading (corrigido para usar atributos de classe)
         uso = UsoVeiculo.query.options(
             joinedload(UsoVeiculo.veiculo),
-            joinedload(UsoVeiculo.funcionario).joinedload('funcao_ref'),
+            joinedload(UsoVeiculo.funcionario),
             joinedload(UsoVeiculo.obra)
         ).filter_by(
             id=uso_id,
@@ -78,7 +78,7 @@ class VehicleUsageService:
             return []
             
         passageiros = PassageiroVeiculo.query.options(
-            joinedload(PassageiroVeiculo.funcionario).joinedload('funcao_ref')
+            joinedload(PassageiroVeiculo.funcionario)
         ).filter_by(
             uso_veiculo_id=uso_id,
             admin_id=admin_id
