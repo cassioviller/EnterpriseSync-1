@@ -781,7 +781,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                name="hora_retorno" 
                                class="modern-input"
                                value="{{ request.form.hora_retorno or '' }}">
-                        <div class="input-help">Deixe em branco se ainda em uso</div>
                     </div>
                 </div>
                 
@@ -808,7 +807,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             </option>
                             {% endfor %}
                         </select>
-                        <div class="input-help">Para uso administrativo, deixe em branco</div>
                     </div>
                 </div>
             </div>
@@ -831,7 +829,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                min="0"
                                required
                                value="{{ request.form.km_inicial or (veiculo.km_atual if veiculo else '') }}">
-                        <div class="input-help">KM no odômetro na saída</div>
                     </div>
                     
                     <div class="form-group">
@@ -843,7 +840,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                placeholder="Ex: 25000"
                                min="0"
                                value="{{ request.form.km_final or '' }}">
-                        <div class="input-help">Preencha no retorno</div>
                     </div>
                     
                     <div class="form-group">
@@ -854,49 +850,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                placeholder="Calculado automaticamente"
                                readonly
                                style="background-color: #f8f9fa;">
-                        <div class="input-help">Calculado: KM Final - KM Inicial</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Seção 3: Finalidade e Destino -->
-            <div class="form-section">
-                <div class="section-title">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span>Finalidade e Destino</span>
-                </div>
-                
-                <div class="form-grid form-grid-2">
-                    <div class="form-group">
-                        <label for="finalidade">Finalidade <span class="required">*</span></label>
-                        <input type="text" 
-                               id="finalidade" 
-                               name="finalidade" 
-                               class="modern-input" 
-                               placeholder="Ex: Transporte de materiais, Visita técnica"
-                               required
-                               value="{{ request.form.finalidade or '' }}">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="destino">Destino</label>
-                        <input type="text" 
-                               id="destino" 
-                               name="destino" 
-                               class="modern-input" 
-                               placeholder="Ex: Centro da cidade, Obra ABC"
-                               value="{{ request.form.destino or '' }}">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="rota_detalhada">Rota Detalhada</label>
-                    <textarea id="rota_detalhada" 
-                              name="rota_detalhada" 
-                              class="modern-textarea" 
-                              placeholder="Descreva a rota percorrida (opcional)">{{ request.form.rota_detalhada or '' }}</textarea>
-                </div>
-            </div>
 
             <!-- Seção 4: Passageiros -->
             <div class="form-section">
@@ -905,12 +862,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span>Passageiros</span>
                 </div>
                 
-                <div class="alert-custom alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    <div>
-                        <strong>Registre os passageiros:</strong> Informe quem utilizou o veículo durante este uso.
-                    </div>
-                </div>
                 
                 <div class="form-group">
                     <label for="motorista_id">Motorista <span class="required">*</span></label>
@@ -1209,9 +1160,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const horaSaida = document.getElementById('hora_saida').value;
         const motoristaId = document.getElementById('motorista_id').value;
         const kmInicial = document.getElementById('km_inicial').value;
-        const finalidade = document.getElementById('finalidade').value;
         
-        if (!dataUso || !horaSaida || !motoristaId || !kmInicial || !finalidade) {
+        if (!dataUso || !horaSaida || !motoristaId || !kmInicial) {
             e.preventDefault();
             alert('Por favor, preencha todos os campos obrigatórios.');
             return false;
