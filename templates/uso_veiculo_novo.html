@@ -47,6 +47,121 @@ document.addEventListener('DOMContentLoaded', function() {
     border: 1px solid #ced4da !important;
 }
 
+/* ===== SELETOR DE PASSAGEIROS MODERNO ===== */
+.passageiro-selector {
+    position: relative;
+    width: 100%;
+}
+
+.passageiro-busca {
+    width: 100% !important;
+    padding-right: 2.5rem;
+}
+
+.passageiro-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    margin-top: 2px;
+}
+
+.passageiro-item {
+    padding: 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f8f9fa;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.passageiro-item:hover {
+    background: #f8f9fa;
+    transform: translateX(2px);
+}
+
+.passageiro-item:last-child {
+    border-bottom: none;
+}
+
+.passageiro-nome {
+    font-weight: 600;
+    color: #212529;
+    font-size: 0.875rem;
+}
+
+.passageiro-funcao {
+    color: #6c757d;
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
+.passageiros-selecionados {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-height: 2rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: var(--border-radius);
+    border: 1px dashed #ced4da;
+}
+
+.passageiro-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: #198754;
+    color: white;
+    border-radius: 15px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    animation: slideIn 0.3s ease;
+}
+
+.passageiro-chip-remover {
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.875rem;
+    padding: 0.125rem 0.25rem;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transition: background 0.2s ease;
+}
+
+.passageiro-chip-remover:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.passageiros-selecionados:empty::after {
+    content: "Nenhum passageiro selecionado";
+    color: #6c757d;
+    font-size: 0.8125rem;
+    font-style: italic;
+    opacity: 0.7;
+}
+
 /* ===== DESIGN SYSTEM MODERNO PROFISSIONAL (IDÊNTICO AO RDO) ===== */
 :root {
     --primary-green: #198754;
@@ -816,29 +931,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 <div class="form-grid form-grid-2">
                     <div class="form-group">
-                        <label for="passageiros_frente">Passageiros da Frente</label>
-                        <select id="passageiros_frente" 
-                                name="passageiros_frente" 
-                                class="modern-select" 
-                                multiple>
-                            {% for funcionario in funcionarios %}
-                            <option value="{{ funcionario.id }}">{{ funcionario.nome }} - {{ funcionario.funcao or 'Sem função' }}</option>
-                            {% endfor %}
-                        </select>
-                        <div class="input-help">Selecione os passageiros do banco da frente</div>
+                        <label for="busca_passageiros_frente">Passageiros da Frente</label>
+                        <div class="passageiro-selector">
+                            <input type="text" 
+                                   id="busca_passageiros_frente" 
+                                   class="modern-input passageiro-busca" 
+                                   placeholder="🔍 Buscar funcionário para frente..." 
+                                   autocomplete="off">
+                            <div id="dropdown_passageiros_frente" class="passageiro-dropdown" style="display: none;">
+                                {% for funcionario in funcionarios %}
+                                <div class="passageiro-item" data-id="{{ funcionario.id }}" data-nome="{{ funcionario.nome }}" data-funcao="{{ funcionario.funcao or 'Sem função' }}">
+                                    <span class="passageiro-nome">{{ funcionario.nome }}</span>
+                                    <small class="passageiro-funcao">{{ funcionario.funcao or 'Sem função' }}</small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div id="passageiros_frente_selecionados" class="passageiros-selecionados">
+                                <!-- Funcionários selecionados aparecerão aqui -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="passageiros_frente_ids" name="passageiros_frente" value="">
                     </div>
                     
                     <div class="form-group">
-                        <label for="passageiros_tras">Passageiros de Trás</label>
-                        <select id="passageiros_tras" 
-                                name="passageiros_tras" 
-                                class="modern-select" 
-                                multiple>
-                            {% for funcionario in funcionarios %}
-                            <option value="{{ funcionario.id }}">{{ funcionario.nome }} - {{ funcionario.funcao or 'Sem função' }}</option>
-                            {% endfor %}
-                        </select>
-                        <div class="input-help">Selecione os passageiros do banco de trás</div>
+                        <label for="busca_passageiros_tras">Passageiros de Trás</label>
+                        <div class="passageiro-selector">
+                            <input type="text" 
+                                   id="busca_passageiros_tras" 
+                                   class="modern-input passageiro-busca" 
+                                   placeholder="🔍 Buscar funcionário para trás..." 
+                                   autocomplete="off">
+                            <div id="dropdown_passageiros_tras" class="passageiro-dropdown" style="display: none;">
+                                {% for funcionario in funcionarios %}
+                                <div class="passageiro-item" data-id="{{ funcionario.id }}" data-nome="{{ funcionario.nome }}" data-funcao="{{ funcionario.funcao or 'Sem função' }}">
+                                    <span class="passageiro-nome">{{ funcionario.nome }}</span>
+                                    <small class="passageiro-funcao">{{ funcionario.funcao or 'Sem função' }}</small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div id="passageiros_tras_selecionados" class="passageiros-selecionados">
+                                <!-- Funcionários selecionados aparecerão aqui -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="passageiros_tras_ids" name="passageiros_tras" value="">
                     </div>
                 </div>
                 
@@ -914,17 +1049,142 @@ document.addEventListener('DOMContentLoaded', function() {
         dataUsoInput.value = hoje;
     }
     
+    // Sistema de seleção de passageiros moderno
+    const passageirosSelecionados = {
+        frente: [],
+        tras: []
+    };
+    
+    // Inicializar sistema para passageiros da frente
+    initPassageiroSelector('frente');
+    // Inicializar sistema para passageiros de trás
+    initPassageiroSelector('tras');
+    
+    function initPassageiroSelector(tipo) {
+        const buscaInput = document.getElementById(`busca_passageiros_${tipo}`);
+        const dropdown = document.getElementById(`dropdown_passageiros_${tipo}`);
+        const passageirosSelecionadosDiv = document.getElementById(`passageiros_${tipo}_selecionados`);
+        const hiddenInput = document.getElementById(`passageiros_${tipo}_ids`);
+        
+        // Mostrar dropdown ao focar no campo
+        buscaInput.addEventListener('focus', () => {
+            dropdown.style.display = 'block';
+            filtrarPassageiros(tipo, '');
+        });
+        
+        // Filtrar passageiros conforme digitação
+        buscaInput.addEventListener('input', (e) => {
+            filtrarPassageiros(tipo, e.target.value);
+        });
+        
+        // Esconder dropdown ao clicar fora
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest(`#busca_passageiros_${tipo}`) && !e.target.closest(`#dropdown_passageiros_${tipo}`)) {
+                dropdown.style.display = 'none';
+                buscaInput.value = ''; // Limpar busca
+            }
+        });
+        
+        // Adicionar event listeners aos items de passageiros
+        dropdown.querySelectorAll('.passageiro-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = item.dataset.id;
+                const nome = item.dataset.nome;
+                const funcao = item.dataset.funcao;
+                
+                adicionarPassageiro(tipo, id, nome, funcao);
+                buscaInput.value = ''; // Limpar busca
+                dropdown.style.display = 'none';
+            });
+        });
+    }
+    
+    function filtrarPassageiros(tipo, termo) {
+        const dropdown = document.getElementById(`dropdown_passageiros_${tipo}`);
+        const items = dropdown.querySelectorAll('.passageiro-item');
+        
+        termo = termo.toLowerCase();
+        
+        items.forEach(item => {
+            const nome = item.dataset.nome.toLowerCase();
+            const funcao = item.dataset.funcao.toLowerCase();
+            const id = item.dataset.id;
+            
+            // Esconder se já foi selecionado
+            const jaFoiSelecionado = passageirosSelecionados[tipo].includes(id);
+            
+            if (jaFoiSelecionado) {
+                item.style.display = 'none';
+                return;
+            }
+            
+            // Filtrar por termo de busca
+            if (nome.includes(termo) || funcao.includes(termo)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+    
+    function adicionarPassageiro(tipo, id, nome, funcao) {
+        // Evitar duplicatas
+        if (passageirosSelecionados[tipo].includes(id)) return;
+        
+        // Adicionar à lista
+        passageirosSelecionados[tipo].push(id);
+        
+        // Criar chip visual
+        const passageirosSelecionadosDiv = document.getElementById(`passageiros_${tipo}_selecionados`);
+        const chip = document.createElement('div');
+        chip.className = 'passageiro-chip';
+        chip.dataset.id = id;
+        chip.innerHTML = `
+            <span>${nome} <small>(${funcao})</small></span>
+            <span class="passageiro-chip-remover" onclick="removerPassageiro('${tipo}', '${id}')">&times;</span>
+        `;
+        
+        passageirosSelecionadosDiv.appendChild(chip);
+        
+        // Atualizar campo hidden
+        atualizarCampoHidden(tipo);
+        
+        // Atualizar resumo
+        calcularResumoPassageiros();
+    }
+    
+    function removerPassageiro(tipo, id) {
+        // Remover da lista
+        passageirosSelecionados[tipo] = passageirosSelecionados[tipo].filter(pId => pId !== id);
+        
+        // Remover chip visual
+        const chip = document.querySelector(`#passageiros_${tipo}_selecionados .passageiro-chip[data-id="${id}"]`);
+        if (chip) chip.remove();
+        
+        // Atualizar campo hidden
+        atualizarCampoHidden(tipo);
+        
+        // Atualizar resumo
+        calcularResumoPassageiros();
+    }
+    
+    // Tornar função global para o onclick
+    window.removerPassageiro = removerPassageiro;
+    
+    function atualizarCampoHidden(tipo) {
+        const hiddenInput = document.getElementById(`passageiros_${tipo}_ids`);
+        hiddenInput.value = passageirosSelecionados[tipo].join(',');
+    }
+    
     // Calcular resumo dos passageiros automaticamente
     const motoristaSelect = document.getElementById('motorista_id');
-    const passageirosFrenteSelect = document.getElementById('passageiros_frente');
-    const passageirosTraSelect = document.getElementById('passageiros_tras');
     const totalPessoasDiv = document.getElementById('total_pessoas');
     const distribuicaoDiv = document.getElementById('distribuicao');
     
     function calcularResumoPassageiros() {
         const temMotorista = motoristaSelect.value ? 1 : 0;
-        const totalFrente = passageirosFrenteSelect.selectedOptions.length + temMotorista;
-        const totalTras = passageirosTraSelect.selectedOptions.length;
+        const totalFrente = passageirosSelecionados.frente.length + temMotorista;
+        const totalTras = passageirosSelecionados.tras.length;
         const totalPessoas = totalFrente + totalTras;
         
         if (totalPessoas > 0) {
@@ -936,10 +1196,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Adicionar listeners para atualizar resumo
+    // Adicionar listener para atualizar resumo quando motorista mudar
     motoristaSelect.addEventListener('change', calcularResumoPassageiros);
-    passageirosFrenteSelect.addEventListener('change', calcularResumoPassageiros);
-    passageirosTraSelect.addEventListener('change', calcularResumoPassageiros);
     
     // Calcular resumo inicial
     calcularResumoPassageiros();
