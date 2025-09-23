@@ -1,0 +1,793 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+// Garantir light theme para Veículos (idêntico ao RDO)
+console.log('Initializing Veículos with light theme...');
+</script>
+{% endblock %}
+
+{% block title %}Gestão de Veículos - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA VEÍCULOS (IDÊNTICO AO RDO) ===== */
+.veiculos-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.veiculos-container,
+.veiculos-container * {
+    color: #212529 !important;
+}
+
+.veiculos-container .card,
+.veiculos-container .stat-card,
+.veiculos-container .filters-container {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+.veiculos-container .form-control,
+.veiculos-container .form-select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #495057 !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL (IDÊNTICO AO RDO) ===== */
+:root {
+    --primary-green: #198754;
+    --dark-green: #145a3e;
+    --light-green: #d1e7dd;
+    --accent-green: #20c997;
+    --blue-primary: #0d6efd;
+    --blue-light: #e7f3ff;
+    --yellow-warning: #ffc107;
+    --yellow-light: #fff3cd;
+    --red-danger: #dc3545;
+    --red-light: #f8d7da;
+    --white: #ffffff;
+    --gray-50: #f8f9fa;
+    --gray-100: #e9ecef;
+    --gray-200: #dee2e6;
+    --gray-300: #ced4da;
+    --gray-400: #adb5bd;
+    --gray-500: #6c757d;
+    --gray-600: #495057;
+    --gray-700: #343a40;
+    --gray-800: #212529;
+    --gray-900: #000000;
+    
+    /* Sombras Profissionais */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+    
+    /* Bordas e Transições */
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Gradientes */
+    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    --gradient-card: linear-gradient(135deg, var(--white) 0%, var(--gray-50) 100%);
+    --gradient-success: linear-gradient(135deg, var(--accent-green) 0%, var(--primary-green) 100%);
+}
+
+/* ===== CONTAINER PRINCIPAL ===== */
+.veiculos-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0;
+    background: #f8f9fa !important;
+    min-height: 100vh;
+    color: #212529 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ===== HEADER MODERNO COM GRADIENTE ===== */
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title h1 {
+    font-size: 3rem !important;
+    font-weight: 800 !important;
+    margin: 0;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.02em;
+}
+
+.header-title p {
+    font-size: 1.25rem !important;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-weight: 400;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-light {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(10px);
+}
+
+.btn-light:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: var(--primary-green);
+    color: var(--primary-green);
+    text-decoration: none;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: white;
+    text-decoration: none;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ===== DASHBOARD DE ESTATÍSTICAS PROFISSIONAL ===== */
+.stats-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin: 0 2rem 3rem 2rem;
+    padding: 0;
+}
+
+.stat-card {
+    background: #ffffff !important;
+    padding: 2rem;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 6px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid #e5e7eb !important;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative;
+    overflow: hidden;
+    color: #374151 !important;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+}
+
+.stat-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-xl);
+    border-color: var(--primary-green);
+}
+
+.stat-icon {
+    background: linear-gradient(135deg, #20c997 0%, #198754 100%) !important;
+    color: white !important;
+    padding: 1.25rem;
+    border-radius: 50% !important;
+    font-size: 1.5rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    min-width: 70px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-content .stat-number {
+    font-size: 2.5rem !important;
+    font-weight: 800 !important;
+    color: #374151 !important;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.stat-content .stat-label {
+    font-size: 1rem !important;
+    color: #6b7280 !important;
+    font-weight: 500 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ===== SEÇÃO DE FILTROS PROFISSIONAL ===== */
+.filters-container {
+    background: #ffffff !important;
+    padding: 2rem;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    margin: 0 2rem 3rem 2rem;
+    border: 1px solid #e5e7eb !important;
+    position: relative;
+    color: #374151 !important;
+}
+
+.filters-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+}
+
+.filters-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    color: var(--gray-800);
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+.filters-header i {
+    color: var(--primary-green);
+    font-size: 1.5rem;
+}
+
+.filters-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    align-items: end;
+}
+
+.filter-group label {
+    display: block;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.modern-select, .modern-input {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid var(--gray-300) !important;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    transition: var(--transition);
+    background: var(--white) !important;
+    box-shadow: var(--shadow-sm);
+    color: var(--gray-800) !important;
+}
+
+.modern-select:focus, .modern-input:focus {
+    outline: none;
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.15);
+    transform: translateY(-2px);
+}
+
+/* ===== GRID DE VEÍCULOS PROFISSIONAL ===== */
+.veiculos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 2rem;
+    margin: 0 2rem 2rem 2rem;
+    padding: 0;
+}
+
+.veiculo-card {
+    background: #ffffff !important;
+    padding: 0;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 6px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid #e5e7eb !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative;
+    overflow: hidden;
+    color: #374151 !important;
+}
+
+.veiculo-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-xl);
+    border-color: var(--primary-green);
+}
+
+.veiculo-card-header {
+    background: var(--gradient-primary);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 20px 20px 0 0;
+    position: relative;
+}
+
+.veiculo-placa {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.veiculo-modelo {
+    font-size: 1rem;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+}
+
+.veiculo-status {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-disponivel {
+    background: rgba(32, 201, 151, 0.2);
+    color: #10b981;
+    border: 1px solid rgba(32, 201, 151, 0.3);
+}
+
+.status-em-uso {
+    background: rgba(255, 193, 7, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.status-manutencao {
+    background: rgba(220, 53, 69, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.veiculo-card-body {
+    padding: 1.5rem;
+}
+
+.veiculo-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-label {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.info-value {
+    font-size: 1rem;
+    color: var(--gray-800);
+    font-weight: 600;
+}
+
+.veiculo-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    border-top: 1px solid var(--gray-200);
+    padding-top: 1.5rem;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-align: center;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-primary-custom {
+    background: var(--gradient-primary);
+    color: white;
+    border: 2px solid transparent;
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-outline-custom {
+    background: transparent;
+    color: var(--primary-green);
+    border: 2px solid var(--primary-green);
+}
+
+.btn-outline-custom:hover {
+    background: var(--primary-green);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+}
+
+/* ===== PAGINAÇÃO MODERNA ===== */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    margin: 3rem 2rem 2rem 2rem;
+}
+
+.pagination {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.page-link {
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transition);
+    border: 2px solid var(--gray-300);
+    color: var(--gray-700);
+    background: white;
+}
+
+.page-link:hover {
+    background: var(--primary-green);
+    color: white;
+    border-color: var(--primary-green);
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+.page-link.active {
+    background: var(--gradient-primary);
+    color: white;
+    border-color: var(--primary-green);
+}
+
+/* ===== RESPONSIVIDADE ===== */
+@media (max-width: 768px) {
+    .veiculos-grid {
+        grid-template-columns: 1fr;
+        margin: 0 1rem 2rem 1rem;
+    }
+    
+    .stats-dashboard {
+        grid-template-columns: 1fr;
+        margin: 0 1rem 2rem 1rem;
+    }
+    
+    .filters-container {
+        margin: 0 1rem 2rem 1rem;
+    }
+    
+    .filters-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 2rem;
+        text-align: center;
+    }
+    
+    .header-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="veiculos-container">
+    <!-- Header Moderno com Gradiente -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>🚗 Gestão de Veículos</h1>
+                <p>Sistema integrado de controle de frota e custos</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('main.novo_veiculo') }}" class="btn-light">
+                    <i class="fas fa-plus"></i>
+                    Novo Veículo
+                </a>
+                <a href="{{ url_for('main.dashboard') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard de Estatísticas -->
+    {% if stats %}
+    <div class="stats-dashboard">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-car"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats.total_veiculos }}</div>
+                <div class="stat-label">Total de Veículos</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats.disponiveis }}</div>
+                <div class="stat-label">Disponíveis</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-road"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats.em_uso }}</div>
+                <div class="stat-label">Em Uso</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-wrench"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats.manutencao }}</div>
+                <div class="stat-label">Manutenção</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filtros Avançados -->
+    <div class="filters-container">
+        <div class="filters-header">
+            <i class="fas fa-filter"></i>
+            <span>Filtros Avançados</span>
+        </div>
+        <form method="GET" action="{{ url_for('main.veiculos') }}">
+            <div class="filters-content">
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select name="status" class="modern-select">
+                        <option value="">Todos os Status</option>
+                        <option value="Disponível" {% if filtros_aplicados.status == 'Disponível' %}selected{% endif %}>Disponível</option>
+                        <option value="Em Uso" {% if filtros_aplicados.status == 'Em Uso' %}selected{% endif %}>Em Uso</option>
+                        <option value="Manutenção" {% if filtros_aplicados.status == 'Manutenção' %}selected{% endif %}>Manutenção</option>
+                        <option value="Inativo" {% if filtros_aplicados.status == 'Inativo' %}selected{% endif %}>Inativo</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Tipo</label>
+                    <select name="tipo" class="modern-select">
+                        <option value="">Todos os Tipos</option>
+                        <option value="Utilitário" {% if filtros_aplicados.tipo == 'Utilitário' %}selected{% endif %}>Utilitário</option>
+                        <option value="Caminhão" {% if filtros_aplicados.tipo == 'Caminhão' %}selected{% endif %}>Caminhão</option>
+                        <option value="Van" {% if filtros_aplicados.tipo == 'Van' %}selected{% endif %}>Van</option>
+                        <option value="Carro" {% if filtros_aplicados.tipo == 'Carro' %}selected{% endif %}>Carro</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Placa</label>
+                    <input type="text" name="placa" class="modern-input" placeholder="Digite a placa..." value="{{ filtros_aplicados.placa or '' }}">
+                </div>
+                
+                <div class="filter-group">
+                    <label>Marca</label>
+                    <input type="text" name="marca" class="modern-input" placeholder="Digite a marca..." value="{{ filtros_aplicados.marca or '' }}">
+                </div>
+                
+                <div class="filter-group">
+                    <label>&nbsp;</label>
+                    <button type="submit" class="btn-primary-custom" style="height: 56px;">
+                        <i class="fas fa-search"></i>
+                        Buscar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Grid de Veículos -->
+    {% if veiculos %}
+    <div class="veiculos-grid">
+        {% for veiculo in veiculos %}
+        <div class="veiculo-card">
+            <div class="veiculo-card-header">
+                <h3 class="veiculo-placa">{{ veiculo.placa }}</h3>
+                <p class="veiculo-modelo">{{ veiculo.marca }} {{ veiculo.modelo }}</p>
+                <span class="veiculo-status status-{{ veiculo.status|lower|replace(' ', '-')|replace('ç', 'c')|replace('ã', 'a') }}">
+                    {{ veiculo.status }}
+                </span>
+            </div>
+            
+            <div class="veiculo-card-body">
+                <div class="veiculo-info">
+                    <div class="info-item">
+                        <span class="info-label">Ano</span>
+                        <span class="info-value">{{ veiculo.ano }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Tipo</span>
+                        <span class="info-value">{{ veiculo.tipo }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">KM Atual</span>
+                        <span class="info-value">{{ "{:,}".format(veiculo.km_atual).replace(',', '.') }} km</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Combustível</span>
+                        <span class="info-value">{{ veiculo.combustivel }}</span>
+                    </div>
+                </div>
+                
+                <div class="veiculo-actions">
+                    <a href="{{ url_for('main.detalhes_veiculo', id=veiculo.id) }}" class="btn-action btn-primary-custom">
+                        <i class="fas fa-eye"></i>
+                        Detalhes
+                    </a>
+                    <a href="{{ url_for('main.novo_uso_veiculo', veiculo_id=veiculo.id) }}" class="btn-action btn-outline-custom">
+                        <i class="fas fa-road"></i>
+                        Usar
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Paginação -->
+    {% if pagination and pagination.pages > 1 %}
+    <div class="pagination-container">
+        <div class="pagination">
+            {% if pagination.has_prev %}
+            <a href="{{ url_for('main.veiculos', page=pagination.prev_num, **request.args) }}" class="page-link">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+            {% endif %}
+            
+            {% for page_num in pagination.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num != pagination.page %}
+                    <a href="{{ url_for('main.veiculos', page=page_num, **request.args) }}" class="page-link">{{ page_num }}</a>
+                    {% else %}
+                    <span class="page-link active">{{ page_num }}</span>
+                    {% endif %}
+                {% else %}
+                <span class="page-link">…</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if pagination.has_next %}
+            <a href="{{ url_for('main.veiculos', page=pagination.next_num, **request.args) }}" class="page-link">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <!-- Estado Vazio -->
+    <div style="text-align: center; padding: 4rem 2rem; color: #6b7280;">
+        <i class="fas fa-car" style="font-size: 4rem; margin-bottom: 2rem; color: #d1d5db;"></i>
+        <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Nenhum veículo encontrado</h3>
+        <p style="font-size: 1rem; margin-bottom: 2rem;">Cadastre o primeiro veículo da sua frota para começar o controle.</p>
+        <a href="{{ url_for('main.novo_veiculo') }}" class="btn-primary-custom" style="padding: 1rem 2rem; font-size: 1rem;">
+            <i class="fas fa-plus"></i>
+            Cadastrar Primeiro Veículo
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
