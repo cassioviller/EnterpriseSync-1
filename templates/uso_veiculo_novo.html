@@ -737,14 +737,6 @@ document.addEventListener('DOMContentLoaded', function() {
             <input type="hidden" name="csrf_token" value=""/>
             <input type="hidden" name="veiculo_id" value="{{ veiculo.id if veiculo else request.args.get('veiculo_id') }}">
             
-            <!-- Alerta da Novidade v2.0 -->
-            <div class="alert-custom alert-success">
-                <i class="fas fa-star"></i>
-                <div>
-                    <strong>Novidade v2.0:</strong> Agora você pode registrar uso e custos em um único formulário! 
-                    Preencha os custos relacionados a este uso (combustível, pedágio, etc.) logo abaixo.
-                </div>
-            </div>
 
             <!-- Seção 1: Dados do Uso -->
             <div class="form-section">
