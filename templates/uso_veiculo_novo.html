@@ -887,39 +887,8 @@ document.addEventListener('DOMContentLoaded', function() {
     kmInicialInput.addEventListener('input', calcularKmPercorrido);
     kmFinalInput.addEventListener('input', calcularKmPercorrido);
     
-    // Calcular total de custos automaticamente
-    const custosInputs = [
-        'valor_combustivel',
-        'valor_pedagio', 
-        'valor_manutencao',
-        'valor_outros'
-    ];
-    
-    function calcularTotalCustos() {
-        let total = 0;
-        
-        custosInputs.forEach(inputId => {
-            const input = document.getElementById(inputId);
-            const valor = parseFloat(input.value) || 0;
-            total += valor;
-        });
-        
-        document.getElementById('total_custos').textContent = 
-            'R$ ' + total.toLocaleString('pt-BR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-    }
-    
-    // Adicionar listeners para todos os campos de custo
-    custosInputs.forEach(inputId => {
-        const input = document.getElementById(inputId);
-        input.addEventListener('input', calcularTotalCustos);
-    });
-    
     // Calcular valores iniciais
     calcularKmPercorrido();
-    calcularTotalCustos();
     
     // Definir data padrão como hoje
     const dataUsoInput = document.getElementById('data_uso');
