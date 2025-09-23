@@ -2949,3 +2949,289 @@ def sincronizar_alocacao_com_horario_funcionario(allocation_employee_id, admin_i
     
     return False
 
+# ================================
+# MÓDULO DE VEÍCULOS V2.0 - REDESIGN COMPLETO  
+# ================================
+# Schema moderno com tipos INTEGER corretos e formulários unificados
+# Design visual idêntico aos módulos RDO/Obras
+
+class Veiculo(db.Model):
+    """Modelo principal de veículos com design moderno e tipos corretos"""
+    __tablename__ = 'veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Dados básicos do veículo
+    placa = db.Column(db.String(10), nullable=False)  # ABC-1234 ou ABC1D234
+    marca = db.Column(db.String(50), nullable=False)
+    modelo = db.Column(db.String(100), nullable=False)
+    ano = db.Column(db.Integer, nullable=False)
+    tipo = db.Column(db.String(30), default='Utilitário')  # Utilitário, Caminhão, Van, Carro
+    
+    # Controle de quilometragem
+    km_atual = db.Column(db.Integer, default=0)  # Quilometragem atual
+    
+    # Dados opcionais
+    cor = db.Column(db.String(30))
+    chassi = db.Column(db.String(50))
+    renavam = db.Column(db.String(20))
+    combustivel = db.Column(db.String(20), default='Gasolina')  # Gasolina, Álcool, Diesel, Flex
+    
+    # Status e controle
+    status = db.Column(db.String(20), default='Disponível')  # Disponível, Em Uso, Manutenção, Inativo
+    ativo = db.Column(db.Boolean, default=True)
+    
+    # Manutenção
+    data_ultima_manutencao = db.Column(db.Date)
+    data_proxima_manutencao = db.Column(db.Date)
+    km_proxima_manutencao = db.Column(db.Integer)
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    admin = db.relationship('Usuario', backref='veiculos_administrados')
+    usos = db.relationship('UsoVeiculo', backref='veiculo', cascade='all, delete-orphan', lazy='dynamic')
+    custos = db.relationship('CustoVeiculo', backref='veiculo', cascade='all, delete-orphan', lazy='dynamic')
+    
+    # Índices e constraints para performance
+    __table_args__ = (
+        db.UniqueConstraint('admin_id', 'placa', name='uk_veiculo_admin_placa'),
+        db.Index('idx_veiculo_admin_status', 'admin_id', 'status'),
+        db.Index('idx_veiculo_admin_tipo', 'admin_id', 'tipo'),
+        db.Index('idx_veiculo_placa_admin', 'placa', 'admin_id'),
+    )
+    
+    def __repr__(self):
+        return f'<Veiculo {self.placa} - {self.marca} {self.modelo}>'
+    
+    def to_dict(self):
+        """Converter para dicionário para APIs"""
+        return {
+            'id': self.id,
+            'placa': self.placa,
+            'marca': self.marca,
+            'modelo': self.modelo,
+            'ano': self.ano,
+            'tipo': self.tipo,
+            'km_atual': self.km_atual,
+            'cor': self.cor,
+            'combustivel': self.combustivel,
+            'status': self.status,
+            'ativo': self.ativo,
+            'data_ultima_manutencao': self.data_ultima_manutencao.isoformat() if self.data_ultima_manutencao else None,
+            'data_proxima_manutencao': self.data_proxima_manutencao.isoformat() if self.data_proxima_manutencao else None,
+            'km_proxima_manutencao': self.km_proxima_manutencao,
+            'admin_id': self.admin_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+    
+    @property
+    def marca_modelo(self):
+        """Propriedade para exibição combinada"""
+        return f"{self.marca} {self.modelo}"
+    
+    @property
+    def descricao_completa(self):
+        """Descrição completa do veículo"""
+        return f"{self.placa} - {self.marca} {self.modelo} ({self.ano})"
+
+
+class UsoVeiculo(db.Model):
+    """Registro de uso de veículo com formulário unificado para uso e custos"""
+    __tablename__ = 'uso_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Relacionamentos principais
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # Pode ser uso pessoal/administrativo
+    
+    # Dados do uso
+    data_uso = db.Column(db.Date, nullable=False)
+    hora_saida = db.Column(db.Time, nullable=False)
+    hora_retorno = db.Column(db.Time)
+    
+    # Quilometragem
+    km_inicial = db.Column(db.Integer, nullable=False)
+    km_final = db.Column(db.Integer)
+    km_percorrido = db.Column(db.Integer)  # Calculado automaticamente
+    
+    # Finalidade e destino
+    finalidade = db.Column(db.String(100), nullable=False)  # Transporte de materiais, Visita técnica, etc.
+    destino = db.Column(db.String(200))
+    rota_detalhada = db.Column(db.Text)  # Rota percorrida
+    
+    # === CAMPOS UNIFICADOS PARA CUSTOS (NOVIDADE v2.0) ===
+    # Custos relacionados a este uso específico
+    valor_combustivel = db.Column(db.Numeric(10, 2), default=0.0)
+    litros_combustivel = db.Column(db.Numeric(8, 3), default=0.0)
+    valor_pedagio = db.Column(db.Numeric(10, 2), default=0.0)
+    valor_manutencao = db.Column(db.Numeric(10, 2), default=0.0)  # Manutenção durante o uso
+    valor_outros = db.Column(db.Numeric(10, 2), default=0.0)
+    
+    # Status e controle
+    status = db.Column(db.String(20), default='Em Andamento')  # Em Andamento, Finalizado, Cancelado
+    responsavel_veiculo = db.Column(db.String(100))  # Funcionário responsável pelo veículo
+    
+    # Observações
+    observacoes = db.Column(db.Text)
+    observacoes_retorno = db.Column(db.Text)  # Observações no retorno
+    
+    # Multi-tenant (OBRIGATÓRIO) 
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='usos_veiculo')
+    obra = db.relationship('Obra', backref='usos_veiculo')
+    admin = db.relationship('Usuario', backref='usos_veiculo_administrados')
+    
+    # Índices para performance
+    __table_args__ = (
+        db.Index('idx_uso_veiculo_data_admin', 'data_uso', 'admin_id'),
+        db.Index('idx_uso_veiculo_funcionario', 'funcionario_id'),
+        db.Index('idx_uso_veiculo_obra', 'obra_id'),
+        db.Index('idx_uso_veiculo_status', 'status', 'admin_id'),
+    )
+    
+    def __repr__(self):
+        func_nome = self.funcionario.nome if self.funcionario else f"ID:{self.funcionario_id}"
+        veiculo_placa = self.veiculo.placa if self.veiculo else f"ID:{self.veiculo_id}"
+        return f'<UsoVeiculo {veiculo_placa} - {func_nome} ({self.data_uso})>'
+    
+    def to_dict(self):
+        """Converter para dicionário para APIs"""
+        return {
+            'id': self.id,
+            'veiculo_id': self.veiculo_id,
+            'veiculo_placa': self.veiculo.placa if self.veiculo else None,
+            'funcionario_id': self.funcionario_id,
+            'funcionario_nome': self.funcionario.nome if self.funcionario else None,
+            'obra_id': self.obra_id,
+            'obra_nome': self.obra.nome if self.obra else None,
+            'data_uso': self.data_uso.isoformat(),
+            'hora_saida': self.hora_saida.isoformat() if self.hora_saida else None,
+            'hora_retorno': self.hora_retorno.isoformat() if self.hora_retorno else None,
+            'km_inicial': self.km_inicial,
+            'km_final': self.km_final,
+            'km_percorrido': self.km_percorrido,
+            'finalidade': self.finalidade,
+            'destino': self.destino,
+            'valor_combustivel': float(self.valor_combustivel) if self.valor_combustivel else 0.0,
+            'litros_combustivel': float(self.litros_combustivel) if self.litros_combustivel else 0.0,
+            'valor_pedagio': float(self.valor_pedagio) if self.valor_pedagio else 0.0,
+            'valor_manutencao': float(self.valor_manutencao) if self.valor_manutencao else 0.0,
+            'valor_outros': float(self.valor_outros) if self.valor_outros else 0.0,
+            'status': self.status,
+            'observacoes': self.observacoes,
+            'admin_id': self.admin_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+    
+    @property
+    def valor_total_uso(self):
+        """Valor total dos custos deste uso"""
+        total = 0.0
+        if self.valor_combustivel:
+            total += float(self.valor_combustivel)
+        if self.valor_pedagio:
+            total += float(self.valor_pedagio) 
+        if self.valor_manutencao:
+            total += float(self.valor_manutencao)
+        if self.valor_outros:
+            total += float(self.valor_outros)
+        return total
+    
+    def calcular_km_percorrido(self):
+        """Calcula automaticamente KM percorrido se possível"""
+        if self.km_inicial and self.km_final and self.km_final > self.km_inicial:
+            self.km_percorrido = self.km_final - self.km_inicial
+            return self.km_percorrido
+        return 0
+
+
+class CustoVeiculo(db.Model):
+    """Custos do veículo não relacionados a uso específico (manutenção, seguro, etc.)"""
+    __tablename__ = 'custo_veiculo'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Relacionamento principal
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    
+    # Dados do custo
+    data_custo = db.Column(db.Date, nullable=False)
+    tipo_custo = db.Column(db.String(30), nullable=False)  # manutencao, seguro, ipva, dpvat, multa, outros
+    categoria = db.Column(db.String(20), default='operacional')  # operacional, juridico, administrativo
+    
+    # Valores
+    valor = db.Column(db.Numeric(10, 2), nullable=False)
+    
+    # Detalhes
+    descricao = db.Column(db.String(200), nullable=False)
+    fornecedor = db.Column(db.String(100))  # Oficina, Seguradora, etc.
+    numero_nota_fiscal = db.Column(db.String(20))
+    data_vencimento = db.Column(db.Date)  # Para custos recorrentes
+    
+    # Status
+    status_pagamento = db.Column(db.String(20), default='Pendente')  # Pendente, Pago, Vencido, Cancelado
+    forma_pagamento = db.Column(db.String(30))  # Dinheiro, PIX, Cartão, Boleto
+    
+    # Controle de quilometragem (para manutenções)
+    km_veiculo = db.Column(db.Integer)  # KM do veículo no momento do custo
+    
+    # Observações
+    observacoes = db.Column(db.Text)
+    
+    # Multi-tenant (OBRIGATÓRIO)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Controle de tempo
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    admin = db.relationship('Usuario', backref='custos_veiculo_administrados')
+    
+    # Índices para performance
+    __table_args__ = (
+        db.Index('idx_custo_veiculo_data_admin', 'data_custo', 'admin_id'),
+        db.Index('idx_custo_veiculo_tipo', 'tipo_custo', 'admin_id'),
+        db.Index('idx_custo_veiculo_status', 'status_pagamento', 'admin_id'),
+    )
+    
+    def __repr__(self):
+        veiculo_placa = self.veiculo.placa if self.veiculo else f"ID:{self.veiculo_id}"
+        return f'<CustoVeiculo {veiculo_placa} - {self.tipo_custo} R$ {self.valor}>'
+    
+    def to_dict(self):
+        """Converter para dicionário para APIs"""
+        return {
+            'id': self.id,
+            'veiculo_id': self.veiculo_id,
+            'veiculo_placa': self.veiculo.placa if self.veiculo else None,
+            'data_custo': self.data_custo.isoformat(),
+            'tipo_custo': self.tipo_custo,
+            'categoria': self.categoria,
+            'valor': float(self.valor),
+            'descricao': self.descricao,
+            'fornecedor': self.fornecedor,
+            'numero_nota_fiscal': self.numero_nota_fiscal,
+            'data_vencimento': self.data_vencimento.isoformat() if self.data_vencimento else None,
+            'status_pagamento': self.status_pagamento,
+            'forma_pagamento': self.forma_pagamento,
+            'km_veiculo': self.km_veiculo,
+            'observacoes': self.observacoes,
+            'admin_id': self.admin_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
