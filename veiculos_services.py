@@ -210,9 +210,10 @@ class UsoVeiculoService:
             if not veiculo:
                 return False, None, "Veículo não encontrado"
             
-            funcionario = Funcionario.query.filter_by(id=dados['funcionario_id'], admin_id=admin_id).first()
-            if not funcionario:
-                return False, None, "Funcionário não encontrado"
+            # Motorista opcional (novo campo substitui funcionario_id)
+            motorista = None
+            if dados.get('motorista_id'):
+                motorista = Funcionario.query.filter_by(id=dados['motorista_id'], admin_id=admin_id).first()
             
             # Validar obra se informada
             obra = None
@@ -224,7 +225,7 @@ class UsoVeiculoService:
             # Criar registro de uso
             uso = UsoVeiculo(
                 veiculo_id=dados['veiculo_id'],
-                funcionario_id=dados['funcionario_id'],
+                funcionario_id=dados.get('motorista_id'),  # Agora opcional
                 obra_id=dados.get('obra_id'),
                 data_uso=dados['data_uso'],
                 hora_saida=dados['hora_saida'],
@@ -243,7 +244,7 @@ class UsoVeiculoService:
                 valor_outros=Decimal(str(dados.get('valor_outros', 0))) if dados.get('valor_outros') else Decimal('0'),
                 
                 status=dados.get('status', 'Em Andamento'),
-                responsavel_veiculo=dados.get('responsavel_veiculo', funcionario.nome),
+                responsavel_veiculo=dados.get('responsavel_veiculo', motorista.nome if motorista else 'Não informado'),
                 observacoes=dados.get('observacoes', '').strip() if dados.get('observacoes') else None,
                 admin_id=admin_id
             )

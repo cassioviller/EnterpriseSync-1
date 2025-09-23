@@ -8762,7 +8762,7 @@ def novo_uso_veiculo(veiculo_id):
         print(f"🔍 [NOVO_USO] Dados recebidos: {dados.keys()}")
         
         # Validações básicas
-        campos_obrigatorios = ['data_uso', 'hora_saida', 'funcionario_id', 'km_inicial', 'finalidade']
+        campos_obrigatorios = ['data_uso', 'hora_saida', 'km_inicial']
         for campo in campos_obrigatorios:
             if not dados.get(campo):
                 flash(f'Campo {campo.replace("_", " ").title()} é obrigatório.', 'error')

@@ -775,19 +775,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
                 
-                <div class="form-grid form-grid-2">
-                    <div class="form-group">
-                        <label for="funcionario_id">Funcionário Responsável <span class="required">*</span></label>
-                        <select id="funcionario_id" name="funcionario_id" class="modern-select" required>
-                            <option value="">Selecione o funcionário</option>
-                            {% for funcionario in funcionarios %}
-                            <option value="{{ funcionario.id }}" {% if request.form.funcionario_id == funcionario.id|string %}selected{% endif %}>
-                                {{ funcionario.nome }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
+                <div class="form-grid form-grid-1">
                     <div class="form-group">
                         <label for="obra_id">Obra/Projeto</label>
                         <select id="obra_id" name="obra_id" class="modern-select">
