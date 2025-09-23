@@ -645,6 +645,10 @@ console.log('Initializing Veículos with light theme...');
                         <i class="fas fa-road"></i>
                         Usar
                     </a>
+                    <a href="{{ url_for('main.novo_custo_veiculo_form', veiculo_id=veiculo.id) }}" class="btn-action btn-secondary-custom">
+                        <i class="fas fa-money-bill-wave"></i>
+                        Custo
+                    </a>
                 </div>
             </div>
         </div>

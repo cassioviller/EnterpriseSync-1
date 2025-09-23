@@ -1,0 +1,563 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+// Garantir light theme para Custo de Veículo (idêntico ao RDO)
+console.log('Initializing Custo Veículo with light theme...');
+
+// Definir data atual automaticamente quando a página carregar
+document.addEventListener('DOMContentLoaded', function() {
+    const dataCustoInput = document.getElementById('data_custo');
+    if (dataCustoInput && !dataCustoInput.value) {
+        const hoje = new Date();
+        const dataFormatada = hoje.toISOString().split('T')[0]; // YYYY-MM-DD
+        dataCustoInput.value = dataFormatada;
+    }
+});
+</script>
+{% endblock %}
+
+{% block title %}Novo Custo de Veículo - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA CUSTO DE VEÍCULO (IDÊNTICO AO RDO) ===== */
+.custo-veiculo-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.custo-veiculo-container,
+.custo-veiculo-container * {
+    color: #212529 !important;
+}
+
+.custo-veiculo-container .card,
+.custo-veiculo-container .form-container {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+.custo-veiculo-container .form-control,
+.custo-veiculo-container .form-select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #495057 !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL (IDÊNTICO AO RDO) ===== */
+:root {
+    --primary-green: #198754;
+    --dark-green: #145a3e;
+    --light-green: #d1e7dd;
+    --accent-green: #20c997;
+    --blue-primary: #0d6efd;
+    --blue-light: #e7f3ff;
+    --yellow-warning: #ffc107;
+    --yellow-light: #fff3cd;
+    --red-danger: #dc3545;
+    --red-light: #f8d7da;
+    --white: #ffffff;
+    --gray-50: #f8f9fa;
+    --gray-100: #e9ecef;
+    --gray-200: #dee2e6;
+    --gray-300: #ced4da;
+    --gray-400: #adb5bd;
+    --gray-500: #6c757d;
+    --gray-600: #495057;
+    --gray-700: #343a40;
+    --gray-800: #212529;
+    --gray-900: #000000;
+    
+    /* Sombras Profissionais */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+    
+    /* Bordas e Transições */
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Header da Página */
+.page-header {
+    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.header-content {
+    padding: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.header-title h1 {
+    color: white !important;
+    font-weight: 700;
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.15);
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transition-fast);
+    backdrop-filter: blur(10px);
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+}
+
+/* Informações do Veículo */
+.veiculo-info-card {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.veiculo-header {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--gray-50), var(--white));
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.veiculo-icon {
+    width: 3.5rem;
+    height: 3.5rem;
+    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+}
+
+.veiculo-icon i {
+    font-size: 1.5rem;
+    color: white !important;
+}
+
+.veiculo-details h3 {
+    font-weight: 700;
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+    color: var(--gray-800) !important;
+}
+
+.veiculo-details p {
+    color: var(--gray-600) !important;
+    margin: 0;
+    font-size: 0.9375rem;
+}
+
+/* Container do Formulário */
+.form-container {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+}
+
+.form-header {
+    background: linear-gradient(135deg, var(--gray-50), var(--white));
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.form-header i {
+    font-size: 1.5rem;
+    color: var(--primary-green) !important;
+}
+
+.form-header h2 {
+    font-weight: 700;
+    font-size: 1.375rem;
+    margin: 0;
+    color: var(--gray-800) !important;
+}
+
+/* Seções do Formulário */
+.form-section {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-title i {
+    font-size: 1.25rem;
+    color: var(--primary-green) !important;
+}
+
+.section-title span {
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--gray-800) !important;
+}
+
+/* Grids de Formulário */
+.form-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.form-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.form-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* Grupos de Formulário */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--gray-700) !important;
+    font-size: 0.9375rem;
+}
+
+.required {
+    color: var(--red-danger) !important;
+}
+
+/* Inputs Modernos */
+.modern-input,
+.modern-select,
+.modern-textarea {
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--border-radius);
+    font-size: 0.9375rem;
+    transition: var(--transition-fast);
+    background: var(--white);
+    color: var(--gray-800) !important;
+}
+
+.modern-input:focus,
+.modern-select:focus,
+.modern-textarea:focus {
+    outline: none;
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
+    transform: translateY(-2px);
+}
+
+.modern-textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Alertas */
+.alert-custom {
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    border: 1px solid;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.alert-info {
+    background: var(--blue-light);
+    border-color: var(--blue-primary);
+    color: var(--blue-primary);
+}
+
+/* Botões de Ação */
+.form-actions {
+    padding: 1.5rem;
+    background: var(--gray-50);
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.btn-action {
+    padding: 0.875rem 1.5rem;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.btn-primary-custom {
+    background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+    color: white !important;
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary-custom {
+    background: var(--white);
+    color: var(--gray-700) !important;
+    border: 2px solid var(--gray-300);
+}
+
+.btn-secondary-custom:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+    transform: translateY(-2px);
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .form-grid-2,
+    .form-grid-3 {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-content {
+        text-align: center;
+    }
+    
+    .form-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+    
+    .btn-action {
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="custo-veiculo-container">
+    <!-- Header Moderno com Gradiente -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>💰 Novo Custo de Veículo</h1>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('main.veiculos') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar à Lista
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações do Veículo -->
+    {% if veiculo %}
+    <div class="veiculo-info-card">
+        <div class="veiculo-header">
+            <div class="veiculo-icon">
+                <i class="fas fa-car"></i>
+            </div>
+            <div class="veiculo-details">
+                <h3>{{ veiculo.placa }} - {{ veiculo.marca }} {{ veiculo.modelo }}</h3>
+                <p>{{ veiculo.tipo }} • {{ veiculo.ano }} • {{ veiculo.combustivel }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Formulário Principal -->
+    <div class="form-container">
+        <div class="form-header">
+            <i class="fas fa-money-bill-wave"></i>
+            <h2>Registrar Custo</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('main.novo_custo_veiculo_form', veiculo_id=veiculo.id if veiculo else request.args.get('veiculo_id')) }}" id="formCustoVeiculo">
+            <input type="hidden" name="csrf_token" value=""/>
+            <input type="hidden" name="veiculo_id" value="{{ veiculo.id if veiculo else request.args.get('veiculo_id') }}">
+
+            <!-- Seção 1: Dados do Custo -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Dados do Custo</span>
+                </div>
+                
+                <div class="form-grid form-grid-2">
+                    <div class="form-group">
+                        <label for="data_custo">Data do Custo <span class="required">*</span></label>
+                        <input type="date" 
+                               id="data_custo" 
+                               name="data_custo" 
+                               class="modern-input" 
+                               required
+                               value="{{ request.form.data_custo or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="tipo">Tipo de Custo <span class="required">*</span></label>
+                        <select id="tipo" 
+                                name="tipo" 
+                                class="modern-select" 
+                                required>
+                            <option value="">Selecione o tipo</option>
+                            <option value="COMBUSTIVEL" {{ 'selected' if request.form.tipo == 'COMBUSTIVEL' else '' }}>Combustível</option>
+                            <option value="PEDAGIO" {{ 'selected' if request.form.tipo == 'PEDAGIO' else '' }}>Pedágio</option>
+                            <option value="MANUTENCAO" {{ 'selected' if request.form.tipo == 'MANUTENCAO' else '' }}>Manutenção</option>
+                            <option value="ESTACIONAMENTO" {{ 'selected' if request.form.tipo == 'ESTACIONAMENTO' else '' }}>Estacionamento</option>
+                            <option value="MULTA" {{ 'selected' if request.form.tipo == 'MULTA' else '' }}>Multa</option>
+                            <option value="SEGURO" {{ 'selected' if request.form.tipo == 'SEGURO' else '' }}>Seguro</option>
+                            <option value="IPVA" {{ 'selected' if request.form.tipo == 'IPVA' else '' }}>IPVA</option>
+                            <option value="LICENCIAMENTO" {{ 'selected' if request.form.tipo == 'LICENCIAMENTO' else '' }}>Licenciamento</option>
+                            <option value="LIMPEZA" {{ 'selected' if request.form.tipo == 'LIMPEZA' else '' }}>Limpeza</option>
+                            <option value="OUTROS" {{ 'selected' if request.form.tipo == 'OUTROS' else '' }}>Outros</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-grid form-grid-2">
+                    <div class="form-group">
+                        <label for="valor">Valor <span class="required">*</span></label>
+                        <input type="number" 
+                               id="valor" 
+                               name="valor" 
+                               class="modern-input" 
+                               placeholder="0,00"
+                               step="0.01"
+                               min="0"
+                               required
+                               value="{{ request.form.valor or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="fornecedor">Fornecedor</label>
+                        <input type="text" 
+                               id="fornecedor" 
+                               name="fornecedor" 
+                               class="modern-input" 
+                               placeholder="Ex: Posto ABC, Oficina XYZ"
+                               value="{{ request.form.fornecedor or '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 2: Associações (Opcional) -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-link"></i>
+                    <span>Associações</span>
+                </div>
+                
+                <div class="alert-custom alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <div>
+                        <strong>Opcional:</strong> Associe este custo a um uso específico ou obra (se aplicável).
+                    </div>
+                </div>
+                
+                <div class="form-grid form-grid-2">
+                    <div class="form-group">
+                        <label for="uso_id">Uso Associado</label>
+                        <select id="uso_id" 
+                                name="uso_id" 
+                                class="modern-select">
+                            <option value="">Nenhum uso específico</option>
+                            {% for uso in usos %}
+                            <option value="{{ uso.id }}" {{ 'selected' if request.form.uso_id|string == uso.id|string else '' }}>
+                                {{ uso.data_uso.strftime('%d/%m/%Y') }} - {{ uso.funcionario.nome if uso.funcionario else 'N/A' }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="obra_id">Obra Associada</label>
+                        <select id="obra_id" 
+                                name="obra_id" 
+                                class="modern-select">
+                            <option value="">Nenhuma obra específica</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {{ 'selected' if request.form.obra_id|string == obra.id|string else '' }}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 3: Observações -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-comment-alt"></i>
+                    <span>Observações</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="descricao">Descrição</label>
+                    <textarea id="descricao" 
+                              name="descricao" 
+                              class="modern-textarea" 
+                              placeholder="Detalhes sobre este custo (opcional)">{{ request.form.descricao or '' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="form-actions">
+                <a href="{{ url_for('main.veiculos') }}" class="btn-action btn-secondary-custom">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </a>
+                <button type="submit" class="btn-action btn-primary-custom">
+                    <i class="fas fa-save"></i>
+                    Registrar Custo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

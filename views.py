@@ -8793,6 +8793,86 @@ def novo_uso_veiculo(veiculo_id):
         flash('Erro ao registrar uso do veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
 
+# ===== NOVA ROTA: NOVO CUSTO DE VEÍCULO =====
+@main_bp.route('/veiculos/<int:veiculo_id>/custo/novo', methods=['GET', 'POST'])
+@login_required
+def novo_custo_veiculo_form(veiculo_id):
+    """Formulário para registrar novos custos de veículo"""
+    try:
+        print(f"💰 [NOVO_CUSTO] Iniciando para veículo {veiculo_id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar veículo
+        from models import Veiculo, Funcionario, Obra, UsoVeiculo
+        veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
+        if not veiculo:
+            flash('Veículo não encontrado.', 'error')
+            return redirect(url_for('main.veiculos_lista'))
+        
+        if request.method == 'GET':
+            # Buscar usos recentes para associação (opcional)
+            usos = UsoVeiculo.query.filter_by(
+                veiculo_id=veiculo_id, 
+                admin_id=tenant_admin_id
+            ).order_by(UsoVeiculo.data_uso.desc()).limit(10).all()
+            
+            # Buscar obras para associação (opcional)
+            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+            
+            return render_template('custo_veiculo_novo.html',
+                                 veiculo=veiculo,
+                                 usos=usos,
+                                 obras=obras)
+        
+        # POST - Processar criação do custo
+        dados = request.form.to_dict()
+        dados['veiculo_id'] = veiculo_id
+        
+        print(f"🔍 [NOVO_CUSTO] Dados recebidos: {dados.keys()}")
+        
+        # Validações básicas
+        campos_obrigatorios = ['data_custo', 'tipo', 'valor']
+        for campo in campos_obrigatorios:
+            if not dados.get(campo):
+                flash(f'Campo {campo.replace("_", " ").title()} é obrigatório.', 'error')
+                usos = UsoVeiculo.query.filter_by(
+                    veiculo_id=veiculo_id, 
+                    admin_id=tenant_admin_id
+                ).order_by(UsoVeiculo.data_uso.desc()).limit(10).all()
+                obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+                return render_template('custo_veiculo_novo.html',
+                                     veiculo=veiculo,
+                                     usos=usos,
+                                     obras=obras)
+        
+        # Usar service para criar custo
+        sucesso, custo, mensagem = CustoVeiculoService.criar_custo_veiculo(dados, tenant_admin_id)
+        
+        if sucesso:
+            flash(mensagem, 'success')
+            return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
+        else:
+            flash(mensagem, 'error')
+            usos = UsoVeiculo.query.filter_by(
+                veiculo_id=veiculo_id, 
+                admin_id=tenant_admin_id
+            ).order_by(UsoVeiculo.data_uso.desc()).limit(10).all()
+            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+            return render_template('custo_veiculo_novo.html',
+                                 veiculo=veiculo,
+                                 usos=usos,
+                                 obras=obras)
+        
+    except Exception as e:
+        print(f"❌ [NOVO_CUSTO] Erro: {str(e)}")
+        flash('Erro ao registrar custo do veículo.', 'error')
+        return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
+
 # ===== NOVA ROTA: EDITAR VEÍCULO =====
 @main_bp.route('/veiculos/<int:id>/editar', methods=['GET', 'POST'])
 @login_required
