@@ -2767,62 +2767,17 @@ def veiculos():
         except Exception as inspect_error:
             print(f"⚠️ [VEICULOS] Erro ao inspecionar tabelas: {inspect_error}")
         
-        # 🔍 PROCESSAR FILTROS DA QUERY STRING
+        # 📊 BUSCAR TODOS OS VEÍCULOS (SEM FILTROS)
         from models import Veiculo
-        from flask import request
-        
-        filtros_aplicados = {
-            'status': request.args.get('status', ''),
-            'tipo': request.args.get('tipo', ''),
-            'placa': request.args.get('placa', ''),
-            'marca': request.args.get('marca', '')
-        }
-        print(f"🔍 [VEICULOS] Filtros aplicados: {filtros_aplicados}")
-        
-        # 📊 BUSCAR VEÍCULOS COM FILTROS
-        query = Veiculo.query.filter_by(admin_id=tenant_admin_id)
-        
-        # Aplicar filtros condicionalmente
-        if filtros_aplicados['status']:
-            query = query.filter(Veiculo.status == filtros_aplicados['status'])
-            
-        if filtros_aplicados['tipo']:
-            query = query.filter(Veiculo.tipo == filtros_aplicados['tipo'])
-            
-        if filtros_aplicados['placa']:
-            query = query.filter(Veiculo.placa.ilike(f"%{filtros_aplicados['placa']}%"))
-            
-        if filtros_aplicados['marca']:
-            query = query.filter(Veiculo.marca.ilike(f"%{filtros_aplicados['marca']}%"))
-        
-        # Executar query e buscar todos os veículos
-        veiculos = query.all()
-        print(f"📊 [VEICULOS] Encontrados {len(veiculos)} veículos após filtros")
+        print(f"🔍 [VEICULOS] Executando query para admin_id={tenant_admin_id}")
+        veiculos = Veiculo.query.filter_by(admin_id=tenant_admin_id).all()
+        print(f"📊 [VEICULOS] Encontrados {len(veiculos)} veículos")
         
         for i, veiculo in enumerate(veiculos):
-            print(f"🚗 [VEICULOS] {i+1}. {veiculo.placa} - {veiculo.modelo} (ID: {veiculo.id}, Status: {veiculo.status})")
+            print(f"🚗 [VEICULOS] {i+1}. {veiculo.placa} - {veiculo.modelo} (ID: {veiculo.id})")
         
-        # 📈 CALCULAR ESTATÍSTICAS DOS VEÍCULOS
-        total_veiculos_query = Veiculo.query.filter_by(admin_id=tenant_admin_id)
-        total_veiculos = total_veiculos_query.count()
-        
-        disponiveis = total_veiculos_query.filter_by(status='Disponível').count()
-        em_uso = total_veiculos_query.filter_by(status='Em Uso').count()  
-        manutencao = total_veiculos_query.filter_by(status='Manutenção').count()
-        
-        stats = {
-            'total_veiculos': total_veiculos,
-            'disponiveis': disponiveis,
-            'em_uso': em_uso,
-            'manutencao': manutencao
-        }
-        print(f"📈 [VEICULOS] Estatísticas calculadas: {stats}")
-        
-        print(f"✅ [VEICULOS] Renderizando template com {len(veiculos)} veículos e estatísticas completas")
-        return render_template('veiculos_lista.html', 
-                             veiculos=veiculos,
-                             stats=stats,
-                             filtros_aplicados=filtros_aplicados)
+        print(f"✅ [VEICULOS] Renderizando template com {len(veiculos)} veículos")
+        return render_template('veiculos_lista.html', veiculos=veiculos)
         
     except Exception as e:
         print(f"❌ [VEICULOS] ERRO CRÍTICO: {str(e)}")
