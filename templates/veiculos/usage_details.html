@@ -1,0 +1,288 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ page_title }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header da página com breadcrumb -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb bg-transparent p-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.veiculos') }}">Veículos</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.detalhes_veiculo', id=uso.veiculo.id) }}">{{ uso.veiculo.placa }}</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.vehicle_usage_list', veiculo_id=uso.veiculo.id) }}">Usos</a></li>
+                    <li class="breadcrumb-item active">{{ uso.data_uso.strftime('%d/%m/%Y') if uso.data_uso else 'Detalhes' }}</li>
+                </ol>
+            </nav>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-route text-primary"></i>
+                        Detalhes do Uso
+                    </h1>
+                    <p class="text-muted mb-0">
+                        {{ uso.veiculo.placa }} - {{ uso.data_uso.strftime('%d/%m/%Y') if uso.data_uso else '-' }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ url_for('main.vehicle_usage_list', veiculo_id=uso.veiculo.id) }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar à Lista
+                    </a>
+                    <a href="{{ url_for('main.editar_uso_veiculo', uso_id=uso.id) }}" class="btn btn-warning">
+                        <i class="fas fa-edit"></i> Editar
+                    </a>
+                    <form method="POST" action="{{ url_for('main.deletar_uso_veiculo', uso_id=uso.id) }}" 
+                          style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este uso?')">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Informações Gerais -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i>
+                        Informações Gerais
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <strong class="text-muted d-block">Data do Uso</strong>
+                            <span class="h6">{{ uso.data_uso.strftime('%d/%m/%Y') if uso.data_uso else '-' }}</span>
+                        </div>
+                        <div class="col-6">
+                            <strong class="text-muted d-block">Veículo</strong>
+                            <span class="h6">{{ uso.veiculo.placa }}</span>
+                            <br><small class="text-muted">{{ uso.veiculo.marca }} {{ uso.veiculo.modelo }}</small>
+                        </div>
+                        <div class="col-6">
+                            <strong class="text-muted d-block">Condutor</strong>
+                            <span class="h6">{{ uso.funcionario.nome if uso.funcionario else '-' }}</span>
+                            {% if uso.funcionario and uso.funcionario.funcao_ref %}
+                                <br><small class="text-muted">{{ uso.funcionario.funcao_ref.nome }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="col-6">
+                            <strong class="text-muted d-block">Obra</strong>
+                            {% if uso.obra %}
+                                <span class="badge bg-primary fs-6">{{ uso.obra.nome }}</span>
+                            {% else %}
+                                <span class="text-muted">Não vinculado</span>
+                            {% endif %}
+                        </div>
+                        {% if uso.finalidade %}
+                        <div class="col-12">
+                            <strong class="text-muted d-block">Finalidade</strong>
+                            <span>{{ uso.finalidade }}</span>
+                        </div>
+                        {% endif %}
+                        {% if uso.observacoes %}
+                        <div class="col-12">
+                            <strong class="text-muted d-block">Observações</strong>
+                            <span>{{ uso.observacoes }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dados Técnicos -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tachometer-alt"></i>
+                        Dados Técnicos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <strong class="text-muted d-block">KM Inicial</strong>
+                            <span class="h6">{{ "{:,.0f}".format(uso.km_inicial).replace(",", ".") if uso.km_inicial else '-' }} km</span>
+                        </div>
+                        <div class="col-6">
+                            <strong class="text-muted d-block">KM Final</strong>
+                            <span class="h6">{{ "{:,.0f}".format(uso.km_final).replace(",", ".") if uso.km_final else '-' }} km</span>
+                        </div>
+                        <div class="col-6">
+                            <strong class="text-muted d-block">Distância Percorrida</strong>
+                            {% if uso.km_inicial and uso.km_final %}
+                                <span class="h6 text-primary">{{ "{:,.0f}".format(uso.km_final - uso.km_inicial).replace(",", ".") }} km</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-6">
+                            <strong class="text-muted d-block">Combustível</strong>
+                            {% if uso.porcentagem_combustivel is not none %}
+                                <span class="badge bg-info fs-6">
+                                    <i class="fas fa-gas-pump"></i> {{ uso.porcentagem_combustivel }}%
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Horários -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clock"></i>
+                        Horários
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <strong class="text-muted d-block">Saída</strong>
+                            <span class="h6">{{ uso.horario_saida.strftime('%H:%M') if uso.horario_saida else '-' }}</span>
+                        </div>
+                        <div class="col-6">
+                            <strong class="text-muted d-block">Chegada</strong>
+                            <span class="h6">{{ uso.horario_chegada.strftime('%H:%M') if uso.horario_chegada else '-' }}</span>
+                        </div>
+                        {% if uso.horario_saida and uso.horario_chegada %}
+                        <div class="col-12">
+                            <strong class="text-muted d-block">Duração</strong>
+                            {% set duracao = (uso.horario_chegada.hour * 60 + uso.horario_chegada.minute) - (uso.horario_saida.hour * 60 + uso.horario_saida.minute) %}
+                            {% if duracao > 0 %}
+                                <span class="h6 text-success">{{ duracao // 60 }}h {{ duracao % 60 }}min</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Passageiros -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-users"></i>
+                        Passageiros ({{ passageiros.total }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if passageiros.total > 0 %}
+                        <!-- Passageiros da Frente -->
+                        {% if passageiros.frente %}
+                        <div class="mb-3">
+                            <h6 class="text-success border-bottom pb-2">
+                                <i class="fas fa-user-tie"></i>
+                                Frente ({{ passageiros.frente|length }})
+                            </h6>
+                            {% for passageiro in passageiros.frente %}
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="avatar-circle bg-success text-white me-2">
+                                    {{ passageiro.funcionario.nome[0] if passageiro.funcionario else '?' }}
+                                </div>
+                                <div>
+                                    <strong>{{ passageiro.funcionario.nome if passageiro.funcionario else 'N/A' }}</strong>
+                                    {% if passageiro.funcionario and passageiro.funcionario.funcao_ref %}
+                                        <br><small class="text-muted">{{ passageiro.funcionario.funcao_ref.nome }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Passageiros de Trás -->
+                        {% if passageiros.tras %}
+                        <div>
+                            <h6 class="text-primary border-bottom pb-2">
+                                <i class="fas fa-users"></i>
+                                Trás ({{ passageiros.tras|length }})
+                            </h6>
+                            {% for passageiro in passageiros.tras %}
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="avatar-circle bg-primary text-white me-2">
+                                    {{ passageiro.funcionario.nome[0] if passageiro.funcionario else '?' }}
+                                </div>
+                                <div>
+                                    <strong>{{ passageiro.funcionario.nome if passageiro.funcionario else 'N/A' }}</strong>
+                                    {% if passageiro.funcionario and passageiro.funcionario.funcao_ref %}
+                                        <br><small class="text-muted">{{ passageiro.funcionario.funcao_ref.nome }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-info-circle fa-2x mb-2"></i>
+                            <p>Nenhum passageiro registrado</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border-radius: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.25rem 1rem rgba(0,0,0,0.15) !important;
+}
+
+.avatar-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.875rem;
+}
+
+.badge.fs-6 {
+    font-size: 0.875rem !important;
+    padding: 0.375rem 0.75rem;
+}
+
+.border-bottom {
+    border-bottom: 2px solid #dee2e6 !important;
+}
+
+.h6 {
+    color: #343a40;
+    font-weight: 600;
+}
+
+.text-muted {
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}

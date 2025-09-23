@@ -2786,7 +2786,100 @@ def veiculos():
         flash('Erro ao carregar veículos. Contate o administrador.', 'error')
         return redirect(url_for('funcionario.dashboard'))
 
-# Detalhes de um veículo específico
+# ===========================
+# 🆕 NOVA IMPLEMENTAÇÃO: Visualização Robusta de Veículos
+# ===========================
+
+# Importar serviço de uso de veículos
+from vehicle_usage_service import VehicleUsageService
+
+# Página dedicada para lista de usos de um veículo
+@main_bp.route('/veiculos/<int:veiculo_id>/usos')
+@login_required
+def vehicle_usage_list(veiculo_id):
+    """Lista dedicada de usos de um veículo específico"""
+    try:
+        # 🔒 SEGURANÇA MULTITENANT
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        # Obter página da query string
+        page = request.args.get('page', 1, type=int)
+        
+        # Buscar dados usando o serviço
+        data = VehicleUsageService.get_vehicle_usage_list(
+            veiculo_id=veiculo_id,
+            page=page,
+            per_page=15,
+            admin_id=tenant_admin_id
+        )
+        
+        if not data:
+            flash('Veículo não encontrado ou acesso negado.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        # Obter estatísticas do veículo
+        stats = VehicleUsageService.get_vehicle_usage_stats(
+            veiculo_id=veiculo_id,
+            admin_id=tenant_admin_id
+        )
+        
+        return render_template('veiculos/usage_list.html',
+                             veiculo=data['veiculo'],
+                             usos=data['usos'],
+                             pagination=data['pagination'],
+                             stats=stats,
+                             page_title=f"Usos - {data['veiculo'].placa}")
+        
+    except Exception as e:
+        print(f"ERRO LISTA USOS: {str(e)}")
+        flash(f'Erro ao carregar usos: {str(e)}', 'error')
+        return redirect(url_for('main.veiculos'))
+
+# Página dedicada para detalhes de um uso específico
+@main_bp.route('/veiculos/<int:veiculo_id>/usos/<int:uso_id>')
+@login_required
+def vehicle_usage_details(veiculo_id, uso_id):
+    """Página dedicada para detalhes completos de um uso"""
+    try:
+        # 🔒 SEGURANÇA MULTITENANT
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('main.veiculos'))
+        
+        # Buscar uso com detalhes
+        uso = VehicleUsageService.get_usage_with_details(
+            uso_id=uso_id,
+            admin_id=tenant_admin_id
+        )
+        
+        if not uso or uso.veiculo_id != veiculo_id:
+            flash('Uso não encontrado ou acesso negado.', 'error')
+            return redirect(url_for('main.vehicle_usage_list', veiculo_id=veiculo_id))
+        
+        # Buscar passageiros
+        passageiros = VehicleUsageService.get_usage_passengers(
+            uso_id=uso_id,
+            admin_id=tenant_admin_id
+        )
+        
+        # Organizar passageiros por posição
+        passageiros_organizados = VehicleUsageService.organize_passengers_by_position(passageiros)
+        
+        return render_template('veiculos/usage_details.html',
+                             uso=uso,
+                             passageiros=passageiros_organizados,
+                             page_title=f"Uso {uso.veiculo.placa} - {uso.data_uso.strftime('%d/%m/%Y')}")
+        
+    except Exception as e:
+        print(f"ERRO DETALHES USO: {str(e)}")
+        flash(f'Erro ao carregar detalhes: {str(e)}', 'error')
+        return redirect(url_for('main.vehicle_usage_list', veiculo_id=veiculo_id))
+
+# Detalhes de um veículo específico (MELHORADO com abas)
 @main_bp.route('/veiculos/<int:id>')
 @login_required  # 🔒 MUDANÇA: Agora funcionários também podem acessar
 def detalhes_veiculo(id):
