@@ -798,20 +798,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 
                 <div class="form-group">
-                    <label for="funcionario_id">Motorista (Funcionário Responsável) <span class="required">*</span></label>
-                    <select id="funcionario_id" 
-                            name="funcionario_id" 
+                    <label for="motorista_id">Motorista <span class="required">*</span></label>
+                    <select id="motorista_id" 
+                            name="motorista_id" 
                             class="modern-select" 
                             required>
                         <option value="">Selecione o motorista</option>
                         {% for funcionario in funcionarios %}
                         <option value="{{ funcionario.id }}" 
-                                {% if request.form.funcionario_id|string == funcionario.id|string %}selected{% endif %}>
+                                {% if request.form.motorista_id|string == funcionario.id|string %}selected{% endif %}>
                             {{ funcionario.nome }} - {{ funcionario.funcao or 'Sem função' }}
                         </option>
                         {% endfor %}
                     </select>
-                    <div class="input-help">Funcionário responsável pela condução do veículo</div>
+                    <div class="input-help">Responsável pela condução do veículo</div>
                 </div>
                 
                 <div class="form-grid form-grid-2">
@@ -915,7 +915,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Calcular resumo dos passageiros automaticamente
-    const motoristaSelect = document.getElementById('funcionario_id');
+    const motoristaSelect = document.getElementById('motorista_id');
     const passageirosFrenteSelect = document.getElementById('passageiros_frente');
     const passageirosTraSelect = document.getElementById('passageiros_tras');
     const totalPessoasDiv = document.getElementById('total_pessoas');
@@ -949,11 +949,11 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(e) {
         const dataUso = document.getElementById('data_uso').value;
         const horaSaida = document.getElementById('hora_saida').value;
-        const funcionarioId = document.getElementById('funcionario_id').value;
+        const motoristaId = document.getElementById('motorista_id').value;
         const kmInicial = document.getElementById('km_inicial').value;
         const finalidade = document.getElementById('finalidade').value;
         
-        if (!dataUso || !horaSaida || !funcionarioId || !kmInicial || !finalidade) {
+        if (!dataUso || !horaSaida || !motoristaId || !kmInicial || !finalidade) {
             e.preventDefault();
             alert('Por favor, preencha todos os campos obrigatórios.');
             return false;
