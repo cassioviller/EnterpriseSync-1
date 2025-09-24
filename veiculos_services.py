@@ -225,26 +225,32 @@ class UsoVeiculoService:
             # Criar registro de uso
             uso = UsoVeiculo(
                 veiculo_id=dados['veiculo_id'],
-                funcionario_id=dados.get('motorista_id'),  # Agora opcional
+                motorista_id=dados.get('motorista_id'),  # Novo campo opcional
                 obra_id=dados.get('obra_id'),
                 data_uso=dados['data_uso'],
-                hora_saida=dados['hora_saida'],
-                hora_retorno=dados.get('hora_retorno'),
+                hora_saida=dados.get('hora_saida'),  # Nome correto da tabela
+                hora_retorno=dados.get('hora_retorno'),  # Nome correto da tabela  
                 km_inicial=int(dados['km_inicial']),
                 km_final=int(dados['km_final']) if dados.get('km_final') else None,
-                finalidade=dados['finalidade'].strip(),
-                destino=dados.get('destino', '').strip() if dados.get('destino') else None,
-                rota_detalhada=dados.get('rota_detalhada', '').strip() if dados.get('rota_detalhada') else None,
                 
-                # Campos unificados de custos
-                valor_combustivel=Decimal(str(dados.get('valor_combustivel', 0))) if dados.get('valor_combustivel') else Decimal('0'),
-                litros_combustivel=Decimal(str(dados.get('litros_combustivel', 0))) if dados.get('litros_combustivel') else Decimal('0'),
-                valor_pedagio=Decimal(str(dados.get('valor_pedagio', 0))) if dados.get('valor_pedagio') else Decimal('0'),
-                valor_manutencao=Decimal(str(dados.get('valor_manutencao', 0))) if dados.get('valor_manutencao') else Decimal('0'),
-                valor_outros=Decimal(str(dados.get('valor_outros', 0))) if dados.get('valor_outros') else Decimal('0'),
+                # Novos campos de passageiros modernos
+                passageiros_frente=dados.get('passageiros_frente', ''),
+                passageiros_tras=dados.get('passageiros_tras', ''),
+                
+                # Campos legacy opcionais
+                finalidade='Uso geral',  # Padrão
+                destino=None,
+                rota_detalhada=None,
+                
+                # Custos zerados (gerenciados separadamente agora)
+                valor_combustivel=Decimal('0'),
+                litros_combustivel=Decimal('0'),
+                valor_pedagio=Decimal('0'),
+                valor_manutencao=Decimal('0'),
+                valor_outros=Decimal('0'),
                 
                 status=dados.get('status', 'Em Andamento'),
-                responsavel_veiculo=dados.get('responsavel_veiculo', motorista.nome if motorista else 'Não informado'),
+                responsavel_veiculo=motorista.nome if motorista else 'Não informado',
                 observacoes=dados.get('observacoes', '').strip() if dados.get('observacoes') else None,
                 admin_id=admin_id
             )
