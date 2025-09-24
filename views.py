@@ -164,11 +164,15 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim):
             
             # Somar custos de veículos da obra
             try:
-                veiculos_obra = CustoVeiculo.query.filter(
-                    CustoVeiculo.obra_id == obra.id,
-                    CustoVeiculo.data_custo >= data_inicio,
-                    CustoVeiculo.data_custo <= data_fim
-                ).all()
+                # ✅ CORREÇÃO: Verificar se CustoVeiculo tem o atributo obra_id
+                if hasattr(CustoVeiculo, 'obra_id'):
+                    veiculos_obra = CustoVeiculo.query.filter(
+                        CustoVeiculo.obra_id == obra.id,
+                        CustoVeiculo.data_custo >= data_inicio,
+                        CustoVeiculo.data_custo <= data_fim
+                    ).all()
+                else:
+                    veiculos_obra = []  # Fallback se campo não existir
                 custo_total_obra += sum(v.valor or 0 for v in veiculos_obra)
             except:
                 pass
@@ -1582,11 +1586,16 @@ def obras():
             custo_diversos_total = sum(c.valor for c in custos_diversos if c.valor)
             
             # 4. CUSTOS DE VEÍCULOS/TRANSPORTE da obra
-            custos_transporte = CustoVeiculo.query.filter(
+            # ✅ CORREÇÃO: Usar verificação de atributo para obra_id
+            custos_query = CustoVeiculo.query.filter(
                 CustoVeiculo.data_custo >= periodo_inicio,
-                CustoVeiculo.data_custo <= periodo_fim,
-                CustoVeiculo.obra_id == obra.id  # Filtrar por obra específica se campo existir
-            ).all()
+                CustoVeiculo.data_custo <= periodo_fim
+            )
+            
+            if hasattr(CustoVeiculo, 'obra_id'):
+                custos_query = custos_query.filter(CustoVeiculo.obra_id == obra.id)
+            
+            custos_transporte = custos_query.all()
             custo_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
             
             # CUSTO TOTAL REAL da obra
@@ -2442,11 +2451,16 @@ def detalhes_obra(id):
             ).all()
         
         # Custos de transporte/veículos da obra
-        custos_transporte = CustoVeiculo.query.filter(
-            CustoVeiculo.obra_id == obra_id,
+        # ✅ CORREÇÃO: Verificação segura de atributo obra_id
+        custos_query = CustoVeiculo.query.filter(
             CustoVeiculo.data_custo >= data_inicio,
             CustoVeiculo.data_custo <= data_fim
-        ).all()
+        )
+        
+        if hasattr(CustoVeiculo, 'obra_id'):
+            custos_query = custos_query.filter(CustoVeiculo.obra_id == obra_id)
+            
+        custos_transporte = custos_query.all()
         
         # Buscar custos de alimentação da tabela específica com detalhes
         registros_alimentacao = RegistroAlimentacao.query.filter(
@@ -3889,7 +3903,9 @@ def historico_veiculo(id):
         
         if filtros['obra_id']:
             query_usos = query_usos.filter(UsoVeiculo.obra_id == int(filtros['obra_id']))
-            query_custos = query_custos.filter(CustoVeiculo.obra_id == int(filtros['obra_id']))
+            # ✅ CORREÇÃO: Verificar atributo obra_id antes de usar
+            if hasattr(CustoVeiculo, 'obra_id'):
+                query_custos = query_custos.filter(CustoVeiculo.obra_id == int(filtros['obra_id']))
         
         if filtros['tipo_custo']:
             query_custos = query_custos.filter(CustoVeiculo.tipo_custo == filtros['tipo_custo'])
@@ -4142,7 +4158,9 @@ def lancamentos_veiculos():
         if filtros['obra_id']:
             obra_id = int(filtros['obra_id'])
             query_usos = query_usos.filter(UsoVeiculo.obra_id == obra_id)
-            query_custos = query_custos.filter(CustoVeiculo.obra_id == obra_id)
+            # ✅ CORREÇÃO: Usar verificação segura de atributo
+            if hasattr(CustoVeiculo, 'obra_id'):
+                query_custos = query_custos.filter(CustoVeiculo.obra_id == obra_id)
         
         # Filtro por status de aprovação
         if filtros['status'] == 'aprovado':
@@ -7625,7 +7643,7 @@ def api_servicos_obra_primeira_rdo(obra_id):
             # Buscar subatividades do serviço
             subatividades = SubatividadeMestre.query.filter_by(
                 servico_id=servico.id,
-                admin_id=tenant_admin_id,
+                admin_id=admin_id,  # ✅ CORREÇÃO CRÍTICA: usar admin_id ao invés de tenant_admin_id
                 ativo=True
             ).order_by(SubatividadeMestre.ordem_padrao).all()
             
@@ -8136,11 +8154,15 @@ def api_rdo_ultima_dados(obra_id):
 def _buscar_servicos_obra_resiliente(obra_id, admin_id):
     """Busca serviços da obra com múltiplas estratégias resilientes"""
     try:
-        # ESTRATÉGIA 1: Buscar via ServicoObraReal
+        print(f"🔍 BUSCA RESILIENTE: obra_id={obra_id}, admin_id={admin_id}")
+        
+        # ESTRATÉGIA 1: Buscar via ServicoObraReal (CORRIGIDA)
         try:
-            servicos_obra_query = db.session.query(Servico).join(ServicoObraReal).filter(
+            servicos_obra_query = db.session.query(Servico).join(
+                ServicoObraReal, Servico.id == ServicoObraReal.servico_id
+            ).filter(
                 ServicoObraReal.obra_id == obra_id,
-                ServicoObraReal.ativo == True,
+                ServicoObraReal.admin_id == admin_id,  # ✅ CORREÇÃO CRÍTICA: usar admin_id ao invés de ativo
                 Servico.admin_id == admin_id,
                 Servico.ativo == True
             ).all()

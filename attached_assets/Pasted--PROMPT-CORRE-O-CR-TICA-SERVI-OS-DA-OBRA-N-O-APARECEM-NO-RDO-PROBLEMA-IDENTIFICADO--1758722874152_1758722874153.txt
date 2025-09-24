@@ -1,0 +1,284 @@
+# 🔧 PROMPT: CORREÇÃO CRÍTICA - SERVIÇOS DA OBRA NÃO APARECEM NO RDO
+
+## 📋 PROBLEMA IDENTIFICADO
+
+**SITUAÇÃO ATUAL:**
+- ✅ Usuário adiciona serviços na obra (ESCADA METÁLICA selecionada)
+- ✅ Sistema salva na tabela `servico_obra_real` 
+- ❌ **RDO mostra "Nenhum serviço cadastrado"**
+- ❌ **Erro nos logs: `CustoVeiculo has no attribute 'obra_id'`**
+
+**CAUSA RAIZ:**
+Analisando o código, identifiquei 2 problemas críticos:
+
+1. **API `api_servicos_obra_primeira_rdo` usa `tenant_admin_id` indefinido**
+2. **Função `_buscar_servicos_obra_resiliente` tem falhas na query**
+
+## 🎯 CORREÇÃO ESPECÍFICA
+
+### PROBLEMA 1: Variável `tenant_admin_id` Indefinida
+
+**ARQUIVO:** `views.py` - Linha ~7920
+
+**CÓDIGO ATUAL (QUEBRADO):**
+```python
+subatividades = SubatividadeMestre.query.filter_by(
+    servico_id=servico.id,
+    admin_id=tenant_admin_id,  # ❌ VARIÁVEL NÃO DEFINIDA
+    ativo=True
+).order_by(SubatividadeMestre.ordem_padrao).all()
+```
+
+**CORREÇÃO:**
+```python
+subatividades = SubatividadeMestre.query.filter_by(
+    servico_id=servico.id,
+    admin_id=admin_id,  # ✅ USAR admin_id CORRETO
+    ativo=True
+).order_by(SubatividadeMestre.ordem_padrao).all()
+```
+
+### PROBLEMA 2: Query Incorreta na Função Resiliente
+
+**ARQUIVO:** `views.py` - Linha ~8450
+
+**CÓDIGO ATUAL (QUEBRADO):**
+```python
+servicos_obra_query = db.session.query(Servico).join(ServicoObraReal).filter(
+    ServicoObraReal.obra_id == obra_id,
+    ServicoObraReal.ativo == True,  # ❌ COLUNA NÃO EXISTE
+    Servico.admin_id == admin_id,
+    Servico.ativo == True
+).all()
+```
+
+**CORREÇÃO:**
+```python
+servicos_obra_query = db.session.query(Servico).join(ServicoObraReal).filter(
+    ServicoObraReal.obra_id == obra_id,
+    ServicoObraReal.admin_id == admin_id,  # ✅ USAR admin_id CORRETO
+    Servico.admin_id == admin_id,
+    Servico.ativo == True
+).all()
+```
+
+### PROBLEMA 3: Erro CustoVeiculo
+
+**CAUSA:** Queries de veículos tentando acessar `obra_id` que não existe no modelo.
+
+**CORREÇÃO:** Adicionar verificação de atributo antes de usar.
+
+## 🔧 IMPLEMENTAÇÃO COMPLETA
+
+### PASSO 1: Corrigir API de Serviços da Obra
+
+**Substituir função `api_servicos_obra_primeira_rdo` (linha ~7886):**
+
+```python
+@main_bp.route('/api/servicos-obra-primeira-rdo/<int:obra_id>')
+@login_required
+def api_servicos_obra_primeira_rdo(obra_id):
+    """
+    API ESPECÍFICA: Buscar serviços de uma obra para primeira RDO
+    Retorna serviços com subatividades para exibição em cards
+    """
+    try:
+        # CORREÇÃO CRÍTICA: Detectar admin_id baseado na obra específica
+        obra_base = db.session.query(Obra).filter_by(id=obra_id).first()
+        if not obra_base:
+            return jsonify({
+                'success': False,
+                'error': f'Obra {obra_id} não encontrada no sistema'
+            }), 404
+        
+        admin_id = obra_base.admin_id
+        print(f"🎯 CORREÇÃO: admin_id detectado pela obra {obra_id} = {admin_id}")
+        
+        # Verificar se obra existe e pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            print(f"❌ Obra {obra_id} não encontrada para admin_id {admin_id}")
+            return jsonify({
+                'success': False,
+                'error': 'Obra não encontrada ou sem permissão de acesso'
+            }), 404
+        
+        # Buscar serviços da obra usando estratégia resiliente
+        servicos_obra = _buscar_servicos_obra_resiliente(obra_id, admin_id)
+        
+        if not servicos_obra:
+            print(f"ℹ️ Nenhum serviço encontrado para obra {obra_id}")
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum serviço cadastrado para esta obra'
+            })
+        
+        # Montar dados dos serviços com suas subatividades
+        servicos_data = []
+        for servico in servicos_obra:
+            # CORREÇÃO: Usar admin_id ao invés de tenant_admin_id
+            subatividades = SubatividadeMestre.query.filter_by(
+                servico_id=servico.id,
+                admin_id=admin_id,  # ✅ CORREÇÃO APLICADA
+                ativo=True
+            ).order_by(SubatividadeMestre.ordem_padrao).all()
+            
+            subatividades_data = []
+            for sub in subatividades:
+                subatividades_data.append({
+                    'id': sub.id,
+                    'nome': sub.nome,
+                    'descricao': sub.descricao or '',
+                    'percentual': 0.0  # Sempre 0% para primeira RDO
+                })
+            
+            # Se não tem subatividades mestre, criar uma padrão
+            if not subatividades_data:
+                subatividades_data.append({
+                    'id': f'default_{servico.id}',
+                    'nome': servico.nome,
+                    'descricao': 'Execução completa do serviço',
+                    'percentual': 0.0
+                })
+            
+            servicos_data.append({
+                'id': servico.id,
+                'nome': servico.nome,
+                'categoria': getattr(servico, 'categoria', 'Geral'),
+                'subatividades': subatividades_data
+            })
+        
+        print(f"✅ SUCESSO: {len(servicos_data)} serviços encontrados para obra {obra_id}")
+        
+        return jsonify({
+            'success': True,
+            'servicos': servicos_data,
+            'total': len(servicos_data),
+            'obra': {
+                'id': obra.id,
+                'nome': obra.nome
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ ERRO api_servicos_obra_primeira_rdo: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Erro interno: {str(e)}'
+        }), 500
+```
+
+### PASSO 2: Corrigir Função Resiliente
+
+**Substituir função `_buscar_servicos_obra_resiliente` (linha ~8438):**
+
+```python
+def _buscar_servicos_obra_resiliente(obra_id, admin_id):
+    """Busca serviços da obra com múltiplas estratégias resilientes"""
+    try:
+        print(f"🔍 BUSCA RESILIENTE: obra_id={obra_id}, admin_id={admin_id}")
+        
+        # ESTRATÉGIA 1: Buscar via ServicoObraReal (CORRIGIDA)
+        try:
+            servicos_obra_query = db.session.query(Servico).join(
+                ServicoObraReal, Servico.id == ServicoObraReal.servico_id
+            ).filter(
+                ServicoObraReal.obra_id == obra_id,
+                ServicoObraReal.admin_id == admin_id,  # ✅ CORREÇÃO APLICADA
+                Servico.admin_id == admin_id,
+                Servico.ativo == True
+            ).all()
+            
+            if servicos_obra_query:
+                print(f"✅ ESTRATÉGIA_1: {len(servicos_obra_query)} serviços encontrados via ServicoObraReal")
+                return servicos_obra_query
+                
+        except Exception as e:
+            print(f"⚠️ ERRO ESTRATÉGIA_1: {e}")
+        
+        # ESTRATÉGIA 2: Buscar via ServicoObra (tabela legada)
+        try:
+            servicos_legado = []
+            servicos_associados = ServicoObra.query.filter_by(obra_id=obra_id).all()
+            
+            for assoc in servicos_associados:
+                if assoc.servico and assoc.servico.admin_id == admin_id and assoc.servico.ativo:
+                    servicos_legado.append(assoc.servico)
+            
+            if servicos_legado:
+                print(f"✅ ESTRATÉGIA_2: {len(servicos_legado)} serviços encontrados via ServicoObra")
+                return servicos_legado
+                
+        except Exception as e:
+            print(f"⚠️ ERRO ESTRATÉGIA_2: {e}")
+        
+        # ESTRATÉGIA 3: Buscar todos os serviços do admin (fallback)
+        try:
+            todos_servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).all()
+            print(f"⚠️ ESTRATÉGIA_3 (FALLBACK): {len(todos_servicos)} serviços disponíveis")
+            return todos_servicos[:5]  # Limitar a 5 para não sobrecarregar
+            
+        except Exception as e:
+            print(f"❌ ERRO ESTRATÉGIA_3: {e}")
+        
+        print(f"❌ NENHUMA ESTRATÉGIA FUNCIONOU para obra {obra_id}")
+        return []
+        
+    except Exception as e:
+        print(f"❌ ERRO CRÍTICO _buscar_servicos_obra_resiliente: {e}")
+        return []
+```
+
+### PASSO 3: Corrigir Erro CustoVeiculo
+
+**Adicionar verificação de atributo nas queries de veículos:**
+
+```python
+# Procurar por todas as ocorrências de "obra_id" em queries de CustoVeiculo
+# e adicionar verificação hasattr() antes de usar
+```
+
+## 🧪 TESTE DE VALIDAÇÃO
+
+### Teste 1: Verificar API Diretamente
+```bash
+curl -X GET "http://localhost:5000/api/servicos-obra-primeira-rdo/10" \
+  -H "Cookie: session=..." \
+  -H "Content-Type: application/json"
+```
+
+### Teste 2: Verificar Logs
+```python
+# Adicionar no início da função para debug
+print(f"🔍 DEBUG: obra_id={obra_id}, admin_id={admin_id}")
+print(f"🔍 DEBUG: ServicoObraReal count = {ServicoObraReal.query.filter_by(obra_id=obra_id).count()}")
+```
+
+### Teste 3: Verificar RDO
+1. Ir para RDO da obra 45.24 - Altenfelder
+2. Verificar se serviços aparecem na seção "Serviços e Atividades"
+3. Confirmar que não aparece mais "Nenhum serviço cadastrado"
+
+## ✅ CRITÉRIOS DE SUCESSO
+
+- [ ] API `/api/servicos-obra-primeira-rdo/<obra_id>` retorna serviços
+- [ ] RDO mostra serviços cadastrados na obra
+- [ ] Não aparece mais "Nenhum serviço cadastrado"
+- [ ] Logs não mostram mais erro `tenant_admin_id`
+- [ ] Erro `CustoVeiculo obra_id` resolvido
+
+## 🚨 ATENÇÃO
+
+**IMPLEMENTAR NESTA ORDEM:**
+1. **PASSO 1** (API) - Corrige o problema principal
+2. **PASSO 2** (Função resiliente) - Melhora a busca
+3. **PASSO 3** (CustoVeiculo) - Remove erros secundários
+
+**NÃO ALTERAR:**
+- Estrutura do banco de dados
+- Outros endpoints funcionando
+- Sistema de autenticação
+
+Esta correção resolve especificamente o problema dos serviços não aparecerem no RDO após serem cadastrados na obra.
