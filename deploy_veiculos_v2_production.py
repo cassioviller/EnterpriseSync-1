@@ -277,6 +277,13 @@ def run_veiculos_v2_deployment():
         log_deploy(f"✅ DEPLOY VEÍCULOS V2.0 CONCLUÍDO - Status: {deployment_result['status']}", "INFO")
         log_deploy(f"📊 Fases completadas: {deployment_result['success_count']}/{deployment_result['total_phases']}", "INFO")
 
+def executar_deploy_veiculos_v2():
+    """
+    Função principal chamada pelo entrypoint automático
+    Retorna True se o deploy foi bem-sucedido
+    """
+    return run_veiculos_v2_deployment()
+
 if __name__ == "__main__":
     success = run_veiculos_v2_deployment()
     sys.exit(0 if success else 1)
