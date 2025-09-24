@@ -146,6 +146,41 @@ console.log('Initializing Detalhes Veículo with light theme...');
     color: white;
 }
 
+/* Melhorar visibilidade das abas não selecionadas */
+.nav-tabs .nav-link {
+    color: #495057 !important;
+    border: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link:not(.active):hover {
+    color: #198754 !important;
+    border-color: #198754;
+    background-color: #e8f5f0;
+}
+
+.nav-tabs .nav-link.active {
+    color: #198754 !important;
+    background-color: #ffffff !important;
+    border-color: #198754 #198754 #ffffff !important;
+    border-bottom-color: transparent !important;
+    font-weight: 600;
+}
+
+/* Melhorar aparência da tabela */
+.table tbody tr {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fa !important;
+    transform: translateX(5px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
 @media (max-width: 768px) {
     .veiculo-info-card,
     .actions-card {
@@ -237,27 +272,6 @@ console.log('Initializing Detalhes Veículo with light theme...');
         </div>
     </div>
 
-    <!-- Ações Rápidas -->
-    <div class="actions-card">
-        <h2><i class="fas fa-tools"></i> Ações</h2>
-        
-        <div class="actions-grid">
-            <a href="{{ url_for('main.novo_uso_veiculo', veiculo_id=veiculo.id) }}" class="btn-action-large btn-primary-large">
-                <i class="fas fa-road"></i>
-                Registrar Uso
-            </a>
-            
-            <a href="{{ url_for('main.novo_custo_veiculo_form', veiculo_id=veiculo.id) }}" class="btn-action-large btn-secondary-large">
-                <i class="fas fa-receipt"></i>
-                Adicionar Custo
-            </a>
-            
-            <a href="{{ url_for('main.editar_veiculo', id=veiculo.id) }}" class="btn-action-large btn-secondary-large">
-                <i class="fas fa-edit"></i>
-                Editar Dados
-            </a>
-        </div>
-    </div>
 
     <!-- Histórico de Uso e Custos -->
     <div class="actions-card">
@@ -297,7 +311,7 @@ console.log('Initializing Detalhes Veículo with light theme...');
                         </thead>
                         <tbody>
                             {% for uso in usos %}
-                            <tr>
+                            <tr data-bs-toggle="modal" data-bs-target="#usoModal{{ uso.id }}" style="cursor: pointer;">
                                 <td>{{ uso.data_uso.strftime('%d/%m/%Y') }}</td>
                                 <td>{{ uso.funcionario.nome if uso.funcionario else 'N/A' }}</td>
                                 <td>
@@ -321,6 +335,87 @@ console.log('Initializing Detalhes Veículo with light theme...');
                                 </td>
                                 <td>{{ uso.observacoes[:50] + '...' if uso.observacoes and uso.observacoes|length > 50 else (uso.observacoes or '--') }}</td>
                             </tr>
+                            
+                            <!-- Modal com detalhes completos do uso -->
+                            <div class="modal fade" id="usoModal{{ uso.id }}" tabindex="-1" aria-labelledby="usoModalLabel{{ uso.id }}" aria-hidden="true">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-primary text-white">
+                                            <h5 class="modal-title" id="usoModalLabel{{ uso.id }}">
+                                                <i class="fas fa-road"></i> Detalhes do Uso - {{ uso.data_uso.strftime('%d/%m/%Y') }}
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <h6 class="text-primary"><i class="fas fa-info-circle"></i> Informações Gerais</h6>
+                                                    <p><strong>Data:</strong> {{ uso.data_uso.strftime('%d/%m/%Y') }}</p>
+                                                    <p><strong>Motorista:</strong> {{ uso.funcionario.nome if uso.funcionario else 'Não informado' }}</p>
+                                                    <p><strong>Obra:</strong> {{ uso.obra.nome if uso.obra else 'Uso geral' }}</p>
+                                                    <p><strong>Status:</strong> 
+                                                        <span class="badge bg-{{ 'success' if uso.status == 'Finalizado' else 'warning' if uso.status == 'Em Andamento' else 'danger' }}">
+                                                            {{ uso.status }}
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <h6 class="text-primary"><i class="fas fa-clock"></i> Horários</h6>
+                                                    <p><strong>Saída:</strong> {{ uso.hora_saida.strftime('%H:%M') if uso.hora_saida else 'Não informado' }}</p>
+                                                    <p><strong>Retorno:</strong> {{ uso.hora_retorno.strftime('%H:%M') if uso.hora_retorno else 'Não informado' }}</p>
+                                                    
+                                                    <h6 class="text-primary mt-3"><i class="fas fa-tachometer-alt"></i> Quilometragem</h6>
+                                                    <p><strong>KM Inicial:</strong> {{ "{:,}".format(uso.km_inicial).replace(',', '.') if uso.km_inicial else '--' }} km</p>
+                                                    <p><strong>KM Final:</strong> {{ "{:,}".format(uso.km_final).replace(',', '.') if uso.km_final else '--' }} km</p>
+                                                    <p><strong>KM Percorrido:</strong> {{ uso.km_percorrido if uso.km_percorrido else '--' }} km</p>
+                                                </div>
+                                            </div>
+                                            
+                                            {% if uso.passageiros_frente or uso.passageiros_tras %}
+                                            <hr>
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <h6 class="text-primary"><i class="fas fa-users"></i> Passageiros</h6>
+                                                    {% if uso.passageiros_frente %}
+                                                        <p><strong>Frente:</strong> 
+                                                        {% set passageiros_frente_ids = uso.passageiros_frente.split(',') %}
+                                                        {% for id in passageiros_frente_ids %}
+                                                            {% for func in funcionarios if func.id|string == id.strip() %}
+                                                                <span class="badge bg-info me-1">{{ func.nome }}</span>
+                                                            {% endfor %}
+                                                        {% endfor %}
+                                                        </p>
+                                                    {% endif %}
+                                                    {% if uso.passageiros_tras %}
+                                                        <p><strong>Trás:</strong>
+                                                        {% set passageiros_tras_ids = uso.passageiros_tras.split(',') %}
+                                                        {% for id in passageiros_tras_ids %}
+                                                            {% for func in funcionarios if func.id|string == id.strip() %}
+                                                                <span class="badge bg-secondary me-1">{{ func.nome }}</span>
+                                                            {% endfor %}
+                                                        {% endfor %}
+                                                        </p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            
+                                            {% if uso.observacoes %}
+                                            <hr>
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <h6 class="text-primary"><i class="fas fa-comment"></i> Observações</h6>
+                                                    <p class="text-muted">{{ uso.observacoes }}</p>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             {% endfor %}
                         </tbody>
                     </table>

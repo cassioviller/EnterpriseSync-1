@@ -8690,11 +8690,14 @@ def detalhes_veiculo(id):
             return redirect(url_for('auth.login'))
         
         # Buscar veículo
-        from models import Veiculo
+        from models import Veiculo, Funcionario
         veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
         if not veiculo:
             flash('Veículo não encontrado.', 'error')
             return redirect(url_for('main.veiculos_lista'))
+        
+        # Buscar funcionários para exibir nomes nos passageiros
+        funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id).all()
         
         # Buscar usos recentes (últimos 20)
         usos_resultado = UsoVeiculoService.listar_usos_veiculo(
@@ -8714,6 +8717,7 @@ def detalhes_veiculo(id):
         
         return render_template('veiculos_detalhes.html',
                              veiculo=veiculo,
+                             funcionarios=funcionarios,
                              usos=usos_resultado.get('usos', []),
                              stats_uso=usos_resultado.get('stats', {}),
                              custos=custos_resultado.get('custos', []),
