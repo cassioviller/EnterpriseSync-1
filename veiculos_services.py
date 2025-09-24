@@ -374,7 +374,7 @@ class UsoVeiculoService:
                 if filtros.get('status'):
                     query = query.filter(UsoVeiculo.status == filtros['status'])
                 if filtros.get('funcionario_id'):
-                    query = query.filter(UsoVeiculo.funcionario_id == filtros['funcionario_id'])
+                    query = query.filter(UsoVeiculo.motorista_id == filtros['funcionario_id'])
             
             # Paginação
             pagination = query.order_by(desc(UsoVeiculo.data_uso)).paginate(
