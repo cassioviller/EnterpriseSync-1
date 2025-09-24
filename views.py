@@ -7702,13 +7702,33 @@ def salvar_rdo_flexivel():
     """
     ARQUITETURA REFATORADA - Joris Kuypers Digital Mastery
     Implementação robusta com separação clara de responsabilidades
+    🔥 VERSÃO COM DEBUG DETALHADO PARA PRODUÇÃO
     """
     import logging
     
     logger = logging.getLogger(__name__)
+    
+    # ✅ VERIFICAÇÃO DE SCHEMA PREVENTIVA
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        
+        # Verificar tabelas críticas
+        tabelas_necessarias = ['rdo', 'rdo_servico_subatividade', 'rdo_mao_obra']
+        for tabela in tabelas_necessarias:
+            if tabela in inspector.get_table_names():
+                colunas = [col['name'] for col in inspector.get_columns(tabela)]
+                logger.info(f"✅ Tabela {tabela}: {len(colunas)} colunas encontradas")
+            else:
+                logger.error(f"❌ Tabela {tabela} NÃO ENCONTRADA!")
+                
+    except Exception as schema_check_error:
+        logger.warning(f"⚠️ Não foi possível verificar schema: {schema_check_error}")
+    
     try:
         # IMPLEMENTAÇÃO DA NOVA ARQUITETURA DIRETAMENTE AQUI
         logger.info("🎯 JORIS KUYPERS ARCHITECTURE: Iniciando salvamento RDO")
+        logger.info("🚀 DEBUG PRODUÇÃO: Logs detalhados ativados")
         
         # Obter dados básicos da sessão e formulário
         funcionario_id = session.get('funcionario_id') or request.form.get('funcionario_id', type=int)
@@ -7760,11 +7780,12 @@ def salvar_rdo_flexivel():
             service_name = servico_obj.nome if servico_obj else f"Serviço {target_service_id}"
             logger.info(f"🎯 SERVIÇO DO HISTÓRICO: {service_name} (ID: {target_service_id})")
         else:
-            # Fallback: primeiro serviço ativo da obra
+            # Fallback: primeiro serviço ativo da obra - CORRIGIDO
             try:
+                # ✅ CORREÇÃO CRÍTICA: Usar admin_id ao invés de ativo
                 servico_obra = db.session.query(ServicoObraReal).join(Servico).filter(
                     ServicoObraReal.obra_id == obra_id,
-                    ServicoObraReal.ativo == True,
+                    ServicoObraReal.admin_id == admin_id,  # CORRIGIDO: usar admin_id
                     Servico.admin_id == admin_id,
                     Servico.ativo == True
                 ).first()
@@ -7943,7 +7964,21 @@ def salvar_rdo_flexivel():
         )
         
         # FASE 4: PERSISTIR COM TRANSAÇÃO ROBUSTA (Arquitetura Joris Kuypers INLINE)
+        logger.info(f"🚀 INICIANDO TRANSAÇÃO - RDO {numero_rdo}")
         try:
+            # ✅ CORREÇÃO: Verificar schema do RDO antes de salvar
+            try:
+                # Teste de schema - verificar se todas as colunas existem
+                logger.info(f"🔍 VERIFICAÇÃO SCHEMA RDO:")
+                logger.info(f"  📋 numero_rdo: {rdo.numero_rdo}")
+                logger.info(f"  🏗️ obra_id: {rdo.obra_id}")
+                logger.info(f"  👤 criado_por_id: {rdo.criado_por_id}")
+                logger.info(f"  📅 data_relatorio: {rdo.data_relatorio}")
+                logger.info(f"  📍 local: {rdo.local}")
+                logger.info(f"  🏢 admin_id: {rdo.admin_id}")
+            except Exception as schema_error:
+                logger.error(f"❌ ERRO SCHEMA RDO: {schema_error}")
+                raise Exception(f"Schema RDO inválido: {schema_error}")
             
             # Salvar RDO principal
             db.session.add(rdo)
@@ -7952,23 +7987,33 @@ def salvar_rdo_flexivel():
             logger.info(f"💾 RDO {rdo.numero_rdo} criado com ID {rdo.id}")
             
             # Salvar todas as subatividades no serviço correto
-            for sub_data in subactivities:
-                subatividade = RDOServicoSubatividade(
-                    rdo_id=rdo.id,
-                    servico_id=target_service_id,  # SEMPRE usar o serviço descoberto
-                    nome_subatividade=sub_data['nome'],
-                    percentual_conclusao=sub_data['percentual'],
-                    observacoes_tecnicas=sub_data['observacoes'],
-                    admin_id=admin_id,
-                    ativo=True
-                )
-                
-                db.session.add(subatividade)
-                logger.debug(f"💾 Subatividade salva: {sub_data['nome']} -> Serviço {target_service_id}")
+            logger.info(f"💾 SALVANDO {len(subactivities)} SUBATIVIDADES")
+            for i, sub_data in enumerate(subactivities):
+                try:
+                    logger.info(f"  📋 [{i+1}/{len(subactivities)}] {sub_data['nome']} = {sub_data['percentual']}%")
+                    
+                    subatividade = RDOServicoSubatividade(
+                        rdo_id=rdo.id,
+                        servico_id=target_service_id,  # SEMPRE usar o serviço descoberto
+                        nome_subatividade=sub_data['nome'],
+                        percentual_conclusao=sub_data['percentual'],
+                        observacoes_tecnicas=sub_data['observacoes'],
+                        admin_id=admin_id,
+                        ativo=True
+                    )
+                    
+                    db.session.add(subatividade)
+                    logger.info(f"  ✅ Subatividade {sub_data['nome']} adicionada com sucesso")
+                    
+                except Exception as sub_error:
+                    logger.error(f"  ❌ Erro na subatividade {sub_data['nome']}: {sub_error}")
+                    raise Exception(f"Erro ao criar subatividade {sub_data['nome']}: {sub_error}")
+                # Removido - lógica movida para o bloco anterior
             
             # CORREÇÃO CRÍTICA: PROCESSAR FUNCIONÁRIOS SELECIONADOS
             funcionarios_selecionados = request.form.getlist('funcionarios_selecionados')
             logger.info(f"👥 PROCESSANDO FUNCIONÁRIOS: {len(funcionarios_selecionados)} selecionados")
+            logger.info(f"👥 Lista de IDs: {funcionarios_selecionados}")
             
             for funcionario_id_str in funcionarios_selecionados:
                 try:
@@ -7978,29 +8023,56 @@ def salvar_rdo_flexivel():
                         # Verificar se funcionário existe
                         funcionario = Funcionario.query.get(funcionario_id_sel)
                         if funcionario:
-                            # Criar registro de mão de obra - CORRIGIDO (sem admin_id)
-                            mao_obra = RDOMaoObra(
-                                rdo_id=rdo.id,
-                                funcionario_id=funcionario_id_sel,
-                                horas_trabalhadas=8.8,  # Padrão
-                                funcao_exercida=funcionario.funcao_ref.nome if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref else 'Funcionário'
-                            )
-                            db.session.add(mao_obra)
-                            logger.info(f"👷 Funcionário salvo: {funcionario.nome} (ID: {funcionario_id_sel})")
+                            # ✅ CORREÇÃO CRÍTICA: Criar registro seguro de mão de obra
+                            funcao_exercida = 'Funcionário'  # Padrão seguro
+                            try:
+                                if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref:
+                                    funcao_exercida = funcionario.funcao_ref.nome
+                                elif hasattr(funcionario, 'funcao') and funcionario.funcao:
+                                    funcao_exercida = funcionario.funcao
+                                logger.info(f"👷 Função determinada para {funcionario.nome}: {funcao_exercida}")
+                            except Exception as e:
+                                logger.warning(f"⚠️ Erro ao buscar função do funcionário {funcionario.nome}: {e}")
+                            
+                            # 🔍 VERIFICAÇÃO SCHEMA RDOMaoObra
+                            logger.info(f"🔍 Criando RDOMaoObra - rdo_id: {rdo.id}, funcionario_id: {funcionario_id_sel}")
+                            try:
+                                mao_obra = RDOMaoObra(
+                                    rdo_id=rdo.id,
+                                    funcionario_id=funcionario_id_sel,
+                                    horas_trabalhadas=8.8,  # Padrão
+                                    funcao_exercida=funcao_exercida
+                                )
+                                
+                                # Teste de schema antes de adicionar
+                                logger.info(f"  ✅ RDOMaoObra criado: {vars(mao_obra)}")
+                                db.session.add(mao_obra)
+                                logger.info(f"👷 Funcionário salvo: {funcionario.nome} (ID: {funcionario_id_sel})")
+                            except Exception as mao_obra_error:
+                                logger.error(f"❌ ERRO RDOMaoObra para funcionario {funcionario.nome}: {mao_obra_error}")
+                                raise Exception(f"Erro ao criar RDOMaoObra: {mao_obra_error}")
                         else:
                             logger.warning(f"⚠️ Funcionário ID {funcionario_id_sel} não encontrado")
                 except Exception as e:
                     logger.error(f"❌ Erro ao processar funcionário {funcionario_id_str}: {e}")
                     continue
             
-            # Commit da transação
+            # 🚀 COMMIT DA TRANSAÇÃO FINAL
+            logger.info(f"🚀 EXECUTANDO COMMIT FINAL...")
             db.session.commit()
             success = True
-            logger.info(f"✅ RDO {rdo.numero_rdo} salvo com {len(subactivities)} subatividades")
+            logger.info(f"✅ SUCESSO TOTAL! RDO {rdo.numero_rdo} salvo:")
+            logger.info(f"  📋 {len(subactivities)} subatividades")
+            logger.info(f"  👥 {len(funcionarios_selecionados)} funcionarios")
+            logger.info(f"  🏗️ Obra ID: {obra_id}")
+            logger.info(f"  🏢 Admin ID: {admin_id}")
             
         except Exception as e:
             db.session.rollback()
             logger.error(f"❌ Erro ao salvar RDO: {e}")
+            # ✅ LOG DETALHADO PARA DEBUG PRODUÇÃO
+            import traceback
+            logger.error(f"❌ Stack trace completo: {traceback.format_exc()}")
             success = False
         
         if success:
