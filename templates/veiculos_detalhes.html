@@ -244,14 +244,6 @@ console.log('Initializing Detalhes Veículo with light theme...');
                 <div class="info-value">{{ veiculo.tipo }}</div>
             </div>
             
-            <div class="info-item">
-                <div class="info-label">Status</div>
-                <div class="info-value">
-                    <span class="badge bg-{{ 'success' if veiculo.status == 'Disponível' else 'warning' if veiculo.status == 'Em Uso' else 'danger' }}">
-                        {{ veiculo.status }}
-                    </span>
-                </div>
-            </div>
             
             <div class="info-item">
                 <div class="info-label">KM Atual</div>
@@ -305,7 +297,6 @@ console.log('Initializing Detalhes Veículo with light theme...');
                                 <th>Horário</th>
                                 <th>KM</th>
                                 <th>Obra</th>
-                                <th>Status</th>
                                 <th>Observações</th>
                             </tr>
                         </thead>
@@ -328,11 +319,6 @@ console.log('Initializing Detalhes Veículo with light theme...');
                                     {% endif %}
                                 </td>
                                 <td>{{ uso.obra.nome if uso.obra else 'Uso geral' }}</td>
-                                <td>
-                                    <span class="badge bg-{{ 'success' if uso.status == 'Finalizado' else 'warning' if uso.status == 'Em Andamento' else 'danger' }}">
-                                        {{ uso.status }}
-                                    </span>
-                                </td>
                                 <td>{{ uso.observacoes[:50] + '...' if uso.observacoes and uso.observacoes|length > 50 else (uso.observacoes or '--') }}</td>
                             </tr>
                             
@@ -353,11 +339,6 @@ console.log('Initializing Detalhes Veículo with light theme...');
                                                     <p><strong>Data:</strong> {{ uso.data_uso.strftime('%d/%m/%Y') }}</p>
                                                     <p><strong>Motorista:</strong> {{ uso.funcionario.nome if uso.funcionario else 'Não informado' }}</p>
                                                     <p><strong>Obra:</strong> {{ uso.obra.nome if uso.obra else 'Uso geral' }}</p>
-                                                    <p><strong>Status:</strong> 
-                                                        <span class="badge bg-{{ 'success' if uso.status == 'Finalizado' else 'warning' if uso.status == 'Em Andamento' else 'danger' }}">
-                                                            {{ uso.status }}
-                                                        </span>
-                                                    </p>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <h6 class="text-primary"><i class="fas fa-clock"></i> Horários</h6>
