@@ -2977,8 +2977,7 @@ class Veiculo(db.Model):
     renavam = db.Column(db.String(20))
     combustivel = db.Column(db.String(20), default='Gasolina')  # Gasolina, Álcool, Diesel, Flex
     
-    # Status e controle
-    status = db.Column(db.String(20), default='Disponível')  # Disponível, Em Uso, Manutenção, Inativo
+    # Controle
     ativo = db.Column(db.Boolean, default=True)
     
     # Manutenção
@@ -3001,7 +3000,6 @@ class Veiculo(db.Model):
     # Índices e constraints para performance
     __table_args__ = (
         db.UniqueConstraint('admin_id', 'placa', name='uk_veiculo_admin_placa'),
-        db.Index('idx_veiculo_admin_status', 'admin_id', 'status'),
         db.Index('idx_veiculo_admin_tipo', 'admin_id', 'tipo'),
         db.Index('idx_veiculo_placa_admin', 'placa', 'admin_id'),
     )
@@ -3021,7 +3019,6 @@ class Veiculo(db.Model):
             'km_atual': self.km_atual,
             'cor': self.cor,
             'combustivel': self.combustivel,
-            'status': self.status,
             'ativo': self.ativo,
             'data_ultima_manutencao': self.data_ultima_manutencao.isoformat() if self.data_ultima_manutencao else None,
             'data_proxima_manutencao': self.data_proxima_manutencao.isoformat() if self.data_proxima_manutencao else None,
@@ -3066,21 +3063,9 @@ class UsoVeiculo(db.Model):
     passageiros_frente = db.Column(db.Text)  # IDs separados por vírgula
     passageiros_tras = db.Column(db.Text)    # IDs separados por vírgula
     
-    # Finalidade e destino (legacy - opcionais)
-    finalidade = db.Column(db.String(100), default='Uso geral')  # Agora opcional com padrão
-    destino = db.Column(db.String(200))
-    rota_detalhada = db.Column(db.Text)  # Rota percorrida
     
-    # === CAMPOS UNIFICADOS PARA CUSTOS (NOVIDADE v2.0) ===
-    # Custos relacionados a este uso específico
-    valor_combustivel = db.Column(db.Numeric(10, 2), default=0.0)
-    litros_combustivel = db.Column(db.Numeric(8, 3), default=0.0)
-    valor_pedagio = db.Column(db.Numeric(10, 2), default=0.0)
-    valor_manutencao = db.Column(db.Numeric(10, 2), default=0.0)  # Manutenção durante o uso
-    valor_outros = db.Column(db.Numeric(10, 2), default=0.0)
     
-    # Status e controle
-    status = db.Column(db.String(20), default='Em Andamento')  # Em Andamento, Finalizado, Cancelado
+    # Controle
     responsavel_veiculo = db.Column(db.String(100))  # Funcionário responsável pelo veículo
     
     # Observações
@@ -3103,7 +3088,6 @@ class UsoVeiculo(db.Model):
         db.Index('idx_uso_veiculo_data_admin', 'data_uso', 'admin_id'),
         db.Index('idx_uso_veiculo_motorista', 'motorista_id'),
         db.Index('idx_uso_veiculo_obra', 'obra_id'),
-        db.Index('idx_uso_veiculo_status', 'status', 'admin_id'),
     )
     
     def __repr__(self):
@@ -3127,32 +3111,11 @@ class UsoVeiculo(db.Model):
             'km_inicial': self.km_inicial,
             'km_final': self.km_final,
             'km_percorrido': self.km_percorrido,
-            'finalidade': self.finalidade,
-            'destino': self.destino,
-            'valor_combustivel': float(self.valor_combustivel) if self.valor_combustivel else 0.0,
-            'litros_combustivel': float(self.litros_combustivel) if self.litros_combustivel else 0.0,
-            'valor_pedagio': float(self.valor_pedagio) if self.valor_pedagio else 0.0,
-            'valor_manutencao': float(self.valor_manutencao) if self.valor_manutencao else 0.0,
-            'valor_outros': float(self.valor_outros) if self.valor_outros else 0.0,
-            'status': self.status,
             'observacoes': self.observacoes,
             'admin_id': self.admin_id,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
     
-    @property
-    def valor_total_uso(self):
-        """Valor total dos custos deste uso"""
-        total = 0.0
-        if self.valor_combustivel:
-            total += float(self.valor_combustivel)
-        if self.valor_pedagio:
-            total += float(self.valor_pedagio) 
-        if self.valor_manutencao:
-            total += float(self.valor_manutencao)
-        if self.valor_outros:
-            total += float(self.valor_outros)
-        return total
     
     def calcular_km_percorrido(self):
         """Calcula automaticamente KM percorrido se possível"""
