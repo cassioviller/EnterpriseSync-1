@@ -7950,9 +7950,35 @@ def salvar_rdo_flexivel():
         else:
             data_relatorio = datetime.now().date()
             
-        # Gerar número RDO
-        count_rdos = RDO.query.filter_by(admin_id=admin_id).count()
-        numero_rdo = f"RDO-{admin_id}-{data_relatorio.year}-{count_rdos + 1:03d}"
+        # ✅ CORREÇÃO CRÍTICA: Gerar número RDO Único (evita constraint violation)
+        logger.info(f"🔢 GERANDO NÚMERO RDO Único para admin_id={admin_id}, ano={data_relatorio.year}")
+        
+        # Gerar número único com verificação de duplicata
+        contador = 1
+        numero_rdo = None
+        
+        # Loop para garantir número único
+        for tentativa in range(1, 1000):  # Máximo 999 tentativas
+            numero_proposto = f"RDO-{admin_id}-{data_relatorio.year}-{tentativa:03d}"
+            
+            # Verificar se já existe
+            rdo_existente = RDO.query.filter_by(
+                numero_rdo=numero_proposto,
+                admin_id=admin_id
+            ).first()
+            
+            if not rdo_existente:
+                numero_rdo = numero_proposto
+                logger.info(f"✅ NÚMERO RDO Único GERADO: {numero_rdo}")
+                break
+            else:
+                logger.info(f"⚠️ Número {numero_proposto} já existe, tentando próximo...")
+                
+        # Fallback de segurança
+        if not numero_rdo:
+            import random
+            numero_rdo = f"RDO-{admin_id}-{data_relatorio.year}-{random.randint(1000, 9999):04d}"
+            logger.warning(f"🚑 FALLBACK: Usando número aleatório {numero_rdo}")
         
         rdo = RDO(
             numero_rdo=numero_rdo,
@@ -8066,6 +8092,7 @@ def salvar_rdo_flexivel():
             logger.info(f"  👥 {len(funcionarios_selecionados)} funcionarios")
             logger.info(f"  🏗️ Obra ID: {obra_id}")
             logger.info(f"  🏢 Admin ID: {admin_id}")
+            logger.info(f"  🔢 Número RDO: {numero_rdo} (VERIFICADO Único)")
             
         except Exception as e:
             db.session.rollback()
@@ -8080,7 +8107,8 @@ def salvar_rdo_flexivel():
             logger.info(f"✅ RDO {numero_rdo} salvo com {len(subactivities)} subatividades no serviço {target_service_id}")
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         else:
-            flash('Erro interno ao salvar RDO', 'error')
+            flash('Erro interno ao salvar RDO. Verifique os logs para detalhes.', 'error')
+            logger.error("❌ FALHA NO SALVAMENTO - Redirecionando para formulário")
             return redirect(url_for('main.funcionario_rdo_novo'))
         
     except Exception as e:
