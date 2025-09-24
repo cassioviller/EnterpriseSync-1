@@ -247,10 +247,134 @@ console.log('Initializing Detalhes Veículo with light theme...');
                 Registrar Uso
             </a>
             
+            <a href="{{ url_for('main.novo_custo_veiculo', veiculo_id=veiculo.id) }}" class="btn-action-large btn-secondary-large">
+                <i class="fas fa-receipt"></i>
+                Adicionar Custo
+            </a>
+            
             <a href="{{ url_for('main.editar_veiculo', id=veiculo.id) }}" class="btn-action-large btn-secondary-large">
                 <i class="fas fa-edit"></i>
                 Editar Dados
             </a>
+        </div>
+    </div>
+
+    <!-- Histórico de Uso e Custos -->
+    <div class="actions-card">
+        <h2><i class="fas fa-history"></i> Histórico</h2>
+        
+        <!-- Abas -->
+        <ul class="nav nav-tabs mb-4" id="historicoTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="usos-tab" data-bs-toggle="tab" data-bs-target="#usos" type="button" role="tab">
+                    <i class="fas fa-road"></i> Usos ({{ usos|length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="custos-tab" data-bs-toggle="tab" data-bs-target="#custos" type="button" role="tab">
+                    <i class="fas fa-receipt"></i> Custos ({{ custos|length }})
+                </button>
+            </li>
+        </ul>
+
+        <!-- Conteúdo das abas -->
+        <div class="tab-content" id="historicoTabsContent">
+            <!-- Aba Usos -->
+            <div class="tab-pane fade show active" id="usos" role="tabpanel">
+                {% if usos %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Motorista</th>
+                                <th>Horário</th>
+                                <th>KM</th>
+                                <th>Obra</th>
+                                <th>Status</th>
+                                <th>Observações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for uso in usos %}
+                            <tr>
+                                <td>{{ uso.data_uso.strftime('%d/%m/%Y') }}</td>
+                                <td>{{ uso.funcionario.nome if uso.funcionario else 'N/A' }}</td>
+                                <td>
+                                    {{ uso.hora_saida.strftime('%H:%M') if uso.hora_saida else '--' }}
+                                    {% if uso.hora_retorno %}
+                                    - {{ uso.hora_retorno.strftime('%H:%M') }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if uso.km_percorrido %}
+                                        {{ uso.km_percorrido }} km
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </td>
+                                <td>{{ uso.obra.nome if uso.obra else 'Uso geral' }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if uso.status == 'Finalizado' else 'warning' if uso.status == 'Em Andamento' else 'danger' }}">
+                                        {{ uso.status }}
+                                    </span>
+                                </td>
+                                <td>{{ uso.observacoes[:50] + '...' if uso.observacoes and uso.observacoes|length > 50 else (uso.observacoes or '--') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-road fa-3x mb-3"></i>
+                    <h5>Nenhum uso registrado</h5>
+                    <p>Clique em "Registrar Uso" para adicionar o primeiro uso deste veículo.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Aba Custos -->
+            <div class="tab-pane fade" id="custos" role="tabpanel">
+                {% if custos %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Tipo</th>
+                                <th>Descrição</th>
+                                <th>Valor</th>
+                                <th>Fornecedor</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for custo in custos %}
+                            <tr>
+                                <td>{{ custo.data_custo.strftime('%d/%m/%Y') }}</td>
+                                <td>{{ custo.tipo_custo.title() }}</td>
+                                <td>{{ custo.descricao }}</td>
+                                <td class="fw-bold text-success">R$ {{ "{:,.2f}".format(custo.valor).replace(',', '.') }}</td>
+                                <td>{{ custo.fornecedor or '--' }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if custo.status_pagamento == 'Pago' else 'warning' if custo.status_pagamento == 'Pendente' else 'danger' }}">
+                                        {{ custo.status_pagamento }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-receipt fa-3x mb-3"></i>
+                    <h5>Nenhum custo registrado</h5>
+                    <p>Clique em "Adicionar Custo" para adicionar o primeiro custo deste veículo.</p>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
