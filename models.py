@@ -3085,7 +3085,6 @@ class UsoVeiculo(db.Model):
     
     # Observações
     observacoes = db.Column(db.Text)
-    observacoes_retorno = db.Column(db.Text)  # Observações no retorno
     
     # Multi-tenant (OBRIGATÓRIO) 
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
