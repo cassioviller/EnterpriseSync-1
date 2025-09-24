@@ -24,7 +24,7 @@ class VeiculoService:
         
         Args:
             admin_id: ID do admin (multi-tenant)
-            filtros: dict com filtros opcionais (status, tipo, placa)
+            filtros: dict com filtros opcionais (tipo, placa)
             page: página atual
             per_page: itens por página
             
@@ -36,8 +36,6 @@ class VeiculoService:
             
             # Aplicar filtros
             if filtros:
-                if filtros.get('status'):
-                    query = query.filter(Veiculo.status == filtros['status'])
                 if filtros.get('tipo'):
                     query = query.filter(Veiculo.tipo == filtros['tipo'])
                 if filtros.get('placa'):
@@ -74,24 +72,23 @@ class VeiculoService:
         """Calcula estatísticas gerais da frota"""
         try:
             total_veiculos = Veiculo.query.filter_by(admin_id=admin_id, ativo=True).count()
-            disponveis = Veiculo.query.filter_by(admin_id=admin_id, ativo=True, status='Disponível').count()
-            em_uso = Veiculo.query.filter_by(admin_id=admin_id, ativo=True, status='Em Uso').count()
-            manutencao = Veiculo.query.filter_by(admin_id=admin_id, ativo=True, status='Manutenção').count()
+            
+            # Estatísticas baseadas em uso
+            total_usos = UsoVeiculo.query.join(Veiculo).filter(
+                Veiculo.admin_id == admin_id,
+                Veiculo.ativo == True
+            ).count()
             
             return {
                 'total_veiculos': total_veiculos,
-                'disponiveis': disponveis,
-                'em_uso': em_uso,
-                'manutencao': manutencao,
-                'taxa_disponibilidade': round((disponveis / total_veiculos * 100) if total_veiculos > 0 else 0, 1)
+                'total_usos': total_usos,
+                'media_usos_por_veiculo': round((total_usos / total_veiculos) if total_veiculos > 0 else 0, 1)
             }
         except Exception:
             return {
                 'total_veiculos': 0,
-                'disponiveis': 0,
-                'em_uso': 0,
-                'manutencao': 0,
-                'taxa_disponibilidade': 0
+                'total_usos': 0,
+                'media_usos_por_veiculo': 0
             }
     
     @staticmethod
@@ -122,7 +119,6 @@ class VeiculoService:
                 chassi=dados.get('chassi', '').strip() if dados.get('chassi') else None,
                 renavam=dados.get('renavam', '').strip() if dados.get('renavam') else None,
                 combustivel=dados.get('combustivel', 'Gasolina'),
-                status=dados.get('status', 'Disponível'),
                 data_ultima_manutencao=dados.get('data_ultima_manutencao') if dados.get('data_ultima_manutencao') else None,
                 data_proxima_manutencao=dados.get('data_proxima_manutencao') if dados.get('data_proxima_manutencao') else None,
                 km_proxima_manutencao=int(dados['km_proxima_manutencao']) if dados.get('km_proxima_manutencao') else None,
@@ -249,7 +245,6 @@ class UsoVeiculoService:
                 valor_manutencao=Decimal('0'),
                 valor_outros=Decimal('0'),
                 
-                status=dados.get('status', 'Em Andamento'),
                 responsavel_veiculo=motorista.nome if motorista else 'Não informado',
                 observacoes=dados.get('observacoes', '').strip() if dados.get('observacoes') else None,
                 admin_id=admin_id
@@ -259,11 +254,6 @@ class UsoVeiculoService:
             uso.calcular_km_percorrido()
             
             db.session.add(uso)
-            
-            # Atualizar status do veículo se necessário
-            if veiculo.status == 'Disponível':
-                veiculo.status = 'Em Uso'
-            
             db.session.commit()
             
             return True, uso, f"Uso do veículo {veiculo.placa} registrado com sucesso"
@@ -291,14 +281,11 @@ class UsoVeiculoService:
             if not uso:
                 return False, None, "Uso não encontrado"
             
-            if uso.status == 'Finalizado':
-                return False, None, "Uso já foi finalizado"
             
             # Atualizar dados de finalização
             uso.hora_retorno = dados_finalizacao.get('hora_retorno', time.now())
             uso.km_final = int(dados_finalizacao['km_final'])
             uso.observacoes_retorno = dados_finalizacao.get('observacoes_retorno', '').strip() if dados_finalizacao.get('observacoes_retorno') else None
-            uso.status = 'Finalizado'
             
             # Atualizar custos se informados na finalização
             if dados_finalizacao.get('valor_combustivel'):
@@ -319,15 +306,6 @@ class UsoVeiculoService:
                 veiculo.km_atual = uso.km_final
                 veiculo.updated_at = datetime.utcnow()
             
-            # Verificar se deve liberar o veículo
-            usos_pendentes = UsoVeiculo.query.filter(
-                UsoVeiculo.veiculo_id == veiculo.id,
-                UsoVeiculo.status == 'Em Andamento',
-                UsoVeiculo.id != uso_id
-            ).count()
-            
-            if usos_pendentes == 0:
-                veiculo.status = 'Disponível'
             
             uso.updated_at = datetime.utcnow()
             db.session.commit()
@@ -371,8 +349,6 @@ class UsoVeiculoService:
                     query = query.filter(UsoVeiculo.data_uso >= filtros['data_inicio'])
                 if filtros.get('data_fim'):
                     query = query.filter(UsoVeiculo.data_uso <= filtros['data_fim'])
-                if filtros.get('status'):
-                    query = query.filter(UsoVeiculo.status == filtros['status'])
                 if filtros.get('funcionario_id'):
                     query = query.filter(UsoVeiculo.motorista_id == filtros['funcionario_id'])
             
