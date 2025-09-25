@@ -2742,63 +2742,8 @@ def funcionario_dashboard_desktop():
 def test():
     return jsonify({'status': 'ok', 'message': 'SIGE v8.0 funcionando!'})
 
-@main_bp.route('/veiculos')
-@login_required  # 🔒 MUDANÇA: Agora funcionários também podem acessar
-def veiculos():
-    try:
-        # 🔍 LOGS DETALHADOS PARA PRODUÇÃO
-        print(f"🚗 [VEICULOS] Iniciando listagem de veículos...")
-        
-        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
-        tenant_admin_id = get_tenant_admin_id()
-        print(f"🔑 [VEICULOS] Admin ID detectado: {tenant_admin_id}")
-        
-        if not tenant_admin_id:
-            print(f"❌ [VEICULOS] Admin ID não encontrado - acesso negado")
-            flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
-        
-        # Verificar conexão com banco
-        try:
-            from sqlalchemy import text
-            db.session.execute(text('SELECT 1'))
-            print(f"✅ [VEICULOS] Conexão com banco OK")
-        except Exception as db_error:
-            print(f"❌ [VEICULOS] ERRO DE CONEXÃO: {db_error}")
-            raise
-        
-        # Verificar se tabela veiculo existe
-        try:
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
-            tables = inspector.get_table_names()
-            print(f"📋 [VEICULOS] Tabelas disponíveis: {len(tables)} tabelas")
-            if 'veiculo' in tables:
-                print(f"✅ [VEICULOS] Tabela 'veiculo' encontrada")
-            else:
-                print(f"❌ [VEICULOS] Tabela 'veiculo' NÃO encontrada!")
-                print(f"📋 [VEICULOS] Tabelas: {sorted(tables)}")
-        except Exception as inspect_error:
-            print(f"⚠️ [VEICULOS] Erro ao inspecionar tabelas: {inspect_error}")
-        
-        # 📊 BUSCAR TODOS OS VEÍCULOS (SEM FILTROS)
-        from models import Veiculo
-        print(f"🔍 [VEICULOS] Executando query para admin_id={tenant_admin_id}")
-        veiculos = Veiculo.query.filter_by(admin_id=tenant_admin_id).all()
-        print(f"📊 [VEICULOS] Encontrados {len(veiculos)} veículos")
-        
-        for i, veiculo in enumerate(veiculos):
-            print(f"🚗 [VEICULOS] {i+1}. {veiculo.placa} - {veiculo.modelo} (ID: {veiculo.id})")
-        
-        print(f"✅ [VEICULOS] Renderizando template com {len(veiculos)} veículos")
-        return render_template('veiculos_lista.html', veiculos=veiculos)
-        
-    except Exception as e:
-        print(f"❌ [VEICULOS] ERRO CRÍTICO: {str(e)}")
-        import traceback
-        print(f"📋 [VEICULOS] TRACEBACK: {traceback.format_exc()}")
-        flash('Erro ao carregar veículos. Contate o administrador.', 'error')
-        return redirect(url_for('main.funcionario_dashboard'))
+# ⚠️ ROTA /veiculos REMOVIDA - Conflito corrigido!
+# ✅ Conflito de rota resolvido! Agora usa apenas a função veiculos() moderna
 
 # ===========================
 # 🆕 NOVA IMPLEMENTAÇÃO: Visualização Robusta de Veículos
@@ -8403,10 +8348,10 @@ except ImportError as e:
         def criar_custo_veiculo(dados, admin_id):
             return False, None, "Service não disponível"
 
-# ===== ATUALIZAR ROTA PRINCIPAL DE VEÍCULOS =====
+# ===== ROTA PRINCIPAL DE VEÍCULOS (CORRIGIDA) =====
 @main_bp.route('/veiculos')
 @login_required
-def veiculos_lista():
+def veiculos():
     """Lista principal de veículos com filtros e estatísticas"""
     try:
         print(f"🚗 [VEICULOS_LISTA] Iniciando listagem...")
@@ -8514,7 +8459,7 @@ def detalhes_veiculo(id):
         veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
         if not veiculo:
             flash('Veículo não encontrado.', 'error')
-            return redirect(url_for('main.veiculos_lista'))
+            return redirect(url_for('main.veiculos'))
         
         # Buscar funcionários para exibir nomes nos passageiros
         funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id).all()
@@ -8546,7 +8491,7 @@ def detalhes_veiculo(id):
     except Exception as e:
         print(f"❌ [DETALHES_VEICULO] Erro: {str(e)}")
         flash('Erro ao carregar detalhes do veículo.', 'error')
-        return redirect(url_for('main.veiculos_lista'))
+        return redirect(url_for('main.veiculos'))
 
 # ===== NOVA ROTA: NOVO USO DE VEÍCULO (FORMULÁRIO UNIFICADO) =====
 @main_bp.route('/veiculos/<int:veiculo_id>/uso/novo', methods=['GET', 'POST'])
@@ -8567,7 +8512,7 @@ def novo_uso_veiculo(veiculo_id):
         veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
         if not veiculo:
             flash('Veículo não encontrado.', 'error')
-            return redirect(url_for('main.veiculos_lista'))
+            return redirect(url_for('main.veiculos'))
         
         if request.method == 'GET':
             # Buscar funcionários e obras para os selects
@@ -8636,7 +8581,7 @@ def novo_custo_veiculo_form(veiculo_id):
         veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
         if not veiculo:
             flash('Veículo não encontrado.', 'error')
-            return redirect(url_for('main.veiculos_lista'))
+            return redirect(url_for('main.veiculos'))
         
         if request.method == 'GET':
             # Buscar usos recentes para associação (opcional)
@@ -8716,7 +8661,7 @@ def editar_veiculo(id):
         veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
         if not veiculo:
             flash('Veículo não encontrado.', 'error')
-            return redirect(url_for('main.veiculos_lista'))
+            return redirect(url_for('main.veiculos'))
         
         if request.method == 'GET':
             return render_template('veiculos_editar.html', veiculo=veiculo)
