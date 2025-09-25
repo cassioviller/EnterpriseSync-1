@@ -73,6 +73,84 @@
 .kpi-item.bg-primary { background: linear-gradient(135deg, #0d6efd, #0b5ed7); }
 .kpi-item.bg-warning { background: linear-gradient(135deg, #ffc107, #ffb700); }
 .kpi-item.bg-danger { background: linear-gradient(135deg, #dc3545, #c21807); }
+
+/* ===== ESTILOS PARA FUNCIONÁRIOS INATIVOS ===== */
+.funcionario-card-inativo {
+    opacity: 0.75;
+    background-color: #f8f9fa !important;
+    border: 1px dashed #dee2e6 !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.funcionario-card-inativo::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 8px,
+        rgba(108, 117, 125, 0.1) 8px,
+        rgba(108, 117, 125, 0.1) 16px
+    );
+    pointer-events: none;
+    z-index: 1;
+}
+
+.funcionario-card-inativo .card-body {
+    position: relative;
+    z-index: 2;
+}
+
+.funcionario-card-inativo:hover {
+    opacity: 0.85;
+    transform: translateY(-2px);
+    transition: all 0.3s ease;
+}
+
+.foto-inativo {
+    filter: grayscale(20%);
+}
+
+.funcionarios-separador {
+    margin: 2rem 0 !important;
+    position: relative;
+}
+
+.funcionarios-separador::after {
+    content: "📊 Dados Históricos Preservados";
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    padding: 0 1rem;
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* Seções de funcionários */
+.funcionarios-section {
+    margin-bottom: 2rem;
+}
+
+.funcionarios-ativos {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.05), rgba(25, 135, 84, 0.02));
+    border-radius: 8px;
+    padding: 1rem;
+    border-left: 4px solid #198754;
+}
+
+.funcionarios-inativos {
+    background: linear-gradient(135deg, rgba(108, 117, 125, 0.05), rgba(108, 117, 125, 0.02));
+    border-radius: 8px;
+    padding: 1rem;
+    border-left: 4px solid #6c757d;
+}
 .kpi-item.bg-info { background: linear-gradient(135deg, #0dcaf0, #0aa2c0); }
 .kpi-item.bg-success { background: linear-gradient(135deg, #198754, #146c43); }
 .kpi-item.bg-secondary { background: linear-gradient(135deg, #6c757d, #5a6268); }
@@ -376,15 +454,27 @@
         </div>
     </div>
 
-<!-- Grid de Cards de Funcionários -->
-<div class="row" id="funcionariosGrid">
-    {% if funcionarios_kpis %}
-        {% for kpi in funcionarios_kpis %}
-    <div class="col-lg-4 col-md-6 mb-4 funcionario-card" 
-         data-nome="{{ kpi.funcionario.nome.lower() }}" 
-         data-telefone="{{ kpi.funcionario.telefone.lower() if kpi.funcionario.telefone else '' }}"
-         data-funcao="{{ kpi.funcionario.funcao_ref.nome.lower() if kpi.funcionario.funcao_ref else '' }}"
-         data-status="{{ 'ativo' if kpi.funcionario.ativo else 'inativo' }}">
+<!-- Grid de Cards de Funcionários - SEPARAÇÃO ATIVO/INATIVO -->
+<!-- Funcionários Ativos -->
+{% set funcionarios_ativos = funcionarios_kpis | selectattr('funcionario.ativo', 'equalto', true) | list %}
+{% set funcionarios_inativos = funcionarios_kpis | selectattr('funcionario.ativo', 'equalto', false) | list %}
+
+{% if funcionarios_ativos %}
+<div class="funcionarios-section funcionarios-ativos mb-4">
+    <div class="d-flex align-items-center mb-3">
+        <h5 class="mb-0">
+            <i class="fas fa-users text-success me-2"></i>
+            Funcionários Ativos
+            <span class="badge bg-success ms-2">{{ funcionarios_ativos|length }}</span>
+        </h5>
+    </div>
+    <div class="row" id="funcionariosAtivosGrid">
+        {% for kpi in funcionarios_ativos %}
+        <div class="col-lg-4 col-md-6 mb-4 funcionario-card funcionario-ativo" 
+             data-nome="{{ kpi.funcionario.nome.lower() }}" 
+             data-telefone="{{ kpi.funcionario.telefone.lower() if kpi.funcionario.telefone else '' }}"
+             data-funcao="{{ kpi.funcionario.funcao_ref.nome.lower() if kpi.funcionario.funcao_ref else '' }}"
+             data-status="ativo">
         <div class="card h-100 funcionario-card-item">
             <div class="card-body d-flex flex-column">
                 <!-- Foto e Nome -->
@@ -474,25 +564,130 @@
         </div>
     </div>
         {% endfor %}
-    {% else %}
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body text-center">
-                    <i class="fas fa-users fa-4x text-muted mb-3"></i>
-                    <h5 class="text-muted">Nenhum funcionário encontrado</h5>
-                    <p class="text-muted">Não há funcionários ativos no período selecionado.</p>
-                    <div class="alert alert-info mt-3">
-                        <strong>Debug:</strong> {{ funcionarios|length }} funcionários totais, {{ funcionarios_kpis|length }} KPIs calculados
-                        <br><small>Admin ID: {% if current_user.is_authenticated %}{{ current_user.id }}{% else %}Não logado{% endif %}</small>
+    </div>
+</div>
+{% endif %}
+
+<!-- Linha Separadora entre Ativos e Inativos -->
+{% if funcionarios_inativos %}
+<hr class="funcionarios-separador my-4" style="border: 0; height: 2px; background: linear-gradient(90deg, #dee2e6 0%, #6c757d 50%, #dee2e6 100%); opacity: 0.7;">
+
+<!-- Funcionários Inativos -->
+<div class="funcionarios-section funcionarios-inativos mb-4">
+    <div class="d-flex align-items-center mb-3">
+        <h5 class="mb-0 text-muted">
+            <i class="fas fa-user-slash me-2"></i>
+            Funcionários Inativos 
+            <span class="badge bg-secondary ms-2">{{ funcionarios_inativos|length }}</span>
+        </h5>
+        <small class="text-muted ms-3">(dados históricos preservados)</small>
+    </div>
+    <div class="row" id="funcionariosInativosGrid">
+        {% for kpi in funcionarios_inativos %}
+        <div class="col-lg-4 col-md-6 mb-4 funcionario-card funcionario-inativo" 
+             data-nome="{{ kpi.funcionario.nome.lower() }}" 
+             data-telefone="{{ kpi.funcionario.telefone.lower() if kpi.funcionario.telefone else '' }}"
+             data-funcao="{{ kpi.funcionario.funcao_ref.nome.lower() if kpi.funcionario.funcao_ref else '' }}"
+             data-status="inativo">
+        <div class="card h-100 funcionario-card-item funcionario-card-inativo">
+            <div class="card-body d-flex flex-column">
+                <!-- Foto e Nome -->
+                <div class="text-center mb-3">
+                    <img src="{{ obter_foto_funcionario(kpi.funcionario) }}" 
+                         class="rounded-circle mb-3 foto-inativo" 
+                         width="80" 
+                         height="80" 
+                         style="object-fit: cover; aspect-ratio: 1/1; opacity: 0.7;"
+                         alt="Foto de {{ kpi.funcionario.nome }}"
+                         data-nome="{{ kpi.funcionario.nome }}">
+                    <h5 class="card-title mb-1 text-muted">{{ kpi.funcionario.nome }}</h5>
+                    <small class="text-muted">{{ kpi.funcionario.telefone if kpi.funcionario.telefone else '-' }}</small>
+                </div>
+                
+                <!-- Informações -->
+                <div class="mb-3">
+                    <div class="mb-2">
+                        <i class="fas fa-user-tie text-muted me-2"></i>
+                        <span class="text-muted">{{ kpi.funcionario.funcao_ref.nome if kpi.funcionario.funcao_ref else '-' }}</span>
                     </div>
-                    <a href="{{ url_for('main.funcionarios') }}" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Adicionar Primeiro Funcionário
-                    </a>
+                    <div class="mb-2">
+                        <i class="fas fa-clock text-muted me-2"></i>
+                        <span class="text-muted">{{ kpi.funcionario.horario_trabalho.nome if kpi.funcionario.horario_trabalho else 'Não definido' }}</span>
+                    </div>
+                </div>
+                
+                <!-- KPIs do Período (Dados Históricos) -->
+                <div class="row text-center mb-3">
+                    <div class="col-6">
+                        <div class="border rounded p-2 bg-light">
+                            <small class="text-muted d-block">Horas (histórico)</small>
+                            <strong class="text-muted">{{ '{:,.1f}'.format(kpi.horas_trabalhadas).replace(',', '.') }}h</strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2 bg-light">
+                            <small class="text-muted d-block">Custo (histórico)</small>
+                            <strong class="text-muted">R$ {{ '{:,.0f}'.format(kpi.custo_total).replace(',', '.') }}</strong>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Status -->
+                <div class="mb-3">
+                    <span class="badge bg-danger">
+                        <i class="fas fa-times-circle me-1"></i>Inativo
+                    </span>
+                </div>
+                
+                <!-- Botões de Ação -->
+                <div class="mt-auto">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('main.funcionario_perfil', id=kpi.funcionario.id) }}" 
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-user me-1"></i>Ver Perfil
+                        </a>
+                        <div class="row g-1">
+                            <div class="col-6">
+                                <button class="btn btn-outline-secondary btn-sm w-100" disabled>
+                                    <i class="fas fa-edit"></i> Editar
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <button class="btn btn-outline-success btn-sm w-100" 
+                                        onclick="toggleStatusFuncionario({{ kpi.funcionario.id }}, '{{ kpi.funcionario.nome }}', true)">
+                                    <i class="fas fa-user-check"></i> Reativar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    {% endif %}
+    </div>
+        {% endfor %}
+    </div>
 </div>
+{% endif %}
+
+<!-- Mensagem quando não há funcionários -->
+{% if not funcionarios_kpis %}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhum funcionário encontrado</h5>
+                <p class="text-muted">Não há funcionários no período selecionado.</p>
+                <div class="alert alert-info mt-3">
+                    <strong>Debug:</strong> {{ funcionarios|length }} funcionários totais, {{ funcionarios_kpis|length }} KPIs calculados
+                    <br><small>Admin ID: {% if current_user.is_authenticated %}{{ current_user.id }}{% else %}Não logado{% endif %}</small>
+                </div>
+                <a href="{{ url_for('main.funcionarios') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Adicionar Primeiro Funcionário
+                </a>
+            </div>
+        </div>
+    </div>
+{% endif %}
 
 <!-- Mensagem quando não há funcionários -->
 <div id="noResultsMessage" class="text-center py-5" style="display: none;">
