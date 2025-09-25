@@ -177,6 +177,7 @@ def load_user(user_id):
 @app.template_global()
 def obter_foto_funcionario(funcionario):
     """Obter foto do funcionário (base64 ou padrão)"""
+    from flask import url_for  # Import necessário para template_global
     if funcionario.foto_base64:
         return funcionario.foto_base64
     elif funcionario.foto:

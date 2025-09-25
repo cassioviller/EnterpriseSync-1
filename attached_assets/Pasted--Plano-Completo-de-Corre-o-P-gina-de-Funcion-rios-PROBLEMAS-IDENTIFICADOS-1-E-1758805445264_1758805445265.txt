@@ -1,0 +1,430 @@
+# Plano Completo de Correção - Página de Funcionários
+
+## 🎯 PROBLEMAS IDENTIFICADOS
+
+### 1. **Erro 404 - Rota de Lançamento Múltiplo Inexistente**
+- **Erro:** `https://www.sige.cassioviller.tech/api/ponto/lancamento-multiplo`
+- **Causa:** Template `funcionarios.html` faz chamada para rota que não existe
+- **Impacto:** Lançamento múltiplo de ponto não funciona
+
+### 2. **Obras Não Aparecem no Controle de Ponto**
+- **Problema:** Campo obra não está sendo populado
+- **Causa:** Falta de integração entre funcionários e obras
+
+### 3. **Fotos dos Funcionários Não Aparecem**
+- **Problema:** Cards mostram "Sem função" em vez de foto
+- **Causa:** Problemas no carregamento/exibição de imagens
+
+### 4. **Desativação de Funcionários**
+- **Problema:** Erro ao desativar funcionários
+- **Necessidade:** Separar ativos/inativos visualmente
+
+### 5. **Código Antigo e Sem Uso**
+- **Problema:** Múltiplas rotas duplicadas e código obsoleto
+- **Necessidade:** Limpeza e organização
+
+## 🛠️ PLANO DE CORREÇÃO
+
+### **FASE 1: Limpeza de Código Antigo**
+
+#### 1.1. Identificar e Remover Rotas Duplicadas
+```python
+# ROTAS PARA ANÁLISE E POSSÍVEL REMOÇÃO:
+# - /api/funcionario/funcionarios (linha 7505) - ALIAS desnecessário
+# - Múltiplas APIs de funcionários com funcionalidades sobrepostas
+```
+
+#### 1.2. Consolidar APIs de Funcionários
+- Manter apenas `/api/funcionarios` (linha 4784) como API principal
+- Remover aliases e rotas obsoletas
+- Documentar parâmetros necessários
+
+### **FASE 2: Correção do Controle de Ponto**
+
+#### 2.1. Criar Rota de Lançamento Múltiplo
+```python
+@main_bp.route('/api/ponto/lancamento-multiplo', methods=['POST'])
+@login_required
+def api_ponto_lancamento_multiplo():
+    """API para lançamento múltiplo de ponto"""
+    try:
+        data = request.get_json()
+        
+        # Validar dados obrigatórios
+        funcionarios_ids = data.get('funcionarios_ids', [])
+        obra_id = data.get('obra_id')
+        data_lancamento = data.get('data')
+        
+        if not funcionarios_ids:
+            return jsonify({'success': False, 'message': 'Nenhum funcionário selecionado'}), 400
+        
+        if not obra_id:
+            return jsonify({'success': False, 'message': 'Obra não selecionada'}), 400
+            
+        # Processar lançamentos
+        registros_criados = []
+        erros = []
+        
+        for funcionario_id in funcionarios_ids:
+            try:
+                # Verificar se funcionário existe e está ativo
+                funcionario = Funcionario.query.filter_by(
+                    id=funcionario_id, 
+                    ativo=True,
+                    admin_id=get_tenant_admin_id()
+                ).first()
+                
+                if not funcionario:
+                    erros.append(f"Funcionário ID {funcionario_id} não encontrado")
+                    continue
+                
+                # Verificar se já existe registro para esta data
+                registro_existente = RegistroPonto.query.filter_by(
+                    funcionario_id=funcionario_id,
+                    data=datetime.strptime(data_lancamento, '%Y-%m-%d').date()
+                ).first()
+                
+                if registro_existente:
+                    erros.append(f"Já existe registro para {funcionario.nome} na data {data_lancamento}")
+                    continue
+                
+                # Criar registro de ponto
+                registro = RegistroPonto(
+                    funcionario_id=funcionario_id,
+                    obra_id=obra_id,
+                    data=datetime.strptime(data_lancamento, '%Y-%m-%d').date(),
+                    hora_entrada=datetime.strptime(data.get('hora_entrada'), '%H:%M').time() if data.get('hora_entrada') else None,
+                    hora_saida=datetime.strptime(data.get('hora_saida'), '%H:%M').time() if data.get('hora_saida') else None,
+                    hora_almoco_saida=datetime.strptime(data.get('hora_almoco_saida'), '%H:%M').time() if data.get('hora_almoco_saida') else None,
+                    hora_almoco_retorno=datetime.strptime(data.get('hora_almoco_retorno'), '%H:%M').time() if data.get('hora_almoco_retorno') else None,
+                    observacoes=data.get('observacoes', ''),
+                    tipo_registro=data.get('tipo_lancamento', 'trabalho_normal'),
+                    admin_id=get_tenant_admin_id()
+                )
+                
+                # Calcular horas trabalhadas
+                if registro.hora_entrada and registro.hora_saida:
+                    from utils import calcular_horas_trabalhadas
+                    horas_calc = calcular_horas_trabalhadas(
+                        registro.hora_entrada,
+                        registro.hora_saida,
+                        registro.hora_almoco_saida,
+                        registro.hora_almoco_retorno,
+                        registro.data
+                    )
+                    registro.horas_trabalhadas = horas_calc.get('total', 0)
+                    registro.horas_extras = horas_calc.get('extras', 0)
+                
+                db.session.add(registro)
+                registros_criados.append({
+                    'funcionario_id': funcionario_id,
+                    'funcionario_nome': funcionario.nome
+                })
+                
+            except Exception as e:
+                erros.append(f"Erro ao processar {funcionario.nome if 'funcionario' in locals() else f'ID {funcionario_id}'}: {str(e)}")
+        
+        # Commit se houver registros criados
+        if registros_criados:
+            db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{len(registros_criados)} registros criados com sucesso',
+            'registros_criados': registros_criados,
+            'erros': erros
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
+```
+
+#### 2.2. Adicionar Campo Obra ao Modelo RegistroPonto
+```python
+# No models.py, adicionar à classe RegistroPonto:
+obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+obra = db.relationship('Obra', backref='registros_ponto')
+```
+
+#### 2.3. Criar API para Listar Obras
+```python
+@main_bp.route('/api/obras/ativas')
+@login_required
+def api_obras_ativas():
+    """API para listar obras ativas para seleção"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        obras = Obra.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Obra.nome).all()
+        
+        return jsonify({
+            'success': True,
+            'obras': [{
+                'id': obra.id,
+                'nome': obra.nome,
+                'codigo': obra.codigo,
+                'endereco': obra.endereco
+            } for obra in obras]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+```
+
+### **FASE 3: Correção da Exibição de Fotos**
+
+#### 3.1. Corrigir Carregamento de Fotos no Template
+```html
+<!-- No template funcionarios.html, corrigir a exibição de fotos -->
+<div class="funcionario-foto">
+    {% if funcionario.foto_base64 %}
+        <img src="data:image/jpeg;base64,{{ funcionario.foto_base64 }}" 
+             alt="{{ funcionario.nome }}" 
+             class="foto-funcionario">
+    {% elif funcionario.foto %}
+        <img src="{{ url_for('static', filename='uploads/' + funcionario.foto) }}" 
+             alt="{{ funcionario.nome }}" 
+             class="foto-funcionario"
+             onerror="this.src='{{ url_for('static', filename='img/avatar-default.png') }}'">
+    {% else %}
+        <div class="foto-placeholder">
+            <i class="fas fa-user"></i>
+        </div>
+    {% endif %}
+</div>
+```
+
+#### 3.2. Adicionar CSS para Fotos
+```css
+.foto-funcionario {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #dee2e6;
+}
+
+.foto-placeholder {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #dee2e6;
+    color: #6c757d;
+}
+```
+
+### **FASE 4: Sistema de Ativação/Desativação**
+
+#### 4.1. Corrigir Função de Desativação
+```python
+@main_bp.route('/api/funcionario/<int:funcionario_id>/toggle-ativo', methods=['POST'])
+@login_required
+def toggle_funcionario_ativo(funcionario_id):
+    """Toggle status ativo/inativo do funcionário"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 404
+        
+        # Toggle status
+        funcionario.ativo = not funcionario.ativo
+        
+        # Registrar data de desativação se necessário
+        if not funcionario.ativo:
+            funcionario.data_desativacao = datetime.now().date()
+        else:
+            funcionario.data_desativacao = None
+        
+        db.session.commit()
+        
+        status_texto = "ativado" if funcionario.ativo else "desativado"
+        
+        return jsonify({
+            'success': True,
+            'message': f'Funcionário {status_texto} com sucesso',
+            'ativo': funcionario.ativo
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+```
+
+#### 4.2. Atualizar Template para Separar Ativos/Inativos
+```html
+<!-- Funcionários Ativos -->
+<div class="funcionarios-ativos">
+    <h5><i class="fas fa-users text-success"></i> Funcionários Ativos</h5>
+    <div class="row" id="funcionarios-ativos-grid">
+        {% for funcionario in funcionarios if funcionario.ativo %}
+            <!-- Card do funcionário ativo -->
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Separador -->
+{% if funcionarios_inativos %}
+<hr class="my-4" style="border-top: 2px dashed #dee2e6;">
+
+<!-- Funcionários Inativos -->
+<div class="funcionarios-inativos">
+    <h5><i class="fas fa-user-slash text-muted"></i> Funcionários Inativos</h5>
+    <div class="row" id="funcionarios-inativos-grid">
+        {% for funcionario in funcionarios if not funcionario.ativo %}
+            <!-- Card do funcionário inativo com estilo diferenciado -->
+            <div class="col-md-4 mb-3">
+                <div class="card funcionario-card inativo">
+                    <!-- Conteúdo do card com opacidade reduzida -->
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+```
+
+#### 4.3. CSS para Funcionários Inativos
+```css
+.funcionario-card.inativo {
+    opacity: 0.6;
+    background-color: #f8f9fa;
+    border: 1px dashed #dee2e6;
+}
+
+.funcionario-card.inativo .card-body {
+    background: linear-gradient(45deg, transparent 40%, rgba(255,0,0,0.1) 50%, transparent 60%);
+}
+```
+
+### **FASE 5: Melhorias na Interface**
+
+#### 5.1. Adicionar Debug de Obras no JavaScript
+```javascript
+// Função para carregar obras disponíveis
+async function carregarObras() {
+    try {
+        const response = await fetch('/api/obras/ativas');
+        const data = await response.json();
+        
+        if (data.success) {
+            const selectObra = document.getElementById('obra_id');
+            selectObra.innerHTML = '<option value="">Selecione uma obra...</option>';
+            
+            data.obras.forEach(obra => {
+                const option = document.createElement('option');
+                option.value = obra.id;
+                option.textContent = `${obra.nome} ${obra.codigo ? '(' + obra.codigo + ')' : ''}`;
+                selectObra.appendChild(option);
+            });
+            
+            console.log(`✅ ${data.obras.length} obras carregadas`);
+        } else {
+            console.error('❌ Erro ao carregar obras:', data.message);
+            mostrarAlerta('Erro ao carregar obras: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        console.error('❌ Erro na requisição de obras:', error);
+        mostrarAlerta('Erro de conexão ao carregar obras', 'danger');
+    }
+}
+```
+
+#### 5.2. Melhorar Feedback Visual
+```javascript
+// Função para mostrar progresso do lançamento múltiplo
+function mostrarProgressoLancamento(total) {
+    const progressHtml = `
+        <div class="progress mb-3">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                 role="progressbar" style="width: 0%">
+                Processando 0/${total}
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('progress-container').innerHTML = progressHtml;
+}
+```
+
+## 🧪 PLANO DE TESTES
+
+### 1. **Teste de Lançamento Múltiplo**
+- [ ] Selecionar múltiplos funcionários
+- [ ] Escolher obra
+- [ ] Definir horários
+- [ ] Verificar salvamento no banco
+- [ ] Confirmar cálculo de horas
+
+### 2. **Teste de Desativação**
+- [ ] Desativar funcionário
+- [ ] Verificar posicionamento na lista
+- [ ] Confirmar que dados históricos permanecem
+- [ ] Testar reativação
+
+### 3. **Teste de Fotos**
+- [ ] Upload de nova foto
+- [ ] Exibição em diferentes tamanhos
+- [ ] Fallback para foto padrão
+
+### 4. **Teste de Performance**
+- [ ] Carregamento com muitos funcionários
+- [ ] Filtros e busca
+- [ ] Responsividade mobile
+
+## 📋 CHECKLIST DE IMPLEMENTAÇÃO
+
+- [ ] **FASE 1**: Limpeza de código antigo
+  - [ ] Identificar rotas duplicadas
+  - [ ] Remover código obsoleto
+  - [ ] Consolidar APIs
+
+- [ ] **FASE 2**: Correção do controle de ponto
+  - [ ] Criar rota `/api/ponto/lancamento-multiplo`
+  - [ ] Adicionar campo obra ao modelo
+  - [ ] Criar API de obras ativas
+  - [ ] Testar lançamento múltiplo
+
+- [ ] **FASE 3**: Correção de fotos
+  - [ ] Atualizar template de exibição
+  - [ ] Adicionar CSS para fotos
+  - [ ] Testar upload e exibição
+
+- [ ] **FASE 4**: Sistema de ativação
+  - [ ] Corrigir função de toggle
+  - [ ] Separar ativos/inativos visualmente
+  - [ ] Preservar dados históricos
+
+- [ ] **FASE 5**: Melhorias de interface
+  - [ ] Adicionar debug de obras
+  - [ ] Melhorar feedback visual
+  - [ ] Otimizar responsividade
+
+## 🚀 RESULTADO ESPERADO
+
+Após a implementação:
+- ✅ Lançamento múltiplo de ponto funcionando
+- ✅ Obras aparecendo corretamente
+- ✅ Fotos dos funcionários exibidas
+- ✅ Desativação funcionando com separação visual
+- ✅ Código limpo e organizado
+- ✅ Interface responsiva e intuitiva
+
+---
+
+**Prioridade:** 🔴 CRÍTICA
+**Tempo Estimado:** 4-6 horas
+**Impacto:** Funcionalidade completa do módulo de funcionários
