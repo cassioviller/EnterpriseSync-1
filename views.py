@@ -1143,9 +1143,11 @@ def funcionarios():
     
     # Tratamento de erro robusto para KPIs
     try:
-        # KPIs básicos por funcionário
+        # KPIs básicos por funcionário (INCLUIR INATIVOS)
         funcionarios_kpis = []
-        for func in funcionarios:
+        # Combinar funcionários ativos e inativos para KPIs
+        todos_funcionarios = funcionarios + funcionarios_inativos
+        for func in todos_funcionarios:
             try:
                 registros = RegistroPonto.query.filter(
                     RegistroPonto.funcionario_id == func.id,
