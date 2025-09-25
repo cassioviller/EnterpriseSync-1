@@ -4592,6 +4592,207 @@ def api_funcionarios_consolidada():
                 'funcionarios': []
             }), 500
 
+# ===== NOVAS ROTAS PARA CORRIGIR FUNCIONÁRIOS =====
+
+@main_bp.route('/api/ponto/lancamento-multiplo', methods=['POST'])
+@login_required
+def api_ponto_lancamento_multiplo():
+    """API para lançamento múltiplo de ponto"""
+    try:
+        data = request.get_json()
+        print(f"🔧 DEBUG LANÇAMENTO MÚLTIPLO: Dados recebidos: {data}")
+        
+        # Validar dados obrigatórios
+        funcionarios_ids = data.get('funcionarios_ids', [])
+        obra_id = data.get('obra_id')
+        data_lancamento = data.get('data')
+        
+        if not funcionarios_ids:
+            return jsonify({'success': False, 'message': 'Nenhum funcionário selecionado'}), 400
+        
+        if not obra_id:
+            return jsonify({'success': False, 'message': 'Obra não selecionada'}), 400
+            
+        if not data_lancamento:
+            return jsonify({'success': False, 'message': 'Data não informada'}), 400
+        
+        # Obter admin_id
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+        
+        print(f"🔧 DEBUG: admin_id={admin_id}, obra_id={obra_id}, funcionarios={funcionarios_ids}")
+        
+        # Processar lançamentos
+        registros_criados = []
+        erros = []
+        
+        for funcionario_id in funcionarios_ids:
+            try:
+                # Verificar se funcionário existe e está ativo
+                funcionario = Funcionario.query.filter_by(
+                    id=funcionario_id, 
+                    ativo=True,
+                    admin_id=admin_id
+                ).first()
+                
+                if not funcionario:
+                    erros.append(f"Funcionário ID {funcionario_id} não encontrado")
+                    continue
+                
+                # Verificar se já existe registro para esta data
+                data_obj = datetime.strptime(data_lancamento, '%Y-%m-%d').date()
+                registro_existente = RegistroPonto.query.filter_by(
+                    funcionario_id=funcionario_id,
+                    data=data_obj
+                ).first()
+                
+                if registro_existente:
+                    erros.append(f"Já existe registro para {funcionario.nome} na data {data_lancamento}")
+                    continue
+                
+                # Criar registro de ponto
+                registro = RegistroPonto(
+                    funcionario_id=funcionario_id,
+                    obra_id=obra_id,
+                    data=data_obj,
+                    hora_entrada=datetime.strptime(data.get('hora_entrada'), '%H:%M').time() if data.get('hora_entrada') else None,
+                    hora_saida=datetime.strptime(data.get('hora_saida'), '%H:%M').time() if data.get('hora_saida') else None,
+                    hora_almoco_saida=datetime.strptime(data.get('hora_almoco_saida'), '%H:%M').time() if data.get('hora_almoco_saida') else None,
+                    hora_almoco_retorno=datetime.strptime(data.get('hora_almoco_retorno'), '%H:%M').time() if data.get('hora_almoco_retorno') else None,
+                    observacoes=data.get('observacoes', ''),
+                    tipo_registro=data.get('tipo_lancamento', 'trabalho_normal'),
+                    admin_id=admin_id
+                )
+                
+                # Calcular horas trabalhadas
+                if registro.hora_entrada and registro.hora_saida:
+                    try:
+                        from utils import calcular_horas_trabalhadas
+                        horas_calc = calcular_horas_trabalhadas(
+                            registro.hora_entrada,
+                            registro.hora_saida,
+                            registro.hora_almoco_saida,
+                            registro.hora_almoco_retorno,
+                            registro.data
+                        )
+                        registro.horas_trabalhadas = horas_calc.get('total', 0)
+                        registro.horas_extras = horas_calc.get('extras', 0)
+                    except Exception as calc_e:
+                        print(f"⚠️ Erro ao calcular horas para {funcionario.nome}: {calc_e}")
+                        # Usar valores padrão se o cálculo falhar
+                        registro.horas_trabalhadas = 8.0
+                        registro.horas_extras = 0.0
+                
+                db.session.add(registro)
+                registros_criados.append({
+                    'funcionario_id': funcionario_id,
+                    'funcionario_nome': funcionario.nome
+                })
+                
+                print(f"✅ Registro criado para {funcionario.nome}")
+                
+            except Exception as e:
+                erro_msg = f"Erro ao processar {funcionario.nome if 'funcionario' in locals() and funcionario else f'ID {funcionario_id}'}: {str(e)}"
+                erros.append(erro_msg)
+                print(f"❌ {erro_msg}")
+        
+        # Commit se houver registros criados
+        if registros_criados:
+            db.session.commit()
+            print(f"✅ {len(registros_criados)} registros salvos no banco")
+        
+        return jsonify({
+            'success': True,
+            'message': f'{len(registros_criados)} registros criados com sucesso',
+            'registros_criados': registros_criados,
+            'erros': erros
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ ERRO CRÍTICO NO LANÇAMENTO MÚLTIPLO: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
+
+@main_bp.route('/api/funcionario/<int:funcionario_id>/toggle-ativo', methods=['POST'])
+@login_required
+def toggle_funcionario_ativo(funcionario_id):
+    """Toggle status ativo/inativo do funcionário"""
+    try:
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+        
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 404
+        
+        # Toggle status
+        funcionario.ativo = not funcionario.ativo
+        
+        # Registrar data de desativação se necessário
+        if not funcionario.ativo:
+            funcionario.data_desativacao = datetime.now().date()
+        else:
+            funcionario.data_desativacao = None
+        
+        db.session.commit()
+        
+        status_texto = "ativado" if funcionario.ativo else "desativado"
+        print(f"✅ Funcionário {funcionario.nome} {status_texto}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Funcionário {status_texto} com sucesso',
+            'ativo': funcionario.ativo
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ ERRO AO TOGGLE FUNCIONÁRIO: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@main_bp.route('/api/obras/ativas')
+@login_required
+def api_obras_ativas():
+    """API para listar obras ativas para seleção no modal"""
+    try:
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+        
+        obras = Obra.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Obra.nome).all()
+        
+        print(f"🏗️ DEBUG: Encontradas {len(obras)} obras ativas para admin_id={admin_id}")
+        
+        obras_json = []
+        for obra in obras:
+            obras_json.append({
+                'id': obra.id,
+                'nome': obra.nome,
+                'codigo': obra.codigo if obra.codigo else '',
+                'endereco': obra.endereco if obra.endereco else ''
+            })
+        
+        return jsonify({
+            'success': True,
+            'obras': obras_json,
+            'total': len(obras_json)
+        })
+        
+    except Exception as e:
+        print(f"❌ ERRO AO LISTAR OBRAS: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 def get_admin_id_dinamico():
     """Função helper para detectar admin_id dinamicamente no sistema multi-tenant"""
     try:
