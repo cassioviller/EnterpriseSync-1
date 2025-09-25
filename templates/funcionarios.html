@@ -1604,23 +1604,25 @@ $('#modalLancamentoMultiplo').on('show.bs.modal', function() {
     document.getElementById('periodo_fim').value = hoje.toISOString().split('T')[0];
 });
 
-// Toggle status funcionário (ativar/desativar)
+// Toggle status funcionário (ativar/desativar) - CORRIGIDO
 function toggleStatusFuncionario(id, nome, ativar) {
     const acao = ativar ? 'ativar' : 'desativar';
     const mensagem = `Tem certeza que deseja ${acao} o funcionário ${nome}?`;
     
     if (confirm(mensagem)) {
-        fetch(`/funcionario/${id}/toggle-status`, {
+        console.log(`🔧 DEBUG TOGGLE: ID=${id}, Nome=${nome}, Ativar=${ativar}`);
+        
+        fetch(`/api/funcionario/${id}/toggle-ativo`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCsrfToken()
-            },
-            body: JSON.stringify({
-                ativo: ativar
-            })
+            }
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log(`🔧 DEBUG RESPONSE: Status=${response.status}`);
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 alert(data.message);
