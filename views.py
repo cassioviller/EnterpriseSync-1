@@ -4760,6 +4760,126 @@ def toggle_funcionario_ativo(funcionario_id):
         print(f"❌ ERRO AO TOGGLE FUNCIONÁRIO: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@main_bp.route('/api/ponto/lancamento-finais-semana', methods=['POST'])
+@login_required
+def lancamento_finais_semana():
+    """Lança automaticamente sábados e domingos como folga para todos os funcionários ativos"""
+    try:
+        from calendar import monthrange
+        import calendar
+        
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+        
+        # Obter competência (mês/ano) da requisição
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados não fornecidos'}), 400
+            
+        competencia = data.get('competencia')  # Formato: "2025-09"
+        if not competencia:
+            return jsonify({'success': False, 'message': 'Competência não informada'}), 400
+        
+        try:
+            ano, mes = map(int, competencia.split('-'))
+        except:
+            return jsonify({'success': False, 'message': 'Formato de competência inválido. Use YYYY-MM'}), 400
+        
+        print(f"🗓️ LANÇAMENTO FINAIS DE SEMANA: {mes:02d}/{ano} para admin_id={admin_id}")
+        
+        # Buscar funcionários ativos
+        funcionarios_ativos = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).all()
+        
+        if not funcionarios_ativos:
+            return jsonify({'success': False, 'message': 'Nenhum funcionário ativo encontrado'}), 404
+        
+        # Encontrar todos os sábados e domingos do mês
+        _, ultimo_dia = monthrange(ano, mes)
+        sabados_domingos = []
+        
+        for dia in range(1, ultimo_dia + 1):
+            data_dia = date(ano, mes, dia)
+            dia_semana = data_dia.weekday()  # 0=Monday, 6=Sunday
+            
+            if dia_semana == 5:  # Sábado
+                sabados_domingos.append((data_dia, 'sabado_folga'))
+            elif dia_semana == 6:  # Domingo
+                sabados_domingos.append((data_dia, 'domingo_folga'))
+        
+        print(f"📅 Encontrados {len(sabados_domingos)} sábados/domingos em {mes:02d}/{ano}")
+        
+        # Contadores para relatório
+        registros_criados = 0
+        registros_existentes = 0
+        erros = []
+        
+        # Para cada funcionário ativo
+        for funcionario in funcionarios_ativos:
+            func_registros_criados = 0
+            
+            # Para cada sábado/domingo
+            for data_dia, tipo_folga in sabados_domingos:
+                try:
+                    # Verificar se já existe registro para este dia
+                    registro_existente = RegistroPonto.query.filter_by(
+                        funcionario_id=funcionario.id,
+                        data=data_dia
+                    ).first()
+                    
+                    if registro_existente:
+                        registros_existentes += 1
+                        continue
+                    
+                    # Criar novo registro de folga
+                    novo_registro = RegistroPonto(
+                        funcionario_id=funcionario.id,
+                        data=data_dia,
+                        tipo_registro=tipo_folga,
+                        horas_trabalhadas=0.0,
+                        horas_extras=0.0,
+                        observacoes=f'Lançamento automático - {tipo_folga.replace("_", " ").title()}'
+                    )
+                    
+                    db.session.add(novo_registro)
+                    registros_criados += 1
+                    func_registros_criados += 1
+                    
+                except Exception as e:
+                    erro_msg = f"Erro ao processar {funcionario.nome} em {data_dia.strftime('%d/%m/%Y')}: {str(e)}"
+                    erros.append(erro_msg)
+                    print(f"❌ {erro_msg}")
+            
+            if func_registros_criados > 0:
+                print(f"✅ {funcionario.nome}: {func_registros_criados} registros criados")
+        
+        # Commit se houver registros criados
+        if registros_criados > 0:
+            db.session.commit()
+            print(f"🚀 FINAIS DE SEMANA: {registros_criados} registros salvos no banco")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Lançamento concluído para {mes:02d}/{ano}',
+            'detalhes': {
+                'registros_criados': registros_criados,
+                'registros_existentes': registros_existentes,
+                'funcionarios_processados': len(funcionarios_ativos),
+                'finais_semana_encontrados': len(sabados_domingos),
+                'erros': erros
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ ERRO CRÍTICO NO LANÇAMENTO FINAIS DE SEMANA: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
+
 @main_bp.route('/api/obras/ativas')
 @login_required
 def api_obras_ativas():
