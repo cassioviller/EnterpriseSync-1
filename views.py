@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre
+from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
 
@@ -4793,7 +4793,7 @@ def lancamento_finais_semana():
                 print("❌ Nenhum admin encontrado no sistema!")
                 return jsonify({'success': False, 'message': 'Nenhum administrador encontrado no sistema'}), 500
         
-        # Buscar funcionários ativos
+        # Buscar funcionários ativos  
         funcionarios_ativos = Funcionario.query.filter_by(
             admin_id=admin_id,
             ativo=True
