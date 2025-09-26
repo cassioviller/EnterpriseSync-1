@@ -4761,7 +4761,6 @@ def toggle_funcionario_ativo(funcionario_id):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @main_bp.route('/api/ponto/lancamento-finais-semana', methods=['POST'])
-@login_required
 def lancamento_finais_semana():
     """Lança automaticamente sábados e domingos como folga para todos os funcionários ativos"""
     print("🚀 INÍCIO da função lancamento_finais_semana")
