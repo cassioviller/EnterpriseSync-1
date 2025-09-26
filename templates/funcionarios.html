@@ -243,6 +243,9 @@
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalLancamentoMultiplo">
                         <i class="fas fa-users-cog"></i> Lançamento Múltiplo
                     </button>
+                    <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalFinaisSemana">
+                        <i class="fas fa-calendar-check"></i> Sábados e Domingos
+                    </button>
                 </div>
             </div>
         </div>
@@ -1405,6 +1408,92 @@ function setDateRange(period) {
     </div>
 </div>
 
+<!-- Modal de Lançamento de Sábados e Domingos -->
+<div class="modal fade" id="modalFinaisSemana" tabindex="-1" aria-labelledby="modalFinaisSemanaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="modalFinaisSemanaLabel">
+                    <i class="fas fa-calendar-check"></i> Lançar Sábados e Domingos como Folga
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Como funciona:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Lançará automaticamente "Sábado folga" e "Domingo folga" para todos os funcionários ativos</li>
+                        <li>Será aplicado apenas à competência selecionada</li>
+                        <li>Não irá sobrescrever registros já existentes</li>
+                        <li>Funcionários inativos não serão afetados</li>
+                    </ul>
+                </div>
+                
+                <form id="formFinaisSemana">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="competencia_finais_semana" class="form-label">
+                                    <i class="fas fa-calendar"></i> Competência (Mês/Ano)
+                                </label>
+                                <input type="month" 
+                                       class="form-control" 
+                                       id="competencia_finais_semana" 
+                                       name="competencia" 
+                                       required>
+                                <div class="form-text">Selecione o mês/ano para lançamento</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-users"></i> Funcionários Ativos
+                                </label>
+                                <div class="badge bg-success fs-6" id="contadorFuncionariosAtivos">
+                                    {{ funcionarios|length }} funcionários
+                                </div>
+                                <div class="form-text">Somente funcionários ativos serão afetados</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-preview"></i> Prévia do Lançamento
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <small class="text-muted">Tipo de Registro:</small>
+                                            <div><span class="badge bg-info">Sábado folga</span></div>
+                                            <div><span class="badge bg-info">Domingo folga</span></div>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted">Horas Trabalhadas:</small>
+                                            <div>0 horas (folga)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-warning" onclick="executarLancamentoFinaisSemana()" id="btnLancarFinaisSemana">
+                    <i class="fas fa-rocket"></i> Lançar Sábados e Domingos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // Funções para o Modal de Lançamento Múltiplo
 function toggleCamposTipoLancamento() {
@@ -1603,6 +1692,96 @@ $('#modalLancamentoMultiplo').on('show.bs.modal', function() {
     document.getElementById('periodo_inicio').value = primeiroDiaDoMes.toISOString().split('T')[0];
     document.getElementById('periodo_fim').value = hoje.toISOString().split('T')[0];
 });
+
+// ===== FUNÇÕES PARA LANÇAMENTO DE FINAIS DE SEMANA =====
+
+// Configurar data padrão ao abrir o modal
+$('#modalFinaisSemana').on('show.bs.modal', function() {
+    const hoje = new Date();
+    const competenciaAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+    document.getElementById('competencia_finais_semana').value = competenciaAtual;
+});
+
+// Executar lançamento de sábados e domingos
+function executarLancamentoFinaisSemana() {
+    const competencia = document.getElementById('competencia_finais_semana').value;
+    const btnLancar = document.getElementById('btnLancarFinaisSemana');
+    
+    if (!competencia) {
+        alert('Por favor, selecione a competência (mês/ano).');
+        return;
+    }
+    
+    // Confirmação
+    const [ano, mes] = competencia.split('-');
+    const nomesMeses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const mesNome = nomesMeses[parseInt(mes) - 1];
+    
+    const confirmacao = confirm(`Tem certeza que deseja lançar sábados e domingos como folga para todos os funcionários ativos em ${mesNome}/${ano}?\n\nEsta ação não irá sobrescrever registros já existentes.`);
+    
+    if (!confirmacao) {
+        return;
+    }
+    
+    // Desabilitar botão e mostrar loading
+    btnLancar.disabled = true;
+    btnLancar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+    
+    console.log(`🗓️ Iniciando lançamento de finais de semana para ${competencia}`);
+    
+    // Chamar API
+    fetch('/api/ponto/lancamento-finais-semana', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({
+            competencia: competencia
+        })
+    })
+    .then(response => {
+        console.log(`🔄 Response status: ${response.status}`);
+        return response.json();
+    })
+    .then(result => {
+        console.log('🎯 Resultado da API:', result);
+        
+        if (result.success) {
+            const detalhes = result.detalhes;
+            let mensagem = `✅ Lançamento concluído para ${mesNome}/${ano}!\n\n`;
+            mensagem += `📊 Relatório:\n`;
+            mensagem += `• ${detalhes.registros_criados} novos registros criados\n`;
+            mensagem += `• ${detalhes.registros_existentes} registros já existentes (não alterados)\n`;
+            mensagem += `• ${detalhes.funcionarios_processados} funcionários processados\n`;
+            mensagem += `• ${detalhes.finais_semana_encontrados} sábados/domingos encontrados\n`;
+            
+            if (detalhes.erros && detalhes.erros.length > 0) {
+                mensagem += `\n⚠️ Avisos:\n${detalhes.erros.join('\n')}`;
+            }
+            
+            alert(mensagem);
+            $('#modalFinaisSemana').modal('hide');
+            
+            // Recarregar página se houver registros criados
+            if (detalhes.registros_criados > 0) {
+                location.reload();
+            }
+        } else {
+            alert(`❌ Erro: ${result.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Erro na requisição:', error);
+        alert('❌ Erro ao processar lançamento de finais de semana. Tente novamente.');
+    })
+    .finally(() => {
+        // Restaurar botão
+        btnLancar.disabled = false;
+        btnLancar.innerHTML = '<i class="fas fa-rocket"></i> Lançar Sábados e Domingos';
+    });
+}
 
 // Toggle status funcionário (ativar/desativar) - CORRIGIDO
 function toggleStatusFuncionario(id, nome, ativar) {
