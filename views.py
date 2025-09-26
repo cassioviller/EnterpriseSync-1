@@ -4765,23 +4765,120 @@ def lancamento_finais_semana():
     """Lança automaticamente sábados e domingos como folga para todos os funcionários ativos"""
     print("🚀 INÍCIO da função lancamento_finais_semana")
     
-    # TESTE SIMPLES PRIMEIRO
     try:
-        print("🔍 Teste: função sendo executada")
+        # Obter dados da requisição
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Dados não fornecidos'}), 400
+            
+        competencia = data.get('competencia')  # formato: '2025-08'
+        if not competencia:
+            return jsonify({'success': False, 'message': 'Competência não fornecida'}), 400
+            
+        print(f"📅 Processando competência: {competencia}")
+        
+        # Obter admin_id (usar a mesma lógica do sistema)
+        from utils.tenant import get_tenant_admin_id
+        admin_id = get_tenant_admin_id()
+        print(f"🏢 Admin ID: {admin_id}")
+        
+        # Buscar funcionários ativos
+        funcionarios_ativos = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).all()
+        
+        print(f"👥 Funcionários ativos encontrados: {len(funcionarios_ativos)}")
+        
+        # Parse da competência (ano-mes)
+        ano, mes = competencia.split('-')
+        ano = int(ano)
+        mes = int(mes)
+        
+        # Gerar todos os dias do mês
+        import calendar
+        from datetime import date
+        
+        # Último dia do mês
+        ultimo_dia = calendar.monthrange(ano, mes)[1]
+        
+        sabados_domingos = []
+        for dia in range(1, ultimo_dia + 1):
+            data_atual = date(ano, mes, dia)
+            # 5 = sábado, 6 = domingo (weekday)
+            if data_atual.weekday() in [5, 6]:
+                sabados_domingos.append(data_atual)
+        
+        print(f"📅 Finais de semana encontrados: {len(sabados_domingos)} dias")
+        
+        registros_criados = 0
+        registros_existentes = 0
+        erros = []
+        
+        # Processar cada funcionário
+        for funcionario in funcionarios_ativos:
+            print(f"👤 Processando: {funcionario.nome} (ID: {funcionario.id})")
+            
+            for data_folga in sabados_domingos:
+                # Determinar tipo de folga
+                tipo_folga = 'sabado_folga' if data_folga.weekday() == 5 else 'domingo_folga'
+                
+                # Verificar se já existe registro
+                registro_existente = RegistroPonto.query.filter_by(
+                    funcionario_id=funcionario.id,
+                    data=data_folga,
+                    tipo=tipo_folga
+                ).first()
+                
+                if registro_existente:
+                    registros_existentes += 1
+                    print(f"   ✅ Já existe: {data_folga} ({tipo_folga})")
+                else:
+                    # Criar novo registro
+                    try:
+                        novo_registro = RegistroPonto(
+                            funcionario_id=funcionario.id,
+                            data=data_folga,
+                            tipo=tipo_folga,
+                            horas_trabalhadas=0.0,
+                            observacao=f'Lançamento automático - {competencia}'
+                        )
+                        
+                        db.session.add(novo_registro)
+                        registros_criados += 1
+                        print(f"   ➕ Criado: {data_folga} ({tipo_folga})")
+                        
+                    except Exception as e:
+                        erro_msg = f"Erro ao criar registro para {funcionario.nome} em {data_folga}: {str(e)}"
+                        erros.append(erro_msg)
+                        print(f"   ❌ ERRO: {erro_msg}")
+        
+        # Salvar todas as alterações
+        if registros_criados > 0:
+            db.session.commit()
+            print(f"💾 {registros_criados} registros salvos no banco")
+        
         return jsonify({
             'success': True,
-            'message': 'Teste de rota funcionando',
+            'message': f'Lançamento concluído para {competencia.replace("-", "/")}!',
             'detalhes': {
-                'registros_criados': 0,
-                'registros_existentes': 0,
-                'funcionarios_processados': 0,
-                'finais_semana_encontrados': 0,
-                'erros': []
+                'funcionarios_processados': len(funcionarios_ativos),
+                'registros_criados': registros_criados,
+                'registros_existentes': registros_existentes,
+                'finais_semana_encontrados': len(sabados_domingos),
+                'erros': erros
             }
         })
+        
     except Exception as e:
-        print(f"❌ ERRO NA FUNÇÃO TESTE: {str(e)}")
-        return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
+        db.session.rollback()
+        error_msg = f"Erro interno: {str(e)}"
+        print(f"❌ ERRO GERAL: {error_msg}")
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao processar lançamento de finais de semana',
+            'error': error_msg
+        }), 500
 
 @main_bp.route('/api/obras/ativas')
 @login_required
