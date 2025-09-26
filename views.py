@@ -4768,6 +4768,7 @@ def lancamento_finais_semana():
     try:
         from calendar import monthrange
         import calendar
+        from models import RegistroPonto
         
         print("🔍 Obtendo admin_id...")
         admin_id = get_tenant_admin_id()
