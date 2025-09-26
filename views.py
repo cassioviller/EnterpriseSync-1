@@ -4837,8 +4837,7 @@ def lancamento_finais_semana():
                 # Verificar se já existe registro
                 registro_existente = RegistroPonto.query.filter_by(
                     funcionario_id=funcionario.id,
-                    data=data_folga,
-                    tipo=tipo_folga
+                    data=data_folga
                 ).first()
                 
                 if registro_existente:
@@ -4850,9 +4849,9 @@ def lancamento_finais_semana():
                         novo_registro = RegistroPonto(
                             funcionario_id=funcionario.id,
                             data=data_folga,
-                            tipo=tipo_folga,
+                            tipo_registro=tipo_folga,
                             horas_trabalhadas=0.0,
-                            observacao=f'Lançamento automático - {competencia}'
+                            observacoes=f'Lançamento automático - {competencia}'
                         )
                         
                         db.session.add(novo_registro)
