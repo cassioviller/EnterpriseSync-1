@@ -4777,10 +4777,21 @@ def lancamento_finais_semana():
             
         print(f"📅 Processando competência: {competencia}")
         
-        # Obter admin_id (usar a mesma lógica do sistema)
-        from utils.tenant import get_tenant_admin_id
-        admin_id = get_tenant_admin_id()
+        # Obter admin_id (usar fallback para desenvolvimento)
+        from utils.tenant import get_safe_admin_id
+        admin_id = get_safe_admin_id()
         print(f"🏢 Admin ID: {admin_id}")
+        
+        # Se ainda for None, usar fallback direto para desenvolvimento
+        if admin_id is None:
+            print("⚠️ Admin ID None - tentando fallback direto...")
+            primeiro_admin = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).first()
+            if primeiro_admin:
+                admin_id = primeiro_admin.id
+                print(f"🔧 Fallback aplicado - Admin ID: {admin_id}")
+            else:
+                print("❌ Nenhum admin encontrado no sistema!")
+                return jsonify({'success': False, 'message': 'Nenhum administrador encontrado no sistema'}), 500
         
         # Buscar funcionários ativos
         funcionarios_ativos = Funcionario.query.filter_by(
