@@ -4764,17 +4764,24 @@ def toggle_funcionario_ativo(funcionario_id):
 @login_required
 def lancamento_finais_semana():
     """Lança automaticamente sábados e domingos como folga para todos os funcionários ativos"""
+    print("🚀 INÍCIO da função lancamento_finais_semana")
     try:
         from calendar import monthrange
         import calendar
         
+        print("🔍 Obtendo admin_id...")
         admin_id = get_tenant_admin_id()
+        print(f"🔍 Admin ID obtido: {admin_id}")
         if not admin_id:
+            print("❌ Admin ID não encontrado")
             return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
         
         # Obter competência (mês/ano) da requisição
+        print("📥 Obtendo dados da requisição...")
         data = request.get_json()
+        print(f"📥 Dados recebidos: {data}")
         if not data:
+            print("❌ Nenhum dado fornecido na requisição")
             return jsonify({'success': False, 'message': 'Dados não fornecidos'}), 400
             
         competencia = data.get('competencia')  # Formato: "2025-09"
