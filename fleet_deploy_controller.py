@@ -12,7 +12,7 @@ import subprocess
 import time
 from datetime import datetime
 import json
-import requests
+import urllib.request
 
 # Setup logging
 logging.basicConfig(
@@ -55,7 +55,7 @@ class FleetDeployController:
             'variaveis_ambiente': {
                 'DATABASE_URL': 'obrigatória',
                 'FLEET_CUTOVER': 'deve estar false',
-                'SECRET_KEY': 'obrigatória'
+                'SESSION_SECRET': 'obrigatória'
             }
         }
         
@@ -167,13 +167,14 @@ FLEET_CUTOVER_TIMESTAMP={datetime.now().isoformat()}
             
             for teste in testes:
                 try:
-                    response = requests.get(teste['url'], timeout=30)
-                    if response.status_code == 200:
+                    req = urllib.request.Request(teste['url'])
+                    response = urllib.request.urlopen(req, timeout=30)
+                    if response.getcode() == 200:
                         logger.info(f"✅ {teste['nome']}: OK")
                         testes_passou += 1
                     else:
-                        logger.warning(f"⚠️ {teste['nome']}: HTTP {response.status_code}")
-                except requests.exceptions.RequestException as e:
+                        logger.warning(f"⚠️ {teste['nome']}: HTTP {response.getcode()}")
+                except Exception as e:
                     logger.warning(f"⚠️ {teste['nome']}: {e}")
             
             # Considerar sucesso se pelo menos health check passou

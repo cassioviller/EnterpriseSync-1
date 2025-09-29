@@ -360,6 +360,38 @@ def api_fleet_status():
 
 
 # ================================
+# ENDPOINT DE STATUS DO SISTEMA FLEET
+# ================================
+
+@fleet_bp.route('/api/fleet/status')
+def fleet_status():
+    """Endpoint de status do sistema FLEET"""
+    try:
+        from fleet_models import FleetVehicle
+        from app import db
+        from datetime import datetime
+        
+        # Verificar se tabelas existem e sistema está funcional
+        vehicle_count = FleetVehicle.query.count()
+        
+        return jsonify({
+            'status': 'active',
+            'fleet_enabled': True,
+            'database_ok': True,
+            'vehicle_count': vehicle_count,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'fleet_enabled': True,
+            'database_ok': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+
+# ================================
 # UTILITÁRIOS DE INICIALIZAÇÃO
 # ================================
 
