@@ -7,7 +7,8 @@
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from auth import admin_required, get_tenant_admin_id
+from auth import admin_required
+from utils.tenant import get_tenant_admin_id
 from fleet_service import FleetService
 
 # Blueprint para rotas FLEET
