@@ -3035,6 +3035,16 @@ class FleetVehicle(db.Model):
         """Descrição completa do veículo"""
         year_str = f" ({self.year})" if self.year else ""
         return f"{self.plate} - {self.brand} {self.model}{year_str}"
+    
+    @property
+    def total_costs(self):
+        """Calcular custos totais do veículo"""
+        from sqlalchemy import func
+        try:
+            total = db.session.query(func.sum(FleetCost.amount)).filter_by(vehicle_id=self.id).scalar()
+            return float(total or 0)
+        except Exception:
+            return 0.0
 
 
 class FleetTrip(db.Model):
