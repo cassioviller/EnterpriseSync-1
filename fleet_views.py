@@ -536,3 +536,164 @@ def api_vehicle_stats(vehicle_id):
     except Exception as e:
         logger.error(f"❌ Erro nas estatísticas do veículo: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ========================================
+# HEALTH CHECK - FLEET V3.0
+# ========================================
+
+@fleet_bp.route('/health')
+def fleet_health_check():
+    """
+    Health Check completo do Fleet V3.0
+    Verifica conectividade, tabelas, dados e integridade
+    """
+    try:
+        from sqlalchemy import text, inspect
+        from datetime import datetime
+        
+        health_result = {
+            'service': 'Fleet V3.0',
+            'timestamp': datetime.now().isoformat(),
+            'version': '3.0.0',
+            'status': 'unknown',
+            'checks': {},
+            'summary': {},
+            'errors': [],
+            'warnings': []
+        }
+        
+        # 1. Verificar conectividade com banco
+        try:
+            db.session.execute(text('SELECT 1'))
+            health_result['checks']['database_connection'] = 'OK'
+            logger.info("✅ Fleet Health Check - Conectividade: OK")
+        except Exception as e:
+            health_result['checks']['database_connection'] = 'FAIL'
+            health_result['errors'].append(f'Database connection failed: {str(e)}')
+            logger.error(f"❌ Fleet Health Check - Conectividade: {e}")
+        
+        # 2. Verificar existência das tabelas Fleet V3.0
+        fleet_tables = {
+            'fleet_vehicle': 'Veículos da Frota',
+            'fleet_trip': 'Viagens/Deslocamentos', 
+            'fleet_cost': 'Custos e Despesas',
+            'fleet_passenger': 'Passageiros das Viagens'
+        }
+        
+        try:
+            inspector = inspect(db.engine)
+            existing_tables = inspector.get_table_names()
+            
+            for table_name, description in fleet_tables.items():
+                if table_name in existing_tables:
+                    health_result['checks'][f'table_{table_name}'] = 'PRESENT'
+                    logger.info(f"✅ Fleet Health Check - Tabela {table_name}: presente")
+                    
+                    # Contar registros
+                    try:
+                        result = db.session.execute(text(f'SELECT COUNT(*) FROM {table_name}'))
+                        count = result.scalar()
+                        health_result['checks'][f'count_{table_name}'] = count
+                        logger.info(f"📊 Fleet Health Check - {table_name}: {count} registros")
+                    except Exception as e:
+                        health_result['warnings'].append(f'Failed to count records in {table_name}: {str(e)}')
+                        
+                else:
+                    health_result['checks'][f'table_{table_name}'] = 'MISSING'
+                    health_result['errors'].append(f'Required table missing: {table_name} ({description})')
+                    logger.error(f"❌ Fleet Health Check - Tabela ausente: {table_name}")
+                    
+        except Exception as e:
+            health_result['errors'].append(f'Table inspection failed: {str(e)}')
+            logger.error(f"❌ Fleet Health Check - Inspeção de tabelas: {e}")
+        
+        # 3. Verificar integridade dos modelos Fleet
+        try:
+            # Tentar instanciar os modelos principais
+            vehicle_count = FleetVehicle.query.count()
+            trip_count = FleetTrip.query.count()
+            cost_count = FleetCost.query.count()
+            passenger_count = FleetPassenger.query.count()
+            
+            health_result['summary'] = {
+                'total_vehicles': vehicle_count,
+                'total_trips': trip_count,
+                'total_costs': cost_count,
+                'total_passengers': passenger_count
+            }
+            
+            health_result['checks']['model_integrity'] = 'OK'
+            logger.info(f"✅ Fleet Health Check - Modelos: {vehicle_count} veículos, {trip_count} viagens")
+            
+        except Exception as e:
+            health_result['checks']['model_integrity'] = 'FAIL'
+            health_result['errors'].append(f'Model integrity check failed: {str(e)}')
+            logger.error(f"❌ Fleet Health Check - Integridade de modelos: {e}")
+        
+        # 4. Verificar funcionamento multi-tenant
+        try:
+            admin_id = get_admin_id()
+            if admin_id:
+                # Testar query com filtro de admin_id
+                admin_vehicles = FleetVehicle.query.filter_by(admin_id=admin_id).count()
+                health_result['checks']['multi_tenant'] = 'OK'
+                health_result['summary']['admin_id'] = admin_id
+                health_result['summary']['admin_vehicles'] = admin_vehicles
+                logger.info(f"✅ Fleet Health Check - Multi-tenant: admin_id={admin_id}, {admin_vehicles} veículos")
+            else:
+                health_result['checks']['multi_tenant'] = 'WARNING'
+                health_result['warnings'].append('No admin_id found - multi-tenant may not be working')
+                
+        except Exception as e:
+            health_result['checks']['multi_tenant'] = 'FAIL'
+            health_result['errors'].append(f'Multi-tenant check failed: {str(e)}')
+            logger.error(f"❌ Fleet Health Check - Multi-tenant: {e}")
+        
+        # 5. Verificar tabelas legacy (devem estar ausentes)
+        legacy_tables = [
+            'veiculo', 'uso_veiculo', 'custo_veiculo', 'passageiro_veiculo',
+            'alocacao_veiculo', 'equipe_veiculo', 'transferencia_veiculo'
+        ]
+        
+        try:
+            legacy_found = []
+            for table in legacy_tables:
+                if table in existing_tables:
+                    legacy_found.append(table)
+                    
+            if legacy_found:
+                health_result['checks']['legacy_cleanup'] = 'WARNING'
+                health_result['warnings'].append(f'Legacy tables still present: {", ".join(legacy_found)}')
+                logger.warning(f"⚠️ Fleet Health Check - Tabelas legacy presentes: {legacy_found}")
+            else:
+                health_result['checks']['legacy_cleanup'] = 'OK'
+                logger.info("✅ Fleet Health Check - Limpeza legacy: todas as tabelas removidas")
+                
+        except Exception as e:
+            health_result['warnings'].append(f'Legacy table check failed: {str(e)}')
+            logger.warning(f"⚠️ Fleet Health Check - Verificação legacy: {e}")
+        
+        # Determinar status final
+        if health_result['errors']:
+            health_result['status'] = 'unhealthy'
+            status_code = 503  # Service Unavailable
+            logger.error(f"❌ Fleet Health Check: UNHEALTHY - {len(health_result['errors'])} errors")
+        elif health_result['warnings']:
+            health_result['status'] = 'degraded'
+            status_code = 200  # OK but with warnings
+            logger.warning(f"⚠️ Fleet Health Check: DEGRADED - {len(health_result['warnings'])} warnings")
+        else:
+            health_result['status'] = 'healthy'
+            status_code = 200
+            logger.info("✅ Fleet Health Check: HEALTHY")
+        
+        return jsonify(health_result), status_code
+        
+    except Exception as e:
+        logger.error(f"❌ Fleet Health Check - Erro crítico: {e}")
+        return jsonify({
+            'service': 'Fleet V3.0',
+            'timestamp': datetime.now().isoformat(),
+            'status': 'error',
+            'error': str(e)
+        }), 500
