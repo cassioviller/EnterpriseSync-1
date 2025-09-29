@@ -197,8 +197,33 @@ def obter_foto_funcionario(funcionario):
 
 # Create tables and initialize
 with app.app_context():
+    # Import legacy models
+    import models  # noqa: F401
+    
+    # Import FLEET models if system is enabled
+    try:
+        fleet_enabled = os.environ.get('FLEET_CUTOVER', 'false').lower() == 'true'
+        if fleet_enabled:
+            import fleet_models  # noqa: F401
+            logging.info("✅ FLEET MODELS: Modelos FLEET importados")
+        else:
+            logging.info("ℹ️ FLEET MODELS: Sistema FLEET desabilitado")
+    except ImportError as e:
+        logging.warning(f"⚠️ FLEET MODELS: Erro ao importar: {e}")
+    
     db.create_all()
     logging.info("Database tables created/verified")
+    
+    # Register FLEET routes if enabled
+    try:
+        from fleet_routes import register_fleet_routes
+        fleet_registered = register_fleet_routes(app)
+        if fleet_registered:
+            logging.info("✅ FLEET SYSTEM: Sistema FLEET ativo e funcional")
+        else:
+            logging.info("ℹ️ FLEET SYSTEM: Sistema legacy mantido")
+    except ImportError as e:
+        logging.warning(f"⚠️ FLEET ROUTES: Não disponível: {e}")
     
     # MIGRAÇÕES DESABILITADAS novamente após aplicar mudanças críticas de veículos
     print("🔇 Migrações automáticas DESABILITADAS novamente para evitar loops infinitos")
