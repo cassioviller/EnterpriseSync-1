@@ -1,0 +1,323 @@
+{% extends "base_completo.html" %}
+{% set active_page = "fleet" %}
+
+{% block title %}{{ 'Editar' if trip else 'Nova' }} Viagem{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-dark mb-1">
+                {% if trip %}
+                    <i class="fas fa-edit text-warning"></i> Editar Viagem
+                {% else %}
+                    <i class="fas fa-plus text-success"></i> Nova Viagem
+                {% endif %}
+            </h2>
+            <p class="text-muted">
+                {% if trip %}
+                    Atualize os dados da viagem
+                {% else %}
+                    Registre uma nova viagem da frota
+                {% endif %}
+            </p>
+        </div>
+        <a href="{{ url_for('fleet.trips') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <!-- Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0">
+                    <h5 class="card-title mb-0">Informações da Viagem</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" novalidate>
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Vehicle and Date -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.vehicle_id.label(class="form-label") }}
+                                {{ form.vehicle_id(class="form-select" + (" is-invalid" if form.vehicle_id.errors else "")) }}
+                                {% if form.vehicle_id.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.vehicle_id.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                {{ form.trip_date.label(class="form-label") }}
+                                {{ form.trip_date(class="form-control" + (" is-invalid" if form.trip_date.errors else "")) }}
+                                {% if form.trip_date.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.trip_date.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Time -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.start_time.label(class="form-label") }}
+                                {{ form.start_time(class="form-control" + (" is-invalid" if form.start_time.errors else "")) }}
+                                {% if form.start_time.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.start_time.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                {{ form.end_time.label(class="form-label") }}
+                                {{ form.end_time(class="form-control" + (" is-invalid" if form.end_time.errors else "")) }}
+                                {% if form.end_time.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.end_time.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Route -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.origin.label(class="form-label") }}
+                                {{ form.origin(class="form-control" + (" is-invalid" if form.origin.errors else ""), placeholder="Ex: Escritório") }}
+                                {% if form.origin.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.origin.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                {{ form.destination.label(class="form-label") }}
+                                {{ form.destination(class="form-control" + (" is-invalid" if form.destination.errors else ""), placeholder="Ex: Obra Centro") }}
+                                {% if form.destination.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.destination.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Distance and Project -->
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.distance_km.label(class="form-label") }}
+                                <div class="input-group">
+                                    {{ form.distance_km(class="form-control" + (" is-invalid" if form.distance_km.errors else ""), placeholder="0") }}
+                                    <span class="input-group-text">km</span>
+                                </div>
+                                {% if form.distance_km.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.distance_km.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                {{ form.obra_id.label(class="form-label") }}
+                                {{ form.obra_id(class="form-select" + (" is-invalid" if form.obra_id.errors else "")) }}
+                                {% if form.obra_id.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.obra_id.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                {{ form.driver_employee_id.label(class="form-label") }}
+                                {{ form.driver_employee_id(class="form-select" + (" is-invalid" if form.driver_employee_id.errors else "")) }}
+                                {% if form.driver_employee_id.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.driver_employee_id.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Purpose and Notes -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.purpose.label(class="form-label") }}
+                                {{ form.purpose(class="form-select" + (" is-invalid" if form.purpose.errors else "")) }}
+                                {% if form.purpose.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.purpose.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                {{ form.notes.label(class="form-label") }}
+                                {{ form.notes(class="form-control" + (" is-invalid" if form.notes.errors else ""), 
+                                            rows="3", 
+                                            placeholder="Observações adicionais...") }}
+                                {% if form.notes.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.notes.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a href="{{ url_for('fleet.trips') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if trip %}
+                                    <i class="fas fa-save"></i> Atualizar Viagem
+                                {% else %}
+                                    <i class="fas fa-plus"></i> Criar Viagem
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Sidebar -->
+        <div class="col-lg-4">
+            <!-- Quick Guide -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-route"></i> Guia Rápido
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6 class="fw-bold">🚗 Seleção do Veículo</h6>
+                        <p class="small text-muted mb-0">
+                            Escolha o veículo que realizou a viagem. 
+                            Apenas veículos ativos aparecem na lista.
+                        </p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="fw-bold">📍 Rota da Viagem</h6>
+                        <p class="small text-muted mb-0">
+                            Informe claramente os pontos de origem e destino. 
+                            Isso ajuda no cálculo de custos por quilômetro.
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <h6 class="fw-bold">🎯 Finalidade</h6>
+                        <p class="small text-muted mb-0">
+                            Selecione o tipo de viagem para facilitar 
+                            relatórios e análises posteriores.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Passengers Section -->
+            {% if trip and trip.id %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">👥 Passageiros</h6>
+                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                onclick="addPassenger()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if trip.passengers %}
+                        {% for passenger in trip.passengers %}
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span>{{ passenger.employee.nome if passenger.employee else passenger.name }}</span>
+                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                    onclick="removePassenger({{ passenger.id }})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted small mb-0">Nenhum passageiro registrado</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Vehicle Info -->
+            {% if selected_vehicle %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-car"></i> Informações do Veículo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h5>{{ selected_vehicle.license_plate }}</h5>
+                        <p class="text-muted mb-0">{{ selected_vehicle.make }} {{ selected_vehicle.model }}</p>
+                    </div>
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <small class="text-muted">Combustível</small>
+                            <p class="fw-bold mb-0">{{ selected_vehicle.fuel_type|title }}</p>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Status</small>
+                            <p class="fw-bold mb-0">
+                                {% if selected_vehicle.status == 'active' %}
+                                    <span class="text-success">Ativo</span>
+                                {% else %}
+                                    <span class="text-warning">{{ selected_vehicle.status|title }}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-calculate distance using Google Maps API (if available)
+function calculateDistance() {
+    // Implementation for distance calculation
+    // This would integrate with Google Maps Distance Matrix API
+}
+
+// Add passenger functionality
+function addPassenger() {
+    // Implementation for adding passengers
+    window.location.href = `{{ url_for('fleet.add_passenger', trip_id=trip.id if trip else 0) }}`;
+}
+
+// Remove passenger functionality
+function removePassenger(passengerId) {
+    if (confirm('Remover este passageiro da viagem?')) {
+        window.location.href = `{{ url_for('fleet.remove_passenger', id=0) }}`.replace('0', passengerId);
+    }
+}
+
+// Auto-set current time when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    const startTimeInput = document.querySelector('input[name="start_time"]');
+    if (startTimeInput && !startTimeInput.value) {
+        const now = new Date();
+        const timeString = now.toTimeString().slice(0, 5);
+        startTimeInput.value = timeString;
+    }
+});
+</script>
+{% endblock %}

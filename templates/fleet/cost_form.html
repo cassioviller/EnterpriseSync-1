@@ -1,0 +1,361 @@
+{% extends "base_completo.html" %}
+{% set active_page = "fleet" %}
+
+{% block title %}{{ 'Editar' if cost else 'Novo' }} Custo{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-dark mb-1">
+                {% if cost %}
+                    <i class="fas fa-edit text-warning"></i> Editar Custo
+                {% else %}
+                    <i class="fas fa-plus text-success"></i> Novo Custo
+                {% endif %}
+            </h2>
+            <p class="text-muted">
+                {% if cost %}
+                    Atualize as informações do custo
+                {% else %}
+                    Registre um novo custo da frota
+                {% endif %}
+            </p>
+        </div>
+        <a href="{{ url_for('fleet.costs') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <!-- Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0">
+                    <h5 class="card-title mb-0">Informações do Custo</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" novalidate>
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Vehicle and Date -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.vehicle_id.label(class="form-label") }}
+                                {{ form.vehicle_id(class="form-select" + (" is-invalid" if form.vehicle_id.errors else "")) }}
+                                {% if form.vehicle_id.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.vehicle_id.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                {{ form.cost_date.label(class="form-label") }}
+                                {{ form.cost_date(class="form-control" + (" is-invalid" if form.cost_date.errors else "")) }}
+                                {% if form.cost_date.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.cost_date.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Type and Amount -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.cost_type.label(class="form-label") }}
+                                {{ form.cost_type(class="form-select" + (" is-invalid" if form.cost_type.errors else ""), onchange="updateCostTypeInfo()") }}
+                                {% if form.cost_type.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.cost_type.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                {{ form.amount.label(class="form-label") }}
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    {{ form.amount(class="form-control" + (" is-invalid" if form.amount.errors else ""), placeholder="0,00", step="0.01") }}
+                                </div>
+                                {% if form.amount.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.amount.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Description and Project -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.description.label(class="form-label") }}
+                                {{ form.description(class="form-control" + (" is-invalid" if form.description.errors else ""), placeholder="Ex: Abastecimento, Troca de óleo...") }}
+                                {% if form.description.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.description.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                {{ form.obra_id.label(class="form-label") }}
+                                {{ form.obra_id(class="form-select" + (" is-invalid" if form.obra_id.errors else "")) }}
+                                {% if form.obra_id.errors %}
+                                    <div class="invalid-feedback">
+                                        {% for error in form.obra_id.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">Opcional: associe este custo a uma obra específica</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Fuel-specific fields (shown only for fuel type) -->
+                        <div id="fuelFields" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    {{ form.fuel_liters.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.fuel_liters(class="form-control" + (" is-invalid" if form.fuel_liters.errors else ""), placeholder="0", step="0.1") }}
+                                        <span class="input-group-text">L</span>
+                                    </div>
+                                    {% if form.fuel_liters.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.fuel_liters.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    {{ form.fuel_price_per_liter.label(class="form-label") }}
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        {{ form.fuel_price_per_liter(class="form-control" + (" is-invalid" if form.fuel_price_per_liter.errors else ""), placeholder="0,00", step="0.01") }}
+                                    </div>
+                                    {% if form.fuel_price_per_liter.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.fuel_price_per_liter.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    {{ form.odometer_reading.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.odometer_reading(class="form-control" + (" is-invalid" if form.odometer_reading.errors else ""), placeholder="Ex: 125000") }}
+                                        <span class="input-group-text">km</span>
+                                    </div>
+                                    {% if form.odometer_reading.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.odometer_reading.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Notes -->
+                        <div class="mb-3">
+                            {{ form.notes.label(class="form-label") }}
+                            {{ form.notes(class="form-control" + (" is-invalid" if form.notes.errors else ""), 
+                                        rows="3", 
+                                        placeholder="Observações adicionais sobre este custo...") }}
+                            {% if form.notes.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.notes.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a href="{{ url_for('fleet.costs') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if cost %}
+                                    <i class="fas fa-save"></i> Atualizar Custo
+                                {% else %}
+                                    <i class="fas fa-plus"></i> Criar Custo
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Sidebar -->
+        <div class="col-lg-4">
+            <!-- Cost Type Guide -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> Tipos de Custo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6 class="fw-bold">⛽ Combustível</h6>
+                        <p class="small text-muted mb-0">
+                            Abastecimentos do veículo. Inclui litros, 
+                            preço por litro e quilometragem.
+                        </p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="fw-bold">🔧 Manutenção</h6>
+                        <p class="small text-muted mb-0">
+                            Reparos, trocas de peças, revisões 
+                            e serviços mecânicos.
+                        </p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="fw-bold">🛡️ Seguro</h6>
+                        <p class="small text-muted mb-0">
+                            Seguros obrigatórios e opcionais, 
+                            renovações e parcelas.
+                        </p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="fw-bold">⚠️ Multas</h6>
+                        <p class="small text-muted mb-0">
+                            Multas de trânsito, taxas e 
+                            penalidades relacionadas.
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <h6 class="fw-bold">📄 Outros</h6>
+                        <p class="small text-muted mb-0">
+                            Documentação, lavagem, estacionamento 
+                            e demais custos.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vehicle Info -->
+            {% if selected_vehicle %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-car"></i> Informações do Veículo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h5>{{ selected_vehicle.license_plate }}</h5>
+                        <p class="text-muted mb-0">{{ selected_vehicle.make }} {{ selected_vehicle.model }}</p>
+                    </div>
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <small class="text-muted">Combustível</small>
+                            <p class="fw-bold mb-0">{{ selected_vehicle.fuel_type|title }}</p>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Ano</small>
+                            <p class="fw-bold mb-0">{{ selected_vehicle.year }}</p>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row text-center">
+                        <div class="col-12">
+                            <small class="text-muted">Custos Totais</small>
+                            <h5 class="text-warning mb-0">R$ {{ "%.2f"|format(selected_vehicle.total_costs or 0) }}</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Quick Tips -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-lightbulb"></i> Dicas Rápidas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6 class="fw-bold">💡 Combustível</h6>
+                        <p class="small text-muted mb-0">
+                            Registre sempre litros e preço por litro 
+                            para análises de consumo.
+                        </p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="fw-bold">📊 Quilometragem</h6>
+                        <p class="small text-muted mb-0">
+                            Anote a quilometragem atual para 
+                            controle de consumo e manutenção.
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <h6 class="fw-bold">🎯 Associação com Obras</h6>
+                        <p class="small text-muted mb-0">
+                            Vincule custos a obras específicas 
+                            para relatórios detalhados.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Show/hide fuel-specific fields based on cost type
+function updateCostTypeInfo() {
+    const costType = document.querySelector('select[name="cost_type"]').value;
+    const fuelFields = document.getElementById('fuelFields');
+    
+    if (costType === 'fuel') {
+        fuelFields.style.display = 'block';
+    } else {
+        fuelFields.style.display = 'none';
+        // Clear fuel fields when not needed
+        document.querySelector('input[name="fuel_liters"]').value = '';
+        document.querySelector('input[name="fuel_price_per_liter"]').value = '';
+        document.querySelector('input[name="odometer_reading"]').value = '';
+    }
+}
+
+// Auto-calculate amount based on fuel data
+function calculateFuelAmount() {
+    const liters = parseFloat(document.querySelector('input[name="fuel_liters"]').value) || 0;
+    const pricePerLiter = parseFloat(document.querySelector('input[name="fuel_price_per_liter"]').value) || 0;
+    const amount = liters * pricePerLiter;
+    
+    if (amount > 0) {
+        document.querySelector('input[name="amount"]').value = amount.toFixed(2);
+    }
+}
+
+// Set up event listeners when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize fuel fields visibility
+    updateCostTypeInfo();
+    
+    // Add event listeners for auto-calculation
+    document.querySelector('input[name="fuel_liters"]').addEventListener('input', calculateFuelAmount);
+    document.querySelector('input[name="fuel_price_per_liter"]').addEventListener('input', calculateFuelAmount);
+    
+    // Set default date to today
+    const dateInput = document.querySelector('input[name="cost_date"]');
+    if (dateInput && !dateInput.value) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+    }
+});
+</script>
+{% endblock %}
