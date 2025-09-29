@@ -814,28 +814,30 @@
                         
                         <!-- Segunda Linha -->
                         <div class="d-flex flex-wrap align-items-center justify-content-center nav-spacing">
-                            <!-- Dropdown de Veículos -->
+                            <!-- Dropdown de Frota V3.0 -->
                             <div class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle px-3 py-2" href="#" id="veiculosDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="white-space: nowrap;">
-                                    <i class="fas fa-truck me-2"></i> Veículos
+                                <a class="nav-link dropdown-toggle px-3 py-2" href="#" id="frotaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="white-space: nowrap;">
+                                    <i class="fas fa-car me-2"></i> Frota
                                 </a>
-                                <ul class="dropdown-menu" aria-labelledby="veiculosDropdown">
-                                    <li><a class="dropdown-item" href="{{ url_for('main.veiculos') }}">
-                                        <i class="fas fa-list me-2"></i> Gestão Básica
+                                <ul class="dropdown-menu" aria-labelledby="frotaDropdown">
+                                    <li><a class="dropdown-item" href="{{ url_for('fleet.dashboard') }}">
+                                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('fleet.vehicles') }}">
+                                        <i class="fas fa-car me-2"></i> Veículos
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('fleet.trips') }}">
+                                        <i class="fas fa-route me-2"></i> Viagens
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('fleet.costs') }}">
+                                        <i class="fas fa-receipt me-2"></i> Custos
                                     </a></li>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><h6 class="dropdown-header">Sistema Avançado</h6></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_obra.dashboard_integrado') }}">
-                                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard Integrado
+                                    <li><a class="dropdown-item" href="{{ url_for('fleet.new_vehicle') }}">
+                                        <i class="fas fa-plus me-2"></i> Novo Veículo
                                     </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_obra.listar_alocacoes') }}">
-                                        <i class="fas fa-map-marked-alt me-2"></i> Alocações por Obra
-                                    </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_obra.nova_alocacao') }}">
-                                        <i class="fas fa-plus-circle me-2"></i> Nova Alocação
-                                    </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_relatorios.index_relatorios') }}">
-                                        <i class="fas fa-chart-bar me-2"></i> Relatórios Avançados
+                                    <li><a class="dropdown-item" href="{{ url_for('fleet.new_trip') }}">
+                                        <i class="fas fa-plus me-2"></i> Nova Viagem
                                     </a></li>
                                 </ul>
                             </div>
@@ -885,8 +887,8 @@
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.veiculos') }}">
-                                <i class="fas fa-truck me-1"></i> Uso de Veículo
+                            <a class="nav-link" href="{{ url_for('fleet.dashboard') }}">
+                                <i class="fas fa-car me-1"></i> Frota
                             </a>
                         </li>
                     </ul>

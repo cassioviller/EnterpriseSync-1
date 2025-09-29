@@ -664,7 +664,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if current_user.is_authenticated and current_user.tipo_usuario.name == 'FUNCIONARIO' %}
-                        <!-- Menu simplificado para funcionários: apenas RDO e Veículos -->
+                        <!-- Menu simplificado para funcionários: apenas RDO e Frota -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('main.funcionario_rdo_consolidado') }}">
                                 <i class="fas fa-clipboard-list me-1"></i> RDOs
@@ -672,8 +672,8 @@
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.veiculos') }}">
-                                <i class="fas fa-car me-1"></i> Veículos
+                            <a class="nav-link" href="{{ url_for('fleet.dashboard') }}">
+                                <i class="fas fa-car me-1"></i> Frota
                             </a>
                         </li>
                     {% else %}
@@ -748,10 +748,31 @@
                             </ul>
                         </li>
                         
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.veiculos') }}">
-                                <i class="fas fa-car me-1"></i> Veículos
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="froteDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-car me-1"></i> Frota
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('fleet.dashboard') }}">
+                                    <i class="fas fa-tachometer-alt me-1"></i> Dashboard
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('fleet.vehicles') }}">
+                                    <i class="fas fa-car me-1"></i> Veículos
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('fleet.trips') }}">
+                                    <i class="fas fa-route me-1"></i> Viagens
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('fleet.costs') }}">
+                                    <i class="fas fa-receipt me-1"></i> Custos
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('fleet.new_vehicle') }}">
+                                    <i class="fas fa-plus me-1"></i> Novo Veículo
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('fleet.new_trip') }}">
+                                    <i class="fas fa-plus me-1"></i> Nova Viagem
+                                </a></li>
+                            </ul>
                         </li>
                         
                         <li class="nav-item">
