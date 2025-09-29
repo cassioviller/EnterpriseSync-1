@@ -1,0 +1,12 @@
+{
+  "timestamp": "2025-09-29T11:37:35.848110",
+  "estrutura_ok": true,
+  "operacoes_ok": false,
+  "constraints_ok": false,
+  "status_geral": "ERROR",
+  "problemas_encontrados": [
+    "Operações básicas falhando",
+    "Constraints/índices com problema"
+  ],
+  "solucoes_aplicadas": []
+}
