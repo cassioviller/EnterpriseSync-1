@@ -37,7 +37,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" novalidate>
-                        {{ form.hidden_tag() }}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         
                         <!-- Vehicle and Date -->
                         <div class="row">

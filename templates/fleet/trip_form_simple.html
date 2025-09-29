@@ -1,0 +1,167 @@
+{% extends "base_completo.html" %}
+{% set active_page = "fleet" %}
+
+{% block title %}
+    {% if trip %}Editar Viagem{% else %}Nova Viagem{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-dark mb-1">
+                {% if trip %}
+                    <i class="fas fa-edit text-warning"></i> Editar Viagem
+                {% else %}
+                    <i class="fas fa-plus text-success"></i> Nova Viagem
+                {% endif %}
+            </h2>
+            <p class="text-muted">
+                {% if trip %}
+                    Atualize os dados da viagem
+                {% else %}
+                    Registre uma nova viagem da frota
+                {% endif %}
+            </p>
+        </div>
+        <a href="{{ url_for('fleet.trips') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <!-- Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0">
+                    <h5 class="card-title mb-0">Informações da Viagem</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" novalidate>
+                        <!-- Vehicle and Date -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="vehicle_id" class="form-label">Veículo *</label>
+                                <select class="form-select" id="vehicle_id" name="vehicle_id" required>
+                                    <option value="">Selecione um veículo</option>
+                                    {% for vehicle in vehicles %}
+                                        <option value="{{ vehicle.id }}" 
+                                                {{ 'selected' if trip and trip.vehicle_id == vehicle.id else '' }}>
+                                            {{ vehicle.plate }} - {{ vehicle.brand }} {{ vehicle.model }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="trip_date" class="form-label">Data da Viagem *</label>
+                                <input type="date" class="form-control" id="trip_date" name="trip_date" 
+                                       value="{{ trip.trip_date.strftime('%Y-%m-%d') if trip else '' }}" required>
+                            </div>
+                        </div>
+                        
+                        <!-- Time -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="start_time" class="form-label">Hora de Saída</label>
+                                <input type="time" class="form-control" id="start_time" name="start_time" 
+                                       value="{{ trip.start_time.strftime('%H:%M') if trip and trip.start_time else '' }}">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="end_time" class="form-label">Hora de Chegada</label>
+                                <input type="time" class="form-control" id="end_time" name="end_time" 
+                                       value="{{ trip.end_time.strftime('%H:%M') if trip and trip.end_time else '' }}">
+                            </div>
+                        </div>
+                        
+                        <!-- Driver and Project -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="driver_id" class="form-label">Motorista</label>
+                                <select class="form-select" id="driver_id" name="driver_id">
+                                    <option value="">Selecione um motorista</option>
+                                    {% for driver in drivers %}
+                                        <option value="{{ driver.id }}" 
+                                                {{ 'selected' if trip and trip.driver_id == driver.id else '' }}>
+                                            {{ driver.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="obra_id" class="form-label">Obra</label>
+                                <select class="form-select" id="obra_id" name="obra_id">
+                                    <option value="">Selecione uma obra</option>
+                                    {% for obra in obras %}
+                                        <option value="{{ obra.id }}" 
+                                                {{ 'selected' if trip and trip.obra_id == obra.id else '' }}>
+                                            {{ obra.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Locations -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="origin" class="form-label">Origem</label>
+                                <input type="text" class="form-control" id="origin" name="origin" 
+                                       placeholder="Endereço de origem" value="{{ trip.origin if trip else '' }}">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="destination" class="form-label">Destino</label>
+                                <input type="text" class="form-control" id="destination" name="destination" 
+                                       placeholder="Endereço de destino" value="{{ trip.destination if trip else '' }}">
+                            </div>
+                        </div>
+                        
+                        <!-- Odometer -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="start_odometer" class="form-label">Km Inicial</label>
+                                <input type="number" class="form-control" id="start_odometer" name="start_odometer" 
+                                       placeholder="Quilometragem inicial" value="{{ trip.start_odometer if trip else '' }}" min="0">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="end_odometer" class="form-label">Km Final</label>
+                                <input type="number" class="form-control" id="end_odometer" name="end_odometer" 
+                                       placeholder="Quilometragem final" value="{{ trip.end_odometer if trip else '' }}" min="0">
+                            </div>
+                        </div>
+                        
+                        <!-- Purpose and Notes -->
+                        <div class="mb-3">
+                            <label for="purpose" class="form-label">Finalidade</label>
+                            <input type="text" class="form-control" id="purpose" name="purpose" 
+                                   placeholder="Finalidade da viagem" value="{{ trip.purpose if trip else '' }}">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Observações</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                      placeholder="Observações sobre a viagem">{{ trip.notes if trip else '' }}</textarea>
+                        </div>
+                        
+                        <!-- Submit -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 
+                                {% if trip %}Atualizar{% else %}Salvar{% endif %}
+                            </button>
+                            <a href="{{ url_for('fleet.trips') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

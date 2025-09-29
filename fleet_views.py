@@ -161,7 +161,7 @@ def vehicles():
         
         logger.info(f"✅ Encontrados {total_vehicles} veículos ({active_vehicles} ativos)")
         
-        return render_template('fleet/vehicles_list.html',
+        return render_template('fleet/vehicles.html',
                              vehicles=vehicles,
                              total_vehicles=total_vehicles,
                              active_vehicles=active_vehicles,
@@ -176,7 +176,7 @@ def vehicles():
     except Exception as e:
         logger.error(f"❌ Erro ao listar veículos: {e}")
         flash(f"Erro ao carregar veículos: {e}", 'danger')
-        return render_template('fleet/vehicles_list.html', vehicles=[], total_vehicles=0, active_vehicles=0)
+        return render_template('fleet/vehicles.html', vehicles=[], total_vehicles=0, active_vehicles=0)
 
 @fleet_bp.route('/vehicles/new', methods=['GET', 'POST'])
 @login_required
@@ -210,7 +210,7 @@ def vehicle_new():
             
             if existing:
                 flash(f"Veículo com placa {vehicle.plate} já existe!", 'danger')
-                return render_template('fleet/vehicle_form.html', vehicle=None, mode='create')
+                return render_template('fleet/vehicle_form_simple.html', vehicle=None, mode='create')
             
             db.session.add(vehicle)
             db.session.commit()
@@ -218,14 +218,14 @@ def vehicle_new():
             logger.info(f"✅ Veículo criado: {vehicle.plate} - {vehicle.brand} {vehicle.model}")
             flash(f"Veículo {vehicle.plate} criado com sucesso!", 'success')
             
-            return redirect(url_for('fleet.vehicles_list'))
+            return redirect(url_for('fleet.vehicles'))
             
         except Exception as e:
             db.session.rollback()
             logger.error(f"❌ Erro ao criar veículo: {e}")
             flash(f"Erro ao criar veículo: {e}", 'danger')
     
-    return render_template('fleet/vehicle_form.html', vehicle=None, mode='create')
+    return render_template('fleet/vehicle_form_simple.html', vehicle=None, mode='create')
 
 @fleet_bp.route('/vehicles/<int:vehicle_id>')
 @login_required
@@ -312,7 +312,7 @@ def vehicle_edit(vehicle_id):
             
             return redirect(url_for('fleet.vehicle_detail', vehicle_id=vehicle.id))
         
-        return render_template('fleet/vehicle_form.html', vehicle=vehicle, mode='edit')
+        return render_template('fleet/vehicle_form_simple.html', vehicle=vehicle, mode='edit')
         
     except Exception as e:
         db.session.rollback()
@@ -358,7 +358,7 @@ def trips():
         
         logger.info(f"🛣️ Encontradas {len(trips)} viagens")
         
-        return render_template('fleet/trips_list.html',
+        return render_template('fleet/trips.html',
                              trips=trips,
                              vehicles=vehicles,
                              drivers=drivers,
@@ -372,7 +372,7 @@ def trips():
     except Exception as e:
         logger.error(f"❌ Erro ao listar viagens: {e}")
         flash(f"Erro ao carregar viagens: {e}", 'danger')
-        return render_template('fleet/trips_list.html', trips=[])
+        return render_template('fleet/trips.html', trips=[])
 
 @fleet_bp.route('/trips/new', methods=['GET', 'POST'])
 @login_required
@@ -406,14 +406,14 @@ def trip_new():
             logger.info(f"✅ Viagem criada: {trip.vehicle.plate} - {trip.trip_date}")
             flash("Viagem registrada com sucesso!", 'success')
             
-            return redirect(url_for('fleet.trips_list'))
+            return redirect(url_for('fleet.trips'))
         
         # Opções para formulário
         vehicles = FleetVehicle.query.filter_by(admin_id=admin_id, status='Ativo').order_by(FleetVehicle.plate).all()
         drivers = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
         
-        return render_template('fleet/trip_form.html',
+        return render_template('fleet/trip_form_simple.html',
                              trip=None,
                              vehicles=vehicles,
                              drivers=drivers,
@@ -424,7 +424,7 @@ def trip_new():
         db.session.rollback()
         logger.error(f"❌ Erro ao criar viagem: {e}")
         flash(f"Erro ao criar viagem: {e}", 'danger')
-        return redirect(url_for('fleet.trips_list'))
+        return redirect(url_for('fleet.trips'))
 
 # ========================================
 # ROTAS - CUSTOS
@@ -473,7 +473,7 @@ def costs():
         
         logger.info(f"💰 Encontrados {len(costs)} custos (total: R$ {total_amount})")
         
-        return render_template('fleet/costs_list.html',
+        return render_template('fleet/costs.html',
                              costs=costs,
                              total_amount=total_amount,
                              vehicles=vehicles,
@@ -490,7 +490,7 @@ def costs():
     except Exception as e:
         logger.error(f"❌ Erro ao listar custos: {e}")
         flash(f"Erro ao carregar custos: {e}", 'danger')
-        return render_template('fleet/costs_list.html', costs=[], total_amount=0)
+        return render_template('fleet/costs.html', costs=[], total_amount=0)
 
 @fleet_bp.route('/costs/new', methods=['GET', 'POST'])
 @login_required
