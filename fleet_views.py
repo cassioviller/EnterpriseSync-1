@@ -117,7 +117,7 @@ def dashboard():
 
 @fleet_bp.route('/vehicles')
 @login_required
-def vehicles_list():
+def vehicles():
     """Lista de veículos com filtros avançados"""
     try:
         admin_id = get_admin_id()
@@ -326,7 +326,7 @@ def vehicle_edit(vehicle_id):
 
 @fleet_bp.route('/trips')
 @login_required
-def trips_list():
+def trips():
     """Lista de viagens com filtros"""
     try:
         admin_id = get_admin_id()
@@ -432,7 +432,7 @@ def trip_new():
 
 @fleet_bp.route('/costs')
 @login_required  
-def costs_list():
+def costs():
     """Lista de custos com filtros"""
     try:
         admin_id = get_admin_id()

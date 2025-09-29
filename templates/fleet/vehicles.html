@@ -15,7 +15,7 @@
             <a href="{{ url_for('fleet.dashboard') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-tachometer-alt"></i> Dashboard
             </a>
-            <a href="{{ url_for('fleet.new_vehicle') }}" class="btn btn-primary">
+            <a href="{{ url_for('fleet.vehicle_new') }}" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Novo Veículo
             </a>
         </div>
@@ -211,7 +211,7 @@
                 {% else %}
                     <p class="text-muted mb-4">Adicione o primeiro veículo à sua frota.</p>
                 {% endif %}
-                <a href="{{ url_for('fleet.new_vehicle') }}" class="btn btn-primary">
+                <a href="{{ url_for('fleet.vehicle_new') }}" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Adicionar Veículo
                 </a>
             </div>
