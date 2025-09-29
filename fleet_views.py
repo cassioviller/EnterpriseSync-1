@@ -64,7 +64,7 @@ def dashboard():
         
         # Contar veículos ativos
         total_vehicles = FleetVehicle.query.filter_by(admin_id=admin_id).count()
-        active_vehicles = FleetVehicle.query.filter_by(admin_id=admin_id, active=True).count()
+        active_vehicles = FleetVehicle.query.filter_by(admin_id=admin_id, status='Ativo').count()
         
         # Contar viagens (últimos 30 dias)
         from datetime import datetime, timedelta
@@ -113,7 +113,7 @@ def dashboard():
     except Exception as e:
         logger.error(f"❌ Erro no Fleet Dashboard: {e}")
         flash('Erro ao carregar dashboard da frota', 'error')
-        return redirect(url_for('main_dashboard'))
+        return redirect(url_for('main.dashboard'))
 
 @fleet_bp.route('/vehicles')
 @login_required

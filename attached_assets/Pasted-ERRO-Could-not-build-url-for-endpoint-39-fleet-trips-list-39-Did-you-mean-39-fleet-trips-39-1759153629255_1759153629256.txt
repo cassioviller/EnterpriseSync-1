@@ -1,0 +1,57 @@
+ERRO: Could not build url for endpoint &#39;fleet.trips_list&#39;. Did you mean &#39;fleet.trips&#39; instead?
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/app/fleet_views.py&#34;, line 416, in trip_new
+    return render_template(&#39;fleet/trip_form.html&#39;,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/templating.py&#34;, line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/templating.py&#34;, line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 1295, in render
+    self.environment.handle_exception()
+  File &#34;/usr/local/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File &#34;/app/templates/fleet/trip_form.html&#34;, line 2, in top-level template code
+    {% set active_page = &#34;fleet&#34; %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/templates/base_completo.html&#34;, line 879, in top-level template code
+    {% block content %}{% endblock %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/templates/fleet/trip_form.html&#34;, line 40, in block &#39;content&#39;
+    {{ form.hidden_tag() }}
+  File &#34;/usr/local/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 490, in getattr
+    return getattr(obj, attribute)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+jinja2.exceptions.UndefinedError: &#39;form&#39; is undefined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask_login/utils.py&#34;, line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/fleet_views.py&#34;, line 427, in trip_new
+    return redirect(url_for(&#39;fleet.trips_list&#39;))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/helpers.py&#34;, line 239, in url_for
+    return current_app.url_for(
+           ^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 1121, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 1110, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/werkzeug/routing/map.py&#34;, line 924, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint &#39;fleet.trips_list&#39;. Did you mean &#39;fleet.trips&#39; instead?
