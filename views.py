@@ -140,7 +140,7 @@ def _calcular_funcionarios_departamento(admin_id):
 def _calcular_custos_obra(admin_id, data_inicio, data_fim):
     """Calcula custos por obra com proteção de transação"""
     try:
-        from models import FleetCost, RegistroPonto, RegistroAlimentacao
+        from models import CustoVeiculo, RegistroPonto, RegistroAlimentacao
         custos_por_obra = {}
         
         obras_admin = Obra.query.filter_by(admin_id=admin_id).all()
@@ -162,18 +162,19 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim):
                     horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
                     custo_total_obra += horas * valor_hora
             
-            # Somar custos de veículos da obra (Fleet V3.0)
+            # Somar custos de veículos da obra
             try:
-                # ✅ FLEET V3.0: FleetCost sempre tem obra_id
-                veiculos_obra = FleetCost.query.filter(
-                    FleetCost.obra_id == obra.id,
-                    FleetCost.cost_date >= data_inicio,
-                    FleetCost.cost_date <= data_fim,
-                    FleetCost.admin_id == admin_id  # Multi-tenant rigoroso
-                ).all()
-                custo_total_obra += sum(float(v.amount or 0) for v in veiculos_obra)
-            except Exception as e:
-                print(f"Erro ao calcular custos Fleet: {e}")
+                # ✅ CORREÇÃO: Verificar se CustoVeiculo tem o atributo obra_id
+                if hasattr(CustoVeiculo, 'obra_id'):
+                    veiculos_obra = CustoVeiculo.query.filter(
+                        CustoVeiculo.obra_id == obra.id,
+                        CustoVeiculo.data_custo >= data_inicio,
+                        CustoVeiculo.data_custo <= data_fim
+                    ).all()
+                else:
+                    veiculos_obra = []  # Fallback se campo não existir
+                custo_total_obra += sum(v.valor or 0 for v in veiculos_obra)
+            except:
                 pass
             
             if custo_total_obra > 0:
@@ -727,15 +728,14 @@ def dashboard():
         print(f"DEBUG DASHBOARD: Extras totais: {total_extras_real}")
         
         # Calcular KPIs específicos corretamente
-        # 1. Custos de Transporte (veículos Fleet V3.0) - usar safe_db_operation para evitar transaction abort
+        # 1. Custos de Transporte (veículos) - usar safe_db_operation para evitar transaction abort
         def calcular_custos_veiculo():
-            from models import FleetCost
-            custos_veiculo = FleetCost.query.filter(
-                FleetCost.cost_date >= data_inicio,
-                FleetCost.cost_date <= data_fim,
-                FleetCost.admin_id == admin_id  # Multi-tenant rigoroso
+            from models import CustoVeiculo
+            custos_veiculo = CustoVeiculo.query.filter(
+                CustoVeiculo.data_custo >= data_inicio,
+                CustoVeiculo.data_custo <= data_fim
             ).all()
-            return sum(float(c.amount or 0) for c in custos_veiculo)
+            return sum(c.valor or 0 for c in custos_veiculo)
         
         custo_transporte_real = safe_db_operation(calcular_custos_veiculo, 0)
         print(f"DEBUG Custos veículo: R$ {custo_transporte_real:.2f}")
@@ -1546,7 +1546,7 @@ def obras():
     # Calcular custos reais para cada obra no período
     for obra in obras:
         try:
-            from models import OutroCusto, FleetCost, RegistroPonto, RegistroAlimentacao, Funcionario
+            from models import OutroCusto, CustoVeiculo, RegistroPonto, RegistroAlimentacao, Funcionario
             
             # 1. CUSTO DE MÃO DE OBRA da obra específica no período
             registros_obra = RegistroPonto.query.filter(
@@ -1587,16 +1587,18 @@ def obras():
             ).all()
             custo_diversos_total = sum(c.valor for c in custos_diversos if c.valor)
             
-            # 4. CUSTOS DE VEÍCULOS/TRANSPORTE da obra (Fleet V3.0)
-            # ✅ FLEET V3.0: FleetCost sempre tem obra_id
-            custos_transporte = FleetCost.query.filter(
-                FleetCost.cost_date >= periodo_inicio,
-                FleetCost.cost_date <= periodo_fim,
-                FleetCost.obra_id == obra.id,
-                FleetCost.admin_id == admin_id  # Multi-tenant rigoroso
-            ).all()
+            # 4. CUSTOS DE VEÍCULOS/TRANSPORTE da obra
+            # ✅ CORREÇÃO: Usar verificação de atributo para obra_id
+            custos_query = CustoVeiculo.query.filter(
+                CustoVeiculo.data_custo >= periodo_inicio,
+                CustoVeiculo.data_custo <= periodo_fim
+            )
             
-            custo_transporte_total = sum(float(c.amount or 0) for c in custos_transporte)
+            if hasattr(CustoVeiculo, 'obra_id'):
+                custos_query = custos_query.filter(CustoVeiculo.obra_id == obra.id)
+            
+            custos_transporte = custos_query.all()
+            custo_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
             
             # CUSTO TOTAL REAL da obra
             custo_total_obra = custo_mao_obra + custo_alimentacao + custo_diversos_total + custo_transporte_total
@@ -2434,7 +2436,7 @@ def detalhes_obra(id):
         print(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")
             
         # Buscar custos da obra para o período
-        from models import OutroCusto, FleetCost, RegistroAlimentacao
+        from models import OutroCusto, CustoVeiculo, RegistroAlimentacao
         
         # Custos diversos da obra - adaptado para produção
         if admin_id is not None:
@@ -2450,14 +2452,15 @@ def detalhes_obra(id):
                 OutroCusto.data <= data_fim
             ).all()
         
-        # Custos de transporte/veículos da obra (Fleet V3.0)
-        # ✅ FLEET V3.0: FleetCost sempre tem obra_id
-        custos_query = FleetCost.query.filter(
-            FleetCost.cost_date >= data_inicio,
-            FleetCost.cost_date <= data_fim,
-            FleetCost.obra_id == obra_id,
-            FleetCost.admin_id == admin_id  # Multi-tenant rigoroso
+        # Custos de transporte/veículos da obra
+        # ✅ CORREÇÃO: Verificação segura de atributo obra_id
+        custos_query = CustoVeiculo.query.filter(
+            CustoVeiculo.data_custo >= data_inicio,
+            CustoVeiculo.data_custo <= data_fim
         )
+        
+        if hasattr(CustoVeiculo, 'obra_id'):
+            custos_query = custos_query.filter(CustoVeiculo.obra_id == obra_id)
             
         custos_transporte = custos_query.all()
         
