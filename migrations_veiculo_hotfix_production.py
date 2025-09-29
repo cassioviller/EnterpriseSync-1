@@ -56,7 +56,8 @@ def run_production_migration():
             # 1. VERIFICAR CONEXÃO COM BANCO
             logger.info("🔌 Testando conexão com banco de dados...")
             try:
-                db.session.execute("SELECT 1")
+                from sqlalchemy import text
+                db.session.execute(text("SELECT 1"))
                 logger.info("✅ Conexão com banco OK")
             except Exception as e:
                 logger.error(f"❌ ERRO DE CONEXÃO: {str(e)}")
@@ -65,12 +66,12 @@ def run_production_migration():
             # 2. VERIFICAR SE TABELA VEICULO EXISTE
             logger.info("🔍 Verificando estrutura atual da tabela veiculo...")
             try:
-                result = db.session.execute("""
+                result = db.session.execute(text("""
                     SELECT column_name, data_type, is_nullable, column_default
                     FROM information_schema.columns 
                     WHERE table_name = 'veiculo' 
                     ORDER BY ordinal_position;
-                """)
+                """))
                 
                 existing_columns = [row[0] for row in result.fetchall()]
                 logger.info(f"📋 Colunas existentes: {', '.join(existing_columns)}")
@@ -124,23 +125,23 @@ def run_production_migration():
                     logger.info(f"   SQL: {alter_sql}")
                     
                     # Executar comando
-                    db.session.execute(alter_sql)
+                    db.session.execute(text(alter_sql))
                     logger.info(f"   ✅ Coluna {col_name} adicionada com sucesso")
                 
                 # 6. VERIFICAR INTEGRIDADE DOS DADOS
                 logger.info("🔍 Verificando integridade dos dados...")
                 
                 # Contar registros antes e depois
-                count_result = db.session.execute("SELECT COUNT(*) FROM veiculo")
+                count_result = db.session.execute(text("SELECT COUNT(*) FROM veiculo"))
                 total_veiculos = count_result.fetchone()[0]
                 logger.info(f"📊 Total de veículos: {total_veiculos}")
                 
                 # Verificar se conseguimos fazer SELECT com todas as colunas
-                test_select = db.session.execute("""
+                test_select = db.session.execute(text("""
                     SELECT id, placa, marca, modelo, chassi, renavam, combustivel 
                     FROM veiculo 
                     LIMIT 1
-                """)
+                """))
                 logger.info("✅ SELECT com novas colunas funcionando")
                 
                 # 7. COMMIT DA TRANSAÇÃO
@@ -149,12 +150,12 @@ def run_production_migration():
                 
                 # 8. VERIFICAÇÃO FINAL
                 logger.info("🎯 VERIFICAÇÃO FINAL...")
-                final_result = db.session.execute("""
+                final_result = db.session.execute(text("""
                     SELECT column_name 
                     FROM information_schema.columns 
                     WHERE table_name = 'veiculo' 
                     ORDER BY ordinal_position;
-                """)
+                """))
                 
                 final_columns = [row[0] for row in final_result.fetchall()]
                 logger.info(f"📋 Colunas finais: {', '.join(final_columns)}")
