@@ -344,6 +344,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint EQUIPE: {e}")
     
+    # Registrar blueprint FLEET - Sistema de Gestão de Frota V3.0
+    try:
+        from fleet_views import fleet_bp
+        app.register_blueprint(fleet_bp)
+        logging.info("✅ Blueprint FLEET V3.0 (gestão de frota) registrado")
+    except ImportError as e:
+        logging.warning(f"⚠️ Blueprint FLEET não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint FLEET: {e}")
+    
     # Sistema avançado de veículos removido (código obsoleto limpo)
     
     # Photo migration moved to migrations.py for cleaner app initialization
