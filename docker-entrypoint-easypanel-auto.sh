@@ -221,6 +221,22 @@ try:
             log_migration(f'📝 Stack trace: {traceback.format_exc()}')
             log_migration('🔄 Continuando - deploy concluído com avisos')
         
+        # CRÍTICO: Correção Constraints Veículos SEMPRE (Fase 29/09/2025)
+        log_migration('🔧 EXECUTANDO CORREÇÃO: Constraints Veículos (OBRIGATÓRIA)')
+        try:
+            exec(open('/app/fix_veiculo_constraints_production.py').read())
+            log_migration('✅ Correção constraints veículos executada com sucesso')
+        except FileNotFoundError:
+            log_migration('⚠️ Script de correção constraints não encontrado')
+            try:
+                exec(open('./fix_veiculo_constraints_production.py').read())
+                log_migration('✅ Correção constraints executada (local)')
+            except Exception as e2:
+                log_migration(f'⚠️ Erro na correção constraints local: {e2}')
+        except Exception as e:
+            log_migration(f'❌ Erro na correção constraints: {e}')
+            log_migration('🔄 Continuando - erro não é crítico para app')
+        
         log_migration('✅ TODAS AS MIGRAÇÕES PROCESSADAS COM SUCESSO')
         
 except Exception as e:

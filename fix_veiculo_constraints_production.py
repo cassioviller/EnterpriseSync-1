@@ -276,9 +276,11 @@ def main():
     else:
         print("🧪 AMBIENTE: DESENVOLVIMENTO")
     
-    # Verificar flag de força
+    # Verificar flag de força ou execução automática via Docker
     force_mode = '--force' in sys.argv
-    if not force_mode:
+    auto_mode = os.environ.get('AUTO_MIGRATIONS_ENABLED') == 'true'
+    
+    if not force_mode and not auto_mode:
         print("⚠️  ATENÇÃO: Esta operação irá modificar constraints da tabela 'veiculo'")
         print("   - Definir valores padrão para 'modelo' e 'tipo'")
         print("   - Atualizar registros existentes se necessário")
@@ -287,6 +289,10 @@ def main():
         if response != 'CONFIRMO':
             print("❌ Operação cancelada pelo usuário")
             return False
+    elif auto_mode:
+        print("🚀 Executando correção automaticamente (AUTO_MIGRATIONS_ENABLED)")
+    else:
+        print("🚀 Executando correção automaticamente (--force)")
     
     try:
         # Setup Flask
