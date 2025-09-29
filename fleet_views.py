@@ -47,8 +47,73 @@ def get_admin_id():
         return 10
 
 # ========================================
-# ROTAS PRINCIPAIS - VEÍCULOS
+# ROTAS PRINCIPAIS - DASHBOARD E VEÍCULOS
 # ========================================
+
+@fleet_bp.route('/')
+@fleet_bp.route('/dashboard')
+@login_required
+def dashboard():
+    """
+    Dashboard principal do Fleet V3.0
+    Exibe resumo geral da frota e indicadores
+    """
+    try:
+        admin_id = get_admin_id()
+        logger.info(f"🚗 Fleet Dashboard - admin_id: {admin_id}")
+        
+        # Contar veículos ativos
+        total_vehicles = FleetVehicle.query.filter_by(admin_id=admin_id).count()
+        active_vehicles = FleetVehicle.query.filter_by(admin_id=admin_id, active=True).count()
+        
+        # Contar viagens (últimos 30 dias)
+        from datetime import datetime, timedelta
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        recent_trips = FleetTrip.query.filter(
+            FleetTrip.admin_id == admin_id,
+            FleetTrip.start_date >= thirty_days_ago
+        ).count()
+        
+        # Calcular custos (último mês)
+        total_costs = db.session.query(func.sum(FleetCost.amount)).filter(
+            FleetCost.admin_id == admin_id,
+            FleetCost.date >= thirty_days_ago
+        ).scalar() or Decimal('0.00')
+        
+        # Últimas viagens
+        latest_trips = FleetTrip.query.filter_by(admin_id=admin_id)\
+                                    .order_by(FleetTrip.start_date.desc())\
+                                    .limit(5).all()
+        
+        # Veículos com mais custos
+        vehicle_costs = db.session.query(
+            FleetVehicle.license_plate,
+            FleetVehicle.make,
+            FleetVehicle.model,
+            func.sum(FleetCost.amount).label('total_cost')
+        ).join(FleetCost, FleetVehicle.id == FleetCost.vehicle_id)\
+         .filter(FleetVehicle.admin_id == admin_id)\
+         .filter(FleetCost.date >= thirty_days_ago)\
+         .group_by(FleetVehicle.id, FleetVehicle.license_plate, FleetVehicle.make, FleetVehicle.model)\
+         .order_by(func.sum(FleetCost.amount).desc())\
+         .limit(5).all()
+        
+        context = {
+            'total_vehicles': total_vehicles,
+            'active_vehicles': active_vehicles,
+            'recent_trips': recent_trips,
+            'total_costs': float(total_costs),
+            'latest_trips': latest_trips,
+            'vehicle_costs': vehicle_costs
+        }
+        
+        logger.info(f"✅ Fleet Dashboard carregado - {total_vehicles} veículos, {recent_trips} viagens")
+        return render_template('fleet/dashboard.html', **context)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro no Fleet Dashboard: {e}")
+        flash('Erro ao carregar dashboard da frota', 'error')
+        return redirect(url_for('main_dashboard'))
 
 @fleet_bp.route('/vehicles')
 @login_required

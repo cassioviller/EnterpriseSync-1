@@ -695,8 +695,7 @@ class DocumentoFiscal(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    # Fleet V3.0: Atualizado para usar FleetCost ao invés do CustoVeiculo legacy
-    fleet_costs = db.relationship('FleetCost', backref='documentos_fiscais', overlaps="documentos_fiscais")
+    # Fleet V3.0: Relacionamentos de FleetCost serão adicionados quando necessário com ForeignKey adequada
     validado_por = db.relationship('Usuario', foreign_keys=[validado_por_id], backref='documentos_validados')
     admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='documentos_criados')
     
