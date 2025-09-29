@@ -71,30 +71,30 @@ def dashboard():
         thirty_days_ago = datetime.now() - timedelta(days=30)
         recent_trips = FleetTrip.query.filter(
             FleetTrip.admin_id == admin_id,
-            FleetTrip.start_date >= thirty_days_ago
+            FleetTrip.trip_date >= thirty_days_ago
         ).count()
         
         # Calcular custos (último mês)
         total_costs = db.session.query(func.sum(FleetCost.amount)).filter(
             FleetCost.admin_id == admin_id,
-            FleetCost.date >= thirty_days_ago
+            FleetCost.cost_date >= thirty_days_ago
         ).scalar() or Decimal('0.00')
         
         # Últimas viagens
         latest_trips = FleetTrip.query.filter_by(admin_id=admin_id)\
-                                    .order_by(FleetTrip.start_date.desc())\
+                                    .order_by(FleetTrip.trip_date.desc())\
                                     .limit(5).all()
         
         # Veículos com mais custos
         vehicle_costs = db.session.query(
-            FleetVehicle.license_plate,
-            FleetVehicle.make,
+            FleetVehicle.plate,
+            FleetVehicle.brand,
             FleetVehicle.model,
             func.sum(FleetCost.amount).label('total_cost')
         ).join(FleetCost, FleetVehicle.id == FleetCost.vehicle_id)\
          .filter(FleetVehicle.admin_id == admin_id)\
-         .filter(FleetCost.date >= thirty_days_ago)\
-         .group_by(FleetVehicle.id, FleetVehicle.license_plate, FleetVehicle.make, FleetVehicle.model)\
+         .filter(FleetCost.cost_date >= thirty_days_ago)\
+         .group_by(FleetVehicle.id, FleetVehicle.plate, FleetVehicle.brand, FleetVehicle.model)\
          .order_by(func.sum(FleetCost.amount).desc())\
          .limit(5).all()
         
