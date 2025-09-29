@@ -158,24 +158,22 @@ try:
             log_migration(f'⚠️ Erro em migrações customizadas: {e}')
             log_migration('🔄 Continuando com aplicação...')
         
-        # CRÍTICO: Executar limpeza de veículos SEMPRE
-        log_migration('🚗 EXECUTANDO LIMPEZA DE VEÍCULOS (OBRIGATÓRIA)')
+        # FLEET V3.0: Executar migração completa do Fleet
+        log_migration('🚗 EXECUTANDO MIGRAÇÃO: Fleet V3.0 (OBRIGATÓRIA)')
         try:
-            # Forçar execução independente da flag
-            os.environ['RUN_CLEANUP_VEICULOS'] = '1'
+            # Executar migração completa do Fleet V3.0
+            from fleet_migration_complete_rebuild import run_fleet_migration
+            migration_success = run_fleet_migration()
             
-            from migration_cleanup_veiculos_production import run_migration_if_needed
-            cleanup_success = run_migration_if_needed()
-            
-            if cleanup_success:
-                log_migration('✅ Limpeza de veículos executada com sucesso')
+            if migration_success:
+                log_migration('✅ Migração Fleet V3.0 executada com sucesso')
             else:
-                log_migration('⚠️ Limpeza de veículos não foi necessária ou falhou')
+                log_migration('⚠️ Migração Fleet V3.0 não foi necessária ou falhou')
                 
         except ImportError:
-            log_migration('⚠️ Módulo de limpeza de veículos não encontrado')
+            log_migration('⚠️ Módulo fleet_migration_complete_rebuild não encontrado')
         except Exception as e:
-            log_migration(f'❌ Erro na limpeza de veículos: {e}')
+            log_migration(f'❌ Erro na migração Fleet V3.0: {e}')
             log_migration('🔄 Continuando - erro não é crítico para app')
         
         # CRÍTICO: Executar correção detalhes uso SEMPRE (Fase 22/09/2025)
@@ -194,48 +192,6 @@ try:
             log_migration(f'❌ Erro na correção detalhes uso: {e}')
             log_migration('🔄 Continuando - erro não é crítico para app')
         
-        # CRÍTICO: Deploy do Módulo Veículos V2.0 SEMPRE (Fase 23/09/2025)
-        log_migration('🚗 EXECUTANDO DEPLOY: Módulo Veículos V2.0 Completo (OBRIGATÓRIO)')
-        try:
-            import sys
-            sys.path.append('/app')
-            
-            # ✅ CORREÇÃO: Import direto com tratamento robusto
-            try:
-                from deploy_veiculos_v2_production import executar_deploy_veiculos_v2
-                resultado = executar_deploy_veiculos_v2()
-                if resultado:
-                    log_migration('✅ Deploy módulo veículos v2.0 executado com sucesso')
-                else:
-                    log_migration('⚠️ Deploy veículos v2.0 não foi necessário')
-            except ImportError:
-                log_migration('⚠️ Módulo deploy_veiculos_v2_production não encontrado')
-                # Fallback: exec do arquivo
-                exec(open('/app/deploy_veiculos_v2_production.py').read())
-                log_migration('✅ Deploy módulo veículos v2.0 executado via fallback')
-        except FileNotFoundError:
-            log_migration('⚠️ Script de deploy veículos v2.0 não encontrado')
-        except Exception as e:
-            log_migration(f'❌ Erro no deploy veículos v2.0: {e}')
-            import traceback
-            log_migration(f'📝 Stack trace: {traceback.format_exc()}')
-            log_migration('🔄 Continuando - deploy concluído com avisos')
-        
-        # CRÍTICO: Correção Constraints Veículos SEMPRE (Fase 29/09/2025)
-        log_migration('🔧 EXECUTANDO CORREÇÃO: Constraints Veículos (OBRIGATÓRIA)')
-        try:
-            exec(open('/app/fix_veiculo_constraints_production.py').read())
-            log_migration('✅ Correção constraints veículos executada com sucesso')
-        except FileNotFoundError:
-            log_migration('⚠️ Script de correção constraints não encontrado')
-            try:
-                exec(open('./fix_veiculo_constraints_production.py').read())
-                log_migration('✅ Correção constraints executada (local)')
-            except Exception as e2:
-                log_migration(f'⚠️ Erro na correção constraints local: {e2}')
-        except Exception as e:
-            log_migration(f'❌ Erro na correção constraints: {e}')
-            log_migration('🔄 Continuando - erro não é crítico para app')
         
         log_migration('✅ TODAS AS MIGRAÇÕES PROCESSADAS COM SUCESSO')
         
@@ -316,49 +272,59 @@ try:
             health_result['errors'].append(f'DB Connection: {str(e)}')
             log_health(f'❌ Conectividade com banco: {e}')
         
-        # 2. Verificar tabelas essenciais de veículos
+        # 2. Verificar tabelas do Fleet V3.0
         try:
             inspector = inspect(db.engine)
             tabelas_existentes = inspector.get_table_names()
             
-            tabelas_essenciais = ['veiculo', 'uso_veiculo', 'custo_veiculo', 'passageiro_veiculo']
-            tabelas_obsoletas = ['alocacao_veiculo', 'equipe_veiculo', 'transferencia_veiculo', 'manutencao_veiculo', 'alerta_veiculo']
+            # Fleet V3.0 - Novas tabelas com nomenclatura limpa
+            tabelas_fleet_v3 = ['fleet_vehicle', 'fleet_trip', 'fleet_cost', 'fleet_passenger']
+            tabelas_legacy = ['veiculo', 'uso_veiculo', 'custo_veiculo', 'passageiro_veiculo', 
+                            'alocacao_veiculo', 'equipe_veiculo', 'transferencia_veiculo', 
+                            'manutencao_veiculo', 'alerta_veiculo']
             
-            # Verificar essenciais
-            for tabela in tabelas_essenciais:
+            # Verificar novas tabelas Fleet V3.0
+            fleet_v3_status = True
+            for tabela in tabelas_fleet_v3:
                 if tabela in tabelas_existentes:
-                    health_result['checks'][f'table_{tabela}'] = 'OK'
-                    log_health(f'✅ Tabela essencial: {tabela}')
+                    health_result['checks'][f'fleet_{tabela}'] = 'OK'
+                    log_health(f'✅ Fleet V3.0 - {tabela}: presente')
                     
                     # Contar registros
                     try:
                         result = db.session.execute(text(f'SELECT COUNT(*) FROM {tabela}'))
                         count = result.scalar()
                         health_result['checks'][f'count_{tabela}'] = count
-                        log_health(f'📊 {tabela}: {count} registros')
+                        log_health(f'📊 Fleet V3.0 - {tabela}: {count} registros')
                     except Exception as e:
                         log_health(f'⚠️ Erro ao contar {tabela}: {e}')
                 else:
-                    health_result['checks'][f'table_{tabela}'] = 'MISSING'
-                    health_result['errors'].append(f'Tabela essencial ausente: {tabela}')
-                    log_health(f'❌ Tabela essencial ausente: {tabela}')
+                    health_result['checks'][f'fleet_{tabela}'] = 'MISSING'
+                    health_result['warnings'].append(f'Tabela Fleet V3.0 ausente: {tabela}')
+                    log_health(f'⚠️ Fleet V3.0 - Tabela ausente: {tabela}')
+                    fleet_v3_status = False
             
-            # Verificar obsoletas (devem estar ausentes)
-            obsoletas_presentes = []
-            for tabela in tabelas_obsoletas:
+            # Verificar tabelas legacy (devem estar ausentes após migração)
+            legacy_presentes = []
+            for tabela in tabelas_legacy:
                 if tabela in tabelas_existentes:
-                    obsoletas_presentes.append(tabela)
-                    health_result['checks'][f'obsolete_{tabela}'] = 'PRESENT'
-                    health_result['warnings'].append(f'Tabela obsoleta presente: {tabela}')
-                    log_health(f'⚠️ Tabela obsoleta ainda presente: {tabela}')
+                    legacy_presentes.append(tabela)
+                    health_result['checks'][f'legacy_{tabela}'] = 'PRESENT'
+                    health_result['warnings'].append(f'Tabela legacy presente: {tabela}')
+                    log_health(f'⚠️ Tabela legacy ainda presente: {tabela}')
                 else:
-                    health_result['checks'][f'obsolete_{tabela}'] = 'REMOVED'
-                    log_health(f'✅ Tabela obsoleta removida: {tabela}')
+                    health_result['checks'][f'legacy_{tabela}'] = 'REMOVED'
+                    log_health(f'✅ Tabela legacy removida: {tabela}')
             
-            if obsoletas_presentes:
-                log_health(f'⚠️ ATENÇÃO: {len(obsoletas_presentes)} tabelas obsoletas ainda presentes')
+            if fleet_v3_status:
+                log_health('✅ Fleet V3.0: Todas as tabelas presentes')
             else:
-                log_health('✅ Todas as tabelas obsoletas foram removidas')
+                log_health('⚠️ Fleet V3.0: Sistema incompleto')
+                
+            if legacy_presentes:
+                log_health(f'⚠️ ATENÇÃO: {len(legacy_presentes)} tabelas legacy ainda presentes')
+            else:
+                log_health('✅ Todas as tabelas legacy foram removidas')
                 
         except Exception as e:
             health_result['errors'].append(f'Erro verificação tabelas: {str(e)}')
@@ -440,8 +406,8 @@ echo "📋 RESUMO DO DEPLOY:" | tee -a "$LOG_FILE"
 echo "   📅 Timestamp: $(date)" | tee -a "$LOG_FILE"
 echo "   ⏱️ Duração total: $(($(date +%s) - DEPLOYMENT_TIMESTAMP))s" | tee -a "$LOG_FILE"
 echo "   🔄 Migrações: Executadas automaticamente" | tee -a "$LOG_FILE"
-echo "   🚗 Limpeza veículos: Forçada" | tee -a "$LOG_FILE"
-echo "   🏥 Health check: Executado" | tee -a "$LOG_FILE"
+echo "   🚗 Fleet V3.0: Migração completa executada" | tee -a "$LOG_FILE"
+echo "   🏥 Health check: Executado com verificação Fleet V3.0" | tee -a "$LOG_FILE"
 
 echo "📁 LOGS DISPONÍVEIS:" | tee -a "$LOG_FILE"
 echo "   📋 Deploy geral: $LOG_FILE" | tee -a "$LOG_FILE"
