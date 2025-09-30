@@ -6291,7 +6291,7 @@ def editar_rdo(id):
 
 @main_bp.route('/rdo/api/ultimo-rdo/<int:obra_id>')
 def api_ultimo_rdo(obra_id):
-    """API para buscar atividades para novo RDO - dos serviços da obra ou RDO anterior"""
+    """API CORRIGIDA: Combina último RDO + novos serviços da obra"""
     try:
         # Sistema de bypass para funcionamento em desenvolvimento
         if hasattr(current_user, 'admin_id'):
@@ -6309,38 +6309,89 @@ def api_ultimo_rdo(obra_id):
             RDO.data_relatorio.desc()
         ).first()
         
+        # Buscar TODOS os serviços ativos da obra
+        servicos_obra_atuais = db.session.query(
+            ServicoObraReal, Servico
+        ).join(
+            Servico, ServicoObraReal.servico_id == Servico.id
+        ).filter(
+            ServicoObraReal.obra_id == obra_id,
+            ServicoObraReal.admin_id == admin_id,
+            ServicoObraReal.ativo == True,
+            Servico.ativo == True
+        ).all()
+        
         atividades = []
-        origem = ''
+        servicos_no_ultimo_rdo = set()
         
         if ultimo_rdo:
-            # Já existe RDO anterior - carregar subatividades do último RDO
+            # Carregar subatividades do último RDO
             rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
-            atividades = [
-                {
+            
+            for rdo_sub in rdo_subatividades:
+                servicos_no_ultimo_rdo.add(rdo_sub.servico_id)
+                atividades.append({
                     'descricao': rdo_sub.nome_subatividade,
                     'percentual': rdo_sub.percentual_conclusao,
                     'observacoes': rdo_sub.observacoes_tecnicas or ''
-                }
-                for rdo_sub in rdo_subatividades
-            ]
-            origem = f'RDO anterior: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio.strftime("%d/%m/%Y")})'
-        else:
-            # Primeiro RDO da obra - carregar atividades dos serviços cadastrados na obra
-            servicos_obra = db.session.query(ServicoObra, Servico).join(
-                Servico, ServicoObra.servico_id == Servico.id
-            ).filter(
-                ServicoObra.obra_id == obra_id,
-                ServicoObra.ativo == True
-            ).all()
-            
-            for servico_obra, servico in servicos_obra:
-                atividades.append({
-                    'descricao': servico.nome,
-                    'percentual': 0,  # Começar com 0% para novo RDO
-                    'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}'
                 })
             
-            origem = f'Serviços cadastrados na obra ({len(atividades)} serviços)'
+            # ADICIONAR NOVOS SERVIÇOS (não estavam no último RDO)
+            novos_count = 0
+            for servico_obra_real, servico in servicos_obra_atuais:
+                if servico.id not in servicos_no_ultimo_rdo:
+                    # Buscar subatividades do novo serviço
+                    subs_mestre = SubatividadeMestre.query.filter_by(
+                        servico_id=servico.id,
+                        admin_id=admin_id,
+                        ativo=True
+                    ).order_by(SubatividadeMestre.ordem_padrao).all()
+                    
+                    if subs_mestre:
+                        for sm in subs_mestre:
+                            atividades.append({
+                                'descricao': sm.nome,
+                                'percentual': 0,  # Novo serviço com 0%
+                                'observacoes': ''
+                            })
+                    else:
+                        # Fallback: adicionar o próprio serviço
+                        qtd_info = f"{servico_obra_real.quantidade_planejada or 1} {servico.unidade_simbolo or servico.unidade_medida or 'un'}"
+                        atividades.append({
+                            'descricao': servico.nome,
+                            'percentual': 0,
+                            'observacoes': f'Qtd planejada: {qtd_info}'
+                        })
+                    
+                    novos_count += 1
+            
+            origem = f'RDO anterior: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio.strftime("%d/%m/%Y")})' + (f' + {novos_count} novo(s) serviço(s)' if novos_count > 0 else '')
+        else:
+            # Primeiro RDO da obra - carregar de ServicoObraReal
+            for servico_obra_real, servico in servicos_obra_atuais:
+                # Buscar subatividades
+                subs_mestre = SubatividadeMestre.query.filter_by(
+                    servico_id=servico.id,
+                    admin_id=admin_id,
+                    ativo=True
+                ).order_by(SubatividadeMestre.ordem_padrao).all()
+                
+                if subs_mestre:
+                    for sm in subs_mestre:
+                        atividades.append({
+                            'descricao': sm.nome,
+                            'percentual': 0,
+                            'observacoes': ''
+                        })
+                else:
+                    qtd_info = f"{servico_obra_real.quantidade_planejada or 1} {servico.unidade_simbolo or servico.unidade_medida or 'un'}"
+                    atividades.append({
+                        'descricao': servico.nome,
+                        'percentual': 0,
+                        'observacoes': f'Qtd planejada: {qtd_info}'
+                    })
+            
+            origem = f'Primeiro RDO da obra ({len(servicos_obra_atuais)} serviços)'
         
         return jsonify({
             'atividades': atividades,
@@ -6349,7 +6400,9 @@ def api_ultimo_rdo(obra_id):
         })
         
     except Exception as e:
-        print(f"ERRO API ATIVIDADES OBRA: {str(e)}")
+        print(f"❌ ERRO API ultimo-rdo: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Erro interno'}), 500
 
 @main_bp.route('/api/obra/<int:obra_id>/percentuais-ultimo-rdo')
