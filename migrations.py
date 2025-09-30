@@ -85,6 +85,9 @@ def executar_migracoes():
         
         # Migração 18: CRÍTICA - Corrigir admin_id nullable para multi-tenant seguro
         corrigir_admin_id_vehicle_tables()
+        
+        # Migração 19: NOVA - Adicionar colunas faltantes em veículos (chassi, renavam, combustivel)
+        adicionar_colunas_veiculo_completas()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -1652,6 +1655,73 @@ def corrigir_admin_id_vehicle_tables():
         
     except Exception as e:
         logger.error(f"❌ ERRO na Migração 18 - admin_id vehicle tables: {str(e)}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+
+
+def adicionar_colunas_veiculo_completas():
+    """
+    MIGRAÇÃO 19: Adicionar colunas faltantes na tabela veiculo
+    Resolve erro: column veiculo.chassi does not exist
+    """
+    try:
+        logger.info("🚗 MIGRAÇÃO 19: Adicionando colunas faltantes em veículos...")
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se tabela existe
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'veiculo'
+        """)
+        
+        if cursor.fetchone()[0] == 0:
+            logger.warning("⚠️ Tabela veiculo não existe - será criada pela migração anterior")
+            cursor.close()
+            connection.close()
+            return
+        
+        # Colunas a adicionar
+        colunas_adicionar = {
+            'chassi': 'VARCHAR(50)',
+            'renavam': 'VARCHAR(20)',
+            'combustivel': "VARCHAR(20) DEFAULT 'Gasolina'",
+            'cor': 'VARCHAR(30)',
+            'km_proxima_manutencao': 'INTEGER',
+            'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+        }
+        
+        for coluna, tipo_sql in colunas_adicionar.items():
+            # Verificar se coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'veiculo' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' na tabela veiculo...")
+                cursor.execute(f"ALTER TABLE veiculo ADD COLUMN {coluna} {tipo_sql}")
+                logger.info(f"✅ Coluna '{coluna}' adicionada com sucesso!")
+            else:
+                logger.info(f"✅ Coluna '{coluna}' já existe")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("✅ MIGRAÇÃO 19 CONCLUÍDA: Todas as colunas de veículo verificadas/adicionadas!")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 19 - colunas veiculo: {e}")
         if 'connection' in locals():
             try:
                 connection.rollback()
