@@ -8400,134 +8400,213 @@ def salvar_rdo_flexivel():
 @funcionario_required
 def api_rdo_ultima_dados(obra_id):
     """
-    API CRÍTICA: Buscar dados do último RDO de uma obra
-    Corrige erro 404 no frontend rdo_autocomplete.js
+    API CORRIGIDA: Combina último RDO + novos serviços da obra
+    Resolve bug: novos serviços adicionados à obra não apareciam em RDOs subsequentes
     """
     try:
-        # Usar admin_id robusto (mesma lógica do salvamento)
         admin_id = get_admin_id_robusta()
         
-        print(f"🔍 API ultima-dados: Buscando RDO para obra {obra_id}, admin_id {admin_id}")
+        print(f"🔍 [RDO-API] Obra {obra_id} | Admin {admin_id}")
         
-        # Buscar último RDO da obra
+        # ═══════════════════════════════════════════════════════
+        # ETAPA 1: Buscar último RDO
+        # ═══════════════════════════════════════════════════════
         ultimo_rdo = RDO.query.join(Obra).filter(
             Obra.id == obra_id,
             Obra.admin_id == admin_id
         ).order_by(RDO.data_relatorio.desc()).first()
         
-        if not ultimo_rdo:
-            print(f"ℹ️ Nenhum RDO encontrado para obra {obra_id}")
-            return jsonify({
-                'success': False,
-                'message': 'Nenhum RDO anterior encontrado para esta obra'
-            })
-        
-        # Buscar subatividades do último RDO
-        subatividades = RDOServicoSubatividade.query.filter_by(
-            rdo_id=ultimo_rdo.id
+        # ═══════════════════════════════════════════════════════
+        # ETAPA 2: Buscar TODOS serviços ATIVOS da obra (TABELA CORRETA)
+        # ═══════════════════════════════════════════════════════
+        servicos_obra_atuais = db.session.query(
+            ServicoObraReal, Servico
+        ).join(
+            Servico, ServicoObraReal.servico_id == Servico.id
+        ).filter(
+            ServicoObraReal.obra_id == obra_id,
+            ServicoObraReal.admin_id == admin_id,
+            ServicoObraReal.ativo == True,
+            Servico.ativo == True
         ).all()
         
-        # Buscar funcionários do último RDO
-        funcionarios_rdo = RDOMaoObra.query.filter_by(
-            rdo_id=ultimo_rdo.id
-        ).all()
+        print(f"📊 [RDO-API] {len(servicos_obra_atuais)} serviços ativos na obra")
         
-        # Montar dados dos serviços CORRIGIDO - agrupar subatividades por serviço
-        servicos_agrupados = {}
+        # ═══════════════════════════════════════════════════════
+        # ETAPA 3: Processar serviços do último RDO
+        # ═══════════════════════════════════════════════════════
+        servicos_finais = {}
+        servicos_no_ultimo_rdo = set()
         
-        # Agrupar subatividades por serviço
-        for sub in subatividades:
-            servico_id = sub.servico_id
-            if servico_id not in servicos_agrupados:
-                # Buscar dados do serviço
-                servico = Servico.query.get(servico_id)
-                if servico:
-                    servicos_agrupados[servico_id] = {
-                        'id': servico.id,
-                        'nome': servico.nome,
-                        'categoria': getattr(servico, 'categoria', 'Geral'),
-                        'descricao': servico.descricao or '',
-                        'subatividades': []
-                    }
+        if ultimo_rdo:
+            print(f"📄 [RDO-API] Último RDO: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio})")
             
-            # Adicionar subatividade ao serviço
-            if servico_id in servicos_agrupados:
-                # CORREÇÃO CRÍTICA: Buscar ID correto da subatividade_mestre
-                subatividade_mestre_id = sub.id  # Fallback para o ID atual
-                try:
-                    # Buscar o ID correto na tabela subatividade_mestre pelo nome e serviço
-                    subatividade_mestre = db.session.query(SubatividadeMestre).filter_by(
-                        nome=sub.nome_subatividade,
-                        servico_id=servico_id
-                    ).first()
-                    
-                    if subatividade_mestre:
-                        subatividade_mestre_id = subatividade_mestre.id
-                        print(f"✅ API CORRIGIDA: {sub.nome_subatividade} -> ID correto {subatividade_mestre_id}")
-                    else:
-                        print(f"⚠️ API: Subatividade '{sub.nome_subatividade}' não encontrada na tabela mestre")
-                except Exception as e:
-                    print(f"❌ API: Erro ao buscar ID da subatividade mestre: {e}")
+            subatividades = RDOServicoSubatividade.query.filter_by(
+                rdo_id=ultimo_rdo.id
+            ).all()
+            
+            for sub in subatividades:
+                sid = sub.servico_id
+                servicos_no_ultimo_rdo.add(sid)
                 
-                servicos_agrupados[servico_id]['subatividades'].append({
-                    'id': subatividade_mestre_id,  # ✅ ID correto da subatividade_mestre
-                    'nome': sub.nome_subatividade,
-                    'percentual': float(sub.percentual_conclusao or 0),
-                    'observacoes': sub.observacoes_tecnicas or ''
-                })
+                if sid not in servicos_finais:
+                    servico = Servico.query.get(sid)
+                    if servico:
+                        servicos_finais[sid] = {
+                            'id': servico.id,
+                            'nome': servico.nome,
+                            'categoria': getattr(servico, 'categoria', 'Geral'),
+                            'descricao': servico.descricao or '',
+                            'subatividades': [],
+                            'eh_novo': False
+                        }
+                
+                if sid in servicos_finais:
+                    # Buscar ID da subatividade mestre
+                    sub_mestre_id = sub.id
+                    try:
+                        sub_mestre = SubatividadeMestre.query.filter_by(
+                            nome=sub.nome_subatividade,
+                            servico_id=sid,
+                            admin_id=admin_id
+                        ).first()
+                        if sub_mestre:
+                            sub_mestre_id = sub_mestre.id
+                    except:
+                        pass
+                    
+                    servicos_finais[sid]['subatividades'].append({
+                        'id': sub_mestre_id,
+                        'nome': sub.nome_subatividade,
+                        'percentual': float(sub.percentual_conclusao or 0),
+                        'observacoes': sub.observacoes_tecnicas or ''
+                    })
         
-        # ORDENAR SUBATIVIDADES ANTES DE CONVERTER PARA LISTA
-        def extrair_numero_subatividade_api(sub):
-            """Extrair número da subatividade para ordenação (ex: '1. Detalhamento' -> 1)"""
+        # ═══════════════════════════════════════════════════════
+        # ETAPA 4: ADICIONAR NOVOS SERVIÇOS (CORE FIX) 🎯
+        # ═══════════════════════════════════════════════════════
+        novos_count = 0
+        
+        for servico_obra_real, servico in servicos_obra_atuais:
+            sid = servico.id
+            
+            # 🆕 SERVIÇO NOVO: não estava no último RDO
+            if sid not in servicos_no_ultimo_rdo:
+                print(f"🆕 [RDO-API] NOVO → {servico.nome} (ID:{sid})")
+                
+                # Buscar subatividades
+                subs_mestre = SubatividadeMestre.query.filter_by(
+                    servico_id=sid,
+                    admin_id=admin_id,
+                    ativo=True
+                ).order_by(SubatividadeMestre.ordem_padrao).all()
+                
+                subatividades_novas = []
+                for sm in subs_mestre:
+                    subatividades_novas.append({
+                        'id': sm.id,
+                        'nome': sm.nome,
+                        'percentual': 0.0,  # SEMPRE 0%
+                        'observacoes': ''
+                    })
+                
+                # Fallback: criar subatividade padrão
+                if not subatividades_novas:
+                    qtd_info = f"{servico_obra_real.quantidade_planejada or 1} {servico.unidade_simbolo or servico.unidade_medida or 'un'}"
+                    subatividades_novas.append({
+                        'id': f'new_{sid}',
+                        'nome': servico.nome,
+                        'percentual': 0.0,
+                        'observacoes': f'Qtd planejada: {qtd_info}'
+                    })
+                
+                servicos_finais[sid] = {
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'categoria': getattr(servico, 'categoria', 'Geral'),
+                    'descricao': servico.descricao or '',
+                    'subatividades': subatividades_novas,
+                    'eh_novo': True
+                }
+                
+                novos_count += 1
+        
+        # ═══════════════════════════════════════════════════════
+        # ETAPA 5: Ordenar subatividades e serviços
+        # ═══════════════════════════════════════════════════════
+        def extrair_numero(sub):
             try:
                 nome = sub.get('nome', '')
                 if nome and '.' in nome:
                     return int(nome.split('.')[0])
-                return 999  # Colocar no final se não tem número
+                return 999
             except:
                 return 999
         
-        # Aplicar ordenação em cada serviço
-        for servico_id, servico_data in servicos_agrupados.items():
+        for servico_data in servicos_finais.values():
             if servico_data.get('subatividades'):
-                servico_data['subatividades'].sort(key=extrair_numero_subatividade_api)
-                print(f"🔢 API: Subatividades ordenadas para serviço {servico_data['nome']}: {len(servico_data['subatividades'])} itens")
+                servico_data['subatividades'].sort(key=extrair_numero)
         
-        # Converter para lista
-        servicos_data = list(servicos_agrupados.values())
+        servicos_lista = list(servicos_finais.values())
+        servicos_lista.sort(key=lambda x: (x['categoria'], x['nome']))
         
-        # Montar dados dos funcionários
-        funcionarios_data = []
-        for func_rdo in funcionarios_rdo:
-            if func_rdo.funcionario:
-                funcionarios_data.append({
-                    'id': func_rdo.funcionario.id,
-                    'nome': func_rdo.funcionario.nome,
-                    'cargo': func_rdo.funcionario.funcao_ref.nome if hasattr(func_rdo.funcionario, 'funcao_ref') and func_rdo.funcionario.funcao_ref else 'Funcionário',
-                    'horas_trabalhadas': float(func_rdo.horas_trabalhadas or 8.8)
-                })
+        # Funcionários do último RDO
+        funcionarios_lista = []
+        if ultimo_rdo:
+            func_rdos = RDOMaoObra.query.filter_by(rdo_id=ultimo_rdo.id).all()
+            for fr in func_rdos:
+                if fr.funcionario:
+                    funcionarios_lista.append({
+                        'id': fr.funcionario.id,
+                        'nome': fr.funcionario.nome,
+                        'cargo': fr.funcionario.funcao_ref.nome if hasattr(fr.funcionario, 'funcao_ref') and fr.funcionario.funcao_ref else 'Funcionário',
+                        'horas_trabalhadas': float(fr.horas_trabalhadas or 8.8)
+                    })
         
-        print(f"✅ API ultima-dados: {len(servicos_data)} serviços, {len(funcionarios_data)} funcionários")
+        # ═══════════════════════════════════════════════════════
+        # LOGS FINAIS
+        # ═══════════════════════════════════════════════════════
+        print(f"✅ [RDO-API] Resultado:")
+        print(f"   → Último RDO: {len(servicos_no_ultimo_rdo)} serviços")
+        print(f"   → Novos: {novos_count} serviços")
+        print(f"   → Total: {len(servicos_lista)} serviços")
+        
+        # ═══════════════════════════════════════════════════════
+        # RETORNO
+        # ═══════════════════════════════════════════════════════
+        if not ultimo_rdo:
+            # Primeira RDO da obra
+            return jsonify({
+                'success': True,
+                'tem_rdo_anterior': False,
+                'novos_servicos': len(servicos_lista),
+                'total_servicos': len(servicos_lista),
+                'primeira_rdo': {
+                    'servicos': servicos_lista,
+                    'funcionarios': [],
+                    'observacoes_gerais': ''
+                }
+            })
         
         return jsonify({
             'success': True,
+            'tem_rdo_anterior': True,
+            'novos_servicos': novos_count,
+            'total_servicos': len(servicos_lista),
             'ultima_rdo': {
                 'numero_rdo': ultimo_rdo.numero_rdo or f'RDO-{ultimo_rdo.id}',
                 'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
-                'servicos': servicos_data,
-                'funcionarios': funcionarios_data,
+                'servicos': servicos_lista,
+                'funcionarios': funcionarios_lista,
                 'observacoes_gerais': getattr(ultimo_rdo, 'observacoes_gerais', '') or getattr(ultimo_rdo, 'observacoes', '') or ''
             }
         })
         
     except Exception as e:
-        print(f"❌ ERRO API ultima-dados: {e}")
+        print(f"❌ [RDO-API] ERRO: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 def _buscar_servicos_obra_resiliente(obra_id, admin_id):
     """Busca serviços da obra com múltiplas estratégias resilientes"""
