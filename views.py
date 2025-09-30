@@ -3047,20 +3047,18 @@ def novo_uso_veiculo_lista():
             except (ValueError, TypeError):
                 flash('Porcentagem de combustível inválida.', 'warning')
         
-        # Criar registro de uso
+        # Criar registro de uso (campos corretos do modelo UsoVeiculo)
         uso = UsoVeiculo(
             veiculo_id=veiculo.id,
-            funcionario_id=motorista_id,  # Usar motorista como funcionário principal
+            motorista_id=motorista_id,  # Campo correto: motorista_id
             obra_id=request.form.get('obra_id') if request.form.get('obra_id') else None,
             data_uso=datetime.strptime(request.form.get('data_uso'), '%Y-%m-%d').date(),
-            horario_saida=datetime.strptime(request.form.get('horario_saida'), '%H:%M').time() if request.form.get('horario_saida') else None,
-            horario_chegada=datetime.strptime(request.form.get('horario_chegada'), '%H:%M').time() if request.form.get('horario_chegada') else None,
+            hora_saida=datetime.strptime(request.form.get('horario_saida'), '%H:%M').time() if request.form.get('horario_saida') else None,
+            hora_retorno=datetime.strptime(request.form.get('horario_chegada'), '%H:%M').time() if request.form.get('horario_chegada') else None,
             km_inicial=km_inicial,
             km_final=km_final,
             km_percorrido=km_final - km_inicial if km_final and km_inicial else 0,
-            finalidade=request.form.get('finalidade', 'Operacional'),
             observacoes=request.form.get('observacoes'),
-            porcentagem_combustivel=porcentagem_combustivel,
             admin_id=tenant_admin_id,
             created_at=datetime.utcnow()
         )
@@ -3293,12 +3291,6 @@ def detalhes_uso_veiculo(uso_id):
                         <td><strong>Distância:</strong></td>
                         <td>{f"{uso.km_percorrido:,}".replace(",", ".") if uso.km_percorrido else '-'} km</td>
                     </tr>
-                    <tr>
-                        <td><strong>Combustível:</strong></td>
-                        <td>
-                            {'<span class="badge bg-info"><i class="fas fa-gas-pump"></i> ' + str(uso.porcentagem_combustivel) + '%</span>' if uso.porcentagem_combustivel is not None else '-'}
-                        </td>
-                    </tr>
                 </table>
             </div>
         </div>
@@ -3311,11 +3303,11 @@ def detalhes_uso_veiculo(uso_id):
                 <table class="table table-sm">
                     <tr>
                         <td><strong>Saída:</strong></td>
-                        <td>{uso.horario_saida.strftime('%H:%M') if uso.horario_saida else '-'}</td>
+                        <td>{uso.hora_saida.strftime('%H:%M') if uso.hora_saida else '-'}</td>
                     </tr>
                     <tr>
-                        <td><strong>Chegada:</strong></td>
-                        <td>{uso.horario_chegada.strftime('%H:%M') if uso.horario_chegada else '-'}</td>
+                        <td><strong>Retorno:</strong></td>
+                        <td>{uso.hora_retorno.strftime('%H:%M') if uso.hora_retorno else '-'}</td>
                     </tr>
                     <tr>
                         <td><strong>Duração:</strong></td>
@@ -3336,12 +3328,6 @@ def detalhes_uso_veiculo(uso_id):
             <div class="card">
                 <div class="card-body">
                     {uso.observacoes if uso.observacoes else '<em class="text-muted">Nenhuma observação registrada</em>'}
-                </div>
-            </div>
-            <h6 class="mt-3"><i class="fas fa-bullseye"></i> Finalidade</h6>
-            <div class="card">
-                <div class="card-body">
-                    {uso.finalidade if uso.finalidade else '<em class="text-muted">Não especificada</em>'}
                 </div>
             </div>
         </div>
@@ -3391,15 +3377,13 @@ def editar_uso_veiculo(uso_id):
                                                        for o in Obra.query.filter_by(admin_id=tenant_admin_id).all()]
         
         if form.validate_on_submit():
-            # Atualizar dados
+            # Atualizar dados (usando campos corretos do modelo)
             uso.veiculo_id = form.veiculo_id.data
-            uso.funcionario_id = form.funcionario_id.data
+            uso.motorista_id = form.funcionario_id.data  # Campo correto: motorista_id
             uso.obra_id = form.obra_id.data if form.obra_id.data != 0 else None
             uso.data_uso = form.data_uso.data
             uso.km_inicial = form.km_inicial.data
             uso.km_final = form.km_final.data
-            uso.porcentagem_combustivel = form.porcentagem_combustivel.data
-            uso.finalidade = form.finalidade.data
             uso.observacoes = form.observacoes.data
             
             db.session.commit()
@@ -3992,7 +3976,7 @@ def exportar_dados_veiculo(id):
             # Cabeçalho para usos
             writer.writerow(['=== HISTÓRICO DE USOS ==='])
             writer.writerow(['Data', 'Funcionário', 'Obra', 'KM Inicial', 'KM Final', 'KM Percorrido', 
-                           'Horário Saída', 'Horário Chegada', 'Horas Uso', 'Finalidade', 'Tipo Uso', 'Status'])
+                           'Horário Saída', 'Horário Retorno', 'Observações'])
             
             usos = UsoVeiculo.query.filter_by(veiculo_id=id).order_by(UsoVeiculo.data_uso.desc()).all()
             for uso in usos:
@@ -4003,12 +3987,9 @@ def exportar_dados_veiculo(id):
                     uso.km_inicial or '',
                     uso.km_final or '',
                     uso.km_percorrido or '',
-                    uso.horario_saida.strftime('%H:%M') if uso.horario_saida else '',
-                    uso.horario_chegada.strftime('%H:%M') if uso.horario_chegada else '',
-                    uso.tempo_uso_str,
-                    uso.finalidade or '',
-                    uso.tipo_uso or '',
-                    uso.status_uso or ''
+                    uso.hora_saida.strftime('%H:%M') if uso.hora_saida else '',
+                    uso.hora_retorno.strftime('%H:%M') if uso.hora_retorno else '',
+                    uso.observacoes or ''
                 ])
             writer.writerow([])  # Linha vazia
         
