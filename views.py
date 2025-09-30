@@ -6408,7 +6408,7 @@ def api_ultimo_rdo(obra_id):
 @main_bp.route('/api/obra/<int:obra_id>/percentuais-ultimo-rdo')
 @funcionario_required
 def api_percentuais_ultimo_rdo(obra_id):
-    """API para carregar percentuais da última RDO da obra"""
+    """API CORRIGIDA: Percentuais do último RDO + novos serviços com 0%"""
     try:
         # Buscar funcionário correto para admin_id
         email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
@@ -6430,36 +6430,87 @@ def api_percentuais_ultimo_rdo(obra_id):
         # Buscar último RDO da obra
         ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
         
-        if not ultimo_rdo:
-            return jsonify({
-                'percentuais': {},
-                'origem': 'Nenhum RDO anterior encontrado'
-            })
+        # Buscar TODOS os serviços ativos da obra
+        servicos_obra_atuais = db.session.query(
+            ServicoObraReal, Servico
+        ).join(
+            Servico, ServicoObraReal.servico_id == Servico.id
+        ).filter(
+            ServicoObraReal.obra_id == obra_id,
+            ServicoObraReal.admin_id == admin_id_correto,
+            ServicoObraReal.ativo == True,
+            Servico.ativo == True
+        ).all()
         
-        # Carregar subatividades do último RDO
         percentuais = {}
-        rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+        servicos_no_ultimo_rdo = set()
         
-        for rdo_subativ in rdo_subatividades:
-            # Usar nome da subatividade como chave em vez de ID
-            percentuais[rdo_subativ.nome_subatividade] = {
-                'percentual': rdo_subativ.percentual_conclusao,
-                'observacoes': rdo_subativ.observacoes_tecnicas or ''
-            }
+        if ultimo_rdo:
+            # Carregar subatividades do último RDO
+            rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+            
+            for rdo_subativ in rdo_subatividades:
+                servicos_no_ultimo_rdo.add(rdo_subativ.servico_id)
+                percentuais[rdo_subativ.nome_subatividade] = {
+                    'percentual': rdo_subativ.percentual_conclusao,
+                    'observacoes': rdo_subativ.observacoes_tecnicas or ''
+                }
+            
+            # ADICIONAR NOVOS SERVIÇOS (não estavam no último RDO)
+            for servico_obra_real, servico in servicos_obra_atuais:
+                if servico.id not in servicos_no_ultimo_rdo:
+                    # Buscar subatividades do novo serviço
+                    subs_mestre = SubatividadeMestre.query.filter_by(
+                        servico_id=servico.id,
+                        admin_id=admin_id_correto,
+                        ativo=True
+                    ).order_by(SubatividadeMestre.ordem_padrao).all()
+                    
+                    if subs_mestre:
+                        for sm in subs_mestre:
+                            percentuais[sm.nome] = {
+                                'percentual': 0,  # Novo serviço com 0%
+                                'observacoes': ''
+                            }
+                    else:
+                        # Fallback: adicionar o próprio serviço
+                        percentuais[servico.nome] = {
+                            'percentual': 0,
+                            'observacoes': ''
+                        }
+        else:
+            # Primeira RDO - carregar todos os serviços com 0%
+            for servico_obra_real, servico in servicos_obra_atuais:
+                subs_mestre = SubatividadeMestre.query.filter_by(
+                    servico_id=servico.id,
+                    admin_id=admin_id_correto,
+                    ativo=True
+                ).order_by(SubatividadeMestre.ordem_padrao).all()
+                
+                if subs_mestre:
+                    for sm in subs_mestre:
+                        percentuais[sm.nome] = {
+                            'percentual': 0,
+                            'observacoes': ''
+                        }
+                else:
+                    percentuais[servico.nome] = {
+                        'percentual': 0,
+                        'observacoes': ''
+                    }
         
-        # Fallback para atividades legadas
-        if not percentuais:
-            # Removido: fallback legado - só usar RDOServicoSubatividade
-            pass
+        origem = f'Última RDO: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio.strftime("%d/%m/%Y")})' if ultimo_rdo else 'Primeira RDO da obra'
         
         return jsonify({
             'percentuais': percentuais,
-            'origem': f'Última RDO: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio.strftime("%d/%m/%Y")})',
+            'origem': origem,
             'total_subatividades': len(percentuais)
         })
         
     except Exception as e:
-        print(f"ERRO API ATIVIDADES OBRA: {str(e)}")
+        print(f"❌ ERRO API percentuais-ultimo-rdo: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Erro interno'}), 500
 
 @main_bp.route('/rdo/novo')
