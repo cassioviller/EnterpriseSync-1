@@ -1,0 +1,329 @@
+# 🚨 CORREÇÃO CRÍTICA: Serviços da Obra Não Aparecem no RDO
+
+## 🎯 PROBLEMA IDENTIFICADO
+
+Quando uma obra é editada e **novos serviços são adicionados**, ao criar um novo RDO:
+- ❌ **Apenas os serviços do último RDO aparecem**
+- ❌ **Novos serviços adicionados à obra NÃO aparecem**
+- ❌ **Sistema puxa apenas dados do último RDO, ignorando mudanças na obra**
+
+### Cenário do Problema:
+1. Obra tem serviços A, B, C
+2. Cria RDO-1 com serviços A, B, C
+3. **Edita obra e adiciona serviço D**
+4. Cria RDO-2 → **Serviço D não aparece!**
+
+## 🔍 CAUSA RAIZ
+
+A API `/api/rdo/ultima-dados/<obra_id>` (linha 8400 do views.py) apenas busca serviços do último RDO, não verifica se novos serviços foram adicionados à obra.
+
+```python
+# CÓDIGO ATUAL (PROBLEMÁTICO):
+subatividades = RDOServicoSubatividade.query.filter_by(
+    rdo_id=ultimo_rdo.id  # ❌ Só busca do último RDO
+).all()
+```
+
+## 🛠️ SOLUÇÃO IMPLEMENTADA
+
+### **ESTRATÉGIA: Combinar Dados**
+1. **Buscar serviços do último RDO** (manter progresso)
+2. **Buscar TODOS os serviços atuais da obra**
+3. **Identificar novos serviços** (não estavam no último RDO)
+4. **Adicionar novos serviços com 0% de progresso**
+
+### **NOVA LÓGICA:**
+```
+SERVIÇOS FINAIS = SERVIÇOS_ÚLTIMO_RDO + NOVOS_SERVIÇOS_OBRA
+```
+
+## 📝 IMPLEMENTAÇÃO
+
+### **PASSO 1: Substituir a API no views.py**
+
+Localizar a função `api_rdo_ultima_dados` (linha ~8400) e substituir por:
+
+```python
+@main_bp.route('/api/rdo/ultima-dados/<int:obra_id>')
+@login_required
+def api_rdo_ultima_dados(obra_id):
+    """
+    API CORRIGIDA: Buscar dados do último RDO + novos serviços da obra
+    Combina serviços do último RDO com novos serviços adicionados à obra
+    """
+    try:
+        admin_id = get_admin_id_robusta()
+        
+        print(f"🔍 API ultima-dados CORRIGIDA: obra {obra_id}, admin_id {admin_id}")
+        
+        # ETAPA 1: Buscar último RDO da obra
+        ultimo_rdo = RDO.query.join(Obra).filter(
+            Obra.id == obra_id,
+            Obra.admin_id == admin_id
+        ).order_by(RDO.data_relatorio.desc()).first()
+        
+        # ETAPA 2: Buscar TODOS os serviços ativos da obra (incluindo novos)
+        servicos_obra_atuais = db.session.query(ServicoObra, Servico).join(
+            Servico, ServicoObra.servico_id == Servico.id
+        ).filter(
+            ServicoObra.obra_id == obra_id,
+            ServicoObra.ativo == True,
+            ServicoObra.admin_id == admin_id
+        ).all()
+        
+        print(f"📋 SERVIÇOS ATUAIS DA OBRA: {len(servicos_obra_atuais)} encontrados")
+        
+        # ETAPA 3: Criar dicionário de serviços com dados do último RDO
+        servicos_finais = {}
+        servicos_do_ultimo_rdo = set()
+        
+        if ultimo_rdo:
+            print(f"📄 ÚLTIMO RDO: {ultimo_rdo.numero_rdo} - {ultimo_rdo.data_relatorio}")
+            
+            # Buscar subatividades do último RDO
+            subatividades_ultimo_rdo = RDOServicoSubatividade.query.filter_by(
+                rdo_id=ultimo_rdo.id
+            ).all()
+            
+            # Agrupar subatividades por serviço do último RDO
+            for sub in subatividades_ultimo_rdo:
+                servico_id = sub.servico_id
+                servicos_do_ultimo_rdo.add(servico_id)
+                
+                if servico_id not in servicos_finais:
+                    servico = Servico.query.get(servico_id)
+                    if servico:
+                        servicos_finais[servico_id] = {
+                            'id': servico.id,
+                            'nome': servico.nome,
+                            'categoria': getattr(servico, 'categoria', 'Geral'),
+                            'descricao': servico.descricao or '',
+                            'subatividades': [],
+                            'origem': 'ultimo_rdo'
+                        }
+                
+                # Adicionar subatividade com dados do último RDO
+                if servico_id in servicos_finais:
+                    subatividade_mestre_id = sub.id
+                    try:
+                        subatividade_mestre = db.session.query(SubatividadeMestre).filter_by(
+                            nome=sub.nome_subatividade,
+                            servico_id=servico_id,
+                            admin_id=admin_id
+                        ).first()
+                        
+                        if subatividade_mestre:
+                            subatividade_mestre_id = subatividade_mestre.id
+                    except Exception as e:
+                        print(f"⚠️ Erro ao buscar subatividade mestre: {e}")
+                    
+                    servicos_finais[servico_id]['subatividades'].append({
+                        'id': subatividade_mestre_id,
+                        'nome': sub.nome_subatividade,
+                        'percentual': float(sub.percentual_conclusao or 0),
+                        'observacoes': sub.observacoes_tecnicas or '',
+                        'origem': 'ultimo_rdo'
+                    })
+        
+        # ETAPA 4: Adicionar novos serviços da obra que NÃO estavam no último RDO
+        novos_servicos_adicionados = 0
+        
+        for servico_obra, servico in servicos_obra_atuais:
+            servico_id = servico.id
+            
+            # Se o serviço NÃO estava no último RDO, adicionar com percentual 0
+            if servico_id not in servicos_do_ultimo_rdo:
+                print(f"🆕 NOVO SERVIÇO DETECTADO: {servico.nome} (ID: {servico_id})")
+                
+                # Buscar subatividades do serviço
+                subatividades_mestre = SubatividadeMestre.query.filter_by(
+                    servico_id=servico_id,
+                    admin_id=admin_id,
+                    ativo=True
+                ).order_by(SubatividadeMestre.ordem_padrao).all()
+                
+                subatividades_novas = []
+                for sub_mestre in subatividades_mestre:
+                    subatividades_novas.append({
+                        'id': sub_mestre.id,
+                        'nome': sub_mestre.nome,
+                        'percentual': 0.0,  # SEMPRE 0% para novos serviços
+                        'observacoes': '',
+                        'origem': 'novo_servico'
+                    })
+                
+                # Se não tem subatividades mestre, criar uma padrão
+                if not subatividades_novas:
+                    subatividades_novas.append({
+                        'id': f'default_{servico_id}',
+                        'nome': servico.nome,
+                        'percentual': 0.0,
+                        'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}',
+                        'origem': 'novo_servico_default'
+                    })
+                
+                servicos_finais[servico_id] = {
+                    'id': servico.id,
+                    'nome': servico.nome,
+                    'categoria': getattr(servico, 'categoria', 'Geral'),
+                    'descricao': servico.descricao or '',
+                    'subatividades': subatividades_novas,
+                    'origem': 'novo_servico'
+                }
+                
+                novos_servicos_adicionados += 1
+        
+        # ETAPA 5: Converter para lista e ordenar
+        servicos_data = []
+        for servico_id, servico_data in servicos_finais.items():
+            servico_data['subatividades'].sort(key=lambda x: x['nome'])
+            servicos_data.append(servico_data)
+        
+        servicos_data.sort(key=lambda x: (x['categoria'], x['nome']))
+        
+        # ETAPA 6: Buscar funcionários do último RDO
+        funcionarios_data = []
+        if ultimo_rdo:
+            funcionarios_rdo = RDOMaoObra.query.filter_by(
+                rdo_id=ultimo_rdo.id
+            ).all()
+            
+            for func_rdo in funcionarios_rdo:
+                funcionario = Funcionario.query.get(func_rdo.funcionario_id)
+                if funcionario:
+                    funcionarios_data.append({
+                        'id': funcionario.id,
+                        'nome': funcionario.nome,
+                        'funcao': funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Não definida',
+                        'presente': True
+                    })
+        
+        # LOGS DE DEBUG
+        print(f"✅ RESULTADO FINAL:")
+        print(f"   - Serviços do último RDO: {len(servicos_do_ultimo_rdo)}")
+        print(f"   - Novos serviços adicionados: {novos_servicos_adicionados}")
+        print(f"   - Total de serviços: {len(servicos_data)}")
+        
+        # ETAPA 7: Retornar dados combinados
+        response_data = {
+            'success': True,
+            'tem_rdo_anterior': ultimo_rdo is not None,
+            'novos_servicos_detectados': novos_servicos_adicionados,
+            'total_servicos': len(servicos_data)
+        }
+        
+        if ultimo_rdo:
+            response_data['ultima_rdo'] = {
+                'numero_rdo': ultimo_rdo.numero_rdo or f'RDO-{ultimo_rdo.id}',
+                'data_relatorio': ultimo_rdo.data_relatorio.strftime('%Y-%m-%d'),
+                'servicos': servicos_data,
+                'funcionarios': funcionarios_data,
+                'observacoes_gerais': getattr(ultimo_rdo, 'observacoes_gerais', '') or ''
+            }
+        else:
+            response_data['primeira_rdo'] = {
+                'servicos': servicos_data,
+                'funcionarios': [],
+                'observacoes_gerais': ''
+            }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"❌ ERRO API ultima-dados CORRIGIDA: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+```
+
+### **PASSO 2: Atualizar JavaScript (Opcional)**
+
+Adicionar ao template do RDO para mostrar feedback sobre novos serviços:
+
+```javascript
+// Função para mostrar alerta sobre novos serviços
+function mostrarAlertaNovoServico(quantidade) {
+    if (quantidade > 0) {
+        const alertaHtml = `
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <i class="fas fa-info-circle"></i>
+                <strong>Novos serviços detectados!</strong>
+                ${quantidade} novo(s) serviço(s) foram adicionados à obra e aparecerão com 0% de progresso.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        const container = document.querySelector('.container-fluid') || document.body;
+        const alertaDiv = document.createElement('div');
+        alertaDiv.innerHTML = alertaHtml;
+        container.insertBefore(alertaDiv, container.firstChild);
+    }
+}
+
+// Atualizar função existente de carregamento
+async function carregarDadosUltimoRDO(obraId) {
+    try {
+        const response = await fetch(`/api/rdo/ultima-dados/${obraId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Mostrar alerta se há novos serviços
+            if (data.novos_servicos_detectados > 0) {
+                mostrarAlertaNovoServico(data.novos_servicos_detectados);
+            }
+            
+            // Continuar com lógica existente...
+        }
+    } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+    }
+}
+```
+
+## 🧪 TESTE DA CORREÇÃO
+
+### **Cenário de Teste:**
+1. **Criar obra** com serviços A, B, C
+2. **Criar RDO-1** → Verificar se A, B, C aparecem
+3. **Editar obra** e adicionar serviço D
+4. **Criar RDO-2** → **Verificar se A, B, C, D aparecem**
+5. **Serviços A, B, C** devem manter progresso do RDO-1
+6. **Serviço D** deve aparecer com 0% de progresso
+
+### **Logs Esperados:**
+```
+🔍 API ultima-dados CORRIGIDA: obra 19, admin_id 2
+📋 SERVIÇOS ATUAIS DA OBRA: 4 encontrados
+📄 ÚLTIMO RDO: RDO-2-2025-026 - 2025-09-18
+🆕 NOVO SERVIÇO DETECTADO: PERGOLADO METÁLICO (ID: 37)
+✅ RESULTADO FINAL:
+   - Serviços do último RDO: 3
+   - Novos serviços adicionados: 1
+   - Total de serviços: 4
+```
+
+## 🎯 RESULTADO ESPERADO
+
+Após a correção:
+- ✅ **Serviços do último RDO mantêm progresso**
+- ✅ **Novos serviços aparecem com 0% de progresso**
+- ✅ **Todos os serviços atuais da obra são exibidos**
+- ✅ **Alerta visual sobre novos serviços detectados**
+- ✅ **Logs detalhados para debug**
+
+## 🚀 BENEFÍCIOS
+
+1. **Correção Completa**: Resolve o problema raiz
+2. **Preserva Dados**: Mantém progresso dos serviços existentes
+3. **Flexibilidade**: Permite adicionar serviços a qualquer momento
+4. **Feedback Visual**: Usuário sabe quando novos serviços foram detectados
+5. **Debug Robusto**: Logs detalhados para troubleshooting
+
+---
+
+**Prioridade:** 🔴 CRÍTICA  
+**Tempo Estimado:** 30-45 minutos  
+**Impacto:** Resolve completamente o problema de serviços não aparecerem no RDO
