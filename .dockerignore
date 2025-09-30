@@ -45,12 +45,11 @@ RELATORIO_*.md
 CALCULOS_*.md
 DOCUMENTACAO_*.md
 
-# Scripts de desenvolvimento e teste
+# Scripts de desenvolvimento e teste (EXCETO migrations.py e fleet_*)
 testar_*.py
 criar_*.py
 popular_*.py
 debug_*.py
-migrar_*.py
 relatorio_*.py
 validacao_*.py
 

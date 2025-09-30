@@ -225,29 +225,15 @@ with app.app_context():
     except ImportError as e:
         logging.warning(f"⚠️ FLEET ROUTES: Não disponível: {e}")
     
-    # MIGRAÇÕES DESABILITADAS novamente após aplicar mudanças críticas de veículos
-    print("🔇 Migrações automáticas DESABILITADAS novamente para evitar loops infinitos")
-    print("📋 DOCS MIGRAÇÕES:")
-    print("   Para novo deployment: RUN_MIGRATIONS=1 <start_command>")
-    print("   Ex: RUN_MIGRATIONS=1 gunicorn --bind 0.0.0.0:5000 main:app")
-    print("   ⚠️  Use apenas em deployments NOVOS ou com schema changes")
-    print("   ✅ Desenvolvimento: migrações são executadas automaticamente")
-    print("✅ SISTEMA DE VEÍCULOS MULTI-TENANT já foi corrigido com sucesso!")
-    print("🔒 Constraints aplicadas: unique(admin_id, placa), admin_id NOT NULL")
-    # 🔄 SISTEMA DE MIGRAÇÕES COM FLAG - PROBLEM 1 RESOLVED
-    # Executa migrações apenas quando RUN_MIGRATIONS=1 ou RUN_MIGRATIONS=true
-    run_migrations = os.environ.get('RUN_MIGRATIONS', '').lower() in ['1', 'true', 'yes']
-    if run_migrations:
-        logger.info("🔄 RUN_MIGRATIONS=1 detectado - executando migrações automáticas...")
-        try:
-            from migrations import executar_migracoes
-            executar_migracoes()
-            logger.info("✅ Migrações executadas com sucesso!")
-        except Exception as e:
-            logger.error(f"❌ Erro ao executar migrações: {e}")
-            # Não interromper o app, apenas logar erro
-    else:
-        logger.info("🔇 Migrações automáticas desabilitadas (RUN_MIGRATIONS não definido)")
+    # ✅ MIGRAÇÕES AUTOMÁTICAS SEMPRE ATIVAS - SIMPLICIDADE MÁXIMA
+    logger.info("🔄 Executando migrações automáticas do banco de dados...")
+    try:
+        from migrations import executar_migracoes
+        executar_migracoes()
+        logger.info("✅ Migrações executadas com sucesso!")
+    except Exception as e:
+        logger.error(f"❌ Erro ao executar migrações: {e}")
+        logger.warning("⚠️ Aplicação continuará mesmo com erro nas migrações")
     
     # 🗑️ SISTEMA DE LIMPEZA DE VEÍCULOS - CRITICAL INTEGRATION
     # Executa limpeza de tabelas obsoletas de veículos quando RUN_CLEANUP_VEICULOS=1
