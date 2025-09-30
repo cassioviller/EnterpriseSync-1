@@ -218,33 +218,18 @@ class UsoVeiculoService:
                 if not obra:
                     return False, None, "Obra não encontrada"
             
-            # Criar registro de uso
+            # Criar registro de uso (usando apenas campos que existem no modelo)
             uso = UsoVeiculo(
                 veiculo_id=dados['veiculo_id'],
-                motorista_id=dados.get('motorista_id'),  # Novo campo opcional
+                motorista_id=dados.get('motorista_id'),
                 obra_id=dados.get('obra_id'),
                 data_uso=dados['data_uso'],
-                hora_saida=dados.get('hora_saida'),  # Nome correto da tabela
-                hora_retorno=dados.get('hora_retorno'),  # Nome correto da tabela  
+                hora_saida=dados.get('hora_saida'),
+                hora_retorno=dados.get('hora_retorno'),
                 km_inicial=int(dados['km_inicial']),
                 km_final=int(dados['km_final']) if dados.get('km_final') else None,
-                
-                # Novos campos de passageiros modernos
                 passageiros_frente=dados.get('passageiros_frente', ''),
                 passageiros_tras=dados.get('passageiros_tras', ''),
-                
-                # Campos legacy opcionais
-                finalidade='Uso geral',  # Padrão
-                destino=None,
-                rota_detalhada=None,
-                
-                # Custos zerados (gerenciados separadamente agora)
-                valor_combustivel=Decimal('0'),
-                litros_combustivel=Decimal('0'),
-                valor_pedagio=Decimal('0'),
-                valor_manutencao=Decimal('0'),
-                valor_outros=Decimal('0'),
-                
                 responsavel_veiculo=motorista.nome if motorista else 'Não informado',
                 observacoes=dados.get('observacoes', '').strip() if dados.get('observacoes') else None,
                 admin_id=admin_id
@@ -282,20 +267,11 @@ class UsoVeiculoService:
                 return False, None, "Uso não encontrado"
             
             
-            # Atualizar dados de finalização
-            uso.hora_retorno = dados_finalizacao.get('hora_retorno', time.now())
+            # Atualizar dados de finalização (usando apenas campos que existem no modelo)
+            uso.hora_retorno = dados_finalizacao.get('hora_retorno', datetime.utcnow().time())
             uso.km_final = int(dados_finalizacao['km_final'])
-            uso.observacoes_retorno = dados_finalizacao.get('observacoes_retorno', '').strip() if dados_finalizacao.get('observacoes_retorno') else None
-            
-            # Atualizar custos se informados na finalização
-            if dados_finalizacao.get('valor_combustivel'):
-                uso.valor_combustivel = Decimal(str(dados_finalizacao['valor_combustivel']))
-            if dados_finalizacao.get('litros_combustivel'):
-                uso.litros_combustivel = Decimal(str(dados_finalizacao['litros_combustivel']))
-            if dados_finalizacao.get('valor_pedagio'):
-                uso.valor_pedagio = Decimal(str(dados_finalizacao['valor_pedagio']))
-            if dados_finalizacao.get('valor_outros'):
-                uso.valor_outros = Decimal(str(dados_finalizacao['valor_outros']))
+            if dados_finalizacao.get('observacoes'):
+                uso.observacoes = dados_finalizacao.get('observacoes', '').strip()
             
             # Recalcular KM percorrido
             uso.calcular_km_percorrido()
@@ -390,29 +366,17 @@ class UsoVeiculoService:
             total_usos = len(usos)
             km_total = sum(uso.km_percorrido for uso in usos if uso.km_percorrido)
             
-            custo_total = sum(uso.valor_total_uso for uso in usos)
-            combustivel_total = sum(float(uso.valor_combustivel) for uso in usos if uso.valor_combustivel)
-            pedagio_total = sum(float(uso.valor_pedagio) for uso in usos if uso.valor_pedagio)
-            
             return {
                 'total_usos': total_usos,
                 'km_total': km_total,
-                'custo_total': round(custo_total, 2),
-                'combustivel_total': round(combustivel_total, 2),
-                'pedagio_total': round(pedagio_total, 2),
-                'media_km_por_uso': round(km_total / total_usos, 1) if total_usos > 0 else 0,
-                'custo_por_km': round(custo_total / km_total, 2) if km_total > 0 else 0
+                'media_km_por_uso': round(km_total / total_usos, 1) if total_usos > 0 else 0
             }
             
         except Exception:
             return {
                 'total_usos': 0,
                 'km_total': 0,
-                'custo_total': 0,
-                'combustivel_total': 0,
-                'pedagio_total': 0,
-                'media_km_por_uso': 0,
-                'custo_por_km': 0
+                'media_km_por_uso': 0
             }
 
 
