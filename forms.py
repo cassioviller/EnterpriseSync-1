@@ -229,7 +229,7 @@ class AlimentacaoMultiplaForm(FlaskForm):
 
 
 class UsoVeiculoForm(FlaskForm):
-    """Formulário aprimorado para registro de uso de veículo"""
+    """Formulário para registro de uso de veículo"""
     veiculo_id = SelectField('Veículo', coerce=int, validators=[DataRequired()])
     funcionario_id = SelectField('Funcionário', coerce=int, validators=[DataRequired()])
     obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()])
@@ -238,24 +238,7 @@ class UsoVeiculoForm(FlaskForm):
     km_final = IntegerField('KM Final', validators=[Optional(), NumberRange(min=0)])
     horario_saida = TimeField('Horário de Saída', validators=[Optional()])
     horario_chegada = TimeField('Horário de Chegada', validators=[Optional()])
-    finalidade = StringField('Finalidade', validators=[Optional(), Length(max=200)])
     observacoes = TextAreaField('Observações')
-    
-    # Novos campos
-    local_destino = StringField('Local de Destino', validators=[Optional(), Length(max=200)])
-    tipo_uso = SelectField('Tipo de Uso', choices=[
-        ('trabalho', 'Trabalho'),
-        ('emergencia', 'Emergência'),
-        ('manutencao', 'Manutenção'),
-        ('transporte_materiais', 'Transporte de Materiais'),
-        ('reuniao_cliente', 'Reunião Cliente'),
-        ('outros', 'Outros')
-    ], default='trabalho', validators=[DataRequired()])
-    status_uso = SelectField('Status', choices=[
-        ('ativo', 'Em Uso'),
-        ('finalizado', 'Finalizado'),
-        ('cancelado', 'Cancelado')
-    ], default='ativo', validators=[DataRequired()])
     
     # Validações customizadas
     def validate_km_inicial(form, field):
