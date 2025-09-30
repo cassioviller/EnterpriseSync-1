@@ -384,6 +384,55 @@ console.log('Initializing Veículos with light theme...');
     position: relative;
 }
 
+/* Botões de Ação no Header */
+.card-action-buttons {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.veiculo-card:hover .card-action-buttons {
+    opacity: 1;
+}
+
+.btn-card-action {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    text-decoration: none;
+    backdrop-filter: blur(10px);
+}
+
+.btn-card-action:hover {
+    transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.btn-edit:hover {
+    background: #ffc107;
+}
+
+.btn-delete:hover {
+    background: #dc3545;
+}
+
+.btn-card-action i {
+    font-size: 0.9rem;
+}
+
 .veiculo-placa {
     font-size: 1.5rem;
     font-weight: 800;
@@ -580,6 +629,14 @@ console.log('Initializing Veículos with light theme...');
         {% for veiculo in veiculos %}
         <div class="veiculo-card">
             <div class="veiculo-card-header">
+                <div class="card-action-buttons">
+                    <a href="{{ url_for('main.editar_veiculo', id=veiculo.id) }}" class="btn-card-action btn-edit" title="Editar veículo">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <button type="button" class="btn-card-action btn-delete" onclick="confirmarExclusao('{{ veiculo.id }}', '{{ veiculo.placa }}')" title="Excluir veículo">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
                 <h3 class="veiculo-placa">{{ veiculo.placa }}</h3>
                 <p class="veiculo-modelo">{{ veiculo.marca }} {{ veiculo.modelo }}</p>
             </div>
@@ -667,4 +724,17 @@ console.log('Initializing Veículos with light theme...');
     </div>
     {% endif %}
 </div>
+
+<script>
+function confirmarExclusao(veiculoId, placa) {
+    if (confirm(`⚠️ Tem certeza que deseja excluir o veículo ${placa}?\n\nEsta ação não pode ser desfeita.`)) {
+        // Criar form dinamicamente para enviar POST
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/veiculos/${veiculoId}/excluir`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
 {% endblock %}
