@@ -11,6 +11,9 @@ from sqlalchemy import func, desc, or_, and_, text
 from sqlalchemy.exc import IntegrityError
 import os
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 # SISTEMA DE LOG DETALHADO PARA MÓDULOS
 import sys
@@ -2922,7 +2925,7 @@ def excluir_veiculo(id):
         flash(f'Veículo {veiculo.placa} removido com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO AO EXCLUIR VEÍCULO: {str(e)}")
+        logger.error(f"❌ ERRO AO EXCLUIR VEÍCULO: {str(e)}", exc_info=True)
         flash('Erro ao remover veículo. Tente novamente.', 'error')
     
     return redirect(url_for('main.veiculos'))
