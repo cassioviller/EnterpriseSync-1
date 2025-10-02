@@ -91,6 +91,9 @@ def executar_migracoes():
         
         # Migração 20: CRÍTICA - Sistema Fleet Completo (nova arquitetura de veículos)
         migrar_sistema_fleet_completo()
+        
+        # Migração 21: HOTFIX EMERGENCIAL - Adicionar motorista_id na tabela ANTIGA uso_veiculo
+        hotfix_adicionar_motorista_id_legacy()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -2106,3 +2109,136 @@ def migrar_sistema_fleet_completo():
         
         # Re-raise para que seja tratado pelo executor principal
         raise
+
+
+def hotfix_adicionar_motorista_id_legacy():
+    """
+    MIGRAÇÃO 21: HOTFIX EMERGENCIAL
+    
+    Adiciona coluna motorista_id na tabela ANTIGA uso_veiculo para compatibilidade.
+    Isso permite que o código legacy continue funcionando enquanto migramos para Fleet.
+    
+    CONTEXTO:
+    - views.py ainda usa modelos antigos (Veiculo, UsoVeiculo) diretamente em 27+ rotas
+    - Erro em produção: column "motorista_id" does not exist
+    - Estratégia: hotfix agora, migração gradual para Fleet depois
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🚨 MIGRAÇÃO 21: HOTFIX EMERGENCIAL - motorista_id em uso_veiculo legacy")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se tabela uso_veiculo existe
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'uso_veiculo'
+        """)
+        
+        if cursor.fetchone()[0] == 0:
+            logger.info("ℹ️  Tabela uso_veiculo não existe, hotfix não necessário")
+            cursor.close()
+            connection.close()
+            return
+        
+        # Verificar se coluna motorista_id já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name = 'motorista_id'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("✅ Coluna motorista_id já existe na tabela uso_veiculo legacy")
+            cursor.close()
+            connection.close()
+            return
+        
+        logger.info("🔧 Adicionando coluna motorista_id na tabela uso_veiculo legacy...")
+        
+        # Adicionar coluna motorista_id (NULLABLE para compatibilidade)
+        cursor.execute("""
+            ALTER TABLE uso_veiculo 
+            ADD COLUMN motorista_id INTEGER
+        """)
+        logger.info("✅ Coluna motorista_id adicionada")
+        
+        # Adicionar FK opcional para funcionario
+        try:
+            cursor.execute("""
+                ALTER TABLE uso_veiculo 
+                ADD CONSTRAINT fk_uso_veiculo_motorista 
+                FOREIGN KEY (motorista_id) REFERENCES funcionario(id) 
+                ON DELETE SET NULL
+            """)
+            logger.info("✅ Foreign key fk_uso_veiculo_motorista adicionada")
+        except Exception as fk_error:
+            logger.warning(f"⚠️  Foreign key não pôde ser criada: {fk_error}")
+            logger.warning("ℹ️  Continuando sem FK (não bloqueia funcionalidade)")
+        
+        # Criar índice para performance
+        try:
+            cursor.execute("""
+                CREATE INDEX idx_uso_veiculo_motorista 
+                ON uso_veiculo(motorista_id)
+            """)
+            logger.info("✅ Índice idx_uso_veiculo_motorista criado")
+        except Exception as idx_error:
+            logger.warning(f"⚠️  Índice não pôde ser criado: {idx_error}")
+        
+        # IMPORTANTE: Tentar popular motorista_id com dados existentes de funcionario_id
+        # (caso a tabela tenha usado funcionario_id antes)
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name = 'funcionario_id'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("🔄 Migrando dados de funcionario_id → motorista_id...")
+            cursor.execute("""
+                UPDATE uso_veiculo 
+                SET motorista_id = funcionario_id 
+                WHERE motorista_id IS NULL 
+                AND funcionario_id IS NOT NULL
+            """)
+            migrados = cursor.rowcount
+            if migrados > 0:
+                logger.info(f"✅ {migrados} registros migrados de funcionario_id → motorista_id")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("🎉 HOTFIX 21 CONCLUÍDO COM SUCESSO!")
+        logger.info("=" * 80)
+        logger.info("✅ Coluna motorista_id adicionada em uso_veiculo legacy")
+        logger.info("✅ Código legacy pode continuar funcionando")
+        logger.info("✅ Produção estabilizada - erro 'motorista_id does not exist' resolvido")
+        logger.info("📋 Próximos passos: Migrar rotas do views.py para usar FleetService gradualmente")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error(f"❌ ERRO CRÍTICO no Hotfix 21 - motorista_id legacy: {str(e)}")
+        logger.error("=" * 80)
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        
+        # NÃO re-raise - esse hotfix não deve quebrar o startup
+        logger.warning("⚠️  Hotfix falhou mas aplicação continuará inicializando")
+        logger.warning("⚠️  Sistema de veículos legacy pode apresentar erros até correção manual")
