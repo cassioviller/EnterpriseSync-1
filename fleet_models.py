@@ -6,6 +6,10 @@
 
 from datetime import datetime
 from app import db
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from models import Usuario, Funcionario, Obra
 
 
 class FleetVehicle(db.Model):
@@ -126,6 +130,12 @@ class FleetVehicleUsage(db.Model):
     driver_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=True)  # substitui 'motorista_id'
     worksite_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # substitui 'obra_id'
     
+    if TYPE_CHECKING:
+        fleet_vehicle: 'FleetVehicle'
+        driver: 'Funcionario'
+        worksite: 'Obra'
+        admin_owner: 'Usuario'
+    
     # Dados do uso
     usage_date = db.Column(db.Date, nullable=False)  # substitui 'data_uso'
     departure_time = db.Column(db.Time, nullable=True)  # substitui 'hora_saida'
@@ -229,6 +239,10 @@ class FleetVehicleCost(db.Model):
     
     # Relacionamento principal
     vehicle_id = db.Column(db.Integer, db.ForeignKey('fleet_vehicle.vehicle_id'), nullable=False)
+    
+    if TYPE_CHECKING:
+        fleet_vehicle: 'FleetVehicle'
+        admin_owner: 'Usuario'
     
     # Dados do custo
     cost_date = db.Column(db.Date, nullable=False)  # substitui 'data_custo'
