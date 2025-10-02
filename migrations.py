@@ -88,6 +88,9 @@ def executar_migracoes():
         
         # Migração 19: NOVA - Adicionar colunas faltantes em veículos (chassi, renavam, combustivel)
         adicionar_colunas_veiculo_completas()
+        
+        # Migração 20: CRÍTICA - Sistema Fleet Completo (nova arquitetura de veículos)
+        migrar_sistema_fleet_completo()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -1729,3 +1732,377 @@ def adicionar_colunas_veiculo_completas():
                 connection.close()
             except:
                 pass
+
+
+def migrar_sistema_fleet_completo():
+    """
+    MIGRAÇÃO 20: CRÍTICA - Sistema Fleet Completo
+    
+    Cria a nova arquitetura de veículos com tabelas Fleet:
+    - fleet_vehicle (substitui veiculo)
+    - fleet_vehicle_usage (substitui uso_veiculo) 
+    - fleet_vehicle_cost (substitui custo_veiculo)
+    
+    Migra dados das tabelas antigas para as novas mantendo integridade multi-tenant.
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🚀 MIGRAÇÃO 20: SISTEMA FLEET COMPLETO - NOVA ARQUITETURA")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # ===================================================================
+        # PARTE 1: CRIAR TABELA fleet_vehicle
+        # ===================================================================
+        logger.info("📋 PARTE 1: Criando tabela fleet_vehicle...")
+        
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'fleet_vehicle'
+        """)
+        
+        if cursor.fetchone()[0] == 0:
+            logger.info("🔨 Criando tabela fleet_vehicle...")
+            cursor.execute("""
+                CREATE TABLE fleet_vehicle (
+                    vehicle_id SERIAL PRIMARY KEY,
+                    reg_plate VARCHAR(10) NOT NULL,
+                    make_name VARCHAR(50) NOT NULL,
+                    model_name VARCHAR(100) NOT NULL DEFAULT 'Não informado',
+                    vehicle_year INTEGER NOT NULL,
+                    vehicle_kind VARCHAR(30) NOT NULL DEFAULT 'Veículo',
+                    current_km INTEGER DEFAULT 0,
+                    vehicle_color VARCHAR(30),
+                    chassis_number VARCHAR(50),
+                    renavam_code VARCHAR(20),
+                    fuel_type VARCHAR(20) DEFAULT 'Gasolina',
+                    status_code VARCHAR(20) DEFAULT 'ativo',
+                    last_maintenance_date DATE,
+                    next_maintenance_date DATE,
+                    next_maintenance_km INTEGER,
+                    admin_owner_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
+                    CONSTRAINT uk_fleet_vehicle_admin_plate UNIQUE(admin_owner_id, reg_plate)
+                )
+            """)
+            
+            # Criar índices
+            cursor.execute("CREATE INDEX idx_fleet_vehicle_admin_kind ON fleet_vehicle(admin_owner_id, vehicle_kind)")
+            cursor.execute("CREATE INDEX idx_fleet_vehicle_plate_admin ON fleet_vehicle(reg_plate, admin_owner_id)")
+            cursor.execute("CREATE INDEX idx_fleet_vehicle_status ON fleet_vehicle(admin_owner_id, status_code)")
+            
+            logger.info("✅ Tabela fleet_vehicle criada com sucesso!")
+        else:
+            logger.info("✅ Tabela fleet_vehicle já existe")
+        
+        # ===================================================================
+        # PARTE 2: CRIAR TABELA fleet_vehicle_usage
+        # ===================================================================
+        logger.info("📋 PARTE 2: Criando tabela fleet_vehicle_usage...")
+        
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'fleet_vehicle_usage'
+        """)
+        
+        if cursor.fetchone()[0] == 0:
+            logger.info("🔨 Criando tabela fleet_vehicle_usage...")
+            cursor.execute("""
+                CREATE TABLE fleet_vehicle_usage (
+                    usage_id SERIAL PRIMARY KEY,
+                    vehicle_id INTEGER NOT NULL REFERENCES fleet_vehicle(vehicle_id),
+                    driver_id INTEGER REFERENCES funcionario(id),
+                    worksite_id INTEGER REFERENCES obra(id),
+                    usage_date DATE NOT NULL,
+                    departure_time TIME,
+                    return_time TIME,
+                    start_km INTEGER,
+                    end_km INTEGER,
+                    distance_km INTEGER,
+                    front_passengers TEXT,
+                    rear_passengers TEXT,
+                    vehicle_responsible VARCHAR(100),
+                    usage_notes TEXT,
+                    admin_owner_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Criar índices
+            cursor.execute("CREATE INDEX idx_fleet_usage_date_admin ON fleet_vehicle_usage(usage_date, admin_owner_id)")
+            cursor.execute("CREATE INDEX idx_fleet_usage_driver ON fleet_vehicle_usage(driver_id)")
+            cursor.execute("CREATE INDEX idx_fleet_usage_worksite ON fleet_vehicle_usage(worksite_id)")
+            cursor.execute("CREATE INDEX idx_fleet_usage_vehicle ON fleet_vehicle_usage(vehicle_id)")
+            
+            logger.info("✅ Tabela fleet_vehicle_usage criada com sucesso!")
+        else:
+            logger.info("✅ Tabela fleet_vehicle_usage já existe")
+        
+        # ===================================================================
+        # PARTE 3: CRIAR TABELA fleet_vehicle_cost
+        # ===================================================================
+        logger.info("📋 PARTE 3: Criando tabela fleet_vehicle_cost...")
+        
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'fleet_vehicle_cost'
+        """)
+        
+        if cursor.fetchone()[0] == 0:
+            logger.info("🔨 Criando tabela fleet_vehicle_cost...")
+            cursor.execute("""
+                CREATE TABLE fleet_vehicle_cost (
+                    cost_id SERIAL PRIMARY KEY,
+                    vehicle_id INTEGER NOT NULL REFERENCES fleet_vehicle(vehicle_id),
+                    cost_date DATE NOT NULL,
+                    cost_type VARCHAR(30) NOT NULL,
+                    cost_amount NUMERIC(10, 2) NOT NULL,
+                    cost_description VARCHAR(200) NOT NULL,
+                    supplier_name VARCHAR(100),
+                    invoice_number VARCHAR(20),
+                    due_date DATE,
+                    payment_status VARCHAR(20) DEFAULT 'Pendente',
+                    payment_method VARCHAR(30),
+                    cost_notes TEXT,
+                    admin_owner_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Criar índices
+            cursor.execute("CREATE INDEX idx_fleet_cost_date_admin ON fleet_vehicle_cost(cost_date, admin_owner_id)")
+            cursor.execute("CREATE INDEX idx_fleet_cost_type ON fleet_vehicle_cost(cost_type)")
+            cursor.execute("CREATE INDEX idx_fleet_cost_vehicle ON fleet_vehicle_cost(vehicle_id)")
+            cursor.execute("CREATE INDEX idx_fleet_cost_status ON fleet_vehicle_cost(payment_status)")
+            
+            logger.info("✅ Tabela fleet_vehicle_cost criada com sucesso!")
+        else:
+            logger.info("✅ Tabela fleet_vehicle_cost já existe")
+        
+        # ===================================================================
+        # PARTE 4: MIGRAR DADOS veiculo → fleet_vehicle
+        # ===================================================================
+        logger.info("📋 PARTE 4: Migrando dados veiculo → fleet_vehicle...")
+        
+        # Verificar se tabela antiga existe
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'veiculo'
+        """)
+        
+        if cursor.fetchone()[0] > 0:
+            # Contar registros na tabela antiga
+            cursor.execute("SELECT COUNT(*) FROM veiculo")
+            total_veiculos = cursor.fetchone()[0]
+            
+            if total_veiculos > 0:
+                logger.info(f"🔄 Encontrados {total_veiculos} veículos para migrar...")
+                
+                # Migrar dados (INSERT ... ON CONFLICT para idempotência)
+                cursor.execute("""
+                    INSERT INTO fleet_vehicle (
+                        reg_plate, make_name, model_name, vehicle_year, vehicle_kind,
+                        current_km, vehicle_color, chassis_number, renavam_code, fuel_type,
+                        status_code, last_maintenance_date, next_maintenance_date, 
+                        next_maintenance_km, admin_owner_id, created_at
+                    )
+                    SELECT 
+                        placa,
+                        marca,
+                        COALESCE(modelo, 'Não informado'),
+                        COALESCE(ano, EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER),
+                        COALESCE(tipo, 'Veículo'),
+                        COALESCE(km_atual, 0),
+                        cor,
+                        chassi,
+                        renavam,
+                        COALESCE(combustivel, 'Gasolina'),
+                        CASE WHEN ativo THEN 'ativo' ELSE 'inativo' END,
+                        data_ultima_manutencao,
+                        data_proxima_manutencao,
+                        km_proxima_manutencao,
+                        admin_id,
+                        COALESCE(created_at, CURRENT_TIMESTAMP)
+                    FROM veiculo
+                    WHERE admin_id IS NOT NULL
+                    ON CONFLICT (admin_owner_id, reg_plate) 
+                    DO UPDATE SET
+                        make_name = EXCLUDED.make_name,
+                        model_name = EXCLUDED.model_name,
+                        vehicle_year = EXCLUDED.vehicle_year,
+                        current_km = EXCLUDED.current_km,
+                        updated_at = CURRENT_TIMESTAMP
+                """)
+                
+                migrados = cursor.rowcount
+                logger.info(f"✅ {migrados} veículos migrados/atualizados para fleet_vehicle!")
+            else:
+                logger.info("ℹ️  Tabela veiculo está vazia, nada a migrar")
+        else:
+            logger.info("ℹ️  Tabela veiculo não existe, pulando migração de dados")
+        
+        # ===================================================================
+        # PARTE 5: MIGRAR DADOS uso_veiculo → fleet_vehicle_usage
+        # ===================================================================
+        logger.info("📋 PARTE 5: Migrando dados uso_veiculo → fleet_vehicle_usage...")
+        
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'uso_veiculo'
+        """)
+        
+        if cursor.fetchone()[0] > 0:
+            cursor.execute("SELECT COUNT(*) FROM uso_veiculo")
+            total_usos = cursor.fetchone()[0]
+            
+            if total_usos > 0:
+                logger.info(f"🔄 Encontrados {total_usos} registros de uso para migrar...")
+                
+                # Migrar dados com JOIN para mapear IDs
+                cursor.execute("""
+                    INSERT INTO fleet_vehicle_usage (
+                        vehicle_id, driver_id, worksite_id, usage_date,
+                        departure_time, return_time, start_km, end_km, distance_km,
+                        front_passengers, rear_passengers, vehicle_responsible,
+                        usage_notes, admin_owner_id, created_at
+                    )
+                    SELECT 
+                        fv.vehicle_id,
+                        uv.motorista_id,
+                        uv.obra_id,
+                        uv.data_uso,
+                        uv.hora_saida,
+                        uv.hora_retorno,
+                        uv.km_inicial,
+                        uv.km_final,
+                        uv.km_percorrido,
+                        uv.passageiros_frente,
+                        uv.passageiros_tras,
+                        uv.responsavel_veiculo,
+                        uv.observacoes,
+                        uv.admin_id,
+                        COALESCE(uv.created_at, CURRENT_TIMESTAMP)
+                    FROM uso_veiculo uv
+                    INNER JOIN veiculo v ON uv.veiculo_id = v.id
+                    INNER JOIN fleet_vehicle fv ON (v.placa = fv.reg_plate AND v.admin_id = fv.admin_owner_id)
+                    WHERE uv.admin_id IS NOT NULL
+                    AND NOT EXISTS (
+                        SELECT 1 FROM fleet_vehicle_usage fuv 
+                        WHERE fuv.vehicle_id = fv.vehicle_id 
+                        AND fuv.usage_date = uv.data_uso
+                        AND fuv.admin_owner_id = uv.admin_id
+                    )
+                """)
+                
+                migrados_uso = cursor.rowcount
+                logger.info(f"✅ {migrados_uso} registros de uso migrados para fleet_vehicle_usage!")
+            else:
+                logger.info("ℹ️  Tabela uso_veiculo está vazia, nada a migrar")
+        else:
+            logger.info("ℹ️  Tabela uso_veiculo não existe, pulando migração de dados")
+        
+        # ===================================================================
+        # PARTE 6: MIGRAR DADOS custo_veiculo → fleet_vehicle_cost
+        # ===================================================================
+        logger.info("📋 PARTE 6: Migrando dados custo_veiculo → fleet_vehicle_cost...")
+        
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'custo_veiculo'
+        """)
+        
+        if cursor.fetchone()[0] > 0:
+            cursor.execute("SELECT COUNT(*) FROM custo_veiculo")
+            total_custos = cursor.fetchone()[0]
+            
+            if total_custos > 0:
+                logger.info(f"🔄 Encontrados {total_custos} registros de custo para migrar...")
+                
+                # Migrar dados com JOIN para mapear IDs
+                cursor.execute("""
+                    INSERT INTO fleet_vehicle_cost (
+                        vehicle_id, cost_date, cost_type, cost_amount,
+                        cost_description, supplier_name, invoice_number, due_date,
+                        payment_status, payment_method, cost_notes,
+                        admin_owner_id, created_at
+                    )
+                    SELECT 
+                        fv.vehicle_id,
+                        cv.data_custo,
+                        cv.tipo_custo,
+                        cv.valor,
+                        cv.descricao,
+                        cv.fornecedor,
+                        cv.numero_nota_fiscal,
+                        cv.data_vencimento,
+                        COALESCE(cv.status_pagamento, 'Pendente'),
+                        cv.forma_pagamento,
+                        cv.observacoes,
+                        cv.admin_id,
+                        COALESCE(cv.created_at, CURRENT_TIMESTAMP)
+                    FROM custo_veiculo cv
+                    INNER JOIN veiculo v ON cv.veiculo_id = v.id
+                    INNER JOIN fleet_vehicle fv ON (v.placa = fv.reg_plate AND v.admin_id = fv.admin_owner_id)
+                    WHERE cv.admin_id IS NOT NULL
+                    AND NOT EXISTS (
+                        SELECT 1 FROM fleet_vehicle_cost fvc 
+                        WHERE fvc.vehicle_id = fv.vehicle_id 
+                        AND fvc.cost_date = cv.data_custo
+                        AND fvc.cost_description = cv.descricao
+                        AND fvc.admin_owner_id = cv.admin_id
+                    )
+                """)
+                
+                migrados_custo = cursor.rowcount
+                logger.info(f"✅ {migrados_custo} registros de custo migrados para fleet_vehicle_cost!")
+            else:
+                logger.info("ℹ️  Tabela custo_veiculo está vazia, nada a migrar")
+        else:
+            logger.info("ℹ️  Tabela custo_veiculo não existe, pulando migração de dados")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("🎉 MIGRAÇÃO 20 CONCLUÍDA COM SUCESSO!")
+        logger.info("=" * 80)
+        logger.info("✅ Tabelas Fleet criadas:")
+        logger.info("   - fleet_vehicle")
+        logger.info("   - fleet_vehicle_usage")
+        logger.info("   - fleet_vehicle_cost")
+        logger.info("✅ Dados migrados das tabelas antigas")
+        logger.info("✅ Índices criados para performance")
+        logger.info("✅ Constraints multi-tenant aplicadas")
+        logger.info("🔒 Tabelas antigas preservadas como backup")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error(f"❌ ERRO CRÍTICO na Migração 20 - Sistema Fleet: {str(e)}")
+        logger.error("=" * 80)
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        
+        # Re-raise para que seja tratado pelo executor principal
+        raise
