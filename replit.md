@@ -35,6 +35,12 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
 -   **Dynamic PDF Generation:** Supports custom PDF headers, dynamic content pagination, and multi-category proposal display with subtotals.
 -   **Company Customization:** Allows dynamic branding with logo uploads and custom colors (primary, secondary, background) affecting public proposal portals and PDF outputs.
 -   **Drag-and-Drop Organization:** System for organizing proposals by dragging and dropping multiple templates, dynamically updating PDF output.
+-   **Fleet Management System (Phase 1):** New vehicle management architecture with dual-phase rollout:
+    -   **Migration 20:** Complete Fleet tables created (`fleet_vehicle`, `fleet_vehicle_usage`, `fleet_vehicle_cost`) with 100% data migration from legacy tables verified.
+    -   **Migration 21 (Hotfix):** Emergency fix adding `motorista_id` to legacy `uso_veiculo` table to maintain production stability while views.py still uses legacy models.
+    -   **Phase 1 (Complete):** Hotfix deployed, production stabilized, legacy system operational with enhanced compatibility.
+    -   **Phase 2 (Pending):** Gradual migration of 27+ routes in views.py from legacy models to FleetService using feature flag system.
+    -   **Idempotent Migration:** All migrations prevent data duplication using NOT EXISTS guards; verified counts: 1 vehicle, 3 usage records, 5 cost records all successfully migrated.
 
 ## External Dependencies
 -   **Flask:** Web framework.
