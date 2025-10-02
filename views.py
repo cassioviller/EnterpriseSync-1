@@ -1724,19 +1724,12 @@ def nova_obra():
             db.session.add(nova_obra)
             db.session.flush()  # Para obter o ID da obra
             
-            # Processar serviços selecionados
+            # ✅ CORREÇÃO CRÍTICA: Processar serviços selecionados usando função refatorada
             servicos_selecionados = request.form.getlist('servicos_obra')
+            print(f"🔧 NOVA OBRA: Processando {len(servicos_selecionados)} serviços selecionados")
             if servicos_selecionados:
-                for servico_id in servicos_selecionados:
-                    try:
-                        servico_id = int(servico_id)
-                        # Verificar se é uma relação many-to-many ou criar tabela de associação
-                        # Por enquanto, vamos usar uma abordagem simples com campo JSON na obra
-                        if not hasattr(nova_obra, 'servicos_ids'):
-                            # Se não houver campo específico, criar lista de IDs
-                            pass
-                    except ValueError:
-                        continue
+                servicos_processados = processar_servicos_obra(nova_obra.id, servicos_selecionados)
+                print(f"✅ {servicos_processados} serviços processados para nova obra {nova_obra.id}")
             
             db.session.commit()
             
@@ -1861,6 +1854,11 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
     try:
         print(f"🔧 PROCESSANDO SERVIÇOS NOVA TABELA: obra_id={obra_id}, {len(servicos_selecionados)} serviços")
         
+        # ===== DEFINIR ADMIN_ID NO INÍCIO =====
+        obra = Obra.query.get(obra_id)
+        admin_id = obra.admin_id if obra and obra.admin_id else get_admin_id_robusta()
+        print(f"🎯 USANDO ADMIN_ID DA OBRA: {admin_id}")
+        
         # ===== NOVO SISTEMA: USAR TABELA servico_obra_real =====
         
         # ===== EXCLUSÃO AUTOMÁTICA INTELIGENTE =====
@@ -1892,9 +1890,6 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         
         # Processar novos serviços usando ServicoObraReal
         servicos_processados = 0
-        obra = Obra.query.get(obra_id)
-        admin_id = obra.admin_id if obra and obra.admin_id else get_admin_id_robusta()
-        print(f"🎯 USANDO ADMIN_ID DA OBRA: {admin_id}")
         
         from datetime import date
         data_hoje = date.today()
@@ -8382,11 +8377,13 @@ def salvar_rdo_flexivel():
             logger.info(f"💾 SALVANDO {len(subactivities)} SUBATIVIDADES")
             for i, sub_data in enumerate(subactivities):
                 try:
-                    logger.info(f"  📋 [{i+1}/{len(subactivities)}] {sub_data['nome']} = {sub_data['percentual']}%")
+                    # ✅ CORREÇÃO CRÍTICA: Usar original_service_id de cada subatividade
+                    servico_id_correto = sub_data.get('original_service_id', target_service_id)
+                    logger.info(f"  📋 [{i+1}/{len(subactivities)}] {sub_data['nome']} = {sub_data['percentual']}% (servico_id={servico_id_correto})")
                     
                     subatividade = RDOServicoSubatividade(
                         rdo_id=rdo.id,
-                        servico_id=target_service_id,  # SEMPRE usar o serviço descoberto
+                        servico_id=servico_id_correto,  # ✅ CORRIGIDO: Usa o servico_id específico de cada subatividade
                         nome_subatividade=sub_data['nome'],
                         percentual_conclusao=sub_data['percentual'],
                         observacoes_tecnicas=sub_data['observacoes'],
@@ -8395,7 +8392,7 @@ def salvar_rdo_flexivel():
                     )
                     
                     db.session.add(subatividade)
-                    logger.info(f"  ✅ Subatividade {sub_data['nome']} adicionada com sucesso")
+                    logger.info(f"  ✅ Subatividade {sub_data['nome']} salva com servico_id={servico_id_correto}")
                     
                 except Exception as sub_error:
                     logger.error(f"  ❌ Erro na subatividade {sub_data['nome']}: {sub_error}")
