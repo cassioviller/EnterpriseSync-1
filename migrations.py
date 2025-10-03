@@ -1799,6 +1799,7 @@ def migrar_sistema_fleet_completo():
             cursor.execute("CREATE INDEX idx_fleet_vehicle_plate_admin ON fleet_vehicle(reg_plate, admin_owner_id)")
             cursor.execute("CREATE INDEX idx_fleet_vehicle_status ON fleet_vehicle(admin_owner_id, status_code)")
             
+            connection.commit()
             logger.info("✅ Tabela fleet_vehicle criada com sucesso!")
         else:
             logger.info("✅ Tabela fleet_vehicle já existe")
@@ -1844,6 +1845,7 @@ def migrar_sistema_fleet_completo():
             cursor.execute("CREATE INDEX idx_fleet_usage_worksite ON fleet_vehicle_usage(worksite_id)")
             cursor.execute("CREATE INDEX idx_fleet_usage_vehicle ON fleet_vehicle_usage(vehicle_id)")
             
+            connection.commit()
             logger.info("✅ Tabela fleet_vehicle_usage criada com sucesso!")
         else:
             logger.info("✅ Tabela fleet_vehicle_usage já existe")
@@ -1887,6 +1889,7 @@ def migrar_sistema_fleet_completo():
             cursor.execute("CREATE INDEX idx_fleet_cost_vehicle ON fleet_vehicle_cost(vehicle_id)")
             cursor.execute("CREATE INDEX idx_fleet_cost_status ON fleet_vehicle_cost(payment_status)")
             
+            connection.commit()
             logger.info("✅ Tabela fleet_vehicle_cost criada com sucesso!")
         else:
             logger.info("✅ Tabela fleet_vehicle_cost já existe")
