@@ -1799,7 +1799,6 @@ def migrar_sistema_fleet_completo():
             cursor.execute("CREATE INDEX idx_fleet_vehicle_plate_admin ON fleet_vehicle(reg_plate, admin_owner_id)")
             cursor.execute("CREATE INDEX idx_fleet_vehicle_status ON fleet_vehicle(admin_owner_id, status_code)")
             
-            connection.commit()
             logger.info("✅ Tabela fleet_vehicle criada com sucesso!")
         else:
             logger.info("✅ Tabela fleet_vehicle já existe")
@@ -1820,9 +1819,9 @@ def migrar_sistema_fleet_completo():
             cursor.execute("""
                 CREATE TABLE fleet_vehicle_usage (
                     usage_id SERIAL PRIMARY KEY,
-                    vehicle_id INTEGER NOT NULL REFERENCES fleet_vehicle(vehicle_id),
-                    driver_id INTEGER REFERENCES funcionario(id),
-                    worksite_id INTEGER REFERENCES obra(id),
+                    vehicle_id INTEGER NOT NULL,
+                    driver_id INTEGER,
+                    worksite_id INTEGER,
                     usage_date DATE NOT NULL,
                     departure_time TIME,
                     return_time TIME,
@@ -1833,7 +1832,7 @@ def migrar_sistema_fleet_completo():
                     rear_passengers TEXT,
                     vehicle_responsible VARCHAR(100),
                     usage_notes TEXT,
-                    admin_owner_id INTEGER NOT NULL REFERENCES usuario(id),
+                    admin_owner_id INTEGER NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -1845,7 +1844,6 @@ def migrar_sistema_fleet_completo():
             cursor.execute("CREATE INDEX idx_fleet_usage_worksite ON fleet_vehicle_usage(worksite_id)")
             cursor.execute("CREATE INDEX idx_fleet_usage_vehicle ON fleet_vehicle_usage(vehicle_id)")
             
-            connection.commit()
             logger.info("✅ Tabela fleet_vehicle_usage criada com sucesso!")
         else:
             logger.info("✅ Tabela fleet_vehicle_usage já existe")
@@ -1866,7 +1864,7 @@ def migrar_sistema_fleet_completo():
             cursor.execute("""
                 CREATE TABLE fleet_vehicle_cost (
                     cost_id SERIAL PRIMARY KEY,
-                    vehicle_id INTEGER NOT NULL REFERENCES fleet_vehicle(vehicle_id),
+                    vehicle_id INTEGER NOT NULL,
                     cost_date DATE NOT NULL,
                     cost_type VARCHAR(30) NOT NULL,
                     cost_amount NUMERIC(10, 2) NOT NULL,
@@ -1877,7 +1875,7 @@ def migrar_sistema_fleet_completo():
                     payment_status VARCHAR(20) DEFAULT 'Pendente',
                     payment_method VARCHAR(30),
                     cost_notes TEXT,
-                    admin_owner_id INTEGER NOT NULL REFERENCES usuario(id),
+                    admin_owner_id INTEGER NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -1889,10 +1887,149 @@ def migrar_sistema_fleet_completo():
             cursor.execute("CREATE INDEX idx_fleet_cost_vehicle ON fleet_vehicle_cost(vehicle_id)")
             cursor.execute("CREATE INDEX idx_fleet_cost_status ON fleet_vehicle_cost(payment_status)")
             
-            connection.commit()
             logger.info("✅ Tabela fleet_vehicle_cost criada com sucesso!")
         else:
             logger.info("✅ Tabela fleet_vehicle_cost já existe")
+        
+        # ===================================================================
+        # PARTE 3.5: ADICIONAR FOREIGN KEYS (após criar todas as tabelas)
+        # ===================================================================
+        logger.info("📋 PARTE 3.5: Adicionando foreign keys...")
+        
+        # Verificar e adicionar FK fleet_vehicle → usuario
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'fleet_vehicle' 
+            AND constraint_name = 'fk_fleet_vehicle_admin'
+        """)
+        
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE fleet_vehicle 
+                    ADD CONSTRAINT fk_fleet_vehicle_admin 
+                    FOREIGN KEY (admin_owner_id) REFERENCES usuario(id)
+                """)
+                logger.info("✅ FK fleet_vehicle → usuario adicionada")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle → usuario: {e}")
+        
+        # Verificar e adicionar FK fleet_vehicle_usage → fleet_vehicle
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'fleet_vehicle_usage' 
+            AND constraint_name = 'fk_fleet_usage_vehicle'
+        """)
+        
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE fleet_vehicle_usage 
+                    ADD CONSTRAINT fk_fleet_usage_vehicle 
+                    FOREIGN KEY (vehicle_id) REFERENCES fleet_vehicle(vehicle_id)
+                """)
+                logger.info("✅ FK fleet_vehicle_usage → fleet_vehicle adicionada")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_usage → fleet_vehicle: {e}")
+        
+        # Verificar e adicionar FK fleet_vehicle_usage → funcionario
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'fleet_vehicle_usage' 
+            AND constraint_name = 'fk_fleet_usage_driver'
+        """)
+        
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE fleet_vehicle_usage 
+                    ADD CONSTRAINT fk_fleet_usage_driver 
+                    FOREIGN KEY (driver_id) REFERENCES funcionario(id)
+                """)
+                logger.info("✅ FK fleet_vehicle_usage → funcionario adicionada")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_usage → funcionario: {e}")
+        
+        # Verificar e adicionar FK fleet_vehicle_usage → obra
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'fleet_vehicle_usage' 
+            AND constraint_name = 'fk_fleet_usage_worksite'
+        """)
+        
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE fleet_vehicle_usage 
+                    ADD CONSTRAINT fk_fleet_usage_worksite 
+                    FOREIGN KEY (worksite_id) REFERENCES obra(id)
+                """)
+                logger.info("✅ FK fleet_vehicle_usage → obra adicionada")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_usage → obra: {e}")
+        
+        # Verificar e adicionar FK fleet_vehicle_usage → usuario
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'fleet_vehicle_usage' 
+            AND constraint_name = 'fk_fleet_usage_admin'
+        """)
+        
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE fleet_vehicle_usage 
+                    ADD CONSTRAINT fk_fleet_usage_admin 
+                    FOREIGN KEY (admin_owner_id) REFERENCES usuario(id)
+                """)
+                logger.info("✅ FK fleet_vehicle_usage → usuario adicionada")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_usage → usuario: {e}")
+        
+        # Verificar e adicionar FK fleet_vehicle_cost → fleet_vehicle
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'fleet_vehicle_cost' 
+            AND constraint_name = 'fk_fleet_cost_vehicle'
+        """)
+        
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE fleet_vehicle_cost 
+                    ADD CONSTRAINT fk_fleet_cost_vehicle 
+                    FOREIGN KEY (vehicle_id) REFERENCES fleet_vehicle(vehicle_id)
+                """)
+                logger.info("✅ FK fleet_vehicle_cost → fleet_vehicle adicionada")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_cost → fleet_vehicle: {e}")
+        
+        # Verificar e adicionar FK fleet_vehicle_cost → usuario
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'fleet_vehicle_cost' 
+            AND constraint_name = 'fk_fleet_cost_admin'
+        """)
+        
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE fleet_vehicle_cost 
+                    ADD CONSTRAINT fk_fleet_cost_admin 
+                    FOREIGN KEY (admin_owner_id) REFERENCES usuario(id)
+                """)
+                logger.info("✅ FK fleet_vehicle_cost → usuario adicionada")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_cost → usuario: {e}")
+        
+        logger.info("✅ Todas as foreign keys verificadas/adicionadas!")
         
         # ===================================================================
         # PARTE 4: MIGRAR DADOS veiculo → fleet_vehicle
