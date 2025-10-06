@@ -37,12 +37,13 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
 -   **Drag-and-Drop Organization:** System for organizing proposals by dragging and dropping multiple templates, dynamically updating PDF output.
 -   **Fleet Management System (Phase 1):** New vehicle management architecture with dual-phase rollout:
     -   **Migration 20 (FIXED - Oct 2025):** Complete Fleet tables created (`fleet_vehicle`, `fleet_vehicle_usage`, `fleet_vehicle_cost`) with 100% data migration from legacy tables verified.
-        - **Critical Fix:** Foreign key creation moved to separate ALTER TABLE statements (Part 3.5) AFTER all tables exist, eliminating "vehicle_id constraint does not exist" production error
-        - **Architecture:** Tables created WITHOUT inline FKs → All tables exist → FKs added via ALTER TABLE with existence checks
-        - **Safety:** Each FK wrapped in try/except for resilience; single commit at end preserves atomicity
+        - **Critical Fix 1 (FK):** Foreign key creation moved to separate ALTER TABLE statements (Part 3.5) AFTER all tables exist, eliminating "vehicle_id constraint does not exist" production error
+        - **Critical Fix 2 (motorista_id):** Added Part 4.5 to create `motorista_id` column in `uso_veiculo` BEFORE using it in Part 5, fixing "column motorista_id does not exist" error
+        - **Architecture:** Tables created WITHOUT inline FKs → All tables exist → FKs added via ALTER TABLE → motorista_id created → Data migrated
+        - **Safety:** Each FK wrapped in try/except for resilience; single commit at end preserves atomicity; idempotent column creation
         - **Monitoring:** Production should alert if any ALTER TABLE FK statement fails in logs
-    -   **Migration 21 (Hotfix):** Emergency fix adding `motorista_id` to legacy `uso_veiculo` table to maintain production stability while views.py still uses legacy models.
-    -   **Phase 1 (Complete):** Hotfix deployed, production stabilized, legacy system operational with enhanced compatibility.
+    -   **Migration 21 (Hotfix):** Emergency fix adding `motorista_id` to legacy `uso_veiculo` table (now redundant as Migration 20 Part 4.5 handles it, but kept for idempotency).
+    -   **Phase 1 (Complete):** Both critical fixes deployed, production stabilized, legacy system operational with enhanced compatibility.
     -   **Phase 2 (Pending):** Gradual migration of 27+ routes in views.py from legacy models to FleetService using feature flag system.
     -   **Idempotent Migration:** All migrations prevent data duplication using NOT EXISTS guards; verified counts: 1 vehicle, 3 usage records, 5 cost records all successfully migrated.
 
