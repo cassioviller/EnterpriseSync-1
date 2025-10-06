@@ -275,8 +275,8 @@ class FleetService:
                     query = query.filter(FleetVehicleUsage.usage_date >= filtros['data_inicio'])
                 if filtros.get('data_fim'):
                     query = query.filter(FleetVehicleUsage.usage_date <= filtros['data_fim'])
-                if filtros.get('motorista_id'):
-                    query = query.filter_by(driver_id=filtros['motorista_id'])
+                if filtros.get('funcionario_id'):
+                    query = query.filter_by(driver_id=filtros['funcionario_id'])
             
             # Ordenação
             query = query.order_by(desc(FleetVehicleUsage.usage_date))

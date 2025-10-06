@@ -206,10 +206,10 @@ class UsoVeiculoService:
             if not veiculo:
                 return False, None, "Veículo não encontrado"
             
-            # Motorista opcional (novo campo substitui funcionario_id)
+            # Motorista opcional (campo funcionario_id)
             motorista = None
-            if dados.get('motorista_id'):
-                motorista = Funcionario.query.filter_by(id=dados['motorista_id'], admin_id=admin_id).first()
+            if dados.get('funcionario_id'):
+                motorista = Funcionario.query.filter_by(id=dados['funcionario_id'], admin_id=admin_id).first()
             
             # Validar obra se informada
             obra = None
@@ -221,7 +221,7 @@ class UsoVeiculoService:
             # Criar registro de uso (usando apenas campos que existem no modelo)
             uso = UsoVeiculo(
                 veiculo_id=dados['veiculo_id'],
-                motorista_id=dados.get('motorista_id'),
+                funcionario_id=dados.get('funcionario_id'),
                 obra_id=dados.get('obra_id'),
                 data_uso=dados['data_uso'],
                 hora_saida=dados.get('hora_saida'),
@@ -326,7 +326,7 @@ class UsoVeiculoService:
                 if filtros.get('data_fim'):
                     query = query.filter(UsoVeiculo.data_uso <= filtros['data_fim'])
                 if filtros.get('funcionario_id'):
-                    query = query.filter(UsoVeiculo.motorista_id == filtros['funcionario_id'])
+                    query = query.filter(UsoVeiculo.funcionario_id == filtros['funcionario_id'])
             
             # Paginação
             pagination = query.order_by(desc(UsoVeiculo.data_uso)).paginate(
