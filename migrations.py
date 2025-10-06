@@ -29,6 +29,9 @@ def executar_migracoes():
         database_url = os.environ.get('DATABASE_URL', 'postgresql://sige:sige@viajey_sige:5432/sige')
         logger.info(f"🎯 TARGET DATABASE: {mask_database_url(database_url)}")
         
+        # MIGRAÇÃO 0: CRÍTICA - Garantir coluna motorista_id em uso_veiculo (PRIMEIRA DE TODAS)
+        garantir_motorista_id_uso_veiculo()
+        
         # Verificar se a tabela existe, se não existir, criar completa
         garantir_tabela_proposta_templates_existe()
         
@@ -101,6 +104,107 @@ def executar_migracoes():
         logger.error(f"❌ Erro durante migrações automáticas: {e}")
         # Não interromper a aplicação, apenas logar o erro
         pass
+
+def garantir_motorista_id_uso_veiculo():
+    """
+    MIGRAÇÃO 0: CRÍTICA - PRIMEIRA DE TODAS
+    
+    Garante que a coluna motorista_id existe na tabela uso_veiculo
+    EXECUTA ANTES DE TUDO para evitar erros em produção
+    
+    CONTEXTO:
+    - Erro em produção: column "motorista_id" does not exist
+    - Esta migração é a PRIMEIRA a executar
+    - Idempotente: pode executar múltiplas vezes sem problemas
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🚨 MIGRAÇÃO 0: GARANTINDO motorista_id em uso_veiculo (PRIMEIRA MIGRAÇÃO)")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se tabela uso_veiculo existe
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'uso_veiculo'
+        """)
+        
+        if cursor.fetchone()[0] == 0:
+            logger.info("ℹ️  Tabela uso_veiculo não existe ainda, pulando migração")
+            cursor.close()
+            connection.close()
+            return
+        
+        # Verificar se coluna motorista_id já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name = 'motorista_id'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("✅ Coluna motorista_id já existe em uso_veiculo")
+            cursor.close()
+            connection.close()
+            return
+        
+        logger.info("🔧 CRIANDO coluna motorista_id na tabela uso_veiculo...")
+        
+        # Adicionar coluna motorista_id (NULLABLE para compatibilidade)
+        cursor.execute("""
+            ALTER TABLE uso_veiculo 
+            ADD COLUMN motorista_id INTEGER
+        """)
+        logger.info("✅ Coluna motorista_id adicionada com sucesso!")
+        
+        # Adicionar FK opcional para funcionario
+        try:
+            cursor.execute("""
+                ALTER TABLE uso_veiculo 
+                ADD CONSTRAINT fk_uso_veiculo_motorista 
+                FOREIGN KEY (motorista_id) REFERENCES funcionario(id) 
+                ON DELETE SET NULL
+            """)
+            logger.info("✅ Foreign key fk_uso_veiculo_motorista adicionada!")
+        except Exception as fk_error:
+            logger.warning(f"⚠️  FK não pôde ser criada: {fk_error}")
+        
+        # Criar índice para performance
+        try:
+            cursor.execute("""
+                CREATE INDEX idx_uso_veiculo_motorista 
+                ON uso_veiculo(motorista_id)
+            """)
+            logger.info("✅ Índice idx_uso_veiculo_motorista criado!")
+        except Exception as idx_error:
+            logger.warning(f"⚠️  Índice não pôde ser criado: {idx_error}")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("🎉 MIGRAÇÃO 0 CONCLUÍDA: motorista_id garantido em uso_veiculo!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error(f"❌ ERRO CRÍTICO na Migração 0 - motorista_id: {str(e)}")
+        logger.error("=" * 80)
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
 
 def garantir_usuarios_producao():
     """
