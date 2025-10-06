@@ -2095,6 +2095,63 @@ def migrar_sistema_fleet_completo():
             logger.info("ℹ️  Tabela veiculo não existe, pulando migração de dados")
         
         # ===================================================================
+        # PARTE 4.5: GARANTIR coluna motorista_id em uso_veiculo (ANTES de usar)
+        # ===================================================================
+        logger.info("📋 PARTE 4.5: Verificando coluna motorista_id em uso_veiculo...")
+        
+        # Verificar se tabela uso_veiculo existe
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_name = 'uso_veiculo'
+        """)
+        
+        if cursor.fetchone()[0] > 0:
+            # Verificar se coluna motorista_id já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'uso_veiculo' 
+                AND column_name = 'motorista_id'
+            """)
+            
+            if not cursor.fetchone():
+                logger.info("🔧 Adicionando coluna motorista_id na tabela uso_veiculo...")
+                
+                # Adicionar coluna motorista_id (NULLABLE para compatibilidade)
+                cursor.execute("""
+                    ALTER TABLE uso_veiculo 
+                    ADD COLUMN motorista_id INTEGER
+                """)
+                logger.info("✅ Coluna motorista_id adicionada")
+                
+                # Adicionar FK opcional para funcionario
+                try:
+                    cursor.execute("""
+                        ALTER TABLE uso_veiculo 
+                        ADD CONSTRAINT fk_uso_veiculo_motorista 
+                        FOREIGN KEY (motorista_id) REFERENCES funcionario(id) 
+                        ON DELETE SET NULL
+                    """)
+                    logger.info("✅ FK fk_uso_veiculo_motorista adicionada")
+                except Exception as fk_error:
+                    logger.warning(f"⚠️ FK não pôde ser criada: {fk_error}")
+                
+                # Criar índice para performance
+                try:
+                    cursor.execute("""
+                        CREATE INDEX idx_uso_veiculo_motorista 
+                        ON uso_veiculo(motorista_id)
+                    """)
+                    logger.info("✅ Índice idx_uso_veiculo_motorista criado")
+                except Exception as idx_error:
+                    logger.warning(f"⚠️ Índice não pôde ser criado: {idx_error}")
+            else:
+                logger.info("✅ Coluna motorista_id já existe em uso_veiculo")
+        else:
+            logger.info("ℹ️  Tabela uso_veiculo não existe, coluna motorista_id não necessária")
+        
+        # ===================================================================
         # PARTE 5: MIGRAR DADOS uso_veiculo → fleet_vehicle_usage
         # ===================================================================
         logger.info("📋 PARTE 5: Migrando dados uso_veiculo → fleet_vehicle_usage...")
