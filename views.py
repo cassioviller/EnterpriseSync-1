@@ -2927,7 +2927,7 @@ def excluir_veiculo(id):
 
 
 # Helper function para processar passageiros por posição
-def processar_passageiro_veiculo(passageiro_id, motorista_id, uso_veiculo_id, admin_id, posicao):
+def processar_passageiro_veiculo(passageiro_id, funcionario_id, uso_veiculo_id, admin_id, posicao):
     """
     Processa um passageiro individual do veículo com validações
     Retorna 1 se criado com sucesso, 0 caso contrário
@@ -2935,9 +2935,9 @@ def processar_passageiro_veiculo(passageiro_id, motorista_id, uso_veiculo_id, ad
     try:
         passageiro_id = int(passageiro_id)
         
-        # Validar se o passageiro não é o mesmo que o motorista
-        if passageiro_id == int(motorista_id):
-            return 0  # Pular motorista - ele já está registrado como condutor
+        # Validar se o passageiro não é o mesmo que o funcionário condutor
+        if passageiro_id == int(funcionario_id):
+            return 0  # Pular funcionário - ele já está registrado como condutor
         
         # Verificar se o funcionário existe e pertence ao mesmo admin
         funcionario_passageiro = Funcionario.query.filter_by(
@@ -3024,9 +3024,9 @@ def novo_uso_veiculo_lista():
                 return redirect(url_for('main.veiculos'))
         
         # Obter dados dos campos do formulário
-        motorista_id = request.form.get('motorista_id')
-        if not motorista_id:
-            flash('Erro: Motorista é obrigatório.', 'error')
+        funcionario_id = request.form.get('funcionario_id')
+        if not funcionario_id:
+            flash('Erro: Funcionário é obrigatório.', 'error')
             return redirect(url_for('main.veiculos'))
         
         # Processar porcentagem de combustível
@@ -3045,7 +3045,7 @@ def novo_uso_veiculo_lista():
         # Criar registro de uso (campos corretos do modelo UsoVeiculo)
         uso = UsoVeiculo(
             veiculo_id=veiculo.id,
-            motorista_id=motorista_id,  # Campo correto: motorista_id
+            funcionario_id=funcionario_id,  # Campo correto: funcionario_id
             obra_id=request.form.get('obra_id') if request.form.get('obra_id') else None,
             data_uso=datetime.strptime(request.form.get('data_uso'), '%Y-%m-%d').date(),
             hora_saida=datetime.strptime(request.form.get('horario_saida'), '%H:%M').time() if request.form.get('horario_saida') else None,
@@ -3082,7 +3082,7 @@ def novo_uso_veiculo_lista():
         if passageiros_frente_ids:
             for passageiro_id in passageiros_frente_ids:
                 resultado = processar_passageiro_veiculo(
-                    passageiro_id, motorista_id, uso.id, tenant_admin_id, 'frente'
+                    passageiro_id, funcionario_id, uso.id, tenant_admin_id, 'frente'
                 )
                 if resultado == -1:
                     erros_integridade += 1
@@ -3093,7 +3093,7 @@ def novo_uso_veiculo_lista():
         if passageiros_tras_ids:
             for passageiro_id in passageiros_tras_ids:
                 resultado = processar_passageiro_veiculo(
-                    passageiro_id, motorista_id, uso.id, tenant_admin_id, 'tras'
+                    passageiro_id, funcionario_id, uso.id, tenant_admin_id, 'tras'
                 )
                 if resultado == -1:
                     erros_integridade += 1
@@ -3374,7 +3374,7 @@ def editar_uso_veiculo(uso_id):
         if form.validate_on_submit():
             # Atualizar dados (usando campos corretos do modelo)
             uso.veiculo_id = form.veiculo_id.data
-            uso.motorista_id = form.funcionario_id.data  # Campo correto: motorista_id
+            uso.funcionario_id = form.funcionario_id.data  # Campo correto: funcionario_id
             uso.obra_id = form.obra_id.data if form.obra_id.data != 0 else None
             uso.data_uso = form.data_uso.data
             uso.km_inicial = form.km_inicial.data

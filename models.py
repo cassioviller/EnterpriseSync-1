@@ -928,8 +928,8 @@ class AlocacaoEquipe(db.Model):
         """Converter para dicionário para APIs do sistema Kanban/Calendário"""
         return {
             'id': self.id,
-            'motorista_id': self.motorista_id,
-            'motorista_nome': self.funcionario.nome if self.funcionario else None,
+            'funcionario_id': self.funcionario_id,
+            'funcionario_nome': self.funcionario.nome if self.funcionario else None,
             'funcionario_cargo': self.funcionario.cargo if self.funcionario else None,
             'obra_id': self.obra_id,
             'obra_nome': self.obra.nome if self.obra else None,
@@ -3046,7 +3046,7 @@ class UsoVeiculo(db.Model):
     
     # Relacionamentos principais
     veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
-    motorista_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=True)  # Agora opcional
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=True)  # Agora opcional
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # Pode ser uso pessoal/administrativo
     
     # Dados do uso
@@ -3079,19 +3079,19 @@ class UsoVeiculo(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    funcionario = db.relationship('Funcionario', foreign_keys=[motorista_id], backref='usos_veiculo')
+    funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id], backref='usos_veiculo')
     obra = db.relationship('Obra', backref='usos_veiculo')
     admin = db.relationship('Usuario', backref='usos_veiculo_administrados')
     
     # Índices para performance
     __table_args__ = (
         db.Index('idx_uso_veiculo_data_admin', 'data_uso', 'admin_id'),
-        db.Index('idx_uso_veiculo_motorista', 'motorista_id'),
+        db.Index('idx_uso_veiculo_funcionario', 'funcionario_id'),
         db.Index('idx_uso_veiculo_obra', 'obra_id'),
     )
     
     def __repr__(self):
-        func_nome = self.funcionario.nome if self.funcionario else f"ID:{self.motorista_id}"
+        func_nome = self.funcionario.nome if self.funcionario else f"ID:{self.funcionario_id}"
         veiculo_placa = self.veiculo.placa if self.veiculo else f"ID:{self.veiculo_id}"
         return f'<UsoVeiculo {veiculo_placa} - {func_nome} ({self.data_uso})>'
     
@@ -3101,7 +3101,7 @@ class UsoVeiculo(db.Model):
             'id': self.id,
             'veiculo_id': self.veiculo_id,
             'veiculo_placa': self.veiculo.placa if self.veiculo else None,
-            'motorista_id': self.motorista_id,
+            'funcionario_id': self.funcionario_id,
             'motorista_nome': self.funcionario.nome if self.funcionario else None,
             'obra_id': self.obra_id,
             'obra_nome': self.obra.nome if self.obra else None,
