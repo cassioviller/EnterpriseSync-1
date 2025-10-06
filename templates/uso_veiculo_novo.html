@@ -839,15 +839,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 
                 <div class="form-group">
-                    <label for="motorista_id">Motorista <span class="required">*</span></label>
-                    <select id="motorista_id" 
-                            name="motorista_id" 
+                    <label for="funcionario_id">Motorista <span class="required">*</span></label>
+                    <select id="funcionario_id" 
+                            name="funcionario_id" 
                             class="modern-select" 
                             required>
                         <option value="">Selecione o motorista</option>
                         {% for funcionario in funcionarios %}
                         <option value="{{ funcionario.id }}" 
-                                {% if request.form.motorista_id|string == funcionario.id|string %}selected{% endif %}>
+                                {% if request.form.funcionario_id|string == funcionario.id|string %}selected{% endif %}>
                             {{ funcionario.nome }} - {{ funcionario.funcao or 'Sem função' }}
                         </option>
                         {% endfor %}
@@ -1103,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Calcular resumo dos passageiros automaticamente
-    const motoristaSelect = document.getElementById('motorista_id');
+    const motoristaSelect = document.getElementById('funcionario_id');
     const totalPessoasDiv = document.getElementById('total_pessoas');
     const distribuicaoDiv = document.getElementById('distribuicao');
     
@@ -1133,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(e) {
         const dataUso = document.getElementById('data_uso').value;
         const horaSaida = document.getElementById('hora_saida').value;
-        const motoristaId = document.getElementById('motorista_id').value;
+        const motoristaId = document.getElementById('funcionario_id').value;
         const kmInicial = document.getElementById('km_inicial').value;
         
         if (!dataUso || !horaSaida || !motoristaId || !kmInicial) {
