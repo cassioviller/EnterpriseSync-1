@@ -36,16 +36,23 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
 -   **Company Customization:** Allows dynamic branding with logo uploads and custom colors (primary, secondary, background) affecting public proposal portals and PDF outputs.
 -   **Drag-and-Drop Organization:** System for organizing proposals by dragging and dropping multiple templates, dynamically updating PDF output.
 -   **Fleet Management System (Phase 1):** New vehicle management architecture with dual-phase rollout:
+    -   **Migration 0 (FIRST - Oct 2025):** CRITICAL automatic migration that executes BEFORE all others to guarantee `motorista_id` column exists in `uso_veiculo` table.
+        - **Execution Order:** Runs as FIRST migration (line 36 in executar_migracoes())
+        - **Functionality:** Verifies table existence → checks column existence → creates column/FK/index if missing
+        - **Safety:** Completely idempotent, safe to run multiple times, detailed logging for production monitoring
+        - **Production Fix:** Automatically resolves "column motorista_id does not exist" error without manual intervention
+        - **Triple Redundancy:** Migration 0 (primary) + Migration 20 Part 4.5 (secondary) + Migration 21 (tertiary)
     -   **Migration 20 (FIXED - Oct 2025):** Complete Fleet tables created (`fleet_vehicle`, `fleet_vehicle_usage`, `fleet_vehicle_cost`) with 100% data migration from legacy tables verified.
         - **Critical Fix 1 (FK):** Foreign key creation moved to separate ALTER TABLE statements (Part 3.5) AFTER all tables exist, eliminating "vehicle_id constraint does not exist" production error
-        - **Critical Fix 2 (motorista_id):** Added Part 4.5 to create `motorista_id` column in `uso_veiculo` BEFORE using it in Part 5, fixing "column motorista_id does not exist" error
-        - **Architecture:** Tables created WITHOUT inline FKs → All tables exist → FKs added via ALTER TABLE → motorista_id created → Data migrated
+        - **Critical Fix 2 (motorista_id):** Part 4.5 verifies `motorista_id` column exists before Part 5 uses it (now redundant with Migration 0, kept for safety)
+        - **Architecture:** Tables created WITHOUT inline FKs → All tables exist → FKs added via ALTER TABLE → motorista_id verified → Data migrated
         - **Safety:** Each FK wrapped in try/except for resilience; single commit at end preserves atomicity; idempotent column creation
         - **Monitoring:** Production should alert if any ALTER TABLE FK statement fails in logs
-    -   **Migration 21 (Hotfix):** Emergency fix adding `motorista_id` to legacy `uso_veiculo` table (now redundant as Migration 20 Part 4.5 handles it, but kept for idempotency).
-    -   **Phase 1 (Complete):** Both critical fixes deployed, production stabilized, legacy system operational with enhanced compatibility.
+    -   **Migration 21 (Hotfix):** Emergency fix verifying `motorista_id` in legacy `uso_veiculo` table (now redundant with Migration 0, but kept for triple-redundancy safety).
+    -   **Phase 1 (Complete):** All critical fixes deployed, 100% automatic deployment achieved, production stabilized, legacy system operational with enhanced compatibility.
     -   **Phase 2 (Pending):** Gradual migration of 27+ routes in views.py from legacy models to FleetService using feature flag system.
     -   **Idempotent Migration:** All migrations prevent data duplication using NOT EXISTS guards; verified counts: 1 vehicle, 3 usage records, 5 cost records all successfully migrated.
+    -   **Deployment Strategy:** Zero manual intervention required - all migrations run automatically on application startup in both development and production environments.
 
 ## External Dependencies
 -   **Flask:** Web framework.
