@@ -69,9 +69,5 @@ externalPort = 6000
 localPort = 46747
 externalPort = 3000
 
-[[ports]]
-localPort = 46789
-externalPort = 6800
-
 [agent]
 integrations = ["python_database==1.0.0"]

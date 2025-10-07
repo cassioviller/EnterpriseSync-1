@@ -94,6 +94,9 @@ def executar_migracoes():
         
         # Migração 21: Confirmar estrutura funcionario_id na tabela uso_veiculo
         confirmar_estrutura_funcionario_id()
+        
+        # Migração 22: Adicionar colunas de passageiros em uso_veiculo
+        adicionar_colunas_passageiros_uso_veiculo()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -2372,6 +2375,85 @@ def confirmar_estrutura_funcionario_id():
     except Exception as e:
         logger.error("=" * 80)
         logger.error(f"❌ ERRO na Migração 21: {str(e)}")
+        logger.error("=" * 80)
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        if 'connection' in locals():
+            try:
+                cursor.close()
+                connection.close()
+            except:
+                pass
+
+
+def adicionar_colunas_passageiros_uso_veiculo():
+    """
+    MIGRAÇÃO 22: Adicionar colunas passageiros_frente e passageiros_tras
+    
+    Garante que as colunas de passageiros existam na tabela uso_veiculo.
+    Essas colunas armazenam IDs de funcionários separados por vírgula.
+    
+    CONTEXTO:
+    - Desenvolvimento tem as colunas (criadas anteriormente)
+    - Produção pode não ter (precisa adicionar)
+    - Esta migração alinha ambos os ambientes
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🚗 MIGRAÇÃO 22: Adicionar colunas de passageiros em uso_veiculo")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se passageiros_frente existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name = 'passageiros_frente'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("✅ Coluna passageiros_frente já existe")
+        else:
+            logger.info("🔧 Adicionando coluna passageiros_frente...")
+            cursor.execute("""
+                ALTER TABLE uso_veiculo 
+                ADD COLUMN passageiros_frente TEXT
+            """)
+            logger.info("✅ Coluna passageiros_frente adicionada com sucesso!")
+        
+        # Verificar se passageiros_tras existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name = 'passageiros_tras'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("✅ Coluna passageiros_tras já existe")
+        else:
+            logger.info("🔧 Adicionando coluna passageiros_tras...")
+            cursor.execute("""
+                ALTER TABLE uso_veiculo 
+                ADD COLUMN passageiros_tras TEXT
+            """)
+            logger.info("✅ Coluna passageiros_tras adicionada com sucesso!")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 22 CONCLUÍDA: Colunas de passageiros verificadas/adicionadas")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error(f"❌ ERRO na Migração 22: {str(e)}")
         logger.error("=" * 80)
         import traceback
         logger.error(traceback.format_exc())
