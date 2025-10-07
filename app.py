@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Create app instance
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "sige-v10-digital-mastery-production-key-2025")
+app.secret_key = os.environ.get("SESSION_SECRET")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Database configuration - v10.0 Digital Mastery
