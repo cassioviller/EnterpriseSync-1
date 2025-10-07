@@ -107,6 +107,9 @@ def executar_migracoes():
         
         # Migração 24: SEGURA - Adicionar colunas passageiros com tratamento robusto
         adicionar_colunas_passageiros_robusto()
+        
+        # Migração 25: ULTRA-ROBUSTA - SQL Puro para garantir colunas passageiros
+        adicionar_passageiros_sql_puro()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -2831,3 +2834,145 @@ def adicionar_colunas_passageiros_robusto():
         
         # NÃO re-raise - permitir que a aplicação continue
         logger.warning("⚠️  Aplicação continuará rodando, mas funcionalidade de passageiros pode não funcionar")
+
+def adicionar_passageiros_sql_puro():
+    """
+    MIGRAÇÃO 25 ULTRA-ROBUSTA: SQL Puro com DO Block PostgreSQL
+    
+    Esta migração usa SQL nativo do PostgreSQL com blocos DO para 
+    emular IF NOT EXISTS no ALTER TABLE ADD COLUMN.
+    
+    VANTAGENS:
+    - SQL executado diretamente no PostgreSQL (não passa por ORM)
+    - Emula IF NOT EXISTS usando blocos DO
+    - Trata erro "column already exists" como sucesso
+    - Absolutamente idempotente
+    - Funciona em qualquer versão PostgreSQL 9.0+
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🔥 MIGRAÇÃO 25 ULTRA-ROBUSTA: SQL Puro para colunas passageiros")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Detectar ambiente
+        cursor.execute("SELECT current_database(), current_user, version()")
+        db_info = cursor.fetchone()
+        logger.info(f"📍 Database: {db_info[0]}")
+        logger.info(f"📍 User: {db_info[1]}")
+        logger.info(f"📍 PostgreSQL: {db_info[2].split(',')[0]}")
+        
+        # SQL PURO com DO block para passageiros_frente
+        sql_frente = """
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'uso_veiculo' 
+                AND column_name = 'passageiros_frente'
+            ) THEN
+                ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT;
+                RAISE NOTICE 'Coluna passageiros_frente criada com sucesso';
+            ELSE
+                RAISE NOTICE 'Coluna passageiros_frente já existe';
+            END IF;
+        END $$;
+        """
+        
+        # SQL PURO com DO block para passageiros_tras
+        sql_tras = """
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'uso_veiculo' 
+                AND column_name = 'passageiros_tras'
+            ) THEN
+                ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT;
+                RAISE NOTICE 'Coluna passageiros_tras criada com sucesso';
+            ELSE
+                RAISE NOTICE 'Coluna passageiros_tras já existe';
+            END IF;
+        END $$;
+        """
+        
+        # Executar SQL para passageiros_frente
+        logger.info("🔄 Executando SQL para passageiros_frente...")
+        logger.debug(f"SQL: {sql_frente.strip()}")
+        try:
+            cursor.execute(sql_frente)
+            connection.commit()
+            logger.info("✅ SQL passageiros_frente executado com sucesso!")
+        except Exception as e:
+            logger.error(f"❌ Erro ao executar SQL passageiros_frente: {e}")
+            connection.rollback()
+        
+        # Executar SQL para passageiros_tras
+        logger.info("🔄 Executando SQL para passageiros_tras...")
+        logger.debug(f"SQL: {sql_tras.strip()}")
+        try:
+            cursor.execute(sql_tras)
+            connection.commit()
+            logger.info("✅ SQL passageiros_tras executado com sucesso!")
+        except Exception as e:
+            logger.error(f"❌ Erro ao executar SQL passageiros_tras: {e}")
+            connection.rollback()
+        
+        # Verificação final GARANTIDA
+        logger.info("🔍 Verificação final das colunas...")
+        cursor.execute("""
+            SELECT column_name, data_type, is_nullable
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name IN ('passageiros_frente', 'passageiros_tras')
+            ORDER BY column_name
+        """)
+        
+        colunas = cursor.fetchall()
+        
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        if len(colunas) == 2:
+            logger.info("✅✅✅ MIGRAÇÃO 25 SUCESSO TOTAL! ✅✅✅")
+            logger.info("📊 Colunas confirmadas:")
+            for col in colunas:
+                logger.info(f"   - {col[0]}: {col[1]} (nullable={col[2]})")
+        elif len(colunas) == 1:
+            logger.error(f"⚠️  MIGRAÇÃO 25 PARCIAL: Apenas {colunas[0][0]} existe")
+            logger.error("🚨 AÇÃO MANUAL URGENTE: Execute no banco de produção:")
+            if colunas[0][0] == 'passageiros_frente':
+                logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT;")
+            else:
+                logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT;")
+        else:
+            logger.error("❌❌❌ MIGRAÇÃO 25 FALHOU COMPLETAMENTE ❌❌❌")
+            logger.error("🚨 AÇÃO MANUAL URGENTE: Execute no banco de produção:")
+            logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT;")
+            logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT;")
+            logger.error("")
+            logger.error("📋 Ou use o comando SQL completo com DO block:")
+            logger.error(sql_frente.strip())
+            logger.error(sql_tras.strip())
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error(f"❌ ERRO CRÍTICO na Migração 25: {str(e)}")
+        logger.error("=" * 80)
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        
+        # NÃO re-raise - permitir que a aplicação continue
+        logger.error("⚠️  Aplicação continuará rodando, mas registro de uso de veículo FALHARÁ")
