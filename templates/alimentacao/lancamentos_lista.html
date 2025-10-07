@@ -387,11 +387,8 @@ console.log('Initializing Lançamentos with light theme...');
                     </td>
                     <td>
                         <div style="display: flex; gap: 0.5rem;">
-                            <button type="button" class="btn-action-small btn-outline-danger" 
-                                    onclick="confirmarExclusao('{{ lancamento.id }}', '{{ lancamento.data.strftime('%d/%m/%Y') }}')" 
-                                    title="Excluir lançamento">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <!-- Funcionalidade de edição/exclusão será implementada futuramente -->
+                            <span style="color: #6c757d; font-size: 0.875rem;">-</span>
                         </div>
                     </td>
                 </tr>
@@ -407,12 +404,4 @@ console.log('Initializing Lançamentos with light theme...');
     </div>
 </div>
 
-<script>
-function confirmarExclusao(lancamentoId, data) {
-    if (confirm(`Tem certeza que deseja excluir o lançamento de ${data}?`)) {
-        // Implement delete action
-        window.location.href = `{{ url_for('alimentacao.lancamento_deletar', lancamento_id=0) }}`.replace('0', lancamentoId);
-    }
-}
-</script>
 {% endblock %}

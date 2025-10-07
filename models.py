@@ -617,7 +617,6 @@ class Restaurante(db.Model):
     endereco = db.Column(db.Text)
     telefone = db.Column(db.String(20))
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
     lancamentos = db.relationship('AlimentacaoLancamento', back_populates='restaurante', lazy='dynamic')
@@ -647,7 +646,6 @@ class AlimentacaoLancamento(db.Model):
     restaurante_id = db.Column(db.Integer, db.ForeignKey('restaurante.id'), nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
     restaurante = db.relationship('Restaurante', back_populates='lancamentos')

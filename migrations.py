@@ -28,7 +28,7 @@ def _migration_27_alimentacao_system():
     logger.info("=" * 80)
     
     try:
-        # 1. Criar tabela restaurante
+        # 1. Criar tabela restaurante (se não existir - pode já existir do sistema antigo)
         logger.info("📋 Criando tabela restaurante...")
         db.session.execute(text("""
             CREATE TABLE IF NOT EXISTS restaurante (
@@ -36,9 +36,7 @@ def _migration_27_alimentacao_system():
                 nome VARCHAR(100) NOT NULL,
                 endereco TEXT,
                 telefone VARCHAR(20),
-                admin_id INTEGER NOT NULL REFERENCES usuario(id),
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(admin_id, nome)
+                admin_id INTEGER REFERENCES usuario(id)
             )
         """))
         logger.info("✅ Tabela restaurante criada/verificada")
@@ -53,8 +51,7 @@ def _migration_27_alimentacao_system():
                 descricao TEXT,
                 restaurante_id INTEGER NOT NULL REFERENCES restaurante(id),
                 obra_id INTEGER NOT NULL REFERENCES obra(id),
-                admin_id INTEGER NOT NULL REFERENCES usuario(id),
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                admin_id INTEGER NOT NULL REFERENCES usuario(id)
             )
         """))
         logger.info("✅ Tabela alimentacao_lancamento criada/verificada")
