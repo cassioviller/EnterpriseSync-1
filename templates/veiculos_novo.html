@@ -426,7 +426,7 @@ console.log('Initializing Novo Veículo with light theme...');
                 <p>Cadastro completo de veículo na frota</p>
             </div>
             <div class="header-actions">
-                <a href="{{ url_for('main.veiculos') }}" class="btn-voltar">
+                <a href="{{ url_for('frota.lista') }}" class="btn-voltar">
                     <i class="fas fa-arrow-left"></i>
                     Voltar à Lista
                 </a>
@@ -441,7 +441,7 @@ console.log('Initializing Novo Veículo with light theme...');
             <h2>Cadastro de Veículo</h2>
         </div>
 
-        <form method="POST" action="{{ url_for('main.novo_veiculo') }}" id="formVeiculo">
+        <form method="POST" action="{{ url_for('frota.novo') }}" id="formVeiculo">
             <input type="hidden" name="csrf_token" value=""/>
             
             <!-- Alerta Informativo -->
@@ -651,7 +651,7 @@ console.log('Initializing Novo Veículo with light theme...');
 
             <!-- Botões de Ação -->
             <div class="form-actions">
-                <a href="{{ url_for('main.veiculos') }}" class="btn-action btn-secondary-custom">
+                <a href="{{ url_for('frota.lista') }}" class="btn-action btn-secondary-custom">
                     <i class="fas fa-times"></i>
                     Cancelar
                 </a>

@@ -610,7 +610,7 @@ console.log('Initializing Veículos with light theme...');
                 <p>Sistema integrado de controle de frota e custos</p>
             </div>
             <div class="header-actions">
-                <a href="{{ url_for('main.novo_veiculo') }}" class="btn-light">
+                <a href="{{ url_for('frota.novo') }}" class="btn-light">
                     <i class="fas fa-plus"></i>
                     Novo Veículo
                 </a>
@@ -630,7 +630,7 @@ console.log('Initializing Veículos with light theme...');
         <div class="veiculo-card">
             <div class="veiculo-card-header">
                 <div class="card-action-buttons">
-                    <a href="{{ url_for('main.editar_veiculo', id=veiculo.id) }}" class="btn-card-action btn-edit" title="Editar veículo">
+                    <a href="{{ url_for('frota.editar', id=veiculo.id) }}" class="btn-card-action btn-edit" title="Editar veículo">
                         <i class="fas fa-edit"></i>
                     </a>
                     <button type="button" class="btn-card-action btn-delete" onclick="confirmarExclusao('{{ veiculo.id }}', '{{ veiculo.placa }}')" title="Excluir veículo">
@@ -662,15 +662,15 @@ console.log('Initializing Veículos with light theme...');
                 </div>
                 
                 <div class="veiculo-actions">
-                    <a href="{{ url_for('main.detalhes_veiculo', id=veiculo.id) }}" class="btn-action btn-primary-custom">
+                    <a href="{{ url_for('frota.detalhes', id=veiculo.id) }}" class="btn-action btn-primary-custom">
                         <i class="fas fa-eye"></i>
                         Detalhes
                     </a>
-                    <a href="{{ url_for('main.novo_uso_veiculo', veiculo_id=veiculo.id) }}" class="btn-action btn-outline-custom">
+                    <a href="{{ url_for('frota.novo_uso', veiculo_id=veiculo.id) }}" class="btn-action btn-outline-custom">
                         <i class="fas fa-road"></i>
                         Usar
                     </a>
-                    <a href="{{ url_for('main.novo_custo_veiculo_form', veiculo_id=veiculo.id) }}" class="btn-action btn-secondary-custom">
+                    <a href="{{ url_for('frota.novo_custo', veiculo_id=veiculo.id) }}" class="btn-action btn-secondary-custom">
                         <i class="fas fa-money-bill-wave"></i>
                         Custo
                     </a>
@@ -685,7 +685,7 @@ console.log('Initializing Veículos with light theme...');
     <div class="pagination-container">
         <div class="pagination">
             {% if pagination.has_prev %}
-            <a href="{{ url_for('main.veiculos', page=pagination.prev_num, **request.args) }}" class="page-link">
+            <a href="{{ url_for('frota.lista', page=pagination.prev_num, **request.args) }}" class="page-link">
                 <i class="fas fa-chevron-left"></i>
             </a>
             {% endif %}
@@ -693,7 +693,7 @@ console.log('Initializing Veículos with light theme...');
             {% for page_num in pagination.iter_pages() %}
                 {% if page_num %}
                     {% if page_num != pagination.page %}
-                    <a href="{{ url_for('main.veiculos', page=page_num, **request.args) }}" class="page-link">{{ page_num }}</a>
+                    <a href="{{ url_for('frota.lista', page=page_num, **request.args) }}" class="page-link">{{ page_num }}</a>
                     {% else %}
                     <span class="page-link active">{{ page_num }}</span>
                     {% endif %}
@@ -703,7 +703,7 @@ console.log('Initializing Veículos with light theme...');
             {% endfor %}
             
             {% if pagination.has_next %}
-            <a href="{{ url_for('main.veiculos', page=pagination.next_num, **request.args) }}" class="page-link">
+            <a href="{{ url_for('frota.lista', page=pagination.next_num, **request.args) }}" class="page-link">
                 <i class="fas fa-chevron-right"></i>
             </a>
             {% endif %}
@@ -717,7 +717,7 @@ console.log('Initializing Veículos with light theme...');
         <i class="fas fa-car" style="font-size: 4rem; margin-bottom: 2rem; color: #d1d5db;"></i>
         <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Nenhum veículo encontrado</h3>
         <p style="font-size: 1rem; margin-bottom: 2rem;">Cadastre o primeiro veículo da sua frota para começar o controle.</p>
-        <a href="{{ url_for('main.novo_veiculo') }}" class="btn-primary-custom" style="padding: 1rem 2rem; font-size: 1rem;">
+        <a href="{{ url_for('frota.novo') }}" class="btn-primary-custom" style="padding: 1rem 2rem; font-size: 1rem;">
             <i class="fas fa-plus"></i>
             Cadastrar Primeiro Veículo
         </a>

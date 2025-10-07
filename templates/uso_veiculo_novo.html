@@ -687,7 +687,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h1>🚗 Novo Uso de Veículo</h1>
             </div>
             <div class="header-actions">
-                <a href="{{ url_for('main.veiculos') }}" class="btn-voltar">
+                <a href="{{ url_for('frota.lista') }}" class="btn-voltar">
                     <i class="fas fa-arrow-left"></i>
                     Voltar à Lista
                 </a>
@@ -728,7 +728,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <h2>Registro de Uso</h2>
         </div>
 
-        <form method="POST" action="{{ url_for('main.novo_uso_veiculo', veiculo_id=veiculo.id if veiculo else request.args.get('veiculo_id')) }}" id="formUsoVeiculo">
+        <form method="POST" action="{{ url_for('frota.novo_uso', veiculo_id=veiculo.id if veiculo else request.args.get('veiculo_id')) }}" id="formUsoVeiculo">
             <input type="hidden" name="csrf_token" value=""/>
             <input type="hidden" name="veiculo_id" value="{{ veiculo.id if veiculo else request.args.get('veiculo_id') }}">
             
@@ -930,7 +930,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             <!-- Botões de Ação -->
             <div class="form-actions">
-                <a href="{{ url_for('main.veiculos') }}" class="btn-action btn-secondary-custom">
+                <a href="{{ url_for('frota.lista') }}" class="btn-action btn-secondary-custom">
                     <i class="fas fa-times"></i>
                     Cancelar
                 </a>
