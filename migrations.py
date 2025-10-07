@@ -18,6 +18,75 @@ def mask_database_url(url):
     masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', url)
     return masked
 
+def _migration_27_alimentacao_system():
+    """
+    Migration 27: Sistema de Alimentação
+    Cria tabelas: restaurante, alimentacao_lancamento, alimentacao_funcionarios_assoc
+    """
+    logger.info("=" * 80)
+    logger.info("🍽️  MIGRAÇÃO 27: Sistema de Alimentação")
+    logger.info("=" * 80)
+    
+    try:
+        # 1. Criar tabela restaurante
+        logger.info("📋 Criando tabela restaurante...")
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS restaurante (
+                id SERIAL PRIMARY KEY,
+                nome VARCHAR(100) NOT NULL,
+                endereco TEXT,
+                telefone VARCHAR(20),
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(admin_id, nome)
+            )
+        """))
+        logger.info("✅ Tabela restaurante criada/verificada")
+        
+        # 2. Criar tabela alimentacao_lancamento
+        logger.info("📋 Criando tabela alimentacao_lancamento...")
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS alimentacao_lancamento (
+                id SERIAL PRIMARY KEY,
+                data DATE NOT NULL,
+                valor_total NUMERIC(10, 2) NOT NULL,
+                descricao TEXT,
+                restaurante_id INTEGER NOT NULL REFERENCES restaurante(id),
+                obra_id INTEGER NOT NULL REFERENCES obra(id),
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        logger.info("✅ Tabela alimentacao_lancamento criada/verificada")
+        
+        # 3. Criar índice na data
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_alimentacao_lancamento_data 
+            ON alimentacao_lancamento(data)
+        """))
+        
+        # 4. Criar tabela de associação
+        logger.info("📋 Criando tabela alimentacao_funcionarios_assoc...")
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS alimentacao_funcionarios_assoc (
+                lancamento_id INTEGER NOT NULL REFERENCES alimentacao_lancamento(id) ON DELETE CASCADE,
+                funcionario_id INTEGER NOT NULL REFERENCES funcionario(id) ON DELETE CASCADE,
+                PRIMARY KEY (lancamento_id, funcionario_id)
+            )
+        """))
+        logger.info("✅ Tabela alimentacao_funcionarios_assoc criada/verificada")
+        
+        db.session.commit()
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 27 CONCLUÍDA: Sistema de Alimentação implantado!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro na migração 27: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -117,6 +186,9 @@ def executar_migracoes():
             drop_tabelas_veiculos_antigas()
         else:
             logger.info("🔒 Migração 26 (DROP tabelas antigas) bloqueada - defina DROP_OLD_VEHICLE_TABLES=true para executar")
+
+        # Migração 27: Sistema de Alimentação
+        _migration_27_alimentacao_system()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         

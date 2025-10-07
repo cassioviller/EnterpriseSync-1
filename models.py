@@ -606,7 +606,8 @@ class RDOFoto(db.Model):
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-# Novos modelos para funcionalidades aprimoradas
+# ===== MÓDULO ALIMENTAÇÃO - Gestão de Refeições =====
+
 class Restaurante(db.Model):
     """Modelo para restaurantes/fornecedores de alimentação"""
     __tablename__ = 'restaurante'
@@ -615,20 +616,57 @@ class Restaurante(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     endereco = db.Column(db.Text)
     telefone = db.Column(db.String(20))
-    email = db.Column(db.String(120))
-    ativo = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    responsavel = db.Column(db.String(100))  # Campo adicionado
-    preco_almoco = db.Column(db.Float, default=0.0)  # Campo adicionado
-    preco_jantar = db.Column(db.Float, default=0.0)  # Campo adicionado
-    preco_lanche = db.Column(db.Float, default=0.0)  # Campo adicionado
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
+    lancamentos = db.relationship('AlimentacaoLancamento', back_populates='restaurante', lazy='dynamic')
     registros_alimentacao = db.relationship('RegistroAlimentacao', lazy=True, overlaps="restaurante_ref")
     
     def __repr__(self):
         return f'<Restaurante {self.nome}>'
+
+
+# Tabela de associação para relacionamento Many-to-Many entre AlimentacaoLancamento e Funcionario
+alimentacao_funcionarios_assoc = db.Table('alimentacao_funcionarios_assoc',
+    db.Column('lancamento_id', db.Integer, db.ForeignKey('alimentacao_lancamento.id'), primary_key=True),
+    db.Column('funcionario_id', db.Integer, db.ForeignKey('funcionario.id'), primary_key=True)
+)
+
+
+class AlimentacaoLancamento(db.Model):
+    """Lançamentos de alimentação para controle de custos com refeições"""
+    __tablename__ = 'alimentacao_lancamento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.Date, nullable=False, index=True)
+    valor_total = db.Column(db.Numeric(10, 2), nullable=False)
+    descricao = db.Column(db.Text)
+    
+    # Chaves Estrangeiras - padrão multi-tenant com admin_id NOT NULL
+    restaurante_id = db.Column(db.Integer, db.ForeignKey('restaurante.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    restaurante = db.relationship('Restaurante', back_populates='lancamentos')
+    obra = db.relationship('Obra', backref='lancamentos_alimentacao')
+    
+    # Many-to-Many com Funcionários
+    funcionarios = db.relationship('Funcionario',
+                                 secondary=alimentacao_funcionarios_assoc,
+                                 backref=db.backref('lancamentos_alimentacao', lazy='dynamic'),
+                                 lazy='dynamic')
+    
+    @property
+    def valor_por_funcionario(self):
+        """Calcula o valor rateado por funcionário"""
+        num_funcionarios = self.funcionarios.count()
+        if not num_funcionarios or self.valor_total is None:
+            return 0
+        return self.valor_total / num_funcionarios
+
 
 class DocumentoFiscal(db.Model):
     """Controle de documentos fiscais relacionados a veículos"""
@@ -3435,4 +3473,5 @@ class FrotaDespesa(db.Model):
             'admin_id': self.admin_id,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
 
