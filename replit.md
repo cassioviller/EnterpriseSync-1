@@ -50,7 +50,18 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
         - **Monitoring:** Production should alert if any ALTER TABLE FK statement fails in logs
     -   **Migration 21 (Schema Confirmation):** Confirms `funcionario_id` structure in legacy `uso_veiculo` table, renames `motorista_id` if found (development compatibility).
     -   **Migration 22 (Passageiros - Oct 2025):** Adiciona colunas `passageiros_frente` e `passageiros_tras` (TEXT) na tabela `uso_veiculo` para registro de passageiros do veículo (IDs separados por vírgula).
+    -   **Migration 23 (Emergencial - DROP TABLE - BLOQUEADA):** Recria tabela `uso_veiculo` com schema correto. **BLOQUEADA POR SEGURANÇA** - requer `ALLOW_DESTRUCTIVE_MIGRATION=true` para executar. Não usar em produção sem backup completo.
+    -   **Migration 24 (Passageiros Robusto - Oct 2025):** Adiciona colunas `passageiros_frente` e `passageiros_tras` com estratégia robusta: tratamento individual por coluna, commits explícitos, logging detalhado do SQL, não interrompe aplicação em caso de falha. Fornece SQL manual se ALTER TABLE falhar.
+        - **Resiliência:** Não re-raise erros - aplicação continua mesmo se falhar
+        - **Diagnóstico:** Detecta ambiente (dev/prod), loga SQL exato executado
+        - **Fallback:** Se falhar, loga comandos SQL para execução manual no banco
+        - **Idempotência:** Verifica existência antes de adicionar cada coluna
     -   **Phase 1 (Complete):** All critical fixes deployed, 100% automatic deployment achieved, production stabilized, schema alignment complete, legacy system operational with enhanced compatibility.
+    -   **Estratégia de Migração em 3 Camadas (Oct 2025):**
+        1. **Camada 1 (Migração 22):** Tentativa simples e idempotente de ALTER TABLE
+        2. **Camada 2 (Migração 23):** Solução destrutiva (DROP TABLE) - bloqueada por feature flag
+        3. **Camada 3 (Migração 24):** Solução robusta com fallback manual e logging detalhado
+        - **Resultado:** Zero downtime garantido, aplicação sempre inicia, logs guiam correção manual se necessário
     -   **Phase 2 (Pending):** Gradual migration of 27+ routes in views.py from legacy models to FleetService using feature flag system.
     -   **Idempotent Migration:** All migrations prevent data duplication using NOT EXISTS guards; verified counts: 1 vehicle, 3 usage records, 5 cost records all successfully migrated.
     -   **Deployment Strategy:** Zero manual intervention required - all migrations run automatically on application startup in both development and production environments.
