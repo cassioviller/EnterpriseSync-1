@@ -13,7 +13,17 @@ logger = logging.getLogger(__name__)
 
 # Create app instance
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET")
+
+# CRITICAL: Configurar secret_key com fallback seguro para evitar erro de sessão
+secret_key = os.environ.get("SESSION_SECRET")
+if not secret_key:
+    logger.error("❌ SESSION_SECRET não encontrado! Usando fallback temporário.")
+    secret_key = "fallback-dev-key-CHANGE-IN-PRODUCTION"
+    
+app.secret_key = secret_key
+app.config["SECRET_KEY"] = secret_key  # Garantir ambas as formas
+logger.info(f"✅ Secret key configurado (length: {len(secret_key)})")
+
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Database configuration - v10.0 Digital Mastery
