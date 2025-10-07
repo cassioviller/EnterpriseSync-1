@@ -197,11 +197,6 @@ class ServicoObraReal(db.Model):
     # Unique constraint para evitar duplicatas
     __table_args__ = (db.UniqueConstraint('obra_id', 'servico_id', name='_servico_obra_real_uc'),)
 
-# MODELO VEICULO REMOVIDO - SERÁ REIMPLEMENTADO NA VERSÃO 2.0
-    
-
-
-
 
 
 
@@ -634,16 +629,6 @@ class Restaurante(db.Model):
     
     def __repr__(self):
         return f'<Restaurante {self.nome}>'
-
-
-# MODELO USO_VEICULO REMOVIDO - SERÁ REIMPLEMENTADO NA VERSÃO 2.0
-
-
-# MODELO PASSAGEIRO_VEICULO REMOVIDO - SERÁ REIMPLEMENTADO NA VERSÃO 2.0
-
-
-# MODELO CUSTO_VEICULO REMOVIDO - SERÁ REIMPLEMENTADO NA VERSÃO 2.0
-
 
 class DocumentoFiscal(db.Model):
     """Controle de documentos fiscais relacionados a veículos"""
