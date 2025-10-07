@@ -494,3 +494,249 @@ def novo_custo(veiculo_id):
         print(f"❌ [FROTA_NOVO_CUSTO] Erro: {str(e)}")
         flash('Erro ao registrar custo do veículo.', 'error')
         return redirect(url_for('frota.detalhes', id=veiculo_id))
+
+
+# ===== ROTA: EDITAR USO DE VEÍCULO DA FROTA =====
+@frota_bp.route('/uso/<int:uso_id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_uso(uso_id):
+    """Formulário para editar uso existente de veículo da frota"""
+    try:
+        print(f"✏️ [FROTA_EDITAR_USO] Iniciando para uso {uso_id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar uso da frota
+        uso = FrotaUtilizacao.query.filter_by(id=uso_id, admin_id=tenant_admin_id).first()
+        if not uso:
+            flash('Uso de veículo não encontrado.', 'error')
+            return redirect(url_for('frota.lista'))
+        
+        # Buscar veículo
+        veiculo = FrotaVeiculo.query.filter_by(id=uso.veiculo_id, admin_id=tenant_admin_id).first()
+        if not veiculo:
+            flash('Veículo não encontrado.', 'error')
+            return redirect(url_for('frota.lista'))
+        
+        if request.method == 'GET':
+            # Buscar funcionários e obras para os selects
+            funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
+            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+            
+            return render_template('uso_veiculo_editar.html',
+                                 uso=uso,
+                                 veiculo=veiculo,
+                                 funcionarios=funcionarios,
+                                 obras=obras)
+        
+        # POST - Processar edição
+        dados = request.form.to_dict()
+        print(f"🔍 [FROTA_EDITAR_USO] Dados recebidos: {dados.keys()}")
+        
+        try:
+            # Atualizar campos
+            if dados.get('funcionario_id'):
+                uso.funcionario_id = int(dados['funcionario_id'])
+            if dados.get('obra_id'):
+                uso.obra_id = int(dados['obra_id'])
+            if dados.get('data_uso'):
+                uso.data_uso = datetime.strptime(dados['data_uso'], '%Y-%m-%d').date()
+            if dados.get('hora_saida'):
+                uso.hora_saida = datetime.strptime(dados['hora_saida'], '%H:%M').time()
+            if dados.get('hora_retorno'):
+                uso.hora_retorno = datetime.strptime(dados['hora_retorno'], '%H:%M').time()
+            if dados.get('km_inicial'):
+                uso.km_inicial = int(dados['km_inicial'])
+            if dados.get('km_final'):
+                uso.km_final = int(dados['km_final'])
+            
+            # Recalcular KM percorrido
+            if uso.km_inicial and uso.km_final:
+                uso.km_percorrido = uso.km_final - uso.km_inicial
+            
+            uso.passageiros_frente = dados.get('passageiros_frente')
+            uso.passageiros_tras = dados.get('passageiros_tras')
+            uso.responsavel_veiculo = dados.get('responsavel_veiculo')
+            uso.observacoes = dados.get('observacoes')
+            
+            db.session.commit()
+            
+            flash('Uso do veículo atualizado com sucesso!', 'success')
+            return redirect(url_for('frota.detalhes', id=veiculo.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ [FROTA_EDITAR_USO] Erro ao salvar: {str(e)}")
+            flash(f'Erro ao atualizar uso: {str(e)}', 'error')
+            funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
+            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+            return render_template('uso_veiculo_editar.html',
+                                 uso=uso,
+                                 veiculo=veiculo,
+                                 funcionarios=funcionarios,
+                                 obras=obras)
+        
+    except Exception as e:
+        print(f"❌ [FROTA_EDITAR_USO] Erro: {str(e)}")
+        flash('Erro ao editar uso do veículo.', 'error')
+        return redirect(url_for('frota.lista'))
+
+
+# ===== ROTA: DELETAR USO DE VEÍCULO DA FROTA =====
+@frota_bp.route('/uso/<int:uso_id>/deletar', methods=['POST'])
+@login_required
+def deletar_uso(uso_id):
+    """Deleta um uso de veículo da frota"""
+    try:
+        print(f"🗑️ [FROTA_DELETAR_USO] Iniciando para uso {uso_id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar uso da frota
+        uso = FrotaUtilizacao.query.filter_by(id=uso_id, admin_id=tenant_admin_id).first()
+        if not uso:
+            flash('Uso de veículo não encontrado.', 'error')
+            return redirect(url_for('frota.lista'))
+        
+        veiculo_id = uso.veiculo_id
+        
+        db.session.delete(uso)
+        db.session.commit()
+        
+        flash('Uso do veículo deletado com sucesso!', 'success')
+        return redirect(url_for('frota.detalhes', id=veiculo_id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ [FROTA_DELETAR_USO] Erro: {str(e)}")
+        flash(f'Erro ao deletar uso: {str(e)}', 'error')
+        return redirect(url_for('frota.lista'))
+
+
+# ===== ROTA: EDITAR CUSTO DE VEÍCULO DA FROTA =====
+@frota_bp.route('/custo/<int:custo_id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_custo(custo_id):
+    """Formulário para editar custo existente de veículo da frota"""
+    try:
+        print(f"✏️ [FROTA_EDITAR_CUSTO] Iniciando para custo {custo_id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar custo da frota
+        custo = FrotaDespesa.query.filter_by(id=custo_id, admin_id=tenant_admin_id).first()
+        if not custo:
+            flash('Custo de veículo não encontrado.', 'error')
+            return redirect(url_for('frota.lista'))
+        
+        # Buscar veículo
+        veiculo = FrotaVeiculo.query.filter_by(id=custo.veiculo_id, admin_id=tenant_admin_id).first()
+        if not veiculo:
+            flash('Veículo não encontrado.', 'error')
+            return redirect(url_for('frota.lista'))
+        
+        if request.method == 'GET':
+            # Buscar obras para associação (opcional)
+            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+            
+            return render_template('custo_veiculo_editar.html',
+                                 custo=custo,
+                                 veiculo=veiculo,
+                                 obras=obras)
+        
+        # POST - Processar edição
+        dados = request.form.to_dict()
+        print(f"🔍 [FROTA_EDITAR_CUSTO] Dados recebidos: {dados.keys()}")
+        
+        try:
+            # Atualizar campos
+            if dados.get('data_custo'):
+                custo.data_custo = datetime.strptime(dados['data_custo'], '%Y-%m-%d').date()
+            if dados.get('tipo'):
+                custo.tipo_custo = dados['tipo']
+            if dados.get('valor'):
+                custo.valor = float(dados['valor'])
+            
+            custo.descricao = dados.get('descricao', '')
+            custo.fornecedor = dados.get('fornecedor')
+            custo.numero_nota_fiscal = dados.get('numero_nota_fiscal')
+            
+            if dados.get('data_vencimento'):
+                custo.data_vencimento = datetime.strptime(dados['data_vencimento'], '%Y-%m-%d').date()
+            
+            if dados.get('status_pagamento'):
+                custo.status_pagamento = dados['status_pagamento']
+            
+            custo.forma_pagamento = dados.get('forma_pagamento')
+            
+            if dados.get('km_veiculo'):
+                custo.km_veiculo = int(dados['km_veiculo'])
+            
+            custo.observacoes = dados.get('observacoes')
+            
+            db.session.commit()
+            
+            flash('Custo do veículo atualizado com sucesso!', 'success')
+            return redirect(url_for('frota.detalhes', id=veiculo.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ [FROTA_EDITAR_CUSTO] Erro ao salvar: {str(e)}")
+            flash(f'Erro ao atualizar custo: {str(e)}', 'error')
+            obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
+            return render_template('custo_veiculo_editar.html',
+                                 custo=custo,
+                                 veiculo=veiculo,
+                                 obras=obras)
+        
+    except Exception as e:
+        print(f"❌ [FROTA_EDITAR_CUSTO] Erro: {str(e)}")
+        flash('Erro ao editar custo do veículo.', 'error')
+        return redirect(url_for('frota.lista'))
+
+
+# ===== ROTA: DELETAR CUSTO DE VEÍCULO DA FROTA =====
+@frota_bp.route('/custo/<int:custo_id>/deletar', methods=['POST'])
+@login_required
+def deletar_custo(custo_id):
+    """Deleta um custo de veículo da frota"""
+    try:
+        print(f"🗑️ [FROTA_DELETAR_CUSTO] Iniciando para custo {custo_id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar custo da frota
+        custo = FrotaDespesa.query.filter_by(id=custo_id, admin_id=tenant_admin_id).first()
+        if not custo:
+            flash('Custo de veículo não encontrado.', 'error')
+            return redirect(url_for('frota.lista'))
+        
+        veiculo_id = custo.veiculo_id
+        
+        db.session.delete(custo)
+        db.session.commit()
+        
+        flash('Custo do veículo deletado com sucesso!', 'success')
+        return redirect(url_for('frota.detalhes', id=veiculo_id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ [FROTA_DELETAR_CUSTO] Erro: {str(e)}")
+        flash(f'Erro ao deletar custo: {str(e)}', 'error')
+        return redirect(url_for('frota.lista'))

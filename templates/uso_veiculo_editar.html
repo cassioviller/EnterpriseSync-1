@@ -1,0 +1,1178 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+// Garantir light theme para Uso de Veículo (idêntico ao RDO)
+console.log('Initializing Uso Veículo Editar with light theme...');
+</script>
+{% endblock %}
+
+{% block title %}Editar Uso de Veículo - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA USO DE VEÍCULO (IDÊNTICO AO RDO) ===== */
+.uso-veiculo-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.uso-veiculo-container,
+.uso-veiculo-container * {
+    color: #212529 !important;
+}
+
+.uso-veiculo-container .card,
+.uso-veiculo-container .form-container {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+.uso-veiculo-container .form-control,
+.uso-veiculo-container .form-select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #495057 !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* ===== SELETOR DE PASSAGEIROS MODERNO ===== */
+.passageiro-selector {
+    position: relative;
+    width: 100%;
+}
+
+.passageiro-busca {
+    width: 100% !important;
+    padding-right: 2.5rem;
+}
+
+.passageiro-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    margin-top: 2px;
+}
+
+.passageiro-item {
+    padding: 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f8f9fa;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.passageiro-item:hover {
+    background: #f8f9fa;
+    transform: translateX(2px);
+}
+
+.passageiro-item:last-child {
+    border-bottom: none;
+}
+
+.passageiro-nome {
+    font-weight: 600;
+    color: #212529;
+    font-size: 0.875rem;
+}
+
+.passageiro-funcao {
+    color: #6c757d;
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
+.passageiros-selecionados {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-height: 2rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: var(--border-radius);
+    border: 1px dashed #ced4da;
+}
+
+.passageiro-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: #198754;
+    color: white;
+    border-radius: 15px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    animation: slideIn 0.3s ease;
+}
+
+.passageiro-chip-remover {
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.875rem;
+    padding: 0.125rem 0.25rem;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transition: background 0.2s ease;
+}
+
+.passageiro-chip-remover:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.passageiros-selecionados:empty::after {
+    content: "Nenhum passageiro selecionado";
+    color: #6c757d;
+    font-size: 0.8125rem;
+    font-style: italic;
+    opacity: 0.7;
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL (IDÊNTICO AO RDO) ===== */
+:root {
+    --primary-green: #198754;
+    --dark-green: #145a3e;
+    --light-green: #d1e7dd;
+    --accent-green: #20c997;
+    --blue-primary: #0d6efd;
+    --blue-light: #e7f3ff;
+    --yellow-warning: #ffc107;
+    --yellow-light: #fff3cd;
+    --red-danger: #dc3545;
+    --red-light: #f8d7da;
+    --white: #ffffff;
+    --gray-50: #f8f9fa;
+    --gray-100: #e9ecef;
+    --gray-200: #dee2e6;
+    --gray-300: #ced4da;
+    --gray-400: #adb5bd;
+    --gray-500: #6c757d;
+    --gray-600: #495057;
+    --gray-700: #343a40;
+    --gray-800: #212529;
+    --gray-900: #000000;
+    
+    /* Sombras Profissionais */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+    
+    /* Bordas e Transições */
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Gradientes */
+    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    --gradient-card: linear-gradient(135deg, var(--white) 0%, var(--gray-50) 100%);
+    --gradient-success: linear-gradient(135deg, var(--accent-green) 0%, var(--primary-green) 100%);
+}
+
+/* ===== CONTAINER PRINCIPAL ===== */
+.uso-veiculo-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0;
+    background: #f8f9fa !important;
+    min-height: 100vh;
+    color: #212529 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ===== HEADER MODERNO COM GRADIENTE ===== */
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title h1 {
+    font-size: 3rem !important;
+    font-weight: 800 !important;
+    margin: 0;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.02em;
+}
+
+.header-title p {
+    font-size: 1.25rem !important;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-weight: 400;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: white;
+    text-decoration: none;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ===== INFORMAÇÕES DO VEÍCULO ===== */
+.veiculo-info-card {
+    background: #ffffff !important;
+    padding: 2rem;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    margin: 0 2rem 2rem 2rem;
+    border: 1px solid #e5e7eb !important;
+    position: relative;
+    color: #374151 !important;
+}
+
+.veiculo-info-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+}
+
+.veiculo-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.veiculo-icon {
+    background: var(--gradient-primary);
+    color: white;
+    padding: 1rem;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 60px;
+    height: 60px;
+}
+
+.veiculo-details h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-800);
+}
+
+.veiculo-details p {
+    margin: 0;
+    color: var(--gray-600);
+    font-size: 1rem;
+}
+
+.veiculo-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
+    border-top: 1px solid var(--gray-200);
+    padding-top: 1.5rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--gray-800);
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ===== FORMULÁRIO MODERNO ===== */
+.form-container {
+    background: #ffffff !important;
+    padding: 3rem;
+    border-radius: 24px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    margin: 0 2rem 3rem 2rem;
+    border: 1px solid #e5e7eb !important;
+    position: relative;
+    color: #374151 !important;
+}
+
+.form-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+    border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
+}
+
+.form-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.form-header i {
+    color: var(--primary-green);
+    font-size: 2rem;
+}
+
+.form-header h2 {
+    color: var(--gray-800);
+    font-weight: 700;
+    font-size: 1.75rem;
+    margin: 0;
+}
+
+.form-section {
+    margin-bottom: 3rem;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    color: var(--gray-700);
+    font-weight: 600;
+    font-size: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.section-title i {
+    color: var(--primary-green);
+    font-size: 1.25rem;
+}
+
+/* Badge Especial para Novidade v2.0 */
+.unified-badge {
+    background: linear-gradient(135deg, #ffc107 0%, #ff8c00 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: auto;
+    box-shadow: var(--shadow-sm);
+}
+
+.form-grid {
+    display: grid;
+    gap: 2rem;
+}
+
+.form-grid-2 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.form-grid-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.form-grid-4 {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-group .required {
+    color: var(--red-danger);
+}
+
+.modern-input, .modern-select, .modern-textarea {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid var(--gray-300) !important;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    transition: var(--transition);
+    background: var(--white) !important;
+    box-shadow: var(--shadow-sm);
+    color: var(--gray-800) !important;
+    font-family: inherit;
+}
+
+.modern-input:focus, .modern-select:focus, .modern-textarea:focus {
+    outline: none;
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.15);
+    transform: translateY(-2px);
+}
+
+.modern-textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.input-help {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-top: 0.5rem;
+    font-style: italic;
+}
+
+.currency-input {
+    position: relative;
+}
+
+.currency-input::before {
+    content: 'R$';
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-500);
+    font-weight: 600;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.currency-input .modern-input {
+    padding-left: 3rem;
+}
+
+/* ===== ALERTAS E NOVIDADES ===== */
+.alert-custom {
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 2rem;
+    border: 1px solid;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.alert-info {
+    background: var(--blue-light);
+    color: var(--blue-primary);
+    border-color: rgba(13, 110, 253, 0.2);
+}
+
+.alert-success {
+    background: var(--light-green);
+    color: var(--dark-green);
+    border-color: rgba(25, 135, 84, 0.2);
+}
+
+.alert-warning {
+    background: var(--yellow-light);
+    color: #b45309;
+    border-color: rgba(255, 193, 7, 0.2);
+}
+
+.alert-custom i {
+    font-size: 1.25rem;
+}
+
+/* ===== BOTÕES DE AÇÃO ===== */
+.form-actions {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: flex-end;
+    align-items: center;
+    padding-top: 2rem;
+    border-top: 2px solid var(--gray-200);
+    margin-top: 3rem;
+}
+
+.btn-action {
+    padding: 1rem 2.5rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.btn-primary-custom {
+    background: var(--gradient-primary);
+    color: white;
+    border: 2px solid transparent;
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-secondary-custom {
+    background: transparent;
+    color: var(--gray-600);
+    border: 2px solid var(--gray-400);
+}
+
+.btn-secondary-custom:hover {
+    background: var(--gray-100);
+    color: var(--gray-800);
+    border-color: var(--gray-500);
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+/* ===== RESPONSIVIDADE ===== */
+@media (max-width: 768px) {
+    .form-container {
+        margin: 0 1rem 2rem 1rem;
+        padding: 2rem 1.5rem;
+    }
+    
+    .veiculo-info-card {
+        margin: 0 1rem 2rem 1rem;
+        padding: 1.5rem;
+    }
+    
+    .form-grid-2,
+    .form-grid-3,
+    .form-grid-4 {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 2rem;
+        text-align: center;
+    }
+    
+    .form-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+    
+    .btn-action {
+        justify-content: center;
+    }
+    
+    .veiculo-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 992px) {
+    .form-grid-3,
+    .form-grid-4 {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="uso-veiculo-container">
+    <!-- Header Moderno com Gradiente -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>✏️ Editar Uso de Veículo</h1>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('frota.detalhes', veiculo_id=veiculo.id) }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações do Veículo -->
+    {% if veiculo %}
+    <div class="veiculo-info-card">
+        <div class="veiculo-header">
+            <div class="veiculo-icon">
+                <i class="fas fa-car"></i>
+            </div>
+            <div class="veiculo-details">
+                <h3>{{ veiculo.placa }} - {{ veiculo.marca }} {{ veiculo.modelo }}</h3>
+                <p>{{ veiculo.tipo }} • {{ veiculo.ano }} • {{ veiculo.combustivel }}</p>
+            </div>
+        </div>
+        
+        <div class="veiculo-stats">
+            <div class="stat-item">
+                <div class="stat-value">{{ "{:,}".format(veiculo.km_atual).replace(',', '.') }} km</div>
+                <div class="stat-label">KM Atual</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ veiculo.cor or 'N/A' }}</div>
+                <div class="stat-label">Cor</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Formulário Principal -->
+    <div class="form-container">
+        <div class="form-header">
+            <i class="fas fa-road"></i>
+            <h2>Editar Registro de Uso</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('frota.editar_uso', uso_id=uso.id) }}" id="formUsoVeiculo">
+            <input type="hidden" name="csrf_token" value=""/>
+            <input type="hidden" name="veiculo_id" value="{{ veiculo.id }}">
+            
+
+            <!-- Seção 1: Dados do Uso -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Dados do Uso</span>
+                </div>
+                
+                <div class="form-grid form-grid-3">
+                    <div class="form-group">
+                        <label for="data_uso">Data do Uso <span class="required">*</span></label>
+                        <input type="date" 
+                               id="data_uso" 
+                               name="data_uso" 
+                               class="modern-input" 
+                               required
+                               value="{{ request.form.data_uso or (uso.data_uso.strftime('%Y-%m-%d') if uso.data_uso else '') }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="hora_saida">Hora de Saída <span class="required">*</span></label>
+                        <input type="time" 
+                               id="hora_saida" 
+                               name="hora_saida" 
+                               class="modern-input" 
+                               required
+                               value="{{ request.form.hora_saida or (uso.hora_saida.strftime('%H:%M') if uso.hora_saida else '') }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="hora_retorno">Hora de Retorno</label>
+                        <input type="time" 
+                               id="hora_retorno" 
+                               name="hora_retorno" 
+                               class="modern-input"
+                               value="{{ request.form.hora_retorno or (uso.hora_retorno.strftime('%H:%M') if uso.hora_retorno else '') }}">
+                    </div>
+                </div>
+                
+                <div class="form-grid form-grid-1">
+                    <div class="form-group">
+                        <label for="obra_id">Obra/Projeto</label>
+                        <select id="obra_id" name="obra_id" class="modern-select">
+                            <option value="">Selecione a obra (opcional)</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if (request.form.obra_id|string == obra.id|string) or (uso.obra_id == obra.id) %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 2: Quilometragem -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Quilometragem</span>
+                </div>
+                
+                <div class="form-grid form-grid-3">
+                    <div class="form-group">
+                        <label for="km_inicial">KM Inicial <span class="required">*</span></label>
+                        <input type="number" 
+                               id="km_inicial" 
+                               name="km_inicial" 
+                               class="modern-input" 
+                               placeholder="{{ veiculo.km_atual if veiculo else '0' }}"
+                               min="0"
+                               required
+                               value="{{ request.form.km_inicial or (uso.km_inicial if uso.km_inicial else '') }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="km_final">KM Final</label>
+                        <input type="number" 
+                               id="km_final" 
+                               name="km_final" 
+                               class="modern-input" 
+                               placeholder="Ex: 25000"
+                               min="0"
+                               value="{{ request.form.km_final or (uso.km_final if uso.km_final else '') }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="km_percorrido_display">KM Percorrido</label>
+                        <input type="text" 
+                               id="km_percorrido_display" 
+                               class="modern-input" 
+                               placeholder="Calculado automaticamente"
+                               readonly
+                               style="background-color: #f8f9fa;">
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Seção 4: Passageiros -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-users"></i>
+                    <span>Passageiros</span>
+                </div>
+                
+                
+                <div class="form-group">
+                    <label for="funcionario_id">Motorista <span class="required">*</span></label>
+                    <select id="funcionario_id" 
+                            name="funcionario_id" 
+                            class="modern-select" 
+                            required>
+                        <option value="">Selecione o motorista</option>
+                        {% for funcionario in funcionarios %}
+                        <option value="{{ funcionario.id }}" 
+                                {% if (request.form.funcionario_id|string == funcionario.id|string) or (uso.funcionario_id == funcionario.id) %}selected{% endif %}>
+                            {{ funcionario.nome }} - {{ funcionario.funcao or 'Sem função' }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="input-help">Responsável pela condução do veículo</div>
+                </div>
+                
+                <div class="form-grid form-grid-2">
+                    <div class="form-group">
+                        <label for="busca_passageiros_frente">Passageiros da Frente</label>
+                        <div class="passageiro-selector">
+                            <input type="text" 
+                                   id="busca_passageiros_frente" 
+                                   class="modern-input passageiro-busca" 
+                                   placeholder="🔍 Buscar funcionário para frente..." 
+                                   autocomplete="off">
+                            <div id="dropdown_passageiros_frente" class="passageiro-dropdown" style="display: none;">
+                                {% for funcionario in funcionarios %}
+                                <div class="passageiro-item" data-id="{{ funcionario.id }}" data-nome="{{ funcionario.nome }}" data-funcao="{{ funcionario.funcao or 'Sem função' }}">
+                                    <span class="passageiro-nome">{{ funcionario.nome }}</span>
+                                    <small class="passageiro-funcao">{{ funcionario.funcao or 'Sem função' }}</small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div id="passageiros_frente_selecionados" class="passageiros-selecionados">
+                                <!-- Funcionários selecionados aparecerão aqui -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="passageiros_frente_ids" name="passageiros_frente" value="{{ request.form.passageiros_frente or (uso.passageiros_frente or '') }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="busca_passageiros_tras">Passageiros de Trás</label>
+                        <div class="passageiro-selector">
+                            <input type="text" 
+                                   id="busca_passageiros_tras" 
+                                   class="modern-input passageiro-busca" 
+                                   placeholder="🔍 Buscar funcionário para trás..." 
+                                   autocomplete="off">
+                            <div id="dropdown_passageiros_tras" class="passageiro-dropdown" style="display: none;">
+                                {% for funcionario in funcionarios %}
+                                <div class="passageiro-item" data-id="{{ funcionario.id }}" data-nome="{{ funcionario.nome }}" data-funcao="{{ funcionario.funcao or 'Sem função' }}">
+                                    <span class="passageiro-nome">{{ funcionario.nome }}</span>
+                                    <small class="passageiro-funcao">{{ funcionario.funcao or 'Sem função' }}</small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div id="passageiros_tras_selecionados" class="passageiros-selecionados">
+                                <!-- Funcionários selecionados aparecerão aqui -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="passageiros_tras_ids" name="passageiros_tras" value="{{ request.form.passageiros_tras or (uso.passageiros_tras or '') }}">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Resumo dos Passageiros</label>
+                    <div id="resumo_passageiros" style="background: #f8f9fa; padding: 1rem; border-radius: var(--border-radius); border: 1px solid #dee2e6;">
+                        <div id="total_pessoas" style="font-weight: 600; color: #198754;">Total: 1 pessoa (motorista)</div>
+                        <div id="distribuicao" style="font-size: 0.875rem; color: #6c757d; margin-top: 0.25rem;">Frente: 1 | Trás: 0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 5: Observações -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-comment-alt"></i>
+                    <span>Observações</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="observacoes">Observações Gerais</label>
+                    <textarea id="observacoes" 
+                              name="observacoes" 
+                              class="modern-textarea" 
+                              placeholder="Informações adicionais sobre o uso do veículo">{{ request.form.observacoes or (uso.observacoes or '') }}</textarea>
+                </div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="form-actions">
+                <a href="{{ url_for('frota.detalhes', veiculo_id=veiculo.id) }}" class="btn-action btn-secondary-custom">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </a>
+                <button type="submit" class="btn-action btn-primary-custom">
+                    <i class="fas fa-save"></i>
+                    Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Calcular KM percorrido automaticamente
+    const kmInicialInput = document.getElementById('km_inicial');
+    const kmFinalInput = document.getElementById('km_final');
+    const kmPercorridoDisplay = document.getElementById('km_percorrido_display');
+    
+    function calcularKmPercorrido() {
+        const kmInicial = parseFloat(kmInicialInput.value) || 0;
+        const kmFinal = parseFloat(kmFinalInput.value) || 0;
+        
+        if (kmFinal > kmInicial) {
+            const kmPercorrido = kmFinal - kmInicial;
+            kmPercorridoDisplay.value = kmPercorrido.toLocaleString('pt-BR') + ' km';
+        } else {
+            kmPercorridoDisplay.value = '';
+        }
+    }
+    
+    kmInicialInput.addEventListener('input', calcularKmPercorrido);
+    kmFinalInput.addEventListener('input', calcularKmPercorrido);
+    
+    // Calcular valores iniciais
+    calcularKmPercorrido();
+    
+    // Sistema de seleção de passageiros moderno
+    const passageirosSelecionados = {
+        frente: [],
+        tras: []
+    };
+    
+    // Carregar passageiros existentes dos campos hidden
+    const passageirosFrente = document.getElementById('passageiros_frente_ids').value;
+    const passageirosTras = document.getElementById('passageiros_tras_ids').value;
+    
+    if (passageirosFrente) {
+        passageirosSelecionados.frente = passageirosFrente.split(',');
+    }
+    if (passageirosTras) {
+        passageirosSelecionados.tras = passageirosTras.split(',');
+    }
+    
+    // Inicializar sistema para passageiros da frente
+    initPassageiroSelector('frente');
+    // Inicializar sistema para passageiros de trás
+    initPassageiroSelector('tras');
+    
+    // Renderizar passageiros existentes
+    renderizarPassageirosExistentes('frente');
+    renderizarPassageirosExistentes('tras');
+    
+    function renderizarPassageirosExistentes(tipo) {
+        const passageirosSelecionadosDiv = document.getElementById(`passageiros_${tipo}_selecionados`);
+        const dropdown = document.getElementById(`dropdown_passageiros_${tipo}`);
+        
+        passageirosSelecionados[tipo].forEach(id => {
+            const item = dropdown.querySelector(`.passageiro-item[data-id="${id}"]`);
+            if (item) {
+                const nome = item.dataset.nome;
+                const funcao = item.dataset.funcao;
+                
+                const chip = document.createElement('div');
+                chip.className = 'passageiro-chip';
+                chip.dataset.id = id;
+                chip.innerHTML = `
+                    <span>${nome} <small>(${funcao})</small></span>
+                    <span class="passageiro-chip-remover" onclick="removerPassageiro('${tipo}', '${id}')">&times;</span>
+                `;
+                
+                passageirosSelecionadosDiv.appendChild(chip);
+            }
+        });
+    }
+    
+    function initPassageiroSelector(tipo) {
+        const buscaInput = document.getElementById(`busca_passageiros_${tipo}`);
+        const dropdown = document.getElementById(`dropdown_passageiros_${tipo}`);
+        const passageirosSelecionadosDiv = document.getElementById(`passageiros_${tipo}_selecionados`);
+        const hiddenInput = document.getElementById(`passageiros_${tipo}_ids`);
+        
+        // Mostrar dropdown ao focar no campo
+        buscaInput.addEventListener('focus', () => {
+            dropdown.style.display = 'block';
+            filtrarPassageiros(tipo, '');
+        });
+        
+        // Filtrar passageiros conforme digitação
+        buscaInput.addEventListener('input', (e) => {
+            filtrarPassageiros(tipo, e.target.value);
+        });
+        
+        // Esconder dropdown ao clicar fora
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest(`#busca_passageiros_${tipo}`) && !e.target.closest(`#dropdown_passageiros_${tipo}`)) {
+                dropdown.style.display = 'none';
+                buscaInput.value = ''; // Limpar busca
+            }
+        });
+        
+        // Adicionar event listeners aos items de passageiros
+        dropdown.querySelectorAll('.passageiro-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = item.dataset.id;
+                const nome = item.dataset.nome;
+                const funcao = item.dataset.funcao;
+                
+                adicionarPassageiro(tipo, id, nome, funcao);
+                buscaInput.value = ''; // Limpar busca
+                dropdown.style.display = 'none';
+            });
+        });
+    }
+    
+    function filtrarPassageiros(tipo, termo) {
+        const dropdown = document.getElementById(`dropdown_passageiros_${tipo}`);
+        const items = dropdown.querySelectorAll('.passageiro-item');
+        
+        termo = termo.toLowerCase();
+        
+        items.forEach(item => {
+            const nome = item.dataset.nome.toLowerCase();
+            const funcao = item.dataset.funcao.toLowerCase();
+            const id = item.dataset.id;
+            
+            // Esconder se já foi selecionado
+            const jaFoiSelecionado = passageirosSelecionados[tipo].includes(id);
+            
+            if (jaFoiSelecionado) {
+                item.style.display = 'none';
+                return;
+            }
+            
+            // Filtrar por termo de busca
+            if (nome.includes(termo) || funcao.includes(termo)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+    
+    function adicionarPassageiro(tipo, id, nome, funcao) {
+        // Evitar duplicatas
+        if (passageirosSelecionados[tipo].includes(id)) return;
+        
+        // Adicionar à lista
+        passageirosSelecionados[tipo].push(id);
+        
+        // Criar chip visual
+        const passageirosSelecionadosDiv = document.getElementById(`passageiros_${tipo}_selecionados`);
+        const chip = document.createElement('div');
+        chip.className = 'passageiro-chip';
+        chip.dataset.id = id;
+        chip.innerHTML = `
+            <span>${nome} <small>(${funcao})</small></span>
+            <span class="passageiro-chip-remover" onclick="removerPassageiro('${tipo}', '${id}')">&times;</span>
+        `;
+        
+        passageirosSelecionadosDiv.appendChild(chip);
+        
+        // Atualizar campo hidden
+        atualizarCampoHidden(tipo);
+        
+        // Atualizar resumo
+        calcularResumoPassageiros();
+    }
+    
+    function removerPassageiro(tipo, id) {
+        // Remover da lista
+        passageirosSelecionados[tipo] = passageirosSelecionados[tipo].filter(pId => pId !== id);
+        
+        // Remover chip visual
+        const chip = document.querySelector(`#passageiros_${tipo}_selecionados .passageiro-chip[data-id="${id}"]`);
+        if (chip) chip.remove();
+        
+        // Atualizar campo hidden
+        atualizarCampoHidden(tipo);
+        
+        // Atualizar resumo
+        calcularResumoPassageiros();
+    }
+    
+    // Tornar função global para o onclick
+    window.removerPassageiro = removerPassageiro;
+    
+    function atualizarCampoHidden(tipo) {
+        const hiddenInput = document.getElementById(`passageiros_${tipo}_ids`);
+        hiddenInput.value = passageirosSelecionados[tipo].join(',');
+    }
+    
+    // Calcular resumo dos passageiros automaticamente
+    const motoristaSelect = document.getElementById('funcionario_id');
+    const totalPessoasDiv = document.getElementById('total_pessoas');
+    const distribuicaoDiv = document.getElementById('distribuicao');
+    
+    function calcularResumoPassageiros() {
+        const temMotorista = motoristaSelect.value ? 1 : 0;
+        const totalFrente = passageirosSelecionados.frente.length + temMotorista;
+        const totalTras = passageirosSelecionados.tras.length;
+        const totalPessoas = totalFrente + totalTras;
+        
+        if (totalPessoas > 0) {
+            totalPessoasDiv.textContent = `Total: ${totalPessoas} pessoa${totalPessoas > 1 ? 's' : ''} ${temMotorista ? '(incluindo motorista)' : ''}`;
+            distribuicaoDiv.textContent = `Frente: ${totalFrente} | Trás: ${totalTras}`;
+        } else {
+            totalPessoasDiv.textContent = 'Total: 0 pessoas';
+            distribuicaoDiv.textContent = 'Selecione o motorista e passageiros';
+        }
+    }
+    
+    // Adicionar listener para atualizar resumo quando motorista mudar
+    motoristaSelect.addEventListener('change', calcularResumoPassageiros);
+    
+    // Calcular resumo inicial
+    calcularResumoPassageiros();
+    
+    // Validação do formulário
+    const form = document.getElementById('formUsoVeiculo');
+    form.addEventListener('submit', function(e) {
+        const dataUso = document.getElementById('data_uso').value;
+        const horaSaida = document.getElementById('hora_saida').value;
+        const motoristaId = document.getElementById('funcionario_id').value;
+        const kmInicial = document.getElementById('km_inicial').value;
+        
+        if (!dataUso || !horaSaida || !motoristaId || !kmInicial) {
+            e.preventDefault();
+            alert('Por favor, preencha todos os campos obrigatórios.');
+            return false;
+        }
+        
+        // Validar KM
+        const kmInicialVal = parseFloat(kmInicial);
+        const kmFinalVal = parseFloat(kmFinalInput.value);
+        
+        if (kmFinalVal && kmFinalVal <= kmInicialVal) {
+            e.preventDefault();
+            alert('O KM final deve ser maior que o KM inicial.');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}
