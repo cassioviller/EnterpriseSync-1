@@ -62,6 +62,12 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
         2. **Camada 2 (Migração 23):** Solução destrutiva (DROP TABLE) - bloqueada por feature flag
         3. **Camada 3 (Migração 24):** Solução robusta com fallback manual e logging detalhado
         - **Resultado:** Zero downtime garantido, aplicação sempre inicia, logs guiam correção manual se necessário
+    -   **Migration 25 (ULTRA-ROBUSTA - SQL Puro - Oct 2025):** Solução definitiva para garantir colunas passageiros em produção usando SQL nativo do PostgreSQL.
+        - **Tecnologia:** Blocos DO com IF NOT EXISTS emulado (compatível PostgreSQL 9.0+)
+        - **Vantagens:** Execução direta no banco (não passa por ORM), commits separados por coluna, absolutamente idempotente
+        - **Logging:** Detecta ambiente (dev/prod), mostra SQL exato executado, confirma colunas criadas
+        - **Segurança:** Não re-raise erros, aplicação continua mesmo se falhar, fornece SQL para execução manual
+        - **Status:** ✅ Testado e aprovado em desenvolvimento, pronto para produção
     -   **Phase 2 (Pending):** Gradual migration of 27+ routes in views.py from legacy models to FleetService using feature flag system.
     -   **Idempotent Migration:** All migrations prevent data duplication using NOT EXISTS guards; verified counts: 1 vehicle, 3 usage records, 5 cost records all successfully migrated.
     -   **Deployment Strategy:** Zero manual intervention required - all migrations run automatically on application startup in both development and production environments.
