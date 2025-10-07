@@ -266,7 +266,7 @@ with app.app_context():
     
     # Registrar blueprint de alimentação
     try:
-        from alimentacao_crud import alimentacao_bp
+        from alimentacao_views import alimentacao_bp
         app.register_blueprint(alimentacao_bp)
         logging.info("✅ Blueprint alimentação registrado")
     except ImportError as e:

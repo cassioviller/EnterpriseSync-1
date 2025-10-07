@@ -1,0 +1,451 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+console.log('Initializing Novo Lançamento with light theme...');
+
+document.addEventListener('DOMContentLoaded', function() {
+    const dataInput = document.getElementById('data');
+    if (dataInput && !dataInput.value) {
+        const hoje = new Date();
+        const dataFormatada = hoje.toISOString().split('T')[0];
+        dataInput.value = dataFormatada;
+    }
+});
+</script>
+{% endblock %}
+
+{% block title %}Novo Lançamento - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA FORMULÁRIO (IDÊNTICO AO RDO) ===== */
+.lancamento-form-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.lancamento-form-container,
+.lancamento-form-container * {
+    color: #212529 !important;
+}
+
+.lancamento-form-container .card,
+.lancamento-form-container .form-container {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+.lancamento-form-container .form-control,
+.lancamento-form-container .form-select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #495057 !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL ===== */
+:root {
+    --primary-green: #198754;
+    --dark-green: #145a3e;
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+}
+
+.lancamento-form-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0;
+    background: #f8f9fa !important;
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ===== HEADER MODERNO COM GRADIENTE ===== */
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title h1 {
+    font-size: 3rem !important;
+    font-weight: 800 !important;
+    margin: 0;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.header-title p {
+    font-size: 1.25rem !important;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.35);
+    color: white;
+    text-decoration: none;
+    transform: translateY(-3px);
+}
+
+/* ===== FORMULÁRIO MODERNO ===== */
+.form-container {
+    background: #ffffff !important;
+    padding: 3rem;
+    border-radius: 24px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    margin: 0 2rem 3rem 2rem;
+    border: 1px solid #e5e7eb !important;
+    position: relative;
+}
+
+.form-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+    border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
+}
+
+.form-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.form-header i {
+    color: var(--primary-green);
+    font-size: 2rem;
+}
+
+.form-header h2 {
+    color: #374151;
+    font-weight: 700;
+    font-size: 1.75rem;
+    margin: 0;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.form-row-single {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin-bottom: 2rem;
+}
+
+.form-group {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.form-group label.required::after {
+    content: ' *';
+    color: #dc3545;
+}
+
+.form-control, .form-select {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid #ced4da !important;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    transition: var(--transition);
+    background: #ffffff !important;
+    color: #495057 !important;
+}
+
+.form-control:focus, .form-select:focus {
+    outline: none;
+    border-color: var(--primary-green) !important;
+    box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.15);
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* ===== SELECT MÚLTIPLO ESTILIZADO ===== */
+select[multiple] {
+    min-height: 250px !important;
+    padding: 0.5rem !important;
+}
+
+select[multiple] option {
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 0.25rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+select[multiple] option:hover {
+    background: #e9ecef !important;
+}
+
+select[multiple] option:checked {
+    background: linear-gradient(135deg, #198754 0%, #145a3e 100%) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.helper-text {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 0.5rem;
+    font-style: italic;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding-top: 2rem;
+    border-top: 2px solid #e5e7eb;
+    margin-top: 2rem;
+}
+
+.btn {
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-success {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: 2rem;
+        text-align: center;
+    }
+    
+    .form-container {
+        margin: 0 1rem 2rem 1rem;
+        padding: 2rem 1.5rem;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="lancamento-form-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>🍽️ Novo Lançamento</h1>
+                <p>Registre despesa com alimentação e rateio entre funcionários</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('alimentacao.lancamentos_lista') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="margin: 0 2rem 2rem 2rem;">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Formulário -->
+    <div class="form-container">
+        <div class="form-header">
+            <i class="fas fa-utensils"></i>
+            <h2>Dados do Lançamento</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('alimentacao.lancamento_novo') }}">
+            {{ form.hidden_tag() if form else '' }}
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="data" class="required">Data</label>
+                    <input type="date" class="form-control" id="data" name="data" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="valor_total" class="required">Valor Total</label>
+                    <input type="number" class="form-control" id="valor_total" name="valor_total" 
+                           required step="0.01" min="0" placeholder="0.00">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="restaurante_id" class="required">Restaurante</label>
+                    <select class="form-select" id="restaurante_id" name="restaurante_id" required>
+                        <option value="">Selecione um restaurante</option>
+                        {% for restaurante in restaurantes %}
+                        <option value="{{ restaurante.id }}" {% if request.args.get('restaurante_id')|int == restaurante.id %}selected{% endif %}>
+                            {{ restaurante.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="obra_id" class="required">Obra</label>
+                    <select class="form-select" id="obra_id" name="obra_id" required>
+                        <option value="">Selecione uma obra</option>
+                        {% for obra in obras %}
+                        <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row-single">
+                <div class="form-group">
+                    <label for="funcionarios" class="required">Funcionários</label>
+                    <select class="form-control" id="funcionarios" name="funcionarios" multiple size="10" required>
+                        {% for funcionario in funcionarios %}
+                        <option value="{{ funcionario.id }}">
+                            {{ funcionario.nome }} - {{ funcionario.funcao or 'Sem função' }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="helper-text">
+                        <i class="fas fa-info-circle"></i>
+                        Mantenha pressionado Ctrl (Windows) ou Cmd (Mac) para selecionar múltiplos funcionários
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-row-single">
+                <div class="form-group">
+                    <label for="descricao">Descrição dos Itens</label>
+                    <textarea class="form-control" id="descricao" name="descricao" rows="4" 
+                              placeholder="Descreva os itens comprados (exemplo: 10 marmitas, 5 refrigerantes, 3 sucos)"></textarea>
+                    <small class="helper-text">
+                        Opcional: Detalhe os itens comprados para facilitar o controle
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <a href="{{ url_for('alimentacao.lancamentos_lista') }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </a>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save"></i>
+                    Salvar Lançamento
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

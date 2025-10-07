@@ -1,0 +1,489 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+console.log('Initializing Restaurantes with light theme...');
+</script>
+{% endblock %}
+
+{% block title %}Gestão de Restaurantes - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA RESTAURANTES (IDÊNTICO AO RDO) ===== */
+.restaurantes-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.restaurantes-container,
+.restaurantes-container * {
+    color: #212529 !important;
+}
+
+.restaurantes-container .card,
+.restaurantes-container .stat-card,
+.restaurantes-container .filters-container {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+.restaurantes-container .form-control,
+.restaurantes-container .form-select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #495057 !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL (IDÊNTICO AO RDO) ===== */
+:root {
+    --primary-green: #198754;
+    --dark-green: #145a3e;
+    --light-green: #d1e7dd;
+    --accent-green: #20c997;
+    --blue-primary: #0d6efd;
+    --blue-light: #e7f3ff;
+    --yellow-warning: #ffc107;
+    --yellow-light: #fff3cd;
+    --red-danger: #dc3545;
+    --red-light: #f8d7da;
+    --white: #ffffff;
+    --gray-50: #f8f9fa;
+    --gray-100: #e9ecef;
+    --gray-200: #dee2e6;
+    --gray-300: #ced4da;
+    --gray-400: #adb5bd;
+    --gray-500: #6c757d;
+    --gray-600: #495057;
+    --gray-700: #343a40;
+    --gray-800: #212529;
+    --gray-900: #000000;
+    
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+    
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    --gradient-card: linear-gradient(135deg, var(--white) 0%, var(--gray-50) 100%);
+    --gradient-success: linear-gradient(135deg, var(--accent-green) 0%, var(--primary-green) 100%);
+}
+
+.restaurantes-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0;
+    background: #f8f9fa !important;
+    min-height: 100vh;
+    color: #212529 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ===== HEADER MODERNO COM GRADIENTE ===== */
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title h1 {
+    font-size: 3rem !important;
+    font-weight: 800 !important;
+    margin: 0;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.02em;
+}
+
+.header-title p {
+    font-size: 1.25rem !important;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-weight: 400;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-light {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-light:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: var(--primary-green);
+    color: var(--primary-green);
+    text-decoration: none;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: white;
+    text-decoration: none;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ===== GRID DE RESTAURANTES ===== */
+.restaurantes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 2rem;
+    margin: 0 2rem 2rem 2rem;
+    padding: 0;
+}
+
+.restaurante-card {
+    background: #ffffff !important;
+    padding: 0;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 6px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid #e5e7eb !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative;
+    overflow: hidden;
+    color: #374151 !important;
+}
+
+.restaurante-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-xl);
+    border-color: var(--primary-green);
+}
+
+.restaurante-card-header {
+    background: var(--gradient-primary);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 20px 20px 0 0;
+    position: relative;
+}
+
+.card-action-buttons {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.restaurante-card:hover .card-action-buttons {
+    opacity: 1;
+}
+
+.btn-card-action {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    text-decoration: none;
+    backdrop-filter: blur(10px);
+}
+
+.btn-card-action:hover {
+    transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.btn-edit:hover {
+    background: #ffc107;
+}
+
+.btn-delete:hover {
+    background: #dc3545;
+}
+
+.restaurante-nome {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.restaurante-endereco {
+    font-size: 0.95rem;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+}
+
+.restaurante-card-body {
+    padding: 1.5rem;
+}
+
+.restaurante-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-label {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.info-value {
+    font-size: 1rem;
+    color: var(--gray-800);
+    font-weight: 600;
+}
+
+.restaurante-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    border-top: 1px solid var(--gray-200);
+    padding-top: 1.5rem;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-align: center;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-primary-custom {
+    background: var(--gradient-primary);
+    color: white;
+    border: 2px solid transparent;
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-outline-custom {
+    background: transparent;
+    color: var(--primary-green);
+    border: 2px solid var(--primary-green);
+}
+
+.btn-outline-custom:hover {
+    background: var(--primary-green);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+}
+
+/* ===== RESPONSIVIDADE ===== */
+@media (max-width: 768px) {
+    .restaurantes-grid {
+        grid-template-columns: 1fr;
+        margin: 0 1rem 2rem 1rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 2rem;
+        text-align: center;
+    }
+    
+    .header-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="restaurantes-container">
+    <!-- Header Moderno com Gradiente -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>🍽️ Gestão de Restaurantes</h1>
+                <p>Cadastro e controle de fornecedores de alimentação</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('alimentacao.restaurante_novo') }}" class="btn-light">
+                    <i class="fas fa-plus"></i>
+                    Novo Restaurante
+                </a>
+                <a href="{{ url_for('main.dashboard') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="margin: 0 2rem 2rem 2rem;">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Grid de Restaurantes -->
+    {% if restaurantes %}
+    <div class="restaurantes-grid">
+        {% for restaurante in restaurantes %}
+        <div class="restaurante-card">
+            <div class="restaurante-card-header">
+                <div class="card-action-buttons">
+                    <a href="{{ url_for('alimentacao.restaurante_editar', restaurante_id=restaurante.id) }}" class="btn-card-action btn-edit" title="Editar restaurante">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <button type="button" class="btn-card-action btn-delete" onclick="confirmarExclusao('{{ restaurante.id }}', '{{ restaurante.nome }}')" title="Excluir restaurante">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <h3 class="restaurante-nome">{{ restaurante.nome }}</h3>
+                <p class="restaurante-endereco">{{ restaurante.endereco or 'Endereço não informado' }}</p>
+            </div>
+            
+            <div class="restaurante-card-body">
+                <div class="restaurante-info">
+                    <div class="info-item">
+                        <span class="info-label">Telefone</span>
+                        <span class="info-value">{{ restaurante.telefone or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Status</span>
+                        <span class="info-value">{{ 'Ativo' if restaurante.ativo else 'Inativo' }}</span>
+                    </div>
+                </div>
+                
+                <div class="restaurante-actions">
+                    <a href="{{ url_for('alimentacao.lancamento_novo', restaurante_id=restaurante.id) }}" class="btn-action btn-primary-custom">
+                        <i class="fas fa-utensils"></i>
+                        Lançar
+                    </a>
+                    <a href="{{ url_for('alimentacao.restaurante_editar', restaurante_id=restaurante.id) }}" class="btn-action btn-outline-custom">
+                        <i class="fas fa-edit"></i>
+                        Editar
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="margin: 0 2rem 2rem 2rem;">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Nenhum restaurante cadastrado. Clique em "Novo Restaurante" para começar.
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function confirmarExclusao(restauranteId, restauranteNome) {
+    if (confirm(`Tem certeza que deseja excluir o restaurante "${restauranteNome}"?`)) {
+        window.location.href = `{{ url_for('alimentacao.restaurante_deletar', restaurante_id=0) }}`.replace('0', restauranteId);
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,345 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+console.log('Initializing Editar Restaurante with light theme...');
+</script>
+{% endblock %}
+
+{% block title %}Editar Restaurante - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA FORMULÁRIO (IDÊNTICO AO RDO) ===== */
+.restaurante-form-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.restaurante-form-container,
+.restaurante-form-container * {
+    color: #212529 !important;
+}
+
+.restaurante-form-container .card,
+.restaurante-form-container .form-container {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+.restaurante-form-container .form-control,
+.restaurante-form-container .form-select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #495057 !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL ===== */
+:root {
+    --primary-green: #198754;
+    --dark-green: #145a3e;
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+}
+
+.restaurante-form-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0;
+    background: #f8f9fa !important;
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ===== HEADER MODERNO COM GRADIENTE ===== */
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title h1 {
+    font-size: 3rem !important;
+    font-weight: 800 !important;
+    margin: 0;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.header-title p {
+    font-size: 1.25rem !important;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.35);
+    color: white;
+    text-decoration: none;
+    transform: translateY(-3px);
+}
+
+/* ===== FORMULÁRIO MODERNO ===== */
+.form-container {
+    background: #ffffff !important;
+    padding: 3rem;
+    border-radius: 24px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    margin: 0 2rem 3rem 2rem;
+    border: 1px solid #e5e7eb !important;
+    position: relative;
+}
+
+.form-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+    border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
+}
+
+.form-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.form-header i {
+    color: var(--primary-green);
+    font-size: 2rem;
+}
+
+.form-header h2 {
+    color: #374151;
+    font-weight: 700;
+    font-size: 1.75rem;
+    margin: 0;
+}
+
+.form-group {
+    margin-bottom: 2rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.form-group label.required::after {
+    content: ' *';
+    color: #dc3545;
+}
+
+.form-control, .form-select {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid #ced4da !important;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    transition: var(--transition);
+    background: #ffffff !important;
+    color: #495057 !important;
+}
+
+.form-control:focus, .form-select:focus {
+    outline: none;
+    border-color: var(--primary-green) !important;
+    box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.15);
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding-top: 2rem;
+    border-top: 2px solid #e5e7eb;
+}
+
+.btn {
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-success {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: 2rem;
+        text-align: center;
+    }
+    
+    .form-container {
+        margin: 0 1rem 2rem 1rem;
+        padding: 2rem 1.5rem;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="restaurante-form-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>✏️ Editar Restaurante</h1>
+                <p>Atualize as informações do fornecedor</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('alimentacao.restaurantes_lista') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="margin: 0 2rem 2rem 2rem;">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Formulário -->
+    <div class="form-container">
+        <div class="form-header">
+            <i class="fas fa-edit"></i>
+            <h2>Informações do Restaurante</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('alimentacao.restaurante_editar', restaurante_id=restaurante.id) }}">
+            {{ form.hidden_tag() if form else '' }}
+            
+            <div class="form-group">
+                <label for="nome" class="required">Nome do Restaurante</label>
+                <input type="text" class="form-control" id="nome" name="nome" required maxlength="200" 
+                       value="{{ restaurante.nome }}" placeholder="Digite o nome do restaurante">
+            </div>
+
+            <div class="form-group">
+                <label for="endereco">Endereço</label>
+                <textarea class="form-control" id="endereco" name="endereco" rows="3" 
+                          placeholder="Digite o endereço completo do restaurante">{{ restaurante.endereco or '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="telefone">Telefone</label>
+                <input type="text" class="form-control" id="telefone" name="telefone" maxlength="20" 
+                       value="{{ restaurante.telefone or '' }}" placeholder="(00) 0000-0000">
+            </div>
+
+            <div class="form-actions">
+                <a href="{{ url_for('alimentacao.restaurantes_lista') }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </a>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save"></i>
+                    Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

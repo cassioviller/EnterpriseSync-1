@@ -1,0 +1,418 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+console.log('Initializing Lançamentos with light theme...');
+</script>
+{% endblock %}
+
+{% block title %}Lançamentos de Alimentação - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA LANÇAMENTOS (IDÊNTICO AO RDO) ===== */
+.lancamentos-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.lancamentos-container,
+.lancamentos-container * {
+    color: #212529 !important;
+}
+
+.lancamentos-container .card,
+.lancamentos-container .table-container {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+.lancamentos-container .form-control,
+.lancamentos-container .form-select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #495057 !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL ===== */
+:root {
+    --primary-green: #198754;
+    --dark-green: #145a3e;
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+}
+
+.lancamentos-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0;
+    background: #f8f9fa !important;
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ===== HEADER MODERNO COM GRADIENTE ===== */
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title h1 {
+    font-size: 3rem !important;
+    font-weight: 800 !important;
+    margin: 0;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.header-title p {
+    font-size: 1.25rem !important;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-light {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-light:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: var(--primary-green);
+    color: var(--primary-green);
+    text-decoration: none;
+    transform: translateY(-3px);
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.35);
+    color: white;
+    text-decoration: none;
+    transform: translateY(-3px);
+}
+
+/* ===== TABELA RESPONSIVA ===== */
+.table-container {
+    background: #ffffff !important;
+    padding: 2rem;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    margin: 0 2rem 3rem 2rem;
+    border: 1px solid #e5e7eb !important;
+    position: relative;
+    overflow-x: auto;
+}
+
+.table-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+}
+
+.table {
+    width: 100%;
+    margin: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table thead {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.table thead th {
+    padding: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.875rem;
+    color: #374151 !important;
+    border-bottom: 2px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.table tbody td {
+    padding: 1rem;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151 !important;
+    vertical-align: middle;
+}
+
+.table tbody tr {
+    transition: var(--transition);
+}
+
+.table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.badge {
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.8125rem;
+}
+
+.badge-success {
+    background: #d1e7dd;
+    color: #0a3622;
+}
+
+.badge-primary {
+    background: #cfe2ff;
+    color: #084298;
+}
+
+.btn-action-small {
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 2px solid transparent;
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: var(--primary-green);
+    border-color: var(--primary-green);
+}
+
+.btn-outline-primary:hover {
+    background: var(--primary-green);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-outline-danger {
+    background: transparent;
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-outline-danger:hover {
+    background: #dc3545;
+    color: white;
+    text-decoration: none;
+}
+
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: 2rem;
+        text-align: center;
+    }
+    
+    .header-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .table-container {
+        margin: 0 1rem 2rem 1rem;
+        padding: 1rem;
+    }
+    
+    .table {
+        font-size: 0.875rem;
+    }
+    
+    .table thead th,
+    .table tbody td {
+        padding: 0.75rem 0.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="lancamentos-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>📋 Lançamentos de Alimentação</h1>
+                <p>Histórico completo de despesas com alimentação</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('alimentacao.lancamento_novo') }}" class="btn-light">
+                    <i class="fas fa-plus"></i>
+                    Novo Lançamento
+                </a>
+                <a href="{{ url_for('main.dashboard') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="margin: 0 2rem 2rem 2rem;">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Tabela de Lançamentos -->
+    <div class="table-container">
+        {% if lancamentos %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Restaurante</th>
+                    <th>Obra</th>
+                    <th>Nº Funcionários</th>
+                    <th>Valor Total</th>
+                    <th>Valor/Funcionário</th>
+                    <th>Descrição</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lancamento in lancamentos %}
+                <tr>
+                    <td>
+                        <strong>{{ lancamento.data.strftime('%d/%m/%Y') }}</strong>
+                    </td>
+                    <td>
+                        <span class="badge badge-success">
+                            {{ lancamento.restaurante.nome if lancamento.restaurante else 'N/A' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-primary">
+                            {{ lancamento.obra.nome if lancamento.obra else 'N/A' }}
+                        </span>
+                    </td>
+                    <td>
+                        <strong>{{ lancamento.funcionarios|length }}</strong>
+                    </td>
+                    <td>
+                        <strong style="color: #198754;">R$ {{ "%.2f"|format(lancamento.valor_total) }}</strong>
+                    </td>
+                    <td>
+                        {% if lancamento.funcionarios|length > 0 %}
+                        <strong>R$ {{ "%.2f"|format(lancamento.valor_total / lancamento.funcionarios|length) }}</strong>
+                        {% else %}
+                        <em style="color: #6c757d;">N/A</em>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <small style="color: #6c757d;">
+                            {{ lancamento.descricao[:50] + '...' if lancamento.descricao and lancamento.descricao|length > 50 else (lancamento.descricao or '-') }}
+                        </small>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="button" class="btn-action-small btn-outline-danger" 
+                                    onclick="confirmarExclusao('{{ lancamento.id }}', '{{ lancamento.data.strftime('%d/%m/%Y') }}')" 
+                                    title="Excluir lançamento">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Nenhum lançamento encontrado. Clique em "Novo Lançamento" para começar.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function confirmarExclusao(lancamentoId, data) {
+    if (confirm(`Tem certeza que deseja excluir o lançamento de ${data}?`)) {
+        // Implement delete action
+        window.location.href = `{{ url_for('alimentacao.lancamento_deletar', lancamento_id=0) }}`.replace('0', lancamentoId);
+    }
+}
+</script>
+{% endblock %}
