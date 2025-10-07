@@ -1,0 +1,51 @@
+Com certeza! Analisando o erro, o seu repositório e a informação sobre o Docker, preparei um prompt aprimorado e mais completo que você pode usar no Replit ou em outra ferramenta de IA para obter a correção precisa.
+
+### Prompt para o Replit:
+
+```
+Atue como um desenvolvedor full-stack sênior, especialista em Flask, SQLAlchemy e migrações de banco de dados com Docker.
+
+**O Problema:**
+Estou recebendo um erro de coluna inexistente ao tentar registrar o uso de um veículo no meu sistema de gestão de frotas. O deploy da aplicação é feito via Docker.
+
+**O Erro:**
+```
+(psycopg2.errors.UndefinedColumn) column "passageiros_frente" of relation "uso_veiculo" does not exist
+LINE 1: ...ora_retorno, km_inicial, km_final, km_percorrido, passageiro...
+```
+
+**Análise do Código-Fonte:**
+Analisando o repositório, identifiquei o seguinte:
+1.  O arquivo `models.py` contém a maioria dos modelos, mas os modelos relacionados a veículos (`UsoVeiculo`, `CustoVeiculo`, etc.) foram comentados com a anotação: `REMOVIDO - SERÁ REIMPLEMENTADO NA VERSÃO 2.0`.
+2.  Um novo arquivo, `fleet_models.py`, foi criado para gerenciar a frota, introduzindo novos modelos com nomes únicos para evitar conflitos, como `FleetVehicleUsage`.
+3.  O novo modelo `FleetVehicleUsage` (mapeado para a tabela `fleet_vehicle_usage`) contém os campos corretos: `front_passengers` e `rear_passengers`.
+4.  O erro mostra que a aplicação ainda tenta inserir dados na antiga tabela `uso_veiculo`, que provavelmente ainda existe no banco de dados do ambiente de desenvolvimento/produção, mas com uma estrutura diferente (sem as colunas de passageiros), ou o código que a utiliza não foi atualizado.
+
+**Tarefa:**
+Sua missão é refatorar o código que lida com o registro de uso de veículos para alinhá-lo com a nova estrutura de banco de dados definida em `fleet_models.py`.
+
+1.  **Localize a Rota:** Encontre a rota Flask (provavelmente em `fleet_routes.py` ou um arquivo de `views` relacionado) que processa o formulário de "novo uso de veículo".
+2.  **Remova a Lógica Antiga:** Substitua qualquer referência ao antigo modelo `UsoVeiculo`.
+3.  **Implemente a Nova Lógica:**
+    *   Importe o modelo `FleetVehicleUsage` do arquivo `fleet_models.py`.
+    *   Instancie o novo modelo `FleetVehicleUsage` com os dados recebidos do formulário.
+    *   Mapeie corretamente os campos do formulário para os novos campos do modelo. Por exemplo:
+        *   `request.form['passageiros_frente']` deve ir para `front_passengers`.
+        *   `request.form['passageiros_tras']` deve ir para `rear_passengers`.
+        *   `request.form['veiculo_id']` deve ir para `vehicle_id`.
+        *   E assim por diante para todos os outros campos.
+    *   Adicione o novo objeto à sessão do `db` e execute o `commit`.
+4.  **Forneça o Código Corrigido:** Apresente o bloco de código Python da rota Flask completamente corrigido.
+5.  **Explique as Alterações:** Descreva sucintamente as modificações realizadas e por que elas resolvem o problema.
+```
+
+---
+
+### Por que este prompt é mais eficaz:
+
+*   **Contexto de Deploy:** Menciona o Docker, o que sinaliza para a IA que o ambiente pode ter estados de banco de dados persistidos que não são automaticamente limpos, explicando por que a tabela antiga ainda pode existir.
+*   **Análise Precisa:** Aponta diretamente para a refatoração (`models.py` vs. `fleet_models.py`) como a causa raiz, economizando tempo de análise da IA.
+*   **Direcionamento Específico:** Em vez de ser genérico, o prompt guia a IA passo a passo sobre onde procurar (`fleet_routes.py`), o que remover (lógica antiga) и o que implementar (lógica nova com mapeamento de campos).
+*   **Clareza na Tarefa:** As instruções são numeradas e claras, funcionando como um checklist para a IA, o que aumenta a chance de uma resposta completa e correta na primeira tentativa.
+
+Use este prompt e você terá uma solução robusta e bem explicada para o seu problema.
