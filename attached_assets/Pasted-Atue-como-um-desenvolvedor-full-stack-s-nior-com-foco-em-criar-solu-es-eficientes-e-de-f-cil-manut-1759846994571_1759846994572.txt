@@ -1,0 +1,80 @@
+Atue como um desenvolvedor full-stack sênior, com foco em criar soluções eficientes e de fácil manutenção em Flask e SQLAlchemy.
+
+**Objetivo:**
+Refazer o módulo de "Alimentação" do sistema EnterpriseSync, criando a versão mais simples possível que atenda aos requisitos essenciais. O foco é a simplicidade na entrada de dados e na lógica do backend.
+
+**Requisitos Essenciais:**
+1.  **Layout Consistente:** A interface deve usar o mesmo estilo e componentes Bootstrap das páginas de RDO, Veículos e Funcionários.
+2.  **Gestão de Restaurantes:** Uma tela para cadastrar, editar e listar os restaurantes.
+3.  **Lançamento Simplificado:** Uma única tela para registrar uma despesa de alimentação.
+4.  **Rateio de Custo:** O valor total da despesa deve ser dividido igualmente entre todos os funcionários selecionados no lançamento.
+
+**Lógica de Funcionamento (Modelo Simplificado):**
+Para manter a simplicidade, não vamos gerenciar múltiplos "itens" (como marmita, refrigerante, etc.) dentro de um único lançamento. O usuário irá inserir o **valor total** da nota/recibo e poderá usar um campo de descrição para detalhar os itens, se desejar.
+
+**Exemplo da Lógica de Rateio:**
+*   Usuário lança uma despesa de **R$ 150,00**.
+*   Seleciona 3 funcionários: João, Maria e Pedro.
+*   O sistema irá registrar no backend que a despesa para cada um foi de **R$ 50,00** (150 / 3).
+
+**Estrutura de Banco de Dados (Schema Simplificado):**
+Proponho o seguinte schema com apenas duas tabelas principais e uma tabela de associação, o que é o mínimo necessário:
+
+```python
+# 1. Tabela para os Restaurantes (já deve existir, mas para garantir)
+class Restaurante(db.Model):
+    __tablename__ = 'restaurante'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False, unique=True)
+    endereco = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    # ... outros campos que julgar necessários (telefone, etc.)
+
+# Tabela de associação Many-to-Many entre Lançamentos e Funcionários
+alimentacao_funcionarios_assoc = db.Table('alimentacao_funcionarios_assoc',
+    db.Column('lancamento_id', db.Integer, db.ForeignKey('alimentacao_lancamento.id'), primary_key=True),
+    db.Column('funcionario_id', db.Integer, db.ForeignKey('funcionario.id'), primary_key=True)
+)
+
+# 2. Tabela para o Lançamento Principal da Despesa
+class AlimentacaoLancamento(db.Model):
+    __tablename__ = 'alimentacao_lancamento'
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.Date, nullable=False, index=True)
+    valor_total = db.Column(db.Numeric(10, 2), nullable=False)
+    descricao = db.Column(db.Text) # Campo simples para descrever a compra
+
+    # Chaves Estrangeiras
+    restaurante_id = db.Column(db.Integer, db.ForeignKey('restaurante.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+    # Relacionamento Many-to-Many com Funcionários
+    funcionarios = db.relationship('Funcionario',
+                                 secondary=alimentacao_funcionarios_assoc,
+                                 backref=db.backref('lancamentos_alimentacao', lazy='dynamic'),
+                                 lazy='dynamic')
+
+    # Propriedade para calcular o valor rateado (não é uma coluna no banco)
+    @property
+    def valor_por_funcionario(self):
+        num_funcionarios = self.funcionarios.count()
+        if not num_funcionarios or self.valor_total is None:
+            return 0
+        return self.valor_total / num_funcionarios
+```
+
+**Tarefa:**
+
+1.  **Modelos:** Implemente os modelos `Restaurante` e `AlimentacaoLancamento` e a tabela de associação `alimentacao_funcionarios_assoc` no seu `models.py` (ou arquivo similar).
+
+2.  **Rotas e Views (Flask):**
+    *   Crie as rotas para o CRUD completo de **Restaurantes** (`/restaurantes`, `/restaurantes/novo`, etc.).
+    *   Crie as rotas para os **Lançamentos de Alimentação**:
+        *   `GET /alimentacao`: Exibe uma tabela com os lançamentos (Data, Restaurante, Obra, Valor Total, Descrição).
+        *   `GET /alimentacao/novo`: Exibe um formulário simples para um novo lançamento.
+        *   `POST /alimentacao/novo`: Processa o formulário, salva o `AlimentacaoLancamento` e associa os múltiplos funcionários selecionados na tabela `alimentacao_funcionarios_assoc`.
+
+3.  **Templates (HTML):**
+    *   Crie os templates HTML para as telas de listagem e formulários, seguindo o padrão visual do restante do sistema.
+    *   No formulário de lançamento, use um campo `<select multiple>` padrão do HTML para a seleção dos funcionários. Não precisa de bibliotecas JavaScript complexas como Select2 para manter a simplicidade.
