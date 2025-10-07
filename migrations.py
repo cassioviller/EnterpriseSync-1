@@ -97,6 +97,16 @@ def executar_migracoes():
         
         # Migração 22: Adicionar colunas de passageiros em uso_veiculo
         adicionar_colunas_passageiros_uso_veiculo()
+        
+        # Migração 23: EMERGENCIAL - Recriar tabela uso_veiculo com schema correto
+        # BLOQUEADA POR SEGURANÇA - requer variável de ambiente ALLOW_DESTRUCTIVE_MIGRATION=true
+        if os.environ.get('ALLOW_DESTRUCTIVE_MIGRATION') == 'true':
+            recriar_tabela_uso_veiculo_emergencial()
+        else:
+            logger.info("🔒 Migração 23 (DROP TABLE) bloqueada por segurança - defina ALLOW_DESTRUCTIVE_MIGRATION=true para executar")
+        
+        # Migração 24: SEGURA - Adicionar colunas passageiros com tratamento robusto
+        adicionar_colunas_passageiros_robusto()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -2464,3 +2474,360 @@ def adicionar_colunas_passageiros_uso_veiculo():
                 connection.close()
             except:
                 pass
+
+def recriar_tabela_uso_veiculo_emergencial():
+    """
+    MIGRAÇÃO 23 EMERGENCIAL: Recriar tabela uso_veiculo com schema completo
+    
+    CONTEXTO:
+    - Migração 22 falhou silenciosamente em produção
+    - Tabela uso_veiculo existe mas sem colunas passageiros_frente e passageiros_tras
+    - Solução: DROP TABLE CASCADE + CREATE TABLE com schema completo
+    
+    ESTRATÉGIA:
+    1. DROP TABLE uso_veiculo CASCADE (remove tabela e dependências)
+    2. CREATE TABLE com todas as colunas (incluindo passageiros)
+    3. Recriar índices para performance
+    4. Recriar foreign keys com ON DELETE CASCADE
+    
+    PERDA DE DADOS: SIM - esta é uma migração destrutiva
+    Alternativa seria fazer backup, mas para desenvolvimento é aceitável
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🚨 MIGRAÇÃO 23 EMERGENCIAL: Recriar tabela uso_veiculo")
+        logger.info("=" * 80)
+        logger.info("⚠️  ATENÇÃO: Esta migração é DESTRUTIVA e vai excluir todos os dados de uso_veiculo")
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Detectar ambiente
+        cursor.execute("SELECT current_database()")
+        db_name = cursor.fetchone()[0]
+        
+        if 'neon' in db_name or 'localhost' in db_name:
+            ambiente = "🔧 DESENVOLVIMENTO"
+        else:
+            ambiente = "🚀 PRODUÇÃO"
+        
+        logger.info(f"📍 Ambiente detectado: {ambiente}")
+        logger.info(f"📍 Database: {db_name}")
+        
+        # PARTE 1: Verificar se precisa recriar
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name = 'passageiros_frente'
+        """)
+        
+        tem_passageiros = cursor.fetchone()
+        
+        if tem_passageiros:
+            logger.info("✅ Tabela uso_veiculo já tem as colunas de passageiros - migração não necessária")
+            cursor.close()
+            connection.close()
+            return
+        
+        logger.info("🔄 Tabela uso_veiculo precisa ser recriada...")
+        
+        # PARTE 2: Contar registros antes de excluir (para auditoria)
+        try:
+            cursor.execute("SELECT COUNT(*) FROM uso_veiculo")
+            total_registros = cursor.fetchone()[0]
+            logger.info(f"📊 Total de registros que serão perdidos: {total_registros}")
+        except Exception as e:
+            logger.warning(f"⚠️  Erro ao contar registros: {e}")
+            total_registros = 0
+        
+        # PARTE 3: DROP TABLE CASCADE
+        logger.info("🗑️  Executando DROP TABLE uso_veiculo CASCADE...")
+        cursor.execute("DROP TABLE IF EXISTS uso_veiculo CASCADE")
+        logger.info("✅ Tabela uso_veiculo excluída com sucesso!")
+        
+        # PARTE 4: CREATE TABLE com schema completo
+        logger.info("🏗️  Criando nova tabela uso_veiculo com schema completo...")
+        cursor.execute("""
+            CREATE TABLE uso_veiculo (
+                id SERIAL PRIMARY KEY,
+                
+                -- Relacionamentos principais
+                veiculo_id INTEGER NOT NULL,
+                funcionario_id INTEGER,
+                obra_id INTEGER,
+                
+                -- Dados do uso
+                data_uso DATE NOT NULL,
+                hora_saida TIME,
+                hora_retorno TIME,
+                
+                -- Quilometragem
+                km_inicial INTEGER,
+                km_final INTEGER,
+                km_percorrido INTEGER,
+                
+                -- PASSAGEIROS (NOVAS COLUNAS)
+                passageiros_frente TEXT,
+                passageiros_tras TEXT,
+                
+                -- Controle
+                responsavel_veiculo VARCHAR(100),
+                
+                -- Observações
+                observacoes TEXT,
+                
+                -- Multi-tenant (OBRIGATÓRIO)
+                admin_id INTEGER NOT NULL,
+                
+                -- Controle de tempo
+                created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        logger.info("✅ Tabela uso_veiculo criada com sucesso!")
+        
+        # PARTE 5: Criar foreign keys
+        logger.info("🔗 Criando foreign keys...")
+        
+        try:
+            cursor.execute("""
+                ALTER TABLE uso_veiculo 
+                ADD CONSTRAINT fk_uso_veiculo_veiculo 
+                FOREIGN KEY (veiculo_id) REFERENCES veiculo(id) 
+                ON DELETE CASCADE
+            """)
+            logger.info("✅ FK veiculo_id criada")
+        except Exception as e:
+            logger.warning(f"⚠️  FK veiculo_id: {e}")
+        
+        try:
+            cursor.execute("""
+                ALTER TABLE uso_veiculo 
+                ADD CONSTRAINT fk_uso_veiculo_funcionario 
+                FOREIGN KEY (funcionario_id) REFERENCES funcionario(id) 
+                ON DELETE SET NULL
+            """)
+            logger.info("✅ FK funcionario_id criada")
+        except Exception as e:
+            logger.warning(f"⚠️  FK funcionario_id: {e}")
+        
+        try:
+            cursor.execute("""
+                ALTER TABLE uso_veiculo 
+                ADD CONSTRAINT fk_uso_veiculo_obra 
+                FOREIGN KEY (obra_id) REFERENCES obra(id) 
+                ON DELETE SET NULL
+            """)
+            logger.info("✅ FK obra_id criada")
+        except Exception as e:
+            logger.warning(f"⚠️  FK obra_id: {e}")
+        
+        try:
+            cursor.execute("""
+                ALTER TABLE uso_veiculo 
+                ADD CONSTRAINT fk_uso_veiculo_admin 
+                FOREIGN KEY (admin_id) REFERENCES usuario(id) 
+                ON DELETE CASCADE
+            """)
+            logger.info("✅ FK admin_id criada")
+        except Exception as e:
+            logger.warning(f"⚠️  FK admin_id: {e}")
+        
+        # PARTE 6: Criar índices para performance
+        logger.info("📊 Criando índices...")
+        
+        try:
+            cursor.execute("""
+                CREATE INDEX idx_uso_veiculo_data_admin 
+                ON uso_veiculo(data_uso, admin_id)
+            """)
+            logger.info("✅ Índice data_uso + admin_id criado")
+        except Exception as e:
+            logger.warning(f"⚠️  Índice data_admin: {e}")
+        
+        try:
+            cursor.execute("""
+                CREATE INDEX idx_uso_veiculo_funcionario 
+                ON uso_veiculo(funcionario_id)
+            """)
+            logger.info("✅ Índice funcionario_id criado")
+        except Exception as e:
+            logger.warning(f"⚠️  Índice funcionario: {e}")
+        
+        try:
+            cursor.execute("""
+                CREATE INDEX idx_uso_veiculo_obra 
+                ON uso_veiculo(obra_id)
+            """)
+            logger.info("✅ Índice obra_id criado")
+        except Exception as e:
+            logger.warning(f"⚠️  Índice obra: {e}")
+        
+        try:
+            cursor.execute("""
+                CREATE INDEX idx_uso_veiculo_veiculo 
+                ON uso_veiculo(veiculo_id)
+            """)
+            logger.info("✅ Índice veiculo_id criado")
+        except Exception as e:
+            logger.warning(f"⚠️  Índice veiculo: {e}")
+        
+        # PARTE 7: Commit final
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 23 CONCLUÍDA COM SUCESSO!")
+        logger.info("=" * 80)
+        logger.info(f"📊 Registros perdidos: {total_registros}")
+        logger.info("✅ Tabela uso_veiculo recriada com schema completo")
+        logger.info("✅ Colunas passageiros_frente e passageiros_tras adicionadas")
+        logger.info("✅ Foreign keys criadas com CASCADE apropriado")
+        logger.info("✅ Índices criados para performance")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error(f"❌ ERRO CRÍTICO na Migração 23: {str(e)}")
+        logger.error("=" * 80)
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        
+        # RE-RAISE para não silenciar o erro
+        raise Exception(f"Migração 23 falhou: {str(e)}")
+
+def adicionar_colunas_passageiros_robusto():
+    """
+    MIGRAÇÃO 24 SEGURA: Adicionar colunas passageiros com tratamento robusto
+    
+    DIFERENÇA DA MIGRAÇÃO 22:
+    - Logging detalhado do SQL exato que está sendo executado
+    - Tratamento individual de cada coluna (não falha tudo se uma der erro)
+    - Commit explícito após cada ALTER TABLE
+    - Detecção de ambiente para diagnóstico
+    
+    ESTRATÉGIA:
+    1. Tentar adicionar passageiros_frente
+    2. Tentar adicionar passageiros_tras
+    3. Se ambos falharem, logar erro detalhado para diagnóstico manual
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🔒 MIGRAÇÃO 24 SEGURA: Adicionar colunas passageiros (robusto)")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Detectar ambiente
+        cursor.execute("SELECT current_database()")
+        db_name = cursor.fetchone()[0]
+        
+        if 'neon' in db_name or 'localhost' in db_name:
+            ambiente = "🔧 DESENVOLVIMENTO"
+        else:
+            ambiente = "🚀 PRODUÇÃO"
+        
+        logger.info(f"📍 Ambiente: {ambiente}")
+        logger.info(f"📍 Database: {db_name}")
+        
+        # COLUNA 1: passageiros_frente
+        logger.info("🔄 Verificando coluna passageiros_frente...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name = 'passageiros_frente'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("✅ Coluna passageiros_frente já existe")
+        else:
+            try:
+                sql_add_frente = "ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT"
+                logger.info(f"📝 SQL: {sql_add_frente}")
+                cursor.execute(sql_add_frente)
+                connection.commit()
+                logger.info("✅ Coluna passageiros_frente adicionada com sucesso!")
+            except Exception as e:
+                logger.error(f"❌ ERRO ao adicionar passageiros_frente: {e}")
+                logger.error(f"📋 SQL que falhou: {sql_add_frente}")
+                connection.rollback()
+                # Não re-raise - tentar a próxima coluna
+        
+        # COLUNA 2: passageiros_tras
+        logger.info("🔄 Verificando coluna passageiros_tras...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name = 'passageiros_tras'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("✅ Coluna passageiros_tras já existe")
+        else:
+            try:
+                sql_add_tras = "ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT"
+                logger.info(f"📝 SQL: {sql_add_tras}")
+                cursor.execute(sql_add_tras)
+                connection.commit()
+                logger.info("✅ Coluna passageiros_tras adicionada com sucesso!")
+            except Exception as e:
+                logger.error(f"❌ ERRO ao adicionar passageiros_tras: {e}")
+                logger.error(f"📋 SQL que falhou: {sql_add_tras}")
+                connection.rollback()
+                # Não re-raise - apenas logar
+        
+        # Verificação final
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'uso_veiculo' 
+            AND column_name IN ('passageiros_frente', 'passageiros_tras')
+            ORDER BY column_name
+        """)
+        colunas_adicionadas = cursor.fetchall()
+        
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        if len(colunas_adicionadas) == 2:
+            logger.info("✅ MIGRAÇÃO 24 CONCLUÍDA: Ambas as colunas de passageiros estão disponíveis!")
+        elif len(colunas_adicionadas) == 1:
+            logger.warning(f"⚠️  MIGRAÇÃO 24 PARCIAL: Apenas 1 coluna adicionada: {colunas_adicionadas[0][0]}")
+        else:
+            logger.error("❌ MIGRAÇÃO 24 FALHOU: Nenhuma coluna de passageiros foi adicionada")
+            logger.error("🔧 AÇÃO MANUAL NECESSÁRIA: Execute o seguinte SQL manualmente em produção:")
+            logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT;")
+            logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT;")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error(f"❌ ERRO CRÍTICO na Migração 24: {str(e)}")
+        logger.error("=" * 80)
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        
+        # NÃO re-raise - permitir que a aplicação continue
+        logger.warning("⚠️  Aplicação continuará rodando, mas funcionalidade de passageiros pode não funcionar")
