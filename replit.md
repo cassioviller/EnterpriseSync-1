@@ -35,42 +35,29 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
 -   **Dynamic PDF Generation:** Supports custom PDF headers, dynamic content pagination, and multi-category proposal display with subtotals.
 -   **Company Customization:** Allows dynamic branding with logo uploads and custom colors (primary, secondary, background) affecting public proposal portals and PDF outputs.
 -   **Drag-and-Drop Organization:** System for organizing proposals by dragging and dropping multiple templates, dynamically updating PDF output.
--   **Fleet Management System (Phase 1):** New vehicle management architecture with dual-phase rollout:
-    -   **Schema Alignment (Oct 2025):** CRITICAL alignment with production schema ensuring consistent use of `funcionario_id` across all environments.
-        - **Production Discovery:** Production database uses `funcionario_id` (NOT NULL) in `uso_veiculo` table, not `motorista_id`
-        - **Code Updates:** All Python models (models.py, views.py) updated to use `funcionario_id` consistently
-        - **Auto-Migration:** Migrations 20 and 21 automatically rename `motorista_id` → `funcionario_id` in development environments
-        - **Safety:** Completely idempotent, production (already correct) unchanged, development auto-corrects
-        - **Zero Downtime:** No manual intervention required, migrations handle cross-environment differences automatically
-    -   **Migration 20 (FIXED - Oct 2025):** Complete Fleet tables created (`fleet_vehicle`, `fleet_vehicle_usage`, `fleet_vehicle_cost`) with 100% data migration from legacy tables verified.
-        - **Critical Fix 1 (FK):** Foreign key creation moved to separate ALTER TABLE statements (Part 3.5) AFTER all tables exist, eliminating "vehicle_id constraint does not exist" production error
-        - **Critical Fix 2 (funcionario_id):** Part 4.5 verifies/renames to `funcionario_id` (production schema standard)
-        - **Architecture:** Tables created WITHOUT inline FKs → All tables exist → FKs added via ALTER TABLE → funcionario_id verified/renamed → Data migrated
-        - **Safety:** Each FK wrapped in try/except for resilience; single commit at end preserves atomicity; idempotent column creation
-        - **Monitoring:** Production should alert if any ALTER TABLE FK statement fails in logs
-    -   **Migration 21 (Schema Confirmation):** Confirms `funcionario_id` structure in legacy `uso_veiculo` table, renames `motorista_id` if found (development compatibility).
-    -   **Migration 22 (Passageiros - Oct 2025):** Adiciona colunas `passageiros_frente` e `passageiros_tras` (TEXT) na tabela `uso_veiculo` para registro de passageiros do veículo (IDs separados por vírgula).
-    -   **Migration 23 (Emergencial - DROP TABLE - BLOQUEADA):** Recria tabela `uso_veiculo` com schema correto. **BLOQUEADA POR SEGURANÇA** - requer `ALLOW_DESTRUCTIVE_MIGRATION=true` para executar. Não usar em produção sem backup completo.
-    -   **Migration 24 (Passageiros Robusto - Oct 2025):** Adiciona colunas `passageiros_frente` e `passageiros_tras` com estratégia robusta: tratamento individual por coluna, commits explícitos, logging detalhado do SQL, não interrompe aplicação em caso de falha. Fornece SQL manual se ALTER TABLE falhar.
-        - **Resiliência:** Não re-raise erros - aplicação continua mesmo se falhar
-        - **Diagnóstico:** Detecta ambiente (dev/prod), loga SQL exato executado
-        - **Fallback:** Se falhar, loga comandos SQL para execução manual no banco
-        - **Idempotência:** Verifica existência antes de adicionar cada coluna
-    -   **Phase 1 (Complete):** All critical fixes deployed, 100% automatic deployment achieved, production stabilized, schema alignment complete, legacy system operational with enhanced compatibility.
-    -   **Estratégia de Migração em 3 Camadas (Oct 2025):**
-        1. **Camada 1 (Migração 22):** Tentativa simples e idempotente de ALTER TABLE
-        2. **Camada 2 (Migração 23):** Solução destrutiva (DROP TABLE) - bloqueada por feature flag
-        3. **Camada 3 (Migração 24):** Solução robusta com fallback manual e logging detalhado
-        - **Resultado:** Zero downtime garantido, aplicação sempre inicia, logs guiam correção manual se necessário
-    -   **Migration 25 (ULTRA-ROBUSTA - SQL Puro - Oct 2025):** Solução definitiva para garantir colunas passageiros em produção usando SQL nativo do PostgreSQL.
-        - **Tecnologia:** Blocos DO com IF NOT EXISTS emulado (compatível PostgreSQL 9.0+)
-        - **Vantagens:** Execução direta no banco (não passa por ORM), commits separados por coluna, absolutamente idempotente
-        - **Logging:** Detecta ambiente (dev/prod), mostra SQL exato executado, confirma colunas criadas
-        - **Segurança:** Não re-raise erros, aplicação continua mesmo se falhar, fornece SQL para execução manual
-        - **Status:** ✅ Testado e aprovado em desenvolvimento, pronto para produção
-    -   **Phase 2 (Pending):** Gradual migration of 27+ routes in views.py from legacy models to FleetService using feature flag system.
-    -   **Idempotent Migration:** All migrations prevent data duplication using NOT EXISTS guards; verified counts: 1 vehicle, 3 usage records, 5 cost records all successfully migrated.
-    -   **Deployment Strategy:** Zero manual intervention required - all migrations run automatically on application startup in both development and production environments.
+-   **Fleet Management System (REESCRITO - Oct 2025):** Sistema de veículos completamente reescrito com nova arquitetura devido a falhas persistentes de migração em produção.
+    -   **NOVA ARQUITETURA (Outubro 2025):**
+        - **Modelos Novos:** `FrotaVeiculo`, `FrotaUtilizacao`, `FrotaDespesa` (models.py)
+        - **Tabelas Novas:** `frota_veiculo`, `frota_utilizacao`, `frota_despesa`
+        - **Blueprint Novo:** `frota_bp` (frota_views.py) com rotas `/frota/*`
+        - **Frontend:** 23 url_for() atualizados em 7 templates (`main.veiculos*` → `frota.*`)
+        - **Campos:** 100% idênticos às tabelas antigas, incluindo `passageiros_frente` e `passageiros_tras`
+        - **Multi-tenant:** Todos os modelos incluem `admin_id NOT NULL` com isolamento completo
+    -   **Migration 26 (LIMPEZA - Oct 2025):** DROP CASCADE de todas as tabelas antigas do sistema de veículos.
+        - **Tabelas Removidas:** `veiculo`, `uso_veiculo`, `custo_veiculo`, `fleet_vehicle`, `fleet_vehicle_usage`, `fleet_vehicle_cost`
+        - **Feature Flag:** Requer `DROP_OLD_VEHICLE_TABLES=true` para executar (bloqueada por padrão)
+        - **Processo:** Verifica existência → DROP CASCADE → Commit → Logging detalhado
+        - **Segurança:** Idempotente, não re-raise erros, aplicação continua mesmo se falhar
+        - **Status:** ✅ Pronta para ativação após validação funcional
+    -   **HISTÓRICO DE MIGRAÇÕES ANTIGAS (Outubro 2025):**
+        - **Migrações 20-25:** Tentativas de adicionar colunas passageiros em `uso_veiculo` - TODAS FALHARAM em produção
+        - **Problema Root:** Schema inconsistente entre dev/prod impossibilitou ALTER TABLE confiável
+        - **Solução Final:** Reescrita completa do backend com novos nomes (Frota*) em vez de migrações
+    -   **Status Atual (Out 2025):**
+        - ✅ Sistema Frota* funcionando (tabelas frota_*)
+        - ⏸️  Tabelas antigas coexistem (migração 26 bloqueada)
+        - 🎯 Próximo passo: Ativar `DROP_OLD_VEHICLE_TABLES=true` após validação
+    -   **Deployment Strategy:** 100% automático, zero intervenção manual, feature flag garante segurança.
 
 ## External Dependencies
 -   **Flask:** Web framework.
