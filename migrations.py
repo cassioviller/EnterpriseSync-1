@@ -110,6 +110,13 @@ def executar_migracoes():
         
         # Migração 25: ULTRA-ROBUSTA - SQL Puro para garantir colunas passageiros
         adicionar_passageiros_sql_puro()
+        
+        # Migração 26: LIMPEZA - DROP tabelas antigas do sistema de veículos
+        # BLOQUEADA POR SEGURANÇA - requer variável de ambiente DROP_OLD_VEHICLE_TABLES=true
+        if os.environ.get('DROP_OLD_VEHICLE_TABLES') == 'true':
+            drop_tabelas_veiculos_antigas()
+        else:
+            logger.info("🔒 Migração 26 (DROP tabelas antigas) bloqueada - defina DROP_OLD_VEHICLE_TABLES=true para executar")
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -2976,3 +2983,111 @@ def adicionar_passageiros_sql_puro():
         
         # NÃO re-raise - permitir que a aplicação continue
         logger.error("⚠️  Aplicação continuará rodando, mas registro de uso de veículo FALHARÁ")
+
+def drop_tabelas_veiculos_antigas():
+    """
+    MIGRAÇÃO 26: DROP das tabelas antigas do sistema de veículos
+    
+    ⚠️  MIGRAÇÃO DESTRUTIVA - REMOVE PERMANENTEMENTE:
+    - uso_veiculo
+    - custo_veiculo
+    - veiculo
+    - fleet_vehicle_usage
+    - fleet_vehicle_cost
+    - fleet_vehicle
+    
+    Após esta migração, apenas FrotaVeiculo, FrotaUtilizacao e FrotaDespesa existirão.
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🗑️  MIGRAÇÃO 26: DROP DE TABELAS ANTIGAS DO SISTEMA DE VEÍCULOS")
+        logger.info("=" * 80)
+        logger.warning("⚠️  ATENÇÃO: Esta migração é DESTRUTIVA e IRREVERSÍVEL!")
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Detectar ambiente
+        cursor.execute("SELECT current_database()")
+        db_name = cursor.fetchone()[0]
+        logger.info(f"📍 Database: {db_name}")
+        
+        # Lista de tabelas para remover (ordem importa por causa de FKs)
+        tabelas_para_remover = [
+            'uso_veiculo',
+            'custo_veiculo', 
+            'veiculo',
+            'fleet_vehicle_usage',
+            'fleet_vehicle_cost',
+            'fleet_vehicle'
+        ]
+        
+        tabelas_removidas = []
+        tabelas_nao_encontradas = []
+        
+        for tabela in tabelas_para_remover:
+            # Verificar se tabela existe
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = %s
+                )
+            """, (tabela,))
+            
+            existe = cursor.fetchone()[0]
+            
+            if existe:
+                try:
+                    sql_drop = f"DROP TABLE {tabela} CASCADE"
+                    logger.info(f"🗑️  Executando: {sql_drop}")
+                    cursor.execute(sql_drop)
+                    connection.commit()
+                    tabelas_removidas.append(tabela)
+                    logger.info(f"✅ Tabela {tabela} removida com sucesso!")
+                except Exception as e:
+                    logger.error(f"❌ Erro ao remover tabela {tabela}: {e}")
+                    connection.rollback()
+            else:
+                tabelas_nao_encontradas.append(tabela)
+                logger.info(f"ℹ️  Tabela {tabela} não existe (já foi removida ou nunca existiu)")
+        
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("📊 RESUMO DA MIGRAÇÃO 26:")
+        logger.info(f"   ✅ Tabelas removidas: {len(tabelas_removidas)}")
+        if tabelas_removidas:
+            for t in tabelas_removidas:
+                logger.info(f"      - {t}")
+        
+        logger.info(f"   ℹ️  Tabelas não encontradas: {len(tabelas_nao_encontradas)}")
+        if tabelas_nao_encontradas:
+            for t in tabelas_nao_encontradas:
+                logger.info(f"      - {t}")
+        
+        logger.info("")
+        logger.info("✅ MIGRAÇÃO 26 CONCLUÍDA!")
+        logger.info("🎯 Sistema de veículos agora usa apenas:")
+        logger.info("   - frota_veiculo")
+        logger.info("   - frota_utilizacao")
+        logger.info("   - frota_despesa")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error("=" * 80)
+        logger.error(f"❌ ERRO CRÍTICO na Migração 26: {str(e)}")
+        logger.error("=" * 80)
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        
+        # NÃO re-raise - permitir que a aplicação continue
+        logger.error("⚠️  Aplicação continuará rodando, mas tabelas antigas podem ainda existir")
