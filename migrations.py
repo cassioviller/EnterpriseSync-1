@@ -280,8 +280,9 @@ def _migration_20_unified_vehicle_system():
             veiculos_migrados = cursor.rowcount
             logger.info(f"✅ {veiculos_migrados} veículos migrados")
             
-            # Atualizar sequence
-            cursor.execute("SELECT setval('vehicle_id_seq', (SELECT MAX(id) FROM vehicle))")
+            # Atualizar sequence com NULL safety
+            cursor.execute("SELECT setval('vehicle_id_seq', COALESCE((SELECT MAX(id) FROM vehicle), 1))")
+            logger.info("✅ Sequence vehicle_id_seq atualizada com NULL safety")
             
             # 4.2 - Migrar frota_utilizacao → vehicle_usage
             if 'frota_utilizacao' in tabelas_existentes:
@@ -298,6 +299,10 @@ def _migration_20_unified_vehicle_system():
                 """)
                 usos_migrados = cursor.rowcount
                 logger.info(f"✅ {usos_migrados} usos migrados")
+                
+                # Atualizar sequence com NULL safety
+                cursor.execute("SELECT setval('vehicle_usage_id_seq', COALESCE((SELECT MAX(id) FROM vehicle_usage), 1))")
+                logger.info("✅ Sequence vehicle_usage_id_seq atualizada com NULL safety")
             
             # 4.3 - Migrar frota_despesa → vehicle_expense
             if 'frota_despesa' in tabelas_existentes:
@@ -316,6 +321,10 @@ def _migration_20_unified_vehicle_system():
                 """)
                 despesas_migradas = cursor.rowcount
                 logger.info(f"✅ {despesas_migradas} despesas migradas")
+                
+                # Atualizar sequence com NULL safety
+                cursor.execute("SELECT setval('vehicle_expense_id_seq', COALESCE((SELECT MAX(id) FROM vehicle_expense), 1))")
+                logger.info("✅ Sequence vehicle_expense_id_seq atualizada com NULL safety")
         
         elif tabelas_origem == 'antigas':
             logger.info("📋 PASSO 4: Migrando dados tabelas antigas → vehicle_*...")
