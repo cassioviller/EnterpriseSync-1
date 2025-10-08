@@ -298,6 +298,7 @@ console.log('Initializing Detalhes Veículo with light theme...');
                                 <th>KM</th>
                                 <th>Obra</th>
                                 <th>Observações</th>
+                                <th style="width: 100px;">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -320,6 +321,18 @@ console.log('Initializing Detalhes Veículo with light theme...');
                                 </td>
                                 <td>{{ uso.obra.nome if uso.obra else 'Uso geral' }}</td>
                                 <td>{{ uso.observacoes[:50] + '...' if uso.observacoes and uso.observacoes|length > 50 else (uso.observacoes or '--') }}</td>
+                                <td onclick="event.stopPropagation();">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ url_for('frota.editar_uso', uso_id=uso.id) }}" class="btn btn-outline-primary btn-sm" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('frota.deletar_uso', uso_id=uso.id) }}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este uso?');">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
                             </tr>
                             
                             <!-- Modal com detalhes completos do uso -->
@@ -423,6 +436,7 @@ console.log('Initializing Detalhes Veículo with light theme...');
                                 <th>Valor</th>
                                 <th>Fornecedor</th>
                                 <th>Status</th>
+                                <th style="width: 100px;">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -437,6 +451,18 @@ console.log('Initializing Detalhes Veículo with light theme...');
                                     <span class="badge bg-{{ 'success' if custo.status_pagamento == 'Pago' else 'warning' if custo.status_pagamento == 'Pendente' else 'danger' }}">
                                         {{ custo.status_pagamento }}
                                     </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ url_for('frota.editar_custo', custo_id=custo.id) }}" class="btn btn-outline-primary btn-sm" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="{{ url_for('frota.deletar_custo', custo_id=custo.id) }}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este custo?');">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
