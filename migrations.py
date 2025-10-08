@@ -155,14 +155,29 @@ def _migration_28_migrar_dados_frota():
         
         # 3. Migrar custos: custo_veiculo → frota_despesa
         logger.info("📋 PARTE 3: Migrando custo_veiculo → frota_despesa...")
+        # Primeiro, adicionar coluna obra_id se não existir
+        db.session.execute(text("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'frota_despesa' AND column_name = 'obra_id'
+                ) THEN
+                    ALTER TABLE frota_despesa ADD COLUMN obra_id INTEGER REFERENCES obra(id);
+                END IF;
+            END $$;
+        """))
+        
+        # Agora migrar os dados incluindo obra_id e observacoes
         db.session.execute(text("""
             INSERT INTO frota_despesa (
-                veiculo_id, data_custo, tipo_custo, valor, descricao, fornecedor,
-                data_vencimento, status_pagamento, forma_pagamento, km_veiculo,
-                obra_id, observacoes, admin_id
+                veiculo_id, obra_id, data_custo, tipo_custo, valor, descricao, fornecedor,
+                data_vencimento, status_pagamento, forma_pagamento, km_veiculo, 
+                observacoes, admin_id
             )
             SELECT 
                 fv.id,  -- Mapear veiculo_id antigo para frota_veiculo.id novo
+                cv.obra_id,
                 cv.data_custo,
                 cv.tipo_custo,
                 cv.valor,
@@ -172,7 +187,6 @@ def _migration_28_migrar_dados_frota():
                 cv.status_pagamento,
                 cv.forma_pagamento,
                 cv.km_veiculo,
-                cv.obra_id,
                 cv.observacoes,
                 cv.admin_id
             FROM custo_veiculo cv

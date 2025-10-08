@@ -3405,6 +3405,7 @@ class FrotaDespesa(db.Model):
     
     # Relacionamento principal
     veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # Custo pode estar associado a uma obra
     
     # Dados do custo
     data_custo = db.Column(db.Date, nullable=False)
