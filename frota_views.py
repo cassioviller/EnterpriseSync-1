@@ -314,6 +314,43 @@ def editar(id):
         return redirect(url_for('frota.detalhes', id=id))
 
 
+# ===== ROTA: REATIVAR VEÍCULO INATIVO =====
+@frota_bp.route('/<int:id>/reativar', methods=['POST'])
+@login_required
+def reativar(id):
+    """Reativar um veículo inativo"""
+    try:
+        print(f"🚗 [FROTA_REATIVAR] Reativando veículo ID {id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar veículo inativo
+        veiculo = FrotaVeiculo.query.filter_by(id=id, admin_id=tenant_admin_id, ativo=False).first()
+        if not veiculo:
+            flash('Veículo não encontrado ou já está ativo.', 'error')
+            return redirect(url_for('frota.lista'))
+        
+        # Reativar
+        veiculo.ativo = True
+        veiculo.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash(f'Veículo {veiculo.placa} reativado com sucesso!', 'success')
+        print(f"✅ [FROTA_REATIVAR] Veículo {veiculo.placa} reativado")
+        
+        return redirect(url_for('frota.lista'))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ [FROTA_REATIVAR] Erro: {str(e)}")
+        flash(f'Erro ao reativar veículo: {str(e)}', 'error')
+        return redirect(url_for('frota.lista'))
+
+
 # ===== ROTA: NOVO USO DE VEÍCULO DA FROTA =====
 @frota_bp.route('/<int:veiculo_id>/uso/novo', methods=['GET', 'POST'])
 @login_required

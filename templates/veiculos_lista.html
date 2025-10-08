@@ -614,6 +614,17 @@ console.log('Initializing Veículos with light theme...');
                     <i class="fas fa-plus"></i>
                     Novo Veículo
                 </a>
+                {% if filtros_aplicados.get('status') == 'inativo' %}
+                <a href="{{ url_for('frota.lista') }}" class="btn-light" style="background: #6c757d;">
+                    <i class="fas fa-eye"></i>
+                    Mostrar Ativos
+                </a>
+                {% else %}
+                <a href="{{ url_for('frota.lista', status='inativo') }}" class="btn-light" style="background: #dc3545;">
+                    <i class="fas fa-eye-slash"></i>
+                    Mostrar Inativos
+                </a>
+                {% endif %}
                 <a href="{{ url_for('main.dashboard') }}" class="btn-voltar">
                     <i class="fas fa-arrow-left"></i>
                     Dashboard
@@ -637,7 +648,12 @@ console.log('Initializing Veículos with light theme...');
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
-                <h3 class="veiculo-placa">{{ veiculo.placa }}</h3>
+                <h3 class="veiculo-placa">
+                    {{ veiculo.placa }}
+                    {% if not veiculo.ativo %}
+                    <span style="background: #dc3545; color: white; font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 8px; margin-left: 0.5rem; font-weight: 600;">INATIVO</span>
+                    {% endif %}
+                </h3>
                 <p class="veiculo-modelo">{{ veiculo.marca }} {{ veiculo.modelo }}</p>
             </div>
             
@@ -662,6 +678,16 @@ console.log('Initializing Veículos with light theme...');
                 </div>
                 
                 <div class="veiculo-actions">
+                    {% if not veiculo.ativo %}
+                    <!-- Veículo Inativo - Mostrar botão de reativar -->
+                    <form method="POST" action="{{ url_for('frota.reativar', id=veiculo.id) }}" style="flex: 1;">
+                        <button type="submit" class="btn-action btn-primary-custom" style="width: 100%; background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                            <i class="fas fa-check-circle"></i>
+                            Reativar Veículo
+                        </button>
+                    </form>
+                    {% else %}
+                    <!-- Veículo Ativo - Ações normais -->
                     <a href="{{ url_for('frota.detalhes', id=veiculo.id) }}" class="btn-action btn-primary-custom">
                         <i class="fas fa-eye"></i>
                         Detalhes
@@ -674,6 +700,7 @@ console.log('Initializing Veículos with light theme...');
                         <i class="fas fa-money-bill-wave"></i>
                         Custo
                     </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
