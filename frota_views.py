@@ -70,6 +70,9 @@ def lista():
                 query = query.filter_by(ativo=True)
             elif filtros['status'] == 'inativo':
                 query = query.filter_by(ativo=False)
+        else:
+            # ✅ CORREÇÃO: Por padrão, mostrar apenas veículos ativos
+            query = query.filter_by(ativo=True)
         
         if filtros.get('tipo'):
             query = query.filter_by(tipo=filtros['tipo'])
