@@ -57,6 +57,8 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
         - ✅ Sistema Frota* funcionando (tabelas frota_*)
         - ⏸️  Tabelas antigas coexistem (migração 26 bloqueada)
         - 🎯 Próximo passo: Ativar `DROP_OLD_VEHICLE_TABLES=true` após validação
+        - ✅ Redirecionamentos: `/veiculos` → `/frota` (HTTP 307 preserva POST)
+        - ✅ Entrypoint produção atualizado (Outubro 2025): health check verifica tabelas frota_*
     -   **Deployment Strategy:** 100% automático, zero intervenção manual, feature flag garante segurança.
 
 ## External Dependencies

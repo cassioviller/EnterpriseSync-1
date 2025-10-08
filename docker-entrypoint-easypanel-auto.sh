@@ -158,84 +158,9 @@ try:
             log_migration(f'⚠️ Erro em migrações customizadas: {e}')
             log_migration('🔄 Continuando com aplicação...')
         
-        # CRÍTICO: Executar limpeza de veículos SEMPRE
-        log_migration('🚗 EXECUTANDO LIMPEZA DE VEÍCULOS (OBRIGATÓRIA)')
-        try:
-            # Forçar execução independente da flag
-            os.environ['RUN_CLEANUP_VEICULOS'] = '1'
-            
-            from migration_cleanup_veiculos_production import run_migration_if_needed
-            cleanup_success = run_migration_if_needed()
-            
-            if cleanup_success:
-                log_migration('✅ Limpeza de veículos executada com sucesso')
-            else:
-                log_migration('⚠️ Limpeza de veículos não foi necessária ou falhou')
-                
-        except ImportError:
-            log_migration('⚠️ Módulo de limpeza de veículos não encontrado')
-        except Exception as e:
-            log_migration(f'❌ Erro na limpeza de veículos: {e}')
-            log_migration('🔄 Continuando - erro não é crítico para app')
-        
-        # CRÍTICO: Executar correção detalhes uso SEMPRE (Fase 22/09/2025)
-        log_migration('🔧 EXECUTANDO CORREÇÃO: Modal Detalhes Uso (OBRIGATÓRIA)')
-        try:
-            exec(open('/app/fix_detalhes_uso_production.py').read())
-            log_migration('✅ Correção modal detalhes uso executada com sucesso')
-        except FileNotFoundError:
-            log_migration('⚠️ Script de correção não encontrado em /app/')
-            try:
-                exec(open('./fix_detalhes_uso_production.py').read())
-                log_migration('✅ Correção modal detalhes uso executada (local)')
-            except Exception as e2:
-                log_migration(f'⚠️ Erro na correção detalhes uso: {e2}')
-        except Exception as e:
-            log_migration(f'❌ Erro na correção detalhes uso: {e}')
-            log_migration('🔄 Continuando - erro não é crítico para app')
-        
-        # CRÍTICO: Deploy do Módulo Veículos V2.0 SEMPRE (Fase 23/09/2025)
-        log_migration('🚗 EXECUTANDO DEPLOY: Módulo Veículos V2.0 Completo (OBRIGATÓRIO)')
-        try:
-            import sys
-            sys.path.append('/app')
-            
-            # ✅ CORREÇÃO: Import direto com tratamento robusto
-            try:
-                from deploy_veiculos_v2_production import executar_deploy_veiculos_v2
-                resultado = executar_deploy_veiculos_v2()
-                if resultado:
-                    log_migration('✅ Deploy módulo veículos v2.0 executado com sucesso')
-                else:
-                    log_migration('⚠️ Deploy veículos v2.0 não foi necessário')
-            except ImportError:
-                log_migration('⚠️ Módulo deploy_veiculos_v2_production não encontrado')
-                # Fallback: exec do arquivo
-                exec(open('/app/deploy_veiculos_v2_production.py').read())
-                log_migration('✅ Deploy módulo veículos v2.0 executado via fallback')
-        except FileNotFoundError:
-            log_migration('⚠️ Script de deploy veículos v2.0 não encontrado')
-        except Exception as e:
-            log_migration(f'❌ Erro no deploy veículos v2.0: {e}')
-            import traceback
-            log_migration(f'📝 Stack trace: {traceback.format_exc()}')
-            log_migration('🔄 Continuando - deploy concluído com avisos')
-        
-        # CRÍTICO: Correção Constraints Veículos SEMPRE (Fase 29/09/2025)
-        log_migration('🔧 EXECUTANDO CORREÇÃO: Constraints Veículos (OBRIGATÓRIA)')
-        try:
-            exec(open('/app/fix_veiculo_constraints_production.py').read())
-            log_migration('✅ Correção constraints veículos executada com sucesso')
-        except FileNotFoundError:
-            log_migration('⚠️ Script de correção constraints não encontrado')
-            try:
-                exec(open('./fix_veiculo_constraints_production.py').read())
-                log_migration('✅ Correção constraints executada (local)')
-            except Exception as e2:
-                log_migration(f'⚠️ Erro na correção constraints local: {e2}')
-        except Exception as e:
-            log_migration(f'❌ Erro na correção constraints: {e}')
-            log_migration('🔄 Continuando - erro não é crítico para app')
+        # ✅ SISTEMA FROTA: Migrações automáticas via migrations.py
+        log_migration('🚗 Sistema de Frota: Migrações via migrations.py já executadas')
+        log_migration('✅ Tabelas Frota (frota_veiculo, frota_utilizacao, frota_despesa) gerenciadas automaticamente')
         
         log_migration('✅ TODAS AS MIGRAÇÕES PROCESSADAS COM SUCESSO')
         
@@ -321,7 +246,8 @@ try:
             inspector = inspect(db.engine)
             tabelas_existentes = inspector.get_table_names()
             
-            tabelas_essenciais = ['veiculo', 'uso_veiculo', 'custo_veiculo', 'passageiro_veiculo']
+            # ✅ ATUALIZADO: Tabelas do sistema FROTA (Outubro 2025)
+            tabelas_essenciais = ['frota_veiculo', 'frota_utilizacao', 'frota_despesa']
             tabelas_obsoletas = ['alocacao_veiculo', 'equipe_veiculo', 'transferencia_veiculo', 'manutencao_veiculo', 'alerta_veiculo']
             
             # Verificar essenciais
