@@ -84,489 +84,195 @@ def _migration_27_alimentacao_system():
         import traceback
         logger.error(traceback.format_exc())
 
-def _migration_28_migrar_dados_frota():
+def _migration_20_unified_vehicle_system():
     """
-    Migration 28: Migrar dados das tabelas antigas (veiculo, uso_veiculo, custo_veiculo) 
-    para as novas tabelas Frota (frota_veiculo, frota_utilizacao, frota_despesa)
-    """
-    logger.info("=" * 80)
-    logger.info("🚗 MIGRAÇÃO 28: Migrar dados para sistema Frota")
-    logger.info("=" * 80)
+    MIGRAÇÃO 20 UNIFICADA: Sistema de Veículos Inteligente
     
-    try:
-        # 1. Migrar veículos: veiculo → frota_veiculo
-        logger.info("📋 PARTE 1: Migrando veiculo → frota_veiculo...")
-        db.session.execute(text("""
-            INSERT INTO frota_veiculo (
-                placa, marca, modelo, ano, tipo, km_atual, cor, 
-                chassi, renavam, combustivel, ativo, admin_id
-            )
-            SELECT 
-                placa, marca, modelo, ano, 
-                COALESCE(tipo, 'Utilitário'),
-                COALESCE(km_atual, 0),
-                cor, chassi, renavam,
-                COALESCE(combustivel, 'Gasolina'),
-                COALESCE(ativo, true),
-                admin_id
-            FROM veiculo
-            WHERE admin_id IS NOT NULL
-            AND placa NOT IN (SELECT placa FROM frota_veiculo WHERE admin_id = veiculo.admin_id)
-        """))
-        veiculos_migrados = db.session.execute(text("SELECT COUNT(*) FROM frota_veiculo")).scalar()
-        logger.info(f"✅ {veiculos_migrados} veículos na tabela frota_veiculo")
-        
-        # 2. Migrar usos: uso_veiculo → frota_utilizacao
-        logger.info("📋 PARTE 2: Migrando uso_veiculo → frota_utilizacao...")
-        db.session.execute(text("""
-            INSERT INTO frota_utilizacao (
-                veiculo_id, funcionario_id, obra_id, data_uso, hora_saida, hora_retorno,
-                km_inicial, km_final, km_percorrido, passageiros_frente, passageiros_tras,
-                responsavel_veiculo, observacoes, admin_id
-            )
-            SELECT 
-                fv.id,  -- Mapear veiculo_id antigo para frota_veiculo.id novo
-                uv.funcionario_id,
-                uv.obra_id,
-                uv.data_uso,
-                uv.hora_saida,
-                uv.hora_retorno,
-                uv.km_inicial,
-                uv.km_final,
-                uv.km_percorrido,
-                uv.passageiros_frente,
-                uv.passageiros_tras,
-                uv.responsavel_veiculo,
-                uv.observacoes,
-                uv.admin_id
-            FROM uso_veiculo uv
-            INNER JOIN veiculo v ON uv.veiculo_id = v.id
-            INNER JOIN frota_veiculo fv ON fv.placa = v.placa AND fv.admin_id = v.admin_id
-            WHERE uv.admin_id IS NOT NULL
-            AND NOT EXISTS (
-                SELECT 1 FROM frota_utilizacao fu 
-                WHERE fu.veiculo_id = fv.id 
-                AND fu.data_uso = uv.data_uso 
-                AND fu.admin_id = uv.admin_id
-            )
-        """))
-        usos_migrados = db.session.execute(text("SELECT COUNT(*) FROM frota_utilizacao")).scalar()
-        logger.info(f"✅ {usos_migrados} usos na tabela frota_utilizacao")
-        
-        # 3. Migrar custos: custo_veiculo → frota_despesa
-        logger.info("📋 PARTE 3: Migrando custo_veiculo → frota_despesa...")
-        # Primeiro, adicionar coluna obra_id se não existir
-        db.session.execute(text("""
-            DO $$ 
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_name = 'frota_despesa' AND column_name = 'obra_id'
-                ) THEN
-                    ALTER TABLE frota_despesa ADD COLUMN obra_id INTEGER REFERENCES obra(id);
-                END IF;
-            END $$;
-        """))
-        
-        # Agora migrar os dados incluindo obra_id e observacoes
-        db.session.execute(text("""
-            INSERT INTO frota_despesa (
-                veiculo_id, obra_id, data_custo, tipo_custo, valor, descricao, fornecedor,
-                data_vencimento, status_pagamento, forma_pagamento, km_veiculo, 
-                observacoes, admin_id
-            )
-            SELECT 
-                fv.id,  -- Mapear veiculo_id antigo para frota_veiculo.id novo
-                cv.obra_id,
-                cv.data_custo,
-                cv.tipo_custo,
-                cv.valor,
-                cv.descricao,
-                cv.fornecedor,
-                cv.data_vencimento,
-                cv.status_pagamento,
-                cv.forma_pagamento,
-                cv.km_veiculo,
-                cv.observacoes,
-                cv.admin_id
-            FROM custo_veiculo cv
-            INNER JOIN veiculo v ON cv.veiculo_id = v.id
-            INNER JOIN frota_veiculo fv ON fv.placa = v.placa AND fv.admin_id = v.admin_id
-            WHERE cv.admin_id IS NOT NULL
-            AND NOT EXISTS (
-                SELECT 1 FROM frota_despesa fd 
-                WHERE fd.veiculo_id = fv.id 
-                AND fd.data_custo = cv.data_custo 
-                AND fd.admin_id = cv.admin_id
-            )
-        """))
-        custos_migrados = db.session.execute(text("SELECT COUNT(*) FROM frota_despesa")).scalar()
-        logger.info(f"✅ {custos_migrados} custos na tabela frota_despesa")
-        
-        db.session.commit()
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 28 CONCLUÍDA: Dados migrados para sistema Frota!")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"❌ Erro na migração 28: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-
-
-def corrigir_estrutura_frota_despesa():
-    """
-    MIGRAÇÃO 29: Corrigir estrutura da tabela frota_despesa em produção
-    
-    Problema: Em produção a tabela foi criada com coluna 'data_id' em vez de 'data_custo'
-    Solução: Renomear a coluna para o nome correto
-    """
-    logger.info("=" * 80)
-    logger.info("🔧 MIGRAÇÃO 29: Corrigir estrutura frota_despesa")
-    logger.info("=" * 80)
-    
-    try:
-        # Verificar se a coluna errada existe
-        result = db.session.execute(text("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'frota_despesa' 
-            AND column_name IN ('data_id', 'data_custo')
-        """))
-        colunas = [row[0] for row in result]
-        
-        logger.info(f"📋 Colunas encontradas em frota_despesa: {colunas}")
-        
-        if 'data_id' in colunas and 'data_custo' not in colunas:
-            logger.info("🔄 Renomeando coluna data_id → data_custo...")
-            db.session.execute(text("""
-                ALTER TABLE frota_despesa 
-                RENAME COLUMN data_id TO data_custo
-            """))
-            db.session.commit()
-            logger.info("✅ Coluna renomeada com sucesso!")
-            
-        elif 'data_custo' in colunas:
-            logger.info("✅ Coluna data_custo já existe corretamente")
-            
-        else:
-            logger.warning("⚠️ Nenhuma das colunas esperadas encontrada - criando data_custo...")
-            db.session.execute(text("""
-                ALTER TABLE frota_despesa 
-                ADD COLUMN IF NOT EXISTS data_custo DATE NOT NULL DEFAULT CURRENT_DATE
-            """))
-            db.session.commit()
-            logger.info("✅ Coluna data_custo criada")
-        
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 29 CONCLUÍDA: Estrutura frota_despesa corrigida!")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"❌ Erro na migração 29: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-
-
-def corrigir_coluna_obra_id_frota_despesa():
-    """
-    MIGRAÇÃO 30: Adicionar coluna obra_id na tabela frota_despesa
-    
-    CONTEXTO:
-    - A tabela frota_despesa foi criada sem a coluna obra_id em produção
-    - Esta coluna é necessária para vincular custos a obras específicas
-    - Campo é NULLABLE (opcional)
-    """
-    try:
-        logger.info("=" * 80)
-        logger.info("🔧 MIGRAÇÃO 30: Corrigir coluna obra_id em frota_despesa")
-        logger.info("=" * 80)
-        
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        # Verificar se a tabela frota_despesa existe
-        cursor.execute("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_name = 'frota_despesa'
-        """)
-        
-        if not cursor.fetchone():
-            logger.warning("⚠️ Tabela frota_despesa não existe. Pulando migração.")
-            cursor.close()
-            connection.close()
-            return
-        
-        # Verificar se a coluna obra_id já existe
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'frota_despesa' 
-            AND column_name = 'obra_id'
-        """)
-        
-        if cursor.fetchone():
-            logger.info("✅ Coluna obra_id já existe na tabela frota_despesa")
-        else:
-            logger.info("🔧 Adicionando coluna obra_id na tabela frota_despesa...")
-            cursor.execute("""
-                ALTER TABLE frota_despesa 
-                ADD COLUMN obra_id INTEGER REFERENCES obra(id)
-            """)
-            logger.info("✅ Coluna obra_id adicionada com sucesso!")
-            
-            # Criar índice para performance
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_frota_despesa_obra_id 
-                ON frota_despesa(obra_id)
-            """)
-            logger.info("✅ Índice criado para obra_id")
-        
-        connection.commit()
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 30 CONCLUÍDA com sucesso!")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error(f"❌ Erro na Migração 30: {e}")
-        if 'connection' in locals():
-            connection.rollback()
-            cursor.close()
-            connection.close()
-        import traceback
-        logger.error(traceback.format_exc())
-
-
-def limpeza_completa_sistemas_antigos_veiculos():
-    """
-    MIGRAÇÃO 31: Limpeza completa dos sistemas antigos de veículos
-    
-    Remove todas as tabelas e resquícios dos sistemas legacy:
-    - Sistema original: veiculo, uso_veiculo, custo_veiculo, etc.
-    - Sistema FLEET: fleet_vehicle, fleet_vehicle_usage, fleet_vehicle_cost
-    
-    MANTÉM apenas: frota_veiculo, frota_utilizacao, frota_despesa
-    
-    SEGURANÇA: Só executa se DROP_OLD_VEHICLE_TABLES=true
-    """
-    try:
-        # Verificar feature flag de segurança
-        if os.environ.get('DROP_OLD_VEHICLE_TABLES', 'false').lower() != 'true':
-            logger.info("🔒 MIGRAÇÃO 31: Bloqueada por segurança. Para ativar: DROP_OLD_VEHICLE_TABLES=true")
-            return
-        
-        logger.info("=" * 80)
-        logger.info("🧹 MIGRAÇÃO 31: Limpeza completa dos sistemas antigos de veículos")
-        logger.info("⚠️  ATENÇÃO: Esta operação é IRREVERSÍVEL!")
-        logger.info("=" * 80)
-        
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        # Lista de tabelas para remover (ordem importa devido a FKs)
-        tabelas_para_remover = [
-            # Sistema FLEET (intermediário)
-            'fleet_vehicle_usage',
-            'fleet_vehicle_cost', 
-            'fleet_vehicle',
-            
-            # Sistema LEGACY original
-            'passageiro_veiculo',
-            'documento_fiscal',
-            'uso_veiculo',
-            'custo_veiculo',
-            'veiculo'
-        ]
-        
-        for tabela in tabelas_para_remover:
-            try:
-                # Verificar se tabela existe
-                cursor.execute("""
-                    SELECT table_name 
-                    FROM information_schema.tables 
-                    WHERE table_name = %s
-                """, (tabela,))
-                
-                if cursor.fetchone():
-                    logger.info(f"🗑️  Removendo tabela: {tabela}")
-                    cursor.execute(f"DROP TABLE IF EXISTS {tabela} CASCADE")
-                    logger.info(f"✅ Tabela {tabela} removida com sucesso")
-                else:
-                    logger.info(f"ℹ️  Tabela {tabela} não existe (já removida)")
-                    
-            except Exception as e:
-                logger.warning(f"⚠️  Erro ao remover tabela {tabela}: {e}")
-                # Continuar com outras tabelas
-        
-        # Remover índices órfãos se existirem
-        indices_orfaos = [
-            'idx_veiculo_admin_placa',
-            'idx_uso_veiculo_data',
-            'idx_custo_veiculo_tipo',
-            'idx_fleet_vehicle_admin_plate',
-            'idx_fleet_usage_date_admin'
-        ]
-        
-        for indice in indices_orfaos:
-            try:
-                cursor.execute(f"DROP INDEX IF EXISTS {indice}")
-                logger.info(f"🗑️  Índice órfão removido: {indice}")
-            except Exception as e:
-                logger.debug(f"Índice {indice} não existe: {e}")
-        
-        connection.commit()
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 31: Limpeza do banco concluída com sucesso!")
-        logger.info("🎯 Sistema agora usa APENAS tabelas frota_*")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error(f"❌ Erro na Migração 31: {e}")
-        if 'connection' in locals():
-            connection.rollback()
-            cursor.close()
-            connection.close()
-        import traceback
-        logger.error(traceback.format_exc())
-
-
-def _migration_32_recreate_vehicle_system():
-    """
-    MIGRAÇÃO 32: Recriar sistema de veículos com estrutura limpa
-    
-    PROCESSO:
-    1. Criar novas tabelas: vehicle, vehicle_usage, vehicle_expense
-    2. Migrar dados: frota_* → vehicle_*
-    3. DROP tabelas antigas: frota_*
+    ESTRATÉGIA INTELIGENTE:
+    1. Detecta quais tabelas existem (frota_*, vehicle_*, veiculo, fleet_vehicle)
+    2. Decide ação baseada no estado atual:
+       - vehicle_* existem → SKIP (já migrado)
+       - frota_* existem → CREATE vehicle_*, MIGRAR dados, DROP frota_*
+       - Tabelas antigas existem → CREATE vehicle_*, MIGRAR dados, DROP antigas
+       - Nenhuma existe → CREATE vehicle_* do zero
     
     SEGURANÇA: Só executa se RECREATE_VEHICLE_SYSTEM=true
+    IDEMPOTENTE: Pode executar múltiplas vezes sem problemas
+    
+    CAMPOS PRESERVADOS:
+    - Vehicle: placa, modelo, ano, cor, km_atual, renavam, chassi, tipo_veiculo, 
+               status, data_ultima_manutencao, data_proxima_manutencao, 
+               km_proxima_manutencao, observacoes, admin_id
+    - VehicleUsage: data_uso, km_inicial, km_final, motorista_id, obra_id, 
+                    observacoes, admin_id
+    - VehicleExpense: tipo_custo, valor, data_custo, km_veiculo, descricao,
+                      fornecedor, numero_nota_fiscal, data_vencimento, status, 
+                      obra_id, admin_id
     """
     try:
         # Verificar feature flag de segurança
         if os.environ.get('RECREATE_VEHICLE_SYSTEM', 'false').lower() != 'true':
-            logger.info("🔒 MIGRAÇÃO 32: Bloqueada por segurança. Para ativar: RECREATE_VEHICLE_SYSTEM=true")
+            logger.info("🔒 MIGRAÇÃO 20: Bloqueada por segurança. Para ativar: RECREATE_VEHICLE_SYSTEM=true")
             return
         
         logger.info("=" * 80)
-        logger.info("🚗 MIGRAÇÃO 32: Recriar sistema de veículos - ESTRUTURA LIMPA")
-        logger.info("✅ PRESERVANDO DADOS: Migração automática frota_* → vehicle_*")
+        logger.info("🚗 MIGRAÇÃO 20 UNIFICADA: Sistema de Veículos Inteligente")
         logger.info("=" * 80)
         
         connection = db.engine.raw_connection()
         cursor = connection.cursor()
         
-        # PASSO 1: Criar novas tabelas (se não existirem)
-        logger.info("📋 PASSO 1: Criando novas tabelas...")
+        # =====================================================================
+        # PASSO 1: DETECTAR ESTADO ATUAL DO BANCO
+        # =====================================================================
+        logger.info("🔍 PASSO 1: Detectando estado atual do banco de dados...")
         
-        # 2.1 - Tabela vehicle
+        # Detectar tabelas existentes
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_name IN ('vehicle', 'vehicle_usage', 'vehicle_expense',
+                                 'frota_veiculo', 'frota_utilizacao', 'frota_despesa',
+                                 'veiculo', 'uso_veiculo', 'custo_veiculo',
+                                 'fleet_vehicle', 'fleet_vehicle_usage', 'fleet_vehicle_cost')
+        """)
+        tabelas_existentes = [row[0] for row in cursor.fetchall()]
+        logger.info(f"📊 Tabelas encontradas: {tabelas_existentes}")
+        
+        # Decidir estratégia
+        tem_vehicle = 'vehicle' in tabelas_existentes
+        tem_frota = 'frota_veiculo' in tabelas_existentes
+        tem_antigas = 'veiculo' in tabelas_existentes or 'fleet_vehicle' in tabelas_existentes
+        
+        # =====================================================================
+        # PASSO 2: DECISÃO DE ESTRATÉGIA
+        # =====================================================================
+        if tem_vehicle:
+            logger.info("✅ Tabelas vehicle_* já existem - Sistema já migrado!")
+            logger.info("🎯 SKIP: Nenhuma ação necessária")
+            cursor.close()
+            connection.close()
+            return
+        
+        elif tem_frota:
+            logger.info("📋 Estratégia: MIGRAR frota_* → vehicle_*")
+            tabelas_origem = 'frota'
+            
+        elif tem_antigas:
+            logger.info("📋 Estratégia: MIGRAR tabelas antigas → vehicle_*")
+            tabelas_origem = 'antigas'
+            
+        else:
+            logger.info("📋 Estratégia: CREATE vehicle_* do zero (banco vazio)")
+            tabelas_origem = 'criar'
+        
+        # =====================================================================
+        # PASSO 3: CRIAR TABELAS vehicle_*
+        # =====================================================================
+        logger.info("🔨 PASSO 3: Criando tabelas vehicle_*...")
+        
+        # 3.1 - Tabela vehicle
         logger.info("🚗 Criando tabela vehicle...")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS vehicle (
                 id SERIAL PRIMARY KEY,
                 placa VARCHAR(10) NOT NULL,
-                marca VARCHAR(50) NOT NULL,
-                modelo VARCHAR(100) NOT NULL,
-                ano INTEGER NOT NULL,
-                tipo VARCHAR(30) DEFAULT 'Utilitário',
-                km_atual INTEGER DEFAULT 0,
+                marca VARCHAR(50),
+                modelo VARCHAR(100),
+                ano INTEGER,
                 cor VARCHAR(30),
-                chassi VARCHAR(50),
+                km_atual INTEGER DEFAULT 0,
+                proprietario VARCHAR(100),
                 renavam VARCHAR(20),
-                combustivel VARCHAR(20) DEFAULT 'Gasolina',
-                ativo BOOLEAN DEFAULT true,
+                chassi VARCHAR(50),
+                tipo_veiculo VARCHAR(30) DEFAULT 'Utilitário',
+                status VARCHAR(20) DEFAULT 'Ativo',
+                data_aquisicao DATE,
+                valor_aquisicao NUMERIC(10, 2),
                 data_ultima_manutencao DATE,
                 data_proxima_manutencao DATE,
                 km_proxima_manutencao INTEGER,
+                observacoes TEXT,
                 admin_id INTEGER NOT NULL REFERENCES usuario(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 CONSTRAINT uk_vehicle_admin_placa UNIQUE (admin_id, placa)
             )
         """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_admin ON vehicle(admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_admin_id ON vehicle(admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_placa ON vehicle(placa)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_status ON vehicle(status)")
         logger.info("✅ Tabela vehicle criada")
         
-        # 2.2 - Tabela vehicle_usage
+        # 3.2 - Tabela vehicle_usage
         logger.info("📝 Criando tabela vehicle_usage...")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS vehicle_usage (
                 id SERIAL PRIMARY KEY,
                 veiculo_id INTEGER NOT NULL REFERENCES vehicle(id) ON DELETE CASCADE,
-                funcionario_id INTEGER REFERENCES funcionario(id),
-                obra_id INTEGER REFERENCES obra(id),
                 data_uso DATE NOT NULL,
-                hora_saida TIME,
-                hora_retorno TIME,
                 km_inicial INTEGER,
                 km_final INTEGER,
-                km_percorrido INTEGER,
-                passageiros_frente TEXT,
-                passageiros_tras TEXT,
-                responsavel_veiculo VARCHAR(100),
+                destino VARCHAR(200),
+                motorista_id INTEGER REFERENCES funcionario(id),
+                obra_id INTEGER REFERENCES obra(id),
                 observacoes TEXT,
                 admin_id INTEGER NOT NULL REFERENCES usuario(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_usage_data_admin ON vehicle_usage(data_uso, admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_usage_data ON vehicle_usage(data_uso)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_usage_veiculo ON vehicle_usage(veiculo_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_usage_admin ON vehicle_usage(admin_id)")
         logger.info("✅ Tabela vehicle_usage criada")
         
-        # 2.3 - Tabela vehicle_expense
+        # 3.3 - Tabela vehicle_expense
         logger.info("💰 Criando tabela vehicle_expense...")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS vehicle_expense (
                 id SERIAL PRIMARY KEY,
                 veiculo_id INTEGER NOT NULL REFERENCES vehicle(id) ON DELETE CASCADE,
-                obra_id INTEGER REFERENCES obra(id),
-                data_custo DATE NOT NULL,
                 tipo_custo VARCHAR(30) NOT NULL,
                 valor NUMERIC(10, 2) NOT NULL,
-                descricao VARCHAR(200) NOT NULL,
+                data_custo DATE NOT NULL,
+                km_veiculo INTEGER,
+                descricao VARCHAR(200),
+                categoria VARCHAR(50),
                 fornecedor VARCHAR(100),
                 numero_nota_fiscal VARCHAR(20),
-                status_pagamento VARCHAR(20) DEFAULT 'Pendente',
-                forma_pagamento VARCHAR(30),
-                km_veiculo INTEGER,
+                data_vencimento DATE,
+                status VARCHAR(20) DEFAULT 'Pendente',
+                obra_id INTEGER REFERENCES obra(id),
                 observacoes TEXT,
                 admin_id INTEGER NOT NULL REFERENCES usuario(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_expense_data_admin ON vehicle_expense(data_custo, admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_expense_data ON vehicle_expense(data_custo)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_expense_veiculo ON vehicle_expense(veiculo_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_expense_admin ON vehicle_expense(admin_id)")
         logger.info("✅ Tabela vehicle_expense criada")
         
-        # PASSO 2: Migrar dados das tabelas antigas
-        logger.info("📋 PASSO 2: Migrando dados frota_* → vehicle_*...")
-        
-        # 2.1 - Verificar se tabelas antigas existem
-        cursor.execute("""
-            SELECT table_name FROM information_schema.tables 
-            WHERE table_name IN ('frota_veiculo', 'frota_utilizacao', 'frota_despesa')
-        """)
-        tabelas_antigas = [row[0] for row in cursor.fetchall()]
-        logger.info(f"📊 Tabelas antigas encontradas: {tabelas_antigas}")
-        
-        if 'frota_veiculo' in tabelas_antigas:
-            # Migrar veículos
+        # =====================================================================
+        # PASSO 4: MIGRAR DADOS (se houver tabelas de origem)
+        # =====================================================================
+        if tabelas_origem == 'frota':
+            logger.info("📋 PASSO 4: Migrando dados frota_* → vehicle_*...")
+            
+            # 4.1 - Migrar frota_veiculo → vehicle
             logger.info("🚗 Migrando frota_veiculo → vehicle...")
             cursor.execute("""
                 INSERT INTO vehicle (
-                    id, placa, marca, modelo, ano, tipo, km_atual, cor, chassi, renavam,
-                    combustivel, ativo, data_ultima_manutencao, data_proxima_manutencao, 
+                    id, placa, marca, modelo, ano, cor, km_atual, chassi, renavam,
+                    tipo_veiculo, status, data_ultima_manutencao, data_proxima_manutencao,
                     km_proxima_manutencao, admin_id, created_at, updated_at
                 )
                 SELECT 
-                    id, placa, marca, modelo, ano, tipo, km_atual, cor, chassi, renavam,
-                    combustivel, ativo, data_ultima_manutencao, data_proxima_manutencao,
+                    id, placa, marca, modelo, ano, cor, 
+                    COALESCE(km_atual, 0), chassi, renavam,
+                    COALESCE(tipo, 'Utilitário'),
+                    CASE WHEN ativo THEN 'Ativo' ELSE 'Inativo' END,
+                    data_ultima_manutencao, data_proxima_manutencao,
                     km_proxima_manutencao, admin_id, created_at, updated_at
                 FROM frota_veiculo
                 ON CONFLICT (admin_id, placa) DO NOTHING
@@ -574,68 +280,122 @@ def _migration_32_recreate_vehicle_system():
             veiculos_migrados = cursor.rowcount
             logger.info(f"✅ {veiculos_migrados} veículos migrados")
             
-            # Atualizar sequence para evitar conflito de IDs
-            cursor.execute("SELECT MAX(id) FROM vehicle")
-            max_id = cursor.fetchone()[0]
-            if max_id:
-                cursor.execute(f"SELECT setval('vehicle_id_seq', {max_id})")
+            # Atualizar sequence
+            cursor.execute("SELECT setval('vehicle_id_seq', (SELECT MAX(id) FROM vehicle))")
+            
+            # 4.2 - Migrar frota_utilizacao → vehicle_usage
+            if 'frota_utilizacao' in tabelas_existentes:
+                logger.info("📝 Migrando frota_utilizacao → vehicle_usage...")
+                cursor.execute("""
+                    INSERT INTO vehicle_usage (
+                        veiculo_id, data_uso, km_inicial, km_final, 
+                        motorista_id, obra_id, observacoes, admin_id, created_at
+                    )
+                    SELECT 
+                        veiculo_id, data_uso, km_inicial, km_final,
+                        funcionario_id, obra_id, observacoes, admin_id, created_at
+                    FROM frota_utilizacao
+                """)
+                usos_migrados = cursor.rowcount
+                logger.info(f"✅ {usos_migrados} usos migrados")
+            
+            # 4.3 - Migrar frota_despesa → vehicle_expense
+            if 'frota_despesa' in tabelas_existentes:
+                logger.info("💰 Migrando frota_despesa → vehicle_expense...")
+                cursor.execute("""
+                    INSERT INTO vehicle_expense (
+                        veiculo_id, tipo_custo, valor, data_custo, km_veiculo,
+                        descricao, fornecedor, numero_nota_fiscal, data_vencimento,
+                        status, obra_id, observacoes, admin_id, created_at
+                    )
+                    SELECT 
+                        veiculo_id, tipo_custo, valor, data_custo, km_veiculo,
+                        descricao, fornecedor, numero_nota_fiscal, data_vencimento,
+                        status_pagamento, obra_id, observacoes, admin_id, created_at
+                    FROM frota_despesa
+                """)
+                despesas_migradas = cursor.rowcount
+                logger.info(f"✅ {despesas_migradas} despesas migradas")
         
-        if 'frota_utilizacao' in tabelas_antigas and 'frota_veiculo' in tabelas_antigas:
-            # Migrar utilizações
-            logger.info("📝 Migrando frota_utilizacao → vehicle_usage...")
-            cursor.execute("""
-                INSERT INTO vehicle_usage (
-                    veiculo_id, funcionario_id, obra_id, data_uso, hora_saida, hora_retorno,
-                    km_inicial, km_final, km_percorrido, passageiros_frente, passageiros_tras,
-                    responsavel_veiculo, observacoes, admin_id, created_at
-                )
-                SELECT 
-                    veiculo_id, funcionario_id, obra_id, data_uso, hora_saida, hora_retorno,
-                    km_inicial, km_final, km_percorrido, passageiros_frente, passageiros_tras,
-                    responsavel_veiculo, observacoes, admin_id, created_at
-                FROM frota_utilizacao
-            """)
-            usos_migrados = cursor.rowcount
-            logger.info(f"✅ {usos_migrados} utilizações migradas")
+        elif tabelas_origem == 'antigas':
+            logger.info("📋 PASSO 4: Migrando dados tabelas antigas → vehicle_*...")
+            
+            # Migrar de veiculo/fleet_vehicle para vehicle
+            if 'veiculo' in tabelas_existentes:
+                logger.info("🚗 Migrando veiculo → vehicle...")
+                cursor.execute("""
+                    INSERT INTO vehicle (
+                        placa, marca, modelo, ano, cor, km_atual, chassi, renavam,
+                        tipo_veiculo, status, data_ultima_manutencao, 
+                        data_proxima_manutencao, km_proxima_manutencao, admin_id
+                    )
+                    SELECT 
+                        placa, marca, modelo, ano, cor, 
+                        COALESCE(km_atual, 0), chassi, renavam,
+                        COALESCE(tipo, 'Utilitário'),
+                        CASE WHEN ativo THEN 'Ativo' ELSE 'Inativo' END,
+                        data_ultima_manutencao, data_proxima_manutencao,
+                        km_proxima_manutencao, admin_id
+                    FROM veiculo
+                    WHERE admin_id IS NOT NULL
+                    ON CONFLICT (admin_id, placa) DO NOTHING
+                """)
+                logger.info(f"✅ {cursor.rowcount} veículos migrados")
+            
+            elif 'fleet_vehicle' in tabelas_existentes:
+                logger.info("🚗 Migrando fleet_vehicle → vehicle...")
+                cursor.execute("""
+                    INSERT INTO vehicle (
+                        placa, marca, modelo, ano, cor, km_atual, chassi, renavam,
+                        tipo_veiculo, status, data_ultima_manutencao,
+                        data_proxima_manutencao, km_proxima_manutencao, admin_id
+                    )
+                    SELECT 
+                        reg_plate, make_name, model_name, vehicle_year, vehicle_color,
+                        COALESCE(current_km, 0), chassis_number, renavam_code,
+                        COALESCE(vehicle_kind, 'Utilitário'), status_code,
+                        last_maintenance_date, next_maintenance_date,
+                        next_maintenance_km, admin_owner_id
+                    FROM fleet_vehicle
+                    ON CONFLICT (admin_id, placa) DO NOTHING
+                """)
+                logger.info(f"✅ {cursor.rowcount} veículos migrados")
         
-        if 'frota_despesa' in tabelas_antigas and 'frota_veiculo' in tabelas_antigas:
-            # Migrar despesas
-            logger.info("💰 Migrando frota_despesa → vehicle_expense...")
-            cursor.execute("""
-                INSERT INTO vehicle_expense (
-                    veiculo_id, obra_id, data_custo, tipo_custo, valor, descricao,
-                    fornecedor, numero_nota_fiscal, status_pagamento, forma_pagamento,
-                    km_veiculo, observacoes, admin_id, created_at
-                )
-                SELECT 
-                    veiculo_id, obra_id, data_custo, tipo_custo, valor, descricao,
-                    fornecedor, numero_nota_fiscal, status_pagamento, forma_pagamento,
-                    km_veiculo, observacoes, admin_id, created_at
-                FROM frota_despesa
-            """)
-            despesas_migradas = cursor.rowcount
-            logger.info(f"✅ {despesas_migradas} despesas migradas")
+        else:
+            logger.info("ℹ️ PASSO 4: Nenhum dado para migrar (banco vazio)")
         
-        # PASSO 3: DROP tabelas antigas
-        logger.info("📋 PASSO 3: Removendo tabelas antigas...")
-        for tabela in ['frota_despesa', 'frota_utilizacao', 'frota_veiculo']:
-            if tabela in tabelas_antigas:
-                logger.info(f"🗑️  DROP TABLE {tabela} CASCADE...")
+        # =====================================================================
+        # PASSO 5: REMOVER TABELAS ANTIGAS
+        # =====================================================================
+        logger.info("🗑️ PASSO 5: Removendo tabelas antigas...")
+        
+        tabelas_remover = []
+        if tabelas_origem == 'frota':
+            tabelas_remover = ['frota_despesa', 'frota_utilizacao', 'frota_veiculo']
+        elif tabelas_origem == 'antigas':
+            tabelas_remover = ['custo_veiculo', 'uso_veiculo', 'veiculo',
+                             'fleet_vehicle_cost', 'fleet_vehicle_usage', 'fleet_vehicle',
+                             'passageiro_veiculo', 'documento_fiscal']
+        
+        for tabela in tabelas_remover:
+            if tabela in tabelas_existentes:
+                logger.info(f"🗑️ DROP TABLE {tabela} CASCADE...")
                 cursor.execute(f"DROP TABLE IF EXISTS {tabela} CASCADE")
                 logger.info(f"✅ Tabela {tabela} removida")
         
+        # Commit final
         connection.commit()
         cursor.close()
         connection.close()
         
         logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 32 CONCLUÍDA: Sistema de veículos recriado!")
-        logger.info("🎯 Novas tabelas: vehicle, vehicle_usage, vehicle_expense")
-        logger.info("✅ DADOS PRESERVADOS: Todos os registros foram migrados com sucesso")
+        logger.info("✅ MIGRAÇÃO 20 UNIFICADA CONCLUÍDA COM SUCESSO!")
+        logger.info("🎯 Sistema de veículos: vehicle, vehicle_usage, vehicle_expense")
+        logger.info("✅ Dados preservados e migrados com sucesso")
         logger.info("=" * 80)
         
     except Exception as e:
-        logger.error(f"❌ Erro na Migração 32: {e}")
+        logger.error(f"❌ Erro na Migração 20 Unificada: {e}")
         if 'connection' in locals():
             connection.rollback()
             cursor.close()
@@ -715,52 +475,11 @@ def executar_migracoes():
         # Migração 19: NOVA - Adicionar colunas faltantes em veículos (chassi, renavam, combustivel)
         adicionar_colunas_veiculo_completas()
         
-        # Migração 20: CRÍTICA - Sistema Fleet Completo (nova arquitetura de veículos)
-        migrar_sistema_fleet_completo()
-        
-        # Migração 21: Confirmar estrutura funcionario_id na tabela uso_veiculo
-        confirmar_estrutura_funcionario_id()
-        
-        # Migração 22: Adicionar colunas de passageiros em uso_veiculo
-        adicionar_colunas_passageiros_uso_veiculo()
-        
-        # Migração 23: EMERGENCIAL - Recriar tabela uso_veiculo com schema correto
-        # BLOQUEADA POR SEGURANÇA - requer variável de ambiente ALLOW_DESTRUCTIVE_MIGRATION=true
-        if os.environ.get('ALLOW_DESTRUCTIVE_MIGRATION') == 'true':
-            recriar_tabela_uso_veiculo_emergencial()
-        else:
-            logger.info("🔒 Migração 23 (DROP TABLE) bloqueada por segurança - defina ALLOW_DESTRUCTIVE_MIGRATION=true para executar")
-        
-        # Migração 24: SEGURA - Adicionar colunas passageiros com tratamento robusto
-        adicionar_colunas_passageiros_robusto()
-        
-        # Migração 25: ULTRA-ROBUSTA - SQL Puro para garantir colunas passageiros
-        adicionar_passageiros_sql_puro()
-        
-        # Migração 26: LIMPEZA - DROP tabelas antigas do sistema de veículos
-        # BLOQUEADA POR SEGURANÇA - requer variável de ambiente DROP_OLD_VEHICLE_TABLES=true
-        if os.environ.get('DROP_OLD_VEHICLE_TABLES') == 'true':
-            drop_tabelas_veiculos_antigas()
-        else:
-            logger.info("🔒 Migração 26 (DROP tabelas antigas) bloqueada - defina DROP_OLD_VEHICLE_TABLES=true para executar")
+        # Migração 20: UNIFICADA - Sistema de Veículos Inteligente
+        _migration_20_unified_vehicle_system()
 
         # Migração 27: Sistema de Alimentação
         _migration_27_alimentacao_system()
-        
-        # Migração 28: Migrar dados das tabelas antigas para sistema Frota
-        _migration_28_migrar_dados_frota()
-        
-        # Migração 29: Corrigir estrutura da tabela frota_despesa (data_id → data_custo)
-        corrigir_estrutura_frota_despesa()
-        
-        # Migração 30: Adicionar coluna obra_id na tabela frota_despesa
-        corrigir_coluna_obra_id_frota_despesa()
-        
-        # Migração 31: Limpeza completa dos sistemas antigos de veículos
-        limpeza_completa_sistemas_antigos_veiculos()
-        
-        # Migração 32: Recriar sistema de veículos limpo
-        _migration_32_recreate_vehicle_system()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
@@ -2404,1334 +2123,3 @@ def adicionar_colunas_veiculo_completas():
                 pass
 
 
-def migrar_sistema_fleet_completo():
-    """
-    MIGRAÇÃO 20: CRÍTICA - Sistema Fleet Completo
-    
-    Cria a nova arquitetura de veículos com tabelas Fleet:
-    - fleet_vehicle (substitui veiculo)
-    - fleet_vehicle_usage (substitui uso_veiculo) 
-    - fleet_vehicle_cost (substitui custo_veiculo)
-    
-    Migra dados das tabelas antigas para as novas mantendo integridade multi-tenant.
-    """
-    try:
-        logger.info("=" * 80)
-        logger.info("🚀 MIGRAÇÃO 20: SISTEMA FLEET COMPLETO - NOVA ARQUITETURA")
-        logger.info("=" * 80)
-        
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        # ===================================================================
-        # PARTE 1: CRIAR TABELA fleet_vehicle
-        # ===================================================================
-        logger.info("📋 PARTE 1: Criando tabela fleet_vehicle...")
-        
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.tables 
-            WHERE table_name = 'fleet_vehicle'
-        """)
-        
-        if cursor.fetchone()[0] == 0:
-            logger.info("🔨 Criando tabela fleet_vehicle...")
-            cursor.execute("""
-                CREATE TABLE fleet_vehicle (
-                    vehicle_id SERIAL PRIMARY KEY,
-                    reg_plate VARCHAR(10) NOT NULL,
-                    make_name VARCHAR(50) NOT NULL,
-                    model_name VARCHAR(100) NOT NULL DEFAULT 'Não informado',
-                    vehicle_year INTEGER NOT NULL,
-                    vehicle_kind VARCHAR(30) NOT NULL DEFAULT 'Veículo',
-                    current_km INTEGER DEFAULT 0,
-                    vehicle_color VARCHAR(30),
-                    chassis_number VARCHAR(50),
-                    renavam_code VARCHAR(20),
-                    fuel_type VARCHAR(20) DEFAULT 'Gasolina',
-                    status_code VARCHAR(20) DEFAULT 'ativo',
-                    last_maintenance_date DATE,
-                    next_maintenance_date DATE,
-                    next_maintenance_km INTEGER,
-                    admin_owner_id INTEGER NOT NULL REFERENCES usuario(id),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    
-                    CONSTRAINT uk_fleet_vehicle_admin_plate UNIQUE(admin_owner_id, reg_plate)
-                )
-            """)
-            
-            # Criar índices
-            cursor.execute("CREATE INDEX idx_fleet_vehicle_admin_kind ON fleet_vehicle(admin_owner_id, vehicle_kind)")
-            cursor.execute("CREATE INDEX idx_fleet_vehicle_plate_admin ON fleet_vehicle(reg_plate, admin_owner_id)")
-            cursor.execute("CREATE INDEX idx_fleet_vehicle_status ON fleet_vehicle(admin_owner_id, status_code)")
-            
-            logger.info("✅ Tabela fleet_vehicle criada com sucesso!")
-        else:
-            logger.info("✅ Tabela fleet_vehicle já existe")
-        
-        # ===================================================================
-        # PARTE 2: CRIAR TABELA fleet_vehicle_usage
-        # ===================================================================
-        logger.info("📋 PARTE 2: Criando tabela fleet_vehicle_usage...")
-        
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.tables 
-            WHERE table_name = 'fleet_vehicle_usage'
-        """)
-        
-        if cursor.fetchone()[0] == 0:
-            logger.info("🔨 Criando tabela fleet_vehicle_usage...")
-            cursor.execute("""
-                CREATE TABLE fleet_vehicle_usage (
-                    usage_id SERIAL PRIMARY KEY,
-                    vehicle_id INTEGER NOT NULL,
-                    driver_id INTEGER,
-                    worksite_id INTEGER,
-                    usage_date DATE NOT NULL,
-                    departure_time TIME,
-                    return_time TIME,
-                    start_km INTEGER,
-                    end_km INTEGER,
-                    distance_km INTEGER,
-                    front_passengers TEXT,
-                    rear_passengers TEXT,
-                    vehicle_responsible VARCHAR(100),
-                    usage_notes TEXT,
-                    admin_owner_id INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Criar índices
-            cursor.execute("CREATE INDEX idx_fleet_usage_date_admin ON fleet_vehicle_usage(usage_date, admin_owner_id)")
-            cursor.execute("CREATE INDEX idx_fleet_usage_driver ON fleet_vehicle_usage(driver_id)")
-            cursor.execute("CREATE INDEX idx_fleet_usage_worksite ON fleet_vehicle_usage(worksite_id)")
-            cursor.execute("CREATE INDEX idx_fleet_usage_vehicle ON fleet_vehicle_usage(vehicle_id)")
-            
-            logger.info("✅ Tabela fleet_vehicle_usage criada com sucesso!")
-        else:
-            logger.info("✅ Tabela fleet_vehicle_usage já existe")
-        
-        # ===================================================================
-        # PARTE 3: CRIAR TABELA fleet_vehicle_cost
-        # ===================================================================
-        logger.info("📋 PARTE 3: Criando tabela fleet_vehicle_cost...")
-        
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.tables 
-            WHERE table_name = 'fleet_vehicle_cost'
-        """)
-        
-        if cursor.fetchone()[0] == 0:
-            logger.info("🔨 Criando tabela fleet_vehicle_cost...")
-            cursor.execute("""
-                CREATE TABLE fleet_vehicle_cost (
-                    cost_id SERIAL PRIMARY KEY,
-                    vehicle_id INTEGER NOT NULL,
-                    cost_date DATE NOT NULL,
-                    cost_type VARCHAR(30) NOT NULL,
-                    cost_amount NUMERIC(10, 2) NOT NULL,
-                    cost_description VARCHAR(200) NOT NULL,
-                    supplier_name VARCHAR(100),
-                    invoice_number VARCHAR(20),
-                    due_date DATE,
-                    payment_status VARCHAR(20) DEFAULT 'Pendente',
-                    payment_method VARCHAR(30),
-                    cost_notes TEXT,
-                    admin_owner_id INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Criar índices
-            cursor.execute("CREATE INDEX idx_fleet_cost_date_admin ON fleet_vehicle_cost(cost_date, admin_owner_id)")
-            cursor.execute("CREATE INDEX idx_fleet_cost_type ON fleet_vehicle_cost(cost_type)")
-            cursor.execute("CREATE INDEX idx_fleet_cost_vehicle ON fleet_vehicle_cost(vehicle_id)")
-            cursor.execute("CREATE INDEX idx_fleet_cost_status ON fleet_vehicle_cost(payment_status)")
-            
-            logger.info("✅ Tabela fleet_vehicle_cost criada com sucesso!")
-        else:
-            logger.info("✅ Tabela fleet_vehicle_cost já existe")
-        
-        # ===================================================================
-        # PARTE 3.5: ADICIONAR FOREIGN KEYS (após criar todas as tabelas)
-        # ===================================================================
-        logger.info("📋 PARTE 3.5: Adicionando foreign keys...")
-        
-        # Verificar e adicionar FK fleet_vehicle → usuario
-        cursor.execute("""
-            SELECT constraint_name 
-            FROM information_schema.table_constraints 
-            WHERE table_name = 'fleet_vehicle' 
-            AND constraint_name = 'fk_fleet_vehicle_admin'
-        """)
-        
-        if not cursor.fetchone():
-            try:
-                cursor.execute("""
-                    ALTER TABLE fleet_vehicle 
-                    ADD CONSTRAINT fk_fleet_vehicle_admin 
-                    FOREIGN KEY (admin_owner_id) REFERENCES usuario(id)
-                """)
-                logger.info("✅ FK fleet_vehicle → usuario adicionada")
-            except Exception as e:
-                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle → usuario: {e}")
-        
-        # Verificar e adicionar FK fleet_vehicle_usage → fleet_vehicle
-        cursor.execute("""
-            SELECT constraint_name 
-            FROM information_schema.table_constraints 
-            WHERE table_name = 'fleet_vehicle_usage' 
-            AND constraint_name = 'fk_fleet_usage_vehicle'
-        """)
-        
-        if not cursor.fetchone():
-            try:
-                cursor.execute("""
-                    ALTER TABLE fleet_vehicle_usage 
-                    ADD CONSTRAINT fk_fleet_usage_vehicle 
-                    FOREIGN KEY (vehicle_id) REFERENCES fleet_vehicle(vehicle_id)
-                """)
-                logger.info("✅ FK fleet_vehicle_usage → fleet_vehicle adicionada")
-            except Exception as e:
-                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_usage → fleet_vehicle: {e}")
-        
-        # Verificar e adicionar FK fleet_vehicle_usage → funcionario
-        cursor.execute("""
-            SELECT constraint_name 
-            FROM information_schema.table_constraints 
-            WHERE table_name = 'fleet_vehicle_usage' 
-            AND constraint_name = 'fk_fleet_usage_driver'
-        """)
-        
-        if not cursor.fetchone():
-            try:
-                cursor.execute("""
-                    ALTER TABLE fleet_vehicle_usage 
-                    ADD CONSTRAINT fk_fleet_usage_driver 
-                    FOREIGN KEY (driver_id) REFERENCES funcionario(id)
-                """)
-                logger.info("✅ FK fleet_vehicle_usage → funcionario adicionada")
-            except Exception as e:
-                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_usage → funcionario: {e}")
-        
-        # Verificar e adicionar FK fleet_vehicle_usage → obra
-        cursor.execute("""
-            SELECT constraint_name 
-            FROM information_schema.table_constraints 
-            WHERE table_name = 'fleet_vehicle_usage' 
-            AND constraint_name = 'fk_fleet_usage_worksite'
-        """)
-        
-        if not cursor.fetchone():
-            try:
-                cursor.execute("""
-                    ALTER TABLE fleet_vehicle_usage 
-                    ADD CONSTRAINT fk_fleet_usage_worksite 
-                    FOREIGN KEY (worksite_id) REFERENCES obra(id)
-                """)
-                logger.info("✅ FK fleet_vehicle_usage → obra adicionada")
-            except Exception as e:
-                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_usage → obra: {e}")
-        
-        # Verificar e adicionar FK fleet_vehicle_usage → usuario
-        cursor.execute("""
-            SELECT constraint_name 
-            FROM information_schema.table_constraints 
-            WHERE table_name = 'fleet_vehicle_usage' 
-            AND constraint_name = 'fk_fleet_usage_admin'
-        """)
-        
-        if not cursor.fetchone():
-            try:
-                cursor.execute("""
-                    ALTER TABLE fleet_vehicle_usage 
-                    ADD CONSTRAINT fk_fleet_usage_admin 
-                    FOREIGN KEY (admin_owner_id) REFERENCES usuario(id)
-                """)
-                logger.info("✅ FK fleet_vehicle_usage → usuario adicionada")
-            except Exception as e:
-                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_usage → usuario: {e}")
-        
-        # Verificar e adicionar FK fleet_vehicle_cost → fleet_vehicle
-        cursor.execute("""
-            SELECT constraint_name 
-            FROM information_schema.table_constraints 
-            WHERE table_name = 'fleet_vehicle_cost' 
-            AND constraint_name = 'fk_fleet_cost_vehicle'
-        """)
-        
-        if not cursor.fetchone():
-            try:
-                cursor.execute("""
-                    ALTER TABLE fleet_vehicle_cost 
-                    ADD CONSTRAINT fk_fleet_cost_vehicle 
-                    FOREIGN KEY (vehicle_id) REFERENCES fleet_vehicle(vehicle_id)
-                """)
-                logger.info("✅ FK fleet_vehicle_cost → fleet_vehicle adicionada")
-            except Exception as e:
-                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_cost → fleet_vehicle: {e}")
-        
-        # Verificar e adicionar FK fleet_vehicle_cost → usuario
-        cursor.execute("""
-            SELECT constraint_name 
-            FROM information_schema.table_constraints 
-            WHERE table_name = 'fleet_vehicle_cost' 
-            AND constraint_name = 'fk_fleet_cost_admin'
-        """)
-        
-        if not cursor.fetchone():
-            try:
-                cursor.execute("""
-                    ALTER TABLE fleet_vehicle_cost 
-                    ADD CONSTRAINT fk_fleet_cost_admin 
-                    FOREIGN KEY (admin_owner_id) REFERENCES usuario(id)
-                """)
-                logger.info("✅ FK fleet_vehicle_cost → usuario adicionada")
-            except Exception as e:
-                logger.warning(f"⚠️ Erro ao adicionar FK fleet_vehicle_cost → usuario: {e}")
-        
-        logger.info("✅ Todas as foreign keys verificadas/adicionadas!")
-        
-        # ===================================================================
-        # PARTE 4: MIGRAR DADOS veiculo → fleet_vehicle
-        # ===================================================================
-        logger.info("📋 PARTE 4: Migrando dados veiculo → fleet_vehicle...")
-        
-        # Verificar se tabela antiga existe
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.tables 
-            WHERE table_name = 'veiculo'
-        """)
-        
-        if cursor.fetchone()[0] > 0:
-            # Contar registros na tabela antiga
-            cursor.execute("SELECT COUNT(*) FROM veiculo")
-            total_veiculos = cursor.fetchone()[0]
-            
-            if total_veiculos > 0:
-                logger.info(f"🔄 Encontrados {total_veiculos} veículos para migrar...")
-                
-                # Migrar dados (INSERT ... ON CONFLICT para idempotência)
-                cursor.execute("""
-                    INSERT INTO fleet_vehicle (
-                        reg_plate, make_name, model_name, vehicle_year, vehicle_kind,
-                        current_km, vehicle_color, chassis_number, renavam_code, fuel_type,
-                        status_code, last_maintenance_date, next_maintenance_date, 
-                        next_maintenance_km, admin_owner_id, created_at
-                    )
-                    SELECT 
-                        placa,
-                        marca,
-                        COALESCE(modelo, 'Não informado'),
-                        COALESCE(ano, EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER),
-                        COALESCE(tipo, 'Veículo'),
-                        COALESCE(km_atual, 0),
-                        cor,
-                        chassi,
-                        renavam,
-                        COALESCE(combustivel, 'Gasolina'),
-                        CASE WHEN ativo THEN 'ativo' ELSE 'inativo' END,
-                        data_ultima_manutencao,
-                        data_proxima_manutencao,
-                        km_proxima_manutencao,
-                        admin_id,
-                        COALESCE(created_at, CURRENT_TIMESTAMP)
-                    FROM veiculo
-                    WHERE admin_id IS NOT NULL
-                    ON CONFLICT (admin_owner_id, reg_plate) 
-                    DO UPDATE SET
-                        make_name = EXCLUDED.make_name,
-                        model_name = EXCLUDED.model_name,
-                        vehicle_year = EXCLUDED.vehicle_year,
-                        current_km = EXCLUDED.current_km,
-                        updated_at = CURRENT_TIMESTAMP
-                """)
-                
-                migrados = cursor.rowcount
-                logger.info(f"✅ {migrados} veículos migrados/atualizados para fleet_vehicle!")
-            else:
-                logger.info("ℹ️  Tabela veiculo está vazia, nada a migrar")
-        else:
-            logger.info("ℹ️  Tabela veiculo não existe, pulando migração de dados")
-        
-        # ===================================================================
-        # PARTE 4.5: CONFIRMAR coluna funcionario_id em uso_veiculo (coluna real de produção)
-        # ===================================================================
-        logger.info("📋 PARTE 4.5: Verificando coluna funcionario_id em uso_veiculo...")
-        
-        # Verificar se tabela uso_veiculo existe
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.tables 
-            WHERE table_name = 'uso_veiculo'
-        """)
-        
-        if cursor.fetchone()[0] > 0:
-            # Verificar se coluna funcionario_id existe (coluna real da tabela)
-            cursor.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'uso_veiculo' 
-                AND column_name = 'funcionario_id'
-            """)
-            
-            if cursor.fetchone():
-                logger.info("✅ Coluna funcionario_id confirmada em uso_veiculo")
-            else:
-                logger.warning("⚠️ Coluna funcionario_id não existe - tentando renomear motorista_id")
-                
-                # Verificar se motorista_id existe para renomear
-                cursor.execute("""
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'uso_veiculo' 
-                    AND column_name = 'motorista_id'
-                """)
-                
-                if cursor.fetchone():
-                    logger.info("🔧 Renomeando motorista_id → funcionario_id...")
-                    cursor.execute("""
-                        ALTER TABLE uso_veiculo 
-                        RENAME COLUMN motorista_id TO funcionario_id
-                    """)
-                    logger.info("✅ Coluna renomeada com sucesso!")
-                else:
-                    logger.error("❌ Nem funcionario_id nem motorista_id existem!")
-        else:
-            logger.info("ℹ️  Tabela uso_veiculo não existe, verificação não necessária")
-        
-        # ===================================================================
-        # PARTE 5: MIGRAR DADOS uso_veiculo → fleet_vehicle_usage
-        # ===================================================================
-        logger.info("📋 PARTE 5: Migrando dados uso_veiculo → fleet_vehicle_usage...")
-        
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.tables 
-            WHERE table_name = 'uso_veiculo'
-        """)
-        
-        if cursor.fetchone()[0] > 0:
-            cursor.execute("SELECT COUNT(*) FROM uso_veiculo")
-            total_usos = cursor.fetchone()[0]
-            
-            if total_usos > 0:
-                logger.info(f"🔄 Encontrados {total_usos} registros de uso para migrar...")
-                
-                # Migrar dados com JOIN para mapear IDs
-                cursor.execute("""
-                    INSERT INTO fleet_vehicle_usage (
-                        vehicle_id, driver_id, worksite_id, usage_date,
-                        departure_time, return_time, start_km, end_km, distance_km,
-                        front_passengers, rear_passengers, vehicle_responsible,
-                        usage_notes, admin_owner_id, created_at
-                    )
-                    SELECT 
-                        fv.vehicle_id,
-                        uv.funcionario_id,
-                        uv.obra_id,
-                        uv.data_uso,
-                        uv.hora_saida,
-                        uv.hora_retorno,
-                        uv.km_inicial,
-                        uv.km_final,
-                        uv.km_percorrido,
-                        uv.passageiros_frente,
-                        uv.passageiros_tras,
-                        uv.responsavel_veiculo,
-                        uv.observacoes,
-                        uv.admin_id,
-                        COALESCE(uv.created_at, CURRENT_TIMESTAMP)
-                    FROM uso_veiculo uv
-                    INNER JOIN veiculo v ON uv.veiculo_id = v.id
-                    INNER JOIN fleet_vehicle fv ON (v.placa = fv.reg_plate AND v.admin_id = fv.admin_owner_id)
-                    WHERE uv.admin_id IS NOT NULL
-                    AND NOT EXISTS (
-                        SELECT 1 FROM fleet_vehicle_usage fuv 
-                        WHERE fuv.vehicle_id = fv.vehicle_id 
-                        AND fuv.usage_date = uv.data_uso
-                        AND fuv.admin_owner_id = uv.admin_id
-                    )
-                """)
-                
-                migrados_uso = cursor.rowcount
-                logger.info(f"✅ {migrados_uso} registros de uso migrados para fleet_vehicle_usage!")
-            else:
-                logger.info("ℹ️  Tabela uso_veiculo está vazia, nada a migrar")
-        else:
-            logger.info("ℹ️  Tabela uso_veiculo não existe, pulando migração de dados")
-        
-        # ===================================================================
-        # PARTE 6: MIGRAR DADOS custo_veiculo → fleet_vehicle_cost
-        # ===================================================================
-        logger.info("📋 PARTE 6: Migrando dados custo_veiculo → fleet_vehicle_cost...")
-        
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.tables 
-            WHERE table_name = 'custo_veiculo'
-        """)
-        
-        if cursor.fetchone()[0] > 0:
-            cursor.execute("SELECT COUNT(*) FROM custo_veiculo")
-            total_custos = cursor.fetchone()[0]
-            
-            if total_custos > 0:
-                logger.info(f"🔄 Encontrados {total_custos} registros de custo para migrar...")
-                
-                # Migrar dados com JOIN para mapear IDs
-                cursor.execute("""
-                    INSERT INTO fleet_vehicle_cost (
-                        vehicle_id, cost_date, cost_type, cost_amount,
-                        cost_description, supplier_name, invoice_number, due_date,
-                        payment_status, payment_method, cost_notes,
-                        admin_owner_id, created_at
-                    )
-                    SELECT 
-                        fv.vehicle_id,
-                        cv.data_custo,
-                        cv.tipo_custo,
-                        cv.valor,
-                        cv.descricao,
-                        cv.fornecedor,
-                        cv.numero_nota_fiscal,
-                        cv.data_vencimento,
-                        COALESCE(cv.status_pagamento, 'Pendente'),
-                        cv.forma_pagamento,
-                        cv.observacoes,
-                        cv.admin_id,
-                        COALESCE(cv.created_at, CURRENT_TIMESTAMP)
-                    FROM custo_veiculo cv
-                    INNER JOIN veiculo v ON cv.veiculo_id = v.id
-                    INNER JOIN fleet_vehicle fv ON (v.placa = fv.reg_plate AND v.admin_id = fv.admin_owner_id)
-                    WHERE cv.admin_id IS NOT NULL
-                    AND NOT EXISTS (
-                        SELECT 1 FROM fleet_vehicle_cost fvc 
-                        WHERE fvc.vehicle_id = fv.vehicle_id 
-                        AND fvc.cost_date = cv.data_custo
-                        AND fvc.cost_description = cv.descricao
-                        AND fvc.admin_owner_id = cv.admin_id
-                    )
-                """)
-                
-                migrados_custo = cursor.rowcount
-                logger.info(f"✅ {migrados_custo} registros de custo migrados para fleet_vehicle_cost!")
-            else:
-                logger.info("ℹ️  Tabela custo_veiculo está vazia, nada a migrar")
-        else:
-            logger.info("ℹ️  Tabela custo_veiculo não existe, pulando migração de dados")
-        
-        connection.commit()
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        logger.info("🎉 MIGRAÇÃO 20 CONCLUÍDA COM SUCESSO!")
-        logger.info("=" * 80)
-        logger.info("✅ Tabelas Fleet criadas:")
-        logger.info("   - fleet_vehicle")
-        logger.info("   - fleet_vehicle_usage")
-        logger.info("   - fleet_vehicle_cost")
-        logger.info("✅ Dados migrados das tabelas antigas")
-        logger.info("✅ Índices criados para performance")
-        logger.info("✅ Constraints multi-tenant aplicadas")
-        logger.info("🔒 Tabelas antigas preservadas como backup")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error("=" * 80)
-        logger.error(f"❌ ERRO CRÍTICO na Migração 20 - Sistema Fleet: {str(e)}")
-        logger.error("=" * 80)
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        if 'connection' in locals():
-            try:
-                connection.rollback()
-                cursor.close()
-                connection.close()
-            except:
-                pass
-        
-        # Re-raise para que seja tratado pelo executor principal
-        raise
-
-
-def confirmar_estrutura_funcionario_id():
-    """
-    MIGRAÇÃO 21: CONFIRMAÇÃO E CORREÇÃO DE ESTRUTURA
-    
-    Garante que a coluna funcionario_id existe na tabela uso_veiculo.
-    Se existir motorista_id (desenvolvimento antigo), renomeia para funcionario_id.
-    
-    CONTEXTO:
-    - Tabela de produção usa funcionario_id (correto)
-    - Desenvolvimento antigo usava motorista_id (incorreto)
-    - Esta migração alinha ambos os ambientes
-    """
-    try:
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 21: Confirmação de estrutura uso_veiculo")
-        logger.info("=" * 80)
-        
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        # Verificar se tabela uso_veiculo existe
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.tables 
-            WHERE table_name = 'uso_veiculo'
-        """)
-        
-        if cursor.fetchone()[0] == 0:
-            logger.info("ℹ️  Tabela uso_veiculo não existe, verificação não necessária")
-            cursor.close()
-            connection.close()
-            return
-        
-        # Verificar se coluna funcionario_id existe (coluna real da produção)
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'uso_veiculo' 
-            AND column_name = 'funcionario_id'
-        """)
-        
-        if cursor.fetchone():
-            logger.info("✅ Coluna funcionario_id confirmada em uso_veiculo (estrutura correta)")
-        else:
-            logger.warning("⚠️  Coluna funcionario_id não existe - vou renomear motorista_id")
-            
-            # Verificar se motorista_id existe
-            cursor.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'uso_veiculo' 
-                AND column_name = 'motorista_id'
-            """)
-            
-            if cursor.fetchone():
-                logger.info("🔧 Renomeando motorista_id → funcionario_id...")
-                cursor.execute("""
-                    ALTER TABLE uso_veiculo 
-                    RENAME COLUMN motorista_id TO funcionario_id
-                """)
-                logger.info("✅ Coluna renomeada com sucesso!")
-                connection.commit()
-            else:
-                logger.error("❌ Nem funcionario_id nem motorista_id existem!")
-        
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 21 CONCLUÍDA: Estrutura verificada")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error("=" * 80)
-        logger.error(f"❌ ERRO na Migração 21: {str(e)}")
-        logger.error("=" * 80)
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        if 'connection' in locals():
-            try:
-                cursor.close()
-                connection.close()
-            except:
-                pass
-
-
-def adicionar_colunas_passageiros_uso_veiculo():
-    """
-    MIGRAÇÃO 22: Adicionar colunas passageiros_frente e passageiros_tras
-    
-    Garante que as colunas de passageiros existam na tabela uso_veiculo.
-    Essas colunas armazenam IDs de funcionários separados por vírgula.
-    
-    CONTEXTO:
-    - Desenvolvimento tem as colunas (criadas anteriormente)
-    - Produção pode não ter (precisa adicionar)
-    - Esta migração alinha ambos os ambientes
-    """
-    try:
-        logger.info("=" * 80)
-        logger.info("🚗 MIGRAÇÃO 22: Adicionar colunas de passageiros em uso_veiculo")
-        logger.info("=" * 80)
-        
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        # Verificar se passageiros_frente existe
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'uso_veiculo' 
-            AND column_name = 'passageiros_frente'
-        """)
-        
-        if cursor.fetchone():
-            logger.info("✅ Coluna passageiros_frente já existe")
-        else:
-            logger.info("🔧 Adicionando coluna passageiros_frente...")
-            cursor.execute("""
-                ALTER TABLE uso_veiculo 
-                ADD COLUMN passageiros_frente TEXT
-            """)
-            logger.info("✅ Coluna passageiros_frente adicionada com sucesso!")
-        
-        # Verificar se passageiros_tras existe
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'uso_veiculo' 
-            AND column_name = 'passageiros_tras'
-        """)
-        
-        if cursor.fetchone():
-            logger.info("✅ Coluna passageiros_tras já existe")
-        else:
-            logger.info("🔧 Adicionando coluna passageiros_tras...")
-            cursor.execute("""
-                ALTER TABLE uso_veiculo 
-                ADD COLUMN passageiros_tras TEXT
-            """)
-            logger.info("✅ Coluna passageiros_tras adicionada com sucesso!")
-        
-        connection.commit()
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 22 CONCLUÍDA: Colunas de passageiros verificadas/adicionadas")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error("=" * 80)
-        logger.error(f"❌ ERRO na Migração 22: {str(e)}")
-        logger.error("=" * 80)
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        if 'connection' in locals():
-            try:
-                cursor.close()
-                connection.close()
-            except:
-                pass
-
-def recriar_tabela_uso_veiculo_emergencial():
-    """
-    MIGRAÇÃO 23 EMERGENCIAL: Recriar tabela uso_veiculo com schema completo
-    
-    CONTEXTO:
-    - Migração 22 falhou silenciosamente em produção
-    - Tabela uso_veiculo existe mas sem colunas passageiros_frente e passageiros_tras
-    - Solução: DROP TABLE CASCADE + CREATE TABLE com schema completo
-    
-    ESTRATÉGIA:
-    1. DROP TABLE uso_veiculo CASCADE (remove tabela e dependências)
-    2. CREATE TABLE com todas as colunas (incluindo passageiros)
-    3. Recriar índices para performance
-    4. Recriar foreign keys com ON DELETE CASCADE
-    
-    PERDA DE DADOS: SIM - esta é uma migração destrutiva
-    Alternativa seria fazer backup, mas para desenvolvimento é aceitável
-    """
-    try:
-        logger.info("=" * 80)
-        logger.info("🚨 MIGRAÇÃO 23 EMERGENCIAL: Recriar tabela uso_veiculo")
-        logger.info("=" * 80)
-        logger.info("⚠️  ATENÇÃO: Esta migração é DESTRUTIVA e vai excluir todos os dados de uso_veiculo")
-        
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        # Detectar ambiente
-        cursor.execute("SELECT current_database()")
-        db_name = cursor.fetchone()[0]
-        
-        if 'neon' in db_name or 'localhost' in db_name:
-            ambiente = "🔧 DESENVOLVIMENTO"
-        else:
-            ambiente = "🚀 PRODUÇÃO"
-        
-        logger.info(f"📍 Ambiente detectado: {ambiente}")
-        logger.info(f"📍 Database: {db_name}")
-        
-        # PARTE 1: Verificar se precisa recriar
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'uso_veiculo' 
-            AND column_name = 'passageiros_frente'
-        """)
-        
-        tem_passageiros = cursor.fetchone()
-        
-        if tem_passageiros:
-            logger.info("✅ Tabela uso_veiculo já tem as colunas de passageiros - migração não necessária")
-            cursor.close()
-            connection.close()
-            return
-        
-        logger.info("🔄 Tabela uso_veiculo precisa ser recriada...")
-        
-        # PARTE 2: Contar registros antes de excluir (para auditoria)
-        try:
-            cursor.execute("SELECT COUNT(*) FROM uso_veiculo")
-            total_registros = cursor.fetchone()[0]
-            logger.info(f"📊 Total de registros que serão perdidos: {total_registros}")
-        except Exception as e:
-            logger.warning(f"⚠️  Erro ao contar registros: {e}")
-            total_registros = 0
-        
-        # PARTE 3: DROP TABLE CASCADE
-        logger.info("🗑️  Executando DROP TABLE uso_veiculo CASCADE...")
-        cursor.execute("DROP TABLE IF EXISTS uso_veiculo CASCADE")
-        logger.info("✅ Tabela uso_veiculo excluída com sucesso!")
-        
-        # PARTE 4: CREATE TABLE com schema completo
-        logger.info("🏗️  Criando nova tabela uso_veiculo com schema completo...")
-        cursor.execute("""
-            CREATE TABLE uso_veiculo (
-                id SERIAL PRIMARY KEY,
-                
-                -- Relacionamentos principais
-                veiculo_id INTEGER NOT NULL,
-                funcionario_id INTEGER,
-                obra_id INTEGER,
-                
-                -- Dados do uso
-                data_uso DATE NOT NULL,
-                hora_saida TIME,
-                hora_retorno TIME,
-                
-                -- Quilometragem
-                km_inicial INTEGER,
-                km_final INTEGER,
-                km_percorrido INTEGER,
-                
-                -- PASSAGEIROS (NOVAS COLUNAS)
-                passageiros_frente TEXT,
-                passageiros_tras TEXT,
-                
-                -- Controle
-                responsavel_veiculo VARCHAR(100),
-                
-                -- Observações
-                observacoes TEXT,
-                
-                -- Multi-tenant (OBRIGATÓRIO)
-                admin_id INTEGER NOT NULL,
-                
-                -- Controle de tempo
-                created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        logger.info("✅ Tabela uso_veiculo criada com sucesso!")
-        
-        # PARTE 5: Criar foreign keys
-        logger.info("🔗 Criando foreign keys...")
-        
-        try:
-            cursor.execute("""
-                ALTER TABLE uso_veiculo 
-                ADD CONSTRAINT fk_uso_veiculo_veiculo 
-                FOREIGN KEY (veiculo_id) REFERENCES veiculo(id) 
-                ON DELETE CASCADE
-            """)
-            logger.info("✅ FK veiculo_id criada")
-        except Exception as e:
-            logger.warning(f"⚠️  FK veiculo_id: {e}")
-        
-        try:
-            cursor.execute("""
-                ALTER TABLE uso_veiculo 
-                ADD CONSTRAINT fk_uso_veiculo_funcionario 
-                FOREIGN KEY (funcionario_id) REFERENCES funcionario(id) 
-                ON DELETE SET NULL
-            """)
-            logger.info("✅ FK funcionario_id criada")
-        except Exception as e:
-            logger.warning(f"⚠️  FK funcionario_id: {e}")
-        
-        try:
-            cursor.execute("""
-                ALTER TABLE uso_veiculo 
-                ADD CONSTRAINT fk_uso_veiculo_obra 
-                FOREIGN KEY (obra_id) REFERENCES obra(id) 
-                ON DELETE SET NULL
-            """)
-            logger.info("✅ FK obra_id criada")
-        except Exception as e:
-            logger.warning(f"⚠️  FK obra_id: {e}")
-        
-        try:
-            cursor.execute("""
-                ALTER TABLE uso_veiculo 
-                ADD CONSTRAINT fk_uso_veiculo_admin 
-                FOREIGN KEY (admin_id) REFERENCES usuario(id) 
-                ON DELETE CASCADE
-            """)
-            logger.info("✅ FK admin_id criada")
-        except Exception as e:
-            logger.warning(f"⚠️  FK admin_id: {e}")
-        
-        # PARTE 6: Criar índices para performance
-        logger.info("📊 Criando índices...")
-        
-        try:
-            cursor.execute("""
-                CREATE INDEX idx_uso_veiculo_data_admin 
-                ON uso_veiculo(data_uso, admin_id)
-            """)
-            logger.info("✅ Índice data_uso + admin_id criado")
-        except Exception as e:
-            logger.warning(f"⚠️  Índice data_admin: {e}")
-        
-        try:
-            cursor.execute("""
-                CREATE INDEX idx_uso_veiculo_funcionario 
-                ON uso_veiculo(funcionario_id)
-            """)
-            logger.info("✅ Índice funcionario_id criado")
-        except Exception as e:
-            logger.warning(f"⚠️  Índice funcionario: {e}")
-        
-        try:
-            cursor.execute("""
-                CREATE INDEX idx_uso_veiculo_obra 
-                ON uso_veiculo(obra_id)
-            """)
-            logger.info("✅ Índice obra_id criado")
-        except Exception as e:
-            logger.warning(f"⚠️  Índice obra: {e}")
-        
-        try:
-            cursor.execute("""
-                CREATE INDEX idx_uso_veiculo_veiculo 
-                ON uso_veiculo(veiculo_id)
-            """)
-            logger.info("✅ Índice veiculo_id criado")
-        except Exception as e:
-            logger.warning(f"⚠️  Índice veiculo: {e}")
-        
-        # PARTE 7: Commit final
-        connection.commit()
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 23 CONCLUÍDA COM SUCESSO!")
-        logger.info("=" * 80)
-        logger.info(f"📊 Registros perdidos: {total_registros}")
-        logger.info("✅ Tabela uso_veiculo recriada com schema completo")
-        logger.info("✅ Colunas passageiros_frente e passageiros_tras adicionadas")
-        logger.info("✅ Foreign keys criadas com CASCADE apropriado")
-        logger.info("✅ Índices criados para performance")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error("=" * 80)
-        logger.error(f"❌ ERRO CRÍTICO na Migração 23: {str(e)}")
-        logger.error("=" * 80)
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        if 'connection' in locals():
-            try:
-                connection.rollback()
-                cursor.close()
-                connection.close()
-            except:
-                pass
-        
-        # RE-RAISE para não silenciar o erro
-        raise Exception(f"Migração 23 falhou: {str(e)}")
-
-def adicionar_colunas_passageiros_robusto():
-    """
-    MIGRAÇÃO 24 SEGURA: Adicionar colunas passageiros com tratamento robusto
-    
-    DIFERENÇA DA MIGRAÇÃO 22:
-    - Logging detalhado do SQL exato que está sendo executado
-    - Tratamento individual de cada coluna (não falha tudo se uma der erro)
-    - Commit explícito após cada ALTER TABLE
-    - Detecção de ambiente para diagnóstico
-    
-    ESTRATÉGIA:
-    1. Tentar adicionar passageiros_frente
-    2. Tentar adicionar passageiros_tras
-    3. Se ambos falharem, logar erro detalhado para diagnóstico manual
-    """
-    try:
-        logger.info("=" * 80)
-        logger.info("🔒 MIGRAÇÃO 24 SEGURA: Adicionar colunas passageiros (robusto)")
-        logger.info("=" * 80)
-        
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        # Detectar ambiente
-        cursor.execute("SELECT current_database()")
-        db_name = cursor.fetchone()[0]
-        
-        if 'neon' in db_name or 'localhost' in db_name:
-            ambiente = "🔧 DESENVOLVIMENTO"
-        else:
-            ambiente = "🚀 PRODUÇÃO"
-        
-        logger.info(f"📍 Ambiente: {ambiente}")
-        logger.info(f"📍 Database: {db_name}")
-        
-        # COLUNA 1: passageiros_frente
-        logger.info("🔄 Verificando coluna passageiros_frente...")
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'uso_veiculo' 
-            AND column_name = 'passageiros_frente'
-        """)
-        
-        if cursor.fetchone():
-            logger.info("✅ Coluna passageiros_frente já existe")
-        else:
-            try:
-                sql_add_frente = "ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT"
-                logger.info(f"📝 SQL: {sql_add_frente}")
-                cursor.execute(sql_add_frente)
-                connection.commit()
-                logger.info("✅ Coluna passageiros_frente adicionada com sucesso!")
-            except Exception as e:
-                logger.error(f"❌ ERRO ao adicionar passageiros_frente: {e}")
-                logger.error(f"📋 SQL que falhou: {sql_add_frente}")
-                connection.rollback()
-                # Não re-raise - tentar a próxima coluna
-        
-        # COLUNA 2: passageiros_tras
-        logger.info("🔄 Verificando coluna passageiros_tras...")
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'uso_veiculo' 
-            AND column_name = 'passageiros_tras'
-        """)
-        
-        if cursor.fetchone():
-            logger.info("✅ Coluna passageiros_tras já existe")
-        else:
-            try:
-                sql_add_tras = "ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT"
-                logger.info(f"📝 SQL: {sql_add_tras}")
-                cursor.execute(sql_add_tras)
-                connection.commit()
-                logger.info("✅ Coluna passageiros_tras adicionada com sucesso!")
-            except Exception as e:
-                logger.error(f"❌ ERRO ao adicionar passageiros_tras: {e}")
-                logger.error(f"📋 SQL que falhou: {sql_add_tras}")
-                connection.rollback()
-                # Não re-raise - apenas logar
-        
-        # Verificação final
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'uso_veiculo' 
-            AND column_name IN ('passageiros_frente', 'passageiros_tras')
-            ORDER BY column_name
-        """)
-        colunas_adicionadas = cursor.fetchall()
-        
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        if len(colunas_adicionadas) == 2:
-            logger.info("✅ MIGRAÇÃO 24 CONCLUÍDA: Ambas as colunas de passageiros estão disponíveis!")
-        elif len(colunas_adicionadas) == 1:
-            logger.warning(f"⚠️  MIGRAÇÃO 24 PARCIAL: Apenas 1 coluna adicionada: {colunas_adicionadas[0][0]}")
-        else:
-            logger.error("❌ MIGRAÇÃO 24 FALHOU: Nenhuma coluna de passageiros foi adicionada")
-            logger.error("🔧 AÇÃO MANUAL NECESSÁRIA: Execute o seguinte SQL manualmente em produção:")
-            logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT;")
-            logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT;")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error("=" * 80)
-        logger.error(f"❌ ERRO CRÍTICO na Migração 24: {str(e)}")
-        logger.error("=" * 80)
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        if 'connection' in locals():
-            try:
-                connection.rollback()
-                cursor.close()
-                connection.close()
-            except:
-                pass
-        
-        # NÃO re-raise - permitir que a aplicação continue
-        logger.warning("⚠️  Aplicação continuará rodando, mas funcionalidade de passageiros pode não funcionar")
-
-def adicionar_passageiros_sql_puro():
-    """
-    MIGRAÇÃO 25 ULTRA-ROBUSTA: SQL Puro com DO Block PostgreSQL
-    
-    Esta migração usa SQL nativo do PostgreSQL com blocos DO para 
-    emular IF NOT EXISTS no ALTER TABLE ADD COLUMN.
-    
-    VANTAGENS:
-    - SQL executado diretamente no PostgreSQL (não passa por ORM)
-    - Emula IF NOT EXISTS usando blocos DO
-    - Trata erro "column already exists" como sucesso
-    - Absolutamente idempotente
-    - Funciona em qualquer versão PostgreSQL 9.0+
-    """
-    try:
-        logger.info("=" * 80)
-        logger.info("🔥 MIGRAÇÃO 25 ULTRA-ROBUSTA: SQL Puro para colunas passageiros")
-        logger.info("=" * 80)
-        
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        # Detectar ambiente
-        cursor.execute("SELECT current_database(), current_user, version()")
-        db_info = cursor.fetchone()
-        logger.info(f"📍 Database: {db_info[0]}")
-        logger.info(f"📍 User: {db_info[1]}")
-        logger.info(f"📍 PostgreSQL: {db_info[2].split(',')[0]}")
-        
-        # SQL PURO com DO block para passageiros_frente
-        sql_frente = """
-        DO $$ 
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.columns 
-                WHERE table_name = 'uso_veiculo' 
-                AND column_name = 'passageiros_frente'
-            ) THEN
-                ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT;
-                RAISE NOTICE 'Coluna passageiros_frente criada com sucesso';
-            ELSE
-                RAISE NOTICE 'Coluna passageiros_frente já existe';
-            END IF;
-        END $$;
-        """
-        
-        # SQL PURO com DO block para passageiros_tras
-        sql_tras = """
-        DO $$ 
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.columns 
-                WHERE table_name = 'uso_veiculo' 
-                AND column_name = 'passageiros_tras'
-            ) THEN
-                ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT;
-                RAISE NOTICE 'Coluna passageiros_tras criada com sucesso';
-            ELSE
-                RAISE NOTICE 'Coluna passageiros_tras já existe';
-            END IF;
-        END $$;
-        """
-        
-        # Executar SQL para passageiros_frente
-        logger.info("🔄 Executando SQL para passageiros_frente...")
-        logger.debug(f"SQL: {sql_frente.strip()}")
-        try:
-            cursor.execute(sql_frente)
-            connection.commit()
-            logger.info("✅ SQL passageiros_frente executado com sucesso!")
-        except Exception as e:
-            logger.error(f"❌ Erro ao executar SQL passageiros_frente: {e}")
-            connection.rollback()
-        
-        # Executar SQL para passageiros_tras
-        logger.info("🔄 Executando SQL para passageiros_tras...")
-        logger.debug(f"SQL: {sql_tras.strip()}")
-        try:
-            cursor.execute(sql_tras)
-            connection.commit()
-            logger.info("✅ SQL passageiros_tras executado com sucesso!")
-        except Exception as e:
-            logger.error(f"❌ Erro ao executar SQL passageiros_tras: {e}")
-            connection.rollback()
-        
-        # Verificação final GARANTIDA
-        logger.info("🔍 Verificação final das colunas...")
-        cursor.execute("""
-            SELECT column_name, data_type, is_nullable
-            FROM information_schema.columns 
-            WHERE table_name = 'uso_veiculo' 
-            AND column_name IN ('passageiros_frente', 'passageiros_tras')
-            ORDER BY column_name
-        """)
-        
-        colunas = cursor.fetchall()
-        
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        if len(colunas) == 2:
-            logger.info("✅✅✅ MIGRAÇÃO 25 SUCESSO TOTAL! ✅✅✅")
-            logger.info("📊 Colunas confirmadas:")
-            for col in colunas:
-                logger.info(f"   - {col[0]}: {col[1]} (nullable={col[2]})")
-        elif len(colunas) == 1:
-            logger.error(f"⚠️  MIGRAÇÃO 25 PARCIAL: Apenas {colunas[0][0]} existe")
-            logger.error("🚨 AÇÃO MANUAL URGENTE: Execute no banco de produção:")
-            if colunas[0][0] == 'passageiros_frente':
-                logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT;")
-            else:
-                logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT;")
-        else:
-            logger.error("❌❌❌ MIGRAÇÃO 25 FALHOU COMPLETAMENTE ❌❌❌")
-            logger.error("🚨 AÇÃO MANUAL URGENTE: Execute no banco de produção:")
-            logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_frente TEXT;")
-            logger.error("   ALTER TABLE uso_veiculo ADD COLUMN passageiros_tras TEXT;")
-            logger.error("")
-            logger.error("📋 Ou use o comando SQL completo com DO block:")
-            logger.error(sql_frente.strip())
-            logger.error(sql_tras.strip())
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error("=" * 80)
-        logger.error(f"❌ ERRO CRÍTICO na Migração 25: {str(e)}")
-        logger.error("=" * 80)
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        if 'connection' in locals():
-            try:
-                connection.rollback()
-                cursor.close()
-                connection.close()
-            except:
-                pass
-        
-        # NÃO re-raise - permitir que a aplicação continue
-        logger.error("⚠️  Aplicação continuará rodando, mas registro de uso de veículo FALHARÁ")
-
-def drop_tabelas_veiculos_antigas():
-    """
-    MIGRAÇÃO 26: DROP das tabelas antigas do sistema de veículos
-    
-    ⚠️  MIGRAÇÃO DESTRUTIVA - REMOVE PERMANENTEMENTE:
-    - uso_veiculo
-    - custo_veiculo
-    - veiculo
-    - fleet_vehicle_usage
-    - fleet_vehicle_cost
-    - fleet_vehicle
-    
-    Após esta migração, apenas FrotaVeiculo, FrotaUtilizacao e FrotaDespesa existirão.
-    """
-    try:
-        logger.info("=" * 80)
-        logger.info("🗑️  MIGRAÇÃO 26: DROP DE TABELAS ANTIGAS DO SISTEMA DE VEÍCULOS")
-        logger.info("=" * 80)
-        logger.warning("⚠️  ATENÇÃO: Esta migração é DESTRUTIVA e IRREVERSÍVEL!")
-        
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        # Detectar ambiente
-        cursor.execute("SELECT current_database()")
-        db_name = cursor.fetchone()[0]
-        logger.info(f"📍 Database: {db_name}")
-        
-        # Lista de tabelas para remover (ordem importa por causa de FKs)
-        tabelas_para_remover = [
-            'uso_veiculo',
-            'custo_veiculo', 
-            'veiculo',
-            'fleet_vehicle_usage',
-            'fleet_vehicle_cost',
-            'fleet_vehicle'
-        ]
-        
-        tabelas_removidas = []
-        tabelas_nao_encontradas = []
-        
-        for tabela in tabelas_para_remover:
-            # Verificar se tabela existe
-            cursor.execute("""
-                SELECT EXISTS (
-                    SELECT 1 FROM information_schema.tables 
-                    WHERE table_name = %s
-                )
-            """, (tabela,))
-            
-            existe = cursor.fetchone()[0]
-            
-            if existe:
-                try:
-                    sql_drop = f"DROP TABLE {tabela} CASCADE"
-                    logger.info(f"🗑️  Executando: {sql_drop}")
-                    cursor.execute(sql_drop)
-                    connection.commit()
-                    tabelas_removidas.append(tabela)
-                    logger.info(f"✅ Tabela {tabela} removida com sucesso!")
-                except Exception as e:
-                    logger.error(f"❌ Erro ao remover tabela {tabela}: {e}")
-                    connection.rollback()
-            else:
-                tabelas_nao_encontradas.append(tabela)
-                logger.info(f"ℹ️  Tabela {tabela} não existe (já foi removida ou nunca existiu)")
-        
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        logger.info("📊 RESUMO DA MIGRAÇÃO 26:")
-        logger.info(f"   ✅ Tabelas removidas: {len(tabelas_removidas)}")
-        if tabelas_removidas:
-            for t in tabelas_removidas:
-                logger.info(f"      - {t}")
-        
-        logger.info(f"   ℹ️  Tabelas não encontradas: {len(tabelas_nao_encontradas)}")
-        if tabelas_nao_encontradas:
-            for t in tabelas_nao_encontradas:
-                logger.info(f"      - {t}")
-        
-        logger.info("")
-        logger.info("✅ MIGRAÇÃO 26 CONCLUÍDA!")
-        logger.info("🎯 Sistema de veículos agora usa apenas:")
-        logger.info("   - frota_veiculo")
-        logger.info("   - frota_utilizacao")
-        logger.info("   - frota_despesa")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error("=" * 80)
-        logger.error(f"❌ ERRO CRÍTICO na Migração 26: {str(e)}")
-        logger.error("=" * 80)
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        if 'connection' in locals():
-            try:
-                connection.rollback()
-                cursor.close()
-                connection.close()
-            except:
-                pass
-        
-        # NÃO re-raise - permitir que a aplicação continue
-        logger.error("⚠️  Aplicação continuará rodando, mas tabelas antigas podem ainda existir")
