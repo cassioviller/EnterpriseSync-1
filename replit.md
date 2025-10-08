@@ -35,13 +35,15 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
 -   **Dynamic PDF Generation:** Supports custom PDF headers, dynamic content pagination, and multi-category proposal display with subtotals.
 -   **Company Customization:** Allows dynamic branding with logo uploads and custom colors (primary, secondary, background) affecting public proposal portals and PDF outputs.
 -   **Drag-and-Drop Organization:** System for organizing proposals by dragging and dropping multiple templates, dynamically updating PDF output.
--   **Fleet Management System (REESCRITO - Oct 2025):** Sistema de veículos completamente reescrito com nova arquitetura devido a falhas persistentes de migração em produção.
-    -   **NOVA ARQUITETURA (Outubro 2025):**
-        - **Modelos Novos:** `FrotaVeiculo`, `FrotaUtilizacao`, `FrotaDespesa` (models.py)
-        - **Tabelas Novas:** `frota_veiculo`, `frota_utilizacao`, `frota_despesa`
-        - **Blueprint Novo:** `frota_bp` (frota_views.py) com rotas `/frota/*`
-        - **Frontend:** 23 url_for() atualizados em 7 templates (`main.veiculos*` → `frota.*`)
-        - **Campos:** 100% idênticos às tabelas antigas, incluindo `passageiros_frente` e `passageiros_tras`
+-   **Fleet Management System (RECRIADO - Oct 2025):** Sistema de veículos completamente recriado com backend limpo e migração 32.
+    -   **ARQUITETURA ATUAL (Outubro 2025 - Migração 32):**
+        - **Modelos Backend:** `Vehicle`, `VehicleUsage`, `VehicleExpense` (models.py linhas 3229-3327)
+        - **Aliases para Compatibilidade:** `FrotaVeiculo=Vehicle`, `FrotaUtilizacao=VehicleUsage`, `FrotaDespesa=VehicleExpense`
+        - **Tabelas Atuais:** `frota_veiculo`, `frota_utilizacao`, `frota_despesa` (produção)
+        - **Tabelas Novas (Migração 32):** `vehicle`, `vehicle_usage`, `vehicle_expense`
+        - **Blueprint:** `frota_bp` (frota_views.py) com rotas `/frota/*`
+        - **Relacionamentos:** Mantidos `.usos` e `.custos` para compatibilidade total
+        - **Campos Completos:** 18 campos incluindo manutenção (data_ultima_manutencao, data_proxima_manutencao, km_proxima_manutencao)
         - **Multi-tenant:** Todos os modelos incluem `admin_id NOT NULL` com isolamento completo
     -   **Migration 26 (LIMPEZA - Oct 2025):** DROP CASCADE de todas as tabelas antigas do sistema de veículos.
         - **Tabelas Removidas:** `veiculo`, `uso_veiculo`, `custo_veiculo`, `fleet_vehicle`, `fleet_vehicle_usage`, `fleet_vehicle_cost`
@@ -66,14 +68,23 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
             - **Solução:** DROP CASCADE de tabelas legacy e fleet, mantém apenas frota_*
             - **Segurança:** Requer `DROP_OLD_VEHICLE_TABLES=true` (bloqueada por padrão)
             - **Status:** ✅ Implementada, aguardando ativação manual
+        - **Migração 32 (RECREAÇÃO COMPLETA - Out 2025):** Recria sistema de veículos com backend limpo
+            - **Problema:** Código legacy (FrotaVeiculo) misturado, dificultando manutenção
+            - **Solução:** Novos modelos (Vehicle, VehicleUsage, VehicleExpense) + aliases para compatibilidade
+            - **Processo:** CREATE vehicle_* → MIGRAR dados de frota_* → DROP frota_*
+            - **Segurança:** Requer `RECREATE_VEHICLE_SYSTEM=true` (bloqueada por padrão)
+            - **Campos Preservados:** Todos os 18 campos incluindo manutenção
+            - **Relacionamentos:** `.usos` e `.custos` mantidos para compatibilidade total
+            - **Status:** ✅ Implementada, aguardando ativação manual
     -   **Status Atual (Out 2025):**
-        - ✅ Sistema Frota* funcionando (tabelas frota_*)
-        - ✅ Migração 30 corrige divergência dev/prod na coluna obra_id
-        - ✅ Migração 31 pronta para limpeza completa de tabelas antigas
-        - ⏸️  Tabelas antigas coexistem (aguardando ativação manual da Migração 31)
-        - 🎯 Próximo passo: Ativar `DROP_OLD_VEHICLE_TABLES=true` para limpeza final
+        - ✅ Sistema Frota funcionando (tabelas frota_* em produção)
+        - ✅ Backend recriado com modelos Vehicle* + aliases para compatibilidade
+        - ✅ Migração 32 implementada e aguardando ativação (RECREATE_VEHICLE_SYSTEM=true)
+        - ✅ Campos de manutenção preservados (data_ultima_manutencao, data_proxima_manutencao, km_proxima_manutencao)
+        - ✅ Relacionamentos compatíveis (.usos, .custos) funcionando perfeitamente
+        - ✅ Health check passando: `{"database":"connected","status":"healthy"}`
+        - 🎯 Próximo passo: Ativar feature flag para migração de produção frota_* → vehicle_*
         - ✅ Redirecionamentos: `/veiculos` → `/frota` (HTTP 307 preserva POST)
-        - ✅ Entrypoint produção atualizado (Outubro 2025): health check verifica tabelas frota_*
     -   **Deployment Strategy:** 100% automático, zero intervenção manual, feature flag garante segurança.
 
 ## External Dependencies
