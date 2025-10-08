@@ -214,6 +214,62 @@ def _migration_28_migrar_dados_frota():
         import traceback
         logger.error(traceback.format_exc())
 
+
+def corrigir_estrutura_frota_despesa():
+    """
+    MIGRAÇÃO 29: Corrigir estrutura da tabela frota_despesa em produção
+    
+    Problema: Em produção a tabela foi criada com coluna 'data_id' em vez de 'data_custo'
+    Solução: Renomear a coluna para o nome correto
+    """
+    logger.info("=" * 80)
+    logger.info("🔧 MIGRAÇÃO 29: Corrigir estrutura frota_despesa")
+    logger.info("=" * 80)
+    
+    try:
+        # Verificar se a coluna errada existe
+        result = db.session.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'frota_despesa' 
+            AND column_name IN ('data_id', 'data_custo')
+        """))
+        colunas = [row[0] for row in result]
+        
+        logger.info(f"📋 Colunas encontradas em frota_despesa: {colunas}")
+        
+        if 'data_id' in colunas and 'data_custo' not in colunas:
+            logger.info("🔄 Renomeando coluna data_id → data_custo...")
+            db.session.execute(text("""
+                ALTER TABLE frota_despesa 
+                RENAME COLUMN data_id TO data_custo
+            """))
+            db.session.commit()
+            logger.info("✅ Coluna renomeada com sucesso!")
+            
+        elif 'data_custo' in colunas:
+            logger.info("✅ Coluna data_custo já existe corretamente")
+            
+        else:
+            logger.warning("⚠️ Nenhuma das colunas esperadas encontrada - criando data_custo...")
+            db.session.execute(text("""
+                ALTER TABLE frota_despesa 
+                ADD COLUMN IF NOT EXISTS data_custo DATE NOT NULL DEFAULT CURRENT_DATE
+            """))
+            db.session.commit()
+            logger.info("✅ Coluna data_custo criada")
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 29 CONCLUÍDA: Estrutura frota_despesa corrigida!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro na migração 29: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -319,6 +375,9 @@ def executar_migracoes():
         
         # Migração 28: Migrar dados das tabelas antigas para sistema Frota
         _migration_28_migrar_dados_frota()
+        
+        # Migração 29: Corrigir estrutura da tabela frota_despesa (data_id → data_custo)
+        corrigir_estrutura_frota_despesa()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
