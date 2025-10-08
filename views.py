@@ -2891,35 +2891,13 @@ def kpis_veiculo_periodo(id):
 
 
 
-# 3. ROTA EXCLUSÃO - /veiculos/<id>/excluir (POST) - DESATIVADA
+# 3. ROTA EXCLUSÃO - /veiculos/<id>/excluir (POST) - REDIRECIONAMENTO
 @main_bp.route('/veiculos/<int:id>/excluir', methods=['POST'])
 @admin_required
 def excluir_veiculo(id):
-    """Rota antiga desativada - use o sistema Frota"""
-    print(f"🔀 [VEICULOS_EXCLUIR_REDIRECT] Rota antiga acessada para veículo {id}")
-    flash('Por favor, use o sistema de Frota para gerenciar veículos.', 'info')
-    return redirect(url_for('frota.lista'))
-    
-    admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-    # 🔒 Enhanced admin_id verification
-    veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
-    
-    try:
-        # 📝 AUDIT LOG: Log destructive operation for security
-        logger.info(f"🗑️ VEHICLE DELETE: Admin {admin_id} deleted vehicle {veiculo.placa} (ID: {id})")
-        
-        # Marcar como inativo (não deletar fisicamente) - SAFE DELETE
-        veiculo.ativo = False
-        veiculo.updated_at = datetime.utcnow() if hasattr(veiculo, 'updated_at') else None
-        db.session.commit()
-        
-        flash(f'Veículo {veiculo.placa} removido com sucesso!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"❌ ERRO AO EXCLUIR VEÍCULO: {str(e)}", exc_info=True)
-        flash('Erro ao remover veículo. Tente novamente.', 'error')
-    
-    return redirect(url_for('main.veiculos'))
+    """Redireciona para o novo sistema de frota (HTTP 307 preserva POST)"""
+    print(f"🔀 [VEICULOS_EXCLUIR_REDIRECT] Redirecionando para frota.deletar_veiculo({id})")
+    return redirect(url_for('frota.deletar_veiculo', id=id), code=307)
 
 
 # Helper function para processar passageiros por posição

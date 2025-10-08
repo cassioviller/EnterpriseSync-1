@@ -740,3 +740,40 @@ def deletar_custo(custo_id):
         print(f"❌ [FROTA_DELETAR_CUSTO] Erro: {str(e)}")
         flash(f'Erro ao deletar custo: {str(e)}', 'error')
         return redirect(url_for('frota.lista'))
+
+
+# ===== ROTA: DELETAR VEÍCULO DA FROTA (SOFT DELETE) =====
+@frota_bp.route('/<int:id>/deletar', methods=['POST'])
+@login_required
+def deletar_veiculo(id):
+    """Deleta um veículo da frota (soft delete)"""
+    try:
+        print(f"🗑️ [FROTA_DELETAR_VEICULO] Iniciando para veículo {id}")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Buscar veículo da frota
+        veiculo = FrotaVeiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
+        if not veiculo:
+            flash('Veículo não encontrado.', 'error')
+            return redirect(url_for('frota.lista'))
+        
+        # Soft delete (marcar como inativo)
+        veiculo.ativo = False
+        if hasattr(veiculo, 'updated_at'):
+            veiculo.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        flash(f'Veículo {veiculo.placa} removido com sucesso!', 'success')
+        return redirect(url_for('frota.lista'))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ [FROTA_DELETAR_VEICULO] Erro: {str(e)}")
+        flash(f'Erro ao deletar veículo: {str(e)}', 'error')
+        return redirect(url_for('frota.lista'))
