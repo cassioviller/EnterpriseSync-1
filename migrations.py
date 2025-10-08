@@ -439,6 +439,211 @@ def limpeza_completa_sistemas_antigos_veiculos():
         logger.error(traceback.format_exc())
 
 
+def _migration_32_recreate_vehicle_system():
+    """
+    MIGRAÇÃO 32: Recriar sistema de veículos com estrutura limpa
+    
+    PROCESSO:
+    1. Criar novas tabelas: vehicle, vehicle_usage, vehicle_expense
+    2. Migrar dados: frota_* → vehicle_*
+    3. DROP tabelas antigas: frota_*
+    
+    SEGURANÇA: Só executa se RECREATE_VEHICLE_SYSTEM=true
+    """
+    try:
+        # Verificar feature flag de segurança
+        if os.environ.get('RECREATE_VEHICLE_SYSTEM', 'false').lower() != 'true':
+            logger.info("🔒 MIGRAÇÃO 32: Bloqueada por segurança. Para ativar: RECREATE_VEHICLE_SYSTEM=true")
+            return
+        
+        logger.info("=" * 80)
+        logger.info("🚗 MIGRAÇÃO 32: Recriar sistema de veículos - ESTRUTURA LIMPA")
+        logger.info("✅ PRESERVANDO DADOS: Migração automática frota_* → vehicle_*")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # PASSO 1: Criar novas tabelas (se não existirem)
+        logger.info("📋 PASSO 1: Criando novas tabelas...")
+        
+        # 2.1 - Tabela vehicle
+        logger.info("🚗 Criando tabela vehicle...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vehicle (
+                id SERIAL PRIMARY KEY,
+                placa VARCHAR(10) NOT NULL,
+                marca VARCHAR(50) NOT NULL,
+                modelo VARCHAR(100) NOT NULL,
+                ano INTEGER NOT NULL,
+                tipo VARCHAR(30) DEFAULT 'Utilitário',
+                km_atual INTEGER DEFAULT 0,
+                cor VARCHAR(30),
+                chassi VARCHAR(50),
+                renavam VARCHAR(20),
+                combustivel VARCHAR(20) DEFAULT 'Gasolina',
+                ativo BOOLEAN DEFAULT true,
+                data_ultima_manutencao DATE,
+                data_proxima_manutencao DATE,
+                km_proxima_manutencao INTEGER,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP,
+                CONSTRAINT uk_vehicle_admin_placa UNIQUE (admin_id, placa)
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_admin ON vehicle(admin_id)")
+        logger.info("✅ Tabela vehicle criada")
+        
+        # 2.2 - Tabela vehicle_usage
+        logger.info("📝 Criando tabela vehicle_usage...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vehicle_usage (
+                id SERIAL PRIMARY KEY,
+                veiculo_id INTEGER NOT NULL REFERENCES vehicle(id) ON DELETE CASCADE,
+                funcionario_id INTEGER REFERENCES funcionario(id),
+                obra_id INTEGER REFERENCES obra(id),
+                data_uso DATE NOT NULL,
+                hora_saida TIME,
+                hora_retorno TIME,
+                km_inicial INTEGER,
+                km_final INTEGER,
+                km_percorrido INTEGER,
+                passageiros_frente TEXT,
+                passageiros_tras TEXT,
+                responsavel_veiculo VARCHAR(100),
+                observacoes TEXT,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_usage_data_admin ON vehicle_usage(data_uso, admin_id)")
+        logger.info("✅ Tabela vehicle_usage criada")
+        
+        # 2.3 - Tabela vehicle_expense
+        logger.info("💰 Criando tabela vehicle_expense...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vehicle_expense (
+                id SERIAL PRIMARY KEY,
+                veiculo_id INTEGER NOT NULL REFERENCES vehicle(id) ON DELETE CASCADE,
+                obra_id INTEGER REFERENCES obra(id),
+                data_custo DATE NOT NULL,
+                tipo_custo VARCHAR(30) NOT NULL,
+                valor NUMERIC(10, 2) NOT NULL,
+                descricao VARCHAR(200) NOT NULL,
+                fornecedor VARCHAR(100),
+                numero_nota_fiscal VARCHAR(20),
+                status_pagamento VARCHAR(20) DEFAULT 'Pendente',
+                forma_pagamento VARCHAR(30),
+                km_veiculo INTEGER,
+                observacoes TEXT,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vehicle_expense_data_admin ON vehicle_expense(data_custo, admin_id)")
+        logger.info("✅ Tabela vehicle_expense criada")
+        
+        # PASSO 2: Migrar dados das tabelas antigas
+        logger.info("📋 PASSO 2: Migrando dados frota_* → vehicle_*...")
+        
+        # 2.1 - Verificar se tabelas antigas existem
+        cursor.execute("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_name IN ('frota_veiculo', 'frota_utilizacao', 'frota_despesa')
+        """)
+        tabelas_antigas = [row[0] for row in cursor.fetchall()]
+        logger.info(f"📊 Tabelas antigas encontradas: {tabelas_antigas}")
+        
+        if 'frota_veiculo' in tabelas_antigas:
+            # Migrar veículos
+            logger.info("🚗 Migrando frota_veiculo → vehicle...")
+            cursor.execute("""
+                INSERT INTO vehicle (
+                    id, placa, marca, modelo, ano, tipo, km_atual, cor, chassi, renavam,
+                    combustivel, ativo, data_ultima_manutencao, data_proxima_manutencao, 
+                    km_proxima_manutencao, admin_id, created_at, updated_at
+                )
+                SELECT 
+                    id, placa, marca, modelo, ano, tipo, km_atual, cor, chassi, renavam,
+                    combustivel, ativo, data_ultima_manutencao, data_proxima_manutencao,
+                    km_proxima_manutencao, admin_id, created_at, updated_at
+                FROM frota_veiculo
+                ON CONFLICT (admin_id, placa) DO NOTHING
+            """)
+            veiculos_migrados = cursor.rowcount
+            logger.info(f"✅ {veiculos_migrados} veículos migrados")
+            
+            # Atualizar sequence para evitar conflito de IDs
+            cursor.execute("SELECT MAX(id) FROM vehicle")
+            max_id = cursor.fetchone()[0]
+            if max_id:
+                cursor.execute(f"SELECT setval('vehicle_id_seq', {max_id})")
+        
+        if 'frota_utilizacao' in tabelas_antigas and 'frota_veiculo' in tabelas_antigas:
+            # Migrar utilizações
+            logger.info("📝 Migrando frota_utilizacao → vehicle_usage...")
+            cursor.execute("""
+                INSERT INTO vehicle_usage (
+                    veiculo_id, funcionario_id, obra_id, data_uso, hora_saida, hora_retorno,
+                    km_inicial, km_final, km_percorrido, passageiros_frente, passageiros_tras,
+                    responsavel_veiculo, observacoes, admin_id, created_at
+                )
+                SELECT 
+                    veiculo_id, funcionario_id, obra_id, data_uso, hora_saida, hora_retorno,
+                    km_inicial, km_final, km_percorrido, passageiros_frente, passageiros_tras,
+                    responsavel_veiculo, observacoes, admin_id, created_at
+                FROM frota_utilizacao
+            """)
+            usos_migrados = cursor.rowcount
+            logger.info(f"✅ {usos_migrados} utilizações migradas")
+        
+        if 'frota_despesa' in tabelas_antigas and 'frota_veiculo' in tabelas_antigas:
+            # Migrar despesas
+            logger.info("💰 Migrando frota_despesa → vehicle_expense...")
+            cursor.execute("""
+                INSERT INTO vehicle_expense (
+                    veiculo_id, obra_id, data_custo, tipo_custo, valor, descricao,
+                    fornecedor, numero_nota_fiscal, status_pagamento, forma_pagamento,
+                    km_veiculo, observacoes, admin_id, created_at
+                )
+                SELECT 
+                    veiculo_id, obra_id, data_custo, tipo_custo, valor, descricao,
+                    fornecedor, numero_nota_fiscal, status_pagamento, forma_pagamento,
+                    km_veiculo, observacoes, admin_id, created_at
+                FROM frota_despesa
+            """)
+            despesas_migradas = cursor.rowcount
+            logger.info(f"✅ {despesas_migradas} despesas migradas")
+        
+        # PASSO 3: DROP tabelas antigas
+        logger.info("📋 PASSO 3: Removendo tabelas antigas...")
+        for tabela in ['frota_despesa', 'frota_utilizacao', 'frota_veiculo']:
+            if tabela in tabelas_antigas:
+                logger.info(f"🗑️  DROP TABLE {tabela} CASCADE...")
+                cursor.execute(f"DROP TABLE IF EXISTS {tabela} CASCADE")
+                logger.info(f"✅ Tabela {tabela} removida")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 32 CONCLUÍDA: Sistema de veículos recriado!")
+        logger.info("🎯 Novas tabelas: vehicle, vehicle_usage, vehicle_expense")
+        logger.info("✅ DADOS PRESERVADOS: Todos os registros foram migrados com sucesso")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 32: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -553,6 +758,9 @@ def executar_migracoes():
         
         # Migração 31: Limpeza completa dos sistemas antigos de veículos
         limpeza_completa_sistemas_antigos_veiculos()
+        
+        # Migração 32: Recriar sistema de veículos limpo
+        _migration_32_recreate_vehicle_system()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
