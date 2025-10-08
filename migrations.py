@@ -343,6 +343,102 @@ def corrigir_coluna_obra_id_frota_despesa():
         logger.error(traceback.format_exc())
 
 
+def limpeza_completa_sistemas_antigos_veiculos():
+    """
+    MIGRAÇÃO 31: Limpeza completa dos sistemas antigos de veículos
+    
+    Remove todas as tabelas e resquícios dos sistemas legacy:
+    - Sistema original: veiculo, uso_veiculo, custo_veiculo, etc.
+    - Sistema FLEET: fleet_vehicle, fleet_vehicle_usage, fleet_vehicle_cost
+    
+    MANTÉM apenas: frota_veiculo, frota_utilizacao, frota_despesa
+    
+    SEGURANÇA: Só executa se DROP_OLD_VEHICLE_TABLES=true
+    """
+    try:
+        # Verificar feature flag de segurança
+        if os.environ.get('DROP_OLD_VEHICLE_TABLES', 'false').lower() != 'true':
+            logger.info("🔒 MIGRAÇÃO 31: Bloqueada por segurança. Para ativar: DROP_OLD_VEHICLE_TABLES=true")
+            return
+        
+        logger.info("=" * 80)
+        logger.info("🧹 MIGRAÇÃO 31: Limpeza completa dos sistemas antigos de veículos")
+        logger.info("⚠️  ATENÇÃO: Esta operação é IRREVERSÍVEL!")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Lista de tabelas para remover (ordem importa devido a FKs)
+        tabelas_para_remover = [
+            # Sistema FLEET (intermediário)
+            'fleet_vehicle_usage',
+            'fleet_vehicle_cost', 
+            'fleet_vehicle',
+            
+            # Sistema LEGACY original
+            'passageiro_veiculo',
+            'documento_fiscal',
+            'uso_veiculo',
+            'custo_veiculo',
+            'veiculo'
+        ]
+        
+        for tabela in tabelas_para_remover:
+            try:
+                # Verificar se tabela existe
+                cursor.execute("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_name = %s
+                """, (tabela,))
+                
+                if cursor.fetchone():
+                    logger.info(f"🗑️  Removendo tabela: {tabela}")
+                    cursor.execute(f"DROP TABLE IF EXISTS {tabela} CASCADE")
+                    logger.info(f"✅ Tabela {tabela} removida com sucesso")
+                else:
+                    logger.info(f"ℹ️  Tabela {tabela} não existe (já removida)")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️  Erro ao remover tabela {tabela}: {e}")
+                # Continuar com outras tabelas
+        
+        # Remover índices órfãos se existirem
+        indices_orfaos = [
+            'idx_veiculo_admin_placa',
+            'idx_uso_veiculo_data',
+            'idx_custo_veiculo_tipo',
+            'idx_fleet_vehicle_admin_plate',
+            'idx_fleet_usage_date_admin'
+        ]
+        
+        for indice in indices_orfaos:
+            try:
+                cursor.execute(f"DROP INDEX IF EXISTS {indice}")
+                logger.info(f"🗑️  Índice órfão removido: {indice}")
+            except Exception as e:
+                logger.debug(f"Índice {indice} não existe: {e}")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 31: Limpeza do banco concluída com sucesso!")
+        logger.info("🎯 Sistema agora usa APENAS tabelas frota_*")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 31: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -454,6 +550,9 @@ def executar_migracoes():
         
         # Migração 30: Adicionar coluna obra_id na tabela frota_despesa
         corrigir_coluna_obra_id_frota_despesa()
+        
+        # Migração 31: Limpeza completa dos sistemas antigos de veículos
+        limpeza_completa_sistemas_antigos_veiculos()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         

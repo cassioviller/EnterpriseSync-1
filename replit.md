@@ -56,16 +56,22 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
     -   **MIGRAÇÕES CRÍTICAS DE CORREÇÃO (Out 2025):**
         - **Migração 28:** Migração de dados `veiculo/uso_veiculo/custo_veiculo` → `frota_*` (✅ Aplicada)
         - **Migração 29:** Correção `data_id` → `data_custo` em `frota_despesa` (✅ Aplicada)
-        - **Migração 30 (NOVA - Out 2025):** Adiciona coluna `obra_id` em `frota_despesa` em produção
+        - **Migração 30 (Out 2025):** Adiciona coluna `obra_id` em `frota_despesa` em produção
             - **Problema:** Tabela criada sem FK para obras em produção
             - **Solução:** `ALTER TABLE frota_despesa ADD COLUMN obra_id INTEGER REFERENCES obra(id)`
             - **Índice:** Cria `idx_frota_despesa_obra_id` para performance
             - **Status:** ✅ Implementada, idempotente, pronta para deploy
+        - **Migração 31 (LIMPEZA COMPLETA - Out 2025):** Remove TODAS as tabelas antigas de veículos
+            - **Problema:** Coexistência de 3 arquiteturas (veiculo, fleet_*, frota_*)
+            - **Solução:** DROP CASCADE de tabelas legacy e fleet, mantém apenas frota_*
+            - **Segurança:** Requer `DROP_OLD_VEHICLE_TABLES=true` (bloqueada por padrão)
+            - **Status:** ✅ Implementada, aguardando ativação manual
     -   **Status Atual (Out 2025):**
         - ✅ Sistema Frota* funcionando (tabelas frota_*)
         - ✅ Migração 30 corrige divergência dev/prod na coluna obra_id
-        - ⏸️  Tabelas antigas coexistem (migração 26 bloqueada)
-        - 🎯 Próximo passo: Ativar `DROP_OLD_VEHICLE_TABLES=true` após validação
+        - ✅ Migração 31 pronta para limpeza completa de tabelas antigas
+        - ⏸️  Tabelas antigas coexistem (aguardando ativação manual da Migração 31)
+        - 🎯 Próximo passo: Ativar `DROP_OLD_VEHICLE_TABLES=true` para limpeza final
         - ✅ Redirecionamentos: `/veiculos` → `/frota` (HTTP 307 preserva POST)
         - ✅ Entrypoint produção atualizado (Outubro 2025): health check verifica tabelas frota_*
     -   **Deployment Strategy:** 100% automático, zero intervenção manual, feature flag garante segurança.
