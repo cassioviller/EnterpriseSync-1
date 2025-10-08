@@ -3354,6 +3354,7 @@ class FrotaUtilizacao(db.Model):
     funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id], backref='frota_usos_veiculo')
     obra = db.relationship('Obra', backref='frota_usos_veiculo')
     admin = db.relationship('Usuario', backref='frota_usos_veiculo_administrados')
+    # veiculo vem do backref em FrotaVeiculo
     
     # Índices para performance
     __table_args__ = (
@@ -3438,7 +3439,9 @@ class FrotaDespesa(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
+    obra = db.relationship('Obra', backref='despesas_frota')
     admin = db.relationship('Usuario', backref='frota_custos_veiculo_administrados')
+    # veiculo vem do backref em FrotaVeiculo
     
     # Índices para performance
     __table_args__ = (

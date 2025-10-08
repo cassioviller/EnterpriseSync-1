@@ -1,0 +1,116 @@
+# Prompt para Solucionar Erro da Tabela frota_despesa
+
+Analisando o erro apresentado na imagem, identifiquei que o problema está relacionado a uma consulta SQL que tenta acessar a coluna `obra_id` na tabela `frota_despesa`, mas essa coluna não existe.
+
+## Análise do Problema
+
+**Erro:** `(psycopg2.errors.UndefinedColumn) column frota_despesa.obra_id does not exist`
+
+**Contexto:** O erro ocorre em uma consulta SQL que tenta fazer SELECT na tabela `frota_despesa` incluindo a coluna `obra_id`, mas essa coluna não foi criada na estrutura da tabela.
+
+## Prompt para o Replit:
+
+```
+Atue como um desenvolvedor full-stack sênior, especialista em Flask, SQLAlchemy e migrações de banco de dados PostgreSQL.
+
+**O Problema:**
+Estou recebendo um erro de coluna inexistente ao tentar acessar dados de veículos no meu sistema. O erro específico é:
+
+```
+(psycopg2.errors.UndefinedColumn) column frota_despesa.obra_id does not exist
+LINE 1: ...a_despesa.veiculo_id AS frota_despesa_veiculo_id, frota_despesa.obra_id AS frota_despesa_obra_id...
+```
+
+**Análise do Sistema:**
+1. O sistema possui um módulo de gestão de frotas com duas arquiteturas:
+   - **Sistema Legacy:** Tabelas antigas como `uso_veiculo`, `custo_veiculo`, etc.
+   - **Sistema FLEET:** Novas tabelas como `fleet_vehicle`, `fleet_vehicle_usage`, `fleet_vehicle_cost`
+
+2. O erro indica que existe uma tabela `frota_despesa` que está sendo consultada, mas não possui a coluna `obra_id`.
+
+3. Analisando o repositório, não encontrei referências diretas à tabela `frota_despesa` no código Python, o que sugere que pode ser:
+   - Uma view do banco de dados
+   - Uma tabela criada por migração anterior
+   - Uma consulta gerada automaticamente pelo SQLAlchemy
+
+**Tarefa:**
+1. **Investigar a Origem:** Identifique de onde vem a consulta que está gerando o erro. Pode ser:
+   - Uma view no banco de dados
+   - Um modelo SQLAlchemy que não está visível no código atual
+   - Uma consulta em algum arquivo de views ou rotas
+
+2. **Verificar a Estrutura da Tabela:** Execute uma consulta para verificar a estrutura atual da tabela `frota_despesa`:
+   ```sql
+   SELECT column_name, data_type, is_nullable 
+   FROM information_schema.columns 
+   WHERE table_name = 'frota_despesa' 
+   ORDER BY ordinal_position;
+   ```
+
+3. **Solução Recomendada:** Baseado na estrutura encontrada, implemente uma das seguintes soluções:
+
+   **Opção A - Adicionar a coluna faltante:**
+   ```sql
+   ALTER TABLE frota_despesa 
+   ADD COLUMN obra_id INTEGER REFERENCES obra(id);
+   ```
+
+   **Opção B - Atualizar a consulta para não usar a coluna:**
+   Modifique a consulta que está gerando o erro para remover a referência à `obra_id`.
+
+   **Opção C - Migrar para o sistema FLEET:**
+   Se a tabela `frota_despesa` é parte do sistema legacy, considere migrar os dados para as novas tabelas FLEET e atualizar as consultas.
+
+4. **Implementar a Migração:** Crie uma função de migração no arquivo `migrations.py` para corrigir o problema:
+
+```python
+def corrigir_tabela_frota_despesa():
+    """
+    Corrige a estrutura da tabela frota_despesa adicionando a coluna obra_id
+    """
+    try:
+        logger.info("🔧 Corrigindo estrutura da tabela frota_despesa...")
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se a coluna obra_id existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'frota_despesa' 
+            AND column_name = 'obra_id'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("🔧 Adicionando coluna obra_id na tabela frota_despesa...")
+            cursor.execute("""
+                ALTER TABLE frota_despesa 
+                ADD COLUMN obra_id INTEGER REFERENCES obra(id)
+            """)
+            logger.info("✅ Coluna obra_id adicionada com sucesso!")
+        else:
+            logger.info("✅ Coluna obra_id já existe na tabela frota_despesa")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir tabela frota_despesa: {e}")
+```
+
+5. **Testar a Solução:** Após implementar a correção, teste o sistema para garantir que o erro foi resolvido.
+
+**Entregável:**
+Forneça o código da migração implementada e explique qual foi a causa raiz do problema e como a solução resolve definitivamente o erro.
+```
+
+## Observações Adicionais
+
+- O erro sugere que o sistema está tentando fazer um JOIN ou SELECT que inclui a coluna `obra_id` da tabela `frota_despesa`
+- Como não encontrei referências diretas no código, é provável que seja uma view ou consulta gerada automaticamente
+- A solução mais robusta seria adicionar a coluna faltante e garantir que ela seja populada corretamente
+- É importante verificar se existem outras colunas faltantes na mesma tabela
+
+Use este prompt para obter uma solução completa e definitiva para o problema.
