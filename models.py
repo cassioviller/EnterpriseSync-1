@@ -3228,7 +3228,7 @@ class CustoVeiculo(db.Model):
 
 class Vehicle(db.Model):
     """Modelo de veículos - Sistema limpo"""
-    __tablename__ = 'vehicle'
+    __tablename__ = 'frota_veiculo'
     
     id = db.Column(db.Integer, primary_key=True)
     placa = db.Column(db.String(10), nullable=False)
@@ -3264,10 +3264,10 @@ class Vehicle(db.Model):
 
 class VehicleUsage(db.Model):
     """Registro de uso de veículos"""
-    __tablename__ = 'vehicle_usage'
+    __tablename__ = 'frota_utilizacao'
     
     id = db.Column(db.Integer, primary_key=True)
-    veiculo_id = db.Column(db.Integer, db.ForeignKey('vehicle.id'), nullable=False)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     data_uso = db.Column(db.Date, nullable=False)
@@ -3294,10 +3294,10 @@ class VehicleUsage(db.Model):
 
 class VehicleExpense(db.Model):
     """Despesas de veículos"""
-    __tablename__ = 'vehicle_expense'
+    __tablename__ = 'frota_despesa'
     
     id = db.Column(db.Integer, primary_key=True)
-    veiculo_id = db.Column(db.Integer, db.ForeignKey('vehicle.id'), nullable=False)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'), nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     data_custo = db.Column(db.Date, nullable=False)
     tipo_custo = db.Column(db.String(30), nullable=False)
@@ -3305,6 +3305,7 @@ class VehicleExpense(db.Model):
     descricao = db.Column(db.String(200), nullable=False)
     fornecedor = db.Column(db.String(100))
     numero_nota_fiscal = db.Column(db.String(20))
+    data_vencimento = db.Column(db.Date)
     status_pagamento = db.Column(db.String(20), default='Pendente')
     forma_pagamento = db.Column(db.String(30))
     km_veiculo = db.Column(db.Integer)
