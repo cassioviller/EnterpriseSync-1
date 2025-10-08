@@ -84,6 +84,122 @@ def _migration_27_alimentacao_system():
         import traceback
         logger.error(traceback.format_exc())
 
+def _migration_28_migrar_dados_frota():
+    """
+    Migration 28: Migrar dados das tabelas antigas (veiculo, uso_veiculo, custo_veiculo) 
+    para as novas tabelas Frota (frota_veiculo, frota_utilizacao, frota_despesa)
+    """
+    logger.info("=" * 80)
+    logger.info("🚗 MIGRAÇÃO 28: Migrar dados para sistema Frota")
+    logger.info("=" * 80)
+    
+    try:
+        # 1. Migrar veículos: veiculo → frota_veiculo
+        logger.info("📋 PARTE 1: Migrando veiculo → frota_veiculo...")
+        db.session.execute(text("""
+            INSERT INTO frota_veiculo (
+                placa, marca, modelo, ano, tipo, km_atual, cor, 
+                chassi, renavam, combustivel, ativo, admin_id
+            )
+            SELECT 
+                placa, marca, modelo, ano, 
+                COALESCE(tipo, 'Utilitário'),
+                COALESCE(km_atual, 0),
+                cor, chassi, renavam,
+                COALESCE(combustivel, 'Gasolina'),
+                COALESCE(ativo, true),
+                admin_id
+            FROM veiculo
+            WHERE admin_id IS NOT NULL
+            AND placa NOT IN (SELECT placa FROM frota_veiculo WHERE admin_id = veiculo.admin_id)
+        """))
+        veiculos_migrados = db.session.execute(text("SELECT COUNT(*) FROM frota_veiculo")).scalar()
+        logger.info(f"✅ {veiculos_migrados} veículos na tabela frota_veiculo")
+        
+        # 2. Migrar usos: uso_veiculo → frota_utilizacao
+        logger.info("📋 PARTE 2: Migrando uso_veiculo → frota_utilizacao...")
+        db.session.execute(text("""
+            INSERT INTO frota_utilizacao (
+                veiculo_id, funcionario_id, obra_id, data_uso, hora_saida, hora_retorno,
+                km_inicial, km_final, km_percorrido, passageiros_frente, passageiros_tras,
+                responsavel_veiculo, observacoes, admin_id
+            )
+            SELECT 
+                fv.id,  -- Mapear veiculo_id antigo para frota_veiculo.id novo
+                uv.funcionario_id,
+                uv.obra_id,
+                uv.data_uso,
+                uv.hora_saida,
+                uv.hora_retorno,
+                uv.km_inicial,
+                uv.km_final,
+                uv.km_percorrido,
+                uv.passageiros_frente,
+                uv.passageiros_tras,
+                uv.responsavel_veiculo,
+                uv.observacoes,
+                uv.admin_id
+            FROM uso_veiculo uv
+            INNER JOIN veiculo v ON uv.veiculo_id = v.id
+            INNER JOIN frota_veiculo fv ON fv.placa = v.placa AND fv.admin_id = v.admin_id
+            WHERE uv.admin_id IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM frota_utilizacao fu 
+                WHERE fu.veiculo_id = fv.id 
+                AND fu.data_uso = uv.data_uso 
+                AND fu.admin_id = uv.admin_id
+            )
+        """))
+        usos_migrados = db.session.execute(text("SELECT COUNT(*) FROM frota_utilizacao")).scalar()
+        logger.info(f"✅ {usos_migrados} usos na tabela frota_utilizacao")
+        
+        # 3. Migrar custos: custo_veiculo → frota_despesa
+        logger.info("📋 PARTE 3: Migrando custo_veiculo → frota_despesa...")
+        db.session.execute(text("""
+            INSERT INTO frota_despesa (
+                veiculo_id, data_custo, tipo_custo, valor, descricao, fornecedor,
+                data_vencimento, status_pagamento, forma_pagamento, km_veiculo,
+                obra_id, observacoes, admin_id
+            )
+            SELECT 
+                fv.id,  -- Mapear veiculo_id antigo para frota_veiculo.id novo
+                cv.data_custo,
+                cv.tipo_custo,
+                cv.valor,
+                cv.descricao,
+                cv.fornecedor,
+                cv.data_vencimento,
+                cv.status_pagamento,
+                cv.forma_pagamento,
+                cv.km_veiculo,
+                cv.obra_id,
+                cv.observacoes,
+                cv.admin_id
+            FROM custo_veiculo cv
+            INNER JOIN veiculo v ON cv.veiculo_id = v.id
+            INNER JOIN frota_veiculo fv ON fv.placa = v.placa AND fv.admin_id = v.admin_id
+            WHERE cv.admin_id IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM frota_despesa fd 
+                WHERE fd.veiculo_id = fv.id 
+                AND fd.data_custo = cv.data_custo 
+                AND fd.admin_id = cv.admin_id
+            )
+        """))
+        custos_migrados = db.session.execute(text("SELECT COUNT(*) FROM frota_despesa")).scalar()
+        logger.info(f"✅ {custos_migrados} custos na tabela frota_despesa")
+        
+        db.session.commit()
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 28 CONCLUÍDA: Dados migrados para sistema Frota!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro na migração 28: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -186,6 +302,9 @@ def executar_migracoes():
 
         # Migração 27: Sistema de Alimentação
         _migration_27_alimentacao_system()
+        
+        # Migração 28: Migrar dados das tabelas antigas para sistema Frota
+        _migration_28_migrar_dados_frota()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
