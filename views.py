@@ -2891,18 +2891,14 @@ def kpis_veiculo_periodo(id):
 
 
 
-# 3. ROTA EXCLUSÃO - /veiculos/<id>/excluir (POST)
+# 3. ROTA EXCLUSÃO - /veiculos/<id>/excluir (POST) - DESATIVADA
 @main_bp.route('/veiculos/<int:id>/excluir', methods=['POST'])
 @admin_required
 def excluir_veiculo(id):
-    from models import Veiculo
-    
-    # 🛡️ PROBLEM 4 SECURITY: Route hardening for destructive operation
-    # Verify Referrer to prevent CSRF attacks
-    referrer = request.headers.get('Referer', '')
-    if not referrer or 'veiculos' not in referrer:
-        flash('⚠️ Operação não permitida: origem inválida', 'danger')
-        return redirect(url_for('main.veiculos'))
+    """Rota antiga desativada - use o sistema Frota"""
+    print(f"🔀 [VEICULOS_EXCLUIR_REDIRECT] Rota antiga acessada para veículo {id}")
+    flash('Por favor, use o sistema de Frota para gerenciar veículos.', 'info')
+    return redirect(url_for('frota.lista'))
     
     admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
     # 🔒 Enhanced admin_id verification
@@ -8845,59 +8841,27 @@ except ImportError as e:
         def criar_custo_veiculo(dados, admin_id):
             return False, None, "Service não disponível"
 
-# ===== ROTA PRINCIPAL DE VEÍCULOS (CORRIGIDA) =====
+# ===== ROTA PRINCIPAL DE VEÍCULOS (REDIRECIONAMENTO PARA FROTA) =====
 @main_bp.route('/veiculos')
 @login_required
 def veiculos():
-    """Lista principal de veículos com filtros e estatísticas"""
-    try:
-        print(f"🚗 [VEICULOS_LISTA] Iniciando listagem...")
-        
-        # Proteção multi-tenant
-        tenant_admin_id = get_tenant_admin_id()
-        if not tenant_admin_id:
-            flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
-        
-        # Capturar filtros da URL
-        filtros = {
-            'status': request.args.get('status'),
-            'tipo': request.args.get('tipo'),
-            'placa': request.args.get('placa'),
-            'marca': request.args.get('marca')
-        }
-        # Remover filtros vazios
-        filtros = {k: v for k, v in filtros.items() if v}
-        
-        # Paginação
-        page = request.args.get('page', 1, type=int)
-        per_page = 20
-        
-        # Usar service para listar veículos
-        resultado = VeiculoService.listar_veiculos(
-            admin_id=tenant_admin_id,
-            filtros=filtros,
-            page=page,
-            per_page=per_page
-        )
-        
-        print(f"✅ [VEICULOS_LISTA] Encontrados {len(resultado.get('veiculos', []))} veículos")
-        
-        return render_template('veiculos_lista.html',
-                             veiculos=resultado.get('veiculos', []),
-                             pagination=resultado.get('pagination'),
-                             stats=resultado.get('stats', {}),
-                             filtros_aplicados=resultado.get('filtros_aplicados', {}))
-        
-    except Exception as e:
-        print(f"❌ [VEICULOS_LISTA] Erro: {str(e)}")
-        flash('Erro ao carregar veículos. Tente novamente.', 'error')
-        return redirect(url_for('main.dashboard'))
+    """Redireciona para o novo sistema de frota"""
+    print("🔀 [VEICULOS_REDIRECT] Redirecionando /veiculos → /frota")
+    # Preservar query params (filtros, paginação)
+    return redirect(url_for('frota.lista', **request.args))
 
-# ===== NOVA ROTA: NOVO VEÍCULO =====
+# ===== REDIRECIONAMENTO: NOVO VEÍCULO =====
 @main_bp.route('/veiculos/novo', methods=['GET', 'POST'])
 @login_required
 def novo_veiculo():
+    """Redireciona para o novo sistema de frota"""
+    print("🔀 [VEICULOS_NOVO_REDIRECT] Redirecionando /veiculos/novo → /frota/novo")
+    return redirect(url_for('frota.novo'))
+
+# ===== ROTA ANTIGA DESATIVADA: NOVO VEÍCULO =====
+@main_bp.route('/veiculos/novo_OLD', methods=['GET', 'POST'])
+@login_required
+def novo_veiculo_OLD():
     """Formulário para cadastrar novo veículo"""
     try:
         print(f"🚗 [NOVO_VEICULO] Iniciando...")
