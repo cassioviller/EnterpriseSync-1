@@ -43,6 +43,7 @@ def lista():
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
+        print(f"🔍 [FROTA_LISTA] tenant_admin_id = {tenant_admin_id}")
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
             return redirect(url_for('auth.login'))
@@ -63,16 +64,20 @@ def lista():
         
         # Buscar veículos da frota diretamente
         query = FrotaVeiculo.query.filter_by(admin_id=tenant_admin_id)
+        print(f"🔍 [FROTA_LISTA] Query inicial: admin_id={tenant_admin_id}")
         
         # Aplicar filtros
         if filtros.get('status'):
             if filtros['status'] == 'ativo':
                 query = query.filter_by(ativo=True)
+                print(f"🔍 [FROTA_LISTA] Filtro aplicado: ativo=True")
             elif filtros['status'] == 'inativo':
                 query = query.filter_by(ativo=False)
+                print(f"🔍 [FROTA_LISTA] Filtro aplicado: ativo=False")
         else:
             # ✅ CORREÇÃO: Por padrão, mostrar apenas veículos ativos
             query = query.filter_by(ativo=True)
+            print(f"🔍 [FROTA_LISTA] Filtro padrão aplicado: ativo=True")
         
         if filtros.get('tipo'):
             query = query.filter_by(tipo=filtros['tipo'])
@@ -94,7 +99,10 @@ def lista():
             'inativos': FrotaVeiculo.query.filter_by(admin_id=tenant_admin_id, ativo=False).count()
         }
         
-        print(f"✅ [FROTA_LISTA] Encontrados {len(veiculos)} veículos")
+        print(f"📊 [FROTA_LISTA] Stats: total={stats['total']}, ativos={stats['ativos']}, inativos={stats['inativos']}")
+        print(f"✅ [FROTA_LISTA] Encontrados {len(veiculos)} veículos na query paginada")
+        if veiculos:
+            print(f"🚗 [FROTA_LISTA] Primeiro veículo: {veiculos[0].placa} (id={veiculos[0].id})")
         
         return render_template('veiculos_lista.html',
                              veiculos=veiculos,
