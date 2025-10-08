@@ -1,0 +1,290 @@
+# Prompt para Limpeza Completa do Sistema Antigo de Veículos
+
+Com base na documentação técnica do sistema, vou criar um prompt para fazer uma limpeza segura e completa de todos os resquícios das arquiteturas antigas de veículos.
+
+## Prompt para o Replit:
+
+```
+Atue como um desenvolvedor full-stack sênior, especialista em Flask, SQLAlchemy e limpeza de código legacy. Sua missão é fazer uma LIMPEZA COMPLETA e SEGURA do sistema antigo de veículos.
+
+**CONTEXTO CRÍTICO:**
+O sistema de gestão de frota passou por uma REESCRITA COMPLETA em outubro de 2025. Atualmente coexistem TRÊS arquiteturas diferentes:
+
+1. **SISTEMA ATUAL (frota_*)** - ✅ MANTER
+   - `frota_veiculo` → Cadastro de veículos
+   - `frota_utilizacao` → Registros de uso/viagens  
+   - `frota_despesa` → Custos e despesas
+
+2. **SISTEMA LEGACY ORIGINAL** - ❌ REMOVER
+   - `veiculo`, `uso_veiculo`, `custo_veiculo`
+   - `passageiro_veiculo`, `documento_fiscal`
+
+3. **SISTEMA FLEET INTERMEDIÁRIO** - ❌ REMOVER
+   - `fleet_vehicle`, `fleet_vehicle_usage`, `fleet_vehicle_cost`
+
+**OBJETIVO:**
+Fazer uma limpeza completa e segura, removendo TODOS os resquícios dos sistemas antigos, mantendo apenas o sistema `frota_*` que está em produção.
+
+**TAREFA COMPLETA:**
+
+## 1. LIMPEZA DO BANCO DE DADOS
+
+### 1.1 Criar Migração de Limpeza Segura
+Implemente uma nova migração (Migração 31) no arquivo `migrations.py`:
+
+```python
+def limpeza_completa_sistemas_antigos_veiculos():
+    """
+    MIGRAÇÃO 31: Limpeza completa dos sistemas antigos de veículos
+    
+    Remove todas as tabelas e resquícios dos sistemas legacy:
+    - Sistema original: veiculo, uso_veiculo, custo_veiculo, etc.
+    - Sistema FLEET: fleet_vehicle, fleet_vehicle_usage, fleet_vehicle_cost
+    
+    MANTÉM apenas: frota_veiculo, frota_utilizacao, frota_despesa
+    
+    SEGURANÇA: Só executa se DROP_OLD_VEHICLE_TABLES=true
+    """
+    try:
+        # Verificar feature flag de segurança
+        if os.environ.get('DROP_OLD_VEHICLE_TABLES', 'false').lower() != 'true':
+            logger.info("🔒 MIGRAÇÃO 31: Bloqueada por segurança. Para ativar: DROP_OLD_VEHICLE_TABLES=true")
+            return
+        
+        logger.info("=" * 80)
+        logger.info("🧹 MIGRAÇÃO 31: Limpeza completa dos sistemas antigos de veículos")
+        logger.info("⚠️  ATENÇÃO: Esta operação é IRREVERSÍVEL!")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Lista de tabelas para remover (ordem importa devido a FKs)
+        tabelas_para_remover = [
+            # Sistema FLEET (intermediário)
+            'fleet_vehicle_usage',
+            'fleet_vehicle_cost', 
+            'fleet_vehicle',
+            
+            # Sistema LEGACY original
+            'passageiro_veiculo',
+            'documento_fiscal',
+            'uso_veiculo',
+            'custo_veiculo',
+            'veiculo'
+        ]
+        
+        for tabela in tabelas_para_remover:
+            try:
+                # Verificar se tabela existe
+                cursor.execute("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_name = %s
+                """, (tabela,))
+                
+                if cursor.fetchone():
+                    logger.info(f"🗑️  Removendo tabela: {tabela}")
+                    cursor.execute(f"DROP TABLE IF EXISTS {tabela} CASCADE")
+                    logger.info(f"✅ Tabela {tabela} removida com sucesso")
+                else:
+                    logger.info(f"ℹ️  Tabela {tabela} não existe (já removida)")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️  Erro ao remover tabela {tabela}: {e}")
+                # Continuar com outras tabelas
+        
+        # Remover índices órfãos se existirem
+        indices_orfaos = [
+            'idx_veiculo_admin_placa',
+            'idx_uso_veiculo_data',
+            'idx_custo_veiculo_tipo',
+            'idx_fleet_vehicle_admin_plate',
+            'idx_fleet_usage_date_admin'
+        ]
+        
+        for indice in indices_orfaos:
+            try:
+                cursor.execute(f"DROP INDEX IF EXISTS {indice}")
+                logger.info(f"🗑️  Índice órfão removido: {indice}")
+            except Exception as e:
+                logger.debug(f"Índice {indice} não existe: {e}")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 31: Limpeza do banco concluída com sucesso!")
+        logger.info("🎯 Sistema agora usa APENAS tabelas frota_*")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 31: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+```
+
+### 1.2 Adicionar chamada da migração
+```python
+# No final da função executar_migracoes()
+limpeza_completa_sistemas_antigos_veiculos()  # Migração 31
+```
+
+## 2. LIMPEZA DO CÓDIGO PYTHON
+
+### 2.1 Remover Modelos Obsoletos
+No arquivo `models.py`, remova COMPLETAMENTE:
+
+```python
+# REMOVER ESTES MODELOS:
+class Veiculo(db.Model):  # ❌ REMOVER COMPLETAMENTE
+class UsoVeiculo(db.Model):  # ❌ REMOVER COMPLETAMENTE  
+class CustoVeiculo(db.Model):  # ❌ REMOVER COMPLETAMENTE
+class PassageiroVeiculo(db.Model):  # ❌ REMOVER COMPLETAMENTE
+class DocumentoFiscal(db.Model):  # ❌ REMOVER COMPLETAMENTE (se relacionado a veículos)
+```
+
+### 2.2 Remover Arquivos Obsoletos
+Delete os seguintes arquivos se existirem:
+
+```bash
+# Arquivos para DELETAR:
+rm -f fleet_models.py          # Sistema FLEET intermediário
+rm -f fleet_service.py         # Serviços FLEET
+rm -f fleet_routes.py          # Rotas FLEET
+rm -f veiculo_service.py       # Serviços legacy (se existir)
+rm -f veiculo_views.py         # Views legacy (se existir)
+```
+
+### 2.3 Limpar Imports Obsoletos
+Remova todos os imports relacionados aos sistemas antigos:
+
+```python
+# REMOVER imports como:
+from fleet_models import FleetVehicle, FleetVehicleUsage, FleetVehicleCost
+from fleet_service import FleetService
+from veiculo_service import VeiculoService  # se existir
+```
+
+### 2.4 Limpar Registros de Blueprints
+No arquivo `app.py`, remova:
+
+```python
+# REMOVER registros de blueprints obsoletos:
+try:
+    from fleet_routes import register_fleet_routes
+    fleet_registered = register_fleet_routes(app)
+    # ... código relacionado
+except ImportError:
+    # ... código relacionado
+
+# REMOVER também:
+from fleet_routes import fleet_bp
+app.register_blueprint(fleet_bp)
+```
+
+## 3. LIMPEZA DOS TEMPLATES
+
+### 3.1 Remover Templates Obsoletos
+Delete os seguintes templates se existirem:
+
+```bash
+# Templates para DELETAR:
+rm -f templates/fleet_*.html
+rm -f templates/veiculo_*.html  # se diferentes de veiculos_*.html
+rm -f templates/uso_veiculo_*.html  # se diferentes dos atuais
+rm -f templates/custo_veiculo_*.html  # se diferentes dos atuais
+```
+
+### 3.2 Atualizar Links nos Templates
+Nos templates restantes, garanta que todos os links apontem para `/frota`:
+
+```html
+<!-- CORRIGIR links como: -->
+<a href="/veiculos">  →  <a href="/frota">
+<a href="/fleet">     →  <a href="/frota">
+```
+
+## 4. LIMPEZA DAS ROTAS
+
+### 4.1 Simplificar Redirecionamentos
+No arquivo `views.py`, simplifique os redirecionamentos:
+
+```python
+# MANTER apenas este redirecionamento simples:
+@app.route('/veiculos')
+@app.route('/veiculos/')
+def redirect_veiculos_para_frota():
+    """Redireciona URLs antigas /veiculos para /frota"""
+    return redirect('/frota', code=301)  # Redirect permanente
+
+# REMOVER todos os outros redirecionamentos complexos relacionados a fleet_*
+```
+
+## 5. LIMPEZA DE CONFIGURAÇÕES
+
+### 5.1 Remover Feature Flags Obsoletos
+Remova as seguintes variáveis de ambiente e referências no código:
+
+```python
+# REMOVER referências a:
+FLEET_CUTOVER
+FLEET_CUTOVER_TIMESTAMP
+FLEET_ENABLED
+```
+
+### 5.2 Limpar Comentários e TODOs
+Remova todos os comentários relacionados aos sistemas antigos:
+
+```python
+# REMOVER comentários como:
+# TODO: Migrar para sistema FLEET
+# FIXME: Compatibilidade com veiculo legacy
+# NOTE: Sistema fleet em desenvolvimento
+```
+
+## 6. VALIDAÇÃO FINAL
+
+Após a limpeza, execute estes testes:
+
+1. **Teste de Funcionalidade:**
+   - Acesse `/frota` → deve funcionar normalmente
+   - Acesse `/veiculos` → deve redirecionar para `/frota`
+   - Cadastre um novo veículo → deve usar tabela `frota_veiculo`
+   - Registre uso → deve usar tabela `frota_utilizacao`
+   - Registre despesa → deve usar tabela `frota_despesa`
+
+2. **Teste de Limpeza:**
+   - Verifique que não há mais referências a `fleet_*` no código
+   - Verifique que não há mais referências a `veiculo` (legacy) no código
+   - Confirme que apenas tabelas `frota_*` existem no banco
+
+3. **Teste de Performance:**
+   - Sistema deve estar mais rápido sem código legacy
+   - Logs devem estar mais limpos
+
+**ENTREGÁVEL:**
+1. Código da Migração 31 implementada
+2. Lista de arquivos removidos
+3. Lista de modelos/classes removidas do código
+4. Confirmação de que apenas o sistema `frota_*` permanece ativo
+5. Relatório de testes de validação
+
+**SEGURANÇA:**
+- A migração só executa com `DROP_OLD_VEHICLE_TABLES=true`
+- Faça backup do banco antes de executar
+- Teste em ambiente de desenvolvimento primeiro
+```
+
+## Observações Importantes
+
+- **Segurança:** A migração está protegida por feature flag
+- **Irreversível:** Esta operação remove permanentemente os dados antigos
+- **Backup:** Sempre faça backup antes de executar
+- **Teste:** Execute primeiro em desenvolvimento
+- **Gradual:** Pode ser feito em etapas se preferir
+
+Use este prompt para fazer uma limpeza completa e definitiva do sistema!

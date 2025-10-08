@@ -1,0 +1,173 @@
+# Prompt Específico para Erro da Tabela frota_despesa
+
+Baseado na documentação técnica detalhada que você forneceu, agora tenho uma visão completa do problema. O sistema passou por uma reescrita completa e usa a nova arquitetura com tabelas `frota_*`.
+
+## Prompt para o Replit:
+
+```
+Atue como um desenvolvedor full-stack sênior, especialista em Flask, SQLAlchemy e migrações de banco de dados PostgreSQL.
+
+**CONTEXTO CRÍTICO:**
+O sistema de gestão de frota passou por uma REESCRITA COMPLETA em outubro de 2025. A nova arquitetura usa tabelas com prefixo `frota_*` ao invés das antigas tabelas `veiculo`, `uso_veiculo`, `custo_veiculo` e `fleet_*`.
+
+**O PROBLEMA:**
+Estou recebendo o erro:
+```
+(psycopg2.errors.UndefinedColumn) column frota_despesa.obra_id does not exist
+```
+
+**ANÁLISE BASEADA NA DOCUMENTAÇÃO:**
+1. **Nova Arquitetura Atual:**
+   - `frota_veiculo` → Cadastro de veículos
+   - `frota_utilizacao` → Registros de uso/viagens  
+   - `frota_despesa` → Custos e despesas
+
+2. **Problema Identificado:**
+   Segundo a documentação, a tabela `frota_despesa` DEVE ter a coluna `obra_id` (FK → obra.id, NULLABLE), mas o erro indica que ela não existe no banco de dados.
+
+3. **Migração Relacionada:**
+   - **Migração 28:** Migra dados das tabelas antigas para `frota_*`
+   - **Migração 29:** Corrige `data_id` → `data_custo` na tabela `frota_despesa`
+
+**ESTRUTURA ESPERADA DA TABELA frota_despesa:**
+```sql
+CREATE TABLE frota_despesa (
+    id SERIAL PRIMARY KEY,
+    veiculo_id INTEGER NOT NULL REFERENCES frota_veiculo(id),
+    obra_id INTEGER REFERENCES obra(id),  -- ← ESTA COLUNA ESTÁ FALTANDO
+    data_custo DATE NOT NULL,
+    tipo_custo VARCHAR(30) NOT NULL,
+    valor NUMERIC(10,2) NOT NULL,
+    descricao VARCHAR(200) NOT NULL,
+    fornecedor VARCHAR(100),
+    numero_nota_fiscal VARCHAR(20),
+    data_vencimento DATE,
+    status_pagamento VARCHAR(20) DEFAULT 'Pendente',
+    forma_pagamento VARCHAR(30),
+    km_veiculo INTEGER,
+    observacoes TEXT,
+    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**TAREFA:**
+1. **Verificar a estrutura atual da tabela:**
+   ```sql
+   SELECT column_name, data_type, is_nullable 
+   FROM information_schema.columns 
+   WHERE table_name = 'frota_despesa' 
+   ORDER BY ordinal_position;
+   ```
+
+2. **Implementar a correção no arquivo `migrations.py`:**
+   Adicione uma nova migração (Migração 30) para corrigir a estrutura:
+
+```python
+def corrigir_coluna_obra_id_frota_despesa():
+    """
+    MIGRAÇÃO 30: Adicionar coluna obra_id na tabela frota_despesa
+    
+    CONTEXTO:
+    - A tabela frota_despesa foi criada sem a coluna obra_id
+    - Esta coluna é necessária para vincular custos a obras específicas
+    - Campo é NULLABLE (opcional)
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🔧 MIGRAÇÃO 30: Corrigir coluna obra_id em frota_despesa")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se a tabela frota_despesa existe
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_name = 'frota_despesa'
+        """)
+        
+        if not cursor.fetchone():
+            logger.warning("⚠️ Tabela frota_despesa não existe. Pulando migração.")
+            return
+        
+        # Verificar se a coluna obra_id já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'frota_despesa' 
+            AND column_name = 'obra_id'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("✅ Coluna obra_id já existe na tabela frota_despesa")
+        else:
+            logger.info("🔧 Adicionando coluna obra_id na tabela frota_despesa...")
+            cursor.execute("""
+                ALTER TABLE frota_despesa 
+                ADD COLUMN obra_id INTEGER REFERENCES obra(id)
+            """)
+            logger.info("✅ Coluna obra_id adicionada com sucesso!")
+            
+            # Criar índice para performance
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_frota_despesa_obra_id 
+                ON frota_despesa(obra_id)
+            """)
+            logger.info("✅ Índice criado para obra_id")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 30: Concluída com sucesso!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 30: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+```
+
+3. **Adicionar a chamada da migração na função `executar_migracoes()`:**
+   ```python
+   # Adicione esta linha no final da função executar_migracoes()
+   corrigir_coluna_obra_id_frota_despesa()  # Migração 30
+   ```
+
+4. **Verificar o modelo SQLAlchemy:**
+   Confirme que o modelo `FrotaDespesa` em `models.py` está correto:
+   ```python
+   class FrotaDespesa(db.Model):
+       __tablename__ = 'frota_despesa'
+       # ... outros campos ...
+       obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+       # ... outros campos ...
+       
+       # Relacionamentos
+       obra = db.relationship('Obra', backref='despesas_frota')
+   ```
+
+**VALIDAÇÃO:**
+Após aplicar a migração, teste:
+1. Acesse a página de detalhes do veículo
+2. Tente registrar uma nova despesa
+3. Verifique se o erro desapareceu
+
+**ENTREGÁVEL:**
+Forneça o código completo da Migração 30 implementada e confirme que a estrutura da tabela `frota_despesa` agora está alinhada com a documentação técnica.
+```
+
+## Observações Importantes
+
+- O problema é que a tabela `frota_despesa` foi criada sem a coluna `obra_id` que é esperada pelo modelo SQLAlchemy
+- A Migração 29 já corrigiu o problema `data_id` → `data_custo`, mas não adicionou a coluna `obra_id`
+- Esta é uma correção simples mas crítica para o funcionamento do sistema
+- A coluna é NULLABLE, então não afetará dados existentes
+
+Use este prompt para resolver definitivamente o problema!

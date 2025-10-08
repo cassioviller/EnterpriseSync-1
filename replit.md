@@ -53,8 +53,17 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
         - **Migrações 20-25:** Tentativas de adicionar colunas passageiros em `uso_veiculo` - TODAS FALHARAM em produção
         - **Problema Root:** Schema inconsistente entre dev/prod impossibilitou ALTER TABLE confiável
         - **Solução Final:** Reescrita completa do backend com novos nomes (Frota*) em vez de migrações
+    -   **MIGRAÇÕES CRÍTICAS DE CORREÇÃO (Out 2025):**
+        - **Migração 28:** Migração de dados `veiculo/uso_veiculo/custo_veiculo` → `frota_*` (✅ Aplicada)
+        - **Migração 29:** Correção `data_id` → `data_custo` em `frota_despesa` (✅ Aplicada)
+        - **Migração 30 (NOVA - Out 2025):** Adiciona coluna `obra_id` em `frota_despesa` em produção
+            - **Problema:** Tabela criada sem FK para obras em produção
+            - **Solução:** `ALTER TABLE frota_despesa ADD COLUMN obra_id INTEGER REFERENCES obra(id)`
+            - **Índice:** Cria `idx_frota_despesa_obra_id` para performance
+            - **Status:** ✅ Implementada, idempotente, pronta para deploy
     -   **Status Atual (Out 2025):**
         - ✅ Sistema Frota* funcionando (tabelas frota_*)
+        - ✅ Migração 30 corrige divergência dev/prod na coluna obra_id
         - ⏸️  Tabelas antigas coexistem (migração 26 bloqueada)
         - 🎯 Próximo passo: Ativar `DROP_OLD_VEHICLE_TABLES=true` após validação
         - ✅ Redirecionamentos: `/veiculos` → `/frota` (HTTP 307 preserva POST)

@@ -270,6 +270,79 @@ def corrigir_estrutura_frota_despesa():
         logger.error(traceback.format_exc())
 
 
+def corrigir_coluna_obra_id_frota_despesa():
+    """
+    MIGRAÇÃO 30: Adicionar coluna obra_id na tabela frota_despesa
+    
+    CONTEXTO:
+    - A tabela frota_despesa foi criada sem a coluna obra_id em produção
+    - Esta coluna é necessária para vincular custos a obras específicas
+    - Campo é NULLABLE (opcional)
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🔧 MIGRAÇÃO 30: Corrigir coluna obra_id em frota_despesa")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se a tabela frota_despesa existe
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_name = 'frota_despesa'
+        """)
+        
+        if not cursor.fetchone():
+            logger.warning("⚠️ Tabela frota_despesa não existe. Pulando migração.")
+            cursor.close()
+            connection.close()
+            return
+        
+        # Verificar se a coluna obra_id já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'frota_despesa' 
+            AND column_name = 'obra_id'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("✅ Coluna obra_id já existe na tabela frota_despesa")
+        else:
+            logger.info("🔧 Adicionando coluna obra_id na tabela frota_despesa...")
+            cursor.execute("""
+                ALTER TABLE frota_despesa 
+                ADD COLUMN obra_id INTEGER REFERENCES obra(id)
+            """)
+            logger.info("✅ Coluna obra_id adicionada com sucesso!")
+            
+            # Criar índice para performance
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_frota_despesa_obra_id 
+                ON frota_despesa(obra_id)
+            """)
+            logger.info("✅ Índice criado para obra_id")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 30 CONCLUÍDA com sucesso!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 30: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -378,6 +451,9 @@ def executar_migracoes():
         
         # Migração 29: Corrigir estrutura da tabela frota_despesa (data_id → data_custo)
         corrigir_estrutura_frota_despesa()
+        
+        # Migração 30: Adicionar coluna obra_id na tabela frota_despesa
+        corrigir_coluna_obra_id_frota_despesa()
 
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         
