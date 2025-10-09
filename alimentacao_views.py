@@ -38,6 +38,10 @@ def restaurante_novo():
                 nome=request.form['nome'],
                 endereco=request.form.get('endereco', ''),
                 telefone=request.form.get('telefone', ''),
+                razao_social=request.form.get('razao_social', ''),
+                cnpj=request.form.get('cnpj', ''),
+                pix=request.form.get('pix', ''),
+                nome_conta=request.form.get('nome_conta', ''),
                 admin_id=admin_id
             )
             db.session.add(restaurante)
@@ -63,6 +67,10 @@ def restaurante_editar(restaurante_id):
             restaurante.nome = request.form['nome']
             restaurante.endereco = request.form.get('endereco', '')
             restaurante.telefone = request.form.get('telefone', '')
+            restaurante.razao_social = request.form.get('razao_social', '')
+            restaurante.cnpj = request.form.get('cnpj', '')
+            restaurante.pix = request.form.get('pix', '')
+            restaurante.nome_conta = request.form.get('nome_conta', '')
             db.session.commit()
             flash('Restaurante atualizado com sucesso!', 'success')
             return redirect(url_for('alimentacao.restaurantes_lista'))
