@@ -84,6 +84,220 @@ def _migration_27_alimentacao_system():
         import traceback
         logger.error(traceback.format_exc())
 
+def _migration_33_recreate_frota_despesa():
+    """
+    Migration 33: Recriar tabela frota_despesa com schema completo
+    
+    OBJETIVO: Recriar tabela frota_despesa do zero com todos os campos corretos,
+              preservando 100% dos dados.
+    
+    PROCESSO (4 ETAPAS):
+    1. BACKUP: Criar tabela temporária com todos os dados
+    2. DROP: Remover tabela antiga com CASCADE
+    3. CREATE: Criar nova tabela com schema completo
+    4. RESTORE: Restaurar dados do backup e limpar
+    
+    SEGURANÇA: Só executa se RECREATE_FROTA_DESPESA=true
+    IDEMPOTENTE: Pode executar múltiplas vezes sem problemas
+    """
+    try:
+        # Verificar feature flag de segurança
+        if os.environ.get('RECREATE_FROTA_DESPESA', 'false').lower() != 'true':
+            logger.info("🔒 MIGRAÇÃO 33: Bloqueada por segurança. Para ativar: RECREATE_FROTA_DESPESA=true")
+            return
+        
+        logger.info("=" * 80)
+        logger.info("💰 MIGRAÇÃO 33: Recriar tabela frota_despesa com schema completo")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # =====================================================================
+        # PASSO 1: VERIFICAR SE TABELA EXISTE
+        # =====================================================================
+        logger.info("🔍 PASSO 1: Verificando existência da tabela frota_despesa...")
+        
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'frota_despesa'
+            )
+        """)
+        tabela_existe = cursor.fetchone()[0]
+        
+        if not tabela_existe:
+            logger.info("ℹ️ Tabela frota_despesa não existe. Criando do zero...")
+            
+            # Criar tabela do zero
+            cursor.execute("""
+                CREATE TABLE frota_despesa (
+                    id SERIAL PRIMARY KEY,
+                    veiculo_id INTEGER NOT NULL REFERENCES frota_veiculo(id) ON DELETE CASCADE,
+                    obra_id INTEGER REFERENCES obra(id),
+                    data_custo DATE NOT NULL,
+                    tipo_custo VARCHAR(30) NOT NULL,
+                    valor NUMERIC(10, 2) NOT NULL,
+                    descricao VARCHAR(200) NOT NULL,
+                    fornecedor VARCHAR(100),
+                    numero_nota_fiscal VARCHAR(20),
+                    data_vencimento DATE,
+                    status_pagamento VARCHAR(20) DEFAULT 'Pendente',
+                    forma_pagamento VARCHAR(30),
+                    km_veiculo INTEGER,
+                    observacoes TEXT,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP
+                )
+            """)
+            
+            # Criar índices
+            cursor.execute("CREATE INDEX idx_frota_despesa_veiculo ON frota_despesa(veiculo_id)")
+            cursor.execute("CREATE INDEX idx_frota_despesa_data ON frota_despesa(data_custo)")
+            cursor.execute("CREATE INDEX idx_frota_despesa_admin ON frota_despesa(admin_id)")
+            cursor.execute("CREATE INDEX idx_frota_despesa_obra ON frota_despesa(obra_id)")
+            
+            connection.commit()
+            logger.info("✅ Tabela frota_despesa criada do zero com sucesso!")
+            logger.info("=" * 80)
+            cursor.close()
+            connection.close()
+            return
+        
+        # =====================================================================
+        # PASSO 2: BACKUP - Criar tabela temporária
+        # =====================================================================
+        logger.info("📦 PASSO 2: Criando backup da tabela frota_despesa...")
+        
+        cursor.execute("DROP TABLE IF EXISTS frota_despesa_backup CASCADE")
+        cursor.execute("CREATE TABLE frota_despesa_backup AS SELECT * FROM frota_despesa")
+        
+        backup_count = cursor.rowcount
+        logger.info(f"✅ Backup criado: {backup_count} registros copiados")
+        
+        # =====================================================================
+        # PASSO 3: DROP - Remover tabela antiga
+        # =====================================================================
+        logger.info("🗑️ PASSO 3: Removendo tabela frota_despesa antiga...")
+        
+        cursor.execute("DROP TABLE IF EXISTS frota_despesa CASCADE")
+        logger.info("✅ Tabela antiga removida com CASCADE")
+        
+        # =====================================================================
+        # PASSO 4: CREATE - Criar nova tabela com schema completo
+        # =====================================================================
+        logger.info("🔨 PASSO 4: Criando nova tabela frota_despesa com schema completo...")
+        
+        cursor.execute("""
+            CREATE TABLE frota_despesa (
+                id SERIAL PRIMARY KEY,
+                veiculo_id INTEGER NOT NULL REFERENCES frota_veiculo(id) ON DELETE CASCADE,
+                obra_id INTEGER REFERENCES obra(id),
+                data_custo DATE NOT NULL,
+                tipo_custo VARCHAR(30) NOT NULL,
+                valor NUMERIC(10, 2) NOT NULL,
+                descricao VARCHAR(200) NOT NULL,
+                fornecedor VARCHAR(100),
+                numero_nota_fiscal VARCHAR(20),
+                data_vencimento DATE,
+                status_pagamento VARCHAR(20) DEFAULT 'Pendente',
+                forma_pagamento VARCHAR(30),
+                km_veiculo INTEGER,
+                observacoes TEXT,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP
+            )
+        """)
+        logger.info("✅ Nova tabela frota_despesa criada")
+        
+        # Criar índices
+        logger.info("📊 Criando índices...")
+        cursor.execute("CREATE INDEX idx_frota_despesa_veiculo ON frota_despesa(veiculo_id)")
+        cursor.execute("CREATE INDEX idx_frota_despesa_data ON frota_despesa(data_custo)")
+        cursor.execute("CREATE INDEX idx_frota_despesa_admin ON frota_despesa(admin_id)")
+        cursor.execute("CREATE INDEX idx_frota_despesa_obra ON frota_despesa(obra_id)")
+        logger.info("✅ Índices criados")
+        
+        # =====================================================================
+        # PASSO 5: RESTORE - Restaurar dados do backup
+        # =====================================================================
+        logger.info("♻️ PASSO 5: Restaurando dados do backup...")
+        
+        # Verificar colunas disponíveis no backup
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'frota_despesa_backup'
+            ORDER BY ordinal_position
+        """)
+        colunas_backup = [row[0] for row in cursor.fetchall()]
+        logger.info(f"📋 Colunas no backup: {', '.join(colunas_backup)}")
+        
+        # Construir query de INSERT com colunas disponíveis
+        colunas_comuns = []
+        colunas_select = []
+        
+        for col in ['id', 'veiculo_id', 'obra_id', 'data_custo', 'tipo_custo', 'valor', 'descricao',
+                    'fornecedor', 'numero_nota_fiscal', 'data_vencimento', 'status_pagamento',
+                    'forma_pagamento', 'km_veiculo', 'observacoes', 'admin_id', 
+                    'created_at', 'updated_at']:
+            if col in colunas_backup:
+                colunas_comuns.append(col)
+                colunas_select.append(col)
+        
+        if colunas_comuns:
+            insert_query = f"""
+                INSERT INTO frota_despesa ({', '.join(colunas_comuns)})
+                SELECT {', '.join(colunas_select)}
+                FROM frota_despesa_backup
+            """
+            cursor.execute(insert_query)
+            restored_count = cursor.rowcount
+            logger.info(f"✅ {restored_count} registros restaurados")
+        else:
+            logger.warning("⚠️ Nenhuma coluna comum encontrada para restaurar")
+        
+        # =====================================================================
+        # PASSO 6: AJUSTAR SEQUENCE
+        # =====================================================================
+        logger.info("🔢 PASSO 6: Ajustando sequence...")
+        
+        cursor.execute("""
+            SELECT setval('frota_despesa_id_seq', 
+                          COALESCE((SELECT MAX(id) FROM frota_despesa), 1))
+        """)
+        logger.info("✅ Sequence frota_despesa_id_seq ajustada")
+        
+        # =====================================================================
+        # PASSO 7: REMOVER BACKUP
+        # =====================================================================
+        logger.info("🗑️ PASSO 7: Removendo tabela de backup...")
+        
+        cursor.execute("DROP TABLE IF EXISTS frota_despesa_backup")
+        logger.info("✅ Tabela de backup removida")
+        
+        # Commit final
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 33 CONCLUÍDA COM SUCESSO!")
+        logger.info("🎯 Tabela frota_despesa recriada com schema completo")
+        logger.info(f"📊 {restored_count if 'restored_count' in locals() else 0} registros preservados")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 33: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
 def _migration_20_unified_vehicle_system():
     """
     MIGRAÇÃO 20 UNIFICADA: Sistema de Veículos Inteligente
@@ -490,7 +704,12 @@ def executar_migracoes():
         # Migração 27: Sistema de Alimentação
         _migration_27_alimentacao_system()
 
+        # Migração 33: Recriar tabela frota_despesa com schema completo
+        _migration_33_recreate_frota_despesa()
+
+        logger.info("=" * 80)
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
+        logger.info("=" * 80)
         
     except Exception as e:
         logger.error(f"❌ Erro durante migrações automáticas: {e}")

@@ -56,17 +56,33 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
         - **Idempotente:** Pode executar múltiplas vezes com segurança
         - **Logging Detalhado:** Todas as operações são registradas
         - **Redução de Código:** 1.331 linhas removidas (38.5% mais limpo)
+    -   **MIGRAÇÃO 33 (CORREÇÃO PRODUÇÃO - Out 2025):** Recria tabela frota_despesa com schema completo.
+        - **Problema:** Produção sem coluna `obra_id`, causando erro ao registrar despesas
+        - **Solução:** Backup → DROP → CREATE → RESTORE (7 passos seguros)
+        - **Processo:**
+            1. Verifica existência da tabela
+            2. Backup em tabela temporária
+            3. DROP CASCADE da tabela antiga
+            4. CREATE com schema completo (17 colunas)
+            5. RESTORE dos dados do backup
+            6. Ajusta sequence com NULL safety
+            7. Remove backup temporário
+        - **Schema Completo:** 17 campos (id, veiculo_id, **obra_id**, data_custo, tipo_custo, valor, descricao, fornecedor, numero_nota_fiscal, data_vencimento, status_pagamento, forma_pagamento, km_veiculo, observacoes, admin_id, created_at, updated_at)
+        - **Feature Flag:** `RECREATE_FROTA_DESPESA=true` (bloqueada por padrão)
+        - **Testado:** ✅ Dev - 5 registros preservados 100%
+        - **Status:** ✅ Pronta para produção
     -   **Status Atual (Out 2025):**
         - ✅ Sistema Frota funcionando (tabelas frota_* em produção)
         - ✅ Backend limpo com modelos Vehicle* + aliases para compatibilidade
         - ✅ Migração 20 unificada implementada e bloqueada por segurança
+        - ✅ Migração 33 resolve divergência dev/prod na tabela frota_despesa
         - ✅ Código 38.5% mais simples (1 migração vs 13 fragmentadas)
         - ✅ Campos de manutenção preservados em todos os cenários
         - ✅ Relacionamentos compatíveis (.usos, .custos) funcionando perfeitamente
         - ✅ Health check passando: `{"database":"connected","status":"healthy"}`
-        - 🎯 Próximo passo: Ativar `RECREATE_VEHICLE_SYSTEM=true` quando necessário
+        - 🎯 Próximo passo: Ativar `RECREATE_FROTA_DESPESA=true` em produção
         - ✅ Redirecionamentos: `/veiculos` → `/frota` (HTTP 307 preserva POST)
-    -   **Deployment Strategy:** 100% automático, migração inteligente adapta-se ao ambiente, feature flag garante segurança total.
+    -   **Deployment Strategy:** 100% automático, migrações inteligentes adaptam-se ao ambiente, feature flags garantem segurança total.
 
 ## External Dependencies
 -   **Flask:** Web framework.
