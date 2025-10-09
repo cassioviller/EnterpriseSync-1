@@ -298,6 +298,64 @@ def _migration_33_recreate_frota_despesa():
         import traceback
         logger.error(traceback.format_exc())
 
+def _migration_34_restaurante_campos_pagamento():
+    """
+    Migration 34: Adicionar campos de pagamento no Restaurante
+    Adiciona: razao_social, cnpj, pix, nome_conta
+    """
+    logger.info("=" * 80)
+    logger.info("🍽️  MIGRAÇÃO 34: Campos de Pagamento - Restaurante")
+    logger.info("=" * 80)
+    
+    try:
+        # Verificar se tabela existe
+        result = db.session.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'restaurante'
+            )
+        """))
+        if not result.scalar():
+            logger.info("⏭️  Tabela restaurante não existe, pulando migração 34")
+            return
+        
+        # Adicionar campos
+        campos = [
+            ('razao_social', 'VARCHAR(200)'),
+            ('cnpj', 'VARCHAR(18)'),
+            ('pix', 'VARCHAR(100)'),
+            ('nome_conta', 'VARCHAR(100)')
+        ]
+        
+        for campo, tipo in campos:
+            # Verificar se coluna já existe
+            result = db.session.execute(text(f"""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'restaurante' 
+                AND column_name = '{campo}'
+            """))
+            
+            if result.scalar():
+                logger.info(f"✅ Coluna '{campo}' já existe na tabela restaurante")
+            else:
+                db.session.execute(text(f"""
+                    ALTER TABLE restaurante 
+                    ADD COLUMN {campo} {tipo}
+                """))
+                logger.info(f"➕ Coluna '{campo}' adicionada à tabela restaurante")
+        
+        db.session.commit()
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 34 CONCLUÍDA: Campos de pagamento adicionados!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro na migração 34: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
 def _migration_20_unified_vehicle_system():
     """
     MIGRAÇÃO 20 UNIFICADA: Sistema de Veículos Inteligente
@@ -706,6 +764,9 @@ def executar_migracoes():
 
         # Migração 33: Recriar tabela frota_despesa com schema completo
         _migration_33_recreate_frota_despesa()
+
+        # Migração 34: Adicionar campos de pagamento no Restaurante
+        _migration_34_restaurante_campos_pagamento()
 
         logger.info("=" * 80)
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
