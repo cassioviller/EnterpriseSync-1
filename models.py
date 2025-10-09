@@ -659,12 +659,12 @@ class AlimentacaoLancamento(db.Model):
     funcionarios = db.relationship('Funcionario',
                                  secondary=alimentacao_funcionarios_assoc,
                                  backref=db.backref('lancamentos_alimentacao', lazy='dynamic'),
-                                 lazy='dynamic')
+                                 lazy='selectin')
     
     @property
     def valor_por_funcionario(self):
         """Calcula o valor rateado por funcionário"""
-        num_funcionarios = self.funcionarios.count()
+        num_funcionarios = len(self.funcionarios)
         if not num_funcionarios or self.valor_total is None:
             return 0
         return self.valor_total / num_funcionarios

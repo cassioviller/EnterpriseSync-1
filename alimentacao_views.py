@@ -90,7 +90,7 @@ def restaurante_detalhes(restaurante_id):
     # Buscar restaurante com validação multi-tenant
     restaurante = Restaurante.query.filter_by(id=restaurante_id, admin_id=admin_id).first_or_404()
     
-    # Buscar lançamentos desse restaurante
+    # Buscar lançamentos desse restaurante (funcionários carregados via lazy='selectin')
     lancamentos = AlimentacaoLancamento.query.filter_by(
         restaurante_id=restaurante_id, 
         admin_id=admin_id
