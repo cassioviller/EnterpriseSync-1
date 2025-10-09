@@ -143,7 +143,7 @@ def _calcular_funcionarios_departamento(admin_id):
 def _calcular_custos_obra(admin_id, data_inicio, data_fim):
     """Calcula custos por obra com proteção de transação"""
     try:
-        from models import CustoVeiculo, RegistroPonto, RegistroAlimentacao
+        from models import VehicleExpense, RegistroPonto, RegistroAlimentacao
         custos_por_obra = {}
         
         obras_admin = Obra.query.filter_by(admin_id=admin_id).all()
@@ -167,12 +167,12 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim):
             
             # Somar custos de veículos da obra
             try:
-                # ✅ CORREÇÃO: Verificar se CustoVeiculo tem o atributo obra_id
-                if hasattr(CustoVeiculo, 'obra_id'):
-                    veiculos_obra = CustoVeiculo.query.filter(
-                        CustoVeiculo.obra_id == obra.id,
-                        CustoVeiculo.data_custo >= data_inicio,
-                        CustoVeiculo.data_custo <= data_fim
+                # ✅ CORREÇÃO: Verificar se VehicleExpense tem o atributo obra_id
+                if hasattr(VehicleExpense, 'obra_id'):
+                    veiculos_obra = VehicleExpense.query.filter(
+                        VehicleExpense.obra_id == obra.id,
+                        VehicleExpense.data_custo >= data_inicio,
+                        VehicleExpense.data_custo <= data_fim
                     ).all()
                 else:
                     veiculos_obra = []  # Fallback se campo não existir
@@ -733,10 +733,10 @@ def dashboard():
         # Calcular KPIs específicos corretamente
         # 1. Custos de Transporte (veículos) - usar safe_db_operation para evitar transaction abort
         def calcular_custos_veiculo():
-            from models import CustoVeiculo
-            custos_veiculo = CustoVeiculo.query.filter(
-                CustoVeiculo.data_custo >= data_inicio,
-                CustoVeiculo.data_custo <= data_fim
+            from models import VehicleExpense
+            custos_veiculo = VehicleExpense.query.filter(
+                VehicleExpense.data_custo >= data_inicio,
+                VehicleExpense.data_custo <= data_fim
             ).all()
             return sum(c.valor or 0 for c in custos_veiculo)
         
@@ -1549,7 +1549,7 @@ def obras():
     # Calcular custos reais para cada obra no período
     for obra in obras:
         try:
-            from models import OutroCusto, CustoVeiculo, RegistroPonto, RegistroAlimentacao, Funcionario
+            from models import OutroCusto, VehicleExpense, RegistroPonto, RegistroAlimentacao, Funcionario
             
             # 1. CUSTO DE MÃO DE OBRA da obra específica no período
             registros_obra = RegistroPonto.query.filter(
@@ -1592,13 +1592,13 @@ def obras():
             
             # 4. CUSTOS DE VEÍCULOS/TRANSPORTE da obra
             # ✅ CORREÇÃO: Usar verificação de atributo para obra_id
-            custos_query = CustoVeiculo.query.filter(
-                CustoVeiculo.data_custo >= periodo_inicio,
-                CustoVeiculo.data_custo <= periodo_fim
+            custos_query = VehicleExpense.query.filter(
+                VehicleExpense.data_custo >= periodo_inicio,
+                VehicleExpense.data_custo <= periodo_fim
             )
             
-            if hasattr(CustoVeiculo, 'obra_id'):
-                custos_query = custos_query.filter(CustoVeiculo.obra_id == obra.id)
+            if hasattr(VehicleExpense, 'obra_id'):
+                custos_query = custos_query.filter(VehicleExpense.obra_id == obra.id)
             
             custos_transporte = custos_query.all()
             custo_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
@@ -2434,7 +2434,7 @@ def detalhes_obra(id):
         print(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")
             
         # Buscar custos da obra para o período
-        from models import OutroCusto, CustoVeiculo, RegistroAlimentacao
+        from models import OutroCusto, VehicleExpense, RegistroAlimentacao
         
         # Custos diversos da obra - adaptado para produção
         if admin_id is not None:
@@ -2451,14 +2451,14 @@ def detalhes_obra(id):
             ).all()
         
         # Custos de transporte/veículos da obra
-        # ✅ CORREÇÃO: Verificação segura de atributo obra_id
-        custos_query = CustoVeiculo.query.filter(
-            CustoVeiculo.data_custo >= data_inicio,
-            CustoVeiculo.data_custo <= data_fim
+        # ✅ USAR TABELA NOVA: frota_despesa (VehicleExpense) ao invés de custo_veiculo
+        custos_query = VehicleExpense.query.filter(
+            VehicleExpense.data_custo >= data_inicio,
+            VehicleExpense.data_custo <= data_fim
         )
         
-        if hasattr(CustoVeiculo, 'obra_id'):
-            custos_query = custos_query.filter(CustoVeiculo.obra_id == obra_id)
+        if hasattr(VehicleExpense, 'obra_id'):
+            custos_query = custos_query.filter(VehicleExpense.obra_id == obra_id)
             
         custos_transporte = custos_query.all()
         
