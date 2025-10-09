@@ -81,6 +81,31 @@ def restaurante_editar(restaurante_id):
     
     return render_template('alimentacao/restaurante_editar.html', restaurante=restaurante)
 
+@alimentacao_bp.route('/restaurante/<int:restaurante_id>')
+@login_required
+def restaurante_detalhes(restaurante_id):
+    """Exibir detalhes do restaurante e seus lançamentos"""
+    admin_id = get_admin_id()
+    
+    # Buscar restaurante com validação multi-tenant
+    restaurante = Restaurante.query.filter_by(id=restaurante_id, admin_id=admin_id).first_or_404()
+    
+    # Buscar lançamentos desse restaurante
+    lancamentos = AlimentacaoLancamento.query.filter_by(
+        restaurante_id=restaurante_id, 
+        admin_id=admin_id
+    ).order_by(AlimentacaoLancamento.data.desc()).all()
+    
+    # Calcular estatísticas
+    total_gasto = sum(l.valor_total for l in lancamentos) if lancamentos else 0
+    total_lancamentos = len(lancamentos)
+    
+    return render_template('alimentacao/restaurante_detalhes.html', 
+                         restaurante=restaurante,
+                         lancamentos=lancamentos,
+                         total_gasto=total_gasto,
+                         total_lancamentos=total_lancamentos)
+
 @alimentacao_bp.route('/restaurantes/<int:restaurante_id>/deletar', methods=['POST'])
 @login_required
 def restaurante_deletar(restaurante_id):
@@ -102,11 +127,11 @@ def restaurante_deletar(restaurante_id):
 
 @alimentacao_bp.route('/')
 @login_required
-def lancamentos_lista():
-    """Lista lançamentos de alimentação"""
+def index():
+    """Página principal com cards dos restaurantes"""
     admin_id = get_admin_id()
-    lancamentos = AlimentacaoLancamento.query.filter_by(admin_id=admin_id).order_by(AlimentacaoLancamento.data.desc()).all()
-    return render_template('alimentacao/lancamentos_lista.html', lancamentos=lancamentos)
+    restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
+    return render_template('alimentacao/index.html', restaurantes=restaurantes)
 
 @alimentacao_bp.route('/lancamentos/novo', methods=['GET', 'POST'])
 @login_required
@@ -171,7 +196,7 @@ def lancamento_novo():
             
             db.session.commit()
             flash(f'Lançamento criado! Valor por funcionário: R$ {lancamento.valor_por_funcionario:.2f}', 'success')
-            return redirect(url_for('alimentacao.lancamentos_lista'))
+            return redirect(url_for('alimentacao.index'))
             
         except Exception as e:
             db.session.rollback()

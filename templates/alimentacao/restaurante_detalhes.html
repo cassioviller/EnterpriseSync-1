@@ -1,0 +1,565 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+console.log('Initializing Restaurant Details with light theme...');
+</script>
+{% endblock %}
+
+{% block title %}{{ restaurante.nome }} - Detalhes - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA DETALHES ===== */
+.detalhes-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.detalhes-container,
+.detalhes-container * {
+    color: #212529 !important;
+}
+
+.detalhes-container .card,
+.detalhes-container .stat-card {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+.detalhes-container .table {
+    color: #212529 !important;
+}
+
+.detalhes-container .table th {
+    background: rgba(25, 135, 84, 0.1) !important;
+    color: #198754 !important;
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL ===== */
+:root {
+    --primary-green: #198754;
+    --dark-green: #145a3e;
+    --light-green: #d1e7dd;
+    --accent-green: #20c997;
+    --blue-primary: #0d6efd;
+    --blue-light: #e7f3ff;
+    --yellow-warning: #ffc107;
+    --yellow-light: #fff3cd;
+    --red-danger: #dc3545;
+    --red-light: #f8d7da;
+    --white: #ffffff;
+    --gray-50: #f8f9fa;
+    --gray-100: #e9ecef;
+    --gray-200: #dee2e6;
+    --gray-300: #ced4da;
+    --gray-400: #adb5bd;
+    --gray-500: #6c757d;
+    --gray-600: #495057;
+    --gray-700: #343a40;
+    --gray-800: #212529;
+    --gray-900: #000000;
+    
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+    
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    --gradient-card: linear-gradient(135deg, var(--white) 0%, var(--gray-50) 100%);
+    --gradient-success: linear-gradient(135deg, var(--accent-green) 0%, var(--primary-green) 100%);
+}
+
+.detalhes-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0;
+    background: #f8f9fa !important;
+    min-height: 100vh;
+    color: #212529 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ===== HEADER MODERNO COM GRADIENTE ===== */
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title h1 {
+    font-size: 2.5rem !important;
+    font-weight: 800 !important;
+    margin: 0;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.02em;
+}
+
+.header-title p {
+    font-size: 1.1rem !important;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-weight: 400;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-light {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-light:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: var(--primary-green);
+    color: var(--primary-green);
+    text-decoration: none;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: white;
+    text-decoration: none;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ===== INFO CARD DO RESTAURANTE ===== */
+.info-card {
+    background: white;
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    margin: 0 2rem 2rem 2rem;
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+}
+
+.info-card-header {
+    background: var(--gradient-primary);
+    color: white;
+    padding: 1.5rem;
+}
+
+.info-card-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.info-card-body {
+    padding: 2rem;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.info-item-label {
+    font-size: 0.85rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.info-item-value {
+    font-size: 1.1rem;
+    color: var(--gray-800);
+    font-weight: 600;
+}
+
+/* ===== STATISTICS CARDS ===== */
+.stats-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin: 0 2rem 2rem 2rem;
+}
+
+.stat-card {
+    background: white;
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-200);
+    transition: var(--transition);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-green);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+
+.stat-icon.success {
+    background: var(--light-green);
+    color: var(--primary-green);
+}
+
+.stat-icon.info {
+    background: var(--blue-light);
+    color: var(--blue-primary);
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: var(--gray-600);
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--gray-800);
+}
+
+/* ===== TABLE SECTION ===== */
+.table-section {
+    margin: 0 2rem 2rem 2rem;
+}
+
+.table-card {
+    background: white;
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    border: 1px solid var(--gray-200);
+}
+
+.table-card-header {
+    background: var(--gradient-primary);
+    color: white;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.table-card-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.table-responsive {
+    padding: 0;
+}
+
+.table {
+    margin: 0;
+}
+
+.table thead th {
+    background: rgba(25, 135, 84, 0.1);
+    color: var(--primary-green);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    border: none;
+    padding: 1rem;
+}
+
+.table tbody td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--gray-200);
+    color: var(--gray-700);
+}
+
+.table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.table tbody tr:hover {
+    background: var(--gray-50);
+}
+
+.badge {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.badge-success {
+    background: var(--light-green);
+    color: var(--primary-green);
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--gray-500);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+/* ===== RESPONSIVIDADE ===== */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: 2rem;
+        text-align: center;
+    }
+    
+    .header-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .stats-container {
+        grid-template-columns: 1fr;
+        margin: 0 1rem 2rem 1rem;
+    }
+    
+    .info-card,
+    .table-section {
+        margin: 0 1rem 2rem 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detalhes-container">
+    <!-- Header Moderno com Gradiente -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>🍽️ {{ restaurante.nome }}</h1>
+                <p>Detalhes e histórico de lançamentos</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('alimentacao.lancamento_novo') }}" class="btn-light">
+                    <i class="fas fa-plus"></i>
+                    Novo Lançamento
+                </a>
+                <a href="{{ url_for('alimentacao.index') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="margin: 0 2rem 2rem 2rem;">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Informações do Restaurante -->
+    <div class="info-card">
+        <div class="info-card-header">
+            <h3><i class="fas fa-store me-2"></i>Informações do Restaurante</h3>
+        </div>
+        <div class="info-card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-item-label">Nome</span>
+                    <span class="info-item-value">{{ restaurante.nome }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Razão Social</span>
+                    <span class="info-item-value">{{ restaurante.razao_social or 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">CNPJ</span>
+                    <span class="info-item-value">{{ restaurante.cnpj or 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Endereço</span>
+                    <span class="info-item-value">{{ restaurante.endereco or 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Telefone</span>
+                    <span class="info-item-value">{{ restaurante.telefone or 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">PIX</span>
+                    <span class="info-item-value">{{ restaurante.pix or 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Nome da Conta</span>
+                    <span class="info-item-value">{{ restaurante.nome_conta or 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Status</span>
+                    <span class="info-item-value">
+                        <span class="badge badge-success">{{ 'Ativo' if restaurante.ativo else 'Inativo' }}</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="stats-container">
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="stat-label">Total Gasto</div>
+            <div class="stat-value">R$ {{ "%.2f"|format(total_gasto) }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="fas fa-receipt"></i>
+            </div>
+            <div class="stat-label">Total de Lançamentos</div>
+            <div class="stat-value">{{ total_lancamentos }}</div>
+        </div>
+    </div>
+
+    <!-- Tabela de Lançamentos -->
+    <div class="table-section">
+        <div class="table-card">
+            <div class="table-card-header">
+                <h3><i class="fas fa-list me-2"></i>Histórico de Lançamentos</h3>
+            </div>
+            {% if lancamentos %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Obra</th>
+                            <th>Valor Total</th>
+                            <th>Funcionários</th>
+                            <th>Valor/Pessoa</th>
+                            <th>Descrição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lancamento in lancamentos %}
+                        <tr>
+                            <td>{{ lancamento.data.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ lancamento.obra.nome if lancamento.obra else 'N/A' }}</td>
+                            <td><strong>R$ {{ "%.2f"|format(lancamento.valor_total) }}</strong></td>
+                            <td>{{ lancamento.funcionarios|length }}</td>
+                            <td>R$ {{ "%.2f"|format(lancamento.valor_por_funcionario) }}</td>
+                            <td>{{ lancamento.descricao or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>Nenhum lançamento registrado para este restaurante.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
