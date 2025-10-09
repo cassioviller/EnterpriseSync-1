@@ -83,6 +83,35 @@ The system utilizes a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wi
         - 🎯 Próximo passo: Ativar `RECREATE_FROTA_DESPESA=true` em produção
         - ✅ Redirecionamentos: `/veiculos` → `/frota` (HTTP 307 preserva POST)
     -   **Deployment Strategy:** 100% automático, migrações inteligentes adaptam-se ao ambiente, feature flags garantem segurança total.
+-   **Food Management System (REFORMULADO - Oct 2025):** Sistema de alimentação com interface card-based moderna.
+    -   **ARQUITETURA (Outubro 2025):**
+        - **Modelos Backend:** `Restaurante`, `AlimentacaoLancamento` (models.py)
+        - **Tabelas:** `restaurante`, `alimentacao_lancamento`, `alimentacao_funcionarios_assoc`
+        - **Blueprint:** `alimentacao_bp` (alimentacao_views.py) com rotas `/alimentacao/*`
+        - **Campos de Pagamento (Migração 34):** razao_social, cnpj, pix, nome_conta
+        - **Multi-tenant:** Todos os modelos incluem `admin_id NOT NULL` com isolamento completo
+    -   **INTERFACE UX (Out 2025):**
+        - **Página Principal (`/alimentacao/`):** Cards elegantes com gradiente verde, exibindo restaurantes cadastrados
+        - **Página Detalhes (`/alimentacao/restaurante/<id>`):** Informações completas do restaurante + tabela de lançamentos
+        - **Fluxo de Navegação:** Cards → Detalhes → Lançamentos (integração completa)
+        - **Dados de Pagamento:** Razão social, CNPJ, PIX e nome da conta exibidos na página de detalhes
+    -   **MIGRAÇÃO 27 (Sistema Base):** Criação das tabelas restaurante, alimentacao_lancamento, alimentacao_funcionarios_assoc
+    -   **MIGRAÇÃO 34 (Campos Pagamento):** Adição de 4 campos de pagamento no modelo Restaurante
+    -   **Status Atual (Out 2025):**
+        - ✅ Interface reformulada com cards modernos (substituiu lista tradicional)
+        - ✅ Página de detalhes dedicada com informações completas
+        - ✅ Campos de pagamento implementados (razao_social, cnpj, pix, nome_conta)
+        - ✅ Navegação fluida entre restaurantes e lançamentos
+        - ✅ Multi-tenant funcionando perfeitamente
+        - ✅ Templates modernos alinhados com design system do SIGE
+-   **Deploy Optimization (Oct 2025):** Sistema de migrações otimizado para startup rápido.
+    -   **Problema Resolvido:** Migrações antigas causavam lentidão no deploy (262+ linhas de log)
+    -   **Solução Implementada:** Migrações 1-19 desativadas (já aplicadas em produção)
+    -   **Migrações Ativas:** Apenas 20, 27, 33, 34 executam no startup
+    -   **Resultado:** Redução de 94% nos logs de migração (262→15 linhas)
+    -   **Performance:** Deploy significativamente mais rápido em produção
+    -   **Histórico Preservado:** Funções antigas mantidas comentadas para referência
+    -   **Rollback:** Para reativar migrações antigas, descomentar linhas 700-757 em migrations.py
 
 ## External Dependencies
 -   **Flask:** Web framework.
