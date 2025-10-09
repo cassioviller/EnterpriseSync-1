@@ -685,6 +685,56 @@ def _migration_20_unified_vehicle_system():
         logger.error(traceback.format_exc())
 
 
+def _migration_35_custo_veiculo_numero_nota_fiscal():
+    """
+    MIGRAÇÃO 35: Adicionar coluna numero_nota_fiscal na tabela custo_veiculo
+    Resolve erro em produção onde a coluna não existe
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🔧 MIGRAÇÃO 35: Adicionar numero_nota_fiscal em custo_veiculo")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se a coluna já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'custo_veiculo' 
+            AND column_name = 'numero_nota_fiscal'
+        """)
+        coluna_existe = cursor.fetchone()
+        
+        if not coluna_existe:
+            logger.info("📋 Adicionando coluna numero_nota_fiscal...")
+            cursor.execute("""
+                ALTER TABLE custo_veiculo 
+                ADD COLUMN numero_nota_fiscal VARCHAR(20)
+            """)
+            connection.commit()
+            logger.info("✅ Coluna 'numero_nota_fiscal' adicionada com sucesso!")
+        else:
+            logger.info("✅ Coluna 'numero_nota_fiscal' já existe na tabela custo_veiculo")
+        
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 35 CONCLUÍDA: custo_veiculo atualizado!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 35: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -730,6 +780,9 @@ def executar_migracoes():
 
         # Migração 34: Adicionar campos de pagamento no Restaurante
         _migration_34_restaurante_campos_pagamento()
+
+        # Migração 35: Adicionar coluna numero_nota_fiscal na tabela custo_veiculo
+        _migration_35_custo_veiculo_numero_nota_fiscal()
 
         logger.info("=" * 80)
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
