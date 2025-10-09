@@ -2630,9 +2630,12 @@ def detalhes_obra(id):
                              custos_transporte_total=custos_transporte_total,
                              funcionarios_obra=funcionarios_obra)
     except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
         print(f"ERRO DETALHES OBRA: {str(e)}")
-        # Redirecionar para lista de obras em caso de erro
-        flash('Erro ao carregar detalhes da obra', 'error')
+        print(f"TRACEBACK COMPLETO:\n{error_traceback}")
+        # Exibir traceback completo em modo desenvolvimento
+        flash(f'Erro ao carregar detalhes da obra: {str(e)}\n\nTraceback:\n{error_traceback}', 'error')
         return redirect(url_for('main.obras'))
 
 # ===== SUPER ADMIN =====
