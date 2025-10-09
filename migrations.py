@@ -696,66 +696,29 @@ def executar_migracoes():
         database_url = os.environ.get('DATABASE_URL', 'postgresql://sige:sige@viajey_sige:5432/sige')
         logger.info(f"🎯 TARGET DATABASE: {mask_database_url(database_url)}")
         
-        # Verificar se a tabela existe, se não existir, criar completa
-        garantir_tabela_proposta_templates_existe()
+        # ===== MIGRAÇÕES ANTIGAS DESATIVADAS (JÁ APLICADAS EM PRODUÇÃO) =====
+        # Migração 1-19: Comentadas para otimizar tempo de deploy
+        # garantir_tabela_proposta_templates_existe()
+        # migrar_categoria_proposta_templates()
+        # migrar_colunas_faltantes_proposta_templates()
+        # migrar_campos_opcionais_propostas()
+        # migrar_personalizacao_visual_empresa()
+        # migrar_campos_organizacao_propostas()
+        # garantir_usuarios_producao()
+        # migrar_campos_completos_templates()
+        # migrar_campos_rdo_ocorrencia()
+        # migrar_campo_admin_id_rdo()
+        # migrar_sistema_rdo_aprimorado()
+        # adicionar_admin_id_servico()
+        # corrigir_admin_id_servicos_existentes()
+        # migrar_tabela_servico_obra_real()
+        # adicionar_coluna_local_rdo()
+        # adicionar_campos_allocation_employee()
+        # migrar_sistema_veiculos_critical()
+        # corrigir_admin_id_vehicle_tables()
+        # adicionar_colunas_veiculo_completas()
         
-        # Migração 1: Adicionar coluna categoria na tabela proposta_templates
-        migrar_categoria_proposta_templates()
-        
-        # Migração 2: Adicionar outras colunas faltantes se necessário
-        migrar_colunas_faltantes_proposta_templates()
-        
-        # Migração 3: Tornar campos assunto e objeto opcionais em propostas_comerciais
-        migrar_campos_opcionais_propostas()
-        
-        # Migração 4: Adicionar campos de personalização visual na configuração da empresa
-        migrar_personalizacao_visual_empresa()
-        
-        # Migração 5: Adicionar campos de organização para proposta_itens
-        migrar_campos_organizacao_propostas()
-        
-        # Migração 6: Garantir usuários existem para foreign keys
-        garantir_usuarios_producao()
-        
-        # Migração 7: Adicionar novos campos completos para templates
-        migrar_campos_completos_templates()
-        
-        # Migração 8: Adicionar campos editáveis para páginas do PDF - IGNORADA POR ENQUANTO
-        logger.info("✅ Campos PDF serão adicionados manualmente se necessário")
-        
-        # Migração 9: CRÍTICA - Corrigir campos faltantes na tabela rdo_ocorrencia
-        migrar_campos_rdo_ocorrencia()
-        
-        # Migração 10: CRÍTICA - Adicionar campo admin_id na tabela rdo
-        migrar_campo_admin_id_rdo()
-        
-        # Migração 11: CRÍTICA - Criar tabelas do sistema RDO aprimorado
-        migrar_sistema_rdo_aprimorado()
-        
-        # Migração 12: URGENTE - Adicionar admin_id na tabela servico
-        adicionar_admin_id_servico()
-        
-        # Migração 13: CRÍTICA - Corrigir admin_id em serviços existentes
-        corrigir_admin_id_servicos_existentes()
-        
-        # Migração 14: NOVA - Criar tabela ServicoObraReal
-        migrar_tabela_servico_obra_real()
-        
-        # Migração 15: CRÍTICA - Adicionar coluna local na tabela RDO para produção
-        adicionar_coluna_local_rdo()
-        
-        # Migração 16: NOVA - Adicionar campos faltantes na tabela allocation_employee
-        adicionar_campos_allocation_employee()
-        
-        # Migração 17: CRÍTICA - Migração específica para sistema de veículos
-        migrar_sistema_veiculos_critical()
-        
-        # Migração 18: CRÍTICA - Corrigir admin_id nullable para multi-tenant seguro
-        corrigir_admin_id_vehicle_tables()
-        
-        # Migração 19: NOVA - Adicionar colunas faltantes em veículos (chassi, renavam, combustivel)
-        adicionar_colunas_veiculo_completas()
-        
+        # ===== MIGRAÇÕES ATIVAS =====
         # Migração 20: UNIFICADA - Sistema de Veículos Inteligente
         _migration_20_unified_vehicle_system()
 
