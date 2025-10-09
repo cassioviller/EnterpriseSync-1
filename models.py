@@ -616,6 +616,10 @@ class Restaurante(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     endereco = db.Column(db.Text)
     telefone = db.Column(db.String(20))
+    razao_social = db.Column(db.String(200))
+    cnpj = db.Column(db.String(18))
+    pix = db.Column(db.String(100))
+    nome_conta = db.Column(db.String(100))
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
     # Relacionamentos
