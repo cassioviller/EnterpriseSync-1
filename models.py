@@ -3268,7 +3268,6 @@ class VehicleExpense(db.Model):
         db.Index('idx_vehicle_expense_data_admin', 'data_custo', 'admin_id'),
     )
 
-
 # ================================
 # ALIASES PARA COMPATIBILIDADE
 # ================================
