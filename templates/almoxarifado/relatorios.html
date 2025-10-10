@@ -1,0 +1,792 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Relatórios - Almoxarifado{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+<style>
+    .report-card {
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    .report-card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+    .report-icon {
+        width: 48px;
+        height: 48px;
+    }
+    .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    .subtotal-row {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+    .total-row {
+        background-color: #198754;
+        color: white;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i data-feather="bar-chart-2" class="text-success me-2"></i>
+                Relatórios - Almoxarifado
+            </h1>
+            <p class="text-muted mb-0">Gere relatórios completos sobre estoque, movimentações e alertas</p>
+        </div>
+    </div>
+
+    {% if not relatorio_tipo %}
+    <!-- Cards de Seleção de Relatórios -->
+    <div class="row g-4">
+        <!-- Relatório 1: Posição de Estoque -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card report-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-success bg-opacity-10 rounded-3 p-3 me-3">
+                            <i data-feather="package" class="text-success report-icon"></i>
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-1">Posição de Estoque</h5>
+                            <p class="text-muted mb-0 small">Situação atual do estoque</p>
+                        </div>
+                    </div>
+                    <p class="card-text">Visualize todos os itens em estoque com quantidades, valores e condições. Agrupado por categoria com subtotais.</p>
+                    <a href="{{ url_for('almoxarifado.relatorios', tipo='posicao_estoque') }}" class="btn btn-success w-100">
+                        <i data-feather="file-text" style="width: 16px; height: 16px;" class="me-1"></i>
+                        Gerar Relatório
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relatório 2: Movimentações por Período -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card report-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-primary bg-opacity-10 rounded-3 p-3 me-3">
+                            <i data-feather="activity" class="text-primary report-icon"></i>
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-1">Movimentações</h5>
+                            <p class="text-muted mb-0 small">Histórico por período</p>
+                        </div>
+                    </div>
+                    <p class="card-text">Acompanhe todas as entradas, saídas e devoluções em um período específico. Agrupado por tipo de movimento.</p>
+                    <a href="{{ url_for('almoxarifado.relatorios', tipo='movimentacoes') }}" class="btn btn-primary w-100">
+                        <i data-feather="file-text" style="width: 16px; height: 16px;" class="me-1"></i>
+                        Gerar Relatório
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relatório 3: Itens por Funcionário -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card report-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-info bg-opacity-10 rounded-3 p-3 me-3">
+                            <i data-feather="users" class="text-info report-icon"></i>
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-1">Itens por Funcionário</h5>
+                            <p class="text-muted mb-0 small">Itens em posse</p>
+                        </div>
+                    </div>
+                    <p class="card-text">Veja quais itens cada funcionário possui em uso, incluindo valores e datas de retirada.</p>
+                    <a href="{{ url_for('almoxarifado.relatorios', tipo='itens_funcionario') }}" class="btn btn-info w-100">
+                        <i data-feather="file-text" style="width: 16px; height: 16px;" class="me-1"></i>
+                        Gerar Relatório
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relatório 4: Consumo por Obra -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card report-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-warning bg-opacity-10 rounded-3 p-3 me-3">
+                            <i data-feather="trending-up" class="text-warning report-icon"></i>
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-1">Consumo por Obra</h5>
+                            <p class="text-muted mb-0 small">Materiais consumidos</p>
+                        </div>
+                    </div>
+                    <p class="card-text">Analise o consumo de materiais por obra, incluindo itens não devolvidos e valores totais.</p>
+                    <a href="{{ url_for('almoxarifado.relatorios', tipo='consumo_obra') }}" class="btn btn-warning w-100">
+                        <i data-feather="file-text" style="width: 16px; height: 16px;" class="me-1"></i>
+                        Gerar Relatório
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relatório 5: Alertas e Pendências -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card report-card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-danger bg-opacity-10 rounded-3 p-3 me-3">
+                            <i data-feather="alert-triangle" class="text-danger report-icon"></i>
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-1">Alertas e Pendências</h5>
+                            <p class="text-muted mb-0 small">Itens críticos</p>
+                        </div>
+                    </div>
+                    <p class="card-text">Identifique estoques baixos, itens em manutenção e materiais não devolvidos há mais de 30 dias.</p>
+                    <a href="{{ url_for('almoxarifado.relatorios', tipo='alertas') }}" class="btn btn-danger w-100">
+                        <i data-feather="file-text" style="width: 16px; height: 16px;" class="me-1"></i>
+                        Gerar Relatório
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botão Voltar ao Dashboard -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card report-card h-100 border-secondary">
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <div class="text-center">
+                        <i data-feather="arrow-left" style="width: 48px; height: 48px;" class="text-secondary mb-3"></i>
+                        <h5 class="card-title mb-3">Voltar ao Dashboard</h5>
+                        <a href="{{ url_for('almoxarifado.dashboard') }}" class="btn btn-outline-secondary">
+                            <i data-feather="home" style="width: 16px; height: 16px;" class="me-1"></i>
+                            Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- RELATÓRIO 1: POSIÇÃO DE ESTOQUE -->
+    {% if dados_relatorio and dados_relatorio.tipo == 'posicao_estoque' %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-success text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i data-feather="package" style="width: 20px; height: 20px;" class="me-2"></i>
+                    Relatório: Posição de Estoque
+                </h5>
+                <a href="{{ url_for('almoxarifado.relatorios') }}" class="btn btn-sm btn-light">
+                    <i data-feather="arrow-left" style="width: 16px; height: 16px;" class="me-1"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Filtros -->
+            <div class="mb-3">
+                <button class="btn btn-outline-success btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosPosicao">
+                    <i data-feather="filter" style="width: 16px; height: 16px;" class="me-1"></i>
+                    Filtros
+                </button>
+            </div>
+            <div class="collapse {% if dados_relatorio.filtros.categoria_id or dados_relatorio.filtros.tipo_controle or dados_relatorio.filtros.condicao %}show{% endif %}" id="filtrosPosicao">
+                <form method="GET" action="{{ url_for('almoxarifado.relatorios') }}" class="row g-3 mb-3 p-3 bg-light rounded">
+                    <input type="hidden" name="tipo" value="posicao_estoque">
+                    <div class="col-md-4">
+                        <label class="form-label">Categoria</label>
+                        <select name="categoria_id" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            {% for cat in categorias %}
+                            <option value="{{ cat.id }}" {% if dados_relatorio.filtros.categoria_id == cat.id %}selected{% endif %}>{{ cat.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Tipo de Controle</label>
+                        <select name="tipo_controle" class="form-select form-select-sm">
+                            <option value="">Todos</option>
+                            <option value="SERIALIZADO" {% if dados_relatorio.filtros.tipo_controle == 'SERIALIZADO' %}selected{% endif %}>Serializado</option>
+                            <option value="CONSUMIVEL" {% if dados_relatorio.filtros.tipo_controle == 'CONSUMIVEL' %}selected{% endif %}>Consumível</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Condição</label>
+                        <select name="condicao" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            <option value="DISPONIVEL" {% if dados_relatorio.filtros.condicao == 'DISPONIVEL' %}selected{% endif %}>Disponível</option>
+                            <option value="EM_USO" {% if dados_relatorio.filtros.condicao == 'EM_USO' %}selected{% endif %}>Em Uso</option>
+                            <option value="EM_MANUTENCAO" {% if dados_relatorio.filtros.condicao == 'EM_MANUTENCAO' %}selected{% endif %}>Em Manutenção</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i data-feather="search" style="width: 16px; height: 16px;" class="me-1"></i>
+                            Filtrar
+                        </button>
+                        <a href="{{ url_for('almoxarifado.relatorios', tipo='posicao_estoque') }}" class="btn btn-outline-secondary btn-sm">
+                            <i data-feather="x" style="width: 16px; height: 16px;" class="me-1"></i>
+                            Limpar
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabela -->
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-success">
+                        <tr>
+                            <th>Categoria</th>
+                            <th>Item (Código + Nome)</th>
+                            <th>Tipo</th>
+                            <th>Qtd/Serial</th>
+                            <th>Valor Unit.</th>
+                            <th>Valor Total</th>
+                            <th>Condição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for categoria, itens in dados_relatorio.estoque_por_categoria.items() %}
+                        <!-- Itens da Categoria -->
+                        {% for estoque in itens %}
+                        <tr>
+                            <td>{{ categoria }}</td>
+                            <td>{{ estoque.item.codigo }} - {{ estoque.item.nome }}</td>
+                            <td>
+                                {% if estoque.item.tipo_controle == 'SERIALIZADO' %}
+                                <span class="badge bg-info">Serializado</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Consumível</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if estoque.numero_serie %}
+                                {{ estoque.numero_serie }}
+                                {% else %}
+                                {{ estoque.quantidade }}
+                                {% endif %}
+                            </td>
+                            <td>R$ {{ "%.2f"|format(estoque.valor_unitario|float if estoque.valor_unitario else 0) }}</td>
+                            <td>R$ {{ "%.2f"|format((estoque.valor_unitario|float if estoque.valor_unitario else 0) * (estoque.quantidade|float if estoque.quantidade else 0)) }}</td>
+                            <td>
+                                {% if estoque.status == 'DISPONIVEL' %}
+                                <span class="badge bg-success">Disponível</span>
+                                {% elif estoque.status == 'EM_USO' %}
+                                <span class="badge bg-warning">Em Uso</span>
+                                {% elif estoque.status == 'EM_MANUTENCAO' %}
+                                <span class="badge bg-danger">Manutenção</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ estoque.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <!-- Subtotal -->
+                        <tr class="subtotal-row">
+                            <td colspan="5" class="text-end">Subtotal {{ categoria }}:</td>
+                            <td colspan="2"><strong>R$ {{ "%.2f"|format(dados_relatorio.subtotais[categoria]|float) }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                        
+                        <!-- Total Geral -->
+                        <tr class="total-row">
+                            <td colspan="5" class="text-end">TOTAL GERAL:</td>
+                            <td colspan="2"><strong>R$ {{ "%.2f"|format(dados_relatorio.total_geral|float) }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- RELATÓRIO 2: MOVIMENTAÇÕES POR PERÍODO -->
+    {% if dados_relatorio and dados_relatorio.tipo == 'movimentacoes' %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i data-feather="activity" style="width: 20px; height: 20px;" class="me-2"></i>
+                    Relatório: Movimentações por Período
+                </h5>
+                <a href="{{ url_for('almoxarifado.relatorios') }}" class="btn btn-sm btn-light">
+                    <i data-feather="arrow-left" style="width: 16px; height: 16px;" class="me-1"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Filtros -->
+            <div class="mb-3">
+                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosMovimentacoes">
+                    <i data-feather="filter" style="width: 16px; height: 16px;" class="me-1"></i>
+                    Filtros
+                </button>
+            </div>
+            <div class="collapse show" id="filtrosMovimentacoes">
+                <form method="GET" action="{{ url_for('almoxarifado.relatorios') }}" class="row g-3 mb-3 p-3 bg-light rounded">
+                    <input type="hidden" name="tipo" value="movimentacoes">
+                    <div class="col-md-3">
+                        <label class="form-label">Data Início*</label>
+                        <input type="date" name="data_inicio" class="form-control form-control-sm" value="{{ dados_relatorio.filtros.data_inicio }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Data Fim*</label>
+                        <input type="date" name="data_fim" class="form-control form-control-sm" value="{{ dados_relatorio.filtros.data_fim }}" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tipo</label>
+                        <select name="tipo_movimento" class="form-select form-select-sm">
+                            <option value="">Todos</option>
+                            <option value="ENTRADA" {% if dados_relatorio.filtros.tipo_movimento == 'ENTRADA' %}selected{% endif %}>Entrada</option>
+                            <option value="SAIDA" {% if dados_relatorio.filtros.tipo_movimento == 'SAIDA' %}selected{% endif %}>Saída</option>
+                            <option value="DEVOLUCAO" {% if dados_relatorio.filtros.tipo_movimento == 'DEVOLUCAO' %}selected{% endif %}>Devolução</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Funcionário</label>
+                        <select name="funcionario_id" class="form-select form-select-sm">
+                            <option value="">Todos</option>
+                            {% for func in funcionarios %}
+                            <option value="{{ func.id }}" {% if dados_relatorio.filtros.funcionario_id == func.id %}selected{% endif %}>{{ func.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Obra</label>
+                        <select name="obra_id" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if dados_relatorio.filtros.obra_id == obra.id %}selected{% endif %}>{{ obra.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i data-feather="search" style="width: 16px; height: 16px;" class="me-1"></i>
+                            Filtrar
+                        </button>
+                        <a href="{{ url_for('almoxarifado.relatorios', tipo='movimentacoes') }}" class="btn btn-outline-secondary btn-sm">
+                            <i data-feather="x" style="width: 16px; height: 16px;" class="me-1"></i>
+                            Limpar
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabela -->
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Tipo</th>
+                            <th>Item</th>
+                            <th>Qtd/Serial</th>
+                            <th>Funcionário</th>
+                            <th>Obra</th>
+                            <th>Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tipo, movimentos in dados_relatorio.movimentos_por_tipo.items() %}
+                        {% if movimentos %}
+                        <!-- Movimentos do Tipo -->
+                        {% for mov in movimentos %}
+                        <tr>
+                            <td>{{ mov.data_movimento.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>
+                                {% if tipo == 'ENTRADA' %}
+                                <span class="badge bg-success">Entrada</span>
+                                {% elif tipo == 'SAIDA' %}
+                                <span class="badge bg-danger">Saída</span>
+                                {% else %}
+                                <span class="badge bg-warning">Devolução</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ mov.item.codigo }} - {{ mov.item.nome }}</td>
+                            <td>
+                                {% if mov.numero_serie %}
+                                {{ mov.numero_serie }}
+                                {% else %}
+                                {{ mov.quantidade }}
+                                {% endif %}
+                            </td>
+                            <td>{{ mov.funcionario.nome if mov.funcionario else '-' }}</td>
+                            <td>{{ mov.obra.nome if mov.obra else '-' }}</td>
+                            <td>{{ mov.observacao if mov.observacao else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                        <!-- Subtotal -->
+                        <tr class="subtotal-row">
+                            <td colspan="6" class="text-end">Subtotal {{ tipo }}:</td>
+                            <td><strong>{{ dados_relatorio.subtotais_tipo[tipo] }} itens</strong></td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- RELATÓRIO 3: ITENS POR FUNCIONÁRIO -->
+    {% if dados_relatorio and dados_relatorio.tipo == 'itens_funcionario' %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-info text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i data-feather="users" style="width: 20px; height: 20px;" class="me-2"></i>
+                    Relatório: Itens por Funcionário
+                </h5>
+                <a href="{{ url_for('almoxarifado.relatorios') }}" class="btn btn-sm btn-light">
+                    <i data-feather="arrow-left" style="width: 16px; height: 16px;" class="me-1"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Filtros -->
+            <div class="mb-3">
+                <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosFuncionario">
+                    <i data-feather="filter" style="width: 16px; height: 16px;" class="me-1"></i>
+                    Filtros
+                </button>
+            </div>
+            <div class="collapse {% if dados_relatorio.filtros.funcionario_id or dados_relatorio.filtros.obra_id %}show{% endif %}" id="filtrosFuncionario">
+                <form method="GET" action="{{ url_for('almoxarifado.relatorios') }}" class="row g-3 mb-3 p-3 bg-light rounded">
+                    <input type="hidden" name="tipo" value="itens_funcionario">
+                    <div class="col-md-6">
+                        <label class="form-label">Funcionário</label>
+                        <select name="funcionario_id" class="form-select form-select-sm">
+                            <option value="">Todos</option>
+                            {% for func in funcionarios %}
+                            <option value="{{ func.id }}" {% if dados_relatorio.filtros.funcionario_id == func.id %}selected{% endif %}>{{ func.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Obra</label>
+                        <select name="obra_id" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if dados_relatorio.filtros.obra_id == obra.id %}selected{% endif %}>{{ obra.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-info btn-sm">
+                            <i data-feather="search" style="width: 16px; height: 16px;" class="me-1"></i>
+                            Filtrar
+                        </button>
+                        <a href="{{ url_for('almoxarifado.relatorios', tipo='itens_funcionario') }}" class="btn btn-outline-secondary btn-sm">
+                            <i data-feather="x" style="width: 16px; height: 16px;" class="me-1"></i>
+                            Limpar
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabela -->
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-info">
+                        <tr>
+                            <th>Funcionário</th>
+                            <th>Item</th>
+                            <th>Qtd/Serial</th>
+                            <th>Data Retirada</th>
+                            <th>Obra</th>
+                            <th>Valor Unit.</th>
+                            <th>Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for funcionario, itens in dados_relatorio.itens_por_funcionario.items() %}
+                        <!-- Itens do Funcionário -->
+                        {% for estoque in itens %}
+                        <tr>
+                            <td>{{ funcionario }}</td>
+                            <td>{{ estoque.item.codigo }} - {{ estoque.item.nome }}</td>
+                            <td>
+                                {% if estoque.numero_serie %}
+                                {{ estoque.numero_serie }}
+                                {% else %}
+                                {{ estoque.quantidade }}
+                                {% endif %}
+                            </td>
+                            <td>{{ estoque.updated_at.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ estoque.obra.nome if estoque.obra else '-' }}</td>
+                            <td>R$ {{ "%.2f"|format(estoque.valor_unitario|float if estoque.valor_unitario else 0) }}</td>
+                            <td>R$ {{ "%.2f"|format((estoque.valor_unitario|float if estoque.valor_unitario else 0) * (estoque.quantidade|float if estoque.quantidade else 0)) }}</td>
+                        </tr>
+                        {% endfor %}
+                        <!-- Subtotal -->
+                        <tr class="subtotal-row">
+                            <td colspan="6" class="text-end">Subtotal {{ funcionario }}:</td>
+                            <td><strong>R$ {{ "%.2f"|format(dados_relatorio.subtotais_func[funcionario]|float) }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                        
+                        <!-- Total Geral -->
+                        <tr class="total-row">
+                            <td colspan="6" class="text-end">TOTAL GERAL:</td>
+                            <td><strong>R$ {{ "%.2f"|format(dados_relatorio.total_geral|float) }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- RELATÓRIO 4: CONSUMO POR OBRA -->
+    {% if dados_relatorio and dados_relatorio.tipo == 'consumo_obra' %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-warning text-dark">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i data-feather="trending-up" style="width: 20px; height: 20px;" class="me-2"></i>
+                    Relatório: Consumo por Obra
+                </h5>
+                <a href="{{ url_for('almoxarifado.relatorios') }}" class="btn btn-sm btn-dark">
+                    <i data-feather="arrow-left" style="width: 16px; height: 16px;" class="me-1"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Filtros -->
+            <div class="mb-3">
+                <button class="btn btn-outline-warning btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosConsumo">
+                    <i data-feather="filter" style="width: 16px; height: 16px;" class="me-1"></i>
+                    Filtros
+                </button>
+            </div>
+            <div class="collapse {% if dados_relatorio.filtros.obra_id or dados_relatorio.filtros.data_inicio or dados_relatorio.filtros.data_fim %}show{% endif %}" id="filtrosConsumo">
+                <form method="GET" action="{{ url_for('almoxarifado.relatorios') }}" class="row g-3 mb-3 p-3 bg-light rounded">
+                    <input type="hidden" name="tipo" value="consumo_obra">
+                    <div class="col-md-4">
+                        <label class="form-label">Obra</label>
+                        <select name="obra_id" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if dados_relatorio.filtros.obra_id == obra.id %}selected{% endif %}>{{ obra.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Data Início</label>
+                        <input type="date" name="data_inicio" class="form-control form-control-sm" value="{{ dados_relatorio.filtros.data_inicio }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Data Fim</label>
+                        <input type="date" name="data_fim" class="form-control form-control-sm" value="{{ dados_relatorio.filtros.data_fim }}">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-warning btn-sm">
+                            <i data-feather="search" style="width: 16px; height: 16px;" class="me-1"></i>
+                            Filtrar
+                        </button>
+                        <a href="{{ url_for('almoxarifado.relatorios', tipo='consumo_obra') }}" class="btn btn-outline-secondary btn-sm">
+                            <i data-feather="x" style="width: 16px; height: 16px;" class="me-1"></i>
+                            Limpar
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabela -->
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-warning">
+                        <tr>
+                            <th>Obra</th>
+                            <th>Item</th>
+                            <th>Qtd Consumida</th>
+                            <th>Valor Unit.</th>
+                            <th>Valor Total</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for obra, saidas in dados_relatorio.consumo_por_obra.items() %}
+                        <!-- Saídas da Obra -->
+                        {% for saida in saidas %}
+                        <tr>
+                            <td>{{ obra }}</td>
+                            <td>{{ saida.item.codigo }} - {{ saida.item.nome }}</td>
+                            <td>{{ saida.quantidade }}</td>
+                            <td>R$ {{ "%.2f"|format(saida.valor_unitario|float if saida.valor_unitario else 0) }}</td>
+                            <td>R$ {{ "%.2f"|format((saida.valor_unitario|float if saida.valor_unitario else 0) * (saida.quantidade|float if saida.quantidade else 0)) }}</td>
+                            <td>{{ saida.data_movimento.strftime('%d/%m/%Y') }}</td>
+                        </tr>
+                        {% endfor %}
+                        <!-- Subtotal -->
+                        <tr class="subtotal-row">
+                            <td colspan="4" class="text-end">Subtotal {{ obra }}:</td>
+                            <td colspan="2"><strong>R$ {{ "%.2f"|format(dados_relatorio.subtotais_obra[obra]|float) }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                        
+                        <!-- Total Geral -->
+                        <tr class="total-row">
+                            <td colspan="4" class="text-end">TOTAL GERAL:</td>
+                            <td colspan="2"><strong>R$ {{ "%.2f"|format(dados_relatorio.total_geral|float) }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- RELATÓRIO 5: ALERTAS E PENDÊNCIAS -->
+    {% if dados_relatorio and dados_relatorio.tipo == 'alertas' %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-danger text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i data-feather="alert-triangle" style="width: 20px; height: 20px;" class="me-2"></i>
+                    Relatório: Alertas e Pendências
+                </h5>
+                <a href="{{ url_for('almoxarifado.relatorios') }}" class="btn btn-sm btn-light">
+                    <i data-feather="arrow-left" style="width: 16px; height: 16px;" class="me-1"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Seção 1: Estoque Baixo -->
+            <h6 class="text-danger mb-3">
+                <i data-feather="alert-circle" style="width: 18px; height: 18px;" class="me-2"></i>
+                Estoque Baixo ({{ dados_relatorio.estoque_baixo|length }} itens)
+            </h6>
+            {% if dados_relatorio.estoque_baixo %}
+            <div class="table-responsive mb-4">
+                <table class="table table-sm table-hover">
+                    <thead class="table-danger">
+                        <tr>
+                            <th>Item</th>
+                            <th>Situação</th>
+                            <th>Qtd Atual</th>
+                            <th>Qtd Mínima</th>
+                            <th>Diferença</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alerta in dados_relatorio.estoque_baixo %}
+                        <tr>
+                            <td>{{ alerta.item.codigo }} - {{ alerta.item.nome }}</td>
+                            <td><span class="badge bg-danger">Estoque Baixo</span></td>
+                            <td>{{ alerta.qtd_atual }}</td>
+                            <td>{{ alerta.qtd_minima }}</td>
+                            <td class="text-danger">-{{ alerta.diferenca }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Nenhum item com estoque baixo.</p>
+            {% endif %}
+
+            <hr>
+
+            <!-- Seção 2: Manutenção Pendente -->
+            <h6 class="text-warning mb-3">
+                <i data-feather="tool" style="width: 18px; height: 18px;" class="me-2"></i>
+                Manutenção Pendente ({{ dados_relatorio.manutencao|length }} itens)
+            </h6>
+            {% if dados_relatorio.manutencao %}
+            <div class="table-responsive mb-4">
+                <table class="table table-sm table-hover">
+                    <thead class="table-warning">
+                        <tr>
+                            <th>Item</th>
+                            <th>Situação</th>
+                            <th>Serial</th>
+                            <th>Data Entrada Manutenção</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in dados_relatorio.manutencao %}
+                        <tr>
+                            <td>{{ item.item.codigo }} - {{ item.item.nome }}</td>
+                            <td><span class="badge bg-warning">Em Manutenção</span></td>
+                            <td>{{ item.numero_serie }}</td>
+                            <td>{{ item.updated_at.strftime('%d/%m/%Y') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Nenhum item em manutenção.</p>
+            {% endif %}
+
+            <hr>
+
+            <!-- Seção 3: Itens não Devolvidos há >30 dias -->
+            <h6 class="text-danger mb-3">
+                <i data-feather="clock" style="width: 18px; height: 18px;" class="me-2"></i>
+                Itens não Devolvidos há mais de 30 dias ({{ dados_relatorio.nao_devolvidos|length }} itens)
+            </h6>
+            {% if dados_relatorio.nao_devolvidos %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-danger">
+                        <tr>
+                            <th>Item</th>
+                            <th>Situação</th>
+                            <th>Qtd/Serial</th>
+                            <th>Funcionário</th>
+                            <th>Obra</th>
+                            <th>Dias Pendente</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alerta in dados_relatorio.nao_devolvidos %}
+                        <tr>
+                            <td>{{ alerta.item.item.codigo }} - {{ alerta.item.item.nome }}</td>
+                            <td><span class="badge bg-danger">Não Devolvido</span></td>
+                            <td>
+                                {% if alerta.item.numero_serie %}
+                                {{ alerta.item.numero_serie }}
+                                {% else %}
+                                {{ alerta.item.quantidade }}
+                                {% endif %}
+                            </td>
+                            <td>{{ alerta.item.funcionario_atual.nome if alerta.item.funcionario_atual else '-' }}</td>
+                            <td>{{ alerta.item.obra.nome if alerta.item.obra else '-' }}</td>
+                            <td class="text-danger"><strong>{{ alerta.dias_pendente }} dias</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Nenhum item pendente de devolução.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    // Inicializar Feather Icons
+    feather.replace();
+</script>
+{% endblock %}
