@@ -1,85 +1,87 @@
 {% extends "base_completo.html" %}
 
+{% block title %}Almoxarifado - Dashboard{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <!-- Cabeçalho -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0 text-gray-800">
-            <i class="fas fa-warehouse"></i> Almoxarifado Inteligente
-        </h1>
-        <div>
-            {% if pode_gerenciar %}
-            <a href="{{ url_for('almoxarifado.novo_produto') }}" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Novo Produto
-            </a>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- KPIs Cards -->
+<div class="container-fluid py-4">
     <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-boxes text-primary me-2"></i>
+                Almoxarifado - Dashboard
+            </h1>
+            <p class="text-muted mb-0">Visão geral do estoque e movimentações</p>
+        </div>
+    </div>
+
+    <!-- KPIs Principais -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Total de Produtos</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ kpis.total_produtos }}</div>
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-primary bg-opacity-10 rounded-3 p-3">
+                                <i class="fas fa-box-open fa-2x text-primary"></i>
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Total de Itens</h6>
+                            <h3 class="mb-0">{{ total_itens }}</h3>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
+        <div class="col-md-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Estoque Baixo</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ kpis.produtos_baixo_estoque }}</div>
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-warning bg-opacity-10 rounded-3 p-3">
+                                <i class="fas fa-exclamation-triangle fa-2x text-warning"></i>
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Estoque Baixo</h6>
+                            <h3 class="mb-0">{{ estoque_baixo }}</h3>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
+        <div class="col-md-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Valor do Estoque</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">R$ {{ "%.2f"|format(kpis.valor_total_estoque) }}</div>
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-info bg-opacity-10 rounded-3 p-3">
+                                <i class="fas fa-exchange-alt fa-2x text-info"></i>
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Movimentos Hoje</h6>
+                            <h3 class="mb-0">{{ movimentos_hoje }}</h3>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
+        <div class="col-md-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Movimentações (Mês)</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ kpis.movimentacoes_mes }}</div>
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-success bg-opacity-10 rounded-3 p-3">
+                                <i class="fas fa-dollar-sign fa-2x text-success"></i>
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-exchange-alt fa-2x text-gray-300"></i>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Valor Total</h6>
+                            <h3 class="mb-0">R$ {{ "%.2f"|format(valor_total) }}</h3>
                         </div>
                     </div>
                 </div>
@@ -87,149 +89,42 @@
         </div>
     </div>
 
-    <div class="row">
-        <!-- Produtos Críticos -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Produtos com Estoque Crítico</h6>
-                    <a href="{{ url_for('almoxarifado.listar_produtos', status_estoque='CRITICO') }}" class="btn btn-sm btn-outline-primary">
-                        Ver Todos
-                    </a>
-                </div>
+    <!-- Ações Rápidas -->
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    {% if produtos_criticos %}
-                        <div class="table-responsive">
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>Produto</th>
-                                        <th>Estoque</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for produto in produtos_criticos %}
-                                    <tr>
-                                        <td>
-                                            <a href="{{ url_for('almoxarifado.ver_produto', id=produto.id) }}">
-                                                {{ produto.nome }}
-                                            </a>
-                                            <br><small class="text-muted">{{ produto.codigo_interno }}</small>
-                                        </td>
-                                        <td>{{ produto.estoque_atual }} {{ produto.unidade_medida }}</td>
-                                        <td>
-                                            <span class="badge badge-danger">{{ produto.status_estoque }}</span>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-muted">Nenhum produto com estoque crítico.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Últimas Movimentações -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Últimas Movimentações</h6>
-                    <a href="{{ url_for('almoxarifado.listar_movimentacoes') }}" class="btn btn-sm btn-outline-primary">
-                        Ver Todas
-                    </a>
-                </div>
-                <div class="card-body">
-                    {% if ultimas_movimentacoes %}
-                        <div class="table-responsive">
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>Data</th>
-                                        <th>Produto</th>
-                                        <th>Tipo</th>
-                                        <th>Qtd</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for mov in ultimas_movimentacoes %}
-                                    <tr>
-                                        <td>{{ mov.data_movimentacao.strftime('%d/%m %H:%M') }}</td>
-                                        <td>
-                                            <a href="{{ url_for('almoxarifado.ver_produto', id=mov.produto_id) }}">
-                                                {{ mov.produto.nome[:30] }}...
-                                            </a>
-                                        </td>
-                                        <td>
-                                            {% if mov.tipo_movimentacao == 'ENTRADA' %}
-                                                <span class="badge badge-success">{{ mov.tipo_movimentacao }}</span>
-                                            {% elif mov.tipo_movimentacao == 'SAIDA' %}
-                                                <span class="badge badge-danger">{{ mov.tipo_movimentacao }}</span>
-                                            {% else %}
-                                                <span class="badge badge-info">{{ mov.tipo_movimentacao }}</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ mov.quantidade }} {{ mov.produto.unidade_medida }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-muted">Nenhuma movimentação recente.</p>
-                    {% endif %}
+                    <h5 class="card-title mb-3">
+                        <i class="fas fa-bolt text-warning me-2"></i>
+                        Ações Rápidas
+                    </h5>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{{ url_for('almoxarifado.entrada') }}" class="btn btn-success">
+                            <i class="fas fa-plus-circle me-1"></i> Nova Entrada
+                        </a>
+                        <a href="{{ url_for('almoxarifado.saida') }}" class="btn btn-danger">
+                            <i class="fas fa-minus-circle me-1"></i> Nova Saída
+                        </a>
+                        <a href="{{ url_for('almoxarifado.devolucao') }}" class="btn btn-primary">
+                            <i class="fas fa-undo me-1"></i> Devolução
+                        </a>
+                        <a href="{{ url_for('almoxarifado.itens') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-box-open me-1"></i> Ver Catálogo
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Notas Fiscais Pendentes -->
-    {% if nfs_pendentes %}
+    <!-- Mensagem de módulo em desenvolvimento -->
     <div class="row">
         <div class="col-12">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Notas Fiscais Pendentes</h6>
-                    <a href="{{ url_for('almoxarifado.listar_notas_fiscais') }}" class="btn btn-sm btn-outline-primary">
-                        Ver Todas
-                    </a>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Número</th>
-                                    <th>Fornecedor</th>
-                                    <th>Data Emissão</th>
-                                    <th>Valor</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for nf in nfs_pendentes %}
-                                <tr>
-                                    <td>{{ nf.numero_formatado }}</td>
-                                    <td>{{ nf.fornecedor.razao_social }}</td>
-                                    <td>{{ nf.data_emissao.strftime('%d/%m/%Y') }}</td>
-                                    <td>R$ {{ "%.2f"|format(nf.valor_total) }}</td>
-                                    <td>
-                                        {% if pode_gerenciar %}
-                                        <a href="#" class="btn btn-sm btn-primary">Processar</a>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div class="alert alert-info border-0 shadow-sm">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Módulo em Desenvolvimento:</strong> O dashboard completo com alertas e últimas movimentações será implementado na FASE 5.
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}
