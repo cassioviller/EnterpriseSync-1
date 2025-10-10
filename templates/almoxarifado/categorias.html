@@ -1,128 +1,97 @@
 {% extends "base_completo.html" %}
 
+{% block title %}Categorias - Almoxarifado{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <!-- Cabeçalho -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0 text-gray-800">
-            <i class="fas fa-tags"></i> Categorias de Produtos
-        </h1>
-        <div>
-            {% if pode_gerenciar %}
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaCategoria">
-                <i class="fas fa-plus"></i> Nova Categoria
-            </button>
-            {% endif %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-tags text-primary me-2"></i>
+                Categorias de Materiais
+            </h1>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('almoxarifado.categorias_criar') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Nova Categoria
+            </a>
         </div>
     </div>
 
-    <!-- Lista de Categorias -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">
-                Categorias Cadastradas ({{ categorias|length }})
-            </h6>
-        </div>
-        <div class="card-body">
-            {% if categorias %}
-                <div class="row">
-                    {% for categoria in categorias %}
-                    <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
-                        <div class="card h-100">
-                            <div class="card-header text-center" style="background-color: {{ categoria.cor_hex }}; color: white;">
-                                <h5 class="mb-0">{{ categoria.codigo }}</h5>
-                            </div>
-                            <div class="card-body text-center">
-                                <h6 class="card-title">{{ categoria.nome }}</h6>
-                                {% if categoria.descricao %}
-                                <p class="card-text text-muted">{{ categoria.descricao }}</p>
+    {% if categorias %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Tipo de Controle Padrão</th>
+                            <th>Permite Devolução</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for categoria in categorias %}
+                        <tr>
+                            <td><strong>{{ categoria.nome }}</strong></td>
+                            <td>
+                                {% if categoria.tipo_controle_padrao == 'SERIALIZADO' %}
+                                    <span class="badge bg-primary">Serializado</span>
+                                {% else %}
+                                    <span class="badge bg-info">Consumível</span>
                                 {% endif %}
-                                <div class="mt-3">
-                                    <span class="badge badge-info">{{ categoria.produtos|length }} produtos</span>
-                                </div>
-                                {% if pode_gerenciar %}
-                                <div class="mt-3">
-                                    <a href="{{ url_for('almoxarifado.listar_produtos', categoria_id=categoria.id) }}" 
-                                       class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-eye"></i> Ver Produtos
-                                    </a>
-                                </div>
+                            </td>
+                            <td>
+                                {% if categoria.permite_devolucao_padrao %}
+                                    <i class="fas fa-check text-success"></i> Sim
+                                {% else %}
+                                    <i class="fas fa-times text-danger"></i> Não
                                 {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('almoxarifado.categorias_editar', id=categoria.id) }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                        data-bs-toggle="modal" data-bs-target="#deleteModal{{ categoria.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        
+                        <!-- Modal de Confirmação de Exclusão -->
+                        <div class="modal fade" id="deleteModal{{ categoria.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Confirmar Exclusão</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        Tem certeza que deseja excluir a categoria <strong>{{ categoria.nome }}</strong>?
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <form method="POST" action="{{ url_for('almoxarifado.categorias_deletar', id=categoria.id) }}" style="display:inline">
+                                            <button type="submit" class="btn btn-danger">Excluir</button>
+                                        </form>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="text-center py-4">
-                    <i class="fas fa-tags fa-3x text-muted mb-3"></i>
-                    <h5 class="text-muted">Nenhuma categoria cadastrada</h5>
-                    <p class="text-muted">Crie sua primeira categoria para organizar os produtos.</p>
-                    {% if pode_gerenciar %}
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaCategoria">
-                        <i class="fas fa-plus"></i> Criar Primeira Categoria
-                    </button>
-                    {% endif %}
-                </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<!-- Modal Nova Categoria -->
-{% if pode_gerenciar %}
-<div class="modal fade" id="modalNovaCategoria" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Nova Categoria</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <form method="POST" action="{{ url_for('almoxarifado.nova_categoria') }}">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="nome" class="form-label">Nome da Categoria</label>
-                        <input type="text" class="form-control" id="nome" name="nome" required
-                               placeholder="Ex: Material Elétrico">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="codigo" class="form-label">Código (3 letras)</label>
-                        <input type="text" class="form-control" id="codigo" name="codigo" required
-                               maxlength="3" pattern="[A-Z]{3}" style="text-transform: uppercase;"
-                               placeholder="Ex: ELE">
-                        <div class="form-text">Usado para gerar códigos internos dos produtos</div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="descricao" class="form-label">Descrição (opcional)</label>
-                        <textarea class="form-control" id="descricao" name="descricao" rows="3"
-                                  placeholder="Descreva esta categoria..."></textarea>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="cor_hex" class="form-label">Cor da Categoria</label>
-                        <div class="d-flex align-items-center">
-                            <input type="color" class="form-control form-control-color" id="cor_hex" 
-                                   name="cor_hex" value="#007bff" style="width: 3rem; height: 3rem;">
-                            <span class="ms-2">Escolha uma cor para identificar esta categoria</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Criar Categoria</button>
-                </div>
-            </form>
         </div>
     </div>
+    {% else %}
+    <div class="alert alert-info border-0 shadow-sm">
+        <i class="fas fa-info-circle me-2"></i>
+        Nenhuma categoria cadastrada. <a href="{{ url_for('almoxarifado.categorias_criar') }}">Criar primeira categoria</a>
+    </div>
+    {% endif %}
 </div>
-{% endif %}
-
-<script>
-// Converter código para maiúsculo automaticamente
-document.getElementById('codigo').addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-});
-</script>
 {% endblock %}

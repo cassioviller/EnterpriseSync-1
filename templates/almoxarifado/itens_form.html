@@ -1,0 +1,182 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if item else 'Novo' }} Item{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-box text-primary me-2"></i>
+                {{ 'Editar' if item else 'Novo' }} Item
+            </h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="POST" id="itemForm">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="codigo" class="form-label">Código *</label>
+                                <input type="text" class="form-control" id="codigo" name="codigo" 
+                                       value="{{ item.codigo if item else '' }}" required>
+                            </div>
+                            
+                            <div class="col-md-8 mb-3">
+                                <label for="nome" class="form-label">Nome do Item *</label>
+                                <input type="text" class="form-control" id="nome" name="nome" 
+                                       value="{{ item.nome if item else '' }}" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="categoria_id" class="form-label">Categoria *</label>
+                                <select class="form-select" id="categoria_id" name="categoria_id" required>
+                                    <option value="">Selecione...</option>
+                                    {% for categoria in categorias %}
+                                    <option value="{{ categoria.id }}" 
+                                            data-tipo-controle="{{ categoria.tipo_controle_padrao }}"
+                                            data-permite-devolucao="{{ 'true' if categoria.permite_devolucao_padrao else 'false' }}"
+                                            {{ 'selected' if item and item.categoria_id == categoria.id else '' }}>
+                                        {{ categoria.nome }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="tipo_controle" class="form-label">Tipo de Controle *</label>
+                                <select class="form-select" id="tipo_controle" name="tipo_controle" required>
+                                    <option value="SERIALIZADO" {{ 'selected' if item and item.tipo_controle == 'SERIALIZADO' else '' }}>
+                                        Serializado (itens únicos)
+                                    </option>
+                                    <option value="CONSUMIVEL" {{ 'selected' if item and item.tipo_controle == 'CONSUMIVEL' else '' }}>
+                                        Consumível (por quantidade)
+                                    </option>
+                                </select>
+                                <div class="form-text">Define como o estoque será controlado</div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="estoque_minimo" class="form-label">Estoque Mínimo</label>
+                                <input type="number" class="form-control" id="estoque_minimo" name="estoque_minimo" 
+                                       value="{{ item.estoque_minimo if item else 0 }}" min="0">
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="unidade" class="form-label">Unidade</label>
+                                <input type="text" class="form-control" id="unidade" name="unidade" 
+                                       placeholder="ex: UN, CX, KG" value="{{ item.unidade if item else '' }}">
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label d-block">Permite Devolução</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input type="checkbox" class="form-check-input" id="permite_devolucao" 
+                                           name="permite_devolucao" 
+                                           {{ 'checked' if not item or item.permite_devolucao else '' }}>
+                                    <label class="form-check-label" for="permite_devolucao" id="devolucao_label">
+                                        Permite devolução
+                                    </label>
+                                </div>
+                                <div class="form-text" id="devolucao_help">
+                                    Itens serializados sempre permitem devolução
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {{ 'Atualizar' if item else 'Criar' }}
+                            </button>
+                            <a href="{{ url_for('almoxarifado.itens') }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>
+                                Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm bg-light">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-info-circle me-2"></i>Tipos de Controle</h5>
+                    <ul class="list-unstyled mb-3">
+                        <li class="mb-2">
+                            <strong>Serializado:</strong><br>
+                            <small>Para itens únicos com identificação individual (EPIs, ferramentas).
+                            Cada unidade tem número de série único. Sempre permite devolução.</small>
+                        </li>
+                        <li class="mb-2">
+                            <strong>Consumível:</strong><br>
+                            <small>Para materiais controlados por quantidade (parafusos, cabos, tintas).
+                            Controle por quantidade total no estoque.</small>
+                        </li>
+                    </ul>
+                    
+                    <div class="alert alert-warning border-0 mb-0">
+                        <small>
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            <strong>Importante:</strong> Itens serializados sempre permitem devolução.
+                            Esta configuração não pode ser alterada para este tipo.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoControle = document.getElementById('tipo_controle');
+    const permiteDevolucao = document.getElementById('permite_devolucao');
+    const devolucaoLabel = document.getElementById('devolucao_label');
+    const devolucaoHelp = document.getElementById('devolucao_help');
+    const categoriaSelect = document.getElementById('categoria_id');
+    
+    function updateDevolucaoField() {
+        const tipo = tipoControle.value;
+        
+        if (tipo === 'SERIALIZADO') {
+            permiteDevolucao.checked = true;
+            permiteDevolucao.disabled = true;
+            devolucaoLabel.classList.add('text-muted');
+            devolucaoHelp.innerHTML = '<strong>Itens serializados sempre permitem devolução (não editável)</strong>';
+            devolucaoHelp.classList.add('text-primary');
+        } else {
+            permiteDevolucao.disabled = false;
+            devolucaoLabel.classList.remove('text-muted');
+            devolucaoHelp.innerHTML = 'Define se o item pode ser devolvido ao estoque';
+            devolucaoHelp.classList.remove('text-primary');
+        }
+    }
+    
+    categoriaSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption.value) {
+            const tipoControlePadrao = selectedOption.dataset.tipoControle;
+            const permiteDevolucaoPadrao = selectedOption.dataset.permiteDevolucao === 'true';
+            
+            tipoControle.value = tipoControlePadrao;
+            permiteDevolucao.checked = permiteDevolucaoPadrao;
+            
+            updateDevolucaoField();
+        }
+    });
+    
+    tipoControle.addEventListener('change', updateDevolucaoField);
+    
+    updateDevolucaoField();
+});
+</script>
+{% endblock %}

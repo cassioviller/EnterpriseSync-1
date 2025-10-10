@@ -1,0 +1,210 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ item.nome }} - Detalhes{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-box text-primary me-2"></i>
+                Detalhes do Item
+            </h1>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('almoxarifado.itens_editar', id=item.id) }}" class="btn btn-primary">
+                <i class="fas fa-edit me-1"></i> Editar
+            </a>
+            <a href="{{ url_for('almoxarifado.itens') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title border-bottom pb-2 mb-3">Informações Gerais</h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Código</label>
+                            <div><strong>{{ item.codigo }}</strong></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Nome</label>
+                            <div><strong>{{ item.nome }}</strong></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Categoria</label>
+                            <div>{{ item.categoria.nome if item.categoria else '-' }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Tipo de Controle</label>
+                            <div>
+                                {% if item.tipo_controle == 'SERIALIZADO' %}
+                                    <span class="badge bg-primary">Serializado</span>
+                                {% else %}
+                                    <span class="badge bg-info">Consumível</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Unidade</label>
+                            <div>{{ item.unidade or '-' }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Estoque Mínimo</label>
+                            <div>{{ item.estoque_minimo }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Permite Devolução</label>
+                            <div>
+                                {% if item.permite_devolucao %}
+                                    <i class="fas fa-check text-success"></i> Sim
+                                {% else %}
+                                    <i class="fas fa-times text-danger"></i> Não
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Criado em</label>
+                            <div>{{ item.created_at.strftime('%d/%m/%Y %H:%M') if item.created_at else '-' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title border-bottom pb-2 mb-3">
+                        <i class="fas fa-history me-2"></i>Últimas Movimentações
+                    </h5>
+                    {% if movimentos %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Quantidade</th>
+                                    <th>Funcionário</th>
+                                    <th>Obra</th>
+                                    <th>Observação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mov in movimentos %}
+                                <tr>
+                                    <td>{{ mov.data_movimento.strftime('%d/%m/%Y %H:%M') if mov.data_movimento else '-' }}</td>
+                                    <td>
+                                        {% if mov.tipo_movimento == 'ENTRADA' %}
+                                            <span class="badge bg-success">Entrada</span>
+                                        {% elif mov.tipo_movimento == 'SAIDA' %}
+                                            <span class="badge bg-danger">Saída</span>
+                                        {% elif mov.tipo_movimento == 'DEVOLUCAO' %}
+                                            <span class="badge bg-info">Devolução</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ mov.tipo_movimento }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ mov.quantidade }}</td>
+                                    <td>{{ mov.funcionario.nome if mov.funcionario else '-' }}</td>
+                                    <td>{{ mov.obra.nome if mov.obra else '-' }}</td>
+                                    <td>{{ mov.observacao or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info border-0 mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Nenhuma movimentação registrada para este item.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Estoque Atual</h5>
+                    <div class="display-4 my-3">
+                        {% if estoque_atual <= item.estoque_minimo %}
+                            <span class="text-danger">{{ estoque_atual }}</span>
+                        {% else %}
+                            <span class="text-success">{{ estoque_atual }}</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-muted mb-0">{{ item.unidade or 'unidades' }}</p>
+                    {% if estoque_atual <= item.estoque_minimo %}
+                    <div class="alert alert-warning border-0 mt-3 mb-0">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <strong>Estoque baixo!</strong><br>
+                        Mínimo: {{ item.estoque_minimo }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title border-bottom pb-2 mb-3">
+                        <i class="fas fa-warehouse me-2"></i>Itens em Estoque
+                    </h5>
+                    {% if itens_estoque %}
+                    <div class="list-group list-group-flush">
+                        {% for estoque in itens_estoque %}
+                        <div class="list-group-item px-0">
+                            {% if item.tipo_controle == 'SERIALIZADO' %}
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ estoque.numero_serie }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {% if estoque.status == 'DISPONIVEL' %}
+                                                <span class="badge bg-success">Disponível</span>
+                                            {% elif estoque.status == 'EM_USO' %}
+                                                <span class="badge bg-warning">Em Uso</span>
+                                            {% elif estoque.status == 'MANUTENCAO' %}
+                                                <span class="badge bg-info">Manutenção</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ estoque.status }}</span>
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>Qtd: {{ estoque.quantidade }}</strong>
+                                        {% if estoque.lote %}
+                                            <br><small class="text-muted">Lote: {{ estoque.lote }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        {% if estoque.status == 'DISPONIVEL' %}
+                                            <span class="badge bg-success">Disponível</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ estoque.status }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info border-0 mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Nenhum item em estoque.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
