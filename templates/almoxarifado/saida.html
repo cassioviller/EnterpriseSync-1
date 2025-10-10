@@ -1,0 +1,400 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Saída de Materiais - Almoxarifado{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-minus-circle text-danger me-2"></i>
+                Saída de Materiais
+            </h1>
+            <p class="text-muted mb-0">Registrar saída de itens do almoxarifado</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('almoxarifado.dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('almoxarifado.processar_saida') }}" id="formSaida">
+                        <!-- Seleção de Item -->
+                        <div class="mb-4">
+                            <label for="item_id" class="form-label fw-bold">
+                                <i class="fas fa-box text-primary me-1"></i> Item *
+                            </label>
+                            <select class="form-select form-select-lg" id="item_id" name="item_id" required>
+                                <option value="">Selecione um item...</option>
+                                {% for item in itens %}
+                                <option value="{{ item.id }}" 
+                                        data-tipo="{{ item.tipo_controle }}" 
+                                        data-unidade="{{ item.unidade }}">
+                                    {{ item.codigo }} - {{ item.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Informações do Item (exibidas dinamicamente) -->
+                        <div id="infoItem" class="alert alert-info border-0 mb-4" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Tipo de Controle</small>
+                                    <strong id="tipoControle">-</strong>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Unidade</small>
+                                    <strong id="unidade">-</strong>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Estoque Disponível</small>
+                                    <strong id="estoqueDisponivel" class="text-success">-</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Campo Hidden para tipo_controle -->
+                        <input type="hidden" id="tipo_controle" name="tipo_controle">
+
+                        <!-- Campos Dinâmicos: SERIALIZADO -->
+                        <div id="camposSerializado" style="display: none;">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-barcode text-warning me-1"></i> Selecione os Itens para Saída *
+                                </label>
+                                <div id="listaSerializados" class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                                    <p class="text-muted text-center">Nenhum item disponível</p>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Selecione um ou mais itens para dar saída. Cada item será vinculado ao funcionário.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Campos Dinâmicos: CONSUMIVEL -->
+                        <div id="camposConsumivel" style="display: none;">
+                            <div class="mb-4">
+                                <label for="quantidade" class="form-label fw-bold">
+                                    <i class="fas fa-calculator text-info me-1"></i> Quantidade *
+                                </label>
+                                <div class="input-group input-group-lg">
+                                    <input type="number" class="form-control" id="quantidade" name="quantidade" 
+                                           step="0.01" min="0.01" placeholder="0.00">
+                                    <span class="input-group-text" id="unidadeDisplay">un</span>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Máximo disponível: <strong id="maxDisponivel">0</strong> <span id="unidadeMax">un</span>
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Funcionário (Obrigatório) -->
+                        <div class="mb-3">
+                            <label for="funcionario_id" class="form-label fw-bold">
+                                <i class="fas fa-user text-primary me-1"></i> Funcionário *
+                            </label>
+                            <select class="form-select form-select-lg" id="funcionario_id" name="funcionario_id" required>
+                                <option value="">Selecione um funcionário...</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}">{{ funcionario.codigo }} - {{ funcionario.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Responsável pelo recebimento do material
+                            </small>
+                        </div>
+
+                        <!-- Obra (Opcional) -->
+                        <div class="mb-3">
+                            <label for="obra_id" class="form-label">
+                                <i class="fas fa-building text-secondary me-1"></i> Obra (opcional)
+                            </label>
+                            <select class="form-select form-select-lg" id="obra_id" name="obra_id">
+                                <option value="">Nenhuma obra específica</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.codigo }} - {{ obra.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Informe se o material é para uma obra específica
+                            </small>
+                        </div>
+
+                        <!-- Observações -->
+                        <div class="mb-4">
+                            <label for="observacoes" class="form-label">
+                                <i class="fas fa-comment-alt text-secondary me-1"></i> Observações
+                            </label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" 
+                                      rows="3" 
+                                      placeholder="Observações sobre esta saída (opcional)"></textarea>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg" id="btnSubmit" disabled>
+                                <i class="fas fa-check-circle me-1"></i> Processar Saída
+                            </button>
+                            <button type="reset" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-eraser me-1"></i> Limpar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel de Ajuda -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm bg-light">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-question-circle text-info me-2"></i>
+                        Como Funciona?
+                    </h5>
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary">
+                            <i class="fas fa-barcode me-1"></i> Itens Serializados
+                        </h6>
+                        <p class="small mb-0">
+                            Para itens com controle por número de série:
+                        </p>
+                        <ul class="small">
+                            <li>Selecione os itens específicos que serão entregues</li>
+                            <li>Cada item será vinculado ao funcionário</li>
+                            <li>Status do item muda para "EM USO"</li>
+                            <li>Permite rastreamento individual</li>
+                        </ul>
+                    </div>
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-success">
+                            <i class="fas fa-calculator me-1"></i> Itens Consumíveis
+                        </h6>
+                        <p class="small mb-0">
+                            Para itens de controle por quantidade:
+                        </p>
+                        <ul class="small">
+                            <li>Informe a quantidade que será retirada</li>
+                            <li>Sistema usa FIFO (primeiro a entrar, primeiro a sair)</li>
+                            <li>Quantidade é deduzida do estoque disponível</li>
+                            <li>Se estoque zerar, status muda para "CONSUMIDO"</li>
+                        </ul>
+                    </div>
+                    <div class="alert alert-danger border-0 small">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <strong>Importante:</strong> O funcionário é obrigatório para todas as saídas. A obra é opcional.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const itemSelect = document.getElementById('item_id');
+    const infoItem = document.getElementById('infoItem');
+    const tipoControleDisplay = document.getElementById('tipoControle');
+    const unidadeDisplay = document.getElementById('unidade');
+    const estoqueDisponivelDisplay = document.getElementById('estoqueDisponivel');
+    const tipoControleInput = document.getElementById('tipo_controle');
+    const camposSerializado = document.getElementById('camposSerializado');
+    const camposConsumivel = document.getElementById('camposConsumivel');
+    const listaSerializados = document.getElementById('listaSerializados');
+    const quantidadeInput = document.getElementById('quantidade');
+    const unidadeSpan = document.getElementById('unidadeDisplay');
+    const maxDisponivelSpan = document.getElementById('maxDisponivel');
+    const unidadeMaxSpan = document.getElementById('unidadeMax');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const formSaida = document.getElementById('formSaida');
+    const funcionarioSelect = document.getElementById('funcionario_id');
+
+    let quantidadeMaxima = 0;
+
+    itemSelect.addEventListener('change', async function() {
+        const itemId = this.value;
+        
+        if (!itemId) {
+            resetForm();
+            return;
+        }
+
+        try {
+            const response = await fetch(`/almoxarifado/api/estoque-disponivel/${itemId}`);
+            
+            if (!response.ok) {
+                throw new Error('Erro ao buscar estoque disponível');
+            }
+
+            const data = await response.json();
+            
+            tipoControleInput.value = data.tipo_controle;
+            
+            if (data.tipo_controle === 'SERIALIZADO') {
+                handleSerializado(data);
+            } else {
+                handleConsumivel(data);
+            }
+            
+            infoItem.style.display = 'block';
+            
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('Erro ao carregar estoque disponível. Por favor, tente novamente.');
+            resetForm();
+        }
+    });
+
+    function handleSerializado(data) {
+        tipoControleDisplay.textContent = 'Serializado (Nº Série)';
+        unidadeDisplay.textContent = '-';
+        estoqueDisponivelDisplay.textContent = data.itens.length + ' itens';
+        
+        camposSerializado.style.display = 'block';
+        camposConsumivel.style.display = 'none';
+        quantidadeInput.required = false;
+        quantidadeInput.value = '';
+        
+        if (data.itens.length === 0) {
+            listaSerializados.innerHTML = '<p class="text-danger text-center mb-0"><i class="fas fa-exclamation-triangle me-1"></i> Nenhum item disponível em estoque</p>';
+            btnSubmit.disabled = true;
+        } else {
+            let html = '';
+            data.itens.forEach(item => {
+                html += `
+                    <div class="form-check mb-2">
+                        <input class="form-check-input checkbox-serializado" type="checkbox" 
+                               name="estoque_ids[]" value="${item.id}" id="item_${item.id}">
+                        <label class="form-check-label" for="item_${item.id}">
+                            <strong>${item.numero_serie}</strong>
+                            <small class="text-muted"> - Entrada em ${item.data_entrada}</small>
+                        </label>
+                    </div>
+                `;
+            });
+            listaSerializados.innerHTML = html;
+            
+            // Habilitar botão quando pelo menos 1 checkbox estiver marcado
+            const checkboxes = document.querySelectorAll('.checkbox-serializado');
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const algumMarcado = Array.from(checkboxes).some(c => c.checked);
+                    btnSubmit.disabled = !algumMarcado || !funcionarioSelect.value;
+                });
+            });
+            
+            btnSubmit.disabled = true;
+        }
+    }
+
+    function handleConsumivel(data) {
+        tipoControleDisplay.textContent = 'Consumível (Quantidade)';
+        unidadeDisplay.textContent = data.unidade || '-';
+        estoqueDisponivelDisplay.textContent = data.quantidade_disponivel + ' ' + (data.unidade || 'un');
+        quantidadeMaxima = data.quantidade_disponivel;
+        
+        camposSerializado.style.display = 'none';
+        camposConsumivel.style.display = 'block';
+        quantidadeInput.required = true;
+        quantidadeInput.max = quantidadeMaxima;
+        quantidadeInput.value = '';
+        unidadeSpan.textContent = data.unidade || 'un';
+        maxDisponivelSpan.textContent = quantidadeMaxima;
+        unidadeMaxSpan.textContent = data.unidade || 'un';
+        
+        if (quantidadeMaxima <= 0) {
+            quantidadeInput.disabled = true;
+            btnSubmit.disabled = true;
+        } else {
+            quantidadeInput.disabled = false;
+            btnSubmit.disabled = !funcionarioSelect.value;
+        }
+    }
+
+    function resetForm() {
+        infoItem.style.display = 'none';
+        camposSerializado.style.display = 'none';
+        camposConsumivel.style.display = 'none';
+        btnSubmit.disabled = true;
+        tipoControleInput.value = '';
+        listaSerializados.innerHTML = '<p class="text-muted text-center">Nenhum item disponível</p>';
+        quantidadeInput.value = '';
+        quantidadeMaxima = 0;
+    }
+
+    // Validar funcionário selecionado
+    funcionarioSelect.addEventListener('change', function() {
+        const tipoControle = tipoControleInput.value;
+        
+        if (!tipoControle) {
+            btnSubmit.disabled = true;
+            return;
+        }
+        
+        if (tipoControle === 'SERIALIZADO') {
+            const algumMarcado = Array.from(document.querySelectorAll('.checkbox-serializado')).some(c => c.checked);
+            btnSubmit.disabled = !algumMarcado || !this.value;
+        } else {
+            btnSubmit.disabled = !this.value || quantidadeMaxima <= 0;
+        }
+    });
+
+    // Validar quantidade em tempo real
+    quantidadeInput.addEventListener('input', function() {
+        const valor = parseFloat(this.value);
+        if (valor > quantidadeMaxima) {
+            this.value = quantidadeMaxima;
+        }
+    });
+
+    formSaida.addEventListener('reset', function() {
+        resetForm();
+    });
+
+    formSaida.addEventListener('submit', function(e) {
+        const tipoControle = tipoControleInput.value;
+        const funcionarioId = funcionarioSelect.value;
+        
+        if (!funcionarioId) {
+            e.preventDefault();
+            alert('Por favor, selecione um funcionário.');
+            funcionarioSelect.focus();
+            return false;
+        }
+        
+        if (tipoControle === 'SERIALIZADO') {
+            const checkboxesMarcados = Array.from(document.querySelectorAll('.checkbox-serializado:checked'));
+            if (checkboxesMarcados.length === 0) {
+                e.preventDefault();
+                alert('Por favor, selecione ao menos um item para saída.');
+                return false;
+            }
+        } else if (tipoControle === 'CONSUMIVEL') {
+            const qtd = parseFloat(quantidadeInput.value);
+            if (!qtd || qtd <= 0) {
+                e.preventDefault();
+                alert('Por favor, informe uma quantidade válida maior que zero.');
+                quantidadeInput.focus();
+                return false;
+            }
+            if (qtd > quantidadeMaxima) {
+                e.preventDefault();
+                alert(`Quantidade máxima disponível é ${quantidadeMaxima}.`);
+                quantidadeInput.focus();
+                return false;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

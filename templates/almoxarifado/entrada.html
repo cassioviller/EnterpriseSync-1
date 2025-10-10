@@ -1,0 +1,279 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Entrada de Materiais - Almoxarifado{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-plus-circle text-success me-2"></i>
+                Entrada de Materiais
+            </h1>
+            <p class="text-muted mb-0">Registrar entrada de itens no almoxarifado</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('almoxarifado.dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('almoxarifado.processar_entrada') }}" id="formEntrada">
+                        <!-- Seleção de Item -->
+                        <div class="mb-4">
+                            <label for="item_id" class="form-label fw-bold">
+                                <i class="fas fa-box text-primary me-1"></i> Item *
+                            </label>
+                            <select class="form-select form-select-lg" id="item_id" name="item_id" required>
+                                <option value="">Selecione um item...</option>
+                                {% for item in itens %}
+                                <option value="{{ item.id }}" 
+                                        data-tipo="{{ item.tipo_controle }}" 
+                                        data-unidade="{{ item.unidade }}">
+                                    {{ item.codigo }} - {{ item.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Informações do Item (exibidas dinamicamente) -->
+                        <div id="infoItem" class="alert alert-info border-0 mb-4" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Tipo de Controle</small>
+                                    <strong id="tipoControle">-</strong>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Unidade</small>
+                                    <strong id="unidade">-</strong>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Estoque Atual</small>
+                                    <strong id="estoqueAtual" class="text-primary">-</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Campo Hidden para tipo_controle -->
+                        <input type="hidden" id="tipo_controle" name="tipo_controle">
+
+                        <!-- Campos Dinâmicos: SERIALIZADO -->
+                        <div id="camposSerializado" style="display: none;">
+                            <div class="mb-4">
+                                <label for="numeros_serie" class="form-label fw-bold">
+                                    <i class="fas fa-barcode text-warning me-1"></i> Números de Série *
+                                </label>
+                                <textarea class="form-control" id="numeros_serie" name="numeros_serie" 
+                                          rows="5" 
+                                          placeholder="Digite os números de série (um por linha ou separados por vírgula)&#10;Exemplo:&#10;SN001&#10;SN002&#10;SN003"></textarea>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Separe os números por vírgula ou quebra de linha. Cada número será cadastrado individualmente.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Campos Dinâmicos: CONSUMIVEL -->
+                        <div id="camposConsumivel" style="display: none;">
+                            <div class="mb-4">
+                                <label for="quantidade" class="form-label fw-bold">
+                                    <i class="fas fa-calculator text-info me-1"></i> Quantidade *
+                                </label>
+                                <div class="input-group input-group-lg">
+                                    <input type="number" class="form-control" id="quantidade" name="quantidade" 
+                                           step="0.01" min="0.01" placeholder="0.00">
+                                    <span class="input-group-text" id="unidadeDisplay">un</span>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Digite a quantidade recebida. Utilize ponto para decimais.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Campos Comuns -->
+                        <div class="mb-3">
+                            <label for="nota_fiscal" class="form-label">
+                                <i class="fas fa-file-invoice text-secondary me-1"></i> Nota Fiscal
+                            </label>
+                            <input type="text" class="form-control" id="nota_fiscal" name="nota_fiscal" 
+                                   placeholder="Número da nota fiscal (opcional)">
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="observacoes" class="form-label">
+                                <i class="fas fa-comment-alt text-secondary me-1"></i> Observações
+                            </label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" 
+                                      rows="3" 
+                                      placeholder="Observações sobre esta entrada (opcional)"></textarea>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success btn-lg" id="btnSubmit" disabled>
+                                <i class="fas fa-check-circle me-1"></i> Processar Entrada
+                            </button>
+                            <button type="reset" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-eraser me-1"></i> Limpar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel de Ajuda -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm bg-light">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-question-circle text-info me-2"></i>
+                        Como Funciona?
+                    </h5>
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary">
+                            <i class="fas fa-barcode me-1"></i> Itens Serializados
+                        </h6>
+                        <p class="small mb-0">
+                            Para itens com controle por número de série (equipamentos, ferramentas):
+                        </p>
+                        <ul class="small">
+                            <li>Informe cada número de série</li>
+                            <li>Separe por vírgula ou quebra de linha</li>
+                            <li>Cada série será cadastrada individualmente</li>
+                            <li>Permite rastreamento individual</li>
+                        </ul>
+                    </div>
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-success">
+                            <i class="fas fa-calculator me-1"></i> Itens Consumíveis
+                        </h6>
+                        <p class="small mb-0">
+                            Para itens de controle por quantidade (materiais de consumo):
+                        </p>
+                        <ul class="small">
+                            <li>Informe a quantidade total recebida</li>
+                            <li>Use ponto para decimais (ex: 10.5)</li>
+                            <li>A unidade será exibida automaticamente</li>
+                            <li>Controle por saldo total</li>
+                        </ul>
+                    </div>
+                    <div class="alert alert-warning border-0 small">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <strong>Importante:</strong> Números de série duplicados serão rejeitados automaticamente.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const itemSelect = document.getElementById('item_id');
+    const infoItem = document.getElementById('infoItem');
+    const tipoControleDisplay = document.getElementById('tipoControle');
+    const unidadeDisplay = document.getElementById('unidade');
+    const estoqueAtualDisplay = document.getElementById('estoqueAtual');
+    const tipoControleInput = document.getElementById('tipo_controle');
+    const camposSerializado = document.getElementById('camposSerializado');
+    const camposConsumivel = document.getElementById('camposConsumivel');
+    const numerosSerieInput = document.getElementById('numeros_serie');
+    const quantidadeInput = document.getElementById('quantidade');
+    const unidadeSpan = document.getElementById('unidadeDisplay');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const formEntrada = document.getElementById('formEntrada');
+
+    itemSelect.addEventListener('change', async function() {
+        const itemId = this.value;
+        
+        if (!itemId) {
+            infoItem.style.display = 'none';
+            camposSerializado.style.display = 'none';
+            camposConsumivel.style.display = 'none';
+            btnSubmit.disabled = true;
+            tipoControleInput.value = '';
+            return;
+        }
+
+        try {
+            const response = await fetch(`{{ url_for('almoxarifado.api_item_info', id=0) }}`.replace('0', itemId));
+            
+            if (!response.ok) {
+                throw new Error('Erro ao buscar informações do item');
+            }
+
+            const data = await response.json();
+            
+            tipoControleDisplay.textContent = data.tipo_controle === 'SERIALIZADO' ? 'Serializado (Nº Série)' : 'Consumível (Quantidade)';
+            unidadeDisplay.textContent = data.unidade || '-';
+            estoqueAtualDisplay.textContent = data.estoque_atual;
+            tipoControleInput.value = data.tipo_controle;
+            
+            infoItem.style.display = 'block';
+            
+            if (data.tipo_controle === 'SERIALIZADO') {
+                camposSerializado.style.display = 'block';
+                camposConsumivel.style.display = 'none';
+                numerosSerieInput.required = true;
+                quantidadeInput.required = false;
+                quantidadeInput.value = '';
+            } else {
+                camposSerializado.style.display = 'none';
+                camposConsumivel.style.display = 'block';
+                numerosSerieInput.required = false;
+                numerosSerieInput.value = '';
+                quantidadeInput.required = true;
+                unidadeSpan.textContent = data.unidade || 'un';
+            }
+            
+            btnSubmit.disabled = false;
+            
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('Erro ao carregar informações do item. Por favor, tente novamente.');
+            infoItem.style.display = 'none';
+            camposSerializado.style.display = 'none';
+            camposConsumivel.style.display = 'none';
+            btnSubmit.disabled = true;
+        }
+    });
+
+    formEntrada.addEventListener('reset', function() {
+        infoItem.style.display = 'none';
+        camposSerializado.style.display = 'none';
+        camposConsumivel.style.display = 'none';
+        btnSubmit.disabled = true;
+        tipoControleInput.value = '';
+    });
+
+    formEntrada.addEventListener('submit', function(e) {
+        const tipoControle = tipoControleInput.value;
+        
+        if (tipoControle === 'SERIALIZADO') {
+            const numeros = numerosSerieInput.value.trim();
+            if (!numeros) {
+                e.preventDefault();
+                alert('Por favor, informe ao menos um número de série.');
+                numerosSerieInput.focus();
+                return false;
+            }
+        } else if (tipoControle === 'CONSUMIVEL') {
+            const qtd = parseFloat(quantidadeInput.value);
+            if (!qtd || qtd <= 0) {
+                e.preventDefault();
+                alert('Por favor, informe uma quantidade válida maior que zero.');
+                quantidadeInput.focus();
+                return false;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
