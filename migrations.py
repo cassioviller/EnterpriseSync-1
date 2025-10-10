@@ -735,6 +735,289 @@ def _migration_35_custo_veiculo_numero_nota_fiscal():
         logger.error(traceback.format_exc())
 
 
+def _migration_36_remove_old_propostas_tables():
+    """
+    Migração 36: Remover tabelas antigas do sistema de propostas legado
+    
+    Feature flag: REMOVE_OLD_PROPOSTAS_TABLES=true
+    
+    Tabelas removidas:
+    - proposta (10 registros - aprovado pelo usuário)
+    - proposta_historico (vazia)
+    - item_servico_proposta_dinamica (vazia)
+    """
+    try:
+        # Verificar feature flag de segurança
+        if os.environ.get('REMOVE_OLD_PROPOSTAS_TABLES') != 'true':
+            logger.info("🔒 MIGRAÇÃO 36: Bloqueada por segurança. Para ativar: REMOVE_OLD_PROPOSTAS_TABLES=true")
+            return
+        
+        logger.info("=" * 80)
+        logger.info("🗑️  MIGRAÇÃO 36: Remover Tabelas Antigas - Sistema de Propostas")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Lista de tabelas a remover
+        tabelas = ['proposta', 'proposta_historico', 'item_servico_proposta_dinamica']
+        
+        for tabela in tabelas:
+            # Verificar se tabela existe
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = %s
+                )
+            """, (tabela,))
+            tabela_existe = cursor.fetchone()[0]
+            
+            if tabela_existe:
+                logger.info(f"🔍 Tabela '{tabela}' encontrada - removendo...")
+                cursor.execute(f"DROP TABLE IF EXISTS {tabela} CASCADE")
+                logger.info(f"✅ Tabela '{tabela}' removida com CASCADE")
+            else:
+                logger.info(f"ℹ️  Tabela '{tabela}' não existe (já foi removida)")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 36 CONCLUÍDA: Tabelas antigas removidas!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 36: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
+def _migration_37_rename_propostas_fields():
+    """
+    Migração 37: Renomear campos em propostas_comerciais e adicionar cliente_id FK
+    
+    Feature flag: RENAME_PROPOSTAS_FIELDS=true
+    
+    Mudanças:
+    1. numero_proposta → numero
+    2. assunto → titulo
+    3. objeto → descricao
+    4. Adicionar: cliente_id INTEGER REFERENCES cliente(id)
+    """
+    try:
+        if os.environ.get('RENAME_PROPOSTAS_FIELDS') != 'true':
+            logger.info("🔒 MIGRAÇÃO 37: Bloqueada por segurança. Para ativar: RENAME_PROPOSTAS_FIELDS=true")
+            return
+        
+        logger.info("=" * 80)
+        logger.info("📝 MIGRAÇÃO 37: Renomear Campos - Propostas Comerciais")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se tabela existe
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'propostas_comerciais'
+            )
+        """)
+        tabela_existe = cursor.fetchone()[0]
+        
+        if not tabela_existe:
+            logger.info("⏭️  Tabela propostas_comerciais não existe, pulando migração 37")
+            cursor.close()
+            connection.close()
+            return
+        
+        # 1. Renomear numero_proposta → numero
+        logger.info("🔄 PASSO 1: Verificando coluna 'numero_proposta'...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'numero_proposta'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("➡️  Renomeando 'numero_proposta' → 'numero'...")
+            cursor.execute("""
+                ALTER TABLE propostas_comerciais 
+                RENAME COLUMN numero_proposta TO numero
+            """)
+            logger.info("✅ Coluna renomeada: numero_proposta → numero")
+        else:
+            logger.info("ℹ️  Coluna 'numero_proposta' não existe (já foi renomeada)")
+        
+        # 2. Renomear assunto → titulo
+        logger.info("🔄 PASSO 2: Verificando coluna 'assunto'...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'assunto'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("➡️  Renomeando 'assunto' → 'titulo'...")
+            cursor.execute("""
+                ALTER TABLE propostas_comerciais 
+                RENAME COLUMN assunto TO titulo
+            """)
+            logger.info("✅ Coluna renomeada: assunto → titulo")
+        else:
+            logger.info("ℹ️  Coluna 'assunto' não existe (já foi renomeada)")
+        
+        # 3. Renomear objeto → descricao
+        logger.info("🔄 PASSO 3: Verificando coluna 'objeto'...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'objeto'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("➡️  Renomeando 'objeto' → 'descricao'...")
+            cursor.execute("""
+                ALTER TABLE propostas_comerciais 
+                RENAME COLUMN objeto TO descricao
+            """)
+            logger.info("✅ Coluna renomeada: objeto → descricao")
+        else:
+            logger.info("ℹ️  Coluna 'objeto' não existe (já foi renomeada)")
+        
+        # 4. Adicionar cliente_id FK
+        logger.info("🔄 PASSO 4: Verificando coluna 'cliente_id'...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'cliente_id'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("ℹ️  Coluna 'cliente_id' já existe")
+        else:
+            logger.info("➕ Adicionando coluna 'cliente_id' com FK para cliente(id)...")
+            cursor.execute("""
+                ALTER TABLE propostas_comerciais 
+                ADD COLUMN cliente_id INTEGER REFERENCES cliente(id)
+            """)
+            logger.info("✅ Coluna 'cliente_id' adicionada com FK para cliente(id)")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 37 CONCLUÍDA: Campos renomeados e FK adicionada!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 37: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
+def _migration_38_create_proposta_historico():
+    """
+    Migração 38: Criar tabela proposta_historico
+    
+    Feature flag: CREATE_PROPOSTA_HISTORICO=true
+    
+    Tabela para rastreamento de histórico de ações em propostas comerciais:
+    - id: Primary key
+    - proposta_id: FK para propostas_comerciais(id) ON DELETE CASCADE
+    - usuario_id: FK para usuario(id) - usuário que realizou a ação
+    - acao: VARCHAR(50) - Ações: criada, editada, enviada, aprovada, rejeitada, excluida
+    - observacao: TEXT - Observações opcionais sobre a ação
+    - data_hora: TIMESTAMP - Data e hora da ação
+    - admin_id: FK para usuario(id) - Admin responsável
+    """
+    try:
+        if os.environ.get('CREATE_PROPOSTA_HISTORICO') != 'true':
+            logger.info("🔒 MIGRAÇÃO 38: Bloqueada por segurança. Para ativar: CREATE_PROPOSTA_HISTORICO=true")
+            return
+        
+        logger.info("=" * 80)
+        logger.info("📋 MIGRAÇÃO 38: Criar Tabela proposta_historico")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # PASSO 1: Verificar se tabela já existe
+        logger.info("🔍 PASSO 1: Verificando existência da tabela proposta_historico...")
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'proposta_historico'
+            )
+        """)
+        tabela_existe = cursor.fetchone()[0]
+        
+        if tabela_existe:
+            logger.info("ℹ️  Tabela proposta_historico já existe, pulando criação")
+            cursor.close()
+            connection.close()
+            return
+        
+        # PASSO 2: Criar tabela proposta_historico
+        logger.info("🔨 PASSO 2: Criando tabela proposta_historico...")
+        cursor.execute("""
+            CREATE TABLE proposta_historico (
+                id SERIAL PRIMARY KEY,
+                proposta_id INTEGER NOT NULL REFERENCES propostas_comerciais(id) ON DELETE CASCADE,
+                usuario_id INTEGER NOT NULL REFERENCES usuario(id),
+                acao VARCHAR(50) NOT NULL,
+                observacao TEXT,
+                data_hora TIMESTAMP NOT NULL DEFAULT NOW(),
+                admin_id INTEGER NOT NULL REFERENCES usuario(id)
+            )
+        """)
+        logger.info("✅ Tabela proposta_historico criada com sucesso")
+        
+        # PASSO 3: Criar índices para melhor performance
+        logger.info("📊 PASSO 3: Criando índices...")
+        cursor.execute("CREATE INDEX idx_proposta_historico_proposta ON proposta_historico(proposta_id)")
+        cursor.execute("CREATE INDEX idx_proposta_historico_usuario ON proposta_historico(usuario_id)")
+        cursor.execute("CREATE INDEX idx_proposta_historico_admin ON proposta_historico(admin_id)")
+        cursor.execute("CREATE INDEX idx_proposta_historico_data ON proposta_historico(data_hora)")
+        cursor.execute("CREATE INDEX idx_proposta_historico_acao ON proposta_historico(acao)")
+        logger.info("✅ Índices criados com sucesso")
+        
+        # PASSO 4: Commit
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 38 CONCLUÍDA: Tabela proposta_historico criada!")
+        logger.info("📊 Campos: id, proposta_id, usuario_id, acao, observacao, data_hora, admin_id")
+        logger.info("🔗 FKs: propostas_comerciais(id) ON DELETE CASCADE, usuario(id)")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 38: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -783,6 +1066,15 @@ def executar_migracoes():
 
         # Migração 35: Adicionar coluna numero_nota_fiscal na tabela custo_veiculo
         _migration_35_custo_veiculo_numero_nota_fiscal()
+
+        # Migração 36: Remover tabelas antigas do sistema de propostas legado
+        _migration_36_remove_old_propostas_tables()
+
+        # Migração 37: Renomear campos em propostas_comerciais e adicionar cliente_id FK
+        _migration_37_rename_propostas_fields()
+
+        # Migração 38: Criar tabela proposta_historico
+        _migration_38_create_proposta_historico()
 
         logger.info("=" * 80)
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
