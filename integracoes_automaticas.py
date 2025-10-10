@@ -4,11 +4,12 @@ Implementa o fluxo end-to-end automatizado conforme especificação técnica
 """
 
 from datetime import datetime, date
-                    RegistroPonto, FolhaPagamento, LancamentoContabil, NotificacaoCliente)
+from models import (Proposta, AlocacaoEquipe, RDO, MovimentacaoEstoque, Produto,
+                    RegistroPonto, FolhaPagamento, LancamentoContabil, NotificacaoCliente,
+                    CentroCustoContabil, Obra)
 from contabilidade_utils import (contabilizar_proposta_aprovada, contabilizar_entrada_material,
                                 contabilizar_folha_pagamento, criar_lancamento_automatico)
 import logging
-        from models import Produto
 from app import db
 
 # ===============================================================

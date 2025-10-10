@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proposta Comercial {{ proposta.numero_proposta }}</title>
+    <title>Proposta Comercial {{ proposta.numero }}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -127,7 +127,7 @@
         </div>
         
         <div class="proposal-title">
-            PROPOSTA COMERCIAL Nº {{ proposta.numero_proposta }}
+            PROPOSTA COMERCIAL Nº {{ proposta.numero }}
         </div>
         
         <div class="info-grid" style="text-align: left;">
@@ -180,11 +180,11 @@
         <h2 class="section-title">1. OBJETO</h2>
         <div class="info-item">
             <div class="info-label">Assunto:</div>
-            <div>{{ proposta.assunto }}</div>
+            <div>{{ proposta.titulo }}</div>
         </div>
         <div class="info-item">
             <div class="info-label">Descrição:</div>
-            <div style="white-space: pre-line;">{{ proposta.objeto }}</div>
+            <div style="white-space: pre-line;">{{ proposta.descricao }}</div>
         </div>
         {% if proposta.documentos_referencia %}
         <div class="info-item">

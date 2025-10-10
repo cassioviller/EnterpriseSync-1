@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proposta Comercial {{ proposta.numero_proposta }}</title>
+    <title>Proposta Comercial {{ proposta.numero }}</title>
     <style>
         @page {
             margin: 0;
@@ -321,11 +321,11 @@
     </div>
 
     <div class="subject">
-        <strong>Ass.:</strong> {{ proposta.assunto or 'Fabricação e montagem de estrutura metálica.' }}
+        <strong>Ass.:</strong> {{ proposta.titulo or 'Fabricação e montagem de estrutura metálica.' }}
     </div>
 
     <div class="reference">
-        <strong>N. Ref.:</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Proposta Comercial {{ proposta.numero_proposta }} –
+        <strong>N. Ref.:</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Proposta Comercial {{ proposta.numero }} –
     </div>
 
     <div class="greeting">
@@ -457,7 +457,7 @@
 
         <div class="section">
             <div class="section-title">1. OBJETO:</div>
-            <p>{{ proposta.objeto or 'Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.' }}</p>
+            <p>{{ proposta.descricao or 'Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.' }}</p>
             <p><strong>Documentos de referência:</strong> {{ proposta.documentos_referencia or "'Medidas enviadas pelo cliente'" }}</p>
         </div>
 

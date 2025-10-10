@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proposta Comercial {{ proposta.numero_proposta }}</title>
+    <title>Proposta Comercial {{ proposta.numero }}</title>
     <style>
         /* Reset e configurações base */
         * {
@@ -308,11 +308,11 @@
         </div>
         
         <div class="subject">
-            <p><strong>Ass.:</strong> {{ template.assunto or proposta.assunto or proposta.objeto or 'Fabricação e montagem de estrutura metálica.' }}</p>
+            <p><strong>Ass.:</strong> {{ template.titulo or proposta.titulo or proposta.descricao or 'Fabricação e montagem de estrutura metálica.' }}</p>
         </div>
         
         <div class="reference">
-            <p><strong>N. Ref.:</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ template.numero_referencia or 'Proposta Comercial ' + proposta.numero_proposta }}</p>
+            <p><strong>N. Ref.:</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ template.numero_referencia or 'Proposta Comercial ' + proposta.numero }}</p>
         </div>
         
         <div class="greeting">

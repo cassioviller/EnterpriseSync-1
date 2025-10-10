@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func, and_
 from collections import defaultdict
 import statistics
-    from models import Proposta
+from models import Proposta
 
 def calcular_progresso_obra_cliente(obra_id):
     """

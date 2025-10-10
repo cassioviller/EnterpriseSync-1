@@ -1,13 +1,13 @@
 {% extends "base_completo.html" %}
 
-{% block title %}Proposta {{ proposta.numero_proposta }} - SIGE{% endblock %}
+{% block title %}Proposta {{ proposta.numero }} - SIGE{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <!-- Cabeçalho -->
     <div class="row mb-4">
         <div class="col-md-8">
-            <h2><i class="fas fa-file-contract"></i> Proposta {{ proposta.numero_proposta }}</h2>
+            <h2><i class="fas fa-file-contract"></i> Proposta {{ proposta.numero }}</h2>
             <p class="text-muted">{{ proposta.titulo_projeto }} - {{ proposta.cliente_nome }}</p>
         </div>
         <div class="col-md-4 text-end">

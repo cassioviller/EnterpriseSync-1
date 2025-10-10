@@ -52,7 +52,7 @@ except ImportError as e:
 # Importar modelos necessários
 from app import db
 from models import (
-    PropostaComercialSIGE, PropostaItem, PropostaTemplate, 
+    Proposta, PropostaItem, PropostaTemplate, 
     ConfiguracaoEmpresa, Usuario, TipoUsuario, Obra, Servico
 )
 
@@ -119,25 +119,25 @@ def index():
         print(f"DEBUG PROPOSTAS: admin_id={admin_id}, filters=status:{status_filter}, cliente:{cliente_filter}")
         
         # Query base com filtro por admin
-        query = PropostaComercialSIGE.query.filter_by(admin_id=admin_id)
+        query = Proposta.query.filter_by(admin_id=admin_id)
         
         # Aplicar filtros
         if status_filter:
-            query = query.filter(PropostaComercialSIGE.status == status_filter)
+            query = query.filter(Proposta.status == status_filter)
         if cliente_filter:
-            query = query.filter(PropostaComercialSIGE.cliente_nome.ilike(f'%{cliente_filter}%'))
+            query = query.filter(Proposta.cliente_nome.ilike(f'%{cliente_filter}%'))
         
         # Paginação
-        propostas = query.order_by(PropostaComercialSIGE.criado_em.desc()).paginate(
+        propostas = query.order_by(Proposta.criado_em.desc()).paginate(
             page=page, per_page=20, error_out=False
         )
         
         # Estatísticas para dashboard
         stats = safe_db_operation(lambda: {
-            'total': PropostaComercialSIGE.query.filter_by(admin_id=admin_id).count(),
-            'pendentes': PropostaComercialSIGE.query.filter_by(admin_id=admin_id, status='pendente').count(),
-            'aprovadas': PropostaComercialSIGE.query.filter_by(admin_id=admin_id, status='aprovada').count(),
-            'valor_total': db.session.query(func.sum(PropostaComercialSIGE.valor_total)).filter_by(admin_id=admin_id).scalar() or 0
+            'total': Proposta.query.filter_by(admin_id=admin_id).count(),
+            'pendentes': Proposta.query.filter_by(admin_id=admin_id, status='pendente').count(),
+            'aprovadas': Proposta.query.filter_by(admin_id=admin_id, status='aprovada').count(),
+            'valor_total': db.session.query(func.sum(Proposta.valor_total)).filter_by(admin_id=admin_id).scalar() or 0
         }, {})
         
         print(f"DEBUG PROPOSTAS: {stats.get('total', 0)} propostas encontradas")
@@ -229,16 +229,16 @@ def criar():
         # Gerar número da proposta
         ano_atual = datetime.now().year
         last_numero = safe_db_operation(
-            lambda: PropostaComercialSIGE.query.filter_by(admin_id=admin_id).count(),
+            lambda: Proposta.query.filter_by(admin_id=admin_id).count(),
             0
         )
         numero_proposta = f"PROP-{ano_atual}-{(last_numero + 1):04d}"
         
         # Criar proposta
-        proposta = PropostaComercialSIGE(
-            numero_proposta=numero_proposta,
-            assunto=titulo,
-            objeto=descricao,
+        proposta = Proposta(
+            numero=numero_proposta,
+            titulo=titulo,
+            descricao=descricao,
             cliente_nome=cliente_nome,
             cliente_email=cliente_email,
             valor_total=valor_total,
@@ -270,7 +270,7 @@ def visualizar(id):
     try:
         admin_id = get_admin_id()
         
-        proposta = PropostaComercialSIGE.query.filter_by(
+        proposta = Proposta.query.filter_by(
             id=id, admin_id=admin_id
         ).first_or_404()
         
@@ -286,7 +286,7 @@ def visualizar(id):
             []
         )
         
-        print(f"DEBUG VISUALIZAR: Proposta {proposta.numero_proposta} - {len(itens)} itens")
+        print(f"DEBUG VISUALIZAR: Proposta {proposta.numero} - {len(itens)} itens")
         
         return render_template('propostas/visualizar_proposta.html',
                              proposta=proposta,
@@ -313,7 +313,7 @@ def gerar_pdf(id):
     try:
         admin_id = get_admin_id()
         
-        proposta = PropostaComercialSIGE.query.filter_by(
+        proposta = Proposta.query.filter_by(
             id=id, admin_id=admin_id
         ).first_or_404()
         
@@ -339,7 +339,7 @@ def gerar_pdf(id):
             story.append(Spacer(1, 12))
         
         # Dados da proposta
-        story.append(Paragraph(f"Proposta: {proposta.numero_proposta}", styles['Heading1']))
+        story.append(Paragraph(f"Proposta: {proposta.numero}", styles['Heading1']))
         story.append(Paragraph(f"Cliente: {proposta.cliente_nome}", styles['Normal']))
         story.append(Paragraph(f"Título: {proposta.titulo}", styles['Normal']))
         story.append(Spacer(1, 12))
@@ -354,11 +354,11 @@ def gerar_pdf(id):
         doc.build(story)
         buffer.seek(0)
         
-        print(f"DEBUG PDF: Proposta {proposta.numero_proposta} gerada com sucesso")
+        print(f"DEBUG PDF: Proposta {proposta.numero} gerada com sucesso")
         
         response = make_response(buffer.getvalue())
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=proposta_{proposta.numero_proposta}.pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=proposta_{proposta.numero}.pdf'
         
         return response
         

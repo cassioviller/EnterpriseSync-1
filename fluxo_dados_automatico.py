@@ -6,7 +6,7 @@ Baseado no documento: FLUXO COMPLETO DE DADOS DO SIGE v8.0
 
 from datetime import datetime, date
 import logging
-            from models import AlocacaoEquipe
+from models import AlocacaoEquipe, Proposta
 from app import db
 
 # Configuração do logger

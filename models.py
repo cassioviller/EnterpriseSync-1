@@ -775,7 +775,7 @@ class OutroCusto(db.Model):
 # ================================
 # MÓDULO DE PROPOSTAS COMERCIAIS (MOVIDO PARA models_propostas.py)
 # ================================
-# As definições das classes PropostaComercialSIGE e ServicoPropostaComercialSIGE
+# As definições das classes Proposta e ServicoPropostaComercialSIGE
 # foram movidas para models_propostas.py para evitar conflitos de importação
 
 # ================================
@@ -2044,11 +2044,11 @@ class ItemTabelaComposicao(db.Model):
         return float(self.quantidade) * self.valor_unitario_ajustado * (float(self.percentual_aplicacao) / 100)
 
 # MODELS DE PROPOSTAS
-class PropostaComercialSIGE(db.Model):
+class Proposta(db.Model):
     __tablename__ = 'propostas_comerciais'
     
     id = db.Column(db.Integer, primary_key=True)
-    numero_proposta = db.Column(db.String(50), unique=True, nullable=False)
+    numero = db.Column(db.String(50), unique=True, nullable=False)
     data_proposta = db.Column(db.Date, nullable=False, default=date.today)
     
     # Dados do Cliente
@@ -2058,8 +2058,8 @@ class PropostaComercialSIGE(db.Model):
     cliente_endereco = db.Column(db.Text)
     
     # Dados da Proposta
-    assunto = db.Column(db.String(255), nullable=True)
-    objeto = db.Column(db.Text, nullable=True)
+    titulo = db.Column(db.String(255), nullable=True)
+    descricao = db.Column(db.Text, nullable=True)
     documentos_referencia = db.Column(db.Text)
     
     # Condições
@@ -2113,6 +2113,7 @@ class PropostaComercialSIGE(db.Model):
     
     # Metadados
     criado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -2125,9 +2126,9 @@ class PropostaComercialSIGE(db.Model):
     arquivos = db.relationship('PropostaArquivo', backref='proposta', lazy=True, cascade='all, delete-orphan')
     
     def __init__(self, **kwargs):
-        super(PropostaComercialSIGE, self).__init__(**kwargs)
-        if not self.numero_proposta:
-            self.numero_proposta = self.gerar_numero_proposta()
+        super(Proposta, self).__init__(**kwargs)
+        if not self.numero:
+            self.numero = self.gerar_numero_proposta()
         if not self.token_cliente:
             self.token_cliente = secrets.token_urlsafe(32)
     
@@ -2135,8 +2136,8 @@ class PropostaComercialSIGE(db.Model):
         """Gera número sequencial da proposta"""
         ano_atual = date.today().year
         # Contar propostas do ano atual
-        count = db.session.query(func.count(PropostaComercialSIGE.id)).filter(
-            func.extract('year', PropostaComercialSIGE.data_proposta) == ano_atual
+        count = db.session.query(func.count(Proposta.id)).filter(
+            func.extract('year', Proposta.data_proposta) == ano_atual
         ).scalar() or 0
         
         proximo_numero = count + 1
@@ -2151,12 +2152,12 @@ class PropostaComercialSIGE(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
-            'numero_proposta': self.numero_proposta,
+            'numero': self.numero,
             'data_proposta': self.data_proposta.isoformat() if self.data_proposta else None,
             'cliente_nome': self.cliente_nome,
             'cliente_telefone': self.cliente_telefone,
             'cliente_email': self.cliente_email,
-            'assunto': self.assunto,
+            'titulo': self.titulo,
             'status': self.status,
             'valor_total': float(self.valor_total) if self.valor_total else 0,
             'criado_em': self.criado_em.isoformat() if self.criado_em else None

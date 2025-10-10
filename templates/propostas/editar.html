@@ -7,7 +7,7 @@
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h5 class="mb-0"><i class="fas fa-edit me-2"></i> Editar Proposta {{ proposta.numero_proposta }}</h5>
+                    <h5 class="mb-0"><i class="fas fa-edit me-2"></i> Editar Proposta {{ proposta.numero }}</h5>
                     <small class="text-muted">Cliente: {{ proposta.cliente_nome }}</small>
                 </div>
                 <div>
@@ -55,16 +55,16 @@
                         <h6 class="text-primary mb-3">Dados da Obra</h6>
                         <div class="mb-3">
                             <label class="form-label">Número da Proposta *</label>
-                            <input type="text" class="form-control" name="numero_proposta" value="{{ proposta.numero_proposta }}" required>
+                            <input type="text" class="form-control" name="numero_proposta" value="{{ proposta.numero }}" required>
                             <small class="text-muted">Altere o número da proposta se necessário</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Assunto da Proposta</label>
-                            <input type="text" class="form-control" name="assunto" value="{{ proposta.assunto or '' }}" placeholder="Ex: Estrutura Metálica Residencial">
+                            <input type="text" class="form-control" name="assunto" value="{{ proposta.titulo or '' }}" placeholder="Ex: Estrutura Metálica Residencial">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Objeto/Descrição da Obra</label>
-                            <textarea class="form-control" name="objeto" rows="3" placeholder="Descreva os serviços a serem executados...">{{ proposta.objeto or '' }}</textarea>
+                            <textarea class="form-control" name="objeto" rows="3" placeholder="Descreva os serviços a serem executados...">{{ proposta.descricao or '' }}</textarea>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Endereço da Obra</label>

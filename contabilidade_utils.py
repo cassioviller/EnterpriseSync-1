@@ -8,7 +8,7 @@ from sqlalchemy import func, case
 from models import (
     db, PlanoContas, CentroCustoContabil, LancamentoContabil, PartidaContabil, 
     BalanceteMensal, DREMensal, BalancoPatrimonial, FluxoCaixaContabil, 
-    ProvisaoMensal, SpedContabil, AuditoriaContabil, PropostaComercialSIGE, 
+    ProvisaoMensal, SpedContabil, AuditoriaContabil, Proposta, 
     NotaFiscal, MovimentacaoEstoque, FolhaPagamento
 )
 
@@ -151,7 +151,7 @@ def criar_lancamento_automatico(data, historico, valor, origem, origem_id, admin
 
 def contabilizar_proposta_aprovada(proposta_id):
     """Gera lançamentos contábeis quando uma proposta é aprovada."""
-    proposta = PropostaComercialSIGE.query.get(proposta_id)
+    proposta = Proposta.query.get(proposta_id)
     if not proposta or proposta.status != 'APROVADA':
         return
 

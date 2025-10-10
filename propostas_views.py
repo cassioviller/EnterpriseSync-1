@@ -13,7 +13,7 @@ import uuid
 import mimetypes
 
 from app import db
-from models import PropostaComercialSIGE, PropostaItem, PropostaArquivo, PropostaTemplate, ConfiguracaoEmpresa
+from models import Proposta, PropostaItem, PropostaArquivo, PropostaTemplate, ConfiguracaoEmpresa
 
 # Criar blueprint
 propostas_bp = Blueprint('propostas', __name__, url_prefix='/propostas')
@@ -53,15 +53,15 @@ def index():
     status_filter = request.args.get('status', '')
     cliente_filter = request.args.get('cliente', '')
     
-    query = PropostaComercialSIGE.query
+    query = Proposta.query
     
     # Filtros
     if status_filter:
-        query = query.filter(PropostaComercialSIGE.status == status_filter)
+        query = query.filter(Proposta.status == status_filter)
     if cliente_filter:
-        query = query.filter(PropostaComercialSIGE.cliente_nome.ilike(f'%{cliente_filter}%'))
+        query = query.filter(Proposta.cliente_nome.ilike(f'%{cliente_filter}%'))
     
-    propostas = query.order_by(PropostaComercialSIGE.criado_em.desc()).paginate(
+    propostas = query.order_by(Proposta.criado_em.desc()).paginate(
         page=page, per_page=20, error_out=False
     )
     
@@ -111,7 +111,7 @@ def organizar_proposta(proposta_id):
     from multitenant_helper import get_admin_id
     admin_id = get_admin_id()
     
-    proposta = PropostaComercialSIGE.query.filter_by(id=proposta_id, admin_id=admin_id).first()
+    proposta = Proposta.query.filter_by(id=proposta_id, admin_id=admin_id).first()
     
     if not proposta:
         flash('Proposta não encontrada', 'error')
@@ -287,7 +287,7 @@ def nova_proposta_funcionando():
 @propostas_bp.route('/criar-teste-template/<int:template_id>')
 def criar_teste_template(template_id):
     """Cria uma proposta de teste usando um template para validar o sistema"""
-    from models import PropostaComercialSIGE, PropostaItem, PropostaTemplate
+    from models import Proposta, PropostaItem, PropostaTemplate
     
     try:
         # Buscar template especificado
@@ -296,13 +296,13 @@ def criar_teste_template(template_id):
             return jsonify({'error': f'Template {template_id} não encontrado'}), 404
         
         # Criar proposta baseada no template
-        proposta = PropostaComercialSIGE()
+        proposta = Proposta()
         proposta.cliente_nome = f"Cliente Teste {template.nome}"
         proposta.cliente_telefone = "(11) 98765-4321"
         proposta.cliente_email = "contato@fazendaesperanca.com.br"
         proposta.cliente_endereco = "Estrada Rural KM 15, Zona Rural - São José dos Campos/SP"
-        proposta.assunto = f"Proposta Comercial - {template.nome}"
-        proposta.objeto = f"Fornecimento e montagem de {template.nome.lower()} conforme especificações técnicas em anexo"
+        proposta.titulo = f"Proposta Comercial - {template.nome}"
+        proposta.descricao = f"Fornecimento e montagem de {template.nome.lower()} conforme especificações técnicas em anexo"
         proposta.documentos_referencia = "Projeto arquitetônico fornecido pelo cliente"
         
         # Usar dados do template
@@ -378,14 +378,14 @@ def criar_proposta():
             return redirect(url_for('propostas.nova_proposta'))
         
         # Dados básicos da proposta
-        proposta = PropostaComercialSIGE()
+        proposta = Proposta()
         proposta.cliente_nome = cliente_nome.strip()
-        proposta.numero_proposta = request.form.get('numero_proposta', '').strip()
+        proposta.numero = request.form.get('numero_proposta', '').strip()
         proposta.cliente_telefone = request.form.get('cliente_telefone')
         proposta.cliente_email = request.form.get('cliente_email')
         proposta.cliente_endereco = request.form.get('cliente_endereco')
-        proposta.assunto = request.form.get('assunto') or None
-        proposta.objeto = request.form.get('objeto') or None
+        proposta.titulo = request.form.get('assunto') or None
+        proposta.descricao = request.form.get('objeto') or None
         proposta.documentos_referencia = request.form.get('documentos_referencia')
         proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
         proposta.observacoes_entrega = request.form.get('observacoes_entrega')
@@ -509,7 +509,7 @@ def criar_proposta():
 @admin_required
 def visualizar_proposta(id):
     """Visualiza uma proposta específica"""
-    proposta = PropostaComercialSIGE.query.get_or_404(id)
+    proposta = Proposta.query.get_or_404(id)
     return render_template('propostas/visualizar.html', proposta=proposta)
 
 @propostas_bp.route('/<int:id>/editar')
@@ -517,7 +517,7 @@ def visualizar_proposta(id):
 @admin_required
 def editar_proposta(id):
     """Formulário para editar proposta"""
-    proposta = PropostaComercialSIGE.query.get_or_404(id)
+    proposta = Proposta.query.get_or_404(id)
     templates = PropostaTemplate.query.filter_by(ativo=True).all()
     return render_template('propostas/editar.html', proposta=proposta, templates=templates)
 
@@ -526,18 +526,18 @@ def editar_proposta(id):
 @admin_required
 def atualizar_proposta(id):
     """Atualiza uma proposta existente"""
-    proposta = PropostaComercialSIGE.query.get_or_404(id)
+    proposta = Proposta.query.get_or_404(id)
     
     try:
         # Atualizar dados da proposta
         proposta.cliente_nome = request.form.get('cliente_nome')
-        proposta.numero_proposta = request.form.get('numero_proposta', '').strip()
+        proposta.numero = request.form.get('numero_proposta', '').strip()
         proposta.cliente_email = request.form.get('cliente_email')
         proposta.cliente_telefone = request.form.get('cliente_telefone')
         proposta.cliente_cpf_cnpj = request.form.get('cliente_cpf_cnpj')
         proposta.cliente_endereco = request.form.get('cliente_endereco')
-        proposta.assunto = request.form.get('assunto') or None
-        proposta.objeto = request.form.get('objeto') or None
+        proposta.titulo = request.form.get('assunto') or None
+        proposta.descricao = request.form.get('objeto') or None
         proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
         proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
         proposta.condicoes_pagamento = request.form.get('condicoes_pagamento')
@@ -602,7 +602,7 @@ def atualizar_proposta(id):
 @admin_required
 def upload_arquivo(id):
     """Upload de arquivo para uma proposta"""
-    proposta = PropostaComercialSIGE.query.get_or_404(id)
+    proposta = Proposta.query.get_or_404(id)
     
     if 'arquivo' not in request.files:
         return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
@@ -684,10 +684,10 @@ def obter_template(template_id):
 def gerar_pdf(id):
     """Gera PDF da proposta"""
     try:
-        proposta = PropostaComercialSIGE.query.get_or_404(id)
+        proposta = Proposta.query.get_or_404(id)
         
         # Debug da proposta
-        print(f"DEBUG PDF: Proposta {proposta.numero_proposta}")
+        print(f"DEBUG PDF: Proposta {proposta.numero}")
         print(f"DEBUG PDF: Cliente: {proposta.cliente_nome}")
         print(f"DEBUG PDF: Valor total: {proposta.valor_total}")
         print(f"DEBUG PDF: Número de itens: {len(proposta.itens) if proposta.itens else 0}")
@@ -813,7 +813,7 @@ def gerar_pdf(id):
 @admin_required
 def enviar_proposta(id):
     """Envia proposta para o cliente"""
-    proposta = PropostaComercialSIGE.query.get_or_404(id)
+    proposta = Proposta.query.get_or_404(id)
     
     try:
         # Atualizar status e data de envio
@@ -838,7 +838,7 @@ def enviar_proposta(id):
 @admin_required
 def excluir_proposta(id):
     """Exclui uma proposta"""
-    proposta = PropostaComercialSIGE.query.get_or_404(id)
+    proposta = Proposta.query.get_or_404(id)
     
     try:
         # Remover arquivos físicos
@@ -865,7 +865,7 @@ def portal_cliente(token):
     """Portal para o cliente visualizar e aprovar proposta"""
     from models import ConfiguracaoEmpresa, Usuario
     
-    proposta = PropostaComercialSIGE.query.filter_by(token_cliente=token).first_or_404()
+    proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
     
     # Buscar admin_id através do usuário que criou a proposta
     admin_id = None
@@ -898,7 +898,7 @@ def portal_cliente(token):
 @propostas_bp.route('/cliente/<token>/aprovar', methods=['POST'])
 def aprovar_proposta(token):
     """Cliente aprova a proposta"""
-    proposta = PropostaComercialSIGE.query.filter_by(token_cliente=token).first_or_404()
+    proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
     
     try:
         proposta.status = 'aprovada'
@@ -918,7 +918,7 @@ def aprovar_proposta(token):
 @propostas_bp.route('/cliente/<token>/rejeitar', methods=['POST'])
 def rejeitar_proposta(token):
     """Cliente rejeita a proposta"""
-    proposta = PropostaComercialSIGE.query.filter_by(token_cliente=token).first_or_404()
+    proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
     
     try:
         proposta.status = 'rejeitada'

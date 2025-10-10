@@ -3,7 +3,7 @@ API para sistema de organização avançada de propostas
 """
 
 from flask import Blueprint, request, jsonify
-from models import db, PropostaTemplate, PropostaComercialSIGE, PropostaItem
+from models import db, PropostaTemplate, Proposta, PropostaItem
 # bypass_auth removido - usar current_user diretamente
 def get_current_user_bypass():
     from flask_login import current_user
@@ -73,7 +73,7 @@ def carregar_templates_multiplos():
             }), 400
         
         # Buscar proposta
-        proposta = PropostaComercialSIGE.query.get(proposta_id)
+        proposta = Proposta.query.get(proposta_id)
         if not proposta:
             return jsonify({
                 'success': False,
