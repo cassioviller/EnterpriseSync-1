@@ -1869,37 +1869,6 @@ class Cliente(db.Model):
     
     admin = db.relationship('Usuario', backref='clientes_administrados')
 
-class Proposta(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    numero = db.Column(db.String(50), unique=True, nullable=False)
-    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
-    titulo = db.Column(db.String(200), nullable=False)
-    descricao = db.Column(db.Text)
-    valor_total = db.Column(db.Float, default=0.0)
-    status = db.Column(db.String(20), default='rascunho')  # rascunho, enviada, aprovada, rejeitada
-    data_vencimento = db.Column(db.Date)
-    data_envio = db.Column(db.DateTime)
-    data_aprovacao = db.Column(db.DateTime)
-    link_visualizacao = db.Column(db.String(255))
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relacionamentos
-    cliente = db.relationship('Cliente', backref='propostas')
-    admin = db.relationship('Usuario', backref='propostas_administradas')
-    itens_servicos_dinamicos = db.relationship('ItemServicoPropostaDinamica', back_populates='proposta', cascade='all, delete-orphan')
-
-class PropostaHistorico(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    proposta_id = db.Column(db.Integer, db.ForeignKey('proposta.id'), nullable=False)
-    acao = db.Column(db.String(50), nullable=False)
-    descricao = db.Column(db.Text)
-    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relacionamentos
-    proposta = db.relationship('Proposta', backref='historico')
-    usuario = db.relationship('Usuario', backref='acoes_propostas')
 
 # Atualização de timestamp para verificar se o modelo é alterado
 # Essa linha força o gunicorn a recarregar quando há mudanças
@@ -1946,7 +1915,6 @@ class ServicoMestre(db.Model):
     
     # Relacionamentos
     subservicos = relationship('SubServico', back_populates='servico_mestre', cascade='all, delete-orphan')
-    itens_proposta = relationship('ItemServicoPropostaDinamica', back_populates='servico_mestre')
     
     # Administrador
     admin = relationship('Usuario', foreign_keys=[admin_id])
@@ -2074,53 +2042,6 @@ class ItemTabelaComposicao(db.Model):
     def valor_total(self):
         """Valor total do item na composição"""
         return float(self.quantidade) * self.valor_unitario_ajustado * (float(self.percentual_aplicacao) / 100)
-
-class ItemServicoPropostaDinamica(db.Model):
-    """Itens de serviço dinamicamente adicionados à proposta"""
-    __tablename__ = 'item_servico_proposta_dinamica'
-    
-    id = Column(Integer, primary_key=True)
-    proposta_id = Column(Integer, ForeignKey('proposta.id'), nullable=False)
-    servico_mestre_id = Column(Integer, ForeignKey('servico_mestre.id'), nullable=True)
-    admin_id = Column(Integer, ForeignKey('usuario.id'), nullable=False)
-    
-    # Dados do item
-    codigo_item = Column(String(20))  # Código customizado
-    nome_item = Column(String(100), nullable=False)  # Nome pode ser customizado
-    descricao_item = Column(Text)
-    
-    # Dados comerciais
-    quantidade = Column(Numeric(10, 2), nullable=False, default=1.00)
-    unidade = Column(String(10), nullable=False, default='m2')
-    preco_unitario = Column(Numeric(10, 2), nullable=False, default=0.00)
-    desconto_percentual = Column(Numeric(5, 2), default=0.00)
-    
-    # Flags de controle
-    e_servico_mestre = Column(Boolean, default=False)  # Se foi gerado de um serviço mestre
-    inclui_subservicos = Column(Boolean, default=False)  # Se incluiu subserviços automaticamente
-    
-    # Status e controle
-    criado_em = Column(DateTime, default=datetime.utcnow)
-    ordem = Column(Integer, default=1)  # Ordem na proposta
-    
-    # Relacionamentos
-    proposta = relationship('Proposta', back_populates='itens_servicos_dinamicos', foreign_keys=[proposta_id])
-    servico_mestre = relationship('ServicoMestre', back_populates='itens_proposta')
-    admin = relationship('Usuario', foreign_keys=[admin_id])
-    
-    def __repr__(self):
-        return f'<ItemServicoPropostaDinamica {self.nome_item}>'
-    
-    @property
-    def valor_com_desconto(self):
-        """Valor unitário com desconto aplicado"""
-        desconto = float(self.desconto_percentual) / 100
-        return float(self.preco_unitario) * (1 - desconto)
-    
-    @property
-    def valor_total(self):
-        """Valor total do item"""
-        return float(self.quantidade) * self.valor_com_desconto
 
 # MODELS DE PROPOSTAS
 class PropostaComercialSIGE(db.Model):

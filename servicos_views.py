@@ -5,11 +5,9 @@ Módulo completo para gestão de serviços e composições
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
-from models import db, Proposta
-from models_servicos import (
-    ServicoMestre, SubServico, TabelaComposicao, 
-    ItemTabelaComposicao, ItemServicoPropostaDinamica,
-    StatusServico, TipoUnidade
+from models import (
+    db, ServicoMestre, SubServico, TabelaComposicao, 
+    ItemTabelaComposicao, StatusServico, TipoUnidade
 )
 from datetime import datetime
 from decimal import Decimal
@@ -50,19 +48,23 @@ def dashboard():
     total_tabelas = TabelaComposicao.query.filter_by(admin_id=current_user.id).count()
     
     # Serviços mais utilizados (top 5)
-    servicos_populares = db.session.query(
-        ServicoMestre,
-        db.func.count(ItemServicoPropostaDinamica.id).label('uso_count')
-    ).join(
-        ItemServicoPropostaDinamica, 
-        ServicoMestre.id == ItemServicoPropostaDinamica.servico_mestre_id
-    ).filter(
-        ServicoMestre.admin_id == current_user.id
-    ).group_by(
-        ServicoMestre.id
-    ).order_by(
-        db.text('uso_count DESC')
-    ).limit(5).all()
+    # TODO FASE 3: Reimplementar query de serviços populares com PropostaItem
+    # servicos_populares = db.session.query(
+    #     ServicoMestre,
+    #     db.func.count(ItemServicoPropostaDinamica.id).label('uso_count')
+    # ).join(
+    #     ItemServicoPropostaDinamica, 
+    #     ServicoMestre.id == ItemServicoPropostaDinamica.servico_mestre_id
+    # ).filter(
+    #     ServicoMestre.admin_id == current_user.id
+    # ).group_by(
+    #     ServicoMestre.id
+    # ).order_by(
+    #     db.text('uso_count DESC')
+    # ).limit(5).all()
+    
+    # Temporariamente retornando lista vazia até FASE 3
+    servicos_populares = []
     
     # Serviços recentes
     servicos_recentes = ServicoMestre.query.filter_by(
@@ -361,64 +363,66 @@ def api_aplicar_servico_proposta():
     try:
         itens_criados = []
         
+        # TODO FASE 3: Reimplementar com PropostaItem na FASE 3
         # Criar item principal do serviço
-        item_principal = ItemServicoPropostaDinamica(
-            proposta_id=proposta_id if proposta_id > 0 else None,
-            servico_mestre_id=servico.id,
-            admin_id=current_user.id,
-            codigo_item=servico.codigo,
-            nome_item=servico.nome,
-            descricao_item=servico.descricao,
-            quantidade=quantidade_servico,
-            unidade=servico.unidade,
-            preco_unitario=Decimal(str(servico.preco_final)),
-            e_servico_mestre=True,
-            inclui_subservicos=incluir_subservicos,
-            ordem=1
-        )
+        # item_principal = ItemServicoPropostaDinamica(
+        #     proposta_id=proposta_id if proposta_id > 0 else None,
+        #     servico_mestre_id=servico.id,
+        #     admin_id=current_user.id,
+        #     codigo_item=servico.codigo,
+        #     nome_item=servico.nome,
+        #     descricao_item=servico.descricao,
+        #     quantidade=quantidade_servico,
+        #     unidade=servico.unidade,
+        #     preco_unitario=Decimal(str(servico.preco_final)),
+        #     e_servico_mestre=True,
+        #     inclui_subservicos=incluir_subservicos,
+        #     ordem=1
+        # )
+        # 
+        # db.session.add(item_principal)
+        # itens_criados.append({
+        #     'tipo': 'servico_principal',
+        #     'codigo': item_principal.codigo_item,
+        #     'nome': item_principal.nome_item,
+        #     'quantidade': float(item_principal.quantidade),
+        #     'preco_unitario': float(item_principal.preco_unitario),
+        #     'valor_total': item_principal.valor_total
+        # })
         
-        db.session.add(item_principal)
-        itens_criados.append({
-            'tipo': 'servico_principal',
-            'codigo': item_principal.codigo_item,
-            'nome': item_principal.nome_item,
-            'quantidade': float(item_principal.quantidade),
-            'preco_unitario': float(item_principal.preco_unitario),
-            'valor_total': item_principal.valor_total
-        })
-        
+        # TODO FASE 3: Reimplementar com PropostaItem na FASE 3
         # Adicionar subserviços se solicitado
-        if incluir_subservicos:
-            ordem = 2
-            for subservico in servico.subservicos:
-                if subservico.status == 'ativo':
-                    quantidade_sub = quantidade_servico * subservico.quantidade_base
-                    
-                    item_sub = ItemServicoPropostaDinamica(
-                        proposta_id=proposta_id if proposta_id > 0 else None,
-                        servico_mestre_id=servico.id,
-                        admin_id=current_user.id,
-                        codigo_item=subservico.codigo,
-                        nome_item=f"  └─ {subservico.nome}",
-                        descricao_item=subservico.descricao,
-                        quantidade=quantidade_sub,
-                        unidade=subservico.unidade,
-                        preco_unitario=subservico.preco_unitario,
-                        e_servico_mestre=False,
-                        inclui_subservicos=False,
-                        ordem=ordem
-                    )
-                    
-                    db.session.add(item_sub)
-                    itens_criados.append({
-                        'tipo': 'subservico',
-                        'codigo': item_sub.codigo_item,
-                        'nome': item_sub.nome_item,
-                        'quantidade': float(item_sub.quantidade),
-                        'preco_unitario': float(item_sub.preco_unitario),
-                        'valor_total': item_sub.valor_total
-                    })
-                    ordem += 1
+        # if incluir_subservicos:
+        #     ordem = 2
+        #     for subservico in servico.subservicos:
+        #         if subservico.status == 'ativo':
+        #             quantidade_sub = quantidade_servico * subservico.quantidade_base
+        #             
+        #             item_sub = ItemServicoPropostaDinamica(
+        #                 proposta_id=proposta_id if proposta_id > 0 else None,
+        #                 servico_mestre_id=servico.id,
+        #                 admin_id=current_user.id,
+        #                 codigo_item=subservico.codigo,
+        #                 nome_item=f"  └─ {subservico.nome}",
+        #                 descricao_item=subservico.descricao,
+        #                 quantidade=quantidade_sub,
+        #                 unidade=subservico.unidade,
+        #                 preco_unitario=subservico.preco_unitario,
+        #                 e_servico_mestre=False,
+        #                 inclui_subservicos=False,
+        #                 ordem=ordem
+        #             )
+        #             
+        #             db.session.add(item_sub)
+        #             itens_criados.append({
+        #                 'tipo': 'subservico',
+        #                 'codigo': item_sub.codigo_item,
+        #                 'nome': item_sub.nome_item,
+        #                 'quantidade': float(item_sub.quantidade),
+        #                 'preco_unitario': float(item_sub.preco_unitario),
+        #                 'valor_total': item_sub.valor_total
+        #             })
+        #             ordem += 1
         
         db.session.commit()
         
