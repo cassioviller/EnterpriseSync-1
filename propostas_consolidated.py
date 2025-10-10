@@ -52,8 +52,8 @@ except ImportError as e:
 # Importar modelos necessários
 from app import db
 from models import (
-    Proposta, PropostaItem, PropostaTemplate, 
-    ConfiguracaoEmpresa, Usuario, TipoUsuario, Obra, Servico
+    Proposta, PropostaItem, PropostaTemplate, PropostaHistorico,
+    ConfiguracaoEmpresa, Usuario, TipoUsuario, Obra, Servico, Cliente
 )
 
 # Blueprint unificado
@@ -421,5 +421,222 @@ def get_template_data(template_id):
     except Exception as e:
         print(f"ERRO API TEMPLATE: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 400
+
+# ===== ROTAS DE EDIÇÃO E GESTÃO =====
+
+@propostas_bp.route('/editar/<int:id>')
+@login_required
+@admin_required
+def editar(id):
+    """Exibe formulário para editar proposta"""
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        print(f"DEBUG EDITAR: Proposta {proposta.numero} carregada para edição")
+        
+        return render_template('propostas/editar.html', proposta=proposta)
+        
+    except Exception as e:
+        print(f"ERRO EDITAR PROPOSTA: {str(e)}")
+        flash(f'Erro ao carregar proposta para edição: {str(e)}', 'error')
+        return redirect(url_for('propostas.index'))
+
+@propostas_bp.route('/editar/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def atualizar(id):
+    """Atualiza proposta existente"""
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        # Atualizar campos (usar .numero, .titulo, .descricao - campos renomeados!)
+        proposta.numero = request.form.get('numero')
+        proposta.titulo = request.form.get('titulo')
+        proposta.descricao = request.form.get('descricao')
+        proposta.cliente_nome = request.form.get('cliente_nome')
+        proposta.cliente_email = request.form.get('cliente_email')
+        
+        # Parsing seguro de valor_total
+        valor_total_str = request.form.get('valor_total', '0').strip()
+        if valor_total_str:
+            proposta.valor_total = float(valor_total_str.replace(',', '.'))
+        else:
+            proposta.valor_total = 0.0
+            
+        proposta.status = request.form.get('status', proposta.status)
+        
+        # Registrar no histórico
+        historico = PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao='editada',
+            observacao=f'Proposta editada por {current_user.username}',
+            admin_id=admin_id
+        )
+        db.session.add(historico)
+        
+        # Commit transacional único (tudo ou nada)
+        db.session.commit()
+        
+        print(f"DEBUG ATUALIZAR: Proposta {proposta.numero} atualizada com sucesso")
+        flash('Proposta atualizada com sucesso!', 'success')
+        
+        return redirect(url_for('propostas.visualizar', id=proposta.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO ATUALIZAR PROPOSTA: {str(e)}")
+        flash(f'Erro ao atualizar proposta: {str(e)}', 'error')
+        return redirect(url_for('propostas.editar', id=id))
+
+@propostas_bp.route('/deletar/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def deletar(id):
+    """Deletar proposta"""
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        numero_proposta = proposta.numero
+        
+        # Registrar no histórico ANTES de deletar
+        historico = PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao='excluida',
+            observacao=f'Proposta excluída por {current_user.username}',
+            admin_id=admin_id
+        )
+        db.session.add(historico)
+        
+        # Deletar proposta
+        db.session.delete(proposta)
+        
+        # Commit transacional único (tudo ou nada)
+        db.session.commit()
+        
+        print(f"DEBUG DELETAR: Proposta {numero_proposta} excluída com sucesso")
+        flash('Proposta excluída com sucesso!', 'success')
+        
+        return redirect(url_for('propostas.index'))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO DELETAR PROPOSTA: {str(e)}")
+        flash(f'Erro ao excluir proposta: {str(e)}', 'error')
+        return redirect(url_for('propostas.visualizar', id=id))
+
+@propostas_bp.route('/aprovar/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def aprovar(id):
+    """Aprovar proposta"""
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        proposta.status = 'aprovada'
+        
+        # Registrar no histórico
+        historico = PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao='aprovada',
+            observacao=request.form.get('observacao', ''),
+            admin_id=admin_id
+        )
+        db.session.add(historico)
+        
+        # Commit transacional único (tudo ou nada)
+        db.session.commit()
+        
+        print(f"DEBUG APROVAR: Proposta {proposta.numero} aprovada")
+        flash('Proposta aprovada com sucesso!', 'success')
+        
+        return redirect(url_for('propostas.visualizar', id=proposta.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO APROVAR PROPOSTA: {str(e)}")
+        flash(f'Erro ao aprovar proposta: {str(e)}', 'error')
+        return redirect(url_for('propostas.visualizar', id=id))
+
+@propostas_bp.route('/rejeitar/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def rejeitar(id):
+    """Rejeitar proposta"""
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        proposta.status = 'rejeitada'
+        
+        # Registrar no histórico
+        historico = PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao='rejeitada',
+            observacao=request.form.get('motivo', 'Sem motivo especificado'),
+            admin_id=admin_id
+        )
+        db.session.add(historico)
+        
+        # Commit transacional único (tudo ou nada)
+        db.session.commit()
+        
+        print(f"DEBUG REJEITAR: Proposta {proposta.numero} rejeitada")
+        flash('Proposta rejeitada.', 'warning')
+        
+        return redirect(url_for('propostas.visualizar', id=proposta.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO REJEITAR PROPOSTA: {str(e)}")
+        flash(f'Erro ao rejeitar proposta: {str(e)}', 'error')
+        return redirect(url_for('propostas.visualizar', id=id))
+
+# ===== API DE CLIENTES =====
+
+@propostas_bp.route('/api/clientes')
+@login_required
+def api_clientes():
+    """API para buscar clientes - usado no formulário de propostas"""
+    try:
+        admin_id = get_admin_id()
+        termo = request.args.get('q', '').strip()
+        
+        # Query base com filtro por admin
+        query = Cliente.query.filter_by(admin_id=admin_id)
+        
+        # Se houver termo de busca, filtrar por nome ou email
+        if termo:
+            query = query.filter(
+                or_(
+                    Cliente.nome.ilike(f'%{termo}%'),
+                    Cliente.email.ilike(f'%{termo}%')
+                )
+            )
+        
+        # Limitar a 20 resultados
+        clientes = query.limit(20).all()
+        
+        print(f"DEBUG API CLIENTES: {len(clientes)} clientes encontrados para termo '{termo}'")
+        
+        # Retornar JSON
+        return jsonify([{
+            'id': c.id,
+            'nome': c.nome,
+            'email': c.email if c.email else '',
+            'telefone': c.telefone if c.telefone else '',
+            'endereco': c.endereco if c.endereco else ''
+        } for c in clientes])
+        
+    except Exception as e:
+        print(f"ERRO API CLIENTES: {str(e)}")
+        return jsonify({'error': str(e)}), 400
 
 print("✅ Propostas Consolidated Blueprint carregado com padrões de resiliência")
