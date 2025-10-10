@@ -1115,7 +1115,7 @@ def _migration_39_create_almoxarifado_system():
                 item_id INTEGER NOT NULL REFERENCES almoxarifado_item(id),
                 estoque_id INTEGER REFERENCES almoxarifado_estoque(id),
                 funcionario_id INTEGER REFERENCES funcionario(id),
-                obra_id INTEGER NOT NULL REFERENCES obra(id),
+                obra_id INTEGER NULL REFERENCES obra(id),
                 quantidade NUMERIC(10, 2),
                 valor_unitario NUMERIC(10, 2),
                 nota_fiscal VARCHAR(50),
@@ -1135,6 +1135,24 @@ def _migration_39_create_almoxarifado_system():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_movimento_obra ON almoxarifado_movimento(obra_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_movimento_admin ON almoxarifado_movimento(admin_id)")
         logger.info("✅ Tabela almoxarifado_movimento criada/verificada")
+        
+        # Adicionar colunas faltantes com ALTER TABLE (defesa para tabelas existentes)
+        logger.info("🔧 Adicionando colunas faltantes (se necessário)...")
+        cursor.execute("""
+            ALTER TABLE almoxarifado_movimento 
+            ADD COLUMN IF NOT EXISTS lote VARCHAR(50),
+            ADD COLUMN IF NOT EXISTS numero_serie VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS condicao_item VARCHAR(20)
+        """)
+        logger.info("✅ Colunas lote, numero_serie, condicao_item verificadas/adicionadas")
+        
+        # Remover constraint NOT NULL de obra_id (para bancos existentes que tinham NOT NULL)
+        logger.info("🔧 Removendo constraint NOT NULL de obra_id (ENTRADAs não têm obra)...")
+        cursor.execute("""
+            ALTER TABLE almoxarifado_movimento 
+            ALTER COLUMN obra_id DROP NOT NULL
+        """)
+        logger.info("✅ obra_id agora aceita NULL (ENTRADAs sem obra)")
         
         connection.commit()
         cursor.close()

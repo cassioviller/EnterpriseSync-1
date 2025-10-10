@@ -3359,7 +3359,7 @@ class AlmoxarifadoMovimento(db.Model):
     item_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_item.id'), nullable=False)
     estoque_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_estoque.id'))
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # NULL permitido para ENTRADAs
     quantidade = db.Column(db.Numeric(10, 2))
     valor_unitario = db.Column(db.Numeric(10, 2))
     nota_fiscal = db.Column(db.String(50))
