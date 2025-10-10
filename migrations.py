@@ -1018,6 +1018,142 @@ def _migration_38_create_proposta_historico():
         logger.error(traceback.format_exc())
 
 
+def _migration_39_create_almoxarifado_system():
+    """
+    MIGRAÇÃO 39: Sistema de Almoxarifado v3.0 - Gestão de Materiais, Ferramentas e EPIs
+    Feature Flag: CREATE_ALMOXARIFADO_SYSTEM
+    
+    Cria 4 tabelas:
+    - almoxarifado_categoria: Categorias de materiais
+    - almoxarifado_item: Catálogo de itens
+    - almoxarifado_estoque: Controle de estoque (serializado/consumível)
+    - almoxarifado_movimento: Histórico de movimentações
+    """
+    try:
+        if os.environ.get('CREATE_ALMOXARIFADO_SYSTEM', 'false').lower() != 'true':
+            logger.info("🔒 MIGRAÇÃO 39: Bloqueada por segurança. Para ativar: CREATE_ALMOXARIFADO_SYSTEM=true")
+            return
+        
+        logger.info("=" * 80)
+        logger.info("📦 MIGRAÇÃO 39: Sistema de Almoxarifado v3.0")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Tabela de categorias
+        logger.info("📋 Criando tabela almoxarifado_categoria...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS almoxarifado_categoria (
+                id SERIAL PRIMARY KEY,
+                nome VARCHAR(100) NOT NULL,
+                tipo_controle_padrao VARCHAR(20) NOT NULL,
+                permite_devolucao_padrao BOOLEAN DEFAULT TRUE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_categoria_admin ON almoxarifado_categoria(admin_id)")
+        logger.info("✅ Tabela almoxarifado_categoria criada/verificada")
+        
+        # Tabela de itens
+        logger.info("📋 Criando tabela almoxarifado_item...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS almoxarifado_item (
+                id SERIAL PRIMARY KEY,
+                codigo VARCHAR(50) NOT NULL,
+                nome VARCHAR(200) NOT NULL,
+                categoria_id INTEGER NOT NULL REFERENCES almoxarifado_categoria(id),
+                tipo_controle VARCHAR(20) NOT NULL,
+                permite_devolucao BOOLEAN DEFAULT TRUE,
+                estoque_minimo INTEGER DEFAULT 0,
+                unidade VARCHAR(20),
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_item_codigo_admin ON almoxarifado_item(codigo, admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_item_categoria ON almoxarifado_item(categoria_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_item_nome ON almoxarifado_item(nome)")
+        logger.info("✅ Tabela almoxarifado_item criada/verificada")
+        
+        # Tabela de estoque
+        logger.info("📋 Criando tabela almoxarifado_estoque...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS almoxarifado_estoque (
+                id SERIAL PRIMARY KEY,
+                item_id INTEGER NOT NULL REFERENCES almoxarifado_item(id),
+                numero_serie VARCHAR(100),
+                quantidade NUMERIC(10, 2) DEFAULT 0,
+                status VARCHAR(20) DEFAULT 'DISPONIVEL',
+                funcionario_atual_id INTEGER REFERENCES funcionario(id),
+                obra_id INTEGER REFERENCES obra(id),
+                valor_unitario NUMERIC(10, 2),
+                lote VARCHAR(50),
+                data_validade DATE,
+                nota_fiscal VARCHAR(50),
+                data_entrada DATE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_estoque_item_status ON almoxarifado_estoque(item_id, status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_estoque_funcionario ON almoxarifado_estoque(funcionario_atual_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_estoque_admin ON almoxarifado_estoque(admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_estoque_numero_serie ON almoxarifado_estoque(numero_serie)")
+        logger.info("✅ Tabela almoxarifado_estoque criada/verificada")
+        
+        # Tabela de movimentos
+        logger.info("📋 Criando tabela almoxarifado_movimento...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS almoxarifado_movimento (
+                id SERIAL PRIMARY KEY,
+                tipo_movimento VARCHAR(20) NOT NULL,
+                item_id INTEGER NOT NULL REFERENCES almoxarifado_item(id),
+                estoque_id INTEGER REFERENCES almoxarifado_estoque(id),
+                funcionario_id INTEGER REFERENCES funcionario(id),
+                obra_id INTEGER NOT NULL REFERENCES obra(id),
+                quantidade NUMERIC(10, 2),
+                valor_unitario NUMERIC(10, 2),
+                nota_fiscal VARCHAR(50),
+                lote VARCHAR(50),
+                numero_serie VARCHAR(100),
+                condicao_item VARCHAR(20),
+                observacao TEXT,
+                data_movimento TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                usuario_id INTEGER NOT NULL REFERENCES usuario(id),
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_movimento_data ON almoxarifado_movimento(data_movimento)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_movimento_tipo ON almoxarifado_movimento(tipo_movimento)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_movimento_funcionario ON almoxarifado_movimento(funcionario_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_movimento_obra ON almoxarifado_movimento(obra_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_almox_movimento_admin ON almoxarifado_movimento(admin_id)")
+        logger.info("✅ Tabela almoxarifado_movimento criada/verificada")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 39 CONCLUÍDA: Sistema de Almoxarifado v3.0 criado!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 39: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -1075,6 +1211,9 @@ def executar_migracoes():
 
         # Migração 38: Criar tabela proposta_historico
         _migration_38_create_proposta_historico()
+
+        # Migração 39: Sistema de Almoxarifado v3.0
+        _migration_39_create_almoxarifado_system()
 
         logger.info("=" * 80)
         logger.info("✅ Migrações automáticas concluídas com sucesso!")

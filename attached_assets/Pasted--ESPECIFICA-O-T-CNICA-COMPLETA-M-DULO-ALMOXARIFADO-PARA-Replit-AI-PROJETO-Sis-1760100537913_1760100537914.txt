@@ -1,0 +1,735 @@
+# 📋 ESPECIFICAÇÃO TÉCNICA COMPLETA - MÓDULO ALMOXARIFADO
+
+**PARA:** Replit AI  
+**PROJETO:** Sistema SIGE (EnterpriseSync) - Módulo Almoxarifado  
+**VERSÃO:** 3.0 Simplificado  
+**DATA:** Outubro 2025
+
+---
+
+## 1. VISÃO GERAL DO MÓDULO
+
+### 1.1 PROPÓSITO
+O **Módulo de Almoxarifado** é um sistema completo de gestão de materiais, ferramentas e EPIs para empresas de construção civil. Ele controla entrada, saída, devolução e estoque de itens, com rastreabilidade total e integração nativa ao sistema SIGE.
+
+### 1.2 OBJETIVOS PRINCIPAIS
+- **Controlar estoque** de materiais, ferramentas e EPIs
+- **Rastrear movimentações** (entrada, saída, devolução)
+- **Gerenciar responsabilidades** (quem está com cada item)
+- **Controlar custos** por obra/centro de custo
+- **Alertar sobre** estoque baixo e validades
+- **Gerar relatórios** essenciais para gestão
+
+### 1.3 USUÁRIOS ALVO
+- **Almoxarife:** Controla entrada/saída de materiais
+- **Encarregado:** Solicita materiais para obras
+- **Gestor:** Acompanha custos e relatórios
+- **Funcionário:** Visualiza itens sob sua responsabilidade
+
+---
+
+## 2. FUNCIONALIDADES DETALHADAS
+
+### 2.1 GESTÃO DE CATÁLOGO
+
+#### 2.1.1 Categorias de Materiais
+**Funcionalidade:** Organizar itens em categorias com configurações padrão.
+
+**Categorias Padrão:**
+1. **EPIs** (Equipamentos de Proteção Individual)
+   - Tipo padrão: SERIALIZADO
+   - Permite devolução: SIM
+   - Exemplos: Capacetes, óculos, botas
+
+2. **Ferramentas**
+   - Tipo padrão: SERIALIZADO
+   - Permite devolução: SIM
+   - Exemplos: Furadeiras, martelos, chaves
+
+3. **Materiais Elétricos**
+   - Tipo padrão: CONSUMÍVEL
+   - Permite devolução: SIM (sobras)
+   - Exemplos: Fios, cabos, disjuntores
+
+4. **Materiais Hidráulicos**
+   - Tipo padrão: CONSUMÍVEL
+   - Permite devolução: SIM (sobras)
+   - Exemplos: Tubos, conexões, registros
+
+5. **Consumíveis Descartáveis**
+   - Tipo padrão: CONSUMÍVEL
+   - Permite devolução: NÃO
+   - Exemplos: Luvas, máscaras, eletrodos
+
+#### 2.1.2 Cadastro de Itens
+**Funcionalidade:** Cadastrar itens do almoxarifado com suas especificações.
+
+**Tipos de Controle:**
+- **SERIALIZADO:** Itens únicos com número de série (sempre podem ser devolvidos)
+- **CONSUMÍVEL:** Materiais por quantidade (devolução configurável)
+
+**Configuração de Devolução:**
+- **Serializados:** Sempre `permite_devolucao = True` (não editável)
+- **Consumíveis:** Configurável por item (`True` para sobras, `False` para descartáveis)
+
+### 2.2 MOVIMENTAÇÕES
+
+#### 2.2.1 Entrada de Materiais
+**Funcionalidade:** Registrar entrada de novos materiais no estoque.
+
+**Fluxos:**
+- **Itens Serializados:** Informar números de série individuais
+- **Itens Consumíveis:** Informar quantidade total
+
+#### 2.2.2 Saída de Materiais
+**Funcionalidade:** Registrar retirada de materiais por funcionários.
+
+**Fluxos:**
+- **Itens Serializados:** Selecionar itens específicos por número de série
+- **Itens Consumíveis:** Informar quantidade a retirar
+
+#### 2.2.3 Devolução Inteligente
+**Funcionalidade:** Processar devolução baseada no tipo de item.
+
+**Fluxos:**
+- **Serializados:** Devolução obrigatória do item específico
+- **Consumíveis Retornáveis:** Devolução opcional de sobras
+- **Consumíveis Descartáveis:** Não permite devolução
+
+### 2.3 CONTROLE E RELATÓRIOS
+
+#### 2.3.1 Dashboard Executivo
+**Funcionalidade:** Visão geral do almoxarifado com KPIs essenciais.
+
+#### 2.3.2 Relatórios Essenciais
+**Funcionalidade:** 5 relatórios principais para gestão.
+
+---
+
+## 3. ESTRUTURA DE PÁGINAS E NAVEGAÇÃO
+
+### 3.1 MENU PRINCIPAL
+```
+ALMOXARIFADO (Dropdown)
+├── 📊 Dashboard
+├── 📦 Catálogo de Itens
+├── 🏷️ Categorias
+├── ➕ Nova Entrada
+├── ➖ Nova Saída
+├── 🔄 Devolução
+├── 📋 Movimentações
+└── 📈 Relatórios
+```
+
+### 3.2 PÁGINAS DETALHADAS
+
+#### 3.2.1 DASHBOARD (/almoxarifado/)
+**Propósito:** Visão geral do almoxarifado com métricas e ações rápidas.
+
+**Seções:**
+1. **KPIs Principais** (Cards coloridos)
+   - Total de Itens Ativos
+   - Itens com Estoque Baixo
+   - Movimentos do Dia
+   - Valor Total do Inventário
+
+2. **Ações Rápidas** (Botões destacados)
+   - Nova Entrada
+   - Nova Saída
+   - Devolução
+
+3. **Alertas Inteligentes**
+   - Itens com estoque baixo
+   - EPIs próximos do vencimento
+   - Itens sem movimentação
+
+4. **Últimas Movimentações** (Tabela resumida)
+   - Data/Hora
+   - Tipo de movimento
+   - Item
+   - Funcionário
+   - Obra
+
+**Layout:** Grid responsivo com cards Bootstrap 5
+
+#### 3.2.2 CATÁLOGO DE ITENS (/almoxarifado/itens)
+**Propósito:** Listar, buscar e gerenciar itens do catálogo.
+
+**Funcionalidades:**
+- **Busca Inteligente:** Por código ou nome
+- **Filtros:** Categoria, tipo de controle, status
+- **Ações:** Visualizar, editar, entrada rápida
+
+**Campos Exibidos:**
+- Código do item
+- Nome
+- Categoria
+- Tipo de controle
+- Estoque atual
+- Estoque mínimo
+- Status (Normal/Baixo)
+- Ações
+
+**Layout:** Tabela responsiva com filtros superiores
+
+#### 3.2.3 NOVA ENTRADA (/almoxarifado/entrada)
+**Propósito:** Registrar entrada de materiais no estoque.
+
+**Formulário Principal:**
+```
+┌─ DADOS GERAIS ─────────────────────────┐
+│ Item*: [Dropdown com busca]            │
+│ Obra*: [Dropdown]                      │
+│ Data Entrada*: [Date picker]           │
+│ Valor Unitário*: [Number - R$]         │
+│ Nota Fiscal: [Text]                    │
+│ Lote: [Text]                           │
+│ Data Validade: [Date picker]           │
+│ Observações: [Textarea]                │
+└────────────────────────────────────────┘
+
+┌─ DADOS ESPECÍFICOS (Dinâmico) ─────────┐
+│ SE SERIALIZADO:                        │
+│   Números de Série*: [Textarea]        │
+│   (Um por linha)                       │
+│                                        │
+│ SE CONSUMÍVEL:                         │
+│   Quantidade*: [Number]                │
+│   Unidade: [Text - readonly]           │
+└────────────────────────────────────────┘
+
+[Cancelar] [Processar Entrada]
+```
+
+**Validações:**
+- Item obrigatório
+- Obra obrigatória
+- Valor unitário > 0
+- Se serializado: números de série únicos
+- Se consumível: quantidade > 0
+
+**Comportamento:**
+- Ao selecionar item, carrega tipo de controle
+- Mostra campos específicos dinamicamente
+- Valida números de série em tempo real
+- Calcula valor total automaticamente
+
+#### 3.2.4 NOVA SAÍDA (/almoxarifado/saida)
+**Propósito:** Registrar retirada de materiais por funcionários.
+
+**Formulário Principal:**
+```
+┌─ DADOS GERAIS ─────────────────────────┐
+│ Funcionário*: [Dropdown com busca]     │
+│ Obra*: [Dropdown]                      │
+│ Item*: [Dropdown com busca]            │
+│ Data Saída*: [Date picker]             │
+│ Observações: [Textarea]                │
+└────────────────────────────────────────┘
+
+┌─ SELEÇÃO DE ITENS (Dinâmico) ──────────┐
+│ SE SERIALIZADO:                        │
+│   Itens Disponíveis: [Lista checkbox]  │
+│   ☐ #12345 - Furadeira Bosch          │
+│   ☐ #12346 - Furadeira Bosch          │
+│                                        │
+│ SE CONSUMÍVEL:                         │
+│   Estoque Disponível: 150 metros       │
+│   Quantidade*: [Number]                │
+│   Unidade: metros [readonly]           │
+└────────────────────────────────────────┘
+
+[Cancelar] [Processar Saída]
+```
+
+**Validações:**
+- Funcionário obrigatório
+- Obra obrigatória
+- Item obrigatório
+- Verificar disponibilidade em estoque
+- Se serializado: pelo menos 1 item selecionado
+- Se consumível: quantidade <= estoque disponível
+
+**Comportamento:**
+- Ao selecionar item, carrega estoque disponível
+- Mostra itens específicos ou quantidade
+- Valida disponibilidade em tempo real
+- Atualiza estoque automaticamente
+
+#### 3.2.5 DEVOLUÇÃO (/almoxarifado/devolucao)
+**Propósito:** Processar devolução de itens por funcionários.
+
+**Formulário Principal:**
+```
+┌─ SELEÇÃO ──────────────────────────────┐
+│ Funcionário*: [Dropdown]               │
+│ Obra*: [Dropdown]                      │
+│ [Buscar Itens]                         │
+└────────────────────────────────────────┘
+
+┌─ ITENS PARA DEVOLUÇÃO (Dinâmico) ──────┐
+│ Carregado via AJAX após selecionar     │
+│ funcionário                            │
+│                                        │
+│ SERIALIZADOS:                          │
+│ ☐ Furadeira #12345                     │
+│   Condição: [Dropdown: Bom/Danificado]│
+│                                        │
+│ CONSUMÍVEIS RETORNÁVEIS:               │
+│ ☐ Cabo 2,5mm - Retirado: 50m          │
+│   Devolver: [Number] metros            │
+│                                        │
+│ Observações: [Textarea]                │
+└────────────────────────────────────────┘
+
+[Cancelar] [Processar Devolução]
+```
+
+**API de Apoio:**
+```
+GET /almoxarifado/api/itens-funcionario/{funcionario_id}
+Retorna: Lista de itens que podem ser devolvidos
+```
+
+**Validações:**
+- Funcionário obrigatório
+- Pelo menos 1 item selecionado
+- Quantidade devolvida <= quantidade retirada
+- Condição obrigatória para serializados
+
+#### 3.2.6 MOVIMENTAÇÕES (/almoxarifado/movimentacoes)
+**Propósito:** Histórico completo de movimentações.
+
+**Filtros:**
+```
+┌─ FILTROS ──────────────────────────────┐
+│ Período: [Date] até [Date]             │
+│ Tipo: [Dropdown: Todos/Entrada/Saída/  │
+│        Devolução]                      │
+│ Funcionário: [Dropdown: Todos/...]     │
+│ Obra: [Dropdown: Todos/...]            │
+│ Item: [Busca]                          │
+│ [Filtrar] [Limpar]                     │
+└────────────────────────────────────────┘
+```
+
+**Tabela de Resultados:**
+- Data/Hora
+- Tipo (badge colorido)
+- Item
+- Funcionário
+- Obra
+- Quantidade
+- Valor
+- Usuário responsável
+- Ações (ver detalhes)
+
+**Paginação:** 50 registros por página
+
+#### 3.2.7 RELATÓRIOS (/almoxarifado/relatorios)
+**Propósito:** Central de relatórios essenciais.
+
+**5 Relatórios Principais:**
+
+1. **Posição de Estoque**
+   - Estoque atual por item/categoria
+   - Valor total por categoria
+   - Itens com estoque baixo
+
+2. **Movimentações por Período**
+   - Entradas, saídas e devoluções
+   - Filtros por data, tipo, obra
+   - Totalizadores
+
+3. **Itens por Funcionário**
+   - Responsabilidades atuais
+   - Valor total por funcionário
+   - Itens vencidos/vencendo
+
+4. **Consumo por Obra**
+   - Materiais consumidos por projeto
+   - Custo total por obra
+   - Ranking de consumo
+
+5. **Alertas e Pendências**
+   - Estoque baixo
+   - EPIs vencendo
+   - Itens sem movimentação
+
+**Formato de Exportação:**
+- Visualização HTML
+- Download Excel
+- Download PDF
+
+---
+
+## 4. FLUXO DE DADOS DETALHADO
+
+### 4.1 FLUXO DE ENTRADA
+
+```
+1. Usuário acessa /almoxarifado/entrada
+2. Seleciona item → AJAX carrega tipo de controle
+3. Preenche dados gerais (obra, valor, data)
+4. SE SERIALIZADO:
+   - Informa números de série (textarea)
+   - Sistema valida unicidade
+5. SE CONSUMÍVEL:
+   - Informa quantidade
+   - Sistema valida > 0
+6. Submete formulário → POST /almoxarifado/processar-entrada
+7. Sistema cria registros:
+   - AlmoxarifadoEstoque (1 para cada item/lote)
+   - AlmoxarifadoMovimento (registro da entrada)
+8. Atualiza estoque automaticamente
+9. Redireciona com mensagem de sucesso
+```
+
+### 4.2 FLUXO DE SAÍDA
+
+```
+1. Usuário acessa /almoxarifado/saida
+2. Seleciona funcionário e obra
+3. Seleciona item → AJAX carrega estoque disponível
+4. SE SERIALIZADO:
+   - Mostra lista de itens disponíveis
+   - Usuário seleciona itens específicos
+5. SE CONSUMÍVEL:
+   - Mostra quantidade disponível
+   - Usuário informa quantidade a retirar
+6. Sistema valida disponibilidade
+7. Submete formulário → POST /almoxarifado/processar-saida
+8. Sistema atualiza:
+   - AlmoxarifadoEstoque (status ou quantidade)
+   - Cria AlmoxarifadoMovimento
+9. Vincula itens ao funcionário
+10. Redireciona com sucesso
+```
+
+### 4.3 FLUXO DE DEVOLUÇÃO
+
+```
+1. Usuário acessa /almoxarifado/devolucao
+2. Seleciona funcionário → AJAX busca itens em posse
+3. GET /api/itens-funcionario/{id} retorna:
+   - Itens serializados em posse
+   - Consumíveis retornáveis com saldo
+4. Usuário seleciona itens e quantidades
+5. Submete formulário → POST /almoxarifado/processar-devolucao
+6. Sistema processa:
+   - Atualiza status/quantidade no estoque
+   - Cria movimento de devolução
+   - Remove vínculo com funcionário
+7. Redireciona com sucesso
+```
+
+---
+
+## 5. ESPECIFICAÇÃO DE CAMPOS
+
+### 5.1 FORMULÁRIO DE ENTRADA
+
+| Campo | Tipo | Obrigatório | Validação | Comportamento |
+|-------|------|-------------|-----------|---------------|
+| **Item** | Dropdown | SIM | Deve existir e estar ativo | Carrega tipo de controle via AJAX |
+| **Obra** | Dropdown | SIM | Deve existir e estar ativa | Lista obras do tenant |
+| **Data Entrada** | Date | SIM | Não pode ser futura | Padrão: hoje |
+| **Valor Unitário** | Number | SIM | > 0, formato R$ | Máscara monetária |
+| **Nota Fiscal** | Text | NÃO | Máx 50 caracteres | - |
+| **Lote** | Text | NÃO | Máx 50 caracteres | - |
+| **Data Validade** | Date | NÃO | Deve ser futura | Apenas para EPIs |
+| **Observações** | Textarea | NÃO | Máx 500 caracteres | - |
+| **Números de Série** | Textarea | SIM* | Únicos no sistema | *Apenas se SERIALIZADO |
+| **Quantidade** | Number | SIM* | > 0 | *Apenas se CONSUMÍVEL |
+
+### 5.2 FORMULÁRIO DE SAÍDA
+
+| Campo | Tipo | Obrigatório | Validação | Comportamento |
+|-------|------|-------------|-----------|---------------|
+| **Funcionário** | Dropdown | SIM | Deve existir e estar ativo | Lista funcionários do tenant |
+| **Obra** | Dropdown | SIM | Deve existir e estar ativa | Lista obras do tenant |
+| **Item** | Dropdown | SIM | Deve ter estoque > 0 | Carrega estoque via AJAX |
+| **Data Saída** | Date | SIM | Não pode ser futura | Padrão: hoje |
+| **Observações** | Textarea | NÃO | Máx 500 caracteres | - |
+| **Itens Selecionados** | Checkbox | SIM* | Deve estar disponível | *Apenas se SERIALIZADO |
+| **Quantidade** | Number | SIM* | <= estoque disponível | *Apenas se CONSUMÍVEL |
+
+### 5.3 FORMULÁRIO DE DEVOLUÇÃO
+
+| Campo | Tipo | Obrigatório | Validação | Comportamento |
+|-------|------|-------------|-----------|---------------|
+| **Funcionário** | Dropdown | SIM | Deve ter itens em posse | Carrega itens via AJAX |
+| **Obra** | Dropdown | SIM | Deve existir e estar ativa | Lista obras do tenant |
+| **Itens Selecionados** | Checkbox | SIM | Deve estar com funcionário | Carregado dinamicamente |
+| **Condição** | Dropdown | SIM* | Bom/Danificado/Perdido | *Apenas para SERIALIZADO |
+| **Quantidade Devolvida** | Number | SIM* | <= quantidade em posse | *Apenas para CONSUMÍVEL |
+| **Observações** | Textarea | NÃO | Máx 500 caracteres | - |
+
+---
+
+## 6. PÁGINAS DE VISUALIZAÇÃO
+
+### 6.1 DETALHES DO ITEM (/almoxarifado/item/{id})
+
+**Propósito:** Visualizar informações completas de um item.
+
+**Seções:**
+1. **Informações Básicas**
+   - Código, nome, categoria
+   - Tipo de controle, permite devolução
+   - Estoque atual vs mínimo
+   - Valor médio
+
+2. **Estoque Atual**
+   - SE SERIALIZADO: Lista de números de série com status
+   - SE CONSUMÍVEL: Quantidade total por lote
+
+3. **Histórico de Movimentações**
+   - Últimas 20 movimentações
+   - Filtro por tipo de movimento
+
+4. **Ações Disponíveis**
+   - Nova entrada
+   - Editar item
+   - Relatório específico
+
+### 6.2 PERFIL DO FUNCIONÁRIO - ABA ALMOXARIFADO
+
+**Propósito:** Mostrar itens em posse do funcionário.
+
+**Integração:** Nova aba na página de perfil do funcionário existente.
+
+**Conteúdo:**
+```
+┌─ ITENS EM POSSE ───────────────────────┐
+│ SERIALIZADOS:                          │
+│ 🔧 Furadeira #12345 - Desde 15/10/25  │
+│ 🦺 Capacete #67890 - Desde 10/10/25   │
+│                                        │
+│ CONSUMÍVEIS:                           │
+│ ⚡ Cabo 2,5mm - 25 metros              │
+│ 🔩 Parafuso 6mm - 50 unidades          │
+│                                        │
+│ VALOR TOTAL: R$ 1.250,00               │
+│                                        │
+│ [Solicitar Devolução]                  │
+└────────────────────────────────────────┘
+```
+
+### 6.3 DASHBOARD DE OBRA - SEÇÃO ALMOXARIFADO
+
+**Propósito:** Mostrar materiais alocados na obra.
+
+**Integração:** Nova seção na página de detalhes da obra.
+
+**Conteúdo:**
+- Valor total de materiais alocados
+- Top 10 itens mais consumidos
+- Funcionários com mais itens
+- Botão para relatório completo
+
+---
+
+## 7. APIS E INTEGRAÇÕES
+
+### 7.1 APIS AJAX NECESSÁRIAS
+
+```python
+# Busca de itens com autocomplete
+GET /almoxarifado/api/busca-itens?q={termo}
+Response: [{"id": 1, "nome": "Furadeira", "codigo": "F001", "estoque": 5}]
+
+# Detalhes do item para formulários
+GET /almoxarifado/api/item/{id}
+Response: {"tipo_controle": "SERIALIZADO", "estoque_atual": 5, "unidade": "un"}
+
+# Estoque disponível para saída
+GET /almoxarifado/api/estoque-disponivel/{item_id}
+Response: {"quantidade": 150, "itens_serializados": [{"id": 1, "numero_serie": "12345"}]}
+
+# Itens em posse do funcionário
+GET /almoxarifado/api/itens-funcionario/{funcionario_id}
+Response: [{"estoque_id": 1, "item_nome": "Furadeira", "numero_serie": "12345"}]
+
+# Validação de número de série
+POST /almoxarifado/api/validar-serie
+Body: {"item_id": 1, "numero_serie": "12345"}
+Response: {"valido": false, "erro": "Número já existe"}
+```
+
+### 7.2 INTEGRAÇÃO COM MÓDULOS EXISTENTES
+
+**Funcionários:**
+- Nova aba "Almoxarifado" no perfil
+- API para listar itens em posse
+
+**Obras:**
+- Nova seção "Materiais" no dashboard
+- Relatório de consumo por obra
+
+**Financeiro:**
+- Integração de custos de materiais
+- Relatório de valor por centro de custo
+
+---
+
+## 8. REGRAS DE NEGÓCIO
+
+### 8.1 CONTROLE DE ESTOQUE
+
+1. **Itens Serializados:**
+   - Cada item tem número de série único
+   - Status: DISPONÍVEL, EM_USO, MANUTENÇÃO, DESCARTADO
+   - Sempre podem ser devolvidos
+   - Rastreamento individual completo
+
+2. **Itens Consumíveis:**
+   - Controle por quantidade
+   - Podem ter sobras devolvidas (se configurado)
+   - Controle por lote/data de entrada
+   - FIFO automático na saída
+
+### 8.2 MOVIMENTAÇÕES
+
+1. **Entrada:**
+   - Sempre vinculada a uma obra (centro de custo)
+   - Valor unitário obrigatório
+   - Atualiza preço médio automaticamente
+
+2. **Saída:**
+   - Sempre vinculada a funcionário e obra
+   - Verifica disponibilidade antes de processar
+   - Atualiza status/quantidade automaticamente
+
+3. **Devolução:**
+   - Apenas itens que permitem devolução
+   - Registra condição do item (para serializados)
+   - Pode ser parcial (para consumíveis)
+
+### 8.3 ALERTAS E NOTIFICAÇÕES
+
+1. **Estoque Baixo:**
+   - Alerta quando estoque <= estoque mínimo
+   - Exibido no dashboard
+   - Pode gerar notificação por email
+
+2. **Validade de EPIs:**
+   - Alerta 30 dias antes do vencimento
+   - Controle automático por data de validade
+   - Relatório específico
+
+3. **Itens Sem Movimentação:**
+   - Identifica itens parados há mais de 90 dias
+   - Sugestão de remanejamento
+
+---
+
+## 9. VALIDAÇÕES E SEGURANÇA
+
+### 9.1 VALIDAÇÕES DE ENTRADA
+
+- **Multi-tenancy:** Todos os dados isolados por `admin_id`
+- **Permissões:** Verificar se usuário pode acessar obra/funcionário
+- **Integridade:** Validar FK antes de salvar
+- **Unicidade:** Números de série únicos por item
+
+### 9.2 VALIDAÇÕES DE NEGÓCIO
+
+- **Estoque:** Não permitir saída maior que disponível
+- **Datas:** Não permitir datas futuras em movimentações
+- **Status:** Não permitir saída de itens em manutenção
+- **Devolução:** Apenas itens que estão com o funcionário
+
+### 9.3 AUDITORIA
+
+- **Log de Movimentações:** Todos os movimentos registrados
+- **Usuário Responsável:** Quem fez cada operação
+- **Timestamp:** Data/hora de cada ação
+- **Observações:** Campo livre para justificativas
+
+---
+
+## 10. PERFORMANCE E OTIMIZAÇÃO
+
+### 10.1 ÍNDICES NECESSÁRIOS
+
+```sql
+-- Consultas por item e status
+CREATE INDEX idx_almox_estoque_item_status ON almoxarifado_estoque(item_id, status);
+
+-- Consultas por funcionário
+CREATE INDEX idx_almox_estoque_funcionario ON almoxarifado_estoque(funcionario_atual_id);
+
+-- Consultas de movimentação por data
+CREATE INDEX idx_almox_movimento_data ON almoxarifado_movimento(data_movimento);
+
+-- Busca por código/nome
+CREATE INDEX idx_almox_item_busca ON almoxarifado_item(admin_id, codigo, nome);
+```
+
+### 10.2 CACHE E OTIMIZAÇÕES
+
+- **Estoque Atual:** Cache de 5 minutos para cálculos
+- **Autocomplete:** Cache de resultados de busca
+- **Relatórios:** Cache de 1 hora para relatórios pesados
+- **Paginação:** Máximo 50 registros por página
+
+---
+
+## 11. CRONOGRAMA DE IMPLEMENTAÇÃO
+
+### FASE 1: BACKEND (2-3 dias)
+- [ ] Criar modelos de dados
+- [ ] Implementar migração
+- [ ] Criar blueprint básico
+- [ ] Implementar APIs AJAX
+- [ ] Testes unitários
+
+### FASE 2: FRONTEND BÁSICO (2-3 dias)
+- [ ] Dashboard principal
+- [ ] Formulários de entrada/saída
+- [ ] Listagem de itens
+- [ ] Integração AJAX
+
+### FASE 3: FUNCIONALIDADES AVANÇADAS (2-3 dias)
+- [ ] Devolução inteligente
+- [ ] Relatórios essenciais
+- [ ] Integração com perfil funcionário
+- [ ] Alertas automáticos
+
+### FASE 4: REFINAMENTOS (1-2 dias)
+- [ ] Otimizações de performance
+- [ ] Validações completas
+- [ ] Testes de integração
+- [ ] Documentação
+
+**TOTAL ESTIMADO: 7-11 dias**
+
+---
+
+## 12. CRITÉRIOS DE ACEITAÇÃO
+
+### 12.1 FUNCIONALIDADES OBRIGATÓRIAS
+- [ ] Entrada de itens serializados e consumíveis
+- [ ] Saída com verificação de estoque
+- [ ] Devolução baseada no tipo de item
+- [ ] Dashboard com KPIs corretos
+- [ ] Relatórios essenciais funcionando
+- [ ] Integração com perfil do funcionário
+
+### 12.2 PERFORMANCE
+- [ ] Carregamento de páginas < 2 segundos
+- [ ] Busca de itens < 1 segundo
+- [ ] Relatórios < 5 segundos
+- [ ] Interface responsiva em mobile
+
+### 12.3 QUALIDADE
+- [ ] Multi-tenancy funcionando
+- [ ] Validações completas
+- [ ] Tratamento de erros
+- [ ] Logs de auditoria
+- [ ] Código documentado
+
+---
+
+**ESTE DOCUMENTO SERVE COMO ESPECIFICAÇÃO COMPLETA PARA IMPLEMENTAÇÃO DO MÓDULO DE ALMOXARIFADO NO SISTEMA SIGE. TODAS AS FUNCIONALIDADES, FLUXOS E VALIDAÇÕES ESTÃO DETALHADAMENTE ESPECIFICADOS PARA FACILITAR O DESENVOLVIMENTO.**

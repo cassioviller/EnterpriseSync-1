@@ -3269,6 +3269,126 @@ class VehicleExpense(db.Model):
     )
 
 # ================================
+# ALMOXARIFADO V3.0 - GESTÃO DE MATERIAIS, FERRAMENTAS E EPIs
+# ================================
+
+class AlmoxarifadoCategoria(db.Model):
+    """Categorias de materiais do almoxarifado"""
+    __tablename__ = 'almoxarifado_categoria'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    tipo_controle_padrao = db.Column(db.String(20), nullable=False)  # SERIALIZADO ou CONSUMIVEL
+    permite_devolucao_padrao = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    admin = db.relationship('Usuario', backref='almoxarifado_categorias')
+    
+    __table_args__ = (
+        db.Index('idx_almox_categoria_admin', 'admin_id'),
+    )
+
+class AlmoxarifadoItem(db.Model):
+    """Catálogo de itens do almoxarifado"""
+    __tablename__ = 'almoxarifado_item'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(50), nullable=False)
+    nome = db.Column(db.String(200), nullable=False)
+    categoria_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_categoria.id'), nullable=False)
+    tipo_controle = db.Column(db.String(20), nullable=False)  # SERIALIZADO ou CONSUMIVEL
+    permite_devolucao = db.Column(db.Boolean, default=True)
+    estoque_minimo = db.Column(db.Integer, default=0)
+    unidade = db.Column(db.String(20))  # un, kg, m, litros, etc
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    categoria = db.relationship('AlmoxarifadoCategoria', backref='itens')
+    admin = db.relationship('Usuario', backref='almoxarifado_itens')
+    
+    __table_args__ = (
+        db.Index('idx_almox_item_codigo_admin', 'codigo', 'admin_id'),
+        db.Index('idx_almox_item_categoria', 'categoria_id'),
+        db.Index('idx_almox_item_nome', 'nome'),
+    )
+
+class AlmoxarifadoEstoque(db.Model):
+    """Controle de estoque (serializado e consumível)"""
+    __tablename__ = 'almoxarifado_estoque'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_item.id'), nullable=False)
+    numero_serie = db.Column(db.String(100))  # Para SERIALIZADO
+    quantidade = db.Column(db.Numeric(10, 2), default=0)  # Para CONSUMIVEL
+    status = db.Column(db.String(20), default='DISPONIVEL')  # DISPONIVEL, EM_USO, MANUTENCAO, DESCARTADO
+    funcionario_atual_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    valor_unitario = db.Column(db.Numeric(10, 2))
+    lote = db.Column(db.String(50))
+    data_validade = db.Column(db.Date)
+    nota_fiscal = db.Column(db.String(50))
+    data_entrada = db.Column(db.Date)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    item = db.relationship('AlmoxarifadoItem', backref='estoque')
+    funcionario_atual = db.relationship('Funcionario', backref='itens_almoxarifado_posse')
+    obra = db.relationship('Obra', backref='itens_almoxarifado_obra')
+    admin = db.relationship('Usuario', backref='almoxarifado_estoque')
+    
+    __table_args__ = (
+        db.Index('idx_almox_estoque_item_status', 'item_id', 'status'),
+        db.Index('idx_almox_estoque_funcionario', 'funcionario_atual_id'),
+        db.Index('idx_almox_estoque_admin', 'admin_id'),
+        db.Index('idx_almox_estoque_numero_serie', 'numero_serie'),
+    )
+
+class AlmoxarifadoMovimento(db.Model):
+    """Histórico de movimentações (ENTRADA, SAIDA, DEVOLUCAO)"""
+    __tablename__ = 'almoxarifado_movimento'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    tipo_movimento = db.Column(db.String(20), nullable=False)  # ENTRADA, SAIDA, DEVOLUCAO
+    item_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_item.id'), nullable=False)
+    estoque_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_estoque.id'))
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    quantidade = db.Column(db.Numeric(10, 2))
+    valor_unitario = db.Column(db.Numeric(10, 2))
+    nota_fiscal = db.Column(db.String(50))
+    lote = db.Column(db.String(50))
+    numero_serie = db.Column(db.String(100))  # Para movimentos de serializados
+    condicao_item = db.Column(db.String(20))  # Para devoluções: BOM, DANIFICADO, PERDIDO
+    observacao = db.Column(db.Text)
+    data_movimento = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    item = db.relationship('AlmoxarifadoItem', backref='movimentos')
+    estoque = db.relationship('AlmoxarifadoEstoque', backref='movimentos')
+    funcionario = db.relationship('Funcionario', backref='movimentos_almoxarifado')
+    obra = db.relationship('Obra', backref='movimentos_almoxarifado')
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id], backref='movimentos_almoxarifado_criados')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='movimentos_almoxarifado_admin')
+    
+    __table_args__ = (
+        db.Index('idx_almox_movimento_data', 'data_movimento'),
+        db.Index('idx_almox_movimento_tipo', 'tipo_movimento'),
+        db.Index('idx_almox_movimento_funcionario', 'funcionario_id'),
+        db.Index('idx_almox_movimento_obra', 'obra_id'),
+        db.Index('idx_almox_movimento_admin', 'admin_id'),
+    )
+
+# ================================
 # ALIASES PARA COMPATIBILIDADE
 # ================================
 # Manter compatibilidade com código legado que importa Frota*
