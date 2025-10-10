@@ -1346,8 +1346,21 @@ def funcionario_perfil(id):
     }
     
     # Buscar obras disponíveis para o dropdown
-    admin_id = 10  # Default para admin com mais obras
+    admin_id = get_tenant_admin_id()
+    if not admin_id:
+        admin_id = funcionario.admin_id if hasattr(funcionario, 'admin_id') else 10
     obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+    
+    # Buscar itens do almoxarifado em posse do funcionário (MULTI-TENANT)
+    from models import AlmoxarifadoEstoque, AlmoxarifadoItem
+    itens_almoxarifado = AlmoxarifadoEstoque.query.filter_by(
+        admin_id=admin_id,
+        funcionario_atual_id=funcionario.id,
+        status='EM_USO'
+    ).join(AlmoxarifadoItem).order_by(AlmoxarifadoEstoque.updated_at.desc()).all()
+    
+    # Calcular valor total dos itens em posse
+    valor_total_itens = sum((item.valor_unitario or 0) * (item.quantidade or 1) for item in itens_almoxarifado)
     
     return render_template('funcionario_perfil.html', 
                          funcionario=funcionario,
@@ -1358,7 +1371,9 @@ def funcionario_perfil(id):
                          registros_ponto=registros,  # Template espera esta variável
                          registros_alimentacao=[],  # Vazio por enquanto
                          graficos=graficos,
-                         obras=obras)
+                         obras=obras,
+                         itens_almoxarifado=itens_almoxarifado,
+                         valor_total_itens=valor_total_itens)
 
 # Rota para exportar PDF do funcionário - COM CIRCUIT BREAKER
 @main_bp.route('/funcionario_perfil/<int:id>/pdf')

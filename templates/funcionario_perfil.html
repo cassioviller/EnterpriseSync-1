@@ -739,6 +739,118 @@
     </div>
 </div>
 
+<!-- Almoxarifado - Itens em Posse -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="package"></i> Almoxarifado - Itens em Posse
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- KPI - Valor Total -->
+                {% if itens_almoxarifado %}
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded bg-light">
+                            <h4 class="text-primary mb-1">{{ itens_almoxarifado|length }}</h4>
+                            <small class="text-muted fw-bold">Itens em Posse</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded bg-success text-white">
+                            <h4 class="mb-1 text-white">R$ {{ '{:,.2f}'.format(valor_total_itens) }}</h4>
+                            <small class="text-white fw-bold">Valor Total</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Itens -->
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Qtd/Serial</th>
+                                <th>Valor Unit.</th>
+                                <th>Valor Total</th>
+                                <th>Data Retirada</th>
+                                <th>Obra</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for estoque in itens_almoxarifado %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold">{{ estoque.item.codigo }}</span>
+                                        <small class="text-muted">{{ estoque.item.nome }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if estoque.numero_serie %}
+                                        <span class="badge bg-info">{{ estoque.numero_serie }}</span>
+                                    {% else %}
+                                        <span class="fw-bold">{{ estoque.quantidade or 1 }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>R$ {{ '{:,.2f}'.format(estoque.valor_unitario or 0) }}</td>
+                                <td class="fw-bold">R$ {{ '{:,.2f}'.format((estoque.valor_unitario or 0) * (estoque.quantidade or 1)) }}</td>
+                                <td>{{ estoque.created_at.strftime('%d/%m/%Y') if estoque.created_at else '-' }}</td>
+                                <td>
+                                    {% if estoque.obra %}
+                                        <span class="badge bg-secondary">{{ estoque.obra.nome }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if estoque.status == 'EM_USO' %}
+                                        <span class="badge bg-info">Em Uso</span>
+                                    {% elif estoque.status == 'DISPONIVEL' %}
+                                        <span class="badge bg-success">Disponível</span>
+                                    {% elif estoque.status == 'MANUTENCAO' %}
+                                        <span class="badge bg-warning">Manutenção</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ estoque.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="/almoxarifado/itens/{{ estoque.item_id }}" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       data-bs-toggle="tooltip" 
+                                       title="Ver no Almoxarifado">
+                                        <i data-feather="external-link"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-active">
+                                <td colspan="3" class="text-end fw-bold">TOTAL:</td>
+                                <td class="fw-bold text-success">R$ {{ '{:,.2f}'.format(valor_total_itens) }}</td>
+                                <td colspan="4"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <!-- Estado Vazio -->
+                <div class="text-center py-5">
+                    <i data-feather="package" class="text-muted mb-3" style="width: 64px; height: 64px;"></i>
+                    <h5 class="text-muted">Nenhum item em posse</h5>
+                    <p class="text-muted">Este funcionário não possui itens do almoxarifado no momento.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Gráficos de Desempenho -->
 <div class="row mb-4">
     <div class="col-md-6">
