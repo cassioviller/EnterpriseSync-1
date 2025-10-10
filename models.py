@@ -2052,6 +2052,7 @@ class Proposta(db.Model):
     data_proposta = db.Column(db.Date, nullable=False, default=date.today)
     
     # Dados do Cliente
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True)
     cliente_nome = db.Column(db.String(255), nullable=False)
     cliente_telefone = db.Column(db.String(20))
     cliente_email = db.Column(db.String(255))
@@ -2122,6 +2123,7 @@ class Proposta(db.Model):
     convertida_em_obra = db.Column(db.Boolean, default=False)
     
     # Relacionamentos
+    cliente = db.relationship('Cliente', backref='propostas')
     itens = db.relationship('PropostaItem', backref='proposta', lazy=True, cascade='all, delete-orphan')
     arquivos = db.relationship('PropostaArquivo', backref='proposta', lazy=True, cascade='all, delete-orphan')
     
@@ -2162,6 +2164,25 @@ class Proposta(db.Model):
             'valor_total': float(self.valor_total) if self.valor_total else 0,
             'criado_em': self.criado_em.isoformat() if self.criado_em else None
         }
+
+class PropostaHistorico(db.Model):
+    __tablename__ = 'proposta_historico'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(db.Integer, db.ForeignKey('propostas_comerciais.id'), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Ação realizada: 'criada', 'editada', 'enviada', 'aprovada', 'rejeitada', 'excluida'
+    acao = db.Column(db.String(50), nullable=False)
+    observacao = db.Column(db.Text, nullable=True)
+    
+    # Timestamps
+    data_hora = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamentos
+    proposta = db.relationship('Proposta', backref='historico')
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id], backref='acoes_em_propostas')
 
 class PropostaItem(db.Model):
     __tablename__ = 'proposta_itens'
