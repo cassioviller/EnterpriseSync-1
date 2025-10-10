@@ -2,27 +2,31 @@
 
 {% block title %}Almoxarifado - Dashboard{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col">
             <h1 class="h3 mb-0">
-                <i class="fas fa-boxes text-primary me-2"></i>
+                <i data-feather="package" class="text-success me-2"></i>
                 Almoxarifado - Dashboard
             </h1>
             <p class="text-muted mb-0">Visão geral do estoque e movimentações</p>
         </div>
     </div>
 
-    <!-- KPIs Principais -->
+    <!-- KPIs Principais com Feather Icons -->
     <div class="row g-4 mb-4">
         <div class="col-md-6 col-lg-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
-                            <div class="bg-primary bg-opacity-10 rounded-3 p-3">
-                                <i class="fas fa-box-open fa-2x text-primary"></i>
+                            <div class="bg-success bg-opacity-10 rounded-3 p-3">
+                                <i data-feather="box" class="text-success" style="width: 32px; height: 32px;"></i>
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">
@@ -39,8 +43,8 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
-                            <div class="bg-warning bg-opacity-10 rounded-3 p-3">
-                                <i class="fas fa-exclamation-triangle fa-2x text-warning"></i>
+                            <div class="bg-danger bg-opacity-10 rounded-3 p-3">
+                                <i data-feather="alert-triangle" class="text-danger" style="width: 32px; height: 32px;"></i>
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">
@@ -58,7 +62,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
                             <div class="bg-info bg-opacity-10 rounded-3 p-3">
-                                <i class="fas fa-exchange-alt fa-2x text-info"></i>
+                                <i data-feather="activity" class="text-info" style="width: 32px; height: 32px;"></i>
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">
@@ -76,12 +80,12 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-shrink-0">
                             <div class="bg-success bg-opacity-10 rounded-3 p-3">
-                                <i class="fas fa-dollar-sign fa-2x text-success"></i>
+                                <i data-feather="dollar-sign" class="text-success" style="width: 32px; height: 32px;"></i>
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="text-muted mb-1">Valor Total</h6>
-                            <h3 class="mb-0">R$ {{ "%.2f"|format(valor_total) }}</h3>
+                            <h3 class="mb-0">R$ {{ "%.2f"|format(valor_total|float) }}</h3>
                         </div>
                     </div>
                 </div>
@@ -95,21 +99,21 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <h5 class="card-title mb-3">
-                        <i class="fas fa-bolt text-warning me-2"></i>
+                        <i data-feather="zap" class="text-warning me-2"></i>
                         Ações Rápidas
                     </h5>
                     <div class="d-flex flex-wrap gap-2">
                         <a href="{{ url_for('almoxarifado.entrada') }}" class="btn btn-success">
-                            <i class="fas fa-plus-circle me-1"></i> Nova Entrada
+                            <i data-feather="plus-circle" style="width: 16px; height: 16px;" class="me-1"></i> Nova Entrada
                         </a>
                         <a href="{{ url_for('almoxarifado.saida') }}" class="btn btn-danger">
-                            <i class="fas fa-minus-circle me-1"></i> Nova Saída
+                            <i data-feather="minus-circle" style="width: 16px; height: 16px;" class="me-1"></i> Nova Saída
                         </a>
                         <a href="{{ url_for('almoxarifado.devolucao') }}" class="btn btn-primary">
-                            <i class="fas fa-undo me-1"></i> Devolução
+                            <i data-feather="rotate-ccw" style="width: 16px; height: 16px;" class="me-1"></i> Devolução
                         </a>
                         <a href="{{ url_for('almoxarifado.itens') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-box-open me-1"></i> Ver Catálogo
+                            <i data-feather="package" style="width: 16px; height: 16px;" class="me-1"></i> Ver Catálogo
                         </a>
                     </div>
                 </div>
@@ -117,14 +121,185 @@
         </div>
     </div>
 
-    <!-- Mensagem de módulo em desenvolvimento -->
+    <!-- Alertas -->
+    <div class="row g-4 mb-4">
+        <!-- Alerta: Itens com Estoque Baixo -->
+        {% if itens_estoque_baixo %}
+        <div class="col-md-12">
+            <div class="alert alert-danger border-0 shadow-sm" role="alert">
+                <div class="d-flex align-items-center mb-2">
+                    <i data-feather="alert-circle" class="me-2"></i>
+                    <h5 class="mb-0">
+                        <span class="badge bg-danger">{{ itens_estoque_baixo|length }}</span>
+                        Itens com Estoque Baixo
+                    </h5>
+                </div>
+                <ul class="mb-0">
+                    {% for item_info in itens_estoque_baixo[:5] %}
+                    <li>
+                        <strong>{{ item_info.item.nome }}</strong> - 
+                        Estoque atual: <span class="badge bg-danger">{{ item_info.estoque_atual }}</span> 
+                        | Mínimo: {{ item_info.estoque_minimo }}
+                    </li>
+                    {% endfor %}
+                    {% if itens_estoque_baixo|length > 5 %}
+                    <li class="text-muted">... e mais {{ itens_estoque_baixo|length - 5 }} itens</li>
+                    {% endif %}
+                </ul>
+                <a href="{{ url_for('almoxarifado.itens') }}" class="btn btn-sm btn-outline-danger mt-2">
+                    Ver todos os itens
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Alerta: Itens Vencendo -->
+        {% if itens_vencendo %}
+        <div class="col-md-12">
+            <div class="alert alert-warning border-0 shadow-sm" role="alert">
+                <div class="d-flex align-items-center mb-2">
+                    <i data-feather="clock" class="me-2"></i>
+                    <h5 class="mb-0">
+                        <span class="badge bg-warning">{{ itens_vencendo|length }}</span>
+                        Itens Vencendo nos Próximos 30 Dias
+                    </h5>
+                </div>
+                <ul class="mb-0">
+                    {% for estoque in itens_vencendo[:5] %}
+                    <li>
+                        <strong>{{ estoque.item.nome }}</strong> 
+                        {% if estoque.numero_serie %}(S/N: {{ estoque.numero_serie }}){% endif %}
+                        {% if estoque.lote %}(Lote: {{ estoque.lote }}){% endif %}
+                        - Vence em: <span class="badge bg-warning">{{ estoque.data_validade.strftime('%d/%m/%Y') }}</span>
+                    </li>
+                    {% endfor %}
+                    {% if itens_vencendo|length > 5 %}
+                    <li class="text-muted">... e mais {{ itens_vencendo|length - 5 }} itens</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Alerta: Itens em Manutenção -->
+        {% if itens_manutencao %}
+        <div class="col-md-12">
+            <div class="alert alert-info border-0 shadow-sm" role="alert">
+                <div class="d-flex align-items-center mb-2">
+                    <i data-feather="tool" class="me-2"></i>
+                    <h5 class="mb-0">
+                        <span class="badge bg-info">{{ itens_manutencao|length }}</span>
+                        Itens em Manutenção
+                    </h5>
+                </div>
+                <ul class="mb-0">
+                    {% for estoque in itens_manutencao[:5] %}
+                    <li>
+                        <strong>{{ estoque.item.nome }}</strong>
+                        {% if estoque.numero_serie %}(S/N: {{ estoque.numero_serie }}){% endif %}
+                    </li>
+                    {% endfor %}
+                    {% if itens_manutencao|length > 5 %}
+                    <li class="text-muted">... e mais {{ itens_manutencao|length - 5 }} itens</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Últimas 10 Movimentações -->
     <div class="row">
         <div class="col-12">
-            <div class="alert alert-info border-0 shadow-sm">
-                <i class="fas fa-info-circle me-2"></i>
-                <strong>Módulo em Desenvolvimento:</strong> O dashboard completo com alertas e últimas movimentações será implementado na FASE 5.
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0">
+                        <i data-feather="list" class="me-2"></i>
+                        Últimas Movimentações
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if ultimas_movimentacoes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Data/Hora</th>
+                                    <th>Tipo</th>
+                                    <th>Item</th>
+                                    <th>Quantidade/Serial</th>
+                                    <th>Funcionário</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for movimento in ultimas_movimentacoes %}
+                                <tr>
+                                    <td>{{ movimento.data_movimento.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        {% if movimento.tipo_movimento == 'ENTRADA' %}
+                                        <span class="badge bg-success">
+                                            <i data-feather="arrow-down" style="width: 12px; height: 12px;"></i>
+                                            ENTRADA
+                                        </span>
+                                        {% elif movimento.tipo_movimento == 'SAIDA' %}
+                                        <span class="badge bg-danger">
+                                            <i data-feather="arrow-up" style="width: 12px; height: 12px;"></i>
+                                            SAÍDA
+                                        </span>
+                                        {% elif movimento.tipo_movimento == 'DEVOLUCAO' %}
+                                        <span class="badge bg-warning">
+                                            <i data-feather="rotate-ccw" style="width: 12px; height: 12px;"></i>
+                                            DEVOLUÇÃO
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ movimento.item.nome }}</strong><br>
+                                        <small class="text-muted">{{ movimento.item.codigo }}</small>
+                                    </td>
+                                    <td>
+                                        {% if movimento.numero_serie %}
+                                        S/N: <span class="badge bg-secondary">{{ movimento.numero_serie }}</span>
+                                        {% else %}
+                                        {{ movimento.quantidade }} {{ movimento.item.unidade or 'un' }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if movimento.funcionario %}
+                                        {{ movimento.funcionario.nome }}
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('almoxarifado.itens_detalhes', id=movimento.item.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i data-feather="eye" style="width: 14px; height: 14px;"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i data-feather="inbox" class="text-muted mb-3" style="width: 48px; height: 48px;"></i>
+                        <p class="text-muted">Nenhuma movimentação registrada</p>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Inicializar Feather Icons
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+});
+</script>
 {% endblock %}

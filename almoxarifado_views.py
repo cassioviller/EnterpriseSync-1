@@ -23,23 +23,106 @@ def get_admin_id():
 @almoxarifado_bp.route('/')
 @login_required
 def dashboard():
-    """Dashboard principal do almoxarifado - KPIs e ações rápidas"""
+    """Dashboard principal do almoxarifado v3.0 - KPIs, alertas e movimentações"""
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
-    # KPIs básicos (será expandido na FASE 5)
+    # ========================================
+    # KPI 1: Total de Itens Cadastrados
+    # ========================================
     total_itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).count()
-    estoque_baixo = 0
-    movimentos_hoje = 0
-    valor_total = 0
+    
+    # ========================================
+    # KPI 2: Estoque Baixo
+    # ========================================
+    itens_estoque_baixo = []
+    itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).all()
+    
+    for item in itens:
+        if item.tipo_controle == 'SERIALIZADO':
+            estoque_atual = AlmoxarifadoEstoque.query.filter_by(
+                item_id=item.id,
+                status='DISPONIVEL',
+                admin_id=admin_id
+            ).count()
+        else:
+            estoque_atual = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
+                item_id=item.id,
+                status='DISPONIVEL',
+                admin_id=admin_id
+            ).scalar() or 0
+        
+        if estoque_atual < item.estoque_minimo:
+            itens_estoque_baixo.append({
+                'item': item,
+                'estoque_atual': estoque_atual,
+                'estoque_minimo': item.estoque_minimo
+            })
+    
+    estoque_baixo = len(itens_estoque_baixo)
+    
+    # ========================================
+    # KPI 3: Movimentações Hoje
+    # ========================================
+    hoje = datetime.now().date()
+    movimentos_hoje = AlmoxarifadoMovimento.query.filter(
+        AlmoxarifadoMovimento.admin_id == admin_id,
+        func.date(AlmoxarifadoMovimento.data_movimento) == hoje
+    ).count()
+    
+    # ========================================
+    # KPI 4: Valor Total em Estoque
+    # ========================================
+    valor_total = db.session.query(
+        func.sum(AlmoxarifadoEstoque.valor_unitario * AlmoxarifadoEstoque.quantidade)
+    ).filter_by(
+        status='DISPONIVEL',
+        admin_id=admin_id
+    ).scalar() or 0
+    
+    # ========================================
+    # ALERTAS
+    # ========================================
+    
+    # Alerta 1: Itens Vencendo (30 dias)
+    data_limite_vencimento = datetime.now().date() + timedelta(days=30)
+    itens_vencendo = AlmoxarifadoEstoque.query.filter(
+        AlmoxarifadoEstoque.admin_id == admin_id,
+        AlmoxarifadoEstoque.status == 'DISPONIVEL',
+        AlmoxarifadoEstoque.data_validade.isnot(None),
+        AlmoxarifadoEstoque.data_validade <= data_limite_vencimento
+    ).join(AlmoxarifadoItem).all()
+    
+    # Alerta 2: Itens em Manutenção
+    itens_manutencao = AlmoxarifadoEstoque.query.filter_by(
+        admin_id=admin_id,
+        status='EM_MANUTENCAO'
+    ).join(AlmoxarifadoItem).all()
+    
+    # ========================================
+    # ÚLTIMAS 10 MOVIMENTAÇÕES
+    # ========================================
+    ultimas_movimentacoes = AlmoxarifadoMovimento.query.filter_by(
+        admin_id=admin_id
+    ).join(
+        AlmoxarifadoItem
+    ).outerjoin(
+        Funcionario, AlmoxarifadoMovimento.funcionario_id == Funcionario.id
+    ).order_by(
+        AlmoxarifadoMovimento.data_movimento.desc()
+    ).limit(10).all()
     
     return render_template('almoxarifado/dashboard.html',
                          total_itens=total_itens,
                          estoque_baixo=estoque_baixo,
                          movimentos_hoje=movimentos_hoje,
-                         valor_total=valor_total)
+                         valor_total=valor_total,
+                         itens_estoque_baixo=itens_estoque_baixo,
+                         itens_vencendo=itens_vencendo,
+                         itens_manutencao=itens_manutencao,
+                         ultimas_movimentacoes=ultimas_movimentacoes)
 
 # ========================================
 # CRUD CATEGORIAS
@@ -52,7 +135,7 @@ def categorias():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     categorias = AlmoxarifadoCategoria.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoCategoria.nome).all()
     return render_template('almoxarifado/categorias.html', categorias=categorias)
@@ -64,7 +147,7 @@ def categorias_criar():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     if request.method == 'POST':
         try:
@@ -105,7 +188,7 @@ def categorias_editar(id):
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     categoria = AlmoxarifadoCategoria.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
@@ -144,7 +227,7 @@ def categorias_deletar(id):
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     categoria = AlmoxarifadoCategoria.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
@@ -178,7 +261,7 @@ def itens():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     busca = request.args.get('busca', '').strip()
     categoria_id = request.args.get('categoria_id', type=int)
@@ -238,7 +321,7 @@ def itens_criar():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     if request.method == 'POST':
         try:
@@ -295,7 +378,7 @@ def itens_editar(id):
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
@@ -346,7 +429,7 @@ def itens_detalhes(id):
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
@@ -384,7 +467,7 @@ def itens_deletar(id):
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
@@ -417,7 +500,7 @@ def entrada():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoItem.nome).all()
     
@@ -465,7 +548,7 @@ def processar_entrada():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     try:
         item_id = request.form.get('item_id', type=int)
@@ -587,7 +670,7 @@ def saida():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoItem.nome).all()
     funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
@@ -647,7 +730,7 @@ def processar_saida():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     try:
         item_id = request.form.get('item_id', type=int)
@@ -803,7 +886,7 @@ def devolucao():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
     
@@ -897,7 +980,7 @@ def processar_devolucao():
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('main.index'))
     
     try:
         funcionario_id = request.form.get('funcionario_id', type=int)
