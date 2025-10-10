@@ -606,13 +606,15 @@ def processar_entrada():
                 
                 movimento = AlmoxarifadoMovimento(
                     item_id=item_id,
-                    tipo='ENTRADA',
+                    tipo_movimento='ENTRADA',
                     quantidade=1,
                     numero_serie=serie,
                     nota_fiscal=nota_fiscal,
-                    observacoes=observacoes,
+                    observacao=observacoes,
                     estoque_id=None,
-                    admin_id=admin_id
+                    admin_id=admin_id,
+                    usuario_id=current_user.id,
+                    obra_id=None
                 )
                 db.session.add(movimento)
                 movimentos_criados += 1
@@ -639,12 +641,14 @@ def processar_entrada():
             # Criar 1 movimento
             movimento = AlmoxarifadoMovimento(
                 item_id=item_id,
-                tipo='ENTRADA',
+                tipo_movimento='ENTRADA',
                 quantidade=quantidade,
                 nota_fiscal=nota_fiscal,
-                observacoes=observacoes,
+                observacao=observacoes,
                 estoque_id=estoque.id,
-                admin_id=admin_id
+                admin_id=admin_id,
+                usuario_id=current_user.id,
+                obra_id=None
             )
             db.session.add(movimento)
             
@@ -796,14 +800,15 @@ def processar_saida():
                 # Criar movimento
                 movimento = AlmoxarifadoMovimento(
                     item_id=item_id,
-                    tipo='SAIDA',
+                    tipo_movimento='SAIDA',
                     quantidade=1,
                     numero_serie=estoque.numero_serie,
                     funcionario_id=funcionario_id,
                     obra_id=obra_id,
-                    observacoes=observacoes,
+                    observacao=observacoes,
                     estoque_id=estoque.id,
-                    admin_id=admin_id
+                    admin_id=admin_id,
+                    usuario_id=current_user.id
                 )
                 db.session.add(movimento)
                 itens_processados += 1
@@ -855,12 +860,13 @@ def processar_saida():
             # Criar movimento
             movimento = AlmoxarifadoMovimento(
                 item_id=item_id,
-                tipo='SAIDA',
+                tipo_movimento='SAIDA',
                 quantidade=quantidade,
                 funcionario_id=funcionario_id,
                 obra_id=obra_id,
-                observacoes=observacoes,
-                admin_id=admin_id
+                observacao=observacoes,
+                admin_id=admin_id,
+                usuario_id=current_user.id
             )
             db.session.add(movimento)
             
@@ -930,7 +936,7 @@ def api_itens_funcionario(funcionario_id):
     # Buscar movimentos de SAÍDA deste funcionário para itens retornáveis
     movimentos_saida = AlmoxarifadoMovimento.query.filter_by(
         funcionario_id=funcionario_id,
-        tipo='SAIDA',
+        tipo_movimento='SAIDA',
         admin_id=admin_id
     ).join(AlmoxarifadoItem).filter(
         AlmoxarifadoItem.tipo_controle == 'CONSUMIVEL',
@@ -951,7 +957,7 @@ def api_itens_funcionario(funcionario_id):
     # Subtrair devoluções já feitas
     movimentos_devolucao = AlmoxarifadoMovimento.query.filter_by(
         funcionario_id=funcionario_id,
-        tipo='DEVOLUCAO',
+        tipo_movimento='DEVOLUCAO',
         admin_id=admin_id
     ).all()
     
@@ -1033,14 +1039,16 @@ def processar_devolucao():
                 # Criar movimento de devolução
                 movimento = AlmoxarifadoMovimento(
                     item_id=estoque.item_id,
-                    tipo='DEVOLUCAO',
+                    tipo_movimento='DEVOLUCAO',
                     quantidade=1,
                     numero_serie=estoque.numero_serie,
                     funcionario_id=funcionario_id,
-                    condicao_devolucao=condicao_devolucao,
-                    observacoes=observacoes,
+                    condicao_item=condicao_devolucao,
+                    observacao=observacoes,
                     estoque_id=estoque.id,
-                    admin_id=admin_id
+                    admin_id=admin_id,
+                    usuario_id=current_user.id,
+                    obra_id=estoque.obra_id or 1
                 )
                 db.session.add(movimento)
                 itens_processados += 1
@@ -1074,13 +1082,15 @@ def processar_devolucao():
             # Criar movimento de devolução
             movimento = AlmoxarifadoMovimento(
                 item_id=item_id,
-                tipo='DEVOLUCAO',
+                tipo_movimento='DEVOLUCAO',
                 quantidade=quantidade,
                 funcionario_id=funcionario_id,
-                condicao_devolucao=condicao_devolucao,
-                observacoes=observacoes,
+                condicao_item=condicao_devolucao,
+                observacao=observacoes,
                 estoque_id=estoque.id,
-                admin_id=admin_id
+                admin_id=admin_id,
+                usuario_id=current_user.id,
+                obra_id=None
             )
             db.session.add(movimento)
             
@@ -1098,9 +1108,90 @@ def processar_devolucao():
 @almoxarifado_bp.route('/movimentacoes')
 @login_required
 def movimentacoes():
-    """STUB - Será implementado na FASE 5"""
-    flash('Módulo em desenvolvimento - FASE 5', 'info')
-    return redirect(url_for('almoxarifado.dashboard'))
+    """Lista todas as movimentações com filtros avançados e paginação - FASE 5"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # Obter parâmetros de filtro
+    page = request.args.get('page', 1, type=int)
+    data_inicio = request.args.get('data_inicio', '')
+    data_fim = request.args.get('data_fim', '')
+    tipo_movimento = request.args.get('tipo_movimento', '')
+    funcionario_id = request.args.get('funcionario_id', type=int)
+    obra_id = request.args.get('obra_id', type=int)
+    item_id = request.args.get('item_id', type=int)
+    
+    # Query base com multi-tenant
+    query = AlmoxarifadoMovimento.query.filter_by(admin_id=admin_id)
+    
+    # JOIN com Item (sempre necessário)
+    query = query.join(AlmoxarifadoItem, AlmoxarifadoMovimento.item_id == AlmoxarifadoItem.id)
+    
+    # OUTER JOIN com Funcionario e Obra
+    query = query.outerjoin(Funcionario, AlmoxarifadoMovimento.funcionario_id == Funcionario.id)
+    query = query.outerjoin(Obra, AlmoxarifadoMovimento.obra_id == Obra.id)
+    
+    # Aplicar filtros
+    if data_inicio:
+        try:
+            data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d')
+            query = query.filter(AlmoxarifadoMovimento.data_movimento >= data_inicio_obj)
+        except ValueError:
+            flash('Data de início inválida', 'warning')
+    
+    if data_fim:
+        try:
+            data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d')
+            # Adicionar 1 dia para incluir todo o dia final
+            data_fim_obj = data_fim_obj + timedelta(days=1)
+            query = query.filter(AlmoxarifadoMovimento.data_movimento < data_fim_obj)
+        except ValueError:
+            flash('Data de fim inválida', 'warning')
+    
+    if tipo_movimento:
+        query = query.filter(AlmoxarifadoMovimento.tipo_movimento == tipo_movimento)
+    
+    if funcionario_id:
+        query = query.filter(AlmoxarifadoMovimento.funcionario_id == funcionario_id)
+    
+    if obra_id:
+        query = query.filter(AlmoxarifadoMovimento.obra_id == obra_id)
+    
+    if item_id:
+        query = query.filter(AlmoxarifadoMovimento.item_id == item_id)
+    
+    # Ordenar por data mais recente primeiro
+    query = query.order_by(AlmoxarifadoMovimento.data_movimento.desc())
+    
+    # Paginação (50 registros por página)
+    movimentacoes_paginadas = query.paginate(page=page, per_page=50, error_out=False)
+    
+    # Buscar dados para os filtros (com multi-tenant)
+    itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoItem.nome).all()
+    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    
+    # Calcular estatísticas de exibição
+    total_registros = movimentacoes_paginadas.total
+    inicio = (page - 1) * 50 + 1 if total_registros > 0 else 0
+    fim = min(page * 50, total_registros)
+    
+    return render_template('almoxarifado/movimentacoes.html',
+                         movimentacoes=movimentacoes_paginadas,
+                         itens=itens,
+                         funcionarios=funcionarios,
+                         obras=obras,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim,
+                         tipo_movimento=tipo_movimento,
+                         funcionario_id=funcionario_id,
+                         obra_id=obra_id,
+                         item_id=item_id,
+                         total_registros=total_registros,
+                         inicio=inicio,
+                         fim=fim)
 
 @almoxarifado_bp.route('/relatorios')
 @login_required

@@ -1,92 +1,148 @@
 {% extends "base_completo.html" %}
 
+{% block title %}Movimentações - Almoxarifado{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+<style>
+    .badge-movimento {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+        font-weight: 600;
+    }
+    .table-movimentacoes td {
+        vertical-align: middle;
+    }
+    .filtros-card {
+        background: #fff;
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid py-4">
     <!-- Cabeçalho -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0 text-gray-800">
-            <i class="fas fa-exchange-alt"></i> Movimentações de Estoque
-        </h1>
-        <div>
-            {% if pode_gerenciar %}
-            <a href="{{ url_for('almoxarifado.scanner_codigo_barras') }}" class="btn btn-primary">
-                <i class="fas fa-barcode"></i> Scanner
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i data-feather="activity" class="text-success me-2"></i>
+                Movimentações de Estoque
+            </h1>
+            <p class="text-muted mb-0">Histórico completo de entradas, saídas e devoluções</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('almoxarifado.dashboard') }}" class="btn btn-outline-secondary">
+                <i data-feather="arrow-left" style="width: 16px; height: 16px;"></i> Voltar
             </a>
-            {% endif %}
         </div>
     </div>
 
-    <!-- Filtros -->
-    <div class="card shadow mb-4">
-        <div class="card-header">
-            <h6 class="m-0 font-weight-bold text-primary">
-                <i class="fas fa-filter"></i> Filtros de Busca
-            </h6>
-        </div>
+    <!-- Card de Filtros -->
+    <div class="card filtros-card mb-4">
         <div class="card-body">
-            <form method="GET" action="{{ url_for('almoxarifado.listar_movimentacoes_estoque') }}">
-                <div class="row">
+            <h5 class="card-title mb-3">
+                <i data-feather="filter" class="text-primary me-2"></i>
+                Filtros Avançados
+            </h5>
+            <form method="GET" action="{{ url_for('almoxarifado.movimentacoes') }}">
+                <div class="row g-3">
+                    <!-- Período -->
                     <div class="col-md-3">
-                        <label for="data_inicio" class="form-label">Data Início</label>
+                        <label for="data_inicio" class="form-label">
+                            <i data-feather="calendar" style="width: 14px; height: 14px;"></i>
+                            Data Início
+                        </label>
                         <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
-                               value="{{ filtros.data_inicio or '' }}">
+                               value="{{ data_inicio }}">
                     </div>
                     <div class="col-md-3">
-                        <label for="data_fim" class="form-label">Data Fim</label>
+                        <label for="data_fim" class="form-label">
+                            <i data-feather="calendar" style="width: 14px; height: 14px;"></i>
+                            Data Fim
+                        </label>
                         <input type="date" class="form-control" id="data_fim" name="data_fim" 
-                               value="{{ filtros.data_fim or '' }}">
+                               value="{{ data_fim }}">
                     </div>
+
+                    <!-- Tipo de Movimento -->
                     <div class="col-md-3">
-                        <label for="tipo_movimentacao" class="form-label">Tipo</label>
-                        <select class="form-select" id="tipo_movimentacao" name="tipo_movimentacao">
+                        <label for="tipo_movimento" class="form-label">
+                            <i data-feather="list" style="width: 14px; height: 14px;"></i>
+                            Tipo de Movimento
+                        </label>
+                        <select class="form-select" id="tipo_movimento" name="tipo_movimento">
                             <option value="">Todos</option>
-                            <option value="ENTRADA" {% if filtros.tipo_movimentacao == 'ENTRADA' %}selected{% endif %}>Entrada</option>
-                            <option value="SAIDA" {% if filtros.tipo_movimentacao == 'SAIDA' %}selected{% endif %}>Saída</option>
-                            <option value="DEVOLUCAO" {% if filtros.tipo_movimentacao == 'DEVOLUCAO' %}selected{% endif %}>Devolução</option>
-                            <option value="AJUSTE" {% if filtros.tipo_movimentacao == 'AJUSTE' %}selected{% endif %}>Ajuste</option>
+                            <option value="ENTRADA" {% if tipo_movimento == 'ENTRADA' %}selected{% endif %}>
+                                Entrada
+                            </option>
+                            <option value="SAIDA" {% if tipo_movimento == 'SAIDA' %}selected{% endif %}>
+                                Saída
+                            </option>
+                            <option value="DEVOLUCAO" {% if tipo_movimento == 'DEVOLUCAO' %}selected{% endif %}>
+                                Devolução
+                            </option>
                         </select>
                     </div>
+
+                    <!-- Item -->
                     <div class="col-md-3">
-                        <label for="produto_id" class="form-label">Produto</label>
-                        <select class="form-select" id="produto_id" name="produto_id">
+                        <label for="item_id" class="form-label">
+                            <i data-feather="package" style="width: 14px; height: 14px;"></i>
+                            Item
+                        </label>
+                        <select class="form-select" id="item_id" name="item_id">
                             <option value="">Todos</option>
-                            {% for produto in produtos %}
-                            <option value="{{ produto.id }}" {% if filtros.produto_id == produto.id %}selected{% endif %}>
-                                {{ produto.nome }}
+                            {% for item in itens %}
+                            <option value="{{ item.id }}" {% if item_id == item.id %}selected{% endif %}>
+                                {{ item.nome }}
                             </option>
                             {% endfor %}
                         </select>
                     </div>
                 </div>
-                <div class="row mt-3">
+
+                <div class="row g-3 mt-2">
+                    <!-- Funcionário -->
                     <div class="col-md-4">
-                        <label for="obra_id" class="form-label">Obra</label>
-                        <select class="form-select" id="obra_id" name="obra_id">
-                            <option value="">Todas</option>
-                            {% for obra in obras %}
-                            <option value="{{ obra.id }}" {% if filtros.obra_id == obra.id %}selected{% endif %}>
-                                {{ obra.nome }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="funcionario_id" class="form-label">Funcionário</label>
+                        <label for="funcionario_id" class="form-label">
+                            <i data-feather="user" style="width: 14px; height: 14px;"></i>
+                            Funcionário
+                        </label>
                         <select class="form-select" id="funcionario_id" name="funcionario_id">
                             <option value="">Todos</option>
                             {% for funcionario in funcionarios %}
-                            <option value="{{ funcionario.id }}" {% if filtros.funcionario_id == funcionario.id %}selected{% endif %}>
+                            <option value="{{ funcionario.id }}" {% if funcionario_id == funcionario.id %}selected{% endif %}>
                                 {{ funcionario.nome }}
                             </option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary me-2">
-                            <i class="fas fa-search"></i> Filtrar
+
+                    <!-- Obra -->
+                    <div class="col-md-4">
+                        <label for="obra_id" class="form-label">
+                            <i data-feather="map-pin" style="width: 14px; height: 14px;"></i>
+                            Obra
+                        </label>
+                        <select class="form-select" id="obra_id" name="obra_id">
+                            <option value="">Todas</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if obra_id == obra.id %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Botões -->
+                    <div class="col-md-4 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn btn-success flex-fill">
+                            <i data-feather="search" style="width: 16px; height: 16px;"></i> Filtrar
                         </button>
-                        <a href="{{ url_for('almoxarifado.listar_movimentacoes_estoque') }}" class="btn btn-secondary">
-                            <i class="fas fa-times"></i> Limpar
+                        <a href="{{ url_for('almoxarifado.movimentacoes') }}" class="btn btn-outline-secondary">
+                            <i data-feather="x" style="width: 16px; height: 16px;"></i> Limpar
                         </a>
                     </div>
                 </div>
@@ -94,107 +150,120 @@
         </div>
     </div>
 
-    <!-- Lista de Movimentações -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">
-                Movimentações Encontradas 
-                {% if movimentacoes.items %}
-                    ({{ movimentacoes.total }} registros)
+    <!-- Card de Resultados -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i data-feather="list" class="text-success me-2"></i>
+                    Movimentações Encontradas
+                </h5>
+                {% if total_registros > 0 %}
+                <span class="badge bg-success">
+                    Mostrando {{ inicio }}-{{ fim }} de {{ total_registros }} registros
+                </span>
                 {% endif %}
-            </h6>
+            </div>
         </div>
-        <div class="card-body">
+        <div class="card-body p-0">
             {% if movimentacoes.items %}
                 <div class="table-responsive">
-                    <table class="table table-bordered" width="100%" cellspacing="0">
-                        <thead>
+                    <table class="table table-movimentacoes table-hover mb-0">
+                        <thead class="table-light">
                             <tr>
-                                <th>Data/Hora</th>
-                                <th>Produto</th>
-                                <th>Tipo</th>
-                                <th>Quantidade</th>
-                                <th>Valor Unit.</th>
-                                <th>Valor Total</th>
-                                <th>Origem</th>
-                                <th>Usuário</th>
-                                <th>Observações</th>
+                                <th style="width: 130px;">Data/Hora</th>
+                                <th style="width: 110px;">Tipo</th>
+                                <th>Item</th>
+                                <th style="width: 150px;">Qtd/Serial</th>
+                                <th>Funcionário</th>
+                                <th>Obra</th>
+                                <th style="width: 120px;" class="text-center">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for mov in movimentacoes.items %}
                             <tr>
+                                <!-- Data/Hora -->
                                 <td>
-                                    <small>{{ mov.data_movimentacao.strftime('%d/%m/%Y') }}</small><br>
-                                    <small class="text-muted">{{ mov.data_movimentacao.strftime('%H:%M') }}</small>
+                                    <div class="fw-semibold">{{ mov.data_movimento.strftime('%d/%m/%Y') }}</div>
+                                    <small class="text-muted">{{ mov.data_movimento.strftime('%H:%M') }}</small>
                                 </td>
+
+                                <!-- Tipo (Badge colorido) -->
                                 <td>
-                                    <strong>{{ mov.produto_rel.nome if mov.produto_rel else 'Produto ID: ' + mov.produto_id|string }}</strong>
-                                    {% if mov.produto_rel %}
-                                    <br><small class="text-muted">{{ mov.produto_rel.codigo_interno }}</small>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if mov.tipo_movimentacao == 'ENTRADA' %}
-                                        <span class="badge badge-success">{{ mov.tipo_movimentacao }}</span>
-                                    {% elif mov.tipo_movimentacao == 'SAIDA' %}
-                                        <span class="badge badge-danger">{{ mov.tipo_movimentacao }}</span>
-                                    {% elif mov.tipo_movimentacao == 'DEVOLUCAO' %}
-                                        <span class="badge badge-warning">{{ mov.tipo_movimentacao }}</span>
-                                    {% elif mov.tipo_movimentacao == 'AJUSTE' %}
-                                        <span class="badge badge-info">{{ mov.tipo_movimentacao }}</span>
+                                    {% if mov.tipo_movimento == 'ENTRADA' %}
+                                        <span class="badge bg-success badge-movimento">
+                                            <i data-feather="arrow-down-circle" style="width: 14px; height: 14px;"></i>
+                                            ENTRADA
+                                        </span>
+                                    {% elif mov.tipo_movimento == 'SAIDA' %}
+                                        <span class="badge bg-danger badge-movimento">
+                                            <i data-feather="arrow-up-circle" style="width: 14px; height: 14px;"></i>
+                                            SAÍDA
+                                        </span>
+                                    {% elif mov.tipo_movimento == 'DEVOLUCAO' %}
+                                        <span class="badge bg-warning badge-movimento">
+                                            <i data-feather="rotate-ccw" style="width: 14px; height: 14px;"></i>
+                                            DEVOLUÇÃO
+                                        </span>
                                     {% else %}
-                                        <span class="badge badge-secondary">{{ mov.tipo_movimentacao }}</span>
+                                        <span class="badge bg-secondary badge-movimento">{{ mov.tipo_movimento }}</span>
                                     {% endif %}
                                 </td>
+
+                                <!-- Item -->
                                 <td>
-                                    {% if mov.tipo_movimentacao == 'SAIDA' %}
-                                        <span class="text-danger">-{{ mov.quantidade }}</span>
+                                    <div class="fw-semibold">{{ mov.item.nome }}</div>
+                                    <small class="text-muted">{{ mov.item.codigo }}</small>
+                                </td>
+
+                                <!-- Quantidade/Serial -->
+                                <td>
+                                    {% if mov.numero_serie %}
+                                        <span class="badge bg-info">
+                                            <i data-feather="hash" style="width: 12px; height: 12px;"></i>
+                                            {{ mov.numero_serie }}
+                                        </span>
                                     {% else %}
-                                        <span class="text-success">+{{ mov.quantidade }}</span>
-                                    {% endif %}
-                                    {% if mov.produto_rel %}{{ mov.produto_rel.unidade_medida }}{% endif %}
-                                </td>
-                                <td>
-                                    {% if mov.valor_unitario %}
-                                        R$ {{ "%.2f"|format(mov.valor_unitario) }}
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if mov.valor_total %}
-                                        R$ {{ "%.2f"|format(mov.valor_total) }}
-                                    {% else %}
-                                        <span class="text-muted">-</span>
+                                        <span class="fw-semibold">
+                                            {% if mov.tipo_movimento == 'SAIDA' %}
+                                                <span class="text-danger">-{{ mov.quantidade }}</span>
+                                            {% else %}
+                                                <span class="text-success">+{{ mov.quantidade }}</span>
+                                            {% endif %}
+                                            {{ mov.item.unidade }}
+                                        </span>
                                     {% endif %}
                                 </td>
+
+                                <!-- Funcionário -->
                                 <td>
-                                    {% if mov.rdo %}
-                                        <i class="fas fa-clipboard-list text-primary"></i> 
-                                        <a href="/rdo/{{ mov.rdo.id }}">{{ mov.rdo.numero_rdo }}</a>
-                                    {% elif mov.nota_fiscal %}
-                                        <i class="fas fa-file-invoice text-success"></i> 
-                                        NFe {{ mov.nota_fiscal.numero }}/{{ mov.nota_fiscal.serie }}
-                                    {% elif mov.obra %}
-                                        <i class="fas fa-building text-info"></i> 
-                                        {{ mov.obra.nome }}
-                                    {% elif mov.funcionario %}
-                                        <i class="fas fa-user text-warning"></i> 
+                                    {% if mov.funcionario %}
+                                        <i data-feather="user" style="width: 14px; height: 14px;" class="text-muted"></i>
                                         {{ mov.funcionario.nome }}
                                     {% else %}
-                                        <span class="text-muted">Manual</span>
+                                        <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
+
+                                <!-- Obra -->
                                 <td>
-                                    <small>{{ mov.usuario.nome if mov.usuario else 'N/A' }}</small>
-                                </td>
-                                <td>
-                                    {% if mov.observacoes %}
-                                        <small>{{ mov.observacoes[:50] }}{% if mov.observacoes|length > 50 %}...{% endif %}</small>
+                                    {% if mov.obra %}
+                                        <i data-feather="map-pin" style="width: 14px; height: 14px;" class="text-muted"></i>
+                                        {{ mov.obra.nome }}
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
+                                </td>
+
+                                <!-- Ações -->
+                                <td class="text-center">
+                                    <a href="{{ url_for('almoxarifado.itens_detalhes', id=mov.item.id) }}" 
+                                       class="btn btn-sm btn-outline-success" 
+                                       title="Ver Detalhes do Item">
+                                        <i data-feather="eye" style="width: 14px; height: 14px;"></i>
+                                        Detalhes
+                                    </a>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -204,58 +273,84 @@
 
                 <!-- Paginação -->
                 {% if movimentacoes.pages > 1 %}
-                <nav aria-label="Paginação de movimentações">
-                    <ul class="pagination justify-content-center">
-                        {% if movimentacoes.has_prev %}
-                        <li class="page-item">
-                            <a class="page-link" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque', page=movimentacoes.prev_num, **filtros) }}">
-                                Anterior
-                            </a>
-                        </li>
-                        {% endif %}
-                        
-                        {% for page_num in movimentacoes.iter_pages() %}
-                            {% if page_num %}
-                                {% if page_num != movimentacoes.page %}
-                                <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque', page=page_num, **filtros) }}">
-                                        {{ page_num }}
-                                    </a>
-                                </li>
-                                {% else %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ page_num }}</span>
-                                </li>
-                                {% endif %}
+                <div class="p-3 border-top">
+                    <nav aria-label="Navegação de páginas">
+                        <ul class="pagination justify-content-center mb-0">
+                            <!-- Botão Anterior -->
+                            {% if movimentacoes.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('almoxarifado.movimentacoes', page=movimentacoes.prev_num, data_inicio=data_inicio, data_fim=data_fim, tipo_movimento=tipo_movimento, funcionario_id=funcionario_id, obra_id=obra_id, item_id=item_id) }}">
+                                    <i data-feather="chevron-left" style="width: 14px; height: 14px;"></i>
+                                    Anterior
+                                </a>
+                            </li>
                             {% else %}
                             <li class="page-item disabled">
-                                <span class="page-link">…</span>
+                                <span class="page-link">
+                                    <i data-feather="chevron-left" style="width: 14px; height: 14px;"></i>
+                                    Anterior
+                                </span>
                             </li>
                             {% endif %}
-                        {% endfor %}
-                        
-                        {% if movimentacoes.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque', page=movimentacoes.next_num, **filtros) }}">
-                                Próxima
-                            </a>
-                        </li>
-                        {% endif %}
-                    </ul>
-                </nav>
+
+                            <!-- Números de Página -->
+                            {% for page_num in movimentacoes.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                                {% if page_num %}
+                                    {% if page_num == movimentacoes.page %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('almoxarifado.movimentacoes', page=page_num, data_inicio=data_inicio, data_fim=data_fim, tipo_movimento=tipo_movimento, funcionario_id=funcionario_id, obra_id=obra_id, item_id=item_id) }}">
+                                            {{ page_num }}
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">…</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            <!-- Botão Próximo -->
+                            {% if movimentacoes.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('almoxarifado.movimentacoes', page=movimentacoes.next_num, data_inicio=data_inicio, data_fim=data_fim, tipo_movimento=tipo_movimento, funcionario_id=funcionario_id, obra_id=obra_id, item_id=item_id) }}">
+                                    Próximo
+                                    <i data-feather="chevron-right" style="width: 14px; height: 14px;"></i>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">
+                                    Próximo
+                                    <i data-feather="chevron-right" style="width: 14px; height: 14px;"></i>
+                                </span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
                 {% endif %}
 
             {% else %}
-                <div class="text-center py-4">
-                    <i class="fas fa-exchange-alt fa-3x text-muted mb-3"></i>
+                <!-- Mensagem de lista vazia -->
+                <div class="text-center py-5">
+                    <i data-feather="inbox" style="width: 64px; height: 64px;" class="text-muted mb-3"></i>
                     <h5 class="text-muted">Nenhuma movimentação encontrada</h5>
                     <p class="text-muted">
-                        {% if filtros.data_inicio or filtros.data_fim or filtros.tipo_movimentacao or filtros.produto_id %}
+                        {% if data_inicio or data_fim or tipo_movimento or funcionario_id or obra_id or item_id %}
                             Tente ajustar os filtros para encontrar movimentações.
                         {% else %}
                             Ainda não há movimentações registradas no sistema.
                         {% endif %}
                     </p>
+                    <a href="{{ url_for('almoxarifado.entrada') }}" class="btn btn-success mt-2">
+                        <i data-feather="plus-circle" style="width: 16px; height: 16px;"></i>
+                        Registrar Primeira Entrada
+                    </a>
                 </div>
             {% endif %}
         </div>
@@ -263,15 +358,13 @@
 </div>
 
 <script>
-// Melhorar seletores com Select2 ou similar (opcional)
-$(document).ready(function() {
-    // Melhorar UX dos selects se necessário
-    $('#produto_id, #obra_id, #funcionario_id').each(function() {
-        if ($(this).find('option').length > 20) {
-            // Aplicar select2 ou similar para muitas opções
-            // $(this).select2();
-        }
-    });
+// Inicializar Feather Icons
+feather.replace();
+
+// Melhorar UX dos selects longos (opcional: adicionar select2)
+document.addEventListener('DOMContentLoaded', function() {
+    // Se houver muitas opções, considere adicionar Select2 para melhor UX
+    // $('#item_id, #funcionario_id, #obra_id').select2();
 });
 </script>
 {% endblock %}
