@@ -2028,6 +2028,31 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                     'observacoes': servico_obra_real.observacoes or ''
                 })
             
+            # Calcular progresso real de cada serviço baseado nos RDOs
+            print(f"📊 Calculando progresso REAL baseado nos RDOs para {len(servicos_lista)} serviços...")
+            for servico_dict in servicos_lista:
+                try:
+                    # Buscar subatividades deste serviço em TODOS os RDOs da obra
+                    subatividades = db.session.query(RDOServicoSubatividade).join(
+                        RDO, RDOServicoSubatividade.rdo_id == RDO.id
+                    ).filter(
+                        RDO.obra_id == obra_id,
+                        RDOServicoSubatividade.servico_id == servico_dict['id'],
+                        RDOServicoSubatividade.ativo == True
+                    ).all()
+                    
+                    if subatividades:
+                        # Calcular progresso médio das subatividades
+                        total_percentual = sum(sub.percentual_conclusao or 0 for sub in subatividades)
+                        progresso_real = round(total_percentual / len(subatividades), 1)
+                        servico_dict['progresso'] = progresso_real
+                        print(f"   📊 Serviço '{servico_dict['nome']}': {len(subatividades)} subatividades, progresso={progresso_real}%")
+                    else:
+                        servico_dict['progresso'] = 0.0
+                except Exception as e:
+                    print(f"   ⚠️ Erro ao calcular progresso do serviço {servico_dict['id']}: {e}")
+                    servico_dict['progresso'] = 0.0
+            
             print(f"✅ {len(servicos_lista)} serviços encontrados na NOVA TABELA para obra {obra_id}")
             return servicos_lista
             
@@ -2073,6 +2098,34 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                     'progresso': 0.0,
                     'ativo': True
                 })
+            
+            # Calcular progresso real de cada serviço baseado nos RDOs (FALLBACK)
+            print(f"📊 FALLBACK: Calculando progresso REAL baseado nos RDOs para {len(servicos_lista)} serviços...")
+            for servico_dict in servicos_lista:
+                try:
+                    # Buscar subatividades deste serviço em TODOS os RDOs da obra
+                    subatividades = db.session.query(RDOServicoSubatividade).join(
+                        RDO, RDOServicoSubatividade.rdo_id == RDO.id
+                    ).filter(
+                        RDO.obra_id == obra_id,
+                        RDOServicoSubatividade.servico_id == servico_dict['id'],
+                        RDOServicoSubatividade.ativo == True
+                    ).all()
+                    
+                    if subatividades:
+                        # Calcular progresso médio das subatividades
+                        total_percentual = sum(sub.percentual_conclusao or 0 for sub in subatividades)
+                        progresso_real = round(total_percentual / len(subatividades), 1)
+                        servico_dict['progresso'] = progresso_real
+                        servico_dict['total_subatividades'] = len(subatividades)
+                        print(f"   📊 Serviço '{servico_dict['nome']}': {len(subatividades)} subatividades, progresso={progresso_real}%")
+                    else:
+                        servico_dict['progresso'] = 0.0
+                        servico_dict['total_subatividades'] = 0
+                except Exception as e:
+                    print(f"   ⚠️ Erro ao calcular progresso do serviço {servico_dict['id']}: {e}")
+                    servico_dict['progresso'] = 0.0
+                    servico_dict['total_subatividades'] = 0
             
             print(f"✅ FALLBACK: {len(servicos_lista)} serviços encontrados")
             return servicos_lista
@@ -2353,12 +2406,56 @@ def detalhes_obra(id):
         print(f"DEBUG OBRA ENCONTRADA: {obra.nome} - Admin: {obra.admin_id}")
         print(f"DEBUG OBRA DADOS: Status={obra.status}, Orçamento={obra.orcamento}")
         
-        # Buscar funcionários associados à obra - usar admin_id da obra encontrada
+        # === CALCULAR KPIs BASEADO EM RDOs ===
+        # Buscar RDOs da obra para cálculo de KPIs
+        rdos_obra_kpis = RDO.query.filter_by(obra_id=obra_id).all()
+        rdo_ids = [rdo.id for rdo in rdos_obra_kpis]
+        
+        # Buscar mão de obra de todos os RDOs da obra
+        mao_obra_rdos = RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).all() if rdo_ids else []
+        
+        # Calcular totais baseados em RDOs
+        total_horas_rdos = sum(mo.horas_trabalhadas for mo in mao_obra_rdos)
+        dias_trabalhados_rdos = len(set([rdo.data_relatorio for rdo in rdos_obra_kpis]))
+        funcionarios_unicos_rdos = len(set([mo.funcionario_id for mo in mao_obra_rdos]))
+        
+        # Calcular custo mão de obra baseado em RDOs
+        total_custo_mao_obra_rdos = 0.0
+        for mo in mao_obra_rdos:
+            funcionario = Funcionario.query.get(mo.funcionario_id)
+            if funcionario and funcionario.salario:
+                custo_hora = funcionario.salario / 220.0
+                total_custo_mao_obra_rdos += custo_hora * mo.horas_trabalhadas
+            else:
+                # Fallback: salário padrão 1500
+                total_custo_mao_obra_rdos += (1500 / 220.0) * mo.horas_trabalhadas
+        
+        print(f"DEBUG KPIs RDO: Horas={total_horas_rdos}, Dias={dias_trabalhados_rdos}, Funcionários={funcionarios_unicos_rdos}, Custo MO={total_custo_mao_obra_rdos:.2f}")
+        
+        # Buscar funcionários que trabalharam na obra (baseado nos RDOs)
         if admin_id is not None:
-            funcionarios_obra = Funcionario.query.filter_by(admin_id=admin_id).all()
+            funcionarios_obra = db.session.query(Funcionario).join(
+                RDOMaoObra, Funcionario.id == RDOMaoObra.funcionario_id
+            ).join(
+                RDO, RDOMaoObra.rdo_id == RDO.id
+            ).filter(
+                RDO.obra_id == obra_id,
+                Funcionario.admin_id == admin_id
+            ).group_by(Funcionario.id).order_by(
+                func.sum(RDOMaoObra.horas_trabalhadas).desc()
+            ).all()
         else:
-            funcionarios_obra = Funcionario.query.all()
-        print(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados para admin_id {admin_id}")
+            # Produção sem filtro de admin_id
+            funcionarios_obra = db.session.query(Funcionario).join(
+                RDOMaoObra, Funcionario.id == RDOMaoObra.funcionario_id
+            ).join(
+                RDO, RDOMaoObra.rdo_id == RDO.id
+            ).filter(
+                RDO.obra_id == obra_id
+            ).group_by(Funcionario.id).order_by(
+                func.sum(RDOMaoObra.horas_trabalhadas).desc()
+            ).all()
+        print(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados que trabalharam na obra {obra_id}")
         
         # Calcular custos de mão de obra para o período
         total_custo_mao_obra = 0.0
@@ -2567,16 +2664,16 @@ def detalhes_obra(id):
             print(f"ERRO ao calcular progresso da obra: {e}")
             progresso_geral = 0.0
 
-        # Montar KPIs finais da obra
+        # Montar KPIs finais da obra (usando dados dos RDOs)
         kpis_obra = {
             'total_funcionarios': len(funcionarios_obra),
-            'funcionarios_periodo': len(set([r.funcionario_id for r in registros_periodo])),
-            'custo_mao_obra': total_custo_mao_obra,
+            'funcionarios_periodo': funcionarios_unicos_rdos,  # USAR RDO
+            'custo_mao_obra': total_custo_mao_obra_rdos,  # USAR RDO
             'custo_alimentacao': custo_alimentacao,
             'custo_transporte': custos_transporte_total + custo_transporte,
-            'custo_total': total_custo_mao_obra + custo_alimentacao + custo_transporte + outros_custos + custos_transporte_total,
-            'total_horas': total_horas_periodo,
-            'dias_trabalhados': len(set([r.data for r in registros_periodo])),
+            'custo_total': total_custo_mao_obra_rdos + custo_alimentacao + custo_transporte + outros_custos + custos_transporte_total,  # USAR RDO
+            'total_horas': total_horas_rdos,  # USAR RDO
+            'dias_trabalhados': dias_trabalhados_rdos,  # USAR RDO
             'total_rdos': 0,
             'funcionarios_ativos': len(funcionarios_obra),
             'progresso_geral': progresso_geral
