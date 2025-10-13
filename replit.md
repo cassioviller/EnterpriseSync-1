@@ -4,6 +4,12 @@
 SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management system designed to streamline core business operations for the SMB sector. It offers comprehensive solutions for commercial proposals, employee management, construction project control (Daily Work Reports - RDO), and automated payroll. The system aims to enhance efficiency from sales proposal generation and complex payroll calculations to construction site management.
 
 ## Recent Changes
+**October 13, 2025:**
+- Fixed construction site details page to show only employees who clocked in (based on ponto records)
+- Implemented dynamic service progress calculation from RDO data using `calcular_progresso_real_servico` function
+- Fixed critical bug where service progress regressed to 0% when newer RDOs omitted subactivities - now aggregates latest value per subactivity across all RDOs using MAX(id) grouped by subactivity name
+- Architect approved service progress fix with recommendations for future improvements (temporal fields, duplicate validation, performance monitoring)
+
 **October 10, 2025:**
 - Added Almoxarifado v3.0 (Warehouse Management Module) - Complete system for managing materials, tools, and PPE with full traceability and multi-tenant isolation
 
