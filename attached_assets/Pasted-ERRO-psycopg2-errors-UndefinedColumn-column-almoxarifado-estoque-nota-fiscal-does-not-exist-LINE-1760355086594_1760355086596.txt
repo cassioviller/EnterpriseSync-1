@@ -1,0 +1,87 @@
+ERRO: (psycopg2.errors.UndefinedColumn) column almoxarifado_estoque.nota_fiscal does not exist
+LINE 2: ...a_validade AS almoxarifado_estoque_data_validade, almoxarifa...
+                                                             ^
+
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT almoxarifado_estoque.id AS almoxarifado_estoque_id, almoxarifado_estoque.item_id AS almoxarifado_estoque_item_id, almoxarifado_estoque.numero_serie AS almoxarifado_estoque_numero_serie, almoxarifado_estoque.quantidade AS almoxarifado_estoque_quantidade, almoxarifado_estoque.status AS almoxarifado_estoque_status, almoxarifado_estoque.funcionario_atual_id AS almoxarifado_estoque_funcionario_atual_id, almoxarifado_estoque.obra_id AS almoxarifado_estoque_obra_id, almoxarifado_estoque.valor_unitario AS almoxarifado_estoque_valor_unitario, almoxarifado_estoque.lote AS almoxarifado_estoque_lote, almoxarifado_estoque.data_validade AS almoxarifado_estoque_data_validade, almoxarifado_estoque.nota_fiscal AS almoxarifado_estoque_nota_fiscal, almoxarifado_estoque.data_entrada AS almoxarifado_estoque_data_entrada, almoxarifado_estoque.admin_id AS almoxarifado_estoque_admin_id, almoxarifado_estoque.created_at AS almoxarifado_estoque_created_at, almoxarifado_estoque.updated_at AS almoxarifado_estoque_updated_at 
+FROM almoxarifado_estoque 
+WHERE almoxarifado_estoque.item_id = %(item_id_1)s AND almoxarifado_estoque.status = %(status_1)s AND almoxarifado_estoque.admin_id = %(admin_id_1)s) AS anon_1]
+[parameters: {&#39;item_id_1&#39;: 1, &#39;status_1&#39;: &#39;DISPONIVEL&#39;, &#39;admin_id_1&#39;: 10}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1963, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 943, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column almoxarifado_estoque.nota_fiscal does not exist
+LINE 2: ...a_validade AS almoxarifado_estoque_data_validade, almoxarifa...
+                                                             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask_login/utils.py&#34;, line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/almoxarifado_views.py&#34;, line 48, in dashboard
+    ).count()
+      ^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 3146, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2835, in scalar
+    ret = self.one()
+          ^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2808, in one
+    return self._iter().one()  # type: ignore
+           ^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2365, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2251, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/context.py&#34;, line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1415, in execute
+    return meth(
+           ^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/sql/elements.py&#34;, line 523, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1637, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1842, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1982, in _exec_single_context
+    self._handle_dbapi_exception(
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 2351, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1963, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 943, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column almoxarifado_estoque.nota_fiscal does not exist
+LINE 2: ...a_validade AS almoxarifado_estoque_data_validade, almoxarifa...
+                                                             ^
+
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT almoxarifado_estoque.id AS almoxarifado_estoque_id, almoxarifado_estoque.item_id AS almoxarifado_estoque_item_id, almoxarifado_estoque.numero_serie AS almoxarifado_estoque_numero_serie, almoxarifado_estoque.quantidade AS almoxarifado_estoque_quantidade, almoxarifado_estoque.status AS almoxarifado_estoque_status, almoxarifado_estoque.funcionario_atual_id AS almoxarifado_estoque_funcionario_atual_id, almoxarifado_estoque.obra_id AS almoxarifado_estoque_obra_id, almoxarifado_estoque.valor_unitario AS almoxarifado_estoque_valor_unitario, almoxarifado_estoque.lote AS almoxarifado_estoque_lote, almoxarifado_estoque.data_validade AS almoxarifado_estoque_data_validade, almoxarifado_estoque.nota_fiscal AS almoxarifado_estoque_nota_fiscal, almoxarifado_estoque.data_entrada AS almoxarifado_estoque_data_entrada, almoxarifado_estoque.admin_id AS almoxarifado_estoque_admin_id, almoxarifado_estoque.created_at AS almoxarifado_estoque_created_at, almoxarifado_estoque.updated_at AS almoxarifado_estoque_updated_at 
+FROM almoxarifado_estoque 
+WHERE almoxarifado_estoque.item_id = %(item_id_1)s AND almoxarifado_estoque.status = %(status_1)s AND almoxarifado_estoque.admin_id = %(admin_id_1)s) AS anon_1]
+[parameters: {&#39;item_id_1&#39;: 1, &#39;status_1&#39;: &#39;DISPONIVEL&#39;, &#39;admin_id_1&#39;: 10}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
