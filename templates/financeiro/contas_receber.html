@@ -1,0 +1,290 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Contas a Receber - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-hand-holding-usd me-2"></i>Contas a Receber</h2>
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNovaConta">
+                    <i class="fas fa-plus me-2"></i>Nova Conta a Receber
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select" onchange="this.form.submit()">
+                        <option value="">Todos</option>
+                        <option value="PENDENTE" {% if request.args.get('status') == 'PENDENTE' %}selected{% endif %}>Pendente</option>
+                        <option value="PARCIAL" {% if request.args.get('status') == 'PARCIAL' %}selected{% endif %}>Recebido Parcial</option>
+                        <option value="RECEBIDO" {% if request.args.get('status') == 'RECEBIDO' %}selected{% endif %}>Recebido</option>
+                        <option value="VENCIDO" {% if request.args.get('status') == 'VENCIDO' %}selected{% endif %}>Vencido</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Obra</label>
+                    <select name="obra_id" class="form-select" onchange="this.form.submit()">
+                        <option value="">Todas as obras</option>
+                        {% for obra in obras %}
+                        <option value="{{ obra.id }}" {% if request.args.get('obra_id') == obra.id|string %}selected{% endif %}>
+                            {{ obra.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <a href="{{ url_for('financeiro.listar_contas_receber') }}" class="btn btn-secondary">
+                        <i class="fas fa-times me-2"></i>Limpar Filtros
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Resumo -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h6>Vencidas</h6>
+                    <h4>R$ {{ "%.2f"|format(resumo.vencidas|default(0)) }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h6>A Vencer (7 dias)</h6>
+                    <h4>R$ {{ "%.2f"|format(resumo.a_vencer|default(0)) }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h6>Pendentes</h6>
+                    <h4>R$ {{ "%.2f"|format(resumo.pendentes|default(0)) }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h6>Recebidas no Mês</h6>
+                    <h4>R$ {{ "%.2f"|format(resumo.recebidas_mes|default(0)) }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Contas -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Vencimento</th>
+                            <th>Cliente</th>
+                            <th>Descrição</th>
+                            <th>Obra</th>
+                            <th>Valor Original</th>
+                            <th>Valor Recebido</th>
+                            <th>Saldo</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for conta in contas %}
+                        <tr class="{% if conta.status == 'VENCIDO' %}table-danger{% endif %}">
+                            <td>{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ conta.cliente_nome }}</td>
+                            <td>{{ conta.descricao }}</td>
+                            <td>
+                                {% if conta.obra %}
+                                <span class="badge bg-secondary">{{ conta.obra.nome }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>R$ {{ "%.2f"|format(conta.valor_original) }}</td>
+                            <td>R$ {{ "%.2f"|format(conta.valor_recebido) }}</td>
+                            <td>R$ {{ "%.2f"|format(conta.saldo) }}</td>
+                            <td>
+                                {% if conta.status == 'PENDENTE' %}
+                                <span class="badge bg-warning">Pendente</span>
+                                {% elif conta.status == 'PARCIAL' %}
+                                <span class="badge bg-info">Parcial</span>
+                                {% elif conta.status == 'RECEBIDO' %}
+                                <span class="badge bg-success">Recebido</span>
+                                {% elif conta.status == 'VENCIDO' %}
+                                <span class="badge bg-danger">Vencido</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if conta.status != 'RECEBIDO' %}
+                                <button class="btn btn-sm btn-success" 
+                                        onclick="abrirModalBaixa({{ conta.id }}, '{{ conta.descricao }}', {{ conta.saldo }})">
+                                    <i class="fas fa-dollar-sign"></i> Baixar
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-sm btn-info" onclick="verDetalhes({{ conta.id }})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">
+                                <i class="fas fa-inbox fa-3x mb-2"></i><br>
+                                Nenhuma conta a receber encontrada
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nova Conta -->
+<div class="modal fade" id="modalNovaConta" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nova Conta a Receber</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{{ url_for('financeiro.criar_conta_receber') }}">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Cliente *</label>
+                            <input type="text" name="cliente_nome" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">CPF/CNPJ</label>
+                            <input type="text" name="cliente_cpf_cnpj" class="form-control">
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label">Descrição *</label>
+                            <input type="text" name="descricao" class="form-control" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Valor *</label>
+                            <input type="number" name="valor" class="form-control" step="0.01" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Vencimento *</label>
+                            <input type="date" name="data_vencimento" class="form-control" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Obra</label>
+                            <select name="obra_id" class="form-select">
+                                <option value="">Sem obra específica</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Número Documento</label>
+                            <input type="text" name="numero_documento" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Conta Contábil</label>
+                            <input type="text" name="conta_contabil_codigo" class="form-control" 
+                                   placeholder="Ex: 1.1.03">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Baixar Recebimento -->
+<div class="modal fade" id="modalBaixaRecebimento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Baixar Recebimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{{ url_for('financeiro.baixar_conta_receber') }}">
+                <input type="hidden" name="conta_id" id="baixa_conta_id">
+                <div class="modal-body">
+                    <p><strong>Conta:</strong> <span id="baixa_descricao"></span></p>
+                    <p><strong>Saldo:</strong> R$ <span id="baixa_saldo">0.00</span></p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Valor a Receber *</label>
+                        <input type="number" name="valor_recebido" id="baixa_valor" 
+                               class="form-control" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Data Recebimento *</label>
+                        <input type="date" name="data_recebimento" class="form-control" 
+                               value="{{ datetime.now().strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Forma de Recebimento *</label>
+                        <select name="forma_recebimento" class="form-select" required>
+                            <option value="DINHEIRO">Dinheiro</option>
+                            <option value="PIX">PIX</option>
+                            <option value="TRANSFERENCIA">Transferência</option>
+                            <option value="BOLETO">Boleto</option>
+                            <option value="CARTAO">Cartão</option>
+                            <option value="CHEQUE">Cheque</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Banco (opcional)</label>
+                        <select name="banco_id" class="form-select">
+                            <option value="">Sem vínculo bancário</option>
+                            {% for banco in bancos %}
+                            <option value="{{ banco.id }}">{{ banco.nome }} - {{ banco.agencia }}/{{ banco.conta }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar Recebimento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirModalBaixa(contaId, descricao, saldo) {
+    document.getElementById('baixa_conta_id').value = contaId;
+    document.getElementById('baixa_descricao').textContent = descricao;
+    document.getElementById('baixa_saldo').textContent = saldo.toFixed(2);
+    document.getElementById('baixa_valor').value = saldo.toFixed(2);
+    document.getElementById('baixa_valor').max = saldo.toFixed(2);
+    new bootstrap.Modal(document.getElementById('modalBaixaRecebimento')).show();
+}
+
+function verDetalhes(contaId) {
+    // Implementar visualização de detalhes
+    alert('Detalhes da conta ' + contaId);
+}
+</script>
+{% endblock %}

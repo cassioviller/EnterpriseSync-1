@@ -73,13 +73,103 @@ def listar_contas_pagar():
     # Obras para filtro
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
     
+    # Bancos para dropdown de baixa
+    bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).all()
+    
+    # Resumo financeiro
+    hoje = date.today()
+    vencidas = sum(c.saldo for c in ContaPagar.query.filter_by(admin_id=admin_id).filter(
+        ContaPagar.data_vencimento < hoje,
+        ContaPagar.status.in_(['PENDENTE', 'PARCIAL'])
+    ).all())
+    
+    a_vencer = sum(c.saldo for c in ContaPagar.query.filter_by(admin_id=admin_id).filter(
+        ContaPagar.data_vencimento >= hoje,
+        ContaPagar.data_vencimento <= hoje + timedelta(days=7),
+        ContaPagar.status.in_(['PENDENTE', 'PARCIAL'])
+    ).all())
+    
+    pendentes = sum(c.saldo for c in ContaPagar.query.filter_by(admin_id=admin_id, status='PENDENTE').all())
+    
+    pagas_mes = sum(c.valor_pago for c in ContaPagar.query.filter_by(admin_id=admin_id).filter(
+        ContaPagar.data_pagamento >= date(hoje.year, hoje.month, 1),
+        ContaPagar.data_pagamento <= hoje
+    ).all())
+    
+    resumo = {
+        'vencidas': vencidas,
+        'a_vencer': a_vencer,
+        'pendentes': pendentes,
+        'pagas_mes': pagas_mes
+    }
+    
     return render_template(
         'financeiro/contas_pagar.html',
         contas=contas,
         obras=obras,
+        bancos=bancos,
+        resumo=resumo,
         status_selecionado=status,
         obra_selecionada=obra_id
     )
+
+
+@financeiro_bp.route('/contas-pagar/criar', methods=['POST'])
+@login_required
+def criar_conta_pagar():
+    """Criar conta a pagar via formulário modal"""
+    try:
+        admin_id = get_admin_id()
+        
+        fornecedor_nome = request.form.get('fornecedor_nome')
+        fornecedor_cpf_cnpj = request.form.get('fornecedor_cpf_cnpj') or None
+        obra_id_input = request.form.get('obra_id', type=int) or None
+        descricao = request.form.get('descricao')
+        valor = Decimal(request.form.get('valor'))
+        data_vencimento = datetime.strptime(
+            request.form.get('data_vencimento'), 
+            '%Y-%m-%d'
+        ).date()
+        numero_documento = request.form.get('numero_documento') or None
+        conta_contabil_codigo = request.form.get('conta_contabil_codigo') or None
+        
+        # SEGURANÇA: Validar que obra_id pertence ao admin atual
+        obra_id = None
+        if obra_id_input:
+            obra = Obra.query.filter_by(id=obra_id_input, admin_id=admin_id).first()
+            if obra:
+                obra_id = obra_id_input
+            else:
+                logger.warning(f"⚠️ Tentativa de vincular obra {obra_id_input} de outro tenant pelo admin {admin_id}")
+        
+        # Criar conta com obra_id validado
+        conta = ContaPagar(
+            admin_id=admin_id,
+            fornecedor_nome=fornecedor_nome,
+            fornecedor_cpf_cnpj=fornecedor_cpf_cnpj,
+            obra_id=obra_id,
+            numero_documento=numero_documento,
+            descricao=descricao,
+            valor_original=valor,
+            valor_pago=Decimal('0'),
+            saldo=valor,
+            data_emissao=date.today(),
+            data_vencimento=data_vencimento,
+            status='PENDENTE',
+            conta_contabil_codigo=conta_contabil_codigo
+        )
+        
+        db.session.add(conta)
+        db.session.commit()
+        
+        flash(f'Conta a pagar criada com sucesso!', 'success')
+        return redirect(url_for('financeiro.listar_contas_pagar'))
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao criar conta a pagar: {str(e)}")
+        flash('Erro ao criar conta a pagar', 'danger')
+        return redirect(url_for('financeiro.listar_contas_pagar'))
 
 
 @financeiro_bp.route('/contas-pagar/nova', methods=['GET', 'POST'])
@@ -201,13 +291,103 @@ def listar_contas_receber():
     # Obras para filtro
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
     
+    # Bancos para dropdown de baixa
+    bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).all()
+    
+    # Resumo financeiro
+    hoje = date.today()
+    vencidas = sum(c.saldo for c in ContaReceber.query.filter_by(admin_id=admin_id).filter(
+        ContaReceber.data_vencimento < hoje,
+        ContaReceber.status.in_(['PENDENTE', 'PARCIAL'])
+    ).all())
+    
+    a_vencer = sum(c.saldo for c in ContaReceber.query.filter_by(admin_id=admin_id).filter(
+        ContaReceber.data_vencimento >= hoje,
+        ContaReceber.data_vencimento <= hoje + timedelta(days=7),
+        ContaReceber.status.in_(['PENDENTE', 'PARCIAL'])
+    ).all())
+    
+    pendentes = sum(c.saldo for c in ContaReceber.query.filter_by(admin_id=admin_id, status='PENDENTE').all())
+    
+    recebidas_mes = sum(c.valor_recebido for c in ContaReceber.query.filter_by(admin_id=admin_id).filter(
+        ContaReceber.data_recebimento >= date(hoje.year, hoje.month, 1),
+        ContaReceber.data_recebimento <= hoje
+    ).all())
+    
+    resumo = {
+        'vencidas': vencidas,
+        'a_vencer': a_vencer,
+        'pendentes': pendentes,
+        'recebidas_mes': recebidas_mes
+    }
+    
     return render_template(
         'financeiro/contas_receber.html',
         contas=contas,
         obras=obras,
+        bancos=bancos,
+        resumo=resumo,
         status_selecionado=status,
         obra_selecionada=obra_id
     )
+
+
+@financeiro_bp.route('/contas-receber/criar', methods=['POST'])
+@login_required
+def criar_conta_receber():
+    """Criar conta a receber via formulário modal"""
+    try:
+        admin_id = get_admin_id()
+        
+        cliente_nome = request.form.get('cliente_nome')
+        cliente_cpf_cnpj = request.form.get('cliente_cpf_cnpj') or None
+        obra_id_input = request.form.get('obra_id', type=int) or None
+        descricao = request.form.get('descricao')
+        valor = Decimal(request.form.get('valor'))
+        data_vencimento = datetime.strptime(
+            request.form.get('data_vencimento'), 
+            '%Y-%m-%d'
+        ).date()
+        numero_documento = request.form.get('numero_documento') or None
+        conta_contabil_codigo = request.form.get('conta_contabil_codigo') or None
+        
+        # SEGURANÇA: Validar que obra_id pertence ao admin atual
+        obra_id = None
+        if obra_id_input:
+            obra = Obra.query.filter_by(id=obra_id_input, admin_id=admin_id).first()
+            if obra:
+                obra_id = obra_id_input
+            else:
+                logger.warning(f"⚠️ Tentativa de vincular obra {obra_id_input} de outro tenant pelo admin {admin_id}")
+        
+        # Criar conta com obra_id validado
+        conta = ContaReceber(
+            admin_id=admin_id,
+            cliente_nome=cliente_nome,
+            cliente_cpf_cnpj=cliente_cpf_cnpj,
+            obra_id=obra_id,
+            numero_documento=numero_documento,
+            descricao=descricao,
+            valor_original=valor,
+            valor_recebido=Decimal('0'),
+            saldo=valor,
+            data_emissao=date.today(),
+            data_vencimento=data_vencimento,
+            status='PENDENTE',
+            conta_contabil_codigo=conta_contabil_codigo
+        )
+        
+        db.session.add(conta)
+        db.session.commit()
+        
+        flash(f'Conta a receber criada com sucesso!', 'success')
+        return redirect(url_for('financeiro.listar_contas_receber'))
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao criar conta a receber: {str(e)}")
+        flash('Erro ao criar conta a receber', 'danger')
+        return redirect(url_for('financeiro.listar_contas_receber'))
 
 
 @financeiro_bp.route('/contas-receber/nova', methods=['GET', 'POST'])
@@ -344,8 +524,53 @@ def listar_bancos():
     """Lista bancos da empresa"""
     admin_id = get_admin_id()
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id).all()
+    total_saldo = sum(b.saldo_atual for b in bancos if b.ativo)
     
-    return render_template('financeiro/bancos.html', bancos=bancos)
+    return render_template('financeiro/bancos.html', bancos=bancos, total_saldo=total_saldo)
+
+
+@financeiro_bp.route('/bancos/criar', methods=['POST'])
+@login_required
+def criar_banco():
+    """Criar banco via formulário modal"""
+    try:
+        admin_id = get_admin_id()
+        
+        nome = request.form.get('nome')
+        tipo_conta = request.form.get('tipo_conta')
+        codigo_banco = request.form.get('codigo_banco')
+        nome_banco = request.form.get('nome_banco')
+        agencia = request.form.get('agencia')
+        conta = request.form.get('conta')
+        saldo_inicial = Decimal(request.form.get('saldo_inicial', '0'))
+        ativo = request.form.get('ativo', '1') == '1'
+        observacoes = request.form.get('observacoes') or None
+        
+        banco = BancoEmpresa(
+            admin_id=admin_id,
+            nome=nome,
+            tipo_conta=tipo_conta,
+            codigo_banco=codigo_banco,
+            nome_banco=nome_banco,
+            agencia=agencia,
+            conta=conta,
+            saldo_inicial=saldo_inicial,
+            saldo_atual=saldo_inicial,
+            ativo=ativo,
+            observacoes=observacoes
+        )
+        
+        db.session.add(banco)
+        db.session.commit()
+        
+        flash(f'Banco {nome} cadastrado com sucesso!', 'success')
+        return redirect(url_for('financeiro.listar_bancos'))
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao criar banco: {str(e)}")
+        flash('Erro ao cadastrar banco', 'danger')
+        return redirect(url_for('financeiro.listar_bancos'))
 
 
 @financeiro_bp.route('/bancos/novo', methods=['GET', 'POST'])
