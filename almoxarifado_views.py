@@ -674,7 +674,7 @@ def processar_entrada():
 @almoxarifado_bp.route('/processar-entrada-multipla', methods=['POST'])
 @login_required
 def processar_entrada_multipla():
-    """Processa entrada de múltiplos materiais (carrinho)"""
+    """Processa entrada de múltiplos materiais (carrinho) - TRANSAÇÃO ATÔMICA"""
     admin_id = get_admin_id()
     if not admin_id:
         return jsonify({'success': False, 'message': 'Erro de autenticação'}), 401
@@ -686,20 +686,33 @@ def processar_entrada_multipla():
         observacoes = data.get('observacoes', '').strip()
         
         if not itens or len(itens) == 0:
-            return jsonify({'success': False, 'message': 'Nenhum item no carrinho'}), 400
+            return jsonify({'success': False, 'message': 'Carrinho vazio'}), 400
         
-        total_processados = 0
+        # ========================================
+        # FASE 1: VALIDAÇÃO PRÉVIA COMPLETA
+        # ========================================
+        erros = []
+        itens_validados = []
         
-        for item_data in itens:
+        for idx, item_data in enumerate(itens):
             item_id = item_data.get('item_id')
             tipo_controle = item_data.get('tipo_controle')
             valor_unitario = float(item_data.get('valor_unitario', 0))
             
-            if not item_id or not tipo_controle or valor_unitario <= 0:
+            # Validar: item_id, tipo_controle e valor_unitario obrigatórios
+            if not item_id or not tipo_controle:
+                erros.append(f"Item {idx+1}: Dados incompletos")
                 continue
             
+            # Validar: valor unitário > 0
+            if valor_unitario <= 0:
+                erros.append(f"Item {idx+1}: Valor unitário deve ser maior que zero")
+                continue
+            
+            # Verificar se item existe
             item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
             if not item:
+                erros.append(f"Item {idx+1}: Item não encontrado")
                 continue
             
             if tipo_controle == 'SERIALIZADO':
@@ -707,8 +720,12 @@ def processar_entrada_multipla():
                 numeros_serie = item_data.get('numeros_serie', '')
                 series = [s.strip() for s in numeros_serie.split(',') if s.strip()]
                 
+                if not series:
+                    erros.append(f"Item {idx+1} ({item.nome}): Números de série obrigatórios para itens serializados")
+                    continue
+                
+                # Validar: verificar duplicatas nos números de série
                 for serie in series:
-                    # Verificar duplicata
                     existe = AlmoxarifadoEstoque.query.filter_by(
                         item_id=item_id,
                         numero_serie=serie,
@@ -716,10 +733,57 @@ def processar_entrada_multipla():
                     ).first()
                     
                     if existe:
-                        continue  # Pular duplicatas
-                    
+                        erros.append(f"Item {idx+1} ({item.nome}): Número de série '{serie}' já cadastrado")
+                
+                # Se passou nas validações, adicionar à lista de processamento
+                itens_validados.append({
+                    'item': item,
+                    'tipo_controle': tipo_controle,
+                    'valor_unitario': valor_unitario,
+                    'series': series
+                })
+                
+            else:  # CONSUMIVEL
+                quantidade = float(item_data.get('quantidade', 0))
+                
+                # Validar: quantidade > 0
+                if quantidade <= 0:
+                    erros.append(f"Item {idx+1} ({item.nome}): Quantidade deve ser maior que zero")
+                    continue
+                
+                # Se passou nas validações, adicionar à lista de processamento
+                itens_validados.append({
+                    'item': item,
+                    'tipo_controle': tipo_controle,
+                    'valor_unitario': valor_unitario,
+                    'quantidade': quantidade
+                })
+        
+        # Se houver QUALQUER erro, abortar TUDO
+        if erros:
+            return jsonify({
+                'success': False,
+                'message': f'{len(erros)} erro(s) encontrado(s)',
+                'erros': erros
+            }), 400
+        
+        # ========================================
+        # FASE 2: PROCESSAMENTO TRANSACIONAL
+        # ========================================
+        total_processados = 0
+        total_itens_esperados = len(itens_validados)
+        
+        for item_validado in itens_validados:
+            item = item_validado['item']
+            tipo_controle = item_validado['tipo_controle']
+            valor_unitario = item_validado['valor_unitario']
+            
+            if tipo_controle == 'SERIALIZADO':
+                series = item_validado['series']
+                
+                for serie in series:
                     estoque = AlmoxarifadoEstoque(
-                        item_id=item_id,
+                        item_id=item.id,
                         numero_serie=serie,
                         quantidade=1,
                         valor_unitario=valor_unitario,
@@ -729,7 +793,7 @@ def processar_entrada_multipla():
                     db.session.add(estoque)
                     
                     movimento = AlmoxarifadoMovimento(
-                        item_id=item_id,
+                        item_id=item.id,
                         tipo_movimento='ENTRADA',
                         quantidade=1,
                         numero_serie=serie,
@@ -742,16 +806,14 @@ def processar_entrada_multipla():
                         obra_id=None
                     )
                     db.session.add(movimento)
-                    total_processados += 1
-                    
-            else:  # CONSUMIVEL
-                quantidade = float(item_data.get('quantidade', 0))
                 
-                if quantidade <= 0:
-                    continue
+                total_processados += 1
+                
+            else:  # CONSUMIVEL
+                quantidade = item_validado['quantidade']
                 
                 estoque = AlmoxarifadoEstoque(
-                    item_id=item_id,
+                    item_id=item.id,
                     quantidade=quantidade,
                     valor_unitario=valor_unitario,
                     status='DISPONIVEL',
@@ -761,7 +823,7 @@ def processar_entrada_multipla():
                 db.session.flush()
                 
                 movimento = AlmoxarifadoMovimento(
-                    item_id=item_id,
+                    item_id=item.id,
                     tipo_movimento='ENTRADA',
                     quantidade=quantidade,
                     valor_unitario=valor_unitario,
@@ -775,17 +837,27 @@ def processar_entrada_multipla():
                 db.session.add(movimento)
                 total_processados += 1
         
+        # Commit APENAS se TODOS itens foram processados
+        if total_processados != total_itens_esperados:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'message': f'Erro: Esperado {total_itens_esperados} itens, processado {total_processados}'
+            }), 500
+        
         db.session.commit()
         
         return jsonify({
             'success': True,
-            'message': f'Entrada processada com sucesso! {total_processados} itens cadastrados.'
+            'message': f'{total_processados} itens processados com sucesso!',
+            'total_esperado': total_itens_esperados,
+            'total_processado': total_processados
         })
         
     except Exception as e:
         db.session.rollback()
         logger.error(f'Erro ao processar entrada múltipla: {str(e)}')
-        return jsonify({'success': False, 'message': f'Erro ao processar entrada: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': 'Erro ao processar operação'}), 500
 
 # ========================================
 # SAÍDA DE MATERIAIS
@@ -1004,6 +1076,217 @@ def processar_saida():
         logger.error(f'Erro ao processar saída: {str(e)}')
         flash('Erro ao processar saída de material', 'danger')
         return redirect(url_for('almoxarifado.saida'))
+
+@almoxarifado_bp.route('/processar-saida-multipla', methods=['POST'])
+@login_required
+def processar_saida_multipla():
+    """Processa saída de múltiplos itens (carrinho) - TRANSAÇÃO ATÔMICA"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        return jsonify({'success': False, 'message': 'Erro de autenticação'}), 401
+    
+    try:
+        data = request.get_json()
+        itens = data.get('itens', [])
+        observacoes = data.get('observacoes', '').strip()
+        
+        if not itens or len(itens) == 0:
+            return jsonify({'success': False, 'message': 'Carrinho vazio'}), 400
+        
+        # ========================================
+        # FASE 1: VALIDAÇÃO PRÉVIA COMPLETA
+        # ========================================
+        erros = []
+        itens_validados = []
+        
+        # Validar que todos itens têm mesmo funcionário e obra
+        funcionario_id = itens[0].get('funcionario_id')
+        obra_id = itens[0].get('obra_id') or None
+        
+        for item_data in itens:
+            if item_data.get('funcionario_id') != funcionario_id:
+                return jsonify({'success': False, 'message': 'Todos itens devem ter mesmo funcionário'}), 400
+            item_obra_id = item_data.get('obra_id') or None
+            if item_obra_id != obra_id:
+                return jsonify({'success': False, 'message': 'Todos itens devem ter mesma obra'}), 400
+        
+        # Validar que funcionário existe
+        funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
+        if not funcionario:
+            return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 400
+        
+        # Validar cada item
+        for idx, item_data in enumerate(itens):
+            item_id = item_data.get('item_id')
+            tipo_controle = item_data.get('tipo_controle')
+            
+            # Verificar se item existe
+            item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
+            if not item:
+                erros.append(f"Item {idx+1}: Item não encontrado")
+                continue
+            
+            if tipo_controle == 'SERIALIZADO':
+                estoque_id = item_data.get('estoque_id')
+                numero_serie = item_data.get('numero_serie')
+                
+                # VALIDAR: Série existe e está disponível?
+                estoque = AlmoxarifadoEstoque.query.filter_by(
+                    id=estoque_id,
+                    item_id=item_id,
+                    status='DISPONIVEL',
+                    admin_id=admin_id
+                ).first()
+                
+                if not estoque:
+                    erros.append(f"Item {idx+1} ({item.nome}): Número de série {numero_serie} não disponível")
+                    continue
+                
+                # Se passou nas validações, adicionar à lista de processamento
+                itens_validados.append({
+                    'item': item,
+                    'tipo_controle': tipo_controle,
+                    'estoque_id': estoque_id,
+                    'numero_serie': numero_serie,
+                    'estoque': estoque
+                })
+            
+            else:  # CONSUMIVEL
+                quantidade = float(item_data.get('quantidade', 0))
+                
+                # Validar: quantidade > 0
+                if quantidade <= 0:
+                    erros.append(f"Item {idx+1} ({item.nome}): Quantidade deve ser maior que zero")
+                    continue
+                
+                # VALIDAR: Estoque FIFO suficiente?
+                estoque_total = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
+                    item_id=item_id,
+                    status='DISPONIVEL',
+                    admin_id=admin_id
+                ).scalar() or 0
+                
+                if estoque_total < quantidade:
+                    erros.append(f"Item {idx+1} ({item.nome}): Estoque insuficiente (disponível: {estoque_total}, solicitado: {quantidade})")
+                    continue
+                
+                # Se passou nas validações, adicionar à lista de processamento
+                itens_validados.append({
+                    'item': item,
+                    'tipo_controle': tipo_controle,
+                    'quantidade': quantidade
+                })
+        
+        # Se houver QUALQUER erro, abortar TUDO
+        if erros:
+            return jsonify({
+                'success': False,
+                'message': f'{len(erros)} erro(s) encontrado(s)',
+                'erros': erros
+            }), 400
+        
+        # ========================================
+        # FASE 2: PROCESSAMENTO TRANSACIONAL
+        # ========================================
+        total_processados = 0
+        total_itens_esperados = len(itens_validados)
+        
+        for item_validado in itens_validados:
+            item = item_validado['item']
+            tipo_controle = item_validado['tipo_controle']
+            
+            if tipo_controle == 'SERIALIZADO':
+                estoque = item_validado['estoque']
+                numero_serie = item_validado['numero_serie']
+                
+                # Atualizar estoque
+                estoque.status = 'EM_USO'
+                estoque.funcionario_id = funcionario_id
+                estoque.obra_id = obra_id
+                estoque.updated_at = datetime.utcnow()
+                
+                # Criar movimento
+                movimento = AlmoxarifadoMovimento(
+                    item_id=item.id,
+                    tipo_movimento='SAIDA',
+                    quantidade=1,
+                    numero_serie=numero_serie,
+                    funcionario_id=funcionario_id,
+                    obra_id=obra_id,
+                    observacao=observacoes,
+                    estoque_id=estoque.id,
+                    admin_id=admin_id,
+                    usuario_id=current_user.id
+                )
+                db.session.add(movimento)
+                total_processados += 1
+            
+            else:  # CONSUMIVEL
+                quantidade = item_validado['quantidade']
+                
+                # Usar FIFO para consumir estoque
+                estoques = AlmoxarifadoEstoque.query.filter_by(
+                    item_id=item.id,
+                    status='DISPONIVEL',
+                    admin_id=admin_id
+                ).order_by(AlmoxarifadoEstoque.created_at).all()
+                
+                qtd_restante = quantidade
+                for est in estoques:
+                    if qtd_restante <= 0:
+                        break
+                    
+                    if est.quantidade >= qtd_restante:
+                        est.quantidade -= qtd_restante
+                        qtd_saida = qtd_restante
+                        qtd_restante = 0
+                        if est.quantidade == 0:
+                            est.status = 'CONSUMIDO'
+                    else:
+                        qtd_saida = est.quantidade
+                        qtd_restante -= est.quantidade
+                        est.quantidade = 0
+                        est.status = 'CONSUMIDO'
+                    
+                    est.updated_at = datetime.utcnow()
+                    
+                    # Criar movimento
+                    movimento = AlmoxarifadoMovimento(
+                        item_id=item.id,
+                        tipo_movimento='SAIDA',
+                        quantidade=qtd_saida,
+                        funcionario_id=funcionario_id,
+                        obra_id=obra_id,
+                        observacao=observacoes,
+                        estoque_id=est.id,
+                        admin_id=admin_id,
+                        usuario_id=current_user.id
+                    )
+                    db.session.add(movimento)
+                
+                total_processados += 1
+        
+        # Commit APENAS se TODOS itens foram processados
+        if total_processados != total_itens_esperados:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'message': f'Erro: Esperado {total_itens_esperados} itens, processado {total_processados}'
+            }), 500
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{total_processados} itens processados com sucesso! Entregues para {funcionario.nome}.',
+            'total_esperado': total_itens_esperados,
+            'total_processado': total_processados
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Erro ao processar saída múltipla: {str(e)}')
+        return jsonify({'success': False, 'message': 'Erro ao processar operação'}), 500
 
 # ========================================
 # DEVOLUÇÃO DE MATERIAIS
@@ -1228,6 +1511,219 @@ def processar_devolucao():
         logger.error(f'Erro ao processar devolução: {str(e)}')
         flash('Erro ao processar devolução de material', 'danger')
         return redirect(url_for('almoxarifado.devolucao'))
+
+@almoxarifado_bp.route('/processar-devolucao-multipla', methods=['POST'])
+@login_required
+def processar_devolucao_multipla():
+    """Processa devolução de múltiplos itens (carrinho) - TRANSAÇÃO ATÔMICA"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        return jsonify({'success': False, 'message': 'Erro de autenticação'}), 401
+    
+    try:
+        data = request.get_json()
+        itens = data.get('itens', [])
+        observacoes = data.get('observacoes', '').strip()
+        
+        if not itens or len(itens) == 0:
+            return jsonify({'success': False, 'message': 'Carrinho vazio'}), 400
+        
+        # ========================================
+        # FASE 1: VALIDAÇÃO PRÉVIA COMPLETA
+        # ========================================
+        erros = []
+        itens_validados = []
+        
+        # Validar que todos itens têm mesmo funcionário
+        funcionario_id = itens[0].get('funcionario_id')
+        
+        for item_data in itens:
+            if item_data.get('funcionario_id') != funcionario_id:
+                return jsonify({'success': False, 'message': 'Todos itens devem ter mesmo funcionário'}), 400
+        
+        # Validar que funcionário existe
+        funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
+        if not funcionario:
+            return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 400
+        
+        # Condições válidas
+        condicoes_validas = ['Perfeito', 'Bom', 'Regular', 'Danificado', 'Inutilizado']
+        
+        # Validar cada item
+        for idx, item_data in enumerate(itens):
+            item_id = item_data.get('item_id')
+            tipo_controle = item_data.get('tipo_controle')
+            condicao_item = item_data.get('condicao_item', '').strip()
+            
+            # Validar: condição obrigatória
+            if not condicao_item:
+                erros.append(f"Item {idx+1}: Condição do item é obrigatória")
+                continue
+            
+            # Validar: condição válida
+            if condicao_item not in condicoes_validas:
+                erros.append(f"Item {idx+1}: Condição '{condicao_item}' inválida")
+                continue
+            
+            # Verificar se item existe
+            item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
+            if not item:
+                erros.append(f"Item {idx+1}: Item não encontrado")
+                continue
+            
+            if tipo_controle == 'SERIALIZADO':
+                estoque_id = item_data.get('estoque_id')
+                numero_serie = item_data.get('numero_serie')
+                
+                # VALIDAR: Item pertence ao funcionário (status='EM_USO')?
+                estoque = AlmoxarifadoEstoque.query.filter_by(
+                    id=estoque_id,
+                    funcionario_id=funcionario_id,
+                    status='EM_USO',
+                    admin_id=admin_id
+                ).first()
+                
+                if not estoque:
+                    erros.append(f"Item {idx+1} ({item.nome}): Número de série {numero_serie} não está em uso pelo funcionário")
+                    continue
+                
+                # Se passou nas validações, adicionar à lista de processamento
+                itens_validados.append({
+                    'item': item,
+                    'tipo_controle': tipo_controle,
+                    'estoque_id': estoque_id,
+                    'numero_serie': numero_serie,
+                    'condicao_item': condicao_item,
+                    'estoque': estoque
+                })
+            
+            else:  # CONSUMIVEL
+                quantidade = float(item_data.get('quantidade', 0))
+                
+                # Validar: quantidade > 0
+                if quantidade <= 0:
+                    erros.append(f"Item {idx+1} ({item.nome}): Quantidade deve ser maior que zero")
+                    continue
+                
+                # VALIDAR: Item permite devolução?
+                if not item.permite_devolucao:
+                    erros.append(f"Item {idx+1} ({item.nome}): Item não permite devolução")
+                    continue
+                
+                # Se passou nas validações, adicionar à lista de processamento
+                itens_validados.append({
+                    'item': item,
+                    'tipo_controle': tipo_controle,
+                    'quantidade': quantidade,
+                    'condicao_item': condicao_item
+                })
+        
+        # Se houver QUALQUER erro, abortar TUDO
+        if erros:
+            return jsonify({
+                'success': False,
+                'message': f'{len(erros)} erro(s) encontrado(s)',
+                'erros': erros
+            }), 400
+        
+        # ========================================
+        # FASE 2: PROCESSAMENTO TRANSACIONAL
+        # ========================================
+        total_processados = 0
+        total_itens_esperados = len(itens_validados)
+        
+        for item_validado in itens_validados:
+            item = item_validado['item']
+            tipo_controle = item_validado['tipo_controle']
+            condicao_item = item_validado['condicao_item']
+            
+            if tipo_controle == 'SERIALIZADO':
+                estoque = item_validado['estoque']
+                numero_serie = item_validado['numero_serie']
+                
+                # Determinar novo status baseado na condição
+                if condicao_item in ['Perfeito', 'Bom']:
+                    estoque.status = 'DISPONIVEL'
+                elif condicao_item == 'Regular':
+                    estoque.status = 'DISPONIVEL'
+                elif condicao_item == 'Danificado':
+                    estoque.status = 'EM_MANUTENCAO'
+                elif condicao_item == 'Inutilizado':
+                    estoque.status = 'INUTILIZADO'
+                
+                # Limpar vinculo com funcionário e obra
+                obra_id_movimento = estoque.obra_id
+                estoque.funcionario_id = None
+                estoque.obra_id = None
+                estoque.updated_at = datetime.utcnow()
+                
+                # Criar movimento de devolução
+                movimento = AlmoxarifadoMovimento(
+                    item_id=item.id,
+                    tipo_movimento='DEVOLUCAO',
+                    quantidade=1,
+                    numero_serie=numero_serie,
+                    funcionario_id=funcionario_id,
+                    obra_id=obra_id_movimento,
+                    condicao_item=condicao_item,
+                    observacao=observacoes,
+                    estoque_id=estoque.id,
+                    admin_id=admin_id,
+                    usuario_id=current_user.id
+                )
+                db.session.add(movimento)
+                total_processados += 1
+            
+            else:  # CONSUMIVEL
+                quantidade = item_validado['quantidade']
+                
+                # Criar novo registro de estoque com quantidade devolvida
+                estoque = AlmoxarifadoEstoque(
+                    item_id=item.id,
+                    quantidade=quantidade,
+                    status='DISPONIVEL',
+                    admin_id=admin_id
+                )
+                db.session.add(estoque)
+                db.session.flush()
+                
+                # Criar movimento de devolução
+                movimento = AlmoxarifadoMovimento(
+                    item_id=item.id,
+                    tipo_movimento='DEVOLUCAO',
+                    quantidade=quantidade,
+                    funcionario_id=funcionario_id,
+                    obra_id=None,
+                    condicao_item=condicao_item,
+                    observacao=observacoes,
+                    estoque_id=estoque.id,
+                    admin_id=admin_id,
+                    usuario_id=current_user.id
+                )
+                db.session.add(movimento)
+                total_processados += 1
+        
+        # Commit APENAS se TODOS itens foram processados
+        if total_processados != total_itens_esperados:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'message': f'Erro: Esperado {total_itens_esperados} itens, processado {total_processados}'
+            }), 500
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{total_processados} itens devolvidos com sucesso por {funcionario.nome}!',
+            'total_esperado': total_itens_esperados,
+            'total_processado': total_processados
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Erro ao processar devolução múltipla: {str(e)}')
+        return jsonify({'success': False, 'message': 'Erro ao processar operação'}), 500
 
 @almoxarifado_bp.route('/movimentacoes')
 @login_required

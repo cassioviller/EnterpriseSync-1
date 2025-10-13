@@ -23,13 +23,47 @@
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('almoxarifado.processar_saida') }}" id="formSaida">
+                    <form id="formSaida">
+                        <!-- Funcionário (Obrigatório) - PRIMEIRO CAMPO -->
+                        <div class="mb-3">
+                            <label for="funcionario_id" class="form-label fw-bold">
+                                <i class="fas fa-user text-primary me-1"></i> Funcionário *
+                            </label>
+                            <select class="form-select form-select-lg" id="funcionario_id" name="funcionario_id" required>
+                                <option value="">Selecione um funcionário...</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}">{{ funcionario.codigo }} - {{ funcionario.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Responsável pelo recebimento do material
+                            </small>
+                        </div>
+
+                        <!-- Obra (Opcional) -->
+                        <div class="mb-3">
+                            <label for="obra_id" class="form-label">
+                                <i class="fas fa-building text-secondary me-1"></i> Obra (opcional)
+                            </label>
+                            <select class="form-select form-select-lg" id="obra_id" name="obra_id">
+                                <option value="">Nenhuma obra específica</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.codigo }} - {{ obra.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Informe se o material é para uma obra específica
+                            </small>
+                        </div>
+
                         <!-- Seleção de Item -->
                         <div class="mb-4">
                             <label for="item_id" class="form-label fw-bold">
                                 <i class="fas fa-box text-primary me-1"></i> Item *
                             </label>
-                            <select class="form-select form-select-lg" id="item_id" name="item_id" required>
+                            <select class="form-select form-select-lg" id="item_id" name="item_id">
                                 <option value="">Selecione um item...</option>
                                 {% for item in itens %}
                                 <option value="{{ item.id }}" 
@@ -73,7 +107,7 @@
                                 </div>
                                 <small class="text-muted">
                                     <i class="fas fa-info-circle me-1"></i>
-                                    Selecione um ou mais itens para dar saída. Cada item será vinculado ao funcionário.
+                                    Selecione um ou mais itens para adicionar ao carrinho.
                                 </small>
                             </div>
                         </div>
@@ -96,60 +130,46 @@
                             </div>
                         </div>
 
-                        <!-- Funcionário (Obrigatório) -->
-                        <div class="mb-3">
-                            <label for="funcionario_id" class="form-label fw-bold">
-                                <i class="fas fa-user text-primary me-1"></i> Funcionário *
-                            </label>
-                            <select class="form-select form-select-lg" id="funcionario_id" name="funcionario_id" required>
-                                <option value="">Selecione um funcionário...</option>
-                                {% for funcionario in funcionarios %}
-                                <option value="{{ funcionario.id }}">{{ funcionario.codigo }} - {{ funcionario.nome }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Responsável pelo recebimento do material
-                            </small>
-                        </div>
-
-                        <!-- Obra (Opcional) -->
-                        <div class="mb-3">
-                            <label for="obra_id" class="form-label">
-                                <i class="fas fa-building text-secondary me-1"></i> Obra (opcional)
-                            </label>
-                            <select class="form-select form-select-lg" id="obra_id" name="obra_id">
-                                <option value="">Nenhuma obra específica</option>
-                                {% for obra in obras %}
-                                <option value="{{ obra.id }}">{{ obra.codigo }} - {{ obra.nome }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Informe se o material é para uma obra específica
-                            </small>
-                        </div>
-
-                        <!-- Observações -->
-                        <div class="mb-4">
-                            <label for="observacoes" class="form-label">
-                                <i class="fas fa-comment-alt text-secondary me-1"></i> Observações
-                            </label>
-                            <textarea class="form-control" id="observacoes" name="observacoes" 
-                                      rows="3" 
-                                      placeholder="Observações sobre esta saída (opcional)"></textarea>
-                        </div>
-
                         <!-- Botões -->
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-danger btn-lg" id="btnSubmit" disabled>
-                                <i class="fas fa-check-circle me-1"></i> Processar Saída
+                            <button type="button" class="btn btn-danger btn-lg" id="btnAdicionarCarrinho" disabled>
+                                <i class="fas fa-cart-plus me-1"></i> Adicionar ao Carrinho
                             </button>
                             <button type="reset" class="btn btn-outline-secondary btn-lg">
                                 <i class="fas fa-eraser me-1"></i> Limpar
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            <!-- Carrinho de Itens -->
+            <div class="card border-0 shadow-sm mt-3" id="carrinhoContainer" style="display: none;">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shopping-cart me-2"></i>
+                        Itens no Carrinho (<span id="carrinhoCount">0</span>)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Observações Gerais -->
+                    <div class="mb-3">
+                        <label for="observacoes" class="form-label">
+                            <i class="fas fa-comment-alt text-secondary me-1"></i> Observações Gerais
+                        </label>
+                        <textarea class="form-control" id="observacoes" rows="2" 
+                                  placeholder="Observações que serão aplicadas a todos os itens desta saída (opcional)"></textarea>
+                    </div>
+
+                    <div id="carrinhoItens" class="mb-3"></div>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-outline-danger" id="btnLimparCarrinho">
+                            <i class="fas fa-trash me-1"></i> Limpar Carrinho
+                        </button>
+                        <button type="button" class="btn btn-success btn-lg" id="btnFinalizarSaida">
+                            <i class="fas fa-check-circle me-1"></i> Finalizar Saída
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -164,16 +184,29 @@
                     </h5>
                     <div class="mb-3">
                         <h6 class="fw-bold text-primary">
+                            <i class="fas fa-shopping-cart me-1"></i> Sistema de Carrinho
+                        </h6>
+                        <p class="small mb-0">
+                            Agora você pode adicionar múltiplos itens ao carrinho:
+                        </p>
+                        <ul class="small">
+                            <li>Selecione o funcionário e obra primeiro</li>
+                            <li>Adicione vários itens ao carrinho</li>
+                            <li>Todos os itens terão o mesmo funcionário/obra</li>
+                            <li>Finalize a saída de uma vez</li>
+                        </ul>
+                    </div>
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary">
                             <i class="fas fa-barcode me-1"></i> Itens Serializados
                         </h6>
                         <p class="small mb-0">
                             Para itens com controle por número de série:
                         </p>
                         <ul class="small">
-                            <li>Selecione os itens específicos que serão entregues</li>
+                            <li>Selecione os itens específicos</li>
                             <li>Cada item será vinculado ao funcionário</li>
-                            <li>Status do item muda para "EM USO"</li>
-                            <li>Permite rastreamento individual</li>
+                            <li>Status muda para "EM USO"</li>
                         </ul>
                     </div>
                     <div class="mb-3">
@@ -185,14 +218,13 @@
                         </p>
                         <ul class="small">
                             <li>Informe a quantidade que será retirada</li>
-                            <li>Sistema usa FIFO (primeiro a entrar, primeiro a sair)</li>
-                            <li>Quantidade é deduzida do estoque disponível</li>
-                            <li>Se estoque zerar, status muda para "CONSUMIDO"</li>
+                            <li>Sistema usa FIFO</li>
+                            <li>Quantidade é deduzida do estoque</li>
                         </ul>
                     </div>
                     <div class="alert alert-danger border-0 small">
                         <i class="fas fa-exclamation-triangle me-1"></i>
-                        <strong>Importante:</strong> O funcionário é obrigatório para todas as saídas. A obra é opcional.
+                        <strong>Importante:</strong> Todos os itens do carrinho terão o mesmo funcionário e obra.
                     </div>
                 </div>
             </div>
@@ -215,17 +247,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const unidadeSpan = document.getElementById('unidadeDisplay');
     const maxDisponivelSpan = document.getElementById('maxDisponivel');
     const unidadeMaxSpan = document.getElementById('unidadeMax');
-    const btnSubmit = document.getElementById('btnSubmit');
+    const btnAdicionarCarrinho = document.getElementById('btnAdicionarCarrinho');
     const formSaida = document.getElementById('formSaida');
     const funcionarioSelect = document.getElementById('funcionario_id');
+    const obraSelect = document.getElementById('obra_id');
+    const carrinhoContainer = document.getElementById('carrinhoContainer');
+    const carrinhoItens = document.getElementById('carrinhoItens');
+    const carrinhoCount = document.getElementById('carrinhoCount');
+    const btnLimparCarrinho = document.getElementById('btnLimparCarrinho');
+    const btnFinalizarSaida = document.getElementById('btnFinalizarSaida');
+    const observacoesInput = document.getElementById('observacoes');
 
+    let carrinho = [];
+    let itemAtualData = null;
     let quantidadeMaxima = 0;
+    let estoqueSerializadoData = [];
 
     itemSelect.addEventListener('change', async function() {
         const itemId = this.value;
         
         if (!itemId) {
-            resetForm();
+            resetFormItem();
             return;
         }
 
@@ -237,6 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const data = await response.json();
+            itemAtualData = data;
             
             tipoControleInput.value = data.tipo_controle;
             
@@ -251,7 +294,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Erro:', error);
             alert('Erro ao carregar estoque disponível. Por favor, tente novamente.');
-            resetForm();
+            resetFormItem();
         }
     });
 
@@ -259,22 +302,23 @@ document.addEventListener('DOMContentLoaded', function() {
         tipoControleDisplay.textContent = 'Serializado (Nº Série)';
         unidadeDisplay.textContent = '-';
         estoqueDisponivelDisplay.textContent = data.itens.length + ' itens';
+        estoqueSerializadoData = data.itens;
         
         camposSerializado.style.display = 'block';
         camposConsumivel.style.display = 'none';
-        quantidadeInput.required = false;
         quantidadeInput.value = '';
         
         if (data.itens.length === 0) {
             listaSerializados.innerHTML = '<p class="text-danger text-center mb-0"><i class="fas fa-exclamation-triangle me-1"></i> Nenhum item disponível em estoque</p>';
-            btnSubmit.disabled = true;
+            btnAdicionarCarrinho.disabled = true;
         } else {
             let html = '';
             data.itens.forEach(item => {
                 html += `
                     <div class="form-check mb-2">
                         <input class="form-check-input checkbox-serializado" type="checkbox" 
-                               name="estoque_ids[]" value="${item.id}" id="item_${item.id}">
+                               value="${item.id}" id="item_${item.id}"
+                               data-numero-serie="${item.numero_serie}">
                         <label class="form-check-label" for="item_${item.id}">
                             <strong>${item.numero_serie}</strong>
                             <small class="text-muted"> - Entrada em ${item.data_entrada}</small>
@@ -287,13 +331,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Habilitar botão quando pelo menos 1 checkbox estiver marcado
             const checkboxes = document.querySelectorAll('.checkbox-serializado');
             checkboxes.forEach(cb => {
-                cb.addEventListener('change', function() {
-                    const algumMarcado = Array.from(checkboxes).some(c => c.checked);
-                    btnSubmit.disabled = !algumMarcado || !funcionarioSelect.value;
-                });
+                cb.addEventListener('change', validarBotaoAdicionar);
             });
             
-            btnSubmit.disabled = true;
+            validarBotaoAdicionar();
         }
     }
 
@@ -305,7 +346,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         camposSerializado.style.display = 'none';
         camposConsumivel.style.display = 'block';
-        quantidadeInput.required = true;
         quantidadeInput.max = quantidadeMaxima;
         quantidadeInput.value = '';
         unidadeSpan.textContent = data.unidade || 'un';
@@ -314,42 +354,33 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (quantidadeMaxima <= 0) {
             quantidadeInput.disabled = true;
-            btnSubmit.disabled = true;
+            btnAdicionarCarrinho.disabled = true;
         } else {
             quantidadeInput.disabled = false;
-            btnSubmit.disabled = !funcionarioSelect.value;
+            validarBotaoAdicionar();
         }
     }
 
-    function resetForm() {
-        infoItem.style.display = 'none';
-        camposSerializado.style.display = 'none';
-        camposConsumivel.style.display = 'none';
-        btnSubmit.disabled = true;
-        tipoControleInput.value = '';
-        listaSerializados.innerHTML = '<p class="text-muted text-center">Nenhum item disponível</p>';
-        quantidadeInput.value = '';
-        quantidadeMaxima = 0;
-    }
-
-    // Validar funcionário selecionado
-    funcionarioSelect.addEventListener('change', function() {
+    function validarBotaoAdicionar() {
+        const funcionarioId = funcionarioSelect.value;
         const tipoControle = tipoControleInput.value;
         
-        if (!tipoControle) {
-            btnSubmit.disabled = true;
+        if (!funcionarioId || !tipoControle) {
+            btnAdicionarCarrinho.disabled = true;
             return;
         }
         
         if (tipoControle === 'SERIALIZADO') {
-            const algumMarcado = Array.from(document.querySelectorAll('.checkbox-serializado')).some(c => c.checked);
-            btnSubmit.disabled = !algumMarcado || !this.value;
+            const algumMarcado = Array.from(document.querySelectorAll('.checkbox-serializado:checked')).length > 0;
+            btnAdicionarCarrinho.disabled = !algumMarcado;
         } else {
-            btnSubmit.disabled = !this.value || quantidadeMaxima <= 0;
+            btnAdicionarCarrinho.disabled = quantidadeMaxima <= 0;
         }
-    });
+    }
 
-    // Validar quantidade em tempo real
+    funcionarioSelect.addEventListener('change', validarBotaoAdicionar);
+    obraSelect.addEventListener('change', validarBotaoAdicionar);
+
     quantidadeInput.addEventListener('input', function() {
         const valor = parseFloat(this.value);
         if (valor > quantidadeMaxima) {
@@ -357,43 +388,205 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    formSaida.addEventListener('reset', function() {
-        resetForm();
-    });
-
-    formSaida.addEventListener('submit', function(e) {
-        const tipoControle = tipoControleInput.value;
+    btnAdicionarCarrinho.addEventListener('click', function() {
         const funcionarioId = funcionarioSelect.value;
-        
-        if (!funcionarioId) {
-            e.preventDefault();
-            alert('Por favor, selecione um funcionário.');
-            funcionarioSelect.focus();
-            return false;
+        const funcionarioNome = funcionarioSelect.options[funcionarioSelect.selectedIndex].text;
+        const obraId = obraSelect.value || '';
+        const obraNome = obraId ? obraSelect.options[obraSelect.selectedIndex].text : 'Sem obra específica';
+        const tipoControle = tipoControleInput.value;
+        const itemId = itemSelect.value;
+        const itemNome = itemSelect.options[itemSelect.selectedIndex].text;
+
+        // Validar que funcionário/obra sejam os mesmos se já houver itens no carrinho
+        if (carrinho.length > 0) {
+            const primeiroItem = carrinho[0];
+            if (primeiroItem.funcionario_id !== funcionarioId) {
+                alert('Todos os itens do carrinho devem ter o mesmo funcionário!');
+                return;
+            }
+            if (primeiroItem.obra_id !== obraId) {
+                alert('Todos os itens do carrinho devem ter a mesma obra!');
+                return;
+            }
         }
-        
+
         if (tipoControle === 'SERIALIZADO') {
             const checkboxesMarcados = Array.from(document.querySelectorAll('.checkbox-serializado:checked'));
+            
             if (checkboxesMarcados.length === 0) {
-                e.preventDefault();
-                alert('Por favor, selecione ao menos um item para saída.');
-                return false;
+                alert('Por favor, selecione ao menos um item para adicionar ao carrinho.');
+                return;
             }
-        } else if (tipoControle === 'CONSUMIVEL') {
+
+            checkboxesMarcados.forEach(cb => {
+                const estoqueId = cb.value;
+                const numeroSerie = cb.dataset.numeroSerie;
+                
+                carrinho.push({
+                    item_id: itemId,
+                    item_nome: itemNome,
+                    tipo_controle: 'SERIALIZADO',
+                    estoque_id: estoqueId,
+                    numero_serie: numeroSerie,
+                    quantidade: 1,
+                    funcionario_id: funcionarioId,
+                    funcionario_nome: funcionarioNome,
+                    obra_id: obraId,
+                    obra_nome: obraNome
+                });
+            });
+        } else {
             const qtd = parseFloat(quantidadeInput.value);
+            
             if (!qtd || qtd <= 0) {
-                e.preventDefault();
                 alert('Por favor, informe uma quantidade válida maior que zero.');
                 quantidadeInput.focus();
-                return false;
+                return;
             }
+            
             if (qtd > quantidadeMaxima) {
-                e.preventDefault();
                 alert(`Quantidade máxima disponível é ${quantidadeMaxima}.`);
                 quantidadeInput.focus();
-                return false;
+                return;
             }
+
+            carrinho.push({
+                item_id: itemId,
+                item_nome: itemNome,
+                tipo_controle: 'CONSUMIVEL',
+                quantidade: qtd,
+                unidade: itemAtualData.unidade,
+                funcionario_id: funcionarioId,
+                funcionario_nome: funcionarioNome,
+                obra_id: obraId,
+                obra_nome: obraNome
+            });
         }
+
+        atualizarCarrinho();
+        limparFormularioItem();
+    });
+
+    function atualizarCarrinho() {
+        if (carrinho.length === 0) {
+            carrinhoContainer.style.display = 'none';
+            return;
+        }
+        
+        carrinhoContainer.style.display = 'block';
+        carrinhoCount.textContent = carrinho.length;
+        
+        let html = '<div class="list-group">';
+        carrinho.forEach((item, index) => {
+            html += `
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">${item.item_nome}</h6>
+                            <p class="mb-1 small text-muted">
+                                ${item.tipo_controle === 'SERIALIZADO' 
+                                    ? `<strong>N/S:</strong> ${item.numero_serie}` 
+                                    : `<strong>Qtd:</strong> ${item.quantidade} ${item.unidade}`}
+                            </p>
+                            <p class="mb-0 small">
+                                <strong>Funcionário:</strong> ${item.funcionario_nome} | 
+                                <strong>Obra:</strong> ${item.obra_nome}
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerDoCarrinho(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        carrinhoItens.innerHTML = html;
+    }
+
+    window.removerDoCarrinho = function(index) {
+        carrinho.splice(index, 1);
+        atualizarCarrinho();
+    };
+
+    btnLimparCarrinho.addEventListener('click', function() {
+        if (confirm('Deseja realmente limpar o carrinho?')) {
+            carrinho = [];
+            atualizarCarrinho();
+        }
+    });
+
+    btnFinalizarSaida.addEventListener('click', async function() {
+        if (carrinho.length === 0) {
+            alert('O carrinho está vazio!');
+            return;
+        }
+        
+        const observacoes = observacoesInput.value.trim();
+        
+        btnFinalizarSaida.disabled = true;
+        btnFinalizarSaida.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processando...';
+        
+        try {
+            const response = await fetch('{{ url_for("almoxarifado.processar_saida_multipla") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    itens: carrinho,
+                    observacoes: observacoes
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(result.message);
+                carrinho = [];
+                atualizarCarrinho();
+                limparFormularioCompleto();
+                window.location.reload();
+            } else {
+                alert('Erro: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('Erro ao processar saída. Por favor, tente novamente.');
+        } finally {
+            btnFinalizarSaida.disabled = false;
+            btnFinalizarSaida.innerHTML = '<i class="fas fa-check-circle me-1"></i> Finalizar Saída';
+        }
+    });
+
+    function resetFormItem() {
+        infoItem.style.display = 'none';
+        camposSerializado.style.display = 'none';
+        camposConsumivel.style.display = 'none';
+        btnAdicionarCarrinho.disabled = true;
+        tipoControleInput.value = '';
+        listaSerializados.innerHTML = '<p class="text-muted text-center">Nenhum item disponível</p>';
+        quantidadeInput.value = '';
+        quantidadeMaxima = 0;
+        itemAtualData = null;
+        estoqueSerializadoData = [];
+    }
+
+    function limparFormularioItem() {
+        itemSelect.value = '';
+        quantidadeInput.value = '';
+        resetFormItem();
+    }
+
+    function limparFormularioCompleto() {
+        limparFormularioItem();
+        funcionarioSelect.value = '';
+        obraSelect.value = '';
+        observacoesInput.value = '';
+    }
+
+    formSaida.addEventListener('reset', function() {
+        resetFormItem();
     });
 });
 </script>

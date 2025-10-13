@@ -23,13 +23,13 @@
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('almoxarifado.processar_devolucao') }}" id="formDevolucao">
+                    <form id="formDevolucao">
                         <!-- Seleção de Funcionário -->
                         <div class="mb-4">
                             <label for="funcionario_id" class="form-label fw-bold">
                                 <i class="fas fa-user text-primary me-1"></i> Funcionário *
                             </label>
-                            <select class="form-select form-select-lg" id="funcionario_id" name="funcionario_id" required>
+                            <select class="form-select form-select-lg" id="funcionario_id" name="funcionario_id">
                                 <option value="">Selecione um funcionário...</option>
                                 {% for funcionario in funcionarios %}
                                 <option value="{{ funcionario.id }}">{{ funcionario.codigo }} - {{ funcionario.nome }}</option>
@@ -62,13 +62,13 @@
                             <div id="itensSerializados" style="display: none;">
                                 <div class="mb-4">
                                     <label class="form-label fw-bold">
-                                        <i class="fas fa-barcode text-warning me-1"></i> Itens Serializados para Devolução *
+                                        <i class="fas fa-barcode text-warning me-1"></i> Itens Serializados para Devolução
                                     </label>
                                     <div id="listaSerializados" class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
                                     </div>
                                     <small class="text-muted">
                                         <i class="fas fa-info-circle me-1"></i>
-                                        Selecione um ou mais itens para devolver ao almoxarifado.
+                                        Selecione um ou mais itens para adicionar ao carrinho.
                                     </small>
                                 </div>
                             </div>
@@ -83,49 +83,15 @@
                                     </div>
                                     <small class="text-muted">
                                         <i class="fas fa-info-circle me-1"></i>
-                                        Informe a quantidade que está sendo devolvida de cada item.
+                                        Informe a quantidade e condição de cada item a devolver.
                                     </small>
                                 </div>
                             </div>
 
-                            <!-- Condição da Devolução (obrigatório) -->
-                            <div class="mb-3">
-                                <label for="condicao_devolucao" class="form-label fw-bold">
-                                    <i class="fas fa-check-circle text-info me-1"></i> Condição do Item *
-                                </label>
-                                <select class="form-select form-select-lg" id="condicao_devolucao" name="condicao_devolucao" required>
-                                    <option value="">Selecione a condição...</option>
-                                    <option value="Perfeito">Perfeito</option>
-                                    <option value="Bom">Bom</option>
-                                    <option value="Regular">Regular</option>
-                                    <option value="Danificado">Danificado</option>
-                                    <option value="Inutilizado">Inutilizado</option>
-                                </select>
-                                <small class="text-muted">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    Avalie o estado atual do item devolvido
-                                </small>
-                            </div>
-
-                            <!-- Observações -->
-                            <div class="mb-4">
-                                <label for="observacoes" class="form-label">
-                                    <i class="fas fa-comment-alt text-secondary me-1"></i> Observações
-                                </label>
-                                <textarea class="form-control" id="observacoes" name="observacoes" 
-                                          rows="3" 
-                                          placeholder="Observações sobre esta devolução (opcional)"></textarea>
-                            </div>
-
-                            <!-- Campos Hidden para tipo_controle -->
-                            <input type="hidden" id="tipo_controle" name="tipo_controle">
-                            <input type="hidden" id="item_id_consumivel" name="item_id">
-                            <input type="hidden" id="quantidade_consumivel" name="quantidade">
-
                             <!-- Botões -->
                             <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary btn-lg" id="btnSubmit" disabled>
-                                    <i class="fas fa-check-circle me-1"></i> Processar Devolução
+                                <button type="button" class="btn btn-primary btn-lg" id="btnAdicionarCarrinho" disabled>
+                                    <i class="fas fa-cart-plus me-1"></i> Adicionar ao Carrinho
                                 </button>
                                 <button type="reset" class="btn btn-outline-secondary btn-lg">
                                     <i class="fas fa-eraser me-1"></i> Limpar
@@ -133,6 +99,36 @@
                             </div>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            <!-- Carrinho de Itens -->
+            <div class="card border-0 shadow-sm mt-3" id="carrinhoContainer" style="display: none;">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shopping-cart me-2"></i>
+                        Itens no Carrinho (<span id="carrinhoCount">0</span>)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Observações Gerais -->
+                    <div class="mb-3">
+                        <label for="observacoes" class="form-label">
+                            <i class="fas fa-comment-alt text-secondary me-1"></i> Observações Gerais
+                        </label>
+                        <textarea class="form-control" id="observacoes" rows="2" 
+                                  placeholder="Observações que serão aplicadas a todos os itens desta devolução (opcional)"></textarea>
+                    </div>
+
+                    <div id="carrinhoItens" class="mb-3"></div>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-outline-danger" id="btnLimparCarrinho">
+                            <i class="fas fa-trash me-1"></i> Limpar Carrinho
+                        </button>
+                        <button type="button" class="btn btn-success btn-lg" id="btnFinalizarDevolucao">
+                            <i class="fas fa-check-circle me-1"></i> Finalizar Devolução
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -147,6 +143,20 @@
                     </h5>
                     <div class="mb-3">
                         <h6 class="fw-bold text-primary">
+                            <i class="fas fa-shopping-cart me-1"></i> Sistema de Carrinho
+                        </h6>
+                        <p class="small mb-0">
+                            Agora você pode adicionar múltiplos itens ao carrinho:
+                        </p>
+                        <ul class="small">
+                            <li>Selecione o funcionário</li>
+                            <li>Escolha os itens e suas condições</li>
+                            <li>Adicione vários itens ao carrinho</li>
+                            <li>Finalize a devolução de uma vez</li>
+                        </ul>
+                    </div>
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-primary">
                             <i class="fas fa-barcode me-1"></i> Itens Serializados
                         </h6>
                         <p class="small mb-0">
@@ -154,9 +164,8 @@
                         </p>
                         <ul class="small">
                             <li>Sempre podem ser devolvidos</li>
-                            <li>Selecione os itens específicos a devolver</li>
-                            <li>Status volta para "DISPONÍVEL"</li>
-                            <li>Vínculo com funcionário/obra é removido</li>
+                            <li>Selecione condição por item</li>
+                            <li>Status volta para "DISPONÍVEL" se em bom estado</li>
                         </ul>
                     </div>
                     <div class="mb-3">
@@ -168,18 +177,13 @@
                         </p>
                         <ul class="small">
                             <li>Somente se permitir devolução</li>
-                            <li>Informe a quantidade sendo devolvida</li>
+                            <li>Informe quantidade e condição</li>
                             <li>Quantidade volta ao estoque disponível</li>
-                            <li>Sistema calcula automaticamente o disponível</li>
                         </ul>
                     </div>
                     <div class="alert alert-info border-0 small">
                         <i class="fas fa-info-circle me-1"></i>
-                        <strong>Condição Obrigatória:</strong> Sempre informe a condição do item devolvido para melhor controle de qualidade.
-                    </div>
-                    <div class="alert alert-warning border-0 small">
-                        <i class="fas fa-exclamation-triangle me-1"></i>
-                        <strong>Atenção:</strong> A devolução registra a condição atual do item. Items danificados ou inutilizados devem ser reportados corretamente.
+                        <strong>Condição Obrigatória:</strong> Cada item deve ter sua condição informada para melhor controle de qualidade.
                     </div>
                 </div>
             </div>
@@ -197,13 +201,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const itensConsumiveis = document.getElementById('itensConsumiveis');
     const listaSerializados = document.getElementById('listaSerializados');
     const listaConsumiveis = document.getElementById('listaConsumiveis');
-    const btnSubmit = document.getElementById('btnSubmit');
-    const tipoControleInput = document.getElementById('tipo_controle');
-    const itemIdConsumivel = document.getElementById('item_id_consumivel');
-    const quantidadeConsumivel = document.getElementById('quantidade_consumivel');
-    const condicaoSelect = document.getElementById('condicao_devolucao');
+    const btnAdicionarCarrinho = document.getElementById('btnAdicionarCarrinho');
     const formDevolucao = document.getElementById('formDevolucao');
+    const carrinhoContainer = document.getElementById('carrinhoContainer');
+    const carrinhoItens = document.getElementById('carrinhoItens');
+    const carrinhoCount = document.getElementById('carrinhoCount');
+    const btnLimparCarrinho = document.getElementById('btnLimparCarrinho');
+    const btnFinalizarDevolucao = document.getElementById('btnFinalizarDevolucao');
+    const observacoesInput = document.getElementById('observacoes');
 
+    let carrinho = [];
     let itensData = [];
     let temSerializados = false;
     let temConsumiveis = false;
@@ -212,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const funcionarioId = this.value;
         
         if (!funcionarioId) {
-            resetForm();
+            resetFormItens();
             return;
         }
 
@@ -222,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
             semItens.style.display = 'none';
             itensSerializados.style.display = 'none';
             itensConsumiveis.style.display = 'none';
-            btnSubmit.disabled = true;
+            btnAdicionarCarrinho.disabled = true;
 
             const response = await fetch(`/almoxarifado/api/itens-funcionario/${funcionarioId}`);
             
@@ -237,7 +244,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (itensData.length === 0) {
                 semItens.style.display = 'block';
-                btnSubmit.disabled = true;
+                btnAdicionarCarrinho.disabled = true;
                 return;
             }
 
@@ -260,15 +267,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 itensConsumiveis.style.display = 'block';
             }
 
-            // Definir tipo de controle predominante
-            if (temSerializados && !temConsumiveis) {
-                tipoControleInput.value = 'SERIALIZADO';
-            } else if (!temSerializados && temConsumiveis) {
-                tipoControleInput.value = 'CONSUMIVEL';
-            } else {
-                tipoControleInput.value = 'MISTO';
-            }
-
         } catch (error) {
             console.error('Erro:', error);
             alert('Erro ao carregar itens do funcionário. Por favor, tente novamente.');
@@ -281,32 +279,68 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '';
         itens.forEach(item => {
             html += `
-                <div class="form-check mb-2 p-2 border-bottom">
-                    <input class="form-check-input checkbox-serializado" type="checkbox" 
-                           name="estoque_ids[]" value="${item.estoque_id}" id="item_${item.estoque_id}">
-                    <label class="form-check-label w-100" for="item_${item.estoque_id}">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong class="text-primary">${item.item_nome}</strong>
-                                <div class="small text-muted">
-                                    <i class="fas fa-barcode me-1"></i> N/S: ${item.numero_serie}
+                <div class="p-2 border-bottom item-serializado" data-estoque-id="${item.estoque_id}">
+                    <div class="form-check">
+                        <input class="form-check-input checkbox-serializado" type="checkbox" 
+                               value="${item.estoque_id}" id="item_${item.estoque_id}"
+                               data-item-id="${item.item_id}"
+                               data-item-nome="${item.item_nome}"
+                               data-numero-serie="${item.numero_serie}">
+                        <label class="form-check-label w-100" for="item_${item.estoque_id}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong class="text-primary">${item.item_nome}</strong>
+                                    <div class="small text-muted">
+                                        <i class="fas fa-barcode me-1"></i> N/S: ${item.numero_serie}
+                                    </div>
+                                </div>
+                                <div class="text-end small">
+                                    <div><i class="fas fa-building me-1"></i> ${item.obra}</div>
+                                    <div><i class="fas fa-calendar me-1"></i> ${item.data_saida}</div>
                                 </div>
                             </div>
-                            <div class="text-end small">
-                                <div><i class="fas fa-building me-1"></i> ${item.obra}</div>
-                                <div><i class="fas fa-calendar me-1"></i> ${item.data_saida}</div>
-                            </div>
-                        </div>
-                    </label>
+                        </label>
+                    </div>
+                    <div class="mt-2 condicao-serializado" style="display: none;">
+                        <label class="form-label small">Condição *</label>
+                        <select class="form-select form-select-sm select-condicao" data-estoque-id="${item.estoque_id}">
+                            <option value="">Selecione...</option>
+                            <option value="Perfeito">Perfeito</option>
+                            <option value="Bom">Bom</option>
+                            <option value="Regular">Regular</option>
+                            <option value="Danificado">Danificado</option>
+                            <option value="Inutilizado">Inutilizado</option>
+                        </select>
+                    </div>
                 </div>
             `;
         });
         listaSerializados.innerHTML = html;
 
-        // Habilitar botão quando selecionar checkbox
+        // Mostrar/ocultar campo de condição quando checkbox é marcado
         const checkboxes = document.querySelectorAll('.checkbox-serializado');
         checkboxes.forEach(cb => {
-            cb.addEventListener('change', validarFormulario);
+            cb.addEventListener('change', function() {
+                const condicaoDiv = this.closest('.item-serializado').querySelector('.condicao-serializado');
+                const selectCondicao = condicaoDiv.querySelector('.select-condicao');
+                
+                if (this.checked) {
+                    condicaoDiv.style.display = 'block';
+                    selectCondicao.required = true;
+                } else {
+                    condicaoDiv.style.display = 'none';
+                    selectCondicao.required = false;
+                    selectCondicao.value = '';
+                }
+                
+                validarBotaoAdicionar();
+            });
+        });
+
+        // Validar quando condição é selecionada
+        const selectsCondicao = document.querySelectorAll('.select-condicao');
+        selectsCondicao.forEach(select => {
+            select.addEventListener('change', validarBotaoAdicionar);
         });
     }
 
@@ -314,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '';
         itens.forEach((item, index) => {
             html += `
-                <div class="mb-3 p-3 border-bottom">
+                <div class="mb-3 p-3 border-bottom item-consumivel" data-item-id="${item.item_id}">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div>
                             <strong class="text-success">${item.item_nome}</strong>
@@ -324,22 +358,35 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                     <div class="row align-items-end">
-                        <div class="col-md-6">
-                            <label for="qtd_${item.item_id}" class="form-label small">Quantidade a devolver</label>
-                            <div class="input-group">
+                        <div class="col-md-4">
+                            <label for="qtd_${item.item_id}" class="form-label small">Quantidade</label>
+                            <div class="input-group input-group-sm">
                                 <input type="number" class="form-control input-consumivel" 
                                        id="qtd_${item.item_id}" 
                                        data-item-id="${item.item_id}"
                                        data-item-nome="${item.item_nome}"
+                                       data-unidade="${item.unidade}"
                                        step="0.01" min="0.01" max="${item.quantidade_disponivel}"
                                        placeholder="0.00">
                                 <span class="input-group-text">${item.unidade}</span>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-5">
+                            <label for="cond_${item.item_id}" class="form-label small">Condição *</label>
+                            <select class="form-select form-select-sm select-condicao-consumivel" 
+                                    id="cond_${item.item_id}" 
+                                    data-item-id="${item.item_id}">
+                                <option value="">Selecione...</option>
+                                <option value="Perfeito">Perfeito</option>
+                                <option value="Bom">Bom</option>
+                                <option value="Regular">Regular</option>
+                                <option value="Danificado">Danificado</option>
+                                <option value="Inutilizado">Inutilizado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
                             <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Máximo: ${item.quantidade_disponivel} ${item.unidade}
+                                Máx: ${item.quantidade_disponivel}
                             </small>
                         </div>
                     </div>
@@ -351,48 +398,221 @@ document.addEventListener('DOMContentLoaded', function() {
         // Validar formulário quando mudar quantidade
         const inputs = document.querySelectorAll('.input-consumivel');
         inputs.forEach(input => {
-            input.addEventListener('input', validarFormulario);
+            input.addEventListener('input', validarBotaoAdicionar);
+        });
+
+        const selects = document.querySelectorAll('.select-condicao-consumivel');
+        selects.forEach(select => {
+            select.addEventListener('change', validarBotaoAdicionar);
         });
     }
 
-    function validarFormulario() {
+    function validarBotaoAdicionar() {
         let valido = false;
-        const condicao = condicaoSelect.value;
 
-        if (!condicao) {
-            btnSubmit.disabled = true;
-            return;
-        }
-
-        // Verificar se há itens serializados selecionados
+        // Verificar se há itens serializados selecionados com condição
         if (temSerializados) {
             const checkboxesMarcados = Array.from(document.querySelectorAll('.checkbox-serializado:checked'));
-            if (checkboxesMarcados.length > 0) {
-                valido = true;
-                tipoControleInput.value = 'SERIALIZADO';
-            }
-        }
-
-        // Verificar se há consumível com quantidade preenchida
-        if (temConsumiveis) {
-            const inputs = document.querySelectorAll('.input-consumivel');
-            inputs.forEach(input => {
-                const qtd = parseFloat(input.value);
-                if (qtd && qtd > 0) {
+            checkboxesMarcados.forEach(cb => {
+                const estoqueId = cb.value;
+                const selectCondicao = document.querySelector(`.select-condicao[data-estoque-id="${estoqueId}"]`);
+                if (selectCondicao && selectCondicao.value) {
                     valido = true;
-                    tipoControleInput.value = 'CONSUMIVEL';
-                    itemIdConsumivel.value = input.dataset.itemId;
-                    quantidadeConsumivel.value = qtd;
                 }
             });
         }
 
-        btnSubmit.disabled = !valido;
+        // Verificar se há consumível com quantidade e condição
+        if (temConsumiveis) {
+            const inputs = document.querySelectorAll('.input-consumivel');
+            inputs.forEach(input => {
+                const qtd = parseFloat(input.value);
+                const itemId = input.dataset.itemId;
+                const selectCondicao = document.querySelector(`.select-condicao-consumivel[data-item-id="${itemId}"]`);
+                
+                if (qtd && qtd > 0 && selectCondicao && selectCondicao.value) {
+                    valido = true;
+                }
+            });
+        }
+
+        btnAdicionarCarrinho.disabled = !valido;
     }
 
-    condicaoSelect.addEventListener('change', validarFormulario);
+    btnAdicionarCarrinho.addEventListener('click', function() {
+        const funcionarioId = funcionarioSelect.value;
+        const funcionarioNome = funcionarioSelect.options[funcionarioSelect.selectedIndex].text;
 
-    function resetForm() {
+        // Adicionar itens serializados selecionados
+        if (temSerializados) {
+            const checkboxesMarcados = Array.from(document.querySelectorAll('.checkbox-serializado:checked'));
+            
+            checkboxesMarcados.forEach(cb => {
+                const estoqueId = cb.value;
+                const itemId = cb.dataset.itemId;
+                const itemNome = cb.dataset.itemNome;
+                const numeroSerie = cb.dataset.numeroSerie;
+                const selectCondicao = document.querySelector(`.select-condicao[data-estoque-id="${estoqueId}"]`);
+                const condicao = selectCondicao ? selectCondicao.value : '';
+
+                if (!condicao) {
+                    alert('Por favor, selecione a condição para todos os itens marcados.');
+                    return;
+                }
+
+                carrinho.push({
+                    tipo_controle: 'SERIALIZADO',
+                    estoque_id: estoqueId,
+                    item_id: itemId,
+                    item_nome: itemNome,
+                    numero_serie: numeroSerie,
+                    quantidade: 1,
+                    condicao_item: condicao,
+                    funcionario_id: funcionarioId,
+                    funcionario_nome: funcionarioNome
+                });
+
+                // Desmarcar e remover do DOM
+                cb.checked = false;
+                cb.closest('.item-serializado').remove();
+            });
+        }
+
+        // Adicionar itens consumíveis com quantidade preenchida
+        if (temConsumiveis) {
+            const inputs = document.querySelectorAll('.input-consumivel');
+            
+            inputs.forEach(input => {
+                const qtd = parseFloat(input.value);
+                if (qtd && qtd > 0) {
+                    const itemId = input.dataset.itemId;
+                    const itemNome = input.dataset.itemNome;
+                    const unidade = input.dataset.unidade;
+                    const selectCondicao = document.querySelector(`.select-condicao-consumivel[data-item-id="${itemId}"]`);
+                    const condicao = selectCondicao ? selectCondicao.value : '';
+
+                    if (!condicao) {
+                        alert('Por favor, selecione a condição para todos os itens com quantidade preenchida.');
+                        return;
+                    }
+
+                    carrinho.push({
+                        tipo_controle: 'CONSUMIVEL',
+                        item_id: itemId,
+                        item_nome: itemNome,
+                        quantidade: qtd,
+                        unidade: unidade,
+                        condicao_item: condicao,
+                        funcionario_id: funcionarioId,
+                        funcionario_nome: funcionarioNome
+                    });
+
+                    // Limpar campos
+                    input.value = '';
+                    selectCondicao.value = '';
+                }
+            });
+        }
+
+        atualizarCarrinho();
+        validarBotaoAdicionar();
+    });
+
+    function atualizarCarrinho() {
+        if (carrinho.length === 0) {
+            carrinhoContainer.style.display = 'none';
+            return;
+        }
+        
+        carrinhoContainer.style.display = 'block';
+        carrinhoCount.textContent = carrinho.length;
+        
+        let html = '<div class="list-group">';
+        carrinho.forEach((item, index) => {
+            html += `
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">${item.item_nome}</h6>
+                            <p class="mb-1 small text-muted">
+                                ${item.tipo_controle === 'SERIALIZADO' 
+                                    ? `<strong>N/S:</strong> ${item.numero_serie}` 
+                                    : `<strong>Qtd:</strong> ${item.quantidade} ${item.unidade}`}
+                            </p>
+                            <p class="mb-0 small">
+                                <strong>Condição:</strong> <span class="badge bg-info">${item.condicao_item}</span> | 
+                                <strong>Funcionário:</strong> ${item.funcionario_nome}
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerDoCarrinho(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        carrinhoItens.innerHTML = html;
+    }
+
+    window.removerDoCarrinho = function(index) {
+        carrinho.splice(index, 1);
+        atualizarCarrinho();
+    };
+
+    btnLimparCarrinho.addEventListener('click', function() {
+        if (confirm('Deseja realmente limpar o carrinho?')) {
+            carrinho = [];
+            atualizarCarrinho();
+            // Recarregar itens do funcionário
+            funcionarioSelect.dispatchEvent(new Event('change'));
+        }
+    });
+
+    btnFinalizarDevolucao.addEventListener('click', async function() {
+        if (carrinho.length === 0) {
+            alert('O carrinho está vazio!');
+            return;
+        }
+        
+        const observacoes = observacoesInput.value.trim();
+        
+        btnFinalizarDevolucao.disabled = true;
+        btnFinalizarDevolucao.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processando...';
+        
+        try {
+            const response = await fetch('{{ url_for("almoxarifado.processar_devolucao_multipla") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    itens: carrinho,
+                    observacoes: observacoes
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(result.message);
+                carrinho = [];
+                atualizarCarrinho();
+                limparFormularioCompleto();
+                window.location.reload();
+            } else {
+                alert('Erro: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('Erro ao processar devolução. Por favor, tente novamente.');
+        } finally {
+            btnFinalizarDevolucao.disabled = false;
+            btnFinalizarDevolucao.innerHTML = '<i class="fas fa-check-circle me-1"></i> Finalizar Devolução';
+        }
+    });
+
+    function resetFormItens() {
         areaItens.style.display = 'none';
         loadingItens.style.display = 'none';
         semItens.style.display = 'none';
@@ -400,49 +620,20 @@ document.addEventListener('DOMContentLoaded', function() {
         itensConsumiveis.style.display = 'none';
         listaSerializados.innerHTML = '';
         listaConsumiveis.innerHTML = '';
-        btnSubmit.disabled = true;
-        tipoControleInput.value = '';
-        itemIdConsumivel.value = '';
-        quantidadeConsumivel.value = '';
+        btnAdicionarCarrinho.disabled = true;
         itensData = [];
         temSerializados = false;
         temConsumiveis = false;
     }
 
+    function limparFormularioCompleto() {
+        resetFormItens();
+        funcionarioSelect.value = '';
+        observacoesInput.value = '';
+    }
+
     formDevolucao.addEventListener('reset', function() {
-        resetForm();
-    });
-
-    formDevolucao.addEventListener('submit', function(e) {
-        const tipoControle = tipoControleInput.value;
-        const condicao = condicaoSelect.value;
-
-        if (!condicao) {
-            e.preventDefault();
-            alert('Por favor, informe a condição do item devolvido.');
-            condicaoSelect.focus();
-            return false;
-        }
-
-        if (tipoControle === 'SERIALIZADO') {
-            const checkboxesMarcados = Array.from(document.querySelectorAll('.checkbox-serializado:checked'));
-            if (checkboxesMarcados.length === 0) {
-                e.preventDefault();
-                alert('Por favor, selecione ao menos um item para devolução.');
-                return false;
-            }
-        } else if (tipoControle === 'CONSUMIVEL') {
-            const qtd = parseFloat(quantidadeConsumivel.value);
-            if (!qtd || qtd <= 0) {
-                e.preventDefault();
-                alert('Por favor, informe uma quantidade válida para devolução.');
-                return false;
-            }
-        } else {
-            e.preventDefault();
-            alert('Selecione itens para devolução.');
-            return false;
-        }
+        resetFormItens();
     });
 });
 </script>

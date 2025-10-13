@@ -3331,7 +3331,6 @@ class AlmoxarifadoEstoque(db.Model):
     valor_unitario = db.Column(db.Numeric(10, 2))
     lote = db.Column(db.String(50))
     data_validade = db.Column(db.Date)
-    nota_fiscal = db.Column(db.String(50))
     data_entrada = db.Column(db.Date)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
