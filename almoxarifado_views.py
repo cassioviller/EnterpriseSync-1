@@ -12,12 +12,11 @@ logger = logging.getLogger(__name__)
 almoxarifado_bp = Blueprint('almoxarifado', __name__, url_prefix='/almoxarifado')
 
 def get_admin_id():
-    """Retorna admin_id do usuário atual"""
-    if hasattr(current_user, 'perfil'):
-        if current_user.perfil == 'admin':
-            return current_user.id
-        elif current_user.perfil == 'funcionario' and current_user.admin_id:
+    """Retorna admin_id do usuário atual (padrão consolidado do sistema)"""
+    if current_user.is_authenticated:
+        if hasattr(current_user, 'admin_id') and current_user.admin_id:
             return current_user.admin_id
+        return current_user.id
     return None
 
 @almoxarifado_bp.route('/')
