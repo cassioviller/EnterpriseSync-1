@@ -105,6 +105,18 @@
                                    placeholder="Número da nota fiscal (opcional)">
                         </div>
 
+                        <div class="mb-3">
+                            <label for="valor_unitario" class="form-label fw-bold">
+                                <i class="fas fa-dollar-sign text-success me-1"></i> Valor Unitário (R$) *
+                            </label>
+                            <input type="number" class="form-control form-control-lg" id="valor_unitario" name="valor_unitario" 
+                                   step="0.01" min="0.01" placeholder="0.00" required>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Preço unitário de compra. Cada entrada pode ter preço diferente.
+                            </small>
+                        </div>
+
                         <div class="mb-4">
                             <label for="observacoes" class="form-label">
                                 <i class="fas fa-comment-alt text-secondary me-1"></i> Observações
@@ -116,14 +128,35 @@
 
                         <!-- Botões -->
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-success btn-lg" id="btnSubmit" disabled>
-                                <i class="fas fa-check-circle me-1"></i> Processar Entrada
+                            <button type="button" class="btn btn-primary btn-lg" id="btnAdicionarCarrinho" disabled>
+                                <i class="fas fa-cart-plus me-1"></i> Adicionar ao Carrinho
                             </button>
                             <button type="reset" class="btn btn-outline-secondary btn-lg">
                                 <i class="fas fa-eraser me-1"></i> Limpar
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+            
+            <!-- Carrinho de Itens -->
+            <div class="card border-0 shadow-sm mt-3" id="carrinhoContainer" style="display: none;">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shopping-cart me-2"></i>
+                        Itens no Carrinho (<span id="carrinhoCount">0</span>)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="carrinhoItens" class="mb-3"></div>
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-outline-danger" id="btnLimparCarrinho">
+                            <i class="fas fa-trash me-1"></i> Limpar Carrinho
+                        </button>
+                        <button type="button" class="btn btn-success btn-lg" id="btnFinalizarEntrada">
+                            <i class="fas fa-check-circle me-1"></i> Finalizar Entrada
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -187,8 +220,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const numerosSerieInput = document.getElementById('numeros_serie');
     const quantidadeInput = document.getElementById('quantidade');
     const unidadeSpan = document.getElementById('unidadeDisplay');
-    const btnSubmit = document.getElementById('btnSubmit');
+    const btnAdicionarCarrinho = document.getElementById('btnAdicionarCarrinho');
     const formEntrada = document.getElementById('formEntrada');
+    const carrinhoContainer = document.getElementById('carrinhoContainer');
+    const carrinhoItens = document.getElementById('carrinhoItens');
+    const carrinhoCount = document.getElementById('carrinhoCount');
+    const btnLimparCarrinho = document.getElementById('btnLimparCarrinho');
+    const btnFinalizarEntrada = document.getElementById('btnFinalizarEntrada');
+    const notaFiscalInput = document.getElementById('nota_fiscal');
+    const observacoesInput = document.getElementById('observacoes');
+    const valorUnitarioInput = document.getElementById('valor_unitario');
+
+    let carrinho = [];
+    let itemAtualData = null;
 
     itemSelect.addEventListener('change', async function() {
         const itemId = this.value;
@@ -197,8 +241,9 @@ document.addEventListener('DOMContentLoaded', function() {
             infoItem.style.display = 'none';
             camposSerializado.style.display = 'none';
             camposConsumivel.style.display = 'none';
-            btnSubmit.disabled = true;
+            btnAdicionarCarrinho.disabled = true;
             tipoControleInput.value = '';
+            itemAtualData = null;
             return;
         }
 
@@ -210,6 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const data = await response.json();
+            itemAtualData = data;
             
             tipoControleDisplay.textContent = data.tipo_controle === 'SERIALIZADO' ? 'Serializado (Nº Série)' : 'Consumível (Quantidade)';
             unidadeDisplay.textContent = data.unidade || '-';
@@ -233,7 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 unidadeSpan.textContent = data.unidade || 'un';
             }
             
-            btnSubmit.disabled = false;
+            btnAdicionarCarrinho.disabled = false;
             
         } catch (error) {
             console.error('Erro:', error);
@@ -241,38 +287,176 @@ document.addEventListener('DOMContentLoaded', function() {
             infoItem.style.display = 'none';
             camposSerializado.style.display = 'none';
             camposConsumivel.style.display = 'none';
-            btnSubmit.disabled = true;
+            btnAdicionarCarrinho.disabled = true;
+            itemAtualData = null;
         }
     });
 
-    formEntrada.addEventListener('reset', function() {
-        infoItem.style.display = 'none';
-        camposSerializado.style.display = 'none';
-        camposConsumivel.style.display = 'none';
-        btnSubmit.disabled = true;
-        tipoControleInput.value = '';
-    });
-
-    formEntrada.addEventListener('submit', function(e) {
+    btnAdicionarCarrinho.addEventListener('click', function() {
         const tipoControle = tipoControleInput.value;
+        const valorUnitario = parseFloat(valorUnitarioInput.value);
+        
+        if (!valorUnitario || valorUnitario <= 0) {
+            alert('Por favor, informe um valor unitário válido maior que zero.');
+            valorUnitarioInput.focus();
+            return;
+        }
         
         if (tipoControle === 'SERIALIZADO') {
             const numeros = numerosSerieInput.value.trim();
             if (!numeros) {
-                e.preventDefault();
                 alert('Por favor, informe ao menos um número de série.');
                 numerosSerieInput.focus();
-                return false;
+                return;
             }
-        } else if (tipoControle === 'CONSUMIVEL') {
+            
+            const series = numeros.replace(/\n/g, ',').split(',').map(s => s.trim()).filter(s => s);
+            
+            carrinho.push({
+                item_id: itemAtualData.id,
+                item_nome: `${itemAtualData.codigo} - ${itemAtualData.nome}`,
+                tipo_controle: 'SERIALIZADO',
+                numeros_serie: series.join(', '),
+                quantidade: series.length,
+                valor_unitario: valorUnitario,
+                unidade: itemAtualData.unidade
+            });
+        } else {
             const qtd = parseFloat(quantidadeInput.value);
             if (!qtd || qtd <= 0) {
-                e.preventDefault();
                 alert('Por favor, informe uma quantidade válida maior que zero.');
                 quantidadeInput.focus();
-                return false;
+                return;
             }
+            
+            carrinho.push({
+                item_id: itemAtualData.id,
+                item_nome: `${itemAtualData.codigo} - ${itemAtualData.nome}`,
+                tipo_controle: 'CONSUMIVEL',
+                quantidade: qtd,
+                valor_unitario: valorUnitario,
+                unidade: itemAtualData.unidade
+            });
         }
+        
+        atualizarCarrinho();
+        limparFormularioItem();
+    });
+
+    function atualizarCarrinho() {
+        if (carrinho.length === 0) {
+            carrinhoContainer.style.display = 'none';
+            return;
+        }
+        
+        carrinhoContainer.style.display = 'block';
+        carrinhoCount.textContent = carrinho.length;
+        
+        let html = '<div class="list-group">';
+        carrinho.forEach((item, index) => {
+            const valorTotal = item.quantidade * item.valor_unitario;
+            html += `
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">${item.item_nome}</h6>
+                            <p class="mb-1 small text-muted">
+                                <strong>${item.tipo_controle === 'SERIALIZADO' ? 'Séries: ' : 'Quantidade: '}</strong>
+                                ${item.tipo_controle === 'SERIALIZADO' ? item.numeros_serie : `${item.quantidade} ${item.unidade}`}
+                            </p>
+                            <p class="mb-0 small">
+                                <strong>Valor Unit.:</strong> R$ ${item.valor_unitario.toFixed(2)} | 
+                                <strong>Total:</strong> R$ ${valorTotal.toFixed(2)}
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerDoCarrinho(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        carrinhoItens.innerHTML = html;
+    }
+
+    window.removerDoCarrinho = function(index) {
+        carrinho.splice(index, 1);
+        atualizarCarrinho();
+    };
+
+    btnLimparCarrinho.addEventListener('click', function() {
+        if (confirm('Deseja realmente limpar o carrinho?')) {
+            carrinho = [];
+            atualizarCarrinho();
+        }
+    });
+
+    btnFinalizarEntrada.addEventListener('click', async function() {
+        if (carrinho.length === 0) {
+            alert('O carrinho está vazio!');
+            return;
+        }
+        
+        const notaFiscal = notaFiscalInput.value.trim();
+        const observacoes = observacoesInput.value.trim();
+        
+        btnFinalizarEntrada.disabled = true;
+        btnFinalizarEntrada.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processando...';
+        
+        try {
+            const response = await fetch('{{ url_for("almoxarifado.processar_entrada_multipla") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    itens: carrinho,
+                    nota_fiscal: notaFiscal,
+                    observacoes: observacoes
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(result.message);
+                carrinho = [];
+                atualizarCarrinho();
+                limparFormularioCompleto();
+            } else {
+                alert('Erro: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('Erro ao processar entrada. Por favor, tente novamente.');
+        } finally {
+            btnFinalizarEntrada.disabled = false;
+            btnFinalizarEntrada.innerHTML = '<i class="fas fa-check-circle me-1"></i> Finalizar Entrada';
+        }
+    });
+
+    function limparFormularioItem() {
+        itemSelect.value = '';
+        numerosSerieInput.value = '';
+        quantidadeInput.value = '';
+        valorUnitarioInput.value = '';
+        infoItem.style.display = 'none';
+        camposSerializado.style.display = 'none';
+        camposConsumivel.style.display = 'none';
+        btnAdicionarCarrinho.disabled = true;
+        tipoControleInput.value = '';
+        itemAtualData = null;
+    }
+
+    function limparFormularioCompleto() {
+        limparFormularioItem();
+        notaFiscalInput.value = '';
+        observacoesInput.value = '';
+    }
+
+    formEntrada.addEventListener('reset', function() {
+        limparFormularioItem();
     });
 });
 </script>

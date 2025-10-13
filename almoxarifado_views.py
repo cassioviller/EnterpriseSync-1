@@ -554,10 +554,15 @@ def processar_entrada():
         tipo_controle = request.form.get('tipo_controle')
         nota_fiscal = request.form.get('nota_fiscal', '').strip()
         observacoes = request.form.get('observacoes', '').strip()
+        valor_unitario = request.form.get('valor_unitario', type=float)
         
         # Validações básicas
         if not item_id:
             flash('Item é obrigatório', 'danger')
+            return redirect(url_for('almoxarifado.entrada'))
+        
+        if not valor_unitario or valor_unitario <= 0:
+            flash('Valor unitário deve ser maior que zero', 'danger')
             return redirect(url_for('almoxarifado.entrada'))
         
         item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
@@ -598,6 +603,7 @@ def processar_entrada():
                     item_id=item_id,
                     numero_serie=serie,
                     quantidade=1,
+                    valor_unitario=valor_unitario,
                     status='DISPONIVEL',
                     admin_id=admin_id
                 )
@@ -608,6 +614,7 @@ def processar_entrada():
                     tipo_movimento='ENTRADA',
                     quantidade=1,
                     numero_serie=serie,
+                    valor_unitario=valor_unitario,
                     nota_fiscal=nota_fiscal,
                     observacao=observacoes,
                     estoque_id=None,
@@ -631,6 +638,7 @@ def processar_entrada():
             estoque = AlmoxarifadoEstoque(
                 item_id=item_id,
                 quantidade=quantidade,
+                valor_unitario=valor_unitario,
                 status='DISPONIVEL',
                 admin_id=admin_id
             )
@@ -642,6 +650,7 @@ def processar_entrada():
                 item_id=item_id,
                 tipo_movimento='ENTRADA',
                 quantidade=quantidade,
+                valor_unitario=valor_unitario,
                 nota_fiscal=nota_fiscal,
                 observacao=observacoes,
                 estoque_id=estoque.id,
@@ -661,6 +670,122 @@ def processar_entrada():
         logger.error(f'Erro ao processar entrada: {str(e)}')
         flash('Erro ao processar entrada de material', 'danger')
         return redirect(url_for('almoxarifado.entrada'))
+
+@almoxarifado_bp.route('/processar-entrada-multipla', methods=['POST'])
+@login_required
+def processar_entrada_multipla():
+    """Processa entrada de múltiplos materiais (carrinho)"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        return jsonify({'success': False, 'message': 'Erro de autenticação'}), 401
+    
+    try:
+        data = request.get_json()
+        itens = data.get('itens', [])
+        nota_fiscal = data.get('nota_fiscal', '').strip()
+        observacoes = data.get('observacoes', '').strip()
+        
+        if not itens or len(itens) == 0:
+            return jsonify({'success': False, 'message': 'Nenhum item no carrinho'}), 400
+        
+        total_processados = 0
+        
+        for item_data in itens:
+            item_id = item_data.get('item_id')
+            tipo_controle = item_data.get('tipo_controle')
+            valor_unitario = float(item_data.get('valor_unitario', 0))
+            
+            if not item_id or not tipo_controle or valor_unitario <= 0:
+                continue
+            
+            item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
+            if not item:
+                continue
+            
+            if tipo_controle == 'SERIALIZADO':
+                # Processar números de série
+                numeros_serie = item_data.get('numeros_serie', '')
+                series = [s.strip() for s in numeros_serie.split(',') if s.strip()]
+                
+                for serie in series:
+                    # Verificar duplicata
+                    existe = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item_id,
+                        numero_serie=serie,
+                        admin_id=admin_id
+                    ).first()
+                    
+                    if existe:
+                        continue  # Pular duplicatas
+                    
+                    estoque = AlmoxarifadoEstoque(
+                        item_id=item_id,
+                        numero_serie=serie,
+                        quantidade=1,
+                        valor_unitario=valor_unitario,
+                        status='DISPONIVEL',
+                        admin_id=admin_id
+                    )
+                    db.session.add(estoque)
+                    
+                    movimento = AlmoxarifadoMovimento(
+                        item_id=item_id,
+                        tipo_movimento='ENTRADA',
+                        quantidade=1,
+                        numero_serie=serie,
+                        valor_unitario=valor_unitario,
+                        nota_fiscal=nota_fiscal,
+                        observacao=observacoes,
+                        estoque_id=None,
+                        admin_id=admin_id,
+                        usuario_id=current_user.id,
+                        obra_id=None
+                    )
+                    db.session.add(movimento)
+                    total_processados += 1
+                    
+            else:  # CONSUMIVEL
+                quantidade = float(item_data.get('quantidade', 0))
+                
+                if quantidade <= 0:
+                    continue
+                
+                estoque = AlmoxarifadoEstoque(
+                    item_id=item_id,
+                    quantidade=quantidade,
+                    valor_unitario=valor_unitario,
+                    status='DISPONIVEL',
+                    admin_id=admin_id
+                )
+                db.session.add(estoque)
+                db.session.flush()
+                
+                movimento = AlmoxarifadoMovimento(
+                    item_id=item_id,
+                    tipo_movimento='ENTRADA',
+                    quantidade=quantidade,
+                    valor_unitario=valor_unitario,
+                    nota_fiscal=nota_fiscal,
+                    observacao=observacoes,
+                    estoque_id=estoque.id,
+                    admin_id=admin_id,
+                    usuario_id=current_user.id,
+                    obra_id=None
+                )
+                db.session.add(movimento)
+                total_processados += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Entrada processada com sucesso! {total_processados} itens cadastrados.'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Erro ao processar entrada múltipla: {str(e)}')
+        return jsonify({'success': False, 'message': f'Erro ao processar entrada: {str(e)}'}), 500
 
 # ========================================
 # SAÍDA DE MATERIAIS
