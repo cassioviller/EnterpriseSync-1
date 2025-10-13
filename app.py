@@ -262,6 +262,14 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint contabilidade: {e}")
     
+    # Blueprint financeiro v9.0
+    try:
+        from financeiro_views import financeiro_bp
+        app.register_blueprint(financeiro_bp)
+        logging.info("✅ Blueprint financeiro v9.0 registrado")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint financeiro: {e}")
+    
     # Blueprint templates de propostas
     try:
         from templates_views import templates_bp

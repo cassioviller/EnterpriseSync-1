@@ -1345,6 +1345,130 @@ def _migration_40_ponto_compartilhado():
         logger.error(traceback.format_exc())
 
 
+def _migration_41_sistema_financeiro():
+    """
+    MIGRAÇÃO 41: Sistema Financeiro v9.0
+    - Cria tabelas: conta_pagar, conta_receber, banco_empresa
+    - Índices de performance para consultas financeiras
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("💰 MIGRAÇÃO 41: Sistema Financeiro v9.0")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Tabela 1: conta_pagar
+        logger.info("📋 Criando tabela conta_pagar...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS conta_pagar (
+                id SERIAL PRIMARY KEY,
+                fornecedor_id INTEGER NOT NULL REFERENCES fornecedor(id),
+                obra_id INTEGER REFERENCES obra(id),
+                numero_documento VARCHAR(50),
+                descricao TEXT NOT NULL,
+                valor_original NUMERIC(15, 2) NOT NULL,
+                valor_pago NUMERIC(15, 2) DEFAULT 0,
+                saldo NUMERIC(15, 2),
+                data_emissao DATE NOT NULL,
+                data_vencimento DATE NOT NULL,
+                data_pagamento DATE,
+                status VARCHAR(20) DEFAULT 'PENDENTE',
+                conta_contabil_codigo VARCHAR(20) REFERENCES plano_contas(codigo),
+                forma_pagamento VARCHAR(50),
+                observacoes TEXT,
+                origem_tipo VARCHAR(50),
+                origem_id INTEGER,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Índices conta_pagar
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_pagar_vencimento ON conta_pagar(data_vencimento)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_pagar_status ON conta_pagar(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_pagar_fornecedor ON conta_pagar(fornecedor_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_pagar_obra ON conta_pagar(obra_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_pagar_admin ON conta_pagar(admin_id)")
+        logger.info("✅ Tabela conta_pagar criada/verificada com índices")
+        
+        # Tabela 2: conta_receber
+        logger.info("📋 Criando tabela conta_receber...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS conta_receber (
+                id SERIAL PRIMARY KEY,
+                cliente_nome VARCHAR(200) NOT NULL,
+                cliente_cpf_cnpj VARCHAR(18),
+                obra_id INTEGER REFERENCES obra(id),
+                numero_documento VARCHAR(50),
+                descricao TEXT NOT NULL,
+                valor_original NUMERIC(15, 2) NOT NULL,
+                valor_recebido NUMERIC(15, 2) DEFAULT 0,
+                saldo NUMERIC(15, 2),
+                data_emissao DATE NOT NULL,
+                data_vencimento DATE NOT NULL,
+                data_recebimento DATE,
+                status VARCHAR(20) DEFAULT 'PENDENTE',
+                conta_contabil_codigo VARCHAR(20) REFERENCES plano_contas(codigo),
+                forma_recebimento VARCHAR(50),
+                observacoes TEXT,
+                origem_tipo VARCHAR(50),
+                origem_id INTEGER,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Índices conta_receber
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_receber_vencimento ON conta_receber(data_vencimento)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_receber_status ON conta_receber(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_receber_cliente ON conta_receber(cliente_cpf_cnpj)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_receber_obra ON conta_receber(obra_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conta_receber_admin ON conta_receber(admin_id)")
+        logger.info("✅ Tabela conta_receber criada/verificada com índices")
+        
+        # Tabela 3: banco_empresa
+        logger.info("📋 Criando tabela banco_empresa...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS banco_empresa (
+                id SERIAL PRIMARY KEY,
+                nome_banco VARCHAR(100) NOT NULL,
+                agencia VARCHAR(10) NOT NULL,
+                conta VARCHAR(20) NOT NULL,
+                tipo_conta VARCHAR(20),
+                saldo_inicial NUMERIC(15, 2) DEFAULT 0,
+                saldo_atual NUMERIC(15, 2) DEFAULT 0,
+                ativo BOOLEAN DEFAULT TRUE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Índices banco_empresa
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_banco_admin ON banco_empresa(admin_id)")
+        logger.info("✅ Tabela banco_empresa criada/verificada com índice")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 41 CONCLUÍDA: Sistema Financeiro v9.0 criado!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 41: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -1408,6 +1532,9 @@ def executar_migracoes():
 
         # Migração 40: Sistema de Ponto Eletrônico Compartilhado
         _migration_40_ponto_compartilhado()
+
+        # Migração 41: Sistema Financeiro v9.0
+        _migration_41_sistema_financeiro()
 
         logger.info("=" * 80)
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
