@@ -9,6 +9,10 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Created 3 new models: RegistroPonto (enhanced with admin_id), ConfiguracaoHorario, DispositivoObra
 - Built ponto_bp blueprint with 5 routes for mobile-first time clock management
 - Developed mobile-optimized templates with auto-refresh, GPS tracking, and real-time status updates
+- **CRITICAL FIX:** Corrected Migration 40 to eliminate hard-coded admin_id=10 default
+  - Implemented safe multi-tenant backfill: admin_id derived from funcionario.admin_id (fallback to obra.admin_id)
+  - Migration now adds nullable column → backfills from relationships → sets NOT NULL (no hard-coding)
+  - Architect approved: "Mantém isolamento multi-tenant e integridade dos dados"
 - Fixed construction site details page to show only employees who clocked in (based on ponto records)
 - Implemented dynamic service progress calculation from RDO data using `calcular_progresso_real_servico` function
 - Fixed critical bug where service progress regressed to 0% when newer RDOs omitted subactivities - now aggregates latest value per subactivity across all RDOs using MAX(id) grouped by subactivity name
