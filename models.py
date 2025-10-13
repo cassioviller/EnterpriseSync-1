@@ -1148,6 +1148,103 @@ class Fornecedor(db.Model):
             return f"{self.cnpj[:2]}.{self.cnpj[2:5]}.{self.cnpj[5:8]}/{self.cnpj[8:12]}-{self.cnpj[12:]}"
         return self.cnpj
 
+class ContaPagar(db.Model):
+    """Contas a Pagar - Gestão de pagamentos a fornecedores"""
+    __tablename__ = 'conta_pagar'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    numero_documento = db.Column(db.String(50))
+    descricao = db.Column(db.Text, nullable=False)
+    valor_original = db.Column(db.Numeric(15, 2), nullable=False)
+    valor_pago = db.Column(db.Numeric(15, 2), default=0)
+    saldo = db.Column(db.Numeric(15, 2))
+    data_emissao = db.Column(db.Date, nullable=False)
+    data_vencimento = db.Column(db.Date, nullable=False)
+    data_pagamento = db.Column(db.Date)
+    status = db.Column(db.String(20), default='PENDENTE')
+    conta_contabil_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    forma_pagamento = db.Column(db.String(50))
+    observacoes = db.Column(db.Text)
+    origem_tipo = db.Column(db.String(50))
+    origem_id = db.Column(db.Integer)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    fornecedor = db.relationship('Fornecedor', backref='contas_pagar')
+    obra = db.relationship('Obra', backref='contas_pagar')
+    conta_contabil = db.relationship('PlanoContas', backref='contas_pagar_rel')
+    admin = db.relationship('Usuario', backref='contas_pagar_admin')
+    
+    __table_args__ = (
+        db.Index('idx_conta_pagar_vencimento', 'data_vencimento'),
+        db.Index('idx_conta_pagar_status', 'status'),
+        db.Index('idx_conta_pagar_fornecedor', 'fornecedor_id'),
+        db.Index('idx_conta_pagar_obra', 'obra_id'),
+        db.Index('idx_conta_pagar_admin', 'admin_id'),
+    )
+
+class ContaReceber(db.Model):
+    """Contas a Receber - Gestão de recebimentos de clientes"""
+    __tablename__ = 'conta_receber'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_nome = db.Column(db.String(200), nullable=False)
+    cliente_cpf_cnpj = db.Column(db.String(18))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    numero_documento = db.Column(db.String(50))
+    descricao = db.Column(db.Text, nullable=False)
+    valor_original = db.Column(db.Numeric(15, 2), nullable=False)
+    valor_recebido = db.Column(db.Numeric(15, 2), default=0)
+    saldo = db.Column(db.Numeric(15, 2))
+    data_emissao = db.Column(db.Date, nullable=False)
+    data_vencimento = db.Column(db.Date, nullable=False)
+    data_recebimento = db.Column(db.Date)
+    status = db.Column(db.String(20), default='PENDENTE')
+    conta_contabil_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    forma_recebimento = db.Column(db.String(50))
+    observacoes = db.Column(db.Text)
+    origem_tipo = db.Column(db.String(50))
+    origem_id = db.Column(db.Integer)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    obra = db.relationship('Obra', backref='contas_receber')
+    conta_contabil = db.relationship('PlanoContas', backref='contas_receber_rel')
+    admin = db.relationship('Usuario', backref='contas_receber_admin')
+    
+    __table_args__ = (
+        db.Index('idx_conta_receber_vencimento', 'data_vencimento'),
+        db.Index('idx_conta_receber_status', 'status'),
+        db.Index('idx_conta_receber_cliente', 'cliente_cpf_cnpj'),
+        db.Index('idx_conta_receber_obra', 'obra_id'),
+        db.Index('idx_conta_receber_admin', 'admin_id'),
+    )
+
+class BancoEmpresa(db.Model):
+    """Contas Bancárias da Empresa"""
+    __tablename__ = 'banco_empresa'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome_banco = db.Column(db.String(100), nullable=False)
+    agencia = db.Column(db.String(10), nullable=False)
+    conta = db.Column(db.String(20), nullable=False)
+    tipo_conta = db.Column(db.String(20))
+    saldo_inicial = db.Column(db.Numeric(15, 2), default=0)
+    saldo_atual = db.Column(db.Numeric(15, 2), default=0)
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    admin = db.relationship('Usuario', backref='bancos_empresa')
+    
+    __table_args__ = (
+        db.Index('idx_banco_admin', 'admin_id'),
+    )
+
 class Produto(db.Model):
     """Produtos/materiais do almoxarifado com controle completo"""
     __tablename__ = 'produto'
