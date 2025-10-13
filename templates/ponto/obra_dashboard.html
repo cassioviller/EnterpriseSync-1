@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ponto - {{ obra.nome }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            touch-action: manipulation;
+        }
+        
+        .main-container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-bottom: 80px;
+        }
+        
+        .header-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .funcionario-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .funcionario-card:active {
+            transform: scale(0.98);
+        }
+        
+        .funcionario-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+        
+        .btn-ponto {
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 15px 30px;
+            border-radius: 50px;
+            border: none;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-ponto::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn-ponto:active::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .btn-entrada { background: linear-gradient(45deg, #28a745, #20c997); }
+        .btn-saida-almoco { background: linear-gradient(45deg, #ffc107, #fd7e14); }
+        .btn-volta-almoco { background: linear-gradient(45deg, #17a2b8, #6f42c1); }
+        .btn-saida { background: linear-gradient(45deg, #dc3545, #e83e8c); }
+        .btn-concluido { background: linear-gradient(45deg, #6c757d, #495057); }
+        
+        .btn-ponto:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .status-badge {
+            font-size: 0.9rem;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        
+        .relogio {
+            font-size: 3rem;
+            font-weight: 300;
+            color: #2c3e50;
+            text-align: center;
+            margin: 20px 0;
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .funcionario-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+        
+        .funcionario-nome {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+            word-break: break-word;
+        }
+        
+        .funcionario-funcao {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .horarios-info {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        
+        .horario-item {
+            background: rgba(108, 117, 125, 0.1);
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            flex: 1;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        .horario-item.ativo {
+            background: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .fixed-bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .loading-spinner.show {
+            display: inline-block;
+        }
+        
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 10px;
+            }
+            
+            .funcionario-card {
+                padding: 15px;
+            }
+            
+            .relogio {
+                font-size: 2rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .funcionario-nome {
+                font-size: 1.1rem;
+            }
+            
+            .btn-ponto {
+                font-size: 1rem;
+                padding: 12px 20px;
+            }
+            
+            .horario-item {
+                font-size: 0.8rem;
+                padding: 4px 8px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .horarios-info {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .horario-item {
+                min-width: unset;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Header com informações da obra -->
+        <div class="header-card">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h1 class="mb-2">
+                        <i class="fas fa-building me-2"></i>
+                        {{ obra.nome }}
+                    </h1>
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-calendar me-2"></i>
+                        {{ hoje.strftime('%d/%m/%Y') }} - {{ ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'][hoje.weekday()] }}
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <div class="relogio" id="relogio-atual">--:--:--</div>
+                </div>
+            </div>
+            
+            <!-- Estatísticas do dia -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number text-primary">{{ estatisticas.total_funcionarios }}</div>
+                    <div class="text-muted small">Total</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number text-success">{{ estatisticas.presentes }}</div>
+                    <div class="text-muted small">Presentes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number text-danger">{{ estatisticas.faltaram }}</div>
+                    <div class="text-muted small">Faltaram</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number text-warning">{{ estatisticas.atrasados }}</div>
+                    <div class="text-muted small">Atrasados</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Lista de funcionários -->
+        <div id="funcionarios-container">
+            {% for item in funcionarios %}
+            <div class="funcionario-card" data-funcionario-id="{{ item.funcionario.id }}">
+                <div class="funcionario-info">
+                    <div style="flex: 1;">
+                        <div class="funcionario-nome">{{ item.funcionario.nome }}</div>
+                        <div class="funcionario-funcao">{{ item.funcionario.funcao.nome if item.funcionario.funcao else 'N/A' }}</div>
+                    </div>
+                    <div>
+                        <span class="status-badge bg-{{ item.status_visual.cor }} text-white">
+                            <i class="fas fa-{{ item.status_visual.icone }} me-1"></i>
+                            {{ item.status_visual.texto }}
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Horários registrados -->
+                <div class="horarios-info">
+                    <div class="horario-item {% if item.registro and item.registro.hora_entrada %}ativo{% endif %}">
+                        <i class="fas fa-sign-in-alt me-1"></i>
+                        <div>
+                            {% if item.registro and item.registro.hora_entrada %}
+                                {{ item.registro.hora_entrada.strftime('%H:%M') }}
+                            {% else %}
+                                --:--
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="horario-item {% if item.registro and item.registro.hora_almoco_saida %}ativo{% endif %}">
+                        <i class="fas fa-utensils me-1"></i>
+                        <div>
+                            {% if item.registro and item.registro.hora_almoco_saida %}
+                                {{ item.registro.hora_almoco_saida.strftime('%H:%M') }}
+                            {% else %}
+                                --:--
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="horario-item {% if item.registro and item.registro.hora_almoco_retorno %}ativo{% endif %}">
+                        <i class="fas fa-undo me-1"></i>
+                        <div>
+                            {% if item.registro and item.registro.hora_almoco_retorno %}
+                                {{ item.registro.hora_almoco_retorno.strftime('%H:%M') }}
+                            {% else %}
+                                --:--
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="horario-item {% if item.registro and item.registro.hora_saida %}ativo{% endif %}">
+                        <i class="fas fa-sign-out-alt me-1"></i>
+                        <div>
+                            {% if item.registro and item.registro.hora_saida %}
+                                {{ item.registro.hora_saida.strftime('%H:%M') }}
+                            {% else %}
+                                --:--
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Informações de horas -->
+                {% if item.horas_ate_agora and item.horas_ate_agora.total_seconds() > 0 %}
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        Trabalhando há: 
+                        <strong>{{ (item.horas_ate_agora.total_seconds() // 3600)|int }}h{{ ((item.horas_ate_agora.total_seconds() % 3600) // 60)|int }}m</strong>
+                    </small>
+                </div>
+                {% endif %}
+                
+                <!-- Botão de ação -->
+                <div class="text-center mt-3">
+                    {% if item.proximo_ponto %}
+                        <button class="btn btn-ponto btn-{{ item.proximo_ponto }}" 
+                                onclick="baterPonto({{ item.funcionario.id }}, '{{ item.proximo_ponto }}')">
+                            <i class="fas fa-hand-pointer me-2"></i>
+                            {% if item.proximo_ponto == 'entrada' %}
+                                BATER ENTRADA
+                            {% elif item.proximo_ponto == 'saida_almoco' %}
+                                SAÍDA ALMOÇO
+                            {% elif item.proximo_ponto == 'volta_almoco' %}
+                                VOLTA ALMOÇO
+                            {% elif item.proximo_ponto == 'saida' %}
+                                BATER SAÍDA
+                            {% endif %}
+                        </button>
+                    {% else %}
+                        <button class="btn btn-ponto btn-concluido" disabled>
+                            <i class="fas fa-check-circle me-2"></i>
+                            DIA CONCLUÍDO
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Barra fixa inferior -->
+    <div class="fixed-bottom-bar">
+        <div class="d-flex gap-2 justify-content-center">
+            <a href="{{ url_for('ponto.relatorio_obra', obra_id=obra.id) }}" class="btn btn-outline-primary">
+                <i class="fas fa-chart-bar me-2"></i>
+                Relatórios
+            </a>
+            <button class="btn btn-outline-primary" onclick="atualizarStatus()">
+                <i class="fas fa-sync-alt me-2"></i>
+                Atualizar
+            </button>
+            <a href="{{ url_for('ponto.lista_obras') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-2"></i>
+                Obras
+            </a>
+        </div>
+    </div>
+    
+    <!-- Modal de confirmação -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar Ponto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirm-message" class="mb-0"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="confirm-btn">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast para notificações -->
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+        <div id="toast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto">Ponto Registrado</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toast-message">
+                <!-- Mensagem será inserida aqui -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Variáveis globais
+        let obraId = {{ obra.id }};
+        let confirmCallback = null;
+        
+        // Atualizar relógio em tempo real
+        function atualizarRelogio() {
+            const agora = new Date();
+            const hora = agora.toLocaleTimeString('pt-BR');
+            document.getElementById('relogio-atual').textContent = hora;
+        }
+        
+        setInterval(atualizarRelogio, 1000);
+        atualizarRelogio();
+        
+        // Função para bater ponto
+        function baterPonto(funcionarioId, tipoPonto) {
+            // Buscar nome do funcionário
+            const card = document.querySelector(`[data-funcionario-id="${funcionarioId}"]`);
+            const nome = card.querySelector('.funcionario-nome').textContent;
+            
+            // Mapear tipos de ponto para mensagens
+            const tiposTexto = {
+                'entrada': 'ENTRADA',
+                'saida_almoco': 'SAÍDA PARA ALMOÇO',
+                'volta_almoco': 'VOLTA DO ALMOÇO',
+                'saida': 'SAÍDA'
+            };
+            
+            // Mostrar modal de confirmação
+            document.getElementById('confirm-message').innerHTML = 
+                `Confirmar <strong>${tiposTexto[tipoPonto]}</strong> para <strong>${nome}</strong>?`;
+            
+            confirmCallback = () => {
+                executarBaterPonto(funcionarioId, tipoPonto);
+            };
+            
+            new bootstrap.Modal(document.getElementById('confirmModal')).show();
+        }
+        
+        // Executar o registro de ponto
+        function executarBaterPonto(funcionarioId, tipoPonto) {
+            const btn = document.querySelector(`[data-funcionario-id="${funcionarioId}"] .btn-ponto`);
+            const originalText = btn.innerHTML;
+            
+            // Mostrar loading
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Registrando...';
+            
+            // Obter localização (opcional)
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        enviarPonto(funcionarioId, tipoPonto, position.coords.latitude, position.coords.longitude, btn, originalText);
+                    },
+                    function() {
+                        enviarPonto(funcionarioId, tipoPonto, null, null, btn, originalText);
+                    }
+                );
+            } else {
+                enviarPonto(funcionarioId, tipoPonto, null, null, btn, originalText);
+            }
+        }
+        
+        // Enviar requisição de ponto
+        function enviarPonto(funcionarioId, tipoPonto, lat, lng, btn, originalText) {
+            fetch('/ponto/api/bater-ponto', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    funcionario_id: funcionarioId,
+                    tipo_ponto: tipoPonto,
+                    obra_id: obraId,
+                    latitude: lat,
+                    longitude: lng
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar toast de sucesso
+                    mostrarToast(data.message, 'success');
+                    
+                    // Atualizar interface
+                    setTimeout(() => {
+                        atualizarStatus();
+                    }, 1000);
+                } else {
+                    mostrarToast('Erro: ' + (data.error || 'Erro desconhecido'), 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                mostrarToast('Erro ao registrar ponto', 'error');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+        }
+        
+        // Atualizar status da obra
+        function atualizarStatus() {
+            location.reload();
+        }
+        
+        // Mostrar toast de notificação
+        function mostrarToast(message, type) {
+            const toast = document.getElementById('toast');
+            const toastBody = document.getElementById('toast-message');
+            
+            toastBody.textContent = message;
+            
+            // Definir cor baseada no tipo
+            toast.className = 'toast';
+            const toastHeader = toast.querySelector('.toast-header');
+            if (type === 'success') {
+                toast.classList.add('bg-success', 'text-white');
+                toastHeader.classList.add('bg-success', 'text-white');
+            } else if (type === 'error') {
+                toast.classList.add('bg-danger', 'text-white');
+                toastHeader.classList.add('bg-danger', 'text-white');
+            }
+            
+            new bootstrap.Toast(toast).show();
+        }
+        
+        // Event listener para botão de confirmação
+        document.getElementById('confirm-btn').addEventListener('click', function() {
+            if (confirmCallback) {
+                confirmCallback();
+                confirmCallback = null;
+            }
+            bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide();
+        });
+        
+        // Atualizar status automaticamente a cada 60 segundos
+        setInterval(atualizarStatus, 60000);
+        
+        // Prevenir zoom em iOS
+        document.addEventListener('touchmove', function (event) {
+            if (event.scale !== 1) { event.preventDefault(); }
+        }, { passive: false });
+        
+        // Adicionar haptic feedback (iOS)
+        if (window.navigator && window.navigator.vibrate) {
+            document.querySelectorAll('.btn-ponto').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    window.navigator.vibrate(50);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

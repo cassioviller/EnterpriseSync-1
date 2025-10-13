@@ -163,6 +163,13 @@ try:
 except ImportError:
     logging.warning("Almoxarifado views não disponível")
 
+try:
+    from ponto_views import ponto_bp
+    app.register_blueprint(ponto_bp)
+    logging.info("✅ Blueprint ponto eletrônico registrado")
+except ImportError:
+    logging.warning("Ponto views não disponível")
+
 # Register main blueprint
 app.register_blueprint(main_bp)
 app.register_blueprint(production_bp, url_prefix='/prod')

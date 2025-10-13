@@ -5,6 +5,10 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 
 ## Recent Changes
 **October 13, 2025:**
+- Implemented Sistema de Ponto Eletrônico Compartilhado (Shared Device Time Clock System) with Migration 40
+- Created 3 new models: RegistroPonto (enhanced with admin_id), ConfiguracaoHorario, DispositivoObra
+- Built ponto_bp blueprint with 5 routes for mobile-first time clock management
+- Developed mobile-optimized templates with auto-refresh, GPS tracking, and real-time status updates
 - Fixed construction site details page to show only employees who clocked in (based on ponto records)
 - Implemented dynamic service progress calculation from RDO data using `calcular_progresso_real_servico` function
 - Fixed critical bug where service progress regressed to 0% when newer RDOs omitted subactivities - now aggregates latest value per subactivity across all RDOs using MAX(id) grouped by subactivity name
@@ -123,3 +127,92 @@ Sistema completo de gestão de almoxarifado para controle de materiais, ferramen
 ✅ 7 fluxos testados com sucesso
 ✅ Bugs corrigidos na Migração 39 (obra_id nullable + colunas adicionadas)
 ✅ Sistema pronto para produção
+
+---
+
+### Sistema de Ponto Eletrônico - Celular Compartilhado (SIGE v8.0)
+Sistema de controle de ponto eletrônico com abordagem de dispositivo compartilhado: um tablet/celular por obra serve toda a equipe para registro de entrada/saída.
+
+**Arquitetura:**
+- **3 Modelos:** RegistroPonto (com admin_id), ConfiguracaoHorario, DispositivoObra
+- **Migração 40:** Adiciona admin_id ao RegistroPonto, cria tabelas e índices de performance
+- **Blueprint:** ponto_bp (prefixo /ponto) registrado em app.py
+- **Service Layer:** PontoService centraliza lógica de negócio (status, cálculos, validações)
+
+**Design de Dispositivo Compartilhado:**
+- Um tablet/celular por obra exibe todos os funcionários simultaneamente
+- Cada funcionário clica seu próprio botão para bater ponto
+- Interface mobile-first otimizada para touch com auto-refresh a cada 30 segundos
+- GPS tracking para validar localização do registro
+
+**Funcionalidades Principais:**
+
+1. **Dashboard da Obra (/ponto/obra/<id>):**
+   - Lista todos funcionários com status em tempo real (presente, ausente, em almoço)
+   - KPIs: total funcionários, presentes, faltaram, atrasados
+   - Botões grandes para batida rápida (entrada, almoço saída, almoço retorno, saída)
+   - Auto-refresh automático a cada 30s
+
+2. **API de Batida de Ponto (/ponto/api/bater-ponto):**
+   - POST JSON com funcionario_id, tipo_ponto, obra_id, latitude, longitude
+   - Validações: funcionário existe, pertence à obra, horário válido
+   - Cálculo automático de atrasos/horas extras
+   - Retorna status atualizado em tempo real
+
+3. **Status em Tempo Real (/ponto/api/status-funcionarios):**
+   - GET retorna status atual de todos funcionários da obra
+   - Usado pelo auto-refresh do dashboard
+   - JSON compacto para performance
+
+4. **Relatório da Obra (/ponto/relatorio/<obra_id>):**
+   - Filtros: data_inicio, data_fim
+   - Dados: funcionário, dias trabalhados, horas totais, atrasos, extras
+   - Exportação para Excel/PDF
+
+5. **Configuração de Horários (/ponto/configuracao/obra/<id>):**
+   - Admin pode configurar horários padrão por obra
+   - entrada_padrao, saida_padrao, almoco_inicio, almoco_fim
+   - tolerancia_atraso (minutos), carga_horaria_diaria
+   - Configurações específicas por funcionário (opcional)
+
+**Modelos de Dados:**
+
+1. **RegistroPonto:**
+   - funcionario_id, obra_id, data, admin_id
+   - hora_entrada, hora_saida, hora_almoco_saida, hora_almoco_retorno
+   - horas_trabalhadas, horas_extras, minutos_atraso
+   - Índices: (funcionario_id, data), (obra_id, data), (admin_id, data)
+
+2. **ConfiguracaoHorario:**
+   - obra_id, funcionario_id (nullable - config geral ou específica)
+   - entrada_padrao (08:00), saida_padrao (17:00)
+   - almoco_inicio (12:00), almoco_fim (13:00)
+   - tolerancia_atraso (15 min), carga_horaria_diaria (480 min)
+
+3. **DispositivoObra:**
+   - obra_id, nome_dispositivo, identificador
+   - latitude, longitude, ultimo_acesso
+   - Controle de dispositivos autorizados por obra
+
+**PontoService - Lógica de Negócio:**
+- `obter_status_obra()`: Status de todos funcionários da obra
+- `bater_ponto_obra()`: Registra ponto com validações e cálculos
+- `calcular_horas()`: Calcula horas trabalhadas, extras, atrasos
+- `obter_config_horario()`: Busca configuração (específica ou geral)
+- `obter_relatorio_obra()`: Relatório consolidado por período
+
+**Templates Mobile-First:**
+- obra_dashboard.html: Interface principal com grid de funcionários
+- lista_obras.html: Seleção de obra (múltiplos tablets)
+- relatorio_obra.html: Visualização de relatórios
+- Auto-refresh JavaScript, haptic feedback, PWA-ready
+
+**Segurança Multi-Tenant:**
+- TODAS queries filtradas por admin_id
+- Isolamento total entre tenants em pontos/configurações/dispositivos
+- Validação de funcionário pertence à obra do admin
+
+**Integração:**
+- Sistema de Ponto integrado com RegistroPonto existente
+- Reutiliza modelo RegistroPonto (sem breaking changes)
+- Compatível com cálculos de folha de pagamento

@@ -1,0 +1,1300 @@
+# 📱 PROMPT PARA SISTEMA DE PONTO ELETRÔNICO - CELULAR COMPARTILHADO
+
+Atue como um desenvolvedor full-stack sênior especialista em Flask, SQLAlchemy e interfaces mobile-first. Preciso implementar um **Sistema de Ponto Eletrônico** com uma abordagem inovadora: **um celular/tablet por obra** que toda a equipe usa para bater ponto.
+
+## 🎯 CONCEITO PRINCIPAL
+
+### VISÃO GERAL
+- **1 celular/tablet** fica na obra (fixo ou com encarregado)
+- **Todos os funcionários** da obra usam o mesmo dispositivo
+- **Interface mostra todos** os funcionários simultaneamente
+- **Cada um clica** no seu próprio botão para bater ponto
+- **Sistema registra** automaticamente com GPS da obra
+
+### FLUXO BÁSICO
+```
+Funcionário chega → Vê seu nome na tela → Clica "BATER ENTRADA" → Sistema registra → Botão muda para próximo ponto
+```
+
+## 📋 ESPECIFICAÇÃO TÉCNICA COMPLETA
+
+### 1. MODELOS DE DADOS
+
+```python
+# ================================
+# SISTEMA DE PONTO ELETRÔNICO - CELULAR COMPARTILHADO
+# ================================
+
+class RegistroPonto(db.Model):
+    """Registro diário de ponto dos funcionários"""
+    __tablename__ = 'registro_ponto'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    data_ponto = db.Column(db.Date, nullable=False)
+    
+    # Horários do dia (4 pontos)
+    entrada = db.Column(db.Time)           # 08:00
+    saida_almoco = db.Column(db.Time)      # 12:00
+    volta_almoco = db.Column(db.Time)      # 13:00
+    saida = db.Column(db.Time)             # 17:00
+    
+    # Campos calculados automaticamente
+    horas_trabalhadas = db.Column(db.Interval)  # Total de horas do dia
+    horas_extras = db.Column(db.Interval)       # Horas além de 8h
+    atraso = db.Column(db.Interval)             # Atraso na entrada
+    
+    # Localização (GPS da obra)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    
+    # Observações e justificativas
+    observacoes = db.Column(db.Text)
+    justificativa_falta = db.Column(db.Text)
+    motivo_falta = db.Column(db.String(50))  # 'doenca', 'medico', 'pessoal', 'nao_justificada'
+    
+    # Controle multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='registros_ponto')
+    obra = db.relationship('Obra', backref='pontos_registrados')
+    
+    # Índices para performance
+    __table_args__ = (
+        db.Index('idx_funcionario_data', 'funcionario_id', 'data_ponto'),
+        db.Index('idx_obra_data', 'obra_id', 'data_ponto'),
+        db.Index('idx_admin_data', 'admin_id', 'data_ponto'),
+        db.UniqueConstraint('funcionario_id', 'data_ponto', name='uq_funcionario_data_ponto')
+    )
+
+class ConfiguracaoHorario(db.Model):
+    """Configuração de horários padrão por obra ou funcionário"""
+    __tablename__ = 'configuracao_horario'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))  # Opcional: configuração específica
+    
+    # Horários padrão
+    entrada_padrao = db.Column(db.Time, default=time(8, 0))      # 08:00
+    saida_padrao = db.Column(db.Time, default=time(17, 0))       # 17:00
+    almoco_inicio = db.Column(db.Time, default=time(12, 0))      # 12:00
+    almoco_fim = db.Column(db.Time, default=time(13, 0))         # 13:00
+    
+    # Configurações
+    tolerancia_atraso = db.Column(db.Integer, default=15)        # 15 minutos
+    carga_horaria_diaria = db.Column(db.Integer, default=480)    # 8 horas em minutos
+    
+    # Controle
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ativo = db.Column(db.Boolean, default=True)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='configuracao_horario')
+    funcionario = db.relationship('Funcionario', backref='configuracao_horario_individual')
+
+class DispositivoObra(db.Model):
+    """Registro de dispositivos autorizados por obra"""
+    __tablename__ = 'dispositivo_obra'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    nome_dispositivo = db.Column(db.String(100), nullable=False)  # "Tablet Obra A"
+    identificador = db.Column(db.String(200))  # User-agent ou fingerprint
+    ultimo_acesso = db.Column(db.DateTime)
+    ativo = db.Column(db.Boolean, default=True)
+    
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamento
+    obra = db.relationship('Obra', backref='dispositivos_autorizados')
+```
+
+### 2. SERVIÇO DE PONTO
+
+```python
+# ================================
+# SERVIÇO DE CONTROLE DE PONTO
+# ================================
+
+class PontoService:
+    """Serviço centralizado para controle de ponto com celular compartilhado"""
+    
+    @staticmethod
+    def obter_status_obra(obra_id, data=None):
+        """Obtém status de todos os funcionários da obra para uma data"""
+        if not data:
+            data = date.today()
+        
+        admin_id = get_tenant_admin_id()
+        
+        # Buscar funcionários ativos na obra
+        funcionarios = Funcionario.query.filter_by(
+            obra_atual_id=obra_id,
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        status_funcionarios = []
+        
+        for funcionario in funcionarios:
+            # Buscar registro do dia
+            registro = RegistroPonto.query.filter_by(
+                funcionario_id=funcionario.id,
+                data_ponto=data,
+                admin_id=admin_id
+            ).first()
+            
+            # Determinar próximo ponto
+            proximo_ponto = PontoService._determinar_proximo_ponto(registro)
+            
+            # Calcular horas trabalhadas até agora
+            horas_ate_agora = PontoService._calcular_horas_ate_agora(registro)
+            
+            status_funcionarios.append({
+                'funcionario': funcionario,
+                'registro': registro,
+                'proximo_ponto': proximo_ponto,
+                'horas_ate_agora': horas_ate_agora,
+                'status_visual': PontoService._obter_status_visual(registro, proximo_ponto)
+            })
+        
+        return status_funcionarios
+    
+    @staticmethod
+    def bater_ponto_obra(funcionario_id, tipo_ponto, obra_id, latitude=None, longitude=None):
+        """Registra ponto de funcionário via celular da obra"""
+        try:
+            admin_id = get_tenant_admin_id()
+            hoje = date.today()
+            agora = datetime.now().time()
+            
+            # Buscar ou criar registro do dia
+            registro = RegistroPonto.query.filter_by(
+                funcionario_id=funcionario_id,
+                data_ponto=hoje,
+                admin_id=admin_id
+            ).first()
+            
+            if not registro:
+                registro = RegistroPonto(
+                    funcionario_id=funcionario_id,
+                    obra_id=obra_id,
+                    data_ponto=hoje,
+                    admin_id=admin_id,
+                    latitude=latitude,
+                    longitude=longitude
+                )
+                db.session.add(registro)
+            
+            # Validar e registrar o ponto
+            resultado_validacao = PontoService._validar_ponto(registro, tipo_ponto, agora)
+            if not resultado_validacao['valido']:
+                return resultado_validacao
+            
+            # Registrar o ponto baseado no tipo
+            if tipo_ponto == 'entrada':
+                registro.entrada = agora
+            elif tipo_ponto == 'saida_almoco':
+                registro.saida_almoco = agora
+            elif tipo_ponto == 'volta_almoco':
+                registro.volta_almoco = agora
+            elif tipo_ponto == 'saida':
+                registro.saida = agora
+            
+            # Calcular horas trabalhadas
+            PontoService._calcular_horas(registro)
+            
+            db.session.commit()
+            
+            # Buscar nome do funcionário para resposta
+            funcionario = Funcionario.query.get(funcionario_id)
+            
+            return {
+                'success': True,
+                'message': f'{funcionario.nome}: {tipo_ponto.replace("_", " ").title()} registrada às {agora.strftime("%H:%M")}',
+                'funcionario_nome': funcionario.nome,
+                'horario': agora.strftime("%H:%M"),
+                'proximo_ponto': PontoService._determinar_proximo_ponto(registro)
+            }
+            
+        except Exception as e:
+            print(f"Erro ao bater ponto: {e}")
+            db.session.rollback()
+            return {'success': False, 'error': str(e)}
+    
+    @staticmethod
+    def _determinar_proximo_ponto(registro):
+        """Determina qual é o próximo ponto a ser batido"""
+        if not registro:
+            return 'entrada'
+        
+        if not registro.entrada:
+            return 'entrada'
+        elif not registro.saida_almoco:
+            return 'saida_almoco'
+        elif not registro.volta_almoco:
+            return 'volta_almoco'
+        elif not registro.saida:
+            return 'saida'
+        else:
+            return None  # Todos os pontos batidos
+    
+    @staticmethod
+    def _obter_status_visual(registro, proximo_ponto):
+        """Retorna status visual para interface"""
+        if not registro or not registro.entrada:
+            return {'cor': 'secondary', 'icone': 'clock', 'texto': 'Não chegou'}
+        elif proximo_ponto is None:
+            return {'cor': 'success', 'icone': 'check-circle', 'texto': 'Concluído'}
+        elif proximo_ponto == 'saida':
+            return {'cor': 'primary', 'icone': 'play-circle', 'texto': 'Trabalhando'}
+        else:
+            return {'cor': 'warning', 'icone': 'pause-circle', 'texto': 'Em pausa'}
+    
+    @staticmethod
+    def _calcular_horas_ate_agora(registro):
+        """Calcula horas trabalhadas até o momento atual"""
+        if not registro or not registro.entrada:
+            return timedelta()
+        
+        agora = datetime.now().time()
+        entrada_dt = datetime.combine(date.today(), registro.entrada)
+        agora_dt = datetime.combine(date.today(), agora)
+        
+        # Se ainda não saiu para almoço, conta tudo
+        if not registro.saida_almoco:
+            return agora_dt - entrada_dt
+        
+        # Se saiu para almoço mas não voltou, conta até a saída do almoço
+        if not registro.volta_almoco:
+            almoco_dt = datetime.combine(date.today(), registro.saida_almoco)
+            return almoco_dt - entrada_dt
+        
+        # Se voltou do almoço, conta entrada até almoço + volta até agora
+        almoco_saida_dt = datetime.combine(date.today(), registro.saida_almoco)
+        almoco_volta_dt = datetime.combine(date.today(), registro.volta_almoco)
+        
+        periodo_manha = almoco_saida_dt - entrada_dt
+        periodo_tarde = agora_dt - almoco_volta_dt
+        
+        return periodo_manha + periodo_tarde
+    
+    @staticmethod
+    def _validar_ponto(registro, tipo_ponto, horario):
+        """Valida se o ponto pode ser registrado"""
+        if tipo_ponto == 'entrada' and registro.entrada:
+            return {'valido': False, 'error': 'Entrada já registrada hoje'}
+        
+        if tipo_ponto == 'saida_almoco':
+            if not registro.entrada:
+                return {'valido': False, 'error': 'Registre a entrada primeiro'}
+            if registro.saida_almoco:
+                return {'valido': False, 'error': 'Saída para almoço já registrada'}
+        
+        if tipo_ponto == 'volta_almoco':
+            if not registro.saida_almoco:
+                return {'valido': False, 'error': 'Registre a saída para almoço primeiro'}
+            if registro.volta_almoco:
+                return {'valido': False, 'error': 'Volta do almoço já registrada'}
+        
+        if tipo_ponto == 'saida':
+            if not registro.entrada:
+                return {'valido': False, 'error': 'Registre a entrada primeiro'}
+            if registro.saida:
+                return {'valido': False, 'error': 'Saída já registrada hoje'}
+        
+        return {'valido': True}
+    
+    @staticmethod
+    def _calcular_horas(registro):
+        """Calcula horas trabalhadas, extras e atrasos"""
+        try:
+            # Buscar configuração de horário da obra
+            config = ConfiguracaoHorario.query.filter_by(
+                obra_id=registro.obra_id,
+                ativo=True
+            ).first()
+            
+            if not config:
+                # Configuração padrão
+                config = ConfiguracaoHorario()
+            
+            # Calcular atraso na entrada
+            if registro.entrada and config.entrada_padrao:
+                entrada_datetime = datetime.combine(registro.data_ponto, registro.entrada)
+                entrada_padrao_datetime = datetime.combine(registro.data_ponto, config.entrada_padrao)
+                
+                if entrada_datetime > entrada_padrao_datetime:
+                    atraso = entrada_datetime - entrada_padrao_datetime
+                    # Só considera atraso se passou da tolerância
+                    if atraso.total_seconds() > (config.tolerancia_atraso * 60):
+                        registro.atraso = atraso
+            
+            # Calcular horas trabalhadas (só se tiver entrada e saída)
+            if registro.entrada and registro.saida:
+                entrada_dt = datetime.combine(registro.data_ponto, registro.entrada)
+                saida_dt = datetime.combine(registro.data_ponto, registro.saida)
+                
+                # Calcular tempo de almoço
+                tempo_almoco = timedelta(hours=1)  # Padrão 1 hora
+                if registro.saida_almoco and registro.volta_almoco:
+                    almoco_saida = datetime.combine(registro.data_ponto, registro.saida_almoco)
+                    almoco_volta = datetime.combine(registro.data_ponto, registro.volta_almoco)
+                    tempo_almoco = almoco_volta - almoco_saida
+                
+                horas_totais = saida_dt - entrada_dt
+                registro.horas_trabalhadas = horas_totais - tempo_almoco
+                
+                # Calcular horas extras
+                carga_horaria = timedelta(minutes=config.carga_horaria_diaria)
+                if registro.horas_trabalhadas > carga_horaria:
+                    registro.horas_extras = registro.horas_trabalhadas - carga_horaria
+                
+        except Exception as e:
+            print(f"Erro ao calcular horas: {e}")
+    
+    @staticmethod
+    def registrar_falta(funcionario_id, data, motivo, observacoes=None):
+        """Registra falta de funcionário"""
+        try:
+            admin_id = get_tenant_admin_id()
+            
+            # Verificar se já existe registro
+            registro = RegistroPonto.query.filter_by(
+                funcionario_id=funcionario_id,
+                data_ponto=data,
+                admin_id=admin_id
+            ).first()
+            
+            if not registro:
+                # Buscar obra atual do funcionário
+                funcionario = Funcionario.query.get(funcionario_id)
+                
+                registro = RegistroPonto(
+                    funcionario_id=funcionario_id,
+                    obra_id=funcionario.obra_atual_id,
+                    data_ponto=data,
+                    admin_id=admin_id
+                )
+                db.session.add(registro)
+            
+            registro.motivo_falta = motivo
+            registro.justificativa_falta = observacoes
+            
+            db.session.commit()
+            
+            return {'success': True, 'message': 'Falta registrada com sucesso'}
+            
+        except Exception as e:
+            print(f"Erro ao registrar falta: {e}")
+            db.session.rollback()
+            return {'success': False, 'error': str(e)}
+```
+
+### 3. ROTAS E BLUEPRINT
+
+```python
+# ================================
+# BLUEPRINT DE PONTO - CELULAR COMPARTILHADO
+# ================================
+
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+from flask_login import login_required
+
+ponto_bp = Blueprint('ponto', __name__, url_prefix='/ponto')
+
+@ponto_bp.route('/obra/<int:obra_id>')
+@login_required
+def obra_dashboard(obra_id):
+    """Tela principal do celular da obra - mostra todos os funcionários"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        # Verificar se obra existe e pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+        
+        # Obter status de todos os funcionários
+        status_funcionarios = PontoService.obter_status_obra(obra_id)
+        
+        # Estatísticas do dia
+        total_funcionarios = len(status_funcionarios)
+        presentes = len([f for f in status_funcionarios if f['registro'] and f['registro'].entrada])
+        faltaram = total_funcionarios - presentes
+        atrasados = len([f for f in status_funcionarios if f['registro'] and f['registro'].atraso])
+        
+        estatisticas = {
+            'total_funcionarios': total_funcionarios,
+            'presentes': presentes,
+            'faltaram': faltaram,
+            'atrasados': atrasados
+        }
+        
+        return render_template('ponto/obra_dashboard.html',
+                             obra=obra,
+                             funcionarios=status_funcionarios,
+                             estatisticas=estatisticas,
+                             hoje=date.today())
+        
+    except Exception as e:
+        print(f"Erro no dashboard da obra: {e}")
+        flash(f'Erro ao carregar dashboard: {str(e)}', 'error')
+        return redirect(url_for('main.dashboard'))
+
+@ponto_bp.route('/api/bater-ponto', methods=['POST'])
+@login_required
+def api_bater_ponto():
+    """API para registrar ponto via celular da obra"""
+    try:
+        data = request.get_json()
+        
+        funcionario_id = data.get('funcionario_id')
+        tipo_ponto = data.get('tipo_ponto')
+        obra_id = data.get('obra_id')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        
+        if not all([funcionario_id, tipo_ponto, obra_id]):
+            return jsonify({'success': False, 'error': 'Dados obrigatórios não informados'}), 400
+        
+        resultado = PontoService.bater_ponto_obra(
+            funcionario_id=funcionario_id,
+            tipo_ponto=tipo_ponto,
+            obra_id=obra_id,
+            latitude=latitude,
+            longitude=longitude
+        )
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Erro na API de bater ponto: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ponto_bp.route('/api/status-obra/<int:obra_id>')
+@login_required
+def api_status_obra(obra_id):
+    """API para obter status atualizado da obra"""
+    try:
+        status_funcionarios = PontoService.obter_status_obra(obra_id)
+        
+        # Serializar dados para JSON
+        funcionarios_json = []
+        for item in status_funcionarios:
+            funcionario_data = {
+                'id': item['funcionario'].id,
+                'nome': item['funcionario'].nome,
+                'funcao': item['funcionario'].funcao,
+                'proximo_ponto': item['proximo_ponto'],
+                'status_visual': item['status_visual'],
+                'horas_ate_agora': str(item['horas_ate_agora']) if item['horas_ate_agora'] else '0:00:00'
+            }
+            
+            if item['registro']:
+                funcionario_data['registro'] = {
+                    'entrada': item['registro'].entrada.strftime('%H:%M') if item['registro'].entrada else None,
+                    'saida_almoco': item['registro'].saida_almoco.strftime('%H:%M') if item['registro'].saida_almoco else None,
+                    'volta_almoco': item['registro'].volta_almoco.strftime('%H:%M') if item['registro'].volta_almoco else None,
+                    'saida': item['registro'].saida.strftime('%H:%M') if item['registro'].saida else None,
+                    'horas_trabalhadas': str(item['registro'].horas_trabalhadas) if item['registro'].horas_trabalhadas else None,
+                    'horas_extras': str(item['registro'].horas_extras) if item['registro'].horas_extras else None,
+                    'atraso': str(item['registro'].atraso) if item['registro'].atraso else None
+                }
+            else:
+                funcionario_data['registro'] = None
+            
+            funcionarios_json.append(funcionario_data)
+        
+        return jsonify({
+            'success': True,
+            'funcionarios': funcionarios_json,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        print(f"Erro na API de status: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ponto_bp.route('/api/registrar-falta', methods=['POST'])
+@login_required
+@admin_required
+def api_registrar_falta():
+    """API para registrar falta de funcionário"""
+    try:
+        data = request.get_json()
+        
+        funcionario_id = data.get('funcionario_id')
+        data_falta = datetime.strptime(data.get('data'), '%Y-%m-%d').date()
+        motivo = data.get('motivo')
+        observacoes = data.get('observacoes')
+        
+        resultado = PontoService.registrar_falta(
+            funcionario_id=funcionario_id,
+            data=data_falta,
+            motivo=motivo,
+            observacoes=observacoes
+        )
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"Erro ao registrar falta: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ponto_bp.route('/relatorio/obra/<int:obra_id>')
+@login_required
+@admin_required
+def relatorio_obra(obra_id):
+    """Relatório de ponto da obra"""
+    try:
+        admin_id = get_tenant_admin_id()
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+        
+        # Filtros de data
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        if not data_inicio:
+            data_inicio = date.today().replace(day=1)  # Primeiro dia do mês
+        else:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        
+        if not data_fim:
+            data_fim = date.today()
+        else:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        
+        # Buscar registros do período
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.obra_id == obra_id,
+            RegistroPonto.admin_id == admin_id,
+            RegistroPonto.data_ponto >= data_inicio,
+            RegistroPonto.data_ponto <= data_fim
+        ).order_by(
+            RegistroPonto.data_ponto.desc(),
+            RegistroPonto.funcionario_id
+        ).all()
+        
+        # Agrupar por funcionário
+        funcionarios_dados = {}
+        for registro in registros:
+            func_id = registro.funcionario_id
+            if func_id not in funcionarios_dados:
+                funcionarios_dados[func_id] = {
+                    'funcionario': registro.funcionario,
+                    'registros': [],
+                    'total_horas': timedelta(),
+                    'total_extras': timedelta(),
+                    'total_faltas': 0
+                }
+            
+            funcionarios_dados[func_id]['registros'].append(registro)
+            
+            if registro.horas_trabalhadas:
+                funcionarios_dados[func_id]['total_horas'] += registro.horas_trabalhadas
+            
+            if registro.horas_extras:
+                funcionarios_dados[func_id]['total_extras'] += registro.horas_extras
+            
+            if registro.motivo_falta:
+                funcionarios_dados[func_id]['total_faltas'] += 1
+        
+        return render_template('ponto/relatorio_obra.html',
+                             obra=obra,
+                             funcionarios_dados=funcionarios_dados,
+                             data_inicio=data_inicio,
+                             data_fim=data_fim)
+        
+    except Exception as e:
+        print(f"Erro no relatório da obra: {e}")
+        flash(f'Erro ao gerar relatório: {str(e)}', 'error')
+        return redirect(url_for('ponto.obra_dashboard', obra_id=obra_id))
+```
+
+### 4. TEMPLATE PRINCIPAL - DASHBOARD DA OBRA
+
+```html
+<!-- templates/ponto/obra_dashboard.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ponto - {{ obra.nome }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .funcionario-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .funcionario-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+        
+        .btn-ponto {
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 12px 30px;
+            border-radius: 50px;
+            border: none;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .btn-ponto:hover {
+            transform: scale(1.05);
+        }
+        
+        .btn-entrada { background: linear-gradient(45deg, #28a745, #20c997); }
+        .btn-saida-almoco { background: linear-gradient(45deg, #ffc107, #fd7e14); }
+        .btn-volta-almoco { background: linear-gradient(45deg, #17a2b8, #6f42c1); }
+        .btn-saida { background: linear-gradient(45deg, #dc3545, #e83e8c); }
+        .btn-concluido { background: linear-gradient(45deg, #6c757d, #495057); }
+        
+        .status-badge {
+            font-size: 0.9rem;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .relogio {
+            font-size: 3rem;
+            font-weight: 300;
+            color: #2c3e50;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .funcionario-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        
+        .funcionario-nome {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .funcionario-funcao {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .horarios-info {
+            display: flex;
+            gap: 15px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        
+        .horario-item {
+            background: rgba(108, 117, 125, 0.1);
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .horario-item.ativo {
+            background: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 10px;
+            }
+            
+            .funcionario-card {
+                padding: 15px;
+            }
+            
+            .relogio {
+                font-size: 2rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Header com informações da obra -->
+        <div class="header-card">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h1 class="mb-2">
+                        <i class="fas fa-building me-2"></i>
+                        {{ obra.nome }}
+                    </h1>
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-calendar me-2"></i>
+                        {{ hoje.strftime('%d/%m/%Y - %A') }}
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <div class="relogio" id="relogio-atual">--:--:--</div>
+                </div>
+            </div>
+            
+            <!-- Estatísticas do dia -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number text-primary">{{ estatisticas.total_funcionarios }}</div>
+                    <div class="text-muted">Total Funcionários</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number text-success">{{ estatisticas.presentes }}</div>
+                    <div class="text-muted">Presentes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number text-danger">{{ estatisticas.faltaram }}</div>
+                    <div class="text-muted">Faltaram</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number text-warning">{{ estatisticas.atrasados }}</div>
+                    <div class="text-muted">Atrasados</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Lista de funcionários -->
+        <div id="funcionarios-container">
+            {% for item in funcionarios %}
+            <div class="funcionario-card" data-funcionario-id="{{ item.funcionario.id }}">
+                <div class="funcionario-info">
+                    <div>
+                        <div class="funcionario-nome">{{ item.funcionario.nome }}</div>
+                        <div class="funcionario-funcao">{{ item.funcionario.funcao }}</div>
+                    </div>
+                    <div>
+                        <span class="status-badge bg-{{ item.status_visual.cor }} text-white">
+                            <i class="fas fa-{{ item.status_visual.icone }} me-1"></i>
+                            {{ item.status_visual.texto }}
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Horários registrados -->
+                <div class="horarios-info">
+                    <div class="horario-item {% if item.registro and item.registro.entrada %}ativo{% endif %}">
+                        <i class="fas fa-sign-in-alt me-1"></i>
+                        Entrada: 
+                        {% if item.registro and item.registro.entrada %}
+                            {{ item.registro.entrada.strftime('%H:%M') }}
+                        {% else %}
+                            --:--
+                        {% endif %}
+                    </div>
+                    
+                    <div class="horario-item {% if item.registro and item.registro.saida_almoco %}ativo{% endif %}">
+                        <i class="fas fa-utensils me-1"></i>
+                        Almoço: 
+                        {% if item.registro and item.registro.saida_almoco %}
+                            {{ item.registro.saida_almoco.strftime('%H:%M') }}
+                        {% else %}
+                            --:--
+                        {% endif %}
+                    </div>
+                    
+                    <div class="horario-item {% if item.registro and item.registro.volta_almoco %}ativo{% endif %}">
+                        <i class="fas fa-undo me-1"></i>
+                        Volta: 
+                        {% if item.registro and item.registro.volta_almoco %}
+                            {{ item.registro.volta_almoco.strftime('%H:%M') }}
+                        {% else %}
+                            --:--
+                        {% endif %}
+                    </div>
+                    
+                    <div class="horario-item {% if item.registro and item.registro.saida %}ativo{% endif %}">
+                        <i class="fas fa-sign-out-alt me-1"></i>
+                        Saída: 
+                        {% if item.registro and item.registro.saida %}
+                            {{ item.registro.saida.strftime('%H:%M') }}
+                        {% else %}
+                            --:--
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Informações de horas -->
+                {% if item.horas_ate_agora and item.horas_ate_agora.total_seconds() > 0 %}
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        Trabalhando há: 
+                        <strong>{{ (item.horas_ate_agora.total_seconds() // 3600)|int }}h{{ ((item.horas_ate_agora.total_seconds() % 3600) // 60)|int }}m</strong>
+                    </small>
+                </div>
+                {% endif %}
+                
+                <!-- Botão de ação -->
+                <div class="text-center mt-3">
+                    {% if item.proximo_ponto %}
+                        <button class="btn btn-ponto btn-{{ item.proximo_ponto }}" 
+                                onclick="baterPonto({{ item.funcionario.id }}, '{{ item.proximo_ponto }}')">
+                            <i class="fas fa-hand-pointer me-2"></i>
+                            {% if item.proximo_ponto == 'entrada' %}
+                                BATER ENTRADA
+                            {% elif item.proximo_ponto == 'saida_almoco' %}
+                                SAÍDA ALMOÇO
+                            {% elif item.proximo_ponto == 'volta_almoco' %}
+                                VOLTA ALMOÇO
+                            {% elif item.proximo_ponto == 'saida' %}
+                                BATER SAÍDA
+                            {% endif %}
+                        </button>
+                    {% else %}
+                        <button class="btn btn-ponto btn-concluido" disabled>
+                            <i class="fas fa-check-circle me-2"></i>
+                            DIA CONCLUÍDO
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Botões de ação -->
+        <div class="text-center mt-4">
+            <a href="/ponto/relatorio/obra/{{ obra.id }}" class="btn btn-outline-light btn-lg me-3">
+                <i class="fas fa-chart-bar me-2"></i>
+                Relatórios
+            </a>
+            <button class="btn btn-outline-light btn-lg" onclick="atualizarStatus()">
+                <i class="fas fa-sync-alt me-2"></i>
+                Atualizar
+            </button>
+        </div>
+    </div>
+    
+    <!-- Modal de confirmação -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar Ponto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirm-message"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="confirm-btn">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast para notificações -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="toast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto">Ponto Registrado</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toast-message">
+                <!-- Mensagem será inserida aqui -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Variáveis globais
+        let obraId = {{ obra.id }};
+        let confirmCallback = null;
+        
+        // Atualizar relógio em tempo real
+        function atualizarRelogio() {
+            const agora = new Date();
+            const hora = agora.toLocaleTimeString('pt-BR');
+            document.getElementById('relogio-atual').textContent = hora;
+        }
+        
+        setInterval(atualizarRelogio, 1000);
+        atualizarRelogio();
+        
+        // Função para bater ponto
+        function baterPonto(funcionarioId, tipoPonto) {
+            // Buscar nome do funcionário
+            const card = document.querySelector(`[data-funcionario-id="${funcionarioId}"]`);
+            const nome = card.querySelector('.funcionario-nome').textContent;
+            
+            // Mapear tipos de ponto para mensagens
+            const tiposTexto = {
+                'entrada': 'ENTRADA',
+                'saida_almoco': 'SAÍDA PARA ALMOÇO',
+                'volta_almoco': 'VOLTA DO ALMOÇO',
+                'saida': 'SAÍDA'
+            };
+            
+            // Mostrar modal de confirmação
+            document.getElementById('confirm-message').innerHTML = 
+                `Confirmar <strong>${tiposTexto[tipoPonto]}</strong> para <strong>${nome}</strong>?`;
+            
+            confirmCallback = () => {
+                executarBaterPonto(funcionarioId, tipoPonto);
+            };
+            
+            new bootstrap.Modal(document.getElementById('confirmModal')).show();
+        }
+        
+        // Executar o registro de ponto
+        function executarBaterPonto(funcionarioId, tipoPonto) {
+            const btn = document.querySelector(`[data-funcionario-id="${funcionarioId}"] .btn-ponto`);
+            const originalText = btn.innerHTML;
+            
+            // Mostrar loading
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Registrando...';
+            
+            // Obter localização (opcional)
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        enviarPonto(funcionarioId, tipoPonto, position.coords.latitude, position.coords.longitude, btn, originalText);
+                    },
+                    function() {
+                        enviarPonto(funcionarioId, tipoPonto, null, null, btn, originalText);
+                    }
+                );
+            } else {
+                enviarPonto(funcionarioId, tipoPonto, null, null, btn, originalText);
+            }
+        }
+        
+        // Enviar requisição de ponto
+        function enviarPonto(funcionarioId, tipoPonto, lat, lng, btn, originalText) {
+            fetch('/ponto/api/bater-ponto', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    funcionario_id: funcionarioId,
+                    tipo_ponto: tipoPonto,
+                    obra_id: obraId,
+                    latitude: lat,
+                    longitude: lng
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar toast de sucesso
+                    mostrarToast(data.message, 'success');
+                    
+                    // Atualizar interface
+                    setTimeout(() => {
+                        atualizarStatus();
+                    }, 1000);
+                } else {
+                    mostrarToast('Erro: ' + data.error, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                mostrarToast('Erro ao registrar ponto', 'error');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+        }
+        
+        // Atualizar status da obra
+        function atualizarStatus() {
+            fetch(`/ponto/api/status-obra/${obraId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Recarregar página para atualizar interface
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao atualizar status:', error);
+            });
+        }
+        
+        // Mostrar toast de notificação
+        function mostrarToast(message, type) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            
+            toastMessage.textContent = message;
+            
+            // Definir cor baseada no tipo
+            toast.className = 'toast';
+            if (type === 'success') {
+                toast.classList.add('bg-success', 'text-white');
+            } else if (type === 'error') {
+                toast.classList.add('bg-danger', 'text-white');
+            }
+            
+            new bootstrap.Toast(toast).show();
+        }
+        
+        // Event listener para botão de confirmação
+        document.getElementById('confirm-btn').addEventListener('click', function() {
+            if (confirmCallback) {
+                confirmCallback();
+                confirmCallback = null;
+            }
+            bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide();
+        });
+        
+        // Atualizar status automaticamente a cada 30 segundos
+        setInterval(atualizarStatus, 30000);
+        
+        // Registrar service worker para funcionar offline (opcional)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js')
+            .then(registration => console.log('SW registrado'))
+            .catch(error => console.log('Erro no SW:', error));
+        }
+    </script>
+</body>
+</html>
+```
+
+### 5. MIGRAÇÃO DO BANCO
+
+```python
+def migrar_sistema_ponto_compartilhado():
+    """Migração para criar sistema de ponto com celular compartilhado"""
+    try:
+        logger.info("=" * 80)
+        logger.info("📱 MIGRAÇÃO: Sistema de Ponto - Celular Compartilhado v1.0")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # 1. Criar tabela de registros de ponto
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS registro_ponto (
+                id SERIAL PRIMARY KEY,
+                funcionario_id INTEGER NOT NULL REFERENCES funcionario(id),
+                obra_id INTEGER NOT NULL REFERENCES obra(id),
+                data_ponto DATE NOT NULL,
+                entrada TIME,
+                saida_almoco TIME,
+                volta_almoco TIME,
+                saida TIME,
+                horas_trabalhadas INTERVAL,
+                horas_extras INTERVAL,
+                atraso INTERVAL,
+                latitude FLOAT,
+                longitude FLOAT,
+                observacoes TEXT,
+                justificativa_falta TEXT,
+                motivo_falta VARCHAR(50),
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(funcionario_id, data_ponto)
+            )
+        """)
+        
+        # 2. Criar tabela de configuração de horários
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS configuracao_horario (
+                id SERIAL PRIMARY KEY,
+                obra_id INTEGER REFERENCES obra(id),
+                funcionario_id INTEGER REFERENCES funcionario(id),
+                entrada_padrao TIME DEFAULT '08:00:00',
+                saida_padrao TIME DEFAULT '17:00:00',
+                almoco_inicio TIME DEFAULT '12:00:00',
+                almoco_fim TIME DEFAULT '13:00:00',
+                tolerancia_atraso INTEGER DEFAULT 15,
+                carga_horaria_diaria INTEGER DEFAULT 480,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                ativo BOOLEAN DEFAULT true
+            )
+        """)
+        
+        # 3. Criar tabela de dispositivos autorizados
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dispositivo_obra (
+                id SERIAL PRIMARY KEY,
+                obra_id INTEGER NOT NULL REFERENCES obra(id),
+                nome_dispositivo VARCHAR(100) NOT NULL,
+                identificador VARCHAR(200),
+                ultimo_acesso TIMESTAMP,
+                ativo BOOLEAN DEFAULT true,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id)
+            )
+        """)
+        
+        # 4. Criar índices para performance
+        indices = [
+            "CREATE INDEX IF NOT EXISTS idx_registro_ponto_funcionario_data ON registro_ponto(funcionario_id, data_ponto)",
+            "CREATE INDEX IF NOT EXISTS idx_registro_ponto_obra_data ON registro_ponto(obra_id, data_ponto)",
+            "CREATE INDEX IF NOT EXISTS idx_registro_ponto_admin_data ON registro_ponto(admin_id, data_ponto)",
+            "CREATE INDEX IF NOT EXISTS idx_configuracao_horario_obra ON configuracao_horario(obra_id, ativo)",
+            "CREATE INDEX IF NOT EXISTS idx_dispositivo_obra_obra ON dispositivo_obra(obra_id, ativo)"
+        ]
+        
+        for indice in indices:
+            cursor.execute(indice)
+        
+        # 5. Criar configuração padrão para todas as obras
+        cursor.execute("""
+            INSERT INTO configuracao_horario (obra_id, admin_id)
+            SELECT o.id, o.admin_id
+            FROM obra o
+            WHERE o.ativa = true
+            AND NOT EXISTS (
+                SELECT 1 FROM configuracao_horario ch 
+                WHERE ch.obra_id = o.id
+            )
+        """)
+        
+        # 6. Adicionar campo obra_atual_id na tabela funcionario (se não existir)
+        cursor.execute("""
+            ALTER TABLE funcionario 
+            ADD COLUMN IF NOT EXISTS obra_atual_id INTEGER REFERENCES obra(id)
+        """)
+        
+        # 7. Atualizar funcionários com obra padrão (primeira obra ativa do admin)
+        cursor.execute("""
+            UPDATE funcionario 
+            SET obra_atual_id = (
+                SELECT id FROM obra 
+                WHERE admin_id = funcionario.admin_id 
+                AND ativa = true 
+                LIMIT 1
+            )
+            WHERE obra_atual_id IS NULL
+            AND ativo = true
+        """)
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("✅ Sistema de Ponto com Celular Compartilhado criado com sucesso!")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na migração: {e}")
+        if 'connection' in locals():
+            connection.rollback()
+
+# Adicionar no final de executar_migracoes():
+migrar_sistema_ponto_compartilhado()
+```
+
+## 🎯 RESULTADO ESPERADO
+
+### FUNCIONALIDADES IMPLEMENTADAS
+- ✅ **Dashboard da obra** com todos os funcionários
+- ✅ **Botões individuais** para cada funcionário
+- ✅ **4 pontos por dia** (entrada, saída almoço, volta almoço, saída)
+- ✅ **Cálculos automáticos** de horas, extras e atrasos
+- ✅ **Interface mobile-first** otimizada para tablet
+- ✅ **Atualização em tempo real** do status
+- ✅ **GPS automático** da obra
+- ✅ **Relatórios por obra** e funcionário
+- ✅ **Sistema de faltas** com justificativas
+
+### VANTAGENS DA SOLUÇÃO
+- ✅ **1 dispositivo** por obra (economia máxima)
+- ✅ **Controle total** do encarregado
+- ✅ **Impossível burlar** o sistema
+- ✅ **Interface intuitiva** para qualquer funcionário
+- ✅ **Dados precisos** para folha de pagamento
+- ✅ **Relatórios automáticos** por obra
+
+### CRONOGRAMA DE IMPLEMENTAÇÃO
+- **Dia 1:** Backend e modelos (6-8 horas)
+- **Dia 2:** APIs e serviços (6-8 horas)
+- **Dia 3:** Interface e testes (6-8 horas)
+
+**TOTAL: 3 dias para sistema completo e funcional**
+
+## 📋 CHECKLIST DE IMPLEMENTAÇÃO
+
+### Backend
+- [ ] Criar modelos de dados
+- [ ] Implementar PontoService
+- [ ] Criar migração do banco
+- [ ] Implementar APIs REST
+
+### Frontend
+- [ ] Template do dashboard da obra
+- [ ] JavaScript para interações
+- [ ] CSS responsivo para mobile
+- [ ] Sistema de notificações
+
+### Integração
+- [ ] Blueprint de rotas
+- [ ] Integração com sistema existente
+- [ ] Testes de funcionalidade
+- [ ] Deploy e validação
+
+**IMPLEMENTE EXATAMENTE CONFORME ESPECIFICADO PARA GARANTIR FUNCIONAMENTO PERFEITO!**

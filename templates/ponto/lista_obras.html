@@ -1,0 +1,77 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Ponto Eletrônico - Obras{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2>
+                <i class="fas fa-clock me-2"></i>
+                Ponto Eletrônico - Selecione a Obra
+            </h2>
+            <p class="text-muted">Escolha a obra para acessar o sistema de ponto compartilhado</p>
+        </div>
+    </div>
+
+    <div class="row">
+        {% if obras_com_dados %}
+            {% for item in obras_com_dados %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 hover-shadow">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-building me-2 text-primary"></i>
+                            {{ item.obra.nome }}
+                        </h5>
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-3 mb-3">
+                            <div>
+                                <small class="text-muted">Funcionários:</small>
+                                <h3 class="mb-0">{{ item.total_funcionarios }}</h3>
+                            </div>
+                            {% if item.obra.status %}
+                            <span class="badge bg-success">
+                                {{ item.obra.status }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('ponto.obra_dashboard', obra_id=item.obra.id) }}" 
+                               class="btn btn-primary">
+                                <i class="fas fa-fingerprint me-2"></i>
+                                Acessar Ponto
+                            </a>
+                            <a href="{{ url_for('ponto.relatorio_obra', obra_id=item.obra.id) }}" 
+                               class="btn btn-outline-secondary">
+                                <i class="fas fa-chart-bar me-2"></i>
+                                Relatórios
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Nenhuma obra cadastrada. Crie obras para começar a usar o sistema de ponto eletrônico.
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .hover-shadow {
+        transition: all 0.3s ease;
+    }
+    
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}

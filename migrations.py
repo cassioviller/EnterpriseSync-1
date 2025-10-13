@@ -1172,6 +1172,179 @@ def _migration_39_create_almoxarifado_system():
         logger.error(traceback.format_exc())
 
 
+def _migration_40_ponto_compartilhado():
+    """
+    MIGRAÇÃO 40: Sistema de Ponto Eletrônico com Celular Compartilhado
+    - Adiciona tabelas configuracao_horario e dispositivo_obra
+    - Adiciona índices ao RegistroPonto
+    - Adiciona campo admin_id ao RegistroPonto se não existir
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("📱 MIGRAÇÃO 40: Sistema de Ponto Eletrônico Compartilhado")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Adicionar admin_id ao RegistroPonto se não existir
+        logger.info("🔧 Verificando campo admin_id na tabela registro_ponto...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'registro_ponto' 
+            AND column_name = 'admin_id'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("📋 Adicionando coluna admin_id na tabela registro_ponto...")
+            
+            # Passo 1: Adicionar coluna como NULLABLE primeiro
+            cursor.execute("""
+                ALTER TABLE registro_ponto 
+                ADD COLUMN admin_id INTEGER REFERENCES usuario(id)
+            """)
+            logger.info("✅ Coluna admin_id adicionada (nullable)")
+            
+            # Passo 2: Backfill admin_id baseado em funcionario.admin_id
+            logger.info("📋 Backfill de admin_id baseado em funcionários...")
+            cursor.execute("""
+                UPDATE registro_ponto rp
+                SET admin_id = f.admin_id
+                FROM funcionario f
+                WHERE rp.funcionario_id = f.id
+                AND rp.admin_id IS NULL
+            """)
+            backfill_count = cursor.rowcount
+            logger.info(f"✅ {backfill_count} registros atualizados com admin_id")
+            
+            # Passo 3: Verificar se ainda há registros sem admin_id
+            cursor.execute("""
+                SELECT COUNT(*) FROM registro_ponto WHERE admin_id IS NULL
+            """)
+            null_count = cursor.fetchone()[0]
+            
+            if null_count > 0:
+                logger.warning(f"⚠️ {null_count} registros sem admin_id - usando fallback obra.admin_id")
+                cursor.execute("""
+                    UPDATE registro_ponto rp
+                    SET admin_id = o.admin_id
+                    FROM obra o
+                    WHERE rp.obra_id = o.id
+                    AND rp.admin_id IS NULL
+                """)
+                logger.info(f"✅ {cursor.rowcount} registros atualizados via obra")
+            
+            # Passo 4: Tornar NOT NULL após backfill
+            cursor.execute("""
+                SELECT is_nullable 
+                FROM information_schema.columns 
+                WHERE table_name = 'registro_ponto' 
+                AND column_name = 'admin_id'
+            """)
+            is_nullable = cursor.fetchone()[0]
+            
+            if is_nullable == 'YES':
+                cursor.execute("""
+                    ALTER TABLE registro_ponto 
+                    ALTER COLUMN admin_id SET NOT NULL
+                """)
+                logger.info("✅ Coluna admin_id agora é NOT NULL")
+            else:
+                logger.info("✅ Coluna admin_id já é NOT NULL")
+        else:
+            logger.info("✅ Coluna admin_id já existe")
+        
+        # Criar índices no RegistroPonto
+        logger.info("📋 Criando índices de performance no registro_ponto...")
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_registro_ponto_funcionario_data 
+            ON registro_ponto(funcionario_id, data)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_registro_ponto_obra_data 
+            ON registro_ponto(obra_id, data)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_registro_ponto_admin_data 
+            ON registro_ponto(admin_id, data)
+        """)
+        logger.info("✅ Índices criados/verificados")
+        
+        # Criar tabela configuracao_horario
+        logger.info("📋 Criando tabela configuracao_horario...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS configuracao_horario (
+                id SERIAL PRIMARY KEY,
+                obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                funcionario_id INTEGER REFERENCES funcionario(id) ON DELETE CASCADE,
+                entrada_padrao TIME DEFAULT '08:00:00',
+                saida_padrao TIME DEFAULT '17:00:00',
+                almoco_inicio TIME DEFAULT '12:00:00',
+                almoco_fim TIME DEFAULT '13:00:00',
+                tolerancia_atraso INTEGER DEFAULT 15,
+                carga_horaria_diaria INTEGER DEFAULT 480,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                ativo BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_config_horario_obra 
+            ON configuracao_horario(obra_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_config_horario_admin 
+            ON configuracao_horario(admin_id)
+        """)
+        logger.info("✅ Tabela configuracao_horario criada/verificada")
+        
+        # Criar tabela dispositivo_obra
+        logger.info("📋 Criando tabela dispositivo_obra...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dispositivo_obra (
+                id SERIAL PRIMARY KEY,
+                obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                nome_dispositivo VARCHAR(100) NOT NULL,
+                identificador VARCHAR(200),
+                ultimo_acesso TIMESTAMP,
+                ativo BOOLEAN DEFAULT TRUE,
+                latitude FLOAT,
+                longitude FLOAT,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_dispositivo_obra_obra 
+            ON dispositivo_obra(obra_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_dispositivo_obra_admin 
+            ON dispositivo_obra(admin_id)
+        """)
+        logger.info("✅ Tabela dispositivo_obra criada/verificada")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 40 CONCLUÍDA: Sistema de Ponto Compartilhado criado!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 40: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -1232,6 +1405,9 @@ def executar_migracoes():
 
         # Migração 39: Sistema de Almoxarifado v3.0
         _migration_39_create_almoxarifado_system()
+
+        # Migração 40: Sistema de Ponto Eletrônico Compartilhado
+        _migration_40_ponto_compartilhado()
 
         logger.info("=" * 80)
         logger.info("✅ Migrações automáticas concluídas com sucesso!")

@@ -1,0 +1,185 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Relatório de Ponto - {{ obra.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>
+                <i class="fas fa-chart-bar me-2"></i>
+                Relatório de Ponto - {{ obra.nome }}
+            </h2>
+            <p class="text-muted">Período: {{ data_inicio.strftime('%d/%m/%Y') }} a {{ data_fim.strftime('%d/%m/%Y') }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('ponto.obra_dashboard', obra_id=obra.id) }}" class="btn btn-primary">
+                <i class="fas fa-fingerprint me-2"></i>
+                Voltar ao Ponto
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros de Data -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Data Início</label>
+                    <input type="date" name="data_inicio" class="form-control" 
+                           value="{{ data_inicio.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Data Fim</label>
+                    <input type="date" name="data_fim" class="form-control" 
+                           value="{{ data_fim.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-2"></i>
+                        Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Relatórios por Funcionário -->
+    {% if funcionarios_dados %}
+        {% for func_id, dados in funcionarios_dados.items() %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user me-2"></i>
+                        {{ dados.funcionario.nome }}
+                    </h5>
+                    <span class="badge bg-white text-primary">
+                        {{ dados.funcionario.funcao.nome if dados.funcionario.funcao else 'N/A' }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Resumo -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 text-center">
+                            <h3 class="text-primary mb-0">{{ dados.registros|length }}</h3>
+                            <small class="text-muted">Dias Trabalhados</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 text-center">
+                            <h3 class="text-success mb-0">{{ "%.1f"|format(dados.total_horas) }}h</h3>
+                            <small class="text-muted">Total de Horas</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 text-center">
+                            <h3 class="text-warning mb-0">{{ "%.1f"|format(dados.total_extras) }}h</h3>
+                            <small class="text-muted">Horas Extras</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 text-center">
+                            <h3 class="text-danger mb-0">{{ dados.total_faltas }}</h3>
+                            <small class="text-muted">Faltas</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalhes dos Registros -->
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Entrada</th>
+                                <th>Saída Almoço</th>
+                                <th>Volta Almoço</th>
+                                <th>Saída</th>
+                                <th>Horas Trab.</th>
+                                <th>Extras</th>
+                                <th>Atraso</th>
+                                <th>Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for registro in dados.registros %}
+                            <tr>
+                                <td>{{ registro.data.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if registro.hora_entrada %}
+                                        {{ registro.hora_entrada.strftime('%H:%M') }}
+                                    {% else %}
+                                        <span class="text-muted">--:--</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.hora_almoco_saida %}
+                                        {{ registro.hora_almoco_saida.strftime('%H:%M') }}
+                                    {% else %}
+                                        <span class="text-muted">--:--</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.hora_almoco_retorno %}
+                                        {{ registro.hora_almoco_retorno.strftime('%H:%M') }}
+                                    {% else %}
+                                        <span class="text-muted">--:--</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.hora_saida %}
+                                        {{ registro.hora_saida.strftime('%H:%M') }}
+                                    {% else %}
+                                        <span class="text-muted">--:--</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.horas_trabalhadas %}
+                                        <span class="badge bg-success">{{ "%.2f"|format(registro.horas_trabalhadas) }}h</span>
+                                    {% else %}
+                                        <span class="text-muted">--</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.horas_extras and registro.horas_extras > 0 %}
+                                        <span class="badge bg-warning">{{ "%.2f"|format(registro.horas_extras) }}h</span>
+                                    {% else %}
+                                        <span class="text-muted">--</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.minutos_atraso_entrada and registro.minutos_atraso_entrada > 0 %}
+                                        <span class="badge bg-danger">{{ registro.minutos_atraso_entrada }}min</span>
+                                    {% else %}
+                                        <span class="text-muted">--</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if registro.tipo_registro == 'falta' %}
+                                        <span class="badge bg-danger">Falta</span>
+                                    {% elif registro.tipo_registro == 'falta_justificada' %}
+                                        <span class="badge bg-warning">Falta Just.</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Normal</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Nenhum registro encontrado para o período selecionado.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

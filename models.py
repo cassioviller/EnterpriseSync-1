@@ -292,6 +292,65 @@ class RegistroPonto(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos são definidos via backref nos modelos principais
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Índices para performance
+    __table_args__ = (
+        db.Index('idx_registro_ponto_funcionario_data', 'funcionario_id', 'data'),
+        db.Index('idx_registro_ponto_obra_data', 'obra_id', 'data'),
+        db.Index('idx_registro_ponto_admin_data', 'admin_id', 'data'),
+    )
+
+class ConfiguracaoHorario(db.Model):
+    """Configuração de horários padrão por obra"""
+    __tablename__ = 'configuracao_horario'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))  # Opcional: configuração específica por funcionário
+    
+    # Horários padrão
+    entrada_padrao = db.Column(db.Time, default=time(8, 0))      # 08:00
+    saida_padrao = db.Column(db.Time, default=time(17, 0))       # 17:00
+    almoco_inicio = db.Column(db.Time, default=time(12, 0))      # 12:00
+    almoco_fim = db.Column(db.Time, default=time(13, 0))         # 13:00
+    
+    # Configurações
+    tolerancia_atraso = db.Column(db.Integer, default=15)        # 15 minutos
+    carga_horaria_diaria = db.Column(db.Integer, default=480)    # 8 horas em minutos
+    
+    # Controle multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    obra = db.relationship('Obra', backref='configuracoes_horario')
+    funcionario = db.relationship('Funcionario', backref='configuracao_horario_individual')
+
+class DispositivoObra(db.Model):
+    """Registro de dispositivos autorizados por obra para ponto eletrônico compartilhado"""
+    __tablename__ = 'dispositivo_obra'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    nome_dispositivo = db.Column(db.String(100), nullable=False)  # "Tablet Obra A"
+    identificador = db.Column(db.String(200))  # User-agent ou fingerprint
+    ultimo_acesso = db.Column(db.DateTime)
+    ativo = db.Column(db.Boolean, default=True)
+    
+    # Localização GPS do dispositivo
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    
+    # Controle multi-tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamento
+    obra = db.relationship('Obra', backref='dispositivos_autorizados')
 
 # Novos modelos conforme especificação v3.0
 class TipoOcorrencia(db.Model):
