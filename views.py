@@ -1981,6 +1981,55 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         traceback.print_exc()
         return 0
 
+def calcular_progresso_real_servico(obra_id, servico_id):
+    """
+    Calcula o progresso real de um serviço baseado no ÚLTIMO percentual de CADA subatividade
+    ao longo de TODOS os RDOs (corrige bug de regressão de progresso).
+    
+    Args:
+        obra_id: ID da obra
+        servico_id: ID do serviço
+        
+    Returns:
+        float: Percentual médio de conclusão (0.0 a 100.0)
+    """
+    try:
+        from sqlalchemy import text
+        
+        # Query corrigida: busca último percentual de CADA subatividade (não apenas último RDO)
+        query = text("""
+            SELECT AVG(rss.percentual_conclusao) as progresso_medio
+            FROM rdo_servico_subatividade rss
+            WHERE rss.id IN (
+                -- Para cada subatividade, pegar o registro mais recente
+                SELECT MAX(rss2.id)  -- Usar MAX(id) como proxy para data mais recente
+                FROM rdo_servico_subatividade rss2
+                JOIN rdo r ON rss2.rdo_id = r.id
+                WHERE r.obra_id = :obra_id
+                  AND rss2.servico_id = :servico_id
+                  AND rss2.ativo = true
+                GROUP BY rss2.nome_subatividade
+            )
+            AND rss.ativo = true
+        """)
+        
+        result = db.session.execute(query, {
+            'obra_id': obra_id,
+            'servico_id': servico_id
+        }).fetchone()
+        
+        if result and result[0] is not None:
+            progresso = float(result[0])
+            print(f"📊 Serviço {servico_id}: Progresso calculado = {progresso:.1f}% (último valor de cada subatividade)")
+            return round(progresso, 1)
+        else:
+            print(f"ℹ️ Serviço {servico_id}: Sem RDOs registrados")
+            return 0.0
+            
+    except Exception as e:
+        print(f"❌ Erro ao calcular progresso real do serviço {servico_id}: {e}")
+        return 0.0
+
 def obter_servicos_da_obra(obra_id, admin_id=None):
     """Obtém lista de serviços da obra usando NOVA TABELA servico_obra_real"""
     try:
@@ -2028,6 +2077,12 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                     'observacoes': servico_obra_real.observacoes or ''
                 })
             
+            # ✅ CALCULAR PROGRESSO REAL BASEADO EM RDOs
+            print(f"📊 Calculando progresso real dos serviços baseado em RDOs...")
+            for servico in servicos_lista:
+                progresso_real = calcular_progresso_real_servico(obra_id, servico['id'])
+                servico['progresso'] = progresso_real
+            
             print(f"✅ {len(servicos_lista)} serviços encontrados na NOVA TABELA para obra {obra_id}")
             return servicos_lista
             
@@ -2073,6 +2128,12 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                     'progresso': 0.0,
                     'ativo': True
                 })
+            
+            # ✅ CALCULAR PROGRESSO REAL BASEADO EM RDOs (FALLBACK)
+            print(f"📊 Calculando progresso real dos serviços baseado em RDOs (FALLBACK)...")
+            for servico in servicos_lista:
+                progresso_real = calcular_progresso_real_servico(obra_id, servico['id'])
+                servico['progresso'] = progresso_real
             
             print(f"✅ FALLBACK: {len(servicos_lista)} serviços encontrados")
             return servicos_lista
@@ -2353,12 +2414,34 @@ def detalhes_obra(id):
         print(f"DEBUG OBRA ENCONTRADA: {obra.nome} - Admin: {obra.admin_id}")
         print(f"DEBUG OBRA DADOS: Status={obra.status}, Orçamento={obra.orcamento}")
         
-        # Buscar funcionários associados à obra - usar admin_id da obra encontrada
-        if admin_id is not None:
-            funcionarios_obra = Funcionario.query.filter_by(admin_id=admin_id).all()
+        # Buscar funcionários que trabalharam na obra (baseado em registros de ponto) - CORRIGIDO
+        # Primeiro, buscar registros de ponto para obter IDs dos funcionários
+        funcionarios_ids_ponto = set()
+        try:
+            from models import RegistroPonto
+            registros_obra = RegistroPonto.query.filter(
+                RegistroPonto.obra_id == obra_id
+            ).all()
+            funcionarios_ids_ponto = set([r.funcionario_id for r in registros_obra])
+            print(f"DEBUG: {len(funcionarios_ids_ponto)} funcionários únicos com ponto nesta obra")
+        except ImportError:
+            funcionarios_ids_ponto = set()
+        
+        # Buscar dados completos dos funcionários que trabalharam na obra
+        if funcionarios_ids_ponto:
+            if admin_id is not None:
+                funcionarios_obra = Funcionario.query.filter(
+                    Funcionario.id.in_(funcionarios_ids_ponto),
+                    Funcionario.admin_id == admin_id
+                ).all()
+            else:
+                funcionarios_obra = Funcionario.query.filter(
+                    Funcionario.id.in_(funcionarios_ids_ponto)
+                ).all()
+            print(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados (baseado em ponto)")
         else:
-            funcionarios_obra = Funcionario.query.all()
-        print(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados para admin_id {admin_id}")
+            funcionarios_obra = []
+            print(f"DEBUG: Nenhum funcionário com ponto nesta obra")
         
         # Calcular custos de mão de obra para o período
         total_custo_mao_obra = 0.0
