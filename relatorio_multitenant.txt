@@ -1,0 +1,88 @@
+RELATÓRIO DE VALIDAÇÃO MULTI-TENANT
+================================================================================
+
+Total de problemas: 77
+
+PROBLEMAS EM QUERIES:
+--------------------------------------------------------------------------------
+views.py:155 - registros_obra = RegistroPonto.query.filter(
+views.py:162 - funcionario = Funcionario.query.get(registro.funcionario_id)
+views.py:172 - veiculos_obra = VehicleExpense.query.filter(
+views.py:364 - user = Usuario.query.filter(
+views.py:674 - registros = RegistroPonto.query.filter(
+views.py:707 - alimentacao_registros = RegistroAlimentacao.query.filter(
+views.py:715 - outros_alimentacao = OutroCusto.query.filter(
+views.py:737 - custos_veiculo = VehicleExpense.query.filter(
+views.py:749 - faltas_justificadas = RegistroPonto.query.filter(
+views.py:759 - funcionario = Funcionario.query.get(falta.funcionario_id)
+views.py:774 - outros_custos = OutroCusto.query.filter(
+views.py:898 - usuarios = Usuario.query.filter(
+views.py:1010 - ultimo_funcionario = Funcionario.query.filter(
+views.py:1155 - registros = RegistroPonto.query.filter(
+views.py:1249 - departamentos=Departamento.query.all(),
+views.py:1250 - funcoes=Funcao.query.all(),
+views.py:1251 - horarios=HorarioTrabalho.query.all(),
+views.py:1278 - registros = RegistroPonto.query.filter(
+views.py:1407 - registros = RegistroPonto.query.filter(
+views.py:1570 - registros_obra = RegistroPonto.query.filter(
+views.py:1581 - funcionario = Funcionario.query.get(registro.funcionario_id)
+views.py:1592 - alimentacao_obra = RegistroAlimentacao.query.filter(
+views.py:1600 - custos_diversos = OutroCusto.query.filter(
+views.py:1610 - custos_query = VehicleExpense.query.filter(
+views.py:1873 - obra = Obra.query.get(obra_id)
+views.py:2209 - ultimo_obra = Obra.query.filter(
+views.py:2422 - registros_obra = RegistroPonto.query.filter(
+views.py:2433 - funcionarios_obra = Funcionario.query.filter(
+views.py:2438 - funcionarios_obra = Funcionario.query.filter(
+views.py:2454 - registros_periodo = RegistroPonto.query.filter(
+views.py:2539 - custos_obra = OutroCusto.query.filter(
+views.py:2545 - custos_obra = OutroCusto.query.filter(
+views.py:2553 - custos_query = VehicleExpense.query.filter(
+views.py:2564 - registros_alimentacao = RegistroAlimentacao.query.filter(
+views.py:2574 - funcionario = Funcionario.query.get(registro.funcionario_id) if registro.funcionario_id else None
+views.py:2579 - restaurante = Restaurante.query.get(registro.restaurante_id)
+views.py:2776 - funcionario_atual = Funcionario.query.filter(
+views.py:3775 - usos_periodo = UsoVeiculo.query.filter(
+views.py:3785 - custos_periodo = CustoVeiculo.query.filter(
+views.py:3834 - proximas_manutencoes = CustoVeiculo.query.filter(
+views.py:4321 - usos = UsoVeiculo.query.filter(
+views.py:4328 - custos = CustoVeiculo.query.filter(
+views.py:4443 - usos = UsoVeiculo.query.filter(
+views.py:4449 - custos = CustoVeiculo.query.filter(
+views.py:5127 - servicos = Servico.query.filter(
+views.py:5788 - servicos_da_obra = ServicoObra.query.filter(
+views.py:5924 - servico = Servico.query.get(servico_obra.servico_id)
+views.py:6031 - servico = sub.servico if hasattr(sub, 'servico') and sub.servico else Servico.query.get(servico_id)
+views.py:6283 - rdo_existente = RDO.query.filter(
+views.py:7115 - servico_obj = Servico.query.get(servico_id)
+views.py:7346 - funcionario = Funcionario.query.get(funcionario_id)
+views.py:8176 - funcionario = Funcionario.query.get(funcionario_id)
+views.py:8184 - obra = Obra.query.get(obra_id)
+views.py:8215 - servico_obj = Servico.query.get(target_service_id)
+views.py:8488 - funcionario = Funcionario.query.get(funcionario_id_sel)
+views.py:8613 - servico = Servico.query.get(sid)
+views.py:8848 - funcionario = Funcionario.query.get(funcionario_id)
+ponto_views.py:91 - obras = Obra.query.filter(
+ponto_views.py:284 - registros = RegistroPonto.query.filter(
+almoxarifado_views.py:69 - movimentos_hoje = AlmoxarifadoMovimento.query.filter(
+almoxarifado_views.py:90 - itens_vencendo = AlmoxarifadoEstoque.query.filter(
+almoxarifado_views.py:393 - existe = AlmoxarifadoItem.query.filter(
+almoxarifado_views.py:2135 - nao_devolvidos = AlmoxarifadoEstoque.query.filter(
+propostas_views.py:163 - templates = PropostaTemplate.query.filter(
+propostas_views.py:244 - template = PropostaTemplate.query.get(template_id)
+propostas_views.py:275 - templates = PropostaTemplate.query.filter(
+propostas_views.py:294 - template = PropostaTemplate.query.get(template_id)
+propostas_views.py:758 - template_proposta = PropostaTemplate.query.get(proposta.template_id)
+propostas_views.py:873 - usuario = Usuario.query.get(proposta.criado_por)
+ponto_service.py:127 - funcionario = Funcionario.query.get(funcionario_id)
+ponto_service.py:309 - funcionario = Funcionario.query.get(funcionario_id)
+financeiro_service.py:155 - return ContaPagar.query.filter(
+financeiro_service.py:290 - contas_receber = ContaReceber.query.filter(
+financeiro_service.py:302 - contas_pagar = ContaPagar.query.filter(
+
+
+MODELOS SEM admin_id:
+--------------------------------------------------------------------------------
+ServicoObra
+FolhaPagamento
+Proposta

@@ -1,0 +1,605 @@
+# 🔗 PROMPT PARA INTEGRAÇÃO TOTAL ENTRE MÓDULOS DO SIGE
+
+## 🎯 OBJETIVO
+
+Implementar a **integração automática completa** entre todos os módulos do SIGE, garantindo que os dados fluam automaticamente e os lançamentos sejam gerados sem intervenção manual, criando um sistema verdadeiramente integrado.
+
+---
+
+## 📊 ANÁLISE DA SITUAÇÃO ATUAL
+
+### **✅ MÓDULOS IDENTIFICADOS E ATIVOS:**
+1. **Core:** `main_bp` (Dashboard, Funcionários, Obras)
+2. **RDO:** `production_bp` (Relatórios Diários de Obra)
+3. **Frota:** `frota_bp` (Gestão de Veículos)
+4. **Almoxarifado:** `almoxarifado_bp` (Materiais, Ferramentas, EPIs)
+5. **Ponto:** `ponto_bp` (Controle de Horário)
+6. **Propostas:** `propostas_bp` (Propostas Comerciais)
+7. **Alimentação:** `alimentacao_bp` (Controle de Refeições)
+8. **Folha:** `folha_bp` (Folha de Pagamento)
+9. **Financeiro:** `financeiro_bp` (Módulo Financeiro Básico)
+10. **Contabilidade:** `contabilidade_bp` (Lançamentos Contábeis)
+
+### **⚠️ PROBLEMAS IDENTIFICADOS:**
+- **Integrações existem** (`integracoes_automaticas.py`, `fluxo_dados_automatico.py`) mas **NÃO estão sendo chamadas** pelos módulos
+- **Cada módulo opera isoladamente** sem disparar eventos para outros
+- **Dados não fluem automaticamente** entre módulos
+- **Lançamentos manuais** em vez de automáticos
+
+---
+
+## 🔧 PLANO DE INTEGRAÇÃO TOTAL
+
+### **FASE 1: ATIVAÇÃO DO SISTEMA DE EVENTOS**
+
+```python
+# 1. Criar Event Manager Central
+class EventManager:
+    """Gerenciador central de eventos entre módulos"""
+    
+    @staticmethod
+    def emit(event_name, data, admin_id):
+        """Emitir evento para outros módulos"""
+        try:
+            # Log do evento
+            logger.info(f"🔔 EVENTO: {event_name} | Admin: {admin_id}")
+            
+            # Chamar handlers específicos
+            handlers = EVENT_HANDLERS.get(event_name, [])
+            for handler in handlers:
+                try:
+                    handler(data, admin_id)
+                    logger.info(f"✅ Handler {handler.__name__} executado")
+                except Exception as e:
+                    logger.error(f"❌ Erro no handler {handler.__name__}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"❌ Erro ao emitir evento {event_name}: {e}")
+
+# 2. Definir Eventos e Handlers
+EVENT_HANDLERS = {
+    'funcionario_criado': [
+        atualizar_dashboard_kpis,
+        criar_configuracao_ponto,
+    ],
+    'obra_criada': [
+        atualizar_dashboard_kpis,
+        criar_centro_custo,
+        configurar_almoxarifado_obra,
+    ],
+    'ponto_registrado': [
+        calcular_horas_trabalhadas,
+        atualizar_kpis_presenca,
+        gerar_dados_folha,
+    ],
+    'material_movimentado': [
+        atualizar_estoque,
+        lancar_custo_obra,
+        verificar_estoque_minimo,
+    ],
+    'veiculo_usado': [
+        atualizar_km_veiculo,
+        lancar_custo_combustivel,
+        calcular_custo_obra,
+    ],
+    'rdo_aprovado': [
+        lancar_custo_terceiros,
+        atualizar_progresso_obra,
+        notificar_cliente,
+    ],
+    'proposta_aprovada': [
+        criar_obra_automatica,
+        gerar_cronograma_recebimento,
+        ativar_portal_cliente,
+    ],
+    'folha_fechada': [
+        gerar_lancamentos_contabeis,
+        calcular_provisoes,
+        atualizar_custos_obra,
+    ],
+}
+```
+
+### **FASE 2: INTEGRAÇÃO POR MÓDULO**
+
+#### **2.1 MÓDULO FUNCIONÁRIOS → OUTROS**
+
+```python
+# Em funcionario_views.py ou views.py
+@main_bp.route('/funcionarios', methods=['POST'])
+@login_required
+def criar_funcionario():
+    # ... código existente de criação ...
+    
+    if funcionario_criado:
+        # INTEGRAÇÃO AUTOMÁTICA
+        EventManager.emit('funcionario_criado', {
+            'funcionario_id': funcionario.id,
+            'nome': funcionario.nome,
+            'departamento_id': funcionario.departamento_id,
+            'funcao_id': funcionario.funcao_id,
+        }, current_user.id)
+    
+    return redirect(url_for('main.funcionarios'))
+
+# Handlers de integração
+def criar_configuracao_ponto(data, admin_id):
+    """Criar configuração padrão de ponto para novo funcionário"""
+    from ponto_service import PontoService
+    PontoService.criar_configuracao_padrao(data['funcionario_id'], admin_id)
+
+def atualizar_dashboard_kpis(data, admin_id):
+    """Atualizar KPIs do dashboard"""
+    from kpis_engine import recalcular_kpis_funcionarios
+    recalcular_kpis_funcionarios(admin_id)
+```
+
+#### **2.2 MÓDULO PONTO → FOLHA + CUSTOS**
+
+```python
+# Em ponto_views.py
+@ponto_bp.route('/bater-ponto', methods=['POST'])
+@login_required
+def bater_ponto():
+    # ... código existente ...
+    
+    if registro_criado:
+        # INTEGRAÇÃO AUTOMÁTICA
+        EventManager.emit('ponto_registrado', {
+            'registro_id': registro.id,
+            'funcionario_id': registro.funcionario_id,
+            'obra_id': registro.obra_id,
+            'data': registro.data.isoformat(),
+            'horas_trabalhadas': registro.horas_trabalhadas,
+            'horas_extras': registro.horas_extras,
+        }, current_user.id)
+    
+    return jsonify({'success': True})
+
+# Handlers de integração
+def gerar_dados_folha(data, admin_id):
+    """Gerar dados para folha de pagamento"""
+    from folha_pagamento_utils import processar_ponto_para_folha
+    processar_ponto_para_folha(data['registro_id'], admin_id)
+
+def calcular_custo_obra(data, admin_id):
+    """Calcular custo de mão de obra por obra"""
+    from contabilidade_utils import lancar_custo_mao_obra
+    lancar_custo_mao_obra(data['obra_id'], data['funcionario_id'], 
+                         data['horas_trabalhadas'], data['horas_extras'], admin_id)
+```
+
+#### **2.3 MÓDULO ALMOXARIFADO → CUSTOS + ESTOQUE**
+
+```python
+# Em almoxarifado_views.py
+@almoxarifado_bp.route('/saida', methods=['POST'])
+@login_required
+def registrar_saida():
+    # ... código existente ...
+    
+    if movimento_criado:
+        # INTEGRAÇÃO AUTOMÁTICA
+        EventManager.emit('material_movimentado', {
+            'movimento_id': movimento.id,
+            'tipo': 'SAIDA',
+            'item_id': movimento.item_id,
+            'obra_id': movimento.obra_id,
+            'funcionario_id': movimento.funcionario_id,
+            'quantidade': float(movimento.quantidade),
+            'valor_unitario': float(movimento.valor_unitario),
+            'valor_total': float(movimento.quantidade * movimento.valor_unitario),
+        }, current_user.id)
+    
+    return redirect(url_for('almoxarifado.dashboard'))
+
+# Handlers de integração
+def lancar_custo_obra(data, admin_id):
+    """Lançar custo de material na obra"""
+    from contabilidade_utils import criar_lancamento_automatico
+    criar_lancamento_automatico(
+        tipo='CUSTO_MATERIAL',
+        obra_id=data['obra_id'],
+        valor=data['valor_total'],
+        descricao=f"Material usado - Item ID {data['item_id']}",
+        admin_id=admin_id
+    )
+
+def verificar_estoque_minimo(data, admin_id):
+    """Verificar se estoque atingiu mínimo"""
+    from almoxarifado_utils import verificar_alerta_estoque
+    verificar_alerta_estoque(data['item_id'], admin_id)
+```
+
+#### **2.4 MÓDULO FROTA → CUSTOS + OBRAS**
+
+```python
+# Em frota_views.py
+@frota_bp.route('/uso', methods=['POST'])
+@login_required
+def registrar_uso():
+    # ... código existente ...
+    
+    if uso_criado:
+        # INTEGRAÇÃO AUTOMÁTICA
+        EventManager.emit('veiculo_usado', {
+            'uso_id': uso.id,
+            'veiculo_id': uso.veiculo_id,
+            'obra_id': uso.obra_id,
+            'funcionario_id': uso.funcionario_id,
+            'km_percorrido': uso.km_percorrido,
+            'data_uso': uso.data_uso.isoformat(),
+        }, current_user.id)
+    
+    return redirect(url_for('frota.dashboard'))
+
+# Handler de integração
+def calcular_custo_combustivel_obra(data, admin_id):
+    """Calcular custo de combustível por obra"""
+    from contabilidade_utils import lancar_custo_veiculo
+    lancar_custo_veiculo(data['uso_id'], admin_id)
+```
+
+#### **2.5 MÓDULO RDO → CUSTOS + PROGRESSO**
+
+```python
+# Em production_routes.py
+@production_bp.route('/rdo/aprovar', methods=['POST'])
+@login_required
+def aprovar_rdo():
+    # ... código existente ...
+    
+    if rdo_aprovado:
+        # INTEGRAÇÃO AUTOMÁTICA
+        EventManager.emit('rdo_aprovado', {
+            'rdo_id': rdo.id,
+            'obra_id': rdo.obra_id,
+            'data': rdo.data.isoformat(),
+            'servicos': [s.to_dict() for s in rdo.servicos],
+            'valor_total': rdo.valor_total,
+        }, current_user.id)
+    
+    return jsonify({'success': True})
+
+# Handler de integração
+def lancar_custo_terceiros(data, admin_id):
+    """Lançar custos de terceiros aprovados no RDO"""
+    from contabilidade_utils import processar_rdo_contabil
+    processar_rdo_contabil(data['rdo_id'], admin_id)
+```
+
+#### **2.6 MÓDULO PROPOSTAS → OBRAS + FINANCEIRO**
+
+```python
+# Em propostas_consolidated.py
+@propostas_bp.route('/aprovar', methods=['POST'])
+@login_required
+def aprovar_proposta():
+    # ... código existente ...
+    
+    if proposta_aprovada:
+        # INTEGRAÇÃO AUTOMÁTICA
+        EventManager.emit('proposta_aprovada', {
+            'proposta_id': proposta.id,
+            'cliente_id': proposta.cliente_id,
+            'valor_total': float(proposta.valor_total),
+            'prazo_dias': proposta.prazo_dias,
+            'itens': [item.to_dict() for item in proposta.itens],
+        }, current_user.id)
+    
+    return redirect(url_for('propostas.dashboard'))
+
+# Handlers de integração
+def criar_obra_automatica(data, admin_id):
+    """Criar obra automaticamente a partir da proposta"""
+    from models import Obra
+    obra = Obra(
+        nome=f"Obra - Proposta {data['proposta_id']}",
+        cliente_id=data['cliente_id'],
+        proposta_origem_id=data['proposta_id'],
+        admin_id=admin_id
+    )
+    db.session.add(obra)
+    db.session.commit()
+
+def gerar_cronograma_recebimento(data, admin_id):
+    """Gerar contas a receber baseado na proposta"""
+    from financeiro_service import criar_contas_receber_proposta
+    criar_contas_receber_proposta(data['proposta_id'], admin_id)
+```
+
+### **FASE 3: IMPLEMENTAÇÃO DO EVENT MANAGER**
+
+```python
+# Criar arquivo: event_manager.py
+import logging
+from datetime import datetime
+from models import db
+
+logger = logging.getLogger(__name__)
+
+class EventManager:
+    """Gerenciador central de eventos entre módulos"""
+    
+    # Registry de handlers por evento
+    handlers = {}
+    
+    @classmethod
+    def register_handler(cls, event_name, handler_func):
+        """Registrar handler para um evento"""
+        if event_name not in cls.handlers:
+            cls.handlers[event_name] = []
+        cls.handlers[event_name].append(handler_func)
+        logger.info(f"📝 Handler {handler_func.__name__} registrado para evento {event_name}")
+    
+    @classmethod
+    def emit(cls, event_name, data, admin_id):
+        """Emitir evento para todos os handlers registrados"""
+        try:
+            logger.info(f"🔔 EVENTO EMITIDO: {event_name} | Admin: {admin_id} | Data: {data}")
+            
+            # Executar todos os handlers
+            handlers = cls.handlers.get(event_name, [])
+            success_count = 0
+            
+            for handler in handlers:
+                try:
+                    handler(data, admin_id)
+                    success_count += 1
+                    logger.info(f"✅ Handler {handler.__name__} executado com sucesso")
+                except Exception as e:
+                    logger.error(f"❌ Erro no handler {handler.__name__}: {e}")
+            
+            logger.info(f"📊 Evento {event_name}: {success_count}/{len(handlers)} handlers executados")
+            return success_count == len(handlers)
+            
+        except Exception as e:
+            logger.error(f"❌ Erro crítico ao emitir evento {event_name}: {e}")
+            return False
+    
+    @classmethod
+    def list_events(cls):
+        """Listar todos os eventos registrados"""
+        return {event: len(handlers) for event, handlers in cls.handlers.items()}
+
+# Decorador para facilitar registro de handlers
+def event_handler(event_name):
+    """Decorador para registrar handlers de eventos"""
+    def decorator(func):
+        EventManager.register_handler(event_name, func)
+        return func
+    return decorator
+```
+
+### **FASE 4: REGISTRO AUTOMÁTICO DE HANDLERS**
+
+```python
+# Criar arquivo: integration_handlers.py
+from event_manager import event_handler
+from models import db
+import logging
+
+logger = logging.getLogger(__name__)
+
+# ===== HANDLERS PARA FUNCIONÁRIOS =====
+@event_handler('funcionario_criado')
+def criar_configuracao_ponto_padrao(data, admin_id):
+    """Criar configuração padrão de ponto para novo funcionário"""
+    try:
+        from ponto_service import PontoService
+        PontoService.criar_configuracao_padrao(data['funcionario_id'], admin_id)
+        logger.info(f"✅ Configuração de ponto criada para funcionário {data['funcionario_id']}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar configuração de ponto: {e}")
+
+@event_handler('funcionario_criado')
+def atualizar_kpis_dashboard(data, admin_id):
+    """Atualizar KPIs do dashboard"""
+    try:
+        from kpis_engine import recalcular_kpis_funcionarios
+        recalcular_kpis_funcionarios(admin_id)
+        logger.info(f"✅ KPIs atualizados para admin {admin_id}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao atualizar KPIs: {e}")
+
+# ===== HANDLERS PARA PONTO =====
+@event_handler('ponto_registrado')
+def processar_ponto_folha(data, admin_id):
+    """Processar registro de ponto para folha de pagamento"""
+    try:
+        from folha_pagamento_utils import processar_registro_ponto
+        processar_registro_ponto(data['registro_id'], admin_id)
+        logger.info(f"✅ Ponto processado para folha: registro {data['registro_id']}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar ponto para folha: {e}")
+
+@event_handler('ponto_registrado')
+def lancar_custo_mao_obra(data, admin_id):
+    """Lançar custo de mão de obra na obra"""
+    try:
+        from contabilidade_utils import criar_lancamento_mao_obra
+        criar_lancamento_mao_obra(
+            obra_id=data['obra_id'],
+            funcionario_id=data['funcionario_id'],
+            horas_trabalhadas=data['horas_trabalhadas'],
+            horas_extras=data.get('horas_extras', 0),
+            admin_id=admin_id
+        )
+        logger.info(f"✅ Custo de mão de obra lançado: obra {data['obra_id']}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao lançar custo de mão de obra: {e}")
+
+# ===== HANDLERS PARA ALMOXARIFADO =====
+@event_handler('material_movimentado')
+def lancar_custo_material_obra(data, admin_id):
+    """Lançar custo de material na obra"""
+    if data['tipo'] == 'SAIDA' and data.get('obra_id'):
+        try:
+            from contabilidade_utils import criar_lancamento_material
+            criar_lancamento_material(
+                obra_id=data['obra_id'],
+                item_id=data['item_id'],
+                quantidade=data['quantidade'],
+                valor_unitario=data['valor_unitario'],
+                valor_total=data['valor_total'],
+                admin_id=admin_id
+            )
+            logger.info(f"✅ Custo de material lançado: obra {data['obra_id']}, valor R$ {data['valor_total']}")
+        except Exception as e:
+            logger.error(f"❌ Erro ao lançar custo de material: {e}")
+
+@event_handler('material_movimentado')
+def verificar_estoque_minimo(data, admin_id):
+    """Verificar alerta de estoque mínimo"""
+    try:
+        from almoxarifado_utils import verificar_alerta_estoque
+        alertas = verificar_alerta_estoque(data['item_id'], admin_id)
+        if alertas:
+            logger.warning(f"⚠️ Alerta de estoque mínimo: item {data['item_id']}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar estoque mínimo: {e}")
+
+# ===== HANDLERS PARA FROTA =====
+@event_handler('veiculo_usado')
+def calcular_custo_combustivel(data, admin_id):
+    """Calcular e lançar custo de combustível"""
+    try:
+        from contabilidade_utils import criar_lancamento_combustivel
+        criar_lancamento_combustivel(
+            uso_id=data['uso_id'],
+            obra_id=data['obra_id'],
+            km_percorrido=data['km_percorrido'],
+            admin_id=admin_id
+        )
+        logger.info(f"✅ Custo de combustível calculado: uso {data['uso_id']}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao calcular custo de combustível: {e}")
+
+# ===== HANDLERS PARA RDO =====
+@event_handler('rdo_aprovado')
+def lancar_custos_terceiros(data, admin_id):
+    """Lançar custos de terceiros do RDO"""
+    try:
+        from contabilidade_utils import processar_rdo_contabil
+        processar_rdo_contabil(data['rdo_id'], admin_id)
+        logger.info(f"✅ Custos de terceiros lançados: RDO {data['rdo_id']}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao lançar custos de terceiros: {e}")
+
+# ===== HANDLERS PARA PROPOSTAS =====
+@event_handler('proposta_aprovada')
+def criar_obra_automatica(data, admin_id):
+    """Criar obra automaticamente a partir da proposta"""
+    try:
+        from models import Obra, Proposta
+        proposta = Proposta.query.get(data['proposta_id'])
+        
+        obra = Obra(
+            nome=f"Obra - {proposta.titulo}",
+            endereco=proposta.endereco if hasattr(proposta, 'endereco') else '',
+            proposta_origem_id=data['proposta_id'],
+            admin_id=admin_id
+        )
+        db.session.add(obra)
+        db.session.commit()
+        
+        logger.info(f"✅ Obra criada automaticamente: ID {obra.id} da proposta {data['proposta_id']}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar obra automática: {e}")
+
+@event_handler('proposta_aprovada')
+def gerar_contas_receber(data, admin_id):
+    """Gerar contas a receber baseado na proposta"""
+    try:
+        from financeiro_service import criar_contas_receber_proposta
+        criar_contas_receber_proposta(data['proposta_id'], admin_id)
+        logger.info(f"✅ Contas a receber geradas: proposta {data['proposta_id']}")
+    except Exception as e:
+        logger.error(f"❌ Erro ao gerar contas a receber: {e}")
+```
+
+---
+
+## 📋 CHECKLIST DE IMPLEMENTAÇÃO
+
+### **PRÉ-IMPLEMENTAÇÃO**
+- [ ] ✅ Backup completo do sistema
+- [ ] ✅ Testar em ambiente de desenvolvimento
+- [ ] ✅ Documentar integrações atuais
+
+### **IMPLEMENTAÇÃO FASE 1: EVENT MANAGER**
+- [ ] 🔧 Criar `event_manager.py`
+- [ ] 🔧 Criar `integration_handlers.py`
+- [ ] 🔧 Importar no `app.py`
+- [ ] ✅ Testar emissão de eventos
+
+### **IMPLEMENTAÇÃO FASE 2: INTEGRAÇÃO DOS MÓDULOS**
+- [ ] 🔗 Integrar módulo Funcionários
+- [ ] 🔗 Integrar módulo Ponto
+- [ ] 🔗 Integrar módulo Almoxarifado
+- [ ] 🔗 Integrar módulo Frota
+- [ ] 🔗 Integrar módulo RDO
+- [ ] 🔗 Integrar módulo Propostas
+- [ ] 🔗 Integrar módulo Folha
+- [ ] 🔗 Integrar módulo Financeiro
+
+### **IMPLEMENTAÇÃO FASE 3: TESTES DE INTEGRAÇÃO**
+- [ ] 🧪 Testar fluxo: Funcionário → Ponto → Folha
+- [ ] 🧪 Testar fluxo: Almoxarifado → Custos → Obra
+- [ ] 🧪 Testar fluxo: Frota → Combustível → Obra
+- [ ] 🧪 Testar fluxo: RDO → Terceiros → Contabilidade
+- [ ] 🧪 Testar fluxo: Proposta → Obra → Financeiro
+- [ ] 📊 Validar lançamentos automáticos
+
+### **IMPLEMENTAÇÃO FASE 4: MONITORAMENTO**
+- [ ] 📊 Dashboard de eventos em tempo real
+- [ ] 📝 Logs detalhados de integrações
+- [ ] ⚠️ Alertas para falhas de integração
+- [ ] 📈 Métricas de performance
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+### **INTEGRAÇÃO TOTAL FUNCIONANDO:**
+- ✅ **Funcionário criado** → Configuração de ponto automática
+- ✅ **Ponto registrado** → Dados para folha + Custo na obra
+- ✅ **Material usado** → Custo lançado na obra + Alerta estoque
+- ✅ **Veículo usado** → Custo combustível na obra
+- ✅ **RDO aprovado** → Custos terceiros lançados
+- ✅ **Proposta aprovada** → Obra criada + Contas a receber
+
+### **FLUXO DE DADOS AUTOMÁTICO:**
+- ✅ **Zero intervenção manual** para lançamentos
+- ✅ **Dados em tempo real** entre módulos
+- ✅ **Custos precisos** por obra automaticamente
+- ✅ **KPIs atualizados** instantaneamente
+
+### **SISTEMA VERDADEIRAMENTE INTEGRADO:**
+- ✅ **Cada ação** gera eventos automáticos
+- ✅ **Módulos conversam** entre si
+- ✅ **Dados consistentes** em todo sistema
+- ✅ **Base sólida** para módulo financeiro
+
+---
+
+## 🚀 IMPLEMENTAÇÃO NO REPLIT
+
+**Use este prompt:**
+
+```
+Atue como um especialista em arquitetura de sistemas integrados. Implemente a integração automática completa entre todos os módulos do SIGE seguindo EXATAMENTE o plano detalhado acima.
+
+CRÍTICO:
+1. Criar Event Manager central para comunicação entre módulos
+2. Implementar handlers automáticos para cada tipo de evento
+3. Integrar TODOS os módulos para emitir eventos nas ações principais
+4. Testar fluxo completo de dados automático
+5. Garantir que lançamentos sejam gerados automaticamente
+
+OBJETIVO: Sistema totalmente integrado onde cada ação em um módulo automaticamente impacta outros módulos relacionados.
+
+Execute as 4 fases na ordem, reportando o progresso de cada integração implementada.
+```
+
+**Esta integração transformará o SIGE em um sistema verdadeiramente integrado, onde os dados fluem automaticamente entre todos os módulos!** 🔗✨
