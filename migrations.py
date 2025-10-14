@@ -1600,6 +1600,9 @@ def executar_migracoes():
         # Migração 42: Configuração Obras/Funcionário para Ponto
         _migration_42_funcionario_obras_ponto()
 
+        # Migração 43: Completar estruturas v9.0
+        _migration_43_completar_estruturas_v9()
+
         logger.info("=" * 80)
         logger.info("✅ Migrações automáticas concluídas com sucesso!")
         logger.info("=" * 80)
@@ -3244,3 +3247,185 @@ def adicionar_colunas_veiculo_completas():
                 pass
 
 
+
+
+def _migration_43_completar_estruturas_v9():
+    """
+    MIGRAÇÃO 43: Completar estruturas existentes para SIGE v9.0
+    - Adicionar cliente_id em propostas_comerciais
+    - Expandir custo_obra com campos de integração
+    - Expandir proposta_historico com campos de auditoria
+    """
+    logger.info("=" * 80)
+    logger.info("🔧 MIGRAÇÃO 43: Completar Estruturas v9.0")
+    logger.info("=" * 80)
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # PARTE 1: Adicionar cliente_id em propostas_comerciais
+        logger.info("📋 PARTE 1: Adicionar cliente_id em propostas_comerciais")
+        
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'cliente_id'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("🔧 Adicionando coluna cliente_id...")
+            
+            # Adicionar coluna (nullable inicialmente)
+            cursor.execute("""
+                ALTER TABLE propostas_comerciais 
+                ADD COLUMN cliente_id INTEGER REFERENCES cliente(id)
+            """)
+            
+            # Atualizar propostas existentes com cliente padrão
+            logger.info("🔧 Criando/vinculando clientes padrão para propostas existentes...")
+            
+            # Para cada admin_id único, criar um cliente padrão
+            cursor.execute("""
+                WITH admins_unicos AS (
+                    SELECT DISTINCT admin_id 
+                    FROM propostas_comerciais 
+                    WHERE admin_id IS NOT NULL 
+                    AND cliente_id IS NULL
+                )
+                INSERT INTO cliente (nome, email, admin_id)
+                SELECT 'Cliente Padrão - ' || au.admin_id, 
+                       'cliente' || au.admin_id || '@padrao.com', 
+                       au.admin_id
+                FROM admins_unicos au
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM cliente c 
+                    WHERE c.nome = 'Cliente Padrão - ' || au.admin_id 
+                    AND c.admin_id = au.admin_id
+                )
+            """)
+            
+            # Atualizar propostas com cliente padrão
+            cursor.execute("""
+                UPDATE propostas_comerciais p
+                SET cliente_id = (
+                    SELECT c.id 
+                    FROM cliente c 
+                    WHERE c.nome = 'Cliente Padrão - ' || p.admin_id 
+                    AND c.admin_id = p.admin_id
+                    LIMIT 1
+                )
+                WHERE p.cliente_id IS NULL 
+                AND p.admin_id IS NOT NULL
+            """)
+            
+            logger.info("✅ cliente_id adicionado e propostas vinculadas")
+        else:
+            logger.info("✅ cliente_id já existe")
+        
+        # PARTE 2: Expandir custo_obra
+        logger.info("📋 PARTE 2: Expandir tabela custo_obra")
+        
+        colunas_custo_obra = {
+            'funcionario_id': 'INTEGER REFERENCES funcionario(id)',
+            'item_almoxarifado_id': 'INTEGER REFERENCES almoxarifado_item(id)',
+            'veiculo_id': 'INTEGER REFERENCES frota_veiculo(id)',
+            'admin_id': 'INTEGER REFERENCES usuario(id)',
+            'quantidade': 'NUMERIC(10,2) DEFAULT 1',
+            'valor_unitario': 'NUMERIC(10,2) DEFAULT 0',
+            'horas_trabalhadas': 'NUMERIC(5,2)',
+            'horas_extras': 'NUMERIC(5,2)',
+            'rdo_id': 'INTEGER REFERENCES rdo(id)',
+            'categoria': 'VARCHAR(50)'
+        }
+        
+        for coluna, tipo_sql in colunas_custo_obra.items():
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'custo_obra' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' em custo_obra...")
+                cursor.execute(f"ALTER TABLE custo_obra ADD COLUMN {coluna} {tipo_sql}")
+                logger.info(f"✅ Coluna '{coluna}' adicionada")
+            else:
+                logger.info(f"✅ Coluna '{coluna}' já existe")
+        
+        # Criar índices para performance
+        indices_custo_obra = [
+            ('idx_custo_obra_funcionario', 'funcionario_id'),
+            ('idx_custo_obra_veiculo', 'veiculo_id'),
+            ('idx_custo_obra_admin', 'admin_id'),
+            ('idx_custo_obra_data', 'data')
+        ]
+        
+        for nome_indice, coluna in indices_custo_obra:
+            cursor.execute("""
+                SELECT indexname 
+                FROM pg_indexes 
+                WHERE tablename = 'custo_obra' 
+                AND indexname = %s
+            """, (nome_indice,))
+            
+            if not cursor.fetchone():
+                cursor.execute(f"CREATE INDEX {nome_indice} ON custo_obra({coluna})")
+                logger.info(f"✅ Índice {nome_indice} criado")
+        
+        # PARTE 3: Expandir proposta_historico
+        logger.info("📋 PARTE 3: Expandir tabela proposta_historico")
+        
+        colunas_historico = {
+            'campo_alterado': 'VARCHAR(100)',
+            'valor_anterior': 'TEXT',
+            'valor_novo': 'TEXT',
+            'admin_id': 'INTEGER REFERENCES usuario(id)'
+        }
+        
+        for coluna, tipo_sql in colunas_historico.items():
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'proposta_historico' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' em proposta_historico...")
+                cursor.execute(f"ALTER TABLE proposta_historico ADD COLUMN {coluna} {tipo_sql}")
+                logger.info(f"✅ Coluna '{coluna}' adicionada")
+            else:
+                logger.info(f"✅ Coluna '{coluna}' já existe")
+        
+        # Criar índice por admin_id
+        cursor.execute("""
+            SELECT indexname 
+            FROM pg_indexes 
+            WHERE tablename = 'proposta_historico' 
+            AND indexname = 'idx_proposta_historico_admin'
+        """)
+        
+        if not cursor.fetchone():
+            cursor.execute("CREATE INDEX idx_proposta_historico_admin ON proposta_historico(admin_id)")
+            logger.info("✅ Índice criado para proposta_historico.admin_id")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 43 CONCLUÍDA: Estruturas v9.0 completas!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 43: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass

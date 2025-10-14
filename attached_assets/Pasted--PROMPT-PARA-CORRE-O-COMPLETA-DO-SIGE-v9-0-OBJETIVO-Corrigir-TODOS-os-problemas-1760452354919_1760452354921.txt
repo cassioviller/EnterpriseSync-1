@@ -1,0 +1,670 @@
+# 🔧 PROMPT PARA CORREÇÃO COMPLETA DO SIGE v9.0
+
+## 🎯 OBJETIVO
+
+Corrigir **TODOS** os problemas identificados no relatório de análise do SIGE v9.0, implementando as funcionalidades pendentes e finalizando os módulos incompletos, transformando o sistema em uma solução 100% funcional e integrada.
+
+---
+
+## 📊 ANÁLISE DO RELATÓRIO RECEBIDO
+
+### **✅ PROBLEMAS JÁ CORRIGIDOS:**
+- TypeError: Operação Decimal vs Float (Almoxarifado)
+- AttributeError: Campo valor_unitario inexistente
+- UndefinedColumn: propostas_comerciais.numero
+- UndefinedColumn: propostas_comerciais.titulo e descricao
+
+### **⚠️ PROBLEMAS PENDENTES PARA CORREÇÃO:**
+- UndefinedColumn: propostas_comerciais.cliente_id (PARCIAL)
+- Migrações bloqueadas por segurança
+- Módulos com funcionalidades incompletas (50-85%)
+- 60 warnings LSP em models.py
+
+---
+
+## 🔧 PLANO DE CORREÇÃO COMPLETA
+
+### **FASE 1: CORREÇÕES CRÍTICAS DE SCHEMA**
+
+#### **1.1 Resolver cliente_id em Propostas**
+```python
+def corrigir_cliente_id_propostas():
+    """
+    PROBLEMA: Campo cliente_id referenciado no código mas não existe no banco
+    SOLUÇÃO: Implementar migração segura para adicionar FK
+    """
+    
+    # Migração 37 Modificada (Segura)
+    def migrar_propostas_cliente_id_seguro():
+        """Adicionar cliente_id de forma segura"""
+        try:
+            # 1. Verificar se coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'propostas_comerciais' 
+                AND column_name = 'cliente_id'
+            """)
+            
+            if not cursor.fetchone():
+                # 2. Adicionar coluna cliente_id (NULLABLE inicialmente)
+                cursor.execute("""
+                    ALTER TABLE propostas_comerciais 
+                    ADD COLUMN cliente_id INTEGER
+                """)
+                
+                # 3. Criar tabela cliente se não existir
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS cliente (
+                        id SERIAL PRIMARY KEY,
+                        nome VARCHAR(200) NOT NULL,
+                        email VARCHAR(100),
+                        telefone VARCHAR(20),
+                        endereco TEXT,
+                        admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                
+                # 4. Criar cliente padrão para propostas existentes
+                cursor.execute("""
+                    INSERT INTO cliente (nome, email, admin_id) 
+                    SELECT DISTINCT 'Cliente Padrão', 'cliente@padrao.com', admin_id 
+                    FROM propostas_comerciais 
+                    WHERE admin_id IS NOT NULL
+                    ON CONFLICT DO NOTHING
+                """)
+                
+                # 5. Atualizar propostas existentes
+                cursor.execute("""
+                    UPDATE propostas_comerciais 
+                    SET cliente_id = (
+                        SELECT id FROM cliente 
+                        WHERE nome = 'Cliente Padrão' 
+                        AND admin_id = propostas_comerciais.admin_id 
+                        LIMIT 1
+                    )
+                    WHERE cliente_id IS NULL
+                """)
+                
+                # 6. Adicionar FK constraint
+                cursor.execute("""
+                    ALTER TABLE propostas_comerciais 
+                    ADD CONSTRAINT fk_propostas_cliente 
+                    FOREIGN KEY (cliente_id) REFERENCES cliente(id)
+                """)
+                
+                logger.info("✅ Migração cliente_id executada com sucesso")
+            else:
+                logger.info("✅ Campo cliente_id já existe")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro na migração cliente_id: {e}")
+            raise
+
+    # Atualizar modelo PropostasComerciais
+    def atualizar_modelo_propostas():
+        """Remover workaround e usar FK real"""
+        # Em models.py, substituir:
+        # cliente_id = None  # Campo não existe, usado apenas no código
+        
+        # Por:
+        cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True)
+        cliente = db.relationship('Cliente', backref='propostas')
+```
+
+#### **1.2 Executar Migrações Bloqueadas**
+```python
+def executar_migracoes_bloqueadas():
+    """
+    Executar migrações 36, 37 e 38 de forma segura
+    """
+    
+    # Migração 36: Remover tabelas legadas (OPCIONAL)
+    def migrar_36_remover_tabelas_legadas():
+        """Remove tabelas antigas se flag ativada"""
+        if os.getenv('REMOVE_OLD_PROPOSTAS_TABLES') == 'true':
+            tabelas_legadas = [
+                'proposta_item_old',
+                'proposta_template_old', 
+                'propostas_backup_2024'
+            ]
+            
+            for tabela in tabelas_legadas:
+                try:
+                    cursor.execute(f"DROP TABLE IF EXISTS {tabela} CASCADE")
+                    logger.info(f"✅ Tabela legada {tabela} removida")
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao remover {tabela}: {e}")
+    
+    # Migração 37: Já implementada acima (cliente_id)
+    
+    # Migração 38: Criar auditoria de propostas
+    def migrar_38_auditoria_propostas():
+        """Criar tabela de histórico de alterações"""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS proposta_historico (
+                id SERIAL PRIMARY KEY,
+                proposta_id INTEGER NOT NULL REFERENCES propostas_comerciais(id),
+                campo_alterado VARCHAR(100) NOT NULL,
+                valor_anterior TEXT,
+                valor_novo TEXT,
+                usuario_id INTEGER NOT NULL REFERENCES usuario(id),
+                data_alteracao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id)
+            )
+        """)
+        
+        # Índices para performance
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_proposta_historico_proposta 
+            ON proposta_historico(proposta_id)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_proposta_historico_data 
+            ON proposta_historico(data_alteracao)
+        """)
+        
+        logger.info("✅ Tabela proposta_historico criada")
+```
+
+### **FASE 2: COMPLETAR MÓDULOS INCOMPLETOS**
+
+#### **2.1 Sistema de Integração Automática (50% → 100%)**
+```python
+def completar_event_manager():
+    """
+    Implementar handlers completos para todos os eventos
+    """
+    
+    # Handler completo para ponto_registrado
+    @event_handler('ponto_registrado')
+    def processar_ponto_completo(data, admin_id):
+        """Processar ponto para folha e custos"""
+        try:
+            from models import RegistroPonto, CustoObra
+            
+            registro = RegistroPonto.query.get(data['registro_id'])
+            if not registro:
+                return
+            
+            # 1. Calcular horas trabalhadas
+            if registro.entrada and registro.saida:
+                horas = calcular_horas_trabalhadas(registro.entrada, registro.saida)
+                registro.horas_trabalhadas = horas
+                
+                # 2. Calcular horas extras (acima de 8h)
+                if horas > 8:
+                    registro.horas_extras = horas - 8
+                
+                # 3. Criar custo de mão de obra na obra
+                if registro.obra_id:
+                    valor_hora = obter_valor_hora_funcionario(registro.funcionario_id)
+                    valor_total = horas * valor_hora
+                    
+                    custo = CustoObra(
+                        obra_id=registro.obra_id,
+                        tipo_custo='MAO_DE_OBRA',
+                        funcionario_id=registro.funcionario_id,
+                        data_custo=registro.data,
+                        valor=valor_total,
+                        horas_trabalhadas=horas,
+                        horas_extras=registro.horas_extras or 0,
+                        admin_id=admin_id
+                    )
+                    db.session.add(custo)
+                
+                db.session.commit()
+                logger.info(f"✅ Ponto processado: {horas}h trabalhadas, custo R$ {valor_total}")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar ponto: {e}")
+            db.session.rollback()
+    
+    # Handler completo para proposta_aprovada
+    @event_handler('proposta_aprovada')
+    def processar_proposta_aprovada_completo(data, admin_id):
+        """Criar obra e contas a receber automaticamente"""
+        try:
+            from models import PropostasComerciais, Obra, ContaReceber
+            
+            proposta = PropostasComerciais.query.get(data['proposta_id'])
+            if not proposta:
+                return
+            
+            # 1. Criar obra automaticamente
+            obra = Obra(
+                nome=f"Obra - {proposta.titulo}",
+                endereco=proposta.endereco if hasattr(proposta, 'endereco') else '',
+                cliente_id=proposta.cliente_id,
+                proposta_origem_id=proposta.id,
+                valor_contrato=proposta.valor_total,
+                data_inicio=date.today(),
+                admin_id=admin_id
+            )
+            db.session.add(obra)
+            db.session.flush()  # Para obter o ID
+            
+            # 2. Criar contas a receber (parcelamento)
+            parcelas = proposta.parcelas or 1
+            valor_parcela = proposta.valor_total / parcelas
+            
+            for i in range(parcelas):
+                data_vencimento = date.today() + timedelta(days=30 * (i + 1))
+                
+                conta = ContaReceber(
+                    obra_id=obra.id,
+                    cliente_id=proposta.cliente_id,
+                    proposta_id=proposta.id,
+                    numero_parcela=i + 1,
+                    total_parcelas=parcelas,
+                    valor=valor_parcela,
+                    data_vencimento=data_vencimento,
+                    status='PENDENTE',
+                    descricao=f"Parcela {i+1}/{parcelas} - {proposta.titulo}",
+                    admin_id=admin_id
+                )
+                db.session.add(conta)
+            
+            # 3. Atualizar status da proposta
+            proposta.status = 'CONVERTIDA_OBRA'
+            proposta.obra_id = obra.id
+            
+            db.session.commit()
+            logger.info(f"✅ Proposta convertida: Obra ID {obra.id}, {parcelas} parcelas criadas")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar proposta aprovada: {e}")
+            db.session.rollback()
+```
+
+#### **2.2 Módulo Almoxarifado (85% → 100%)**
+```python
+def completar_almoxarifado():
+    """
+    Implementar funcionalidades pendentes do almoxarifado
+    """
+    
+    # 1. Adicionar campo valor_unitario aos itens
+    def adicionar_valor_unitario_itens():
+        """Adicionar campo de preço aos itens"""
+        cursor.execute("""
+            ALTER TABLE almoxarifado_item 
+            ADD COLUMN IF NOT EXISTS valor_unitario_padrao DECIMAL(10,2) DEFAULT 0.00
+        """)
+        
+        cursor.execute("""
+            ALTER TABLE almoxarifado_estoque 
+            ADD COLUMN IF NOT EXISTS valor_unitario DECIMAL(10,2) DEFAULT 0.00
+        """)
+        
+        logger.info("✅ Campos de valor unitário adicionados")
+    
+    # 2. Implementar relatórios de movimentação
+    @almoxarifado_bp.route('/relatorios')
+    @login_required
+    def relatorios_almoxarifado():
+        """Relatórios de movimentação do almoxarifado"""
+        # Relatório de entradas/saídas por período
+        # Relatório de estoque atual
+        # Relatório de itens com estoque baixo
+        # Relatório de movimentação por funcionário
+        pass
+    
+    # 3. Dashboard com alertas
+    def implementar_dashboard_alertas():
+        """Dashboard com KPIs e alertas"""
+        # Itens com estoque abaixo do mínimo
+        # Itens próximos do vencimento
+        # Movimentações do dia
+        # Valor total do estoque
+        pass
+    
+    # 4. Integração completa com custos
+    def integrar_custos_completo():
+        """Integração completa com módulo de custos"""
+        # Usar valor_unitario real dos itens
+        # Criar lançamentos contábeis automáticos
+        # Calcular custo médio dos materiais
+        pass
+```
+
+#### **2.3 Módulo Propostas (70% → 100%)**
+```python
+def completar_propostas():
+    """
+    Implementar funcionalidades pendentes das propostas
+    """
+    
+    # 1. Conversão proposta → obra (já implementado no event_handler)
+    
+    # 2. Portal do cliente
+    def implementar_portal_cliente():
+        """Portal para cliente acompanhar proposta/obra"""
+        
+        # Gerar token único para cliente
+        def gerar_token_cliente(proposta_id):
+            import secrets
+            token = secrets.token_urlsafe(32)
+            
+            # Salvar token na proposta
+            proposta = PropostasComerciais.query.get(proposta_id)
+            proposta.token_cliente = token
+            db.session.commit()
+            
+            return token
+        
+        # Rota do portal
+        @propostas_bp.route('/portal/<token>')
+        def portal_cliente(token):
+            """Portal público para cliente"""
+            proposta = PropostasComerciais.query.filter_by(token_cliente=token).first_or_404()
+            
+            return render_template('propostas/portal_cliente.html', 
+                                 proposta=proposta,
+                                 obra=proposta.obra if hasattr(proposta, 'obra') else None)
+    
+    # 3. Histórico de alterações (Migração 38)
+    def implementar_auditoria_propostas():
+        """Sistema de auditoria de alterações"""
+        
+        @event_handler('proposta_alterada')
+        def registrar_alteracao_proposta(data, admin_id):
+            """Registrar alteração no histórico"""
+            from models import PropostaHistorico
+            
+            historico = PropostaHistorico(
+                proposta_id=data['proposta_id'],
+                campo_alterado=data['campo'],
+                valor_anterior=data['valor_anterior'],
+                valor_novo=data['valor_novo'],
+                usuario_id=data['usuario_id'],
+                admin_id=admin_id
+            )
+            db.session.add(historico)
+            db.session.commit()
+```
+
+#### **2.4 Módulo Financeiro (60% → 100%)**
+```python
+def completar_financeiro():
+    """
+    Implementar interface e funcionalidades do módulo financeiro
+    """
+    
+    # 1. Interface de lançamentos manuais
+    @financeiro_bp.route('/lancamentos')
+    @login_required
+    def lancamentos_financeiros():
+        """Interface para lançamentos manuais"""
+        contas_pagar = ContaPagar.query.filter_by(admin_id=current_user.id).all()
+        contas_receber = ContaReceber.query.filter_by(admin_id=current_user.id).all()
+        
+        return render_template('financeiro/lancamentos.html',
+                             contas_pagar=contas_pagar,
+                             contas_receber=contas_receber)
+    
+    # 2. Relatórios financeiros
+    @financeiro_bp.route('/relatorios')
+    @login_required
+    def relatorios_financeiros():
+        """Relatórios financeiros completos"""
+        # DRE (Demonstração de Resultado)
+        # Fluxo de Caixa
+        # Balancete
+        # Contas a Pagar/Receber em aberto
+        pass
+    
+    # 3. Fluxo de caixa
+    @financeiro_bp.route('/fluxo-caixa')
+    @login_required
+    def fluxo_caixa():
+        """Fluxo de caixa projetado"""
+        # Entradas previstas (contas a receber)
+        # Saídas previstas (contas a pagar)
+        # Saldo projetado por período
+        pass
+    
+    # 4. Recebimento automático de eventos
+    @event_handler('custo_gerado')
+    def criar_conta_pagar_automatica(data, admin_id):
+        """Criar conta a pagar automaticamente"""
+        conta = ContaPagar(
+            obra_id=data.get('obra_id'),
+            fornecedor=data.get('fornecedor', 'Fornecedor Automático'),
+            valor=data['valor'],
+            data_vencimento=data.get('data_vencimento', date.today() + timedelta(days=30)),
+            descricao=data['descricao'],
+            categoria=data.get('categoria', 'OPERACIONAL'),
+            status='PENDENTE',
+            admin_id=admin_id
+        )
+        db.session.add(conta)
+        db.session.commit()
+```
+
+#### **2.5 Módulo Ponto Eletrônico (75% → 100%)**
+```python
+def completar_ponto_eletronico():
+    """
+    Completar funcionalidades do ponto eletrônico
+    """
+    
+    # 1. Emissão de eventos para folha (já implementado no event_handler)
+    
+    # 2. Relatórios de presença
+    @ponto_bp.route('/relatorios')
+    @login_required
+    def relatorios_ponto():
+        """Relatórios de presença e frequência"""
+        # Relatório de presença por período
+        # Relatório de horas extras
+        # Relatório de atrasos e faltas
+        # Espelho de ponto por funcionário
+        pass
+    
+    # 3. Configuração de horários por funcionário
+    def implementar_configuracao_horarios():
+        """Configuração personalizada de horários"""
+        
+        # Modelo para horários personalizados
+        class ConfiguracaoHorarioFuncionario(db.Model):
+            __tablename__ = 'configuracao_horario_funcionario'
+            
+            id = db.Column(db.Integer, primary_key=True)
+            funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+            entrada_padrao = db.Column(db.Time, default=time(8, 0))
+            saida_almoco = db.Column(db.Time, default=time(12, 0))
+            volta_almoco = db.Column(db.Time, default=time(13, 0))
+            saida_padrao = db.Column(db.Time, default=time(17, 0))
+            horas_semanais = db.Column(db.Integer, default=40)
+            admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+        
+        # Interface para configuração
+        @ponto_bp.route('/configuracao-horarios')
+        @login_required
+        def configuracao_horarios():
+            """Interface para configurar horários"""
+            pass
+```
+
+### **FASE 3: LIMPEZA E OTIMIZAÇÃO**
+
+#### **3.1 Corrigir Warnings LSP**
+```python
+def corrigir_warnings_lsp():
+    """
+    Corrigir 60 warnings detectados em models.py
+    """
+    
+    # 1. Remover imports não utilizados
+    # 2. Corrigir tipos de dados inconsistentes
+    # 3. Adicionar type hints onde necessário
+    # 4. Corrigir possíveis problemas de lógica
+    # 5. Padronizar nomenclatura de variáveis
+    
+    # Exemplo de correções:
+    # - from datetime import datetime, date, time  # Remover imports não usados
+    # - Adicionar type hints: def calcular_horas(entrada: time, saida: time) -> float
+    # - Corrigir nullable: db.Column(db.String(100), nullable=False)  # Especificar explicitamente
+```
+
+#### **3.2 Implementar Módulo de Custos por Obra**
+```python
+def implementar_custos_obra():
+    """
+    Criar módulo completo de custos por obra
+    """
+    
+    # Modelo de custos
+    class CustoObra(db.Model):
+        __tablename__ = 'custo_obra'
+        
+        id = db.Column(db.Integer, primary_key=True)
+        obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+        tipo_custo = db.Column(db.String(30), nullable=False)  # MAO_DE_OBRA, MATERIAL, VEICULO, TERCEIROS
+        categoria = db.Column(db.String(50))  # Subcategoria
+        
+        # Referências opcionais
+        funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+        item_almoxarifado_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_item.id'))
+        veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'))
+        rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+        
+        # Valores
+        valor = db.Column(db.Numeric(10, 2), nullable=False)
+        quantidade = db.Column(db.Numeric(10, 2))
+        valor_unitario = db.Column(db.Numeric(10, 2))
+        
+        # Detalhes
+        descricao = db.Column(db.String(200), nullable=False)
+        data_custo = db.Column(db.Date, nullable=False)
+        
+        # Controle
+        admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+        created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Interface de custos
+    @custos_bp.route('/obra/<int:obra_id>')
+    @login_required
+    def custos_obra(obra_id):
+        """Visualizar custos de uma obra"""
+        obra = Obra.query.get_or_404(obra_id)
+        custos = CustoObra.query.filter_by(obra_id=obra_id, admin_id=current_user.id).all()
+        
+        # Agrupar custos por tipo
+        custos_agrupados = {}
+        total_geral = 0
+        
+        for custo in custos:
+            if custo.tipo_custo not in custos_agrupados:
+                custos_agrupados[custo.tipo_custo] = []
+            custos_agrupados[custo.tipo_custo].append(custo)
+            total_geral += custo.valor
+        
+        return render_template('custos/obra.html',
+                             obra=obra,
+                             custos_agrupados=custos_agrupados,
+                             total_geral=total_geral)
+```
+
+---
+
+## 📋 CHECKLIST DE IMPLEMENTAÇÃO
+
+### **PRÉ-IMPLEMENTAÇÃO**
+- [ ] ✅ Backup completo do sistema e banco
+- [ ] ✅ Testar em ambiente de desenvolvimento
+- [ ] ✅ Documentar estado atual
+
+### **FASE 1: CORREÇÕES CRÍTICAS**
+- [ ] 🔧 Corrigir cliente_id em Propostas
+- [ ] 🔧 Executar Migrações 36, 37, 38
+- [ ] 🔧 Criar tabela Cliente
+- [ ] 🔧 Criar tabela PropostaHistorico
+- [ ] ✅ Testar módulo Propostas completo
+
+### **FASE 2: COMPLETAR MÓDULOS**
+- [ ] 🔗 Event Manager 100% funcional
+- [ ] 📦 Almoxarifado 100% completo
+- [ ] 📋 Propostas 100% completas
+- [ ] 💰 Financeiro 100% funcional
+- [ ] ⏰ Ponto Eletrônico 100% completo
+- [ ] 💼 Módulo Custos implementado
+
+### **FASE 3: LIMPEZA E OTIMIZAÇÃO**
+- [ ] 🧹 Corrigir 60 warnings LSP
+- [ ] 🚀 Otimizar performance
+- [ ] 📊 Implementar relatórios pendentes
+- [ ] ✅ Testes completos de integração
+
+### **VALIDAÇÃO FINAL**
+- [ ] 🧪 Todos os módulos funcionando
+- [ ] 🔗 Integrações automáticas ativas
+- [ ] 📊 Relatórios gerando corretamente
+- [ ] 🎯 Sistema 100% operacional
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+### **SISTEMA COMPLETAMENTE FUNCIONAL:**
+- ✅ **Todos os módulos** 100% implementados
+- ✅ **Integrações automáticas** funcionando
+- ✅ **Zero erros críticos** ou warnings
+- ✅ **Relatórios completos** em todos os módulos
+
+### **FUNCIONALIDADES NOVAS:**
+- ✅ **Portal do Cliente** para acompanhar propostas
+- ✅ **Módulo de Custos** completo por obra
+- ✅ **Auditoria completa** de alterações
+- ✅ **Relatórios financeiros** profissionais
+
+### **QUALIDADE DE CÓDIGO:**
+- ✅ **Zero warnings LSP**
+- ✅ **Código limpo** e documentado
+- ✅ **Performance otimizada**
+- ✅ **Arquitetura sólida**
+
+---
+
+## 🚀 PROMPT PARA EXECUÇÃO
+
+**Use este prompt no Replit:**
+
+```
+Atue como um desenvolvedor full-stack sênior especialista em correção e finalização de sistemas. Execute a correção COMPLETA do SIGE v9.0 seguindo EXATAMENTE o plano detalhado acima.
+
+BASEADO NO RELATÓRIO DE ANÁLISE:
+- 5 bugs críticos já corrigidos
+- 1 problema parcial (cliente_id) para resolver
+- 5 módulos incompletos (50-85%) para finalizar
+- 60 warnings LSP para corrigir
+- 3 migrações bloqueadas para executar
+
+OBJETIVO CRÍTICO:
+1. Resolver cliente_id em Propostas definitivamente
+2. Executar migrações 36, 37, 38 com segurança
+3. Completar TODOS os módulos para 100%
+4. Implementar módulo de Custos por Obra
+5. Corrigir todos os warnings LSP
+6. Garantir integrações automáticas funcionando
+
+ENTREGÁVEIS:
+1. Sistema 100% funcional sem erros
+2. Todos os módulos completos
+3. Integrações automáticas ativas
+4. Código limpo sem warnings
+5. Relatório de correções aplicadas
+
+Execute as 3 fases na ordem:
+1. Correções Críticas
+2. Completar Módulos  
+3. Limpeza e Otimização
+
+IMPORTANTE: Transformar o SIGE em um sistema de nível empresarial completamente funcional.
+```
+
+**Esta correção completa transformará o SIGE em um ERP profissional 100% funcional!** 🔧✨
