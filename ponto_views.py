@@ -18,6 +18,13 @@ logger = logging.getLogger(__name__)
 ponto_bp = Blueprint('ponto', __name__, url_prefix='/ponto')
 
 
+@ponto_bp.route('/')
+@login_required
+def index():
+    """Rota raiz do ponto - redireciona para lista de obras"""
+    return redirect(url_for('ponto.lista_obras'))
+
+
 @ponto_bp.route('/obra/<int:obra_id>')
 @login_required
 def obra_dashboard(obra_id):
