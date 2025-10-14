@@ -236,15 +236,16 @@ def processar_integracao():
                                    contabilizar_folha_pagamento)
     
     try:
-        tipo = request.json.get('tipo')
-        origem_id = request.json.get('origem_id')
+        data = request.json or {}
+        tipo = data.get('tipo')
+        origem_id = data.get('origem_id')
         
         if tipo == 'proposta_aprovada':
             contabilizar_proposta_aprovada(origem_id)
         elif tipo == 'entrada_material':
             contabilizar_entrada_material(origem_id)
         elif tipo == 'folha_pagamento':
-            mes_ref = datetime.strptime(request.json.get('mes_referencia'), '%Y-%m-%d').date()
+            mes_ref = datetime.strptime(data.get('mes_referencia'), '%Y-%m-%d').date()
             contabilizar_folha_pagamento(current_user.id, mes_ref)
         
         return jsonify({'success': True, 'message': 'Integração processada com sucesso'})
