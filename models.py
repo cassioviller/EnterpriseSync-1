@@ -420,9 +420,24 @@ class CustoObra(db.Model):
     data = db.Column(db.Date, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Campos adicionados pela Migração 43 para integração completa
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    item_almoxarifado_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_item.id'))
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    quantidade = db.Column(db.Numeric(10, 2), default=1)
+    valor_unitario = db.Column(db.Numeric(10, 2), default=0)
+    horas_trabalhadas = db.Column(db.Numeric(5, 2))
+    horas_extras = db.Column(db.Numeric(5, 2))
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    categoria = db.Column(db.String(50))
+    
     # Relacionamentos
     obra = db.relationship('Obra', overlaps="custos,obra_ref")
     centro_custo_ref = db.relationship('CentroCusto', backref='custos')
+    funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id])
+    veiculo = db.relationship('FrotaVeiculo', foreign_keys=[veiculo_id])
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
 
 # Novos modelos para Gestão Financeira Avançada
 
@@ -2228,7 +2243,7 @@ class Proposta(db.Model):
     data_proposta = db.Column(db.Date, nullable=False, default=date.today)
     
     # Dados do Cliente
-    cliente_id = None  # Campo não existe no banco (Migração 37 pendente) - usado apenas no código
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True)  # FK adicionada pela Migração 43
     cliente_nome = db.Column(db.String(255), nullable=False)
     cliente_telefone = db.Column(db.String(20))
     cliente_email = db.Column(db.String(255))
@@ -2350,11 +2365,16 @@ class PropostaHistorico(db.Model):
     
     # Ação realizada: 'criada', 'editada', 'enviada', 'aprovada', 'rejeitada', 'excluida'
     acao = db.Column(db.String(50), nullable=False)
-    observacao = db.Column(db.Text, nullable=True)
+    observacao = db.Column(db.Text, nullable=True)  # Alias para descricao (mantido para compatibilidade)
+    
+    # Campos adicionados pela Migração 43 para auditoria detalhada
+    campo_alterado = db.Column(db.String(100))  # Nome do campo que foi alterado
+    valor_anterior = db.Column(db.Text)  # Valor antes da alteração
+    valor_novo = db.Column(db.Text)  # Valor após a alteração
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))  # Multi-tenant
     
     # Timestamps
     data_hora = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
     # Relacionamentos
     proposta = db.relationship('Proposta', backref='historico')
