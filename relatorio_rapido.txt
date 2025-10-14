@@ -1,0 +1,178 @@
+RELATÓRIO RÁPIDO - ANÁLISE SIGE
+================================================================================
+
+Total: 153
+Em uso: 58
+Órfãos: 97
+
+ARQUIVOS EM USO:
+  alertas_inteligentes.py
+  alimentacao_views.py
+  almoxarifado_utils.py
+  almoxarifado_views.py
+  analytics_preditivos.py
+  api_funcionarios.py
+  api_funcionarios_buscar.py
+  api_organizer.py
+  api_servicos_obra_limpa.py
+  app.py
+  auth.py
+  cadastrar_servico_obra.py
+  calculadora_obra.py
+  categoria_servicos.py
+  codigo_barras_utils.py
+  configuracoes_views.py
+  contabilidade_utils.py
+  contabilidade_views.py
+  crud_rdo_completo.py
+  crud_servico_obra_real.py
+  crud_servicos_completo.py
+  dashboards_especificos.py
+  decorators.py
+  equipe_views.py
+  error_handlers.py
+  exportacao_relatorios.py
+  financeiro_seeds.py
+  financeiro_service.py
+  financeiro_views.py
+  fluxo_dados_automatico.py
+  folha_pagamento_views.py
+  forms.py
+  frota_views.py
+  gunicorn_config.py
+  health.py
+  integracoes_automaticas.py
+  kpi_unificado.py
+  kpis_engine.py
+  kpis_engine_v8_1.py
+  main.py
+  migrations.py
+  models.py
+  multitenant_helper.py
+  pdf_generator.py
+  ponto_service.py
+  ponto_views.py
+  production_routes.py
+  propostas_consolidated.py
+  propostas_views.py
+  rdo_editar_sistema.py
+  rdo_validations.py
+  relatorios_financeiros_avancados.py
+  relatorios_funcionais.py
+  templates_views.py
+  utils.py
+  veiculos_services.py
+  views.py
+  wsgi.py
+
+
+ARQUIVOS ÓRFÃOS:
+
+MIGRATION:
+  adicionar_tipos_folga_ferias.py
+  atualizar_admin_ids.py
+  atualizar_badges_tabela.py
+  atualizar_dropdowns_v8_1.py
+  atualizar_kpis_engine_dias_uteis.py
+  create_foto_base64_column.py
+  init_migrations.py
+  migrate_config.py
+  migrate_v8_0.py
+  migration_rdo_melhorias.py
+  migration_safety_manager.py
+  migrations_obra_cliente.py
+  migrations_organizer.py
+  migrations_production.py
+  migrations_team_management.py
+  migrations_template_fix.py
+  migrations_veiculo_hotfix_production.py
+  recreate_database.py
+
+DEPLOY:
+  config_producao.py
+  corrigir_producao_agora.py
+  deploy_final_checklist.py
+  deploy_fix_subatividades_v10.py
+  deploy_rdo_completo_v10.py
+  deploy_veiculos_v2_production.py
+  deploy_veiculos_v2_simple.py
+  diagnostico_kpi_producao.py
+  docker_deploy_verification.py
+  fix_detalhes_uso_production.py
+  fix_producao_urgente.py
+  monitoring_producao.py
+  production_config.py
+  production_config_v10.py
+  production_rdo_fix.py
+  script_migracao_producao.py
+  verificacao_producao.py
+  verificar_deploy_veiculos_producao.py
+  verify_deploy.py
+  webhook_deploy.py
+
+FIX:
+  correcao_horas_extras_final.py
+  correcao_obras_completa.py
+  validar_correcao_custo.py
+  validar_correcao_final.py
+  validar_correcao_vazamento.py
+  validar_funcionario_horario_personalizado.py
+  validar_modal_edicao_completo.py
+  validar_tipos_completos_v8_1.py
+
+TEST:
+  test_accessibility.py
+  test_healthcheck_endpoint.py
+  test_performance.py
+  test_rdo_comprehensive.py
+  tests_modulos_consolidados.py
+
+SEED:
+  gerar_lancamentos_julho.py
+  populacao_nova_simples.py
+
+OUTROS:
+  ai_analytics.py
+  alimentacao_crud.py
+  almoxarifado_ia_avancado.py
+  api_servicos_corrigida.py
+  associar_danilo_valverde.py
+  cadastrar_servicos_obra.py
+  check_routes.py
+  cliente_portal_utils.py
+  dashboard_hotfix.py
+  dashboard_interativo.py
+  encontrar_registro_correto.py
+  enhanced_health_checker.py
+  excluir_registros_agosto.py
+  exemplo_integracao_completa.py
+  financeiro.py
+  folha_pagamento_utils.py
+  forcar_atualizacao_interface.py
+  forcar_atualizacao_kpis.py
+  forcar_atualizacao_registro.py
+  forcar_recalculo_kpis_completo.py
+  force_update_sabado.py
+  implementar_filtros_avancados.py
+  kpis_engine_corrigido.py
+  kpis_engine_v8_2.py
+  kpis_financeiros.py
+  login_simples.py
+  melhorar_controle_ponto.py
+  melhorias_rdo_implementacao_imediata.py
+  mobile_api.py
+  notification_system.py
+  otimizar_controle_ponto.py
+  portal_cliente_avancado.py
+  rdo_validator.py
+  rdo_visualizar_simples.py
+  reproduzir_problema_almoco.py
+  revisar_logica_sabado_completa.py
+  security_wrapper.py
+  servicos_views.py
+  simular_impacto_feriado.py
+  sistema_reconhecimento_facial.py
+  solucao_definitiva_sabado.py
+  substituir_lancamentos_vale_verde.py
+  template_rdo_final_fix.py
+  xml_nfe_processor.py
