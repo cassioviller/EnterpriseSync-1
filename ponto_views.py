@@ -327,24 +327,33 @@ def lista_obras():
     try:
         admin_id = get_tenant_admin_id()
         
-        # Buscar obras ativas com funcionários
+        # Buscar obras ativas
         obras = Obra.query.filter_by(
             admin_id=admin_id,
             ativo=True
         ).order_by(Obra.nome).all()
         
-        # Contar funcionários por obra
+        # Total de funcionários ativos (qualquer um pode bater ponto em qualquer obra)
+        total_funcionarios_ativos = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).count()
+        
+        # Contar funcionários que já bateram ponto hoje em cada obra
         obras_com_dados = []
+        hoje = date.today()
+        
         for obra in obras:
-            total_func = Funcionario.query.filter_by(
-                obra_atual_id=obra.id,
-                admin_id=admin_id,
-                ativo=True
+            registros_hoje = RegistroPonto.query.filter_by(
+                obra_id=obra.id,
+                data=hoje,
+                admin_id=admin_id
             ).count()
             
             obras_com_dados.append({
                 'obra': obra,
-                'total_funcionarios': total_func
+                'registros_hoje': registros_hoje,
+                'total_funcionarios': total_funcionarios_ativos
             })
         
         return render_template('ponto/lista_obras.html',
