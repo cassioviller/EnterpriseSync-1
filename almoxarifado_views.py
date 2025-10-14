@@ -1067,6 +1067,22 @@ def processar_saida():
             db.session.add(movimento)
             
             db.session.commit()
+            
+            # 🔗 INTEGRAÇÃO AUTOMÁTICA - Emitir evento de material saída
+            try:
+                from event_manager import EventManager
+                EventManager.emit('material_saida', {
+                    'movimento_id': movimento.id,
+                    'item_id': item_id,
+                    'item_nome': item.nome,
+                    'quantidade': quantidade,
+                    'obra_id': obra_id,
+                    'funcionario_id': funcionario_id,
+                    'valor_total': quantidade * (item.valor_unitario or 0)
+                }, admin_id)
+            except Exception as e:
+                logger.warning(f'Integração automática falhou (não crítico): {e}')
+            
             flash(f'Saída processada com sucesso! {quantidade} {item.unidade} de "{item.nome}" entregues para {funcionario.nome}.', 'success')
         
         return redirect(url_for('almoxarifado.saida'))
@@ -1275,6 +1291,24 @@ def processar_saida_multipla():
             }), 500
         
         db.session.commit()
+        
+        # 🔗 INTEGRAÇÃO AUTOMÁTICA - Emitir eventos para cada item processado
+        try:
+            from event_manager import EventManager
+            for item_validado in itens_validados:
+                item = item_validado['item']
+                quantidade = item_validado.get('quantidade', 1)
+                EventManager.emit('material_saida', {
+                    'movimento_id': 0,  # ID não disponível aqui (múltiplos movimentos)
+                    'item_id': item.id,
+                    'item_nome': item.nome,
+                    'quantidade': quantidade,
+                    'obra_id': obra_id,
+                    'funcionario_id': funcionario_id,
+                    'valor_total': quantidade * (item.valor_unitario or 0)
+                }, admin_id)
+        except Exception as e:
+            logger.warning(f'Integração automática falhou (não crítico): {e}')
         
         return jsonify({
             'success': True,

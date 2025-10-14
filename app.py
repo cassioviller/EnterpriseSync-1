@@ -146,6 +146,13 @@ CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE"],
 from models import *
 logging.info("✅ Todos os modelos importados do arquivo consolidado")
 
+# Import Event Manager to register integration handlers
+try:
+    import event_manager
+    logging.info(f"✅ Event Manager inicializado - {len(event_manager.EventManager.list_events())} eventos registrados")
+except Exception as e:
+    logging.warning(f"⚠️ Event Manager não carregado: {e}")
+
 # Import views
 from views import main_bp
 from production_routes import production_bp

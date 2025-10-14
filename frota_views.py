@@ -424,6 +424,19 @@ def novo_uso(veiculo_id):
             db.session.add(novo_uso)
             db.session.commit()
             
+            # 🔗 INTEGRAÇÃO AUTOMÁTICA - Emitir evento de veículo usado
+            try:
+                from event_manager import EventManager
+                EventManager.emit('veiculo_usado', {
+                    'uso_id': novo_uso.id,
+                    'veiculo_id': veiculo_id,
+                    'obra_id': novo_uso.obra_id,
+                    'km_percorrido': novo_uso.km_percorrido or 0,
+                    'funcionario_id': novo_uso.funcionario_id
+                }, tenant_admin_id)
+            except Exception as e:
+                print(f'Integração automática falhou (não crítico): {e}')
+            
             flash(f'Uso do veículo registrado com sucesso!', 'success')
             return redirect(url_for('frota.detalhes', id=veiculo_id))
             
