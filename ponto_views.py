@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from flask_login import login_required, current_user
 from datetime import date, datetime, timedelta
 from app import db
-from models import Obra, Funcionario, RegistroPonto, ConfiguracaoHorario, DispositivoObra
+from models import Obra, Funcionario, RegistroPonto, ConfiguracaoHorario, DispositivoObra, FuncionarioObrasPonto
 from ponto_service import PontoService
 from multitenant_helper import get_admin_id as get_tenant_admin_id
 from decorators import admin_required
@@ -437,4 +437,109 @@ def lista_obras():
     except Exception as e:
         logger.error(f"Erro ao listar obras: {e}")
         flash(f'Erro ao carregar obras: {str(e)}', 'error')
+        return redirect(url_for('main.dashboard'))
+
+
+@ponto_bp.route('/configuracao/funcionario/<int:funcionario_id>/obras', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def configurar_obras_funcionario(funcionario_id):
+    """Configurar quais obras aparecem no dropdown de ponto para o funcionário"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        # Verificar se funcionário existe e pertence ao admin
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first_or_404()
+        
+        if request.method == 'POST':
+            # Receber lista de obras selecionadas
+            obras_selecionadas = request.form.getlist('obras_ids')
+            
+            # Remover configurações antigas
+            FuncionarioObrasPonto.query.filter_by(
+                funcionario_id=funcionario_id,
+                admin_id=admin_id
+            ).delete()
+            
+            # Adicionar novas configurações
+            for obra_id in obras_selecionadas:
+                config = FuncionarioObrasPonto(
+                    funcionario_id=funcionario_id,
+                    obra_id=int(obra_id),
+                    admin_id=admin_id,
+                    ativo=True
+                )
+                db.session.add(config)
+            
+            db.session.commit()
+            flash('Obras configuradas com sucesso!', 'success')
+            return redirect(url_for('ponto.configurar_obras_funcionario', funcionario_id=funcionario_id))
+        
+        # GET - Mostrar formulário
+        # Buscar todas as obras ativas
+        todas_obras = Obra.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Obra.nome).all()
+        
+        # Buscar obras já configuradas para o funcionário
+        obras_configuradas = FuncionarioObrasPonto.query.filter_by(
+            funcionario_id=funcionario_id,
+            admin_id=admin_id,
+            ativo=True
+        ).all()
+        
+        obras_ids_selecionadas = [config.obra_id for config in obras_configuradas]
+        
+        return render_template('ponto/configurar_obras_funcionario.html',
+                             funcionario=funcionario,
+                             todas_obras=todas_obras,
+                             obras_ids_selecionadas=obras_ids_selecionadas)
+        
+    except Exception as e:
+        logger.error(f"Erro ao configurar obras do funcionário: {e}")
+        flash(f'Erro: {str(e)}', 'error')
+        return redirect(url_for('ponto.index'))
+
+
+@ponto_bp.route('/configuracao/obras-funcionarios')
+@login_required
+@admin_required
+def listar_configuracoes():
+    """Lista todos os funcionários com suas obras configuradas"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        # Buscar todos os funcionários ativos
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        # Para cada funcionário, buscar obras configuradas
+        funcionarios_configs = []
+        for func in funcionarios:
+            configs = FuncionarioObrasPonto.query.filter_by(
+                funcionario_id=func.id,
+                admin_id=admin_id,
+                ativo=True
+            ).all()
+            
+            obras = [config.obra for config in configs]
+            
+            funcionarios_configs.append({
+                'funcionario': func,
+                'obras_configuradas': obras,
+                'total_obras': len(obras)
+            })
+        
+        return render_template('ponto/listar_configuracoes.html',
+                             funcionarios_configs=funcionarios_configs)
+        
+    except Exception as e:
+        logger.error(f"Erro ao listar configurações: {e}")
+        flash(f'Erro: {str(e)}', 'error')
         return redirect(url_for('main.dashboard'))

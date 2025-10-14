@@ -1,0 +1,131 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Configurar Obras - {{ funcionario.nome }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <a href="{{ url_for('ponto.listar_configuracoes') }}" class="btn btn-outline-secondary mb-3">
+                <i class="fas fa-arrow-left me-2"></i>
+                Voltar
+            </a>
+            
+            <h2>
+                <i class="fas fa-cog me-2"></i>
+                Configurar Obras para Ponto
+            </h2>
+            <p class="text-muted">Selecione as obras que {{ funcionario.nome }} pode registrar ponto</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-4">
+                        {% if funcionario.foto_base64 %}
+                        <img src="{{ funcionario.foto_base64 }}" 
+                             alt="{{ funcionario.nome }}" 
+                             class="rounded-circle me-3"
+                             style="width: 60px; height: 60px; object-fit: cover;">
+                        {% else %}
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3"
+                             style="width: 60px; height: 60px; font-size: 24px;">
+                            {{ funcionario.nome[0].upper() }}
+                        </div>
+                        {% endif %}
+                        <div>
+                            <h5 class="mb-0">{{ funcionario.nome }}</h5>
+                            <small class="text-muted">{{ funcionario.codigo }}</small>
+                        </div>
+                    </div>
+
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-building me-2"></i>
+                                Obras Disponíveis
+                            </label>
+                            
+                            {% if todas_obras %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Selecione as obras que este funcionário poderá escolher ao bater ponto
+                                </div>
+                                
+                                <div class="list-group">
+                                    {% for obra in todas_obras %}
+                                    <label class="list-group-item d-flex align-items-center">
+                                        <input 
+                                            type="checkbox" 
+                                            name="obras_ids" 
+                                            value="{{ obra.id }}"
+                                            class="form-check-input me-3"
+                                            {% if obra.id in obras_ids_selecionadas %}checked{% endif %}>
+                                        <div class="flex-grow-1">
+                                            <strong>{{ obra.nome }}</strong>
+                                            {% if obra.endereco %}
+                                            <br>
+                                            <small class="text-muted">{{ obra.endereco }}</small>
+                                            {% endif %}
+                                        </div>
+                                        {% if obra.id in obras_ids_selecionadas %}
+                                        <span class="badge bg-success ms-2">
+                                            <i class="fas fa-check"></i>
+                                        </span>
+                                        {% endif %}
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Nenhuma obra ativa cadastrada.
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>
+                                Salvar Configuração
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-lightbulb me-2 text-warning"></i>
+                        Dica
+                    </h6>
+                    <p class="card-text small">
+                        Ao configurar as obras, apenas elas aparecerão no dropdown quando o funcionário for bater ponto. 
+                        Se nenhuma obra for selecionada, todas as obras ativas aparecerão.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-chart-bar me-2 text-primary"></i>
+                        Estatísticas
+                    </h6>
+                    <p class="card-text small mb-2">
+                        <strong>Total de obras ativas:</strong> {{ todas_obras|length }}
+                    </p>
+                    <p class="card-text small mb-0">
+                        <strong>Obras selecionadas:</strong> {{ obras_ids_selecionadas|length }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
