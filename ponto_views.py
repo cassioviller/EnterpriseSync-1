@@ -57,6 +57,49 @@ def index():
         return redirect(url_for('main.dashboard'))
 
 
+@ponto_bp.route('/funcionario/<int:funcionario_id>')
+@login_required
+def bater_ponto_funcionario(funcionario_id):
+    """Página de batida de ponto individual - mostra horário e dropdown de obras"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        # Verificar se funcionário existe e pertence ao admin
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first_or_404()
+        
+        # Buscar registro de ponto de hoje
+        hoje = date.today()
+        registro_hoje = RegistroPonto.query.filter_by(
+            funcionario_id=funcionario_id,
+            data=hoje,
+            admin_id=admin_id
+        ).first()
+        
+        # Buscar todas as obras ativas (futuramente filtraremos por configuração)
+        obras = Obra.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Obra.nome).all()
+        
+        # Horário atual
+        agora = datetime.now()
+        
+        return render_template('ponto/bater_ponto_individual.html',
+                             funcionario=funcionario,
+                             registro_hoje=registro_hoje,
+                             obras=obras,
+                             agora=agora,
+                             hoje=hoje)
+        
+    except Exception as e:
+        logger.error(f"Erro ao carregar página de batida de ponto: {e}")
+        flash(f'Erro ao carregar página: {str(e)}', 'error')
+        return redirect(url_for('ponto.index'))
+
+
 @ponto_bp.route('/obra/<int:obra_id>')
 @login_required
 def obra_dashboard(obra_id):

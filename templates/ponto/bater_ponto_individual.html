@@ -1,0 +1,206 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Bater Ponto - {{ funcionario.nome }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <a href="{{ url_for('ponto.index') }}" class="btn btn-outline-secondary mb-3">
+                <i class="fas fa-arrow-left me-2"></i>
+                Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow">
+                <div class="card-body text-center p-4">
+                    {% if funcionario.foto_base64 %}
+                    <img src="{{ funcionario.foto_base64 }}" 
+                         alt="{{ funcionario.nome }}" 
+                         class="rounded-circle mb-3"
+                         style="width: 150px; height: 150px; object-fit: cover;">
+                    {% else %}
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3"
+                         style="width: 150px; height: 150px; font-size: 60px;">
+                        {{ funcionario.nome[0].upper() }}
+                    </div>
+                    {% endif %}
+                    
+                    <h3 class="mb-1">{{ funcionario.nome }}</h3>
+                    <p class="text-muted mb-4">{{ funcionario.codigo }}</p>
+                    
+                    <div class="alert alert-info mb-4">
+                        <h4 id="horario-atual" class="mb-0">{{ agora.strftime('%H:%M:%S') }}</h4>
+                        <small>{{ hoje.strftime('%d/%m/%Y') }}</small>
+                    </div>
+                    
+                    {% if registro_hoje %}
+                    <div class="alert alert-secondary mb-4">
+                        <h6 class="mb-2">Registro de Hoje:</h6>
+                        <div class="row text-start">
+                            {% if registro_hoje.hora_entrada %}
+                            <div class="col-6">
+                                <small class="text-muted">Entrada</small>
+                                <div><strong>{{ registro_hoje.hora_entrada.strftime('%H:%M') }}</strong></div>
+                            </div>
+                            {% endif %}
+                            {% if registro_hoje.hora_almoco_saida %}
+                            <div class="col-6">
+                                <small class="text-muted">Almoço Saída</small>
+                                <div><strong>{{ registro_hoje.hora_almoco_saida.strftime('%H:%M') }}</strong></div>
+                            </div>
+                            {% endif %}
+                            {% if registro_hoje.hora_almoco_retorno %}
+                            <div class="col-6 mt-2">
+                                <small class="text-muted">Almoço Retorno</small>
+                                <div><strong>{{ registro_hoje.hora_almoco_retorno.strftime('%H:%M') }}</strong></div>
+                            </div>
+                            {% endif %}
+                            {% if registro_hoje.hora_saida %}
+                            <div class="col-6 mt-2">
+                                <small class="text-muted">Saída</small>
+                                <div><strong>{{ registro_hoje.hora_saida.strftime('%H:%M') }}</strong></div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <form id="form-ponto" method="POST">
+                        <div class="mb-4">
+                            <label for="obra_id" class="form-label">
+                                <i class="fas fa-building me-2"></i>
+                                Selecione a Obra
+                            </label>
+                            <select class="form-select form-select-lg" id="obra_id" name="obra_id" required>
+                                <option value="">Escolha uma obra...</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="fas fa-clock me-2"></i>
+                                Tipo de Registro
+                            </label>
+                            <div class="btn-group w-100" role="group">
+                                {% if not registro_hoje or not registro_hoje.hora_entrada %}
+                                <button type="button" class="btn btn-outline-primary btn-tipo-ponto active" data-tipo="entrada">
+                                    <i class="fas fa-sign-in-alt me-2"></i>
+                                    Entrada
+                                </button>
+                                {% elif not registro_hoje.hora_almoco_saida %}
+                                <button type="button" class="btn btn-outline-warning btn-tipo-ponto active" data-tipo="almoco_saida">
+                                    <i class="fas fa-utensils me-2"></i>
+                                    Almoço Saída
+                                </button>
+                                {% elif not registro_hoje.hora_almoco_retorno %}
+                                <button type="button" class="btn btn-outline-success btn-tipo-ponto active" data-tipo="almoco_retorno">
+                                    <i class="fas fa-utensils me-2"></i>
+                                    Almoço Retorno
+                                </button>
+                                {% elif not registro_hoje.hora_saida %}
+                                <button type="button" class="btn btn-outline-danger btn-tipo-ponto active" data-tipo="saida">
+                                    <i class="fas fa-sign-out-alt me-2"></i>
+                                    Saída
+                                </button>
+                                {% else %}
+                                <div class="alert alert-success">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Jornada completa registrada!
+                                </div>
+                                {% endif %}
+                            </div>
+                            <input type="hidden" id="tipo_ponto" name="tipo_ponto" value="{{ 'entrada' if not registro_hoje or not registro_hoje.hora_entrada else ('almoco_saida' if not registro_hoje.hora_almoco_saida else ('almoco_retorno' if not registro_hoje.hora_almoco_retorno else 'saida')) }}">
+                        </div>
+                        
+                        {% if not registro_hoje or not registro_hoje.hora_saida %}
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="btn-bater-ponto">
+                                <i class="fas fa-fingerprint me-2"></i>
+                                Confirmar Ponto
+                            </button>
+                        </div>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Atualizar relógio
+function atualizarRelogio() {
+    const agora = new Date();
+    const horas = String(agora.getHours()).padStart(2, '0');
+    const minutos = String(agora.getMinutes()).padStart(2, '0');
+    const segundos = String(agora.getSeconds()).padStart(2, '0');
+    document.getElementById('horario-atual').textContent = `${horas}:${minutos}:${segundos}`;
+}
+
+setInterval(atualizarRelogio, 1000);
+
+// Selecionar tipo de ponto
+document.querySelectorAll('.btn-tipo-ponto').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.btn-tipo-ponto').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('tipo_ponto').value = this.dataset.tipo;
+    });
+});
+
+// Enviar formulário via AJAX
+document.getElementById('form-ponto').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const obraId = document.getElementById('obra_id').value;
+    const tipoPonto = document.getElementById('tipo_ponto').value;
+    
+    if (!obraId) {
+        alert('Por favor, selecione uma obra!');
+        return;
+    }
+    
+    const btnSubmit = document.getElementById('btn-bater-ponto');
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Registrando...';
+    
+    try {
+        const response = await fetch('{{ url_for("ponto.api_bater_ponto") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                funcionario_id: {{ funcionario.id }},
+                obra_id: parseInt(obraId),
+                tipo_ponto: tipoPonto,
+                latitude: null,
+                longitude: null
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Ponto registrado com sucesso!');
+            window.location.reload();
+        } else {
+            alert('Erro: ' + data.error);
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = '<i class="fas fa-fingerprint me-2"></i>Confirmar Ponto';
+        }
+    } catch (error) {
+        alert('Erro ao registrar ponto: ' + error.message);
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '<i class="fas fa-fingerprint me-2"></i>Confirmar Ponto';
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Ponto Eletrônico - Funcionários{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2>
+                <i class="fas fa-clock me-2"></i>
+                Ponto Eletrônico - Selecione o Funcionário
+            </h2>
+            <p class="text-muted">Escolha o funcionário para registrar o ponto</p>
+            <p class="text-end"><strong>{{ hoje.strftime('%d/%m/%Y') }}</strong></p>
+        </div>
+    </div>
+
+    <div class="row">
+        {% if funcionarios %}
+            {% for item in funcionarios %}
+            <div class="col-md-6 col-lg-4 col-xl-3 mb-4">
+                <div class="card h-100 hover-shadow">
+                    <div class="card-body text-center">
+                        {% if item.funcionario.foto_base64 %}
+                        <img src="{{ item.funcionario.foto_base64 }}" 
+                             alt="{{ item.funcionario.nome }}" 
+                             class="rounded-circle mb-3"
+                             style="width: 100px; height: 100px; object-fit: cover;">
+                        {% else %}
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3"
+                             style="width: 100px; height: 100px; font-size: 40px;">
+                            {{ item.funcionario.nome[0].upper() }}
+                        </div>
+                        {% endif %}
+                        
+                        <h5 class="card-title mb-1">{{ item.funcionario.nome }}</h5>
+                        <p class="text-muted small mb-3">{{ item.funcionario.codigo }}</p>
+                        
+                        {% if item.registro_hoje %}
+                            {% if item.registro_hoje.hora_saida %}
+                            <span class="badge bg-secondary mb-3">
+                                <i class="fas fa-check-circle me-1"></i>
+                                Jornada Completa
+                            </span>
+                            {% elif item.registro_hoje.hora_entrada %}
+                            <span class="badge bg-success mb-3">
+                                <i class="fas fa-clock me-1"></i>
+                                Trabalhando
+                            </span>
+                            {% endif %}
+                            
+                            <div class="text-start small mb-3">
+                                {% if item.registro_hoje.hora_entrada %}
+                                <div><strong>Entrada:</strong> {{ item.registro_hoje.hora_entrada.strftime('%H:%M') }}</div>
+                                {% endif %}
+                                {% if item.registro_hoje.hora_saida %}
+                                <div><strong>Saída:</strong> {{ item.registro_hoje.hora_saida.strftime('%H:%M') }}</div>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                        <span class="badge bg-warning text-dark mb-3">
+                            <i class="fas fa-exclamation-circle me-1"></i>
+                            Sem registro hoje
+                        </span>
+                        {% endif %}
+                        
+                        <div class="d-grid">
+                            <a href="{{ url_for('ponto.bater_ponto_funcionario', funcionario_id=item.funcionario.id) }}" 
+                               class="btn btn-primary">
+                                <i class="fas fa-fingerprint me-2"></i>
+                                Bater Ponto
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Nenhum funcionário ativo cadastrado.
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .hover-shadow {
+        transition: all 0.3s ease;
+    }
+    
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
