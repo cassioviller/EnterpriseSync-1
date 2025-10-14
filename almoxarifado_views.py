@@ -744,7 +744,9 @@ def processar_entrada_multipla():
                 })
                 
             else:  # CONSUMIVEL
-                quantidade = float(item_data.get('quantidade', 0))
+                from decimal import Decimal
+                quantidade_raw = item_data.get('quantidade', 0)
+                quantidade = Decimal(str(quantidade_raw)) if quantidade_raw else Decimal('0')
                 
                 # Validar: quantidade > 0
                 if quantidade <= 0:
@@ -1013,7 +1015,9 @@ def processar_saida():
             flash(f'Saída processada com sucesso! {itens_processados} itens entregues para {funcionario.nome}.', 'success')
         
         else:  # CONSUMIVEL
-            quantidade = request.form.get('quantidade', type=float)
+            from decimal import Decimal
+            quantidade_raw = request.form.get('quantidade', type=float)
+            quantidade = Decimal(str(quantidade_raw)) if quantidade_raw else Decimal('0')
             if not quantidade or quantidade <= 0:
                 flash('Quantidade deve ser maior que zero', 'danger')
                 return redirect(url_for('almoxarifado.saida'))
@@ -1071,14 +1075,16 @@ def processar_saida():
             # 🔗 INTEGRAÇÃO AUTOMÁTICA - Emitir evento de material saída
             try:
                 from event_manager import EventManager
+                from decimal import Decimal
+                # AlmoxarifadoItem não tem valor_unitario - enviar quantidade e item para cálculo posterior
                 EventManager.emit('material_saida', {
                     'movimento_id': movimento.id,
                     'item_id': item_id,
                     'item_nome': item.nome,
-                    'quantidade': quantidade,
+                    'quantidade': float(quantidade),
                     'obra_id': obra_id,
                     'funcionario_id': funcionario_id,
-                    'valor_total': quantidade * (item.valor_unitario or 0)
+                    'valor_total': 0  # Será calculado quando houver módulo de custos com preços
                 }, admin_id)
             except Exception as e:
                 logger.warning(f'Integração automática falhou (não crítico): {e}')
@@ -1168,7 +1174,9 @@ def processar_saida_multipla():
                 })
             
             else:  # CONSUMIVEL
-                quantidade = float(item_data.get('quantidade', 0))
+                from decimal import Decimal
+                quantidade_raw = item_data.get('quantidade', 0)
+                quantidade = Decimal(str(quantidade_raw)) if quantidade_raw else Decimal('0')
                 
                 # Validar: quantidade > 0
                 if quantidade <= 0:
@@ -1305,7 +1313,7 @@ def processar_saida_multipla():
                     'quantidade': quantidade,
                     'obra_id': obra_id,
                     'funcionario_id': funcionario_id,
-                    'valor_total': quantidade * (item.valor_unitario or 0)
+                    'valor_total': 0  # Será calculado quando houver módulo de custos com preços
                 }, admin_id)
         except Exception as e:
             logger.warning(f'Integração automática falhou (não crítico): {e}')
@@ -1632,7 +1640,9 @@ def processar_devolucao_multipla():
                 })
             
             else:  # CONSUMIVEL
-                quantidade = float(item_data.get('quantidade', 0))
+                from decimal import Decimal
+                quantidade_raw = item_data.get('quantidade', 0)
+                quantidade = Decimal(str(quantidade_raw)) if quantidade_raw else Decimal('0')
                 
                 # Validar: quantidade > 0
                 if quantidade <= 0:

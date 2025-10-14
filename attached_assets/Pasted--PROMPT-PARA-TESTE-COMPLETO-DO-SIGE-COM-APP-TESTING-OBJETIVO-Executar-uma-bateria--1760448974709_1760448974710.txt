@@ -1,0 +1,699 @@
+# 🧪 PROMPT PARA TESTE COMPLETO DO SIGE COM APP TESTING
+
+## 🎯 OBJETIVO
+
+Executar uma **bateria completa de testes automatizados** no sistema SIGE, identificando e documentando **TODOS OS ERROS** encontrados em um relatório detalhado, **SEM CORRIGIR NADA**, para posteriormente fazer todas as correções de uma vez de forma organizada.
+
+---
+
+## 🔧 CONFIGURAÇÃO DO APP TESTING
+
+### **CONFIGURAÇÕES RECOMENDADAS:**
+- **Autonomy Level:** **MAX** (conforme imagem)
+- **App Testing:** **ENABLED** 
+- **Modo:** Long-running, hands-off building experience
+- **Escopo:** Entire app functionality verification
+
+### **FUNCIONALIDADES ATIVADAS:**
+- ✅ Generates and executes on task lists
+- ✅ Reviews latest code changes and fixes issues found
+- ✅ Expands review scope to entire app
+- ✅ Plans and completes new work independently
+
+---
+
+## 📋 PLANO DE TESTE COMPLETO
+
+### **FASE 1: TESTES DE INFRAESTRUTURA**
+
+```python
+def testar_infraestrutura_basica():
+    """
+    Testar se a aplicação inicia e componentes básicos funcionam
+    """
+    testes_infraestrutura = [
+        {
+            'nome': 'Inicialização da Aplicação',
+            'acao': 'python3 app.py',
+            'esperado': 'Aplicação inicia sem erro',
+            'timeout': 30
+        },
+        {
+            'nome': 'Conexão com Banco de Dados',
+            'acao': 'Verificar conexão PostgreSQL',
+            'esperado': 'Conexão estabelecida',
+            'timeout': 10
+        },
+        {
+            'nome': 'Importação de Modelos',
+            'acao': 'from models import *',
+            'esperado': 'Todos os modelos importados sem erro',
+            'timeout': 5
+        },
+        {
+            'nome': 'Registro de Blueprints',
+            'acao': 'Verificar todos os blueprints registrados',
+            'esperado': 'Todos os módulos carregados',
+            'timeout': 10
+        },
+        {
+            'nome': 'Migrações de Banco',
+            'acao': 'Executar migrations.py',
+            'esperado': 'Migrações executadas sem erro',
+            'timeout': 60
+        }
+    ]
+    
+    return executar_testes(testes_infraestrutura, 'INFRAESTRUTURA')
+```
+
+### **FASE 2: TESTES DE AUTENTICAÇÃO E ACESSO**
+
+```python
+def testar_autenticacao_acesso():
+    """
+    Testar sistema de login, logout e controle de acesso
+    """
+    testes_auth = [
+        {
+            'nome': 'Página de Login',
+            'url': '/login',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['form', 'email', 'password']
+        },
+        {
+            'nome': 'Login com Credenciais Válidas',
+            'url': '/login',
+            'metodo': 'POST',
+            'dados': {'email': 'admin@teste.com', 'password': 'senha123'},
+            'esperado': 302,  # Redirect após login
+            'seguir_redirect': True
+        },
+        {
+            'nome': 'Login com Credenciais Inválidas',
+            'url': '/login',
+            'metodo': 'POST',
+            'dados': {'email': 'invalido@teste.com', 'password': 'senha_errada'},
+            'esperado': 200,  # Volta para login com erro
+            'conteudo_esperado': ['erro', 'inválid']
+        },
+        {
+            'nome': 'Acesso sem Login (Dashboard)',
+            'url': '/',
+            'metodo': 'GET',
+            'esperado': 302,  # Redirect para login
+            'sem_autenticacao': True
+        },
+        {
+            'nome': 'Logout',
+            'url': '/logout',
+            'metodo': 'GET',
+            'esperado': 302,  # Redirect para login
+            'requer_autenticacao': True
+        }
+    ]
+    
+    return executar_testes(testes_auth, 'AUTENTICAÇÃO')
+```
+
+### **FASE 3: TESTES DOS MÓDULOS PRINCIPAIS**
+
+```python
+def testar_modulos_principais():
+    """
+    Testar todos os módulos principais do sistema
+    """
+    
+    # MÓDULO DASHBOARD
+    testes_dashboard = [
+        {
+            'nome': 'Dashboard Principal',
+            'url': '/',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['Dashboard', 'KPIs', 'gráfico']
+        },
+        {
+            'nome': 'KPIs Carregando',
+            'url': '/api/kpis',
+            'metodo': 'GET',
+            'esperado': 200,
+            'tipo_resposta': 'json'
+        }
+    ]
+    
+    # MÓDULO FUNCIONÁRIOS
+    testes_funcionarios = [
+        {
+            'nome': 'Lista de Funcionários',
+            'url': '/funcionarios',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['funcionários', 'tabela']
+        },
+        {
+            'nome': 'Criar Funcionário - Formulário',
+            'url': '/funcionarios/novo',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['form', 'nome', 'email']
+        },
+        {
+            'nome': 'Criar Funcionário - Submissão',
+            'url': '/funcionarios',
+            'metodo': 'POST',
+            'dados': {
+                'nome': 'João Teste',
+                'email': 'joao@teste.com',
+                'telefone': '11999999999',
+                'departamento_id': 1,
+                'funcao_id': 1
+            },
+            'esperado': 302  # Redirect após criação
+        },
+        {
+            'nome': 'Editar Funcionário',
+            'url': '/funcionarios/1/editar',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['form', 'value=']
+        },
+        {
+            'nome': 'API Funcionários',
+            'url': '/api/funcionarios',
+            'metodo': 'GET',
+            'esperado': 200,
+            'tipo_resposta': 'json'
+        }
+    ]
+    
+    # MÓDULO OBRAS
+    testes_obras = [
+        {
+            'nome': 'Lista de Obras',
+            'url': '/obras',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['obras', 'tabela']
+        },
+        {
+            'nome': 'Criar Obra - Formulário',
+            'url': '/obras/nova',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['form', 'nome', 'endereco']
+        },
+        {
+            'nome': 'Criar Obra - Submissão',
+            'url': '/obras',
+            'metodo': 'POST',
+            'dados': {
+                'nome': 'Obra Teste',
+                'endereco': 'Rua Teste, 123',
+                'responsavel_id': 1
+            },
+            'esperado': 302
+        }
+    ]
+    
+    # MÓDULO RDO
+    testes_rdo = [
+        {
+            'nome': 'Dashboard RDO',
+            'url': '/rdo',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['RDO', 'relatório']
+        },
+        {
+            'nome': 'Criar RDO',
+            'url': '/rdo/novo',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['form', 'data', 'obra']
+        },
+        {
+            'nome': 'API Serviços Obra',
+            'url': '/api/servicos-obra',
+            'metodo': 'GET',
+            'esperado': 200,
+            'tipo_resposta': 'json'
+        }
+    ]
+    
+    # MÓDULO FROTA
+    testes_frota = [
+        {
+            'nome': 'Dashboard Frota',
+            'url': '/frota',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['frota', 'veículos']
+        },
+        {
+            'nome': 'Lista de Veículos',
+            'url': '/frota/veiculos',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['veículos', 'placa']
+        },
+        {
+            'nome': 'Registrar Uso de Veículo',
+            'url': '/frota/uso/novo',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['form', 'veiculo', 'funcionario']
+        }
+    ]
+    
+    # MÓDULO ALMOXARIFADO
+    testes_almoxarifado = [
+        {
+            'nome': 'Dashboard Almoxarifado',
+            'url': '/almoxarifado',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['almoxarifado', 'estoque']
+        },
+        {
+            'nome': 'Entrada de Material',
+            'url': '/almoxarifado/entrada',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['form', 'item', 'quantidade']
+        },
+        {
+            'nome': 'Saída de Material',
+            'url': '/almoxarifado/saida',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['form', 'funcionario', 'obra']
+        }
+    ]
+    
+    # MÓDULO PONTO
+    testes_ponto = [
+        {
+            'nome': 'Sistema de Ponto',
+            'url': '/ponto',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['ponto', 'funcionários']
+        },
+        {
+            'nome': 'Bater Ponto',
+            'url': '/ponto/bater',
+            'metodo': 'POST',
+            'dados': {'funcionario_id': 1, 'obra_id': 1},
+            'esperado': 200,
+            'tipo_resposta': 'json'
+        }
+    ]
+    
+    # MÓDULO PROPOSTAS
+    testes_propostas = [
+        {
+            'nome': 'Lista de Propostas',
+            'url': '/propostas',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['propostas', 'cliente']
+        },
+        {
+            'nome': 'Nova Proposta',
+            'url': '/propostas/nova',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['form', 'cliente', 'valor']
+        },
+        {
+            'nome': 'API Templates',
+            'url': '/api/templates',
+            'metodo': 'GET',
+            'esperado': 200,
+            'tipo_resposta': 'json'
+        }
+    ]
+    
+    # MÓDULO ALIMENTAÇÃO
+    testes_alimentacao = [
+        {
+            'nome': 'Controle de Alimentação',
+            'url': '/alimentacao',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['alimentação', 'restaurante']
+        }
+    ]
+    
+    # MÓDULO FOLHA
+    testes_folha = [
+        {
+            'nome': 'Folha de Pagamento',
+            'url': '/folha',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['folha', 'pagamento']
+        }
+    ]
+    
+    # MÓDULO FINANCEIRO
+    testes_financeiro = [
+        {
+            'nome': 'Dashboard Financeiro',
+            'url': '/financeiro',
+            'metodo': 'GET',
+            'esperado': 200,
+            'conteudo_esperado': ['financeiro', 'fluxo']
+        }
+    ]
+    
+    todos_testes = {
+        'DASHBOARD': testes_dashboard,
+        'FUNCIONÁRIOS': testes_funcionarios,
+        'OBRAS': testes_obras,
+        'RDO': testes_rdo,
+        'FROTA': testes_frota,
+        'ALMOXARIFADO': testes_almoxarifado,
+        'PONTO': testes_ponto,
+        'PROPOSTAS': testes_propostas,
+        'ALIMENTAÇÃO': testes_alimentacao,
+        'FOLHA': testes_folha,
+        'FINANCEIRO': testes_financeiro
+    }
+    
+    return executar_todos_testes_modulos(todos_testes)
+```
+
+### **FASE 4: TESTES DE APIs**
+
+```python
+def testar_apis():
+    """
+    Testar todas as APIs do sistema
+    """
+    testes_api = [
+        # APIs de Funcionários
+        {'url': '/api/funcionarios', 'metodo': 'GET', 'esperado': 200},
+        {'url': '/api/funcionarios/1', 'metodo': 'GET', 'esperado': 200},
+        
+        # APIs de Obras
+        {'url': '/api/obras', 'metodo': 'GET', 'esperado': 200},
+        {'url': '/api/obras/1', 'metodo': 'GET', 'esperado': 200},
+        
+        # APIs de RDO
+        {'url': '/api/servicos-obra', 'metodo': 'GET', 'esperado': 200},
+        {'url': '/api/rdo/1', 'metodo': 'GET', 'esperado': 200},
+        
+        # APIs de Frota
+        {'url': '/api/frota/veiculos', 'metodo': 'GET', 'esperado': 200},
+        {'url': '/api/frota/uso', 'metodo': 'GET', 'esperado': 200},
+        
+        # APIs de Almoxarifado
+        {'url': '/api/almoxarifado/itens', 'metodo': 'GET', 'esperado': 200},
+        {'url': '/api/almoxarifado/estoque', 'metodo': 'GET', 'esperado': 200},
+        
+        # APIs de Ponto
+        {'url': '/api/ponto/funcionarios', 'metodo': 'GET', 'esperado': 200},
+        
+        # APIs de Propostas
+        {'url': '/api/propostas', 'metodo': 'GET', 'esperado': 200},
+        {'url': '/api/templates', 'metodo': 'GET', 'esperado': 200},
+        
+        # APIs de KPIs
+        {'url': '/api/kpis', 'metodo': 'GET', 'esperado': 200},
+        {'url': '/api/dashboard', 'metodo': 'GET', 'esperado': 200},
+    ]
+    
+    return executar_testes(testes_api, 'APIs')
+```
+
+### **FASE 5: TESTES DE INTEGRAÇÃO ENTRE MÓDULOS**
+
+```python
+def testar_integracoes():
+    """
+    Testar se os módulos se integram corretamente
+    """
+    testes_integracao = [
+        {
+            'nome': 'Funcionário → Ponto',
+            'acao': 'Criar funcionário e registrar ponto',
+            'passos': [
+                'Criar funcionário',
+                'Registrar ponto para funcionário',
+                'Verificar se ponto aparece no perfil'
+            ]
+        },
+        {
+            'nome': 'Obra → RDO',
+            'acao': 'Criar obra e RDO associado',
+            'passos': [
+                'Criar obra',
+                'Criar RDO para obra',
+                'Verificar se RDO aparece na obra'
+            ]
+        },
+        {
+            'nome': 'Almoxarifado → Obra',
+            'acao': 'Movimentar material para obra',
+            'passos': [
+                'Registrar entrada de material',
+                'Registrar saída para obra',
+                'Verificar se custo aparece na obra'
+            ]
+        },
+        {
+            'nome': 'Frota → Obra',
+            'acao': 'Usar veículo em obra',
+            'passos': [
+                'Registrar uso de veículo',
+                'Associar à obra',
+                'Verificar se custo aparece na obra'
+            ]
+        },
+        {
+            'nome': 'Proposta → Obra',
+            'acao': 'Aprovar proposta e criar obra',
+            'passos': [
+                'Criar proposta',
+                'Aprovar proposta',
+                'Verificar se obra foi criada automaticamente'
+            ]
+        }
+    ]
+    
+    return executar_testes_integracao(testes_integracao)
+```
+
+### **FASE 6: TESTES DE PERFORMANCE E CARGA**
+
+```python
+def testar_performance():
+    """
+    Testar performance e comportamento sob carga
+    """
+    testes_performance = [
+        {
+            'nome': 'Tempo de Carregamento Dashboard',
+            'url': '/',
+            'max_tempo': 3.0,  # segundos
+            'requisicoes': 1
+        },
+        {
+            'nome': 'Carga na Lista de Funcionários',
+            'url': '/funcionarios',
+            'max_tempo': 2.0,
+            'requisicoes': 10  # 10 requisições simultâneas
+        },
+        {
+            'nome': 'API KPIs sob Carga',
+            'url': '/api/kpis',
+            'max_tempo': 1.0,
+            'requisicoes': 20
+        },
+        {
+            'nome': 'Criação de Múltiplos Registros',
+            'acao': 'Criar 50 funcionários rapidamente',
+            'max_tempo': 30.0
+        }
+    ]
+    
+    return executar_testes_performance(testes_performance)
+```
+
+---
+
+## 📊 ESTRUTURA DO RELATÓRIO DE ERROS
+
+### **TEMPLATE DO RELATÓRIO:**
+
+```markdown
+# 🐛 RELATÓRIO COMPLETO DE ERROS - SIGE
+
+**Data do Teste:** {data}
+**Versão Testada:** {versao}
+**Ambiente:** {ambiente}
+**Duração Total:** {duracao}
+
+---
+
+## 📊 RESUMO EXECUTIVO
+
+- **Total de Testes:** {total_testes}
+- **Testes Passou:** {testes_ok} ({percentual_ok}%)
+- **Testes Falharam:** {testes_erro} ({percentual_erro}%)
+- **Erros Críticos:** {erros_criticos}
+- **Erros Médios:** {erros_medios}
+- **Erros Leves:** {erros_leves}
+
+---
+
+## 🔥 ERROS CRÍTICOS (Sistema não funciona)
+
+### ERRO #001 - CRÍTICO
+- **Módulo:** {modulo}
+- **Teste:** {nome_teste}
+- **Descrição:** {descricao_erro}
+- **Stack Trace:** 
+```
+{stack_trace}
+```
+- **Como Reproduzir:** {passos_reproducao}
+- **Impacto:** Sistema não inicia / Funcionalidade principal quebrada
+- **Prioridade:** URGENTE
+
+---
+
+## ⚠️ ERROS MÉDIOS (Funcionalidade comprometida)
+
+### ERRO #002 - MÉDIO
+- **Módulo:** {modulo}
+- **Teste:** {nome_teste}
+- **Descrição:** {descricao_erro}
+- **Erro HTTP:** {codigo_http}
+- **Resposta:** {resposta_erro}
+- **Como Reproduzir:** {passos_reproducao}
+- **Impacto:** Funcionalidade específica não funciona
+- **Prioridade:** ALTA
+
+---
+
+## 🟡 ERROS LEVES (Problemas menores)
+
+### ERRO #003 - LEVE
+- **Módulo:** {modulo}
+- **Teste:** {nome_teste}
+- **Descrição:** {descricao_erro}
+- **Detalhes:** {detalhes}
+- **Como Reproduzir:** {passos_reproducao}
+- **Impacto:** Interface ou usabilidade comprometida
+- **Prioridade:** MÉDIA
+
+---
+
+## 📋 DETALHES POR MÓDULO
+
+### MÓDULO FUNCIONÁRIOS
+- **Testes Executados:** {total}
+- **Sucessos:** {sucessos}
+- **Falhas:** {falhas}
+- **Principais Problemas:**
+  - {problema_1}
+  - {problema_2}
+
+### MÓDULO OBRAS
+- **Testes Executados:** {total}
+- **Sucessos:** {sucessos}
+- **Falhas:** {falhas}
+- **Principais Problemas:**
+  - {problema_1}
+  - {problema_2}
+
+[... continuar para todos os módulos ...]
+
+---
+
+## 🔧 RECOMENDAÇÕES DE CORREÇÃO
+
+### PRIORIDADE 1 (Críticos - Corrigir IMEDIATAMENTE)
+1. {erro_critico_1}
+2. {erro_critico_2}
+
+### PRIORIDADE 2 (Médios - Corrigir em seguida)
+1. {erro_medio_1}
+2. {erro_medio_2}
+
+### PRIORIDADE 3 (Leves - Corrigir quando possível)
+1. {erro_leve_1}
+2. {erro_leve_2}
+
+---
+
+## 📈 MÉTRICAS DE PERFORMANCE
+
+- **Tempo médio de resposta:** {tempo_medio}ms
+- **Página mais lenta:** {pagina_lenta} ({tempo}ms)
+- **API mais lenta:** {api_lenta} ({tempo}ms)
+- **Testes de carga:** {resultado_carga}
+
+---
+
+## 🎯 PRÓXIMOS PASSOS
+
+1. **Corrigir erros críticos** (sistema não funciona)
+2. **Corrigir erros médios** (funcionalidades quebradas)
+3. **Otimizar performance** (páginas lentas)
+4. **Corrigir erros leves** (melhorias de UX)
+5. **Re-executar testes** para validar correções
+
+---
+
+## 📎 ANEXOS
+
+- Log completo dos testes: `teste_completo.log`
+- Screenshots dos erros: `screenshots/`
+- Dados de performance: `performance_report.json`
+```
+
+---
+
+## 🚀 PROMPT PARA EXECUÇÃO
+
+**Use este prompt no Replit com App Testing configurado no MAX:**
+
+```
+Atue como um especialista em QA e testes automatizados. Execute uma bateria COMPLETA de testes no sistema SIGE seguindo EXATAMENTE o plano detalhado acima.
+
+CONFIGURAÇÃO OBRIGATÓRIA:
+- App Testing: ENABLED
+- Autonomy Level: MAX
+- Modo: Long-running, hands-off testing
+
+OBJETIVO CRÍTICO:
+1. Testar TODOS os módulos do sistema (Dashboard, Funcionários, Obras, RDO, Frota, Almoxarifado, Ponto, Propostas, Alimentação, Folha, Financeiro)
+2. Testar TODAS as APIs disponíveis
+3. Testar integrações entre módulos
+4. Testar performance e carga
+5. DOCUMENTAR TODOS OS ERROS encontrados em relatório detalhado
+6. NÃO CORRIGIR NENHUM ERRO - apenas documentar
+
+ENTREGÁVEIS:
+1. Relatório completo de erros (formato markdown)
+2. Log detalhado de todos os testes
+3. Classificação de erros por prioridade (Crítico/Médio/Leve)
+4. Recomendações de correção organizadas por prioridade
+
+Execute os testes nas 6 fases na ordem:
+1. Infraestrutura
+2. Autenticação
+3. Módulos Principais
+4. APIs
+5. Integrações
+6. Performance
+
+IMPORTANTE: Documente TUDO que não funcionar, mesmo pequenos problemas de interface.
+```
+
+**Este teste vai mapear TODOS os problemas do sistema para correção organizada posterior!** 🧪📊

@@ -2224,19 +2224,19 @@ class Proposta(db.Model):
     __tablename__ = 'propostas_comerciais'
     
     id = db.Column(db.Integer, primary_key=True)
-    numero = db.Column(db.String(50), unique=True, nullable=False)
+    numero = db.Column('numero_proposta', db.String(50), unique=True, nullable=False)  # Mapeado para coluna numero_proposta no banco
     data_proposta = db.Column(db.Date, nullable=False, default=date.today)
     
     # Dados do Cliente
-    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True)
+    cliente_id = None  # Campo não existe no banco (Migração 37 pendente) - usado apenas no código
     cliente_nome = db.Column(db.String(255), nullable=False)
     cliente_telefone = db.Column(db.String(20))
     cliente_email = db.Column(db.String(255))
     cliente_endereco = db.Column(db.Text)
     
     # Dados da Proposta
-    titulo = db.Column(db.String(255), nullable=True)
-    descricao = db.Column(db.Text, nullable=True)
+    titulo = db.Column('assunto', db.String(255), nullable=True)  # Mapeado para coluna assunto no banco
+    descricao = db.Column('objeto', db.Text, nullable=True)  # Mapeado para coluna objeto no banco
     documentos_referencia = db.Column(db.Text)
     
     # Condições
