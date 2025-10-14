@@ -1,0 +1,27 @@
+ERRO: The &#34;whens&#34; argument to case(), when referring to a sequence of items, is now passed as a series of positional elements, rather than as a list. 
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/contabilidade_views.py&#34;, line 23, in decorated_function
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File &#34;/app/contabilidade_views.py&#34;, line 52, in dashboard_contabil
+    saldo_caixa = calcular_saldo_conta(&#39;1.1.01.001&#39;, current_user.id)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/contabilidade_utils.py&#34;, line 247, in calcular_saldo_conta
+    case([(PartidaContabil.tipo_partida == &#39;DEBITO&#39;, PartidaContabil.valor)], else_=-PartidaContabil.valor)
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/_elements_constructors.py&#34;, line 853, in case
+    return Case(*whens, value=value, else_=else_)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py&#34;, line 3348, in __init__
+    new_whens: Iterable[Any] = coercions._expression_collection_was_a_list(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/coercions.py&#34;, line 151, in _expression_collection_was_a_list
+    raise exc.ArgumentError(
+sqlalchemy.exc.ArgumentError: The &#34;whens&#34; argument to case(), when referring to a sequence of items, is now passed as a series of positional elements, rather than as a list. 

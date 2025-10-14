@@ -244,7 +244,7 @@ def contabilizar_folha_pagamento(admin_id, mes_referencia):
 def calcular_saldo_conta(conta_codigo, admin_id, data_inicio=None, data_fim=None):
     """Calcula o saldo de uma conta em um período."""
     query = db.session.query(func.sum(
-        case([(PartidaContabil.tipo_partida == 'DEBITO', PartidaContabil.valor)], else_=-PartidaContabil.valor)
+        case((PartidaContabil.tipo_partida == 'DEBITO', PartidaContabil.valor), else_=-PartidaContabil.valor)
     )).join(LancamentoContabil).filter(
         PartidaContabil.conta_codigo == conta_codigo,
         PartidaContabil.admin_id == admin_id
