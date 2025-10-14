@@ -24,6 +24,11 @@ The system uses a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with J
 
 **Key Architectural Decisions & Features:**
 -   **Multi-tenant Architecture:** Data isolation per `admin_id` with role-based access control and dynamic `admin_id` handling.
+-   **Event-Driven Integration System (v9.0):** `EventManager` (event_manager.py) implements Observer Pattern for automated cross-module integration. Active integrations:
+    -   Almoxarifado → Custos: Material withdrawals emit `material_saida` events with cost tracking
+    -   Frota → Custos: Vehicle usage emits `veiculo_usado` events calculating fuel/wear costs (R$0.80/km)
+    -   Handlers use structured logging for audit trail until full Cost Management module is implemented
+    -   4 events registered at startup: material_saida, veiculo_usado, ponto_registrado, proposta_aprovada
 -   **UI/UX Design:** Professional design system following modern UX/UI guidelines, including responsive grid layouts, modular components, a cohesive color palette (primary green #198754), hierarchical typography, consistent spacing, advanced visual states, real-time validation, and WCAG accessibility. Mobile-First Design is applied for modules like RDO, optimizing for touch and including PWA meta tags.
 -   **Automated Database Migrations:** `migrations.py` handles schema updates automatically at application initialization, logging all operations and optimized for quick startup.
 -   **Core Modules:**
