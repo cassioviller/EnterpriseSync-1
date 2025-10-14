@@ -1469,6 +1469,67 @@ def _migration_41_sistema_financeiro():
         logger.error(traceback.format_exc())
 
 
+def _migration_42_funcionario_obras_ponto():
+    """
+    MIGRAÇÃO 42: Configuração de Obras por Funcionário para Ponto Eletrônico
+    - Cria tabela funcionario_obras_ponto para selecionar quais obras aparecem no dropdown
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("📱 MIGRAÇÃO 42: Configuração Obras/Funcionário Ponto")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Criar tabela funcionario_obras_ponto
+        logger.info("📋 Criando tabela funcionario_obras_ponto...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS funcionario_obras_ponto (
+                id SERIAL PRIMARY KEY,
+                funcionario_id INTEGER NOT NULL REFERENCES funcionario(id) ON DELETE CASCADE,
+                obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                ativo BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_funcionario_obra_admin UNIQUE (funcionario_id, obra_id, admin_id)
+            )
+        """)
+        logger.info("✅ Tabela funcionario_obras_ponto criada/verificada")
+        
+        # Criar índices de performance
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_funcionario_obras_ponto_funcionario 
+            ON funcionario_obras_ponto(funcionario_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_funcionario_obras_ponto_obra 
+            ON funcionario_obras_ponto(obra_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_funcionario_obras_ponto_admin 
+            ON funcionario_obras_ponto(admin_id)
+        """)
+        logger.info("✅ Índices de performance criados")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 42 CONCLUÍDA: Configuração Obras/Funcionário criada!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 42: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente
@@ -1535,6 +1596,9 @@ def executar_migracoes():
 
         # Migração 41: Sistema Financeiro v9.0
         _migration_41_sistema_financeiro()
+
+        # Migração 42: Configuração Obras/Funcionário para Ponto
+        _migration_42_funcionario_obras_ponto()
 
         logger.info("=" * 80)
         logger.info("✅ Migrações automáticas concluídas com sucesso!")

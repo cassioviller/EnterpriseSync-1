@@ -352,6 +352,26 @@ class DispositivoObra(db.Model):
     # Relacionamento
     obra = db.relationship('Obra', backref='dispositivos_autorizados')
 
+class FuncionarioObrasPonto(db.Model):
+    """Configuração de quais obras aparecem no dropdown para cada funcionário bater ponto"""
+    __tablename__ = 'funcionario_obras_ponto'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='obras_ponto_disponiveis')
+    obra = db.relationship('Obra', backref='funcionarios_autorizados')
+    
+    # Constraint única para evitar duplicatas
+    __table_args__ = (
+        db.UniqueConstraint('funcionario_id', 'obra_id', 'admin_id', name='uq_funcionario_obra_admin'),
+    )
+
 # Novos modelos conforme especificação v3.0
 class TipoOcorrencia(db.Model):
     id = db.Column(db.Integer, primary_key=True)
