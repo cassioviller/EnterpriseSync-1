@@ -1,0 +1,557 @@
+# 🧹 PROMPT PARA LIMPEZA SEGURA E VERIFICAÇÃO DE INTEGRIDADE DO SIGE
+
+## 🎯 OBJETIVO
+
+Realizar uma limpeza meticulosa e segura do sistema SIGE, removendo arquivos órfãos, corrigindo relacionamentos quebrados e validando a integridade entre módulos, preparando o sistema para implementação do módulo financeiro.
+
+---
+
+## 📊 ANÁLISE ATUAL DO SISTEMA
+
+### **SITUAÇÃO IDENTIFICADA:**
+- ✅ **153 arquivos Python** no diretório raiz
+- ⚠️ **95 arquivos órfãos** (62% do total) não são importados
+- ⚠️ **152 templates HTML** (alguns podem estar órfãos)
+- ❌ **Múltiplas ForeignKeys órfãs** apontando para tabelas inexistentes
+- ❌ **Relacionamentos quebrados** entre módulos
+
+### **PROBLEMAS CRÍTICOS ENCONTRADOS:**
+1. **Tabela `usuario` referenciada mas não existe** - deveria ser `Usuario`
+2. **Tabelas do módulo financeiro** (`plano_contas`, `lancamento_contabil`) referenciadas mas não implementadas
+3. **Tabelas de propostas** (`propostas_comerciais`, `proposta_templates`) com referências inconsistentes
+4. **Módulos órfãos** com código duplicado e funcionalidades sobrepostas
+
+---
+
+## 🔧 PLANO DE LIMPEZA SEGURA
+
+### **FASE 1: BACKUP E PREPARAÇÃO (CRÍTICO)**
+
+```python
+def criar_backup_completo():
+    """
+    OBRIGATÓRIO: Criar backup completo antes de qualquer limpeza
+    """
+    import os
+    import datetime
+    from shutil import copytree, ignore_patterns
+    
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_dir = f'backup_pre_limpeza_{timestamp}'
+    
+    # Backup do código
+    copytree('.', backup_dir, 
+             ignore=ignore_patterns('__pycache__', '*.pyc', '.git', 'node_modules'))
+    
+    # Backup do banco de dados
+    os.system(f'pg_dump $DATABASE_URL > {backup_dir}/database_backup.sql')
+    
+    print(f"✅ Backup criado em: {backup_dir}")
+    return backup_dir
+```
+
+### **FASE 2: ANÁLISE DE DEPENDÊNCIAS**
+
+```python
+def analisar_dependencias_seguras():
+    """
+    Identificar quais arquivos podem ser removidos com segurança
+    """
+    
+    # ARQUIVOS SEGUROS PARA REMOÇÃO (Scripts de migração antigos)
+    arquivos_seguros_remocao = [
+        'adicionar_tipos_folga_ferias.py',
+        'atualizar_admin_ids.py',
+        'atualizar_badges_tabela.py',
+        'correcao_horas_extras_final.py',
+        'correcao_obras_completa.py',
+        'create_foto_base64_column.py',
+        'deploy_final_checklist.py',
+        'deploy_fix_subatividades_v10.py',
+        'deploy_rdo_completo_v10.py',
+        'deploy_veiculos_v2_production.py',
+        'excluir_registros_agosto.py',
+        'fix_detalhes_uso_production.py',
+        'fix_producao_urgente.py',
+        'gerar_lancamentos_julho.py',
+        'migrate_v8_0.py',
+        'migration_rdo_melhorias.py',
+        'populacao_nova_simples.py',
+        'script_migracao_producao.py',
+        'substituir_lancamentos_vale_verde.py',
+        'validar_correcao_custo.py',
+        'validar_correcao_final.py',
+        # ... outros scripts de migração pontuais
+    ]
+    
+    # ARQUIVOS DE TESTE (Podem ser movidos para pasta tests/)
+    arquivos_teste = [
+        'test_accessibility.py',
+        'test_healthcheck_endpoint.py',
+        'test_performance.py',
+        'test_rdo_comprehensive.py',
+        'tests_modulos_consolidados.py',
+    ]
+    
+    # ARQUIVOS DUPLICADOS (Funcionalidade já implementada em outros)
+    arquivos_duplicados = [
+        'alimentacao_crud.py',  # Funcionalidade em alimentacao_views.py
+        'api_servicos_corrigida.py',  # Funcionalidade em api_servicos_obra_limpa.py
+        'dashboard_hotfix.py',  # Funcionalidade em views.py
+        'login_simples.py',  # Funcionalidade em auth.py
+        'mobile_api.py',  # Não está sendo usado
+    ]
+    
+    return {
+        'seguros_remocao': arquivos_seguros_remocao,
+        'arquivos_teste': arquivos_teste,
+        'duplicados': arquivos_duplicados
+    }
+```
+
+### **FASE 3: CORREÇÃO DE RELACIONAMENTOS**
+
+```python
+def corrigir_relacionamentos_models():
+    """
+    Corrigir ForeignKeys órfãs e relacionamentos quebrados
+    """
+    
+    # CORREÇÕES NECESSÁRIAS NO MODELS.PY:
+    
+    # 1. Corrigir referências para 'usuario' -> 'Usuario'
+    correcoes_fk = {
+        "db.ForeignKey('usuario.id')": "db.ForeignKey('usuario.id')",  # Manter como está (tabela real)
+        # Verificar se a tabela realmente se chama 'usuario' ou 'Usuario'
+    }
+    
+    # 2. Remover/comentar modelos não implementados
+    modelos_nao_implementados = [
+        'PlanoContas',  # Será implementado no módulo financeiro
+        'LancamentoContabil',  # Será implementado no módulo financeiro
+        'CentroCustoContabil',  # Será implementado no módulo financeiro
+        'NotaFiscal',  # Não está sendo usado
+        'CategoriaServico',  # Verificar se está sendo usado
+    ]
+    
+    # 3. Validar relacionamentos existentes
+    relacionamentos_validar = [
+        'Funcionario -> Departamento',
+        'Funcionario -> Funcao',
+        'Obra -> Funcionario (responsavel)',
+        'RegistroPonto -> Funcionario',
+        'RegistroPonto -> Obra',
+        'ServicoObra -> Obra',
+        'ServicoObra -> Servico',
+    ]
+    
+    return {
+        'correcoes_fk': correcoes_fk,
+        'modelos_nao_implementados': modelos_nao_implementados,
+        'relacionamentos_validar': relacionamentos_validar
+    }
+```
+
+### **FASE 4: LIMPEZA DE TEMPLATES ÓRFÃOS**
+
+```python
+def identificar_templates_orfaos():
+    """
+    Identificar templates HTML não referenciados
+    """
+    import os
+    import re
+    
+    # Buscar por render_template em todos os arquivos Python
+    templates_referenciados = set()
+    
+    for root, dirs, files in os.walk('.'):
+        for file in files:
+            if file.endswith('.py'):
+                filepath = os.path.join(root, file)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        # Buscar padrões render_template('template.html')
+                        matches = re.findall(r"render_template\(['\"]([^'\"]+)['\"]", content)
+                        templates_referenciados.update(matches)
+                except:
+                    continue
+    
+    # Listar todos os templates existentes
+    templates_existentes = set()
+    for root, dirs, files in os.walk('templates'):
+        for file in files:
+            if file.endswith('.html'):
+                # Caminho relativo a partir de templates/
+                rel_path = os.path.relpath(os.path.join(root, file), 'templates')
+                templates_existentes.add(rel_path)
+    
+    # Templates órfãos
+    templates_orfaos = templates_existentes - templates_referenciados
+    
+    return {
+        'referenciados': templates_referenciados,
+        'existentes': templates_existentes,
+        'orfaos': templates_orfaos
+    }
+```
+
+---
+
+## 🔍 VERIFICAÇÃO DE INTEGRIDADE ENTRE MÓDULOS
+
+### **TESTE 1: Integridade de Dados**
+
+```python
+def testar_integridade_dados():
+    """
+    Verificar se os relacionamentos entre módulos estão funcionando
+    """
+    from app import app, db
+    from models import *
+    
+    with app.app_context():
+        testes = []
+        
+        # Teste 1: Funcionário -> Departamento
+        try:
+            funcionario = Funcionario.query.first()
+            if funcionario and funcionario.departamento_id:
+                departamento = funcionario.departamento_ref
+                testes.append({
+                    'teste': 'Funcionario -> Departamento',
+                    'status': 'OK' if departamento else 'ERRO',
+                    'detalhes': f'Funcionário {funcionario.nome} -> Depto {departamento.nome if departamento else "NULL"}'
+                })
+        except Exception as e:
+            testes.append({
+                'teste': 'Funcionario -> Departamento',
+                'status': 'ERRO',
+                'detalhes': str(e)
+            })
+        
+        # Teste 2: Obra -> Responsável
+        try:
+            obra = Obra.query.first()
+            if obra and obra.responsavel_id:
+                responsavel = Funcionario.query.get(obra.responsavel_id)
+                testes.append({
+                    'teste': 'Obra -> Responsavel',
+                    'status': 'OK' if responsavel else 'ERRO',
+                    'detalhes': f'Obra {obra.nome} -> Resp {responsavel.nome if responsavel else "NULL"}'
+                })
+        except Exception as e:
+            testes.append({
+                'teste': 'Obra -> Responsavel',
+                'status': 'ERRO',
+                'detalhes': str(e)
+            })
+        
+        # Teste 3: RegistroPonto -> Funcionario/Obra
+        try:
+            registro = RegistroPonto.query.first()
+            if registro:
+                funcionario = registro.funcionario_ref
+                obra = registro.obra_ref
+                testes.append({
+                    'teste': 'RegistroPonto -> Funcionario/Obra',
+                    'status': 'OK' if (funcionario and obra) else 'ERRO',
+                    'detalhes': f'Ponto {registro.data} -> {funcionario.nome if funcionario else "NULL"} / {obra.nome if obra else "NULL"}'
+                })
+        except Exception as e:
+            testes.append({
+                'teste': 'RegistroPonto -> Funcionario/Obra',
+                'status': 'ERRO',
+                'detalhes': str(e)
+            })
+        
+        return testes
+```
+
+### **TESTE 2: Funcionalidades dos Módulos**
+
+```python
+def testar_funcionalidades_modulos():
+    """
+    Testar se as funcionalidades principais de cada módulo estão funcionando
+    """
+    from app import app
+    import requests
+    
+    # URLs para testar (assumindo que o app está rodando)
+    base_url = 'http://localhost:5000'
+    
+    testes_urls = [
+        # Módulo Principal
+        {'url': '/', 'modulo': 'Dashboard', 'esperado': 200},
+        {'url': '/funcionarios', 'modulo': 'Funcionários', 'esperado': 200},
+        {'url': '/obras', 'modulo': 'Obras', 'esperado': 200},
+        
+        # Módulo RDO
+        {'url': '/rdo', 'modulo': 'RDO', 'esperado': 200},
+        
+        # Módulo Veículos/Frota
+        {'url': '/frota', 'modulo': 'Frota', 'esperado': 200},
+        
+        # Módulo Almoxarifado
+        {'url': '/almoxarifado', 'modulo': 'Almoxarifado', 'esperado': 200},
+        
+        # Módulo Ponto
+        {'url': '/ponto', 'modulo': 'Ponto', 'esperado': 200},
+        
+        # Módulo Propostas
+        {'url': '/propostas', 'modulo': 'Propostas', 'esperado': 200},
+        
+        # APIs
+        {'url': '/api/funcionarios', 'modulo': 'API Funcionários', 'esperado': 200},
+    ]
+    
+    resultados = []
+    
+    with app.test_client() as client:
+        for teste in testes_urls:
+            try:
+                response = client.get(teste['url'])
+                status = 'OK' if response.status_code == teste['esperado'] else 'ERRO'
+                resultados.append({
+                    'modulo': teste['modulo'],
+                    'url': teste['url'],
+                    'status_code': response.status_code,
+                    'esperado': teste['esperado'],
+                    'status': status
+                })
+            except Exception as e:
+                resultados.append({
+                    'modulo': teste['modulo'],
+                    'url': teste['url'],
+                    'status_code': 'ERRO',
+                    'esperado': teste['esperado'],
+                    'status': 'ERRO',
+                    'erro': str(e)
+                })
+    
+    return resultados
+```
+
+### **TESTE 3: Lançamentos Automáticos**
+
+```python
+def testar_lancamentos_automaticos():
+    """
+    Testar se os lançamentos automáticos entre módulos estão funcionando
+    """
+    from app import app, db
+    from models import *
+    from datetime import datetime, date
+    
+    with app.app_context():
+        testes_lancamentos = []
+        
+        # Teste 1: Criar registro de ponto -> Deve impactar KPIs
+        try:
+            funcionario = Funcionario.query.first()
+            obra = Obra.query.first()
+            
+            if funcionario and obra:
+                # Criar registro de ponto
+                registro = RegistroPonto(
+                    funcionario_id=funcionario.id,
+                    obra_id=obra.id,
+                    data=date.today(),
+                    entrada=datetime.now().time(),
+                    admin_id=funcionario.admin_id
+                )
+                db.session.add(registro)
+                db.session.commit()
+                
+                # Verificar se foi criado
+                registro_criado = RegistroPonto.query.filter_by(
+                    funcionario_id=funcionario.id,
+                    data=date.today()
+                ).first()
+                
+                testes_lancamentos.append({
+                    'teste': 'Criar Registro Ponto',
+                    'status': 'OK' if registro_criado else 'ERRO',
+                    'detalhes': f'Registro ID: {registro_criado.id if registro_criado else "NULL"}'
+                })
+                
+                # Limpar teste
+                if registro_criado:
+                    db.session.delete(registro_criado)
+                    db.session.commit()
+                    
+        except Exception as e:
+            testes_lancamentos.append({
+                'teste': 'Criar Registro Ponto',
+                'status': 'ERRO',
+                'detalhes': str(e)
+            })
+        
+        # Teste 2: Criar entrada no almoxarifado -> Deve impactar estoque
+        try:
+            # Verificar se módulo almoxarifado está implementado
+            if hasattr(sys.modules.get('models'), 'AlmoxarifadoItem'):
+                item = AlmoxarifadoItem.query.first()
+                if item:
+                    estoque_antes = AlmoxarifadoEstoque.query.filter_by(item_id=item.id).first()
+                    quantidade_antes = estoque_antes.quantidade if estoque_antes else 0
+                    
+                    # Simular entrada (isso deveria ser feito via service)
+                    # ... código de teste de entrada ...
+                    
+                    testes_lancamentos.append({
+                        'teste': 'Entrada Almoxarifado',
+                        'status': 'IMPLEMENTAR',
+                        'detalhes': 'Módulo almoxarifado detectado'
+                    })
+                else:
+                    testes_lancamentos.append({
+                        'teste': 'Entrada Almoxarifado',
+                        'status': 'SEM_DADOS',
+                        'detalhes': 'Nenhum item no almoxarifado'
+                    })
+            else:
+                testes_lancamentos.append({
+                    'teste': 'Entrada Almoxarifado',
+                    'status': 'NAO_IMPLEMENTADO',
+                    'detalhes': 'Módulo almoxarifado não encontrado'
+                })
+                
+        except Exception as e:
+            testes_lancamentos.append({
+                'teste': 'Entrada Almoxarifado',
+                'status': 'ERRO',
+                'detalhes': str(e)
+            })
+        
+        return testes_lancamentos
+```
+
+---
+
+## 📋 CHECKLIST DE EXECUÇÃO
+
+### **PRÉ-EXECUÇÃO (OBRIGATÓRIO)**
+- [ ] ✅ Criar backup completo do sistema e banco de dados
+- [ ] ✅ Testar backup (restaurar em ambiente de teste)
+- [ ] ✅ Documentar versão atual do sistema
+- [ ] ✅ Notificar usuários sobre manutenção
+
+### **EXECUÇÃO FASE 1: LIMPEZA SEGURA**
+- [ ] 🗑️ Mover arquivos de teste para pasta `tests/`
+- [ ] 🗑️ Remover scripts de migração antigos (já executados)
+- [ ] 🗑️ Remover arquivos duplicados (manter versão mais recente)
+- [ ] 🗑️ Limpar pasta `attached_assets/` (arquivos temporários)
+- [ ] 📁 Criar pasta `archive/` para arquivos históricos
+
+### **EXECUÇÃO FASE 2: CORREÇÃO DE MODELOS**
+- [ ] 🔧 Corrigir ForeignKeys órfãs no `models.py`
+- [ ] 🔧 Remover/comentar modelos não implementados
+- [ ] 🔧 Validar relacionamentos existentes
+- [ ] 🔧 Executar migração para corrigir banco de dados
+- [ ] ✅ Testar integridade dos relacionamentos
+
+### **EXECUÇÃO FASE 3: LIMPEZA DE TEMPLATES**
+- [ ] 🎨 Identificar templates órfãos
+- [ ] 🎨 Mover templates não utilizados para `templates/archive/`
+- [ ] 🎨 Validar templates principais
+- [ ] 🎨 Testar renderização das páginas principais
+
+### **EXECUÇÃO FASE 4: TESTES DE INTEGRIDADE**
+- [ ] 🧪 Executar testes de integridade de dados
+- [ ] 🧪 Testar funcionalidades de cada módulo
+- [ ] 🧪 Validar lançamentos automáticos
+- [ ] 🧪 Testar APIs principais
+- [ ] 📊 Gerar relatório de integridade
+
+### **PÓS-EXECUÇÃO**
+- [ ] 📝 Documentar mudanças realizadas
+- [ ] 🚀 Deploy em ambiente de produção
+- [ ] 👥 Treinar usuários sobre mudanças
+- [ ] 📊 Monitorar sistema por 48h
+- [ ] ✅ Confirmar que tudo está funcionando
+
+---
+
+## ⚠️ CUIDADOS ESPECIAIS
+
+### **ARQUIVOS QUE NÃO DEVEM SER REMOVIDOS**
+- `app.py` - Arquivo principal da aplicação
+- `models.py` - Modelos de dados principais
+- `views.py` - Views principais
+- `auth.py` - Sistema de autenticação
+- `migrations.py` - Sistema de migrações
+- Qualquer arquivo importado em `app.py`
+
+### **VALIDAÇÕES OBRIGATÓRIAS**
+1. **Antes de remover qualquer arquivo:**
+   ```bash
+   grep -r "nome_do_arquivo" . --exclude="nome_do_arquivo.py"
+   ```
+
+2. **Antes de alterar models.py:**
+   ```python
+   # Testar em ambiente de desenvolvimento primeiro
+   python3 -c "from models import *; print('Modelos OK')"
+   ```
+
+3. **Após cada mudança:**
+   ```bash
+   python3 app.py  # Verificar se inicia sem erro
+   ```
+
+### **ROLLBACK PLAN**
+Se algo der errado:
+1. Parar aplicação
+2. Restaurar backup do código
+3. Restaurar backup do banco de dados
+4. Reiniciar aplicação
+5. Validar funcionamento
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+Após a execução completa:
+
+### **SISTEMA LIMPO**
+- ✅ **~60 arquivos removidos** (scripts antigos, duplicados, testes)
+- ✅ **Estrutura organizada** com pastas `tests/` e `archive/`
+- ✅ **Zero ForeignKeys órfãs** no models.py
+- ✅ **Templates organizados** sem órfãos
+
+### **INTEGRIDADE VALIDADA**
+- ✅ **Relacionamentos funcionando** entre todos os módulos
+- ✅ **APIs respondendo** corretamente
+- ✅ **Lançamentos automáticos** testados e funcionais
+- ✅ **Zero erros** no log da aplicação
+
+### **PREPARADO PARA FINANCEIRO**
+- ✅ **Base de dados limpa** e consistente
+- ✅ **Estrutura de relacionamentos** validada
+- ✅ **Performance otimizada** sem código morto
+- ✅ **Documentação atualizada** do que foi alterado
+
+---
+
+## 🚀 IMPLEMENTAÇÃO
+
+**Para executar esta limpeza, use este prompt no Replit:**
+
+```
+Atue como um especialista em refatoração de sistemas Python/Flask. Execute uma limpeza meticulosa e segura do sistema SIGE seguindo EXATAMENTE o plano detalhado acima.
+
+CRÍTICO: 
+1. SEMPRE criar backup completo antes de qualquer alteração
+2. Testar cada mudança antes de prosseguir
+3. Documentar tudo que foi alterado
+4. Validar integridade após cada fase
+
+Execute as 4 fases na ordem, reportando o progresso de cada etapa.
+
+OBJETIVO: Deixar o sistema limpo, organizado e com integridade validada, preparado para implementação do módulo financeiro.
+```
+
+**Este processo transformará o SIGE em uma base sólida e confiável para futuras implementações!** 🧹✨
