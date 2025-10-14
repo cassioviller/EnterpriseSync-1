@@ -21,8 +21,40 @@ ponto_bp = Blueprint('ponto', __name__, url_prefix='/ponto')
 @ponto_bp.route('/')
 @login_required
 def index():
-    """Rota raiz do ponto - redireciona para lista de obras"""
-    return redirect(url_for('ponto.lista_obras'))
+    """Página inicial do ponto - lista todos os funcionários ativos"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        # Buscar todos os funcionários ativos
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        # Para cada funcionário, verificar se já bateu ponto hoje
+        hoje = date.today()
+        funcionarios_com_status = []
+        
+        for func in funcionarios:
+            registro_hoje = RegistroPonto.query.filter_by(
+                funcionario_id=func.id,
+                data=hoje,
+                admin_id=admin_id
+            ).first()
+            
+            funcionarios_com_status.append({
+                'funcionario': func,
+                'registro_hoje': registro_hoje
+            })
+        
+        return render_template('ponto/lista_funcionarios.html',
+                             funcionarios=funcionarios_com_status,
+                             hoje=hoje)
+        
+    except Exception as e:
+        logger.error(f"Erro ao listar funcionários: {e}")
+        flash(f'Erro ao carregar funcionários: {str(e)}', 'error')
+        return redirect(url_for('main.dashboard'))
 
 
 @ponto_bp.route('/obra/<int:obra_id>')
