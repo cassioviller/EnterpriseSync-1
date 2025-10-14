@@ -78,11 +78,27 @@ def bater_ponto_funcionario(funcionario_id):
             admin_id=admin_id
         ).first()
         
-        # Buscar todas as obras ativas (futuramente filtraremos por configuração)
-        obras = Obra.query.filter_by(
+        # Buscar obras configuradas para o funcionário
+        obras_configuradas = FuncionarioObrasPonto.query.filter_by(
+            funcionario_id=funcionario_id,
             admin_id=admin_id,
             ativo=True
-        ).order_by(Obra.nome).all()
+        ).all()
+        
+        # Se tem obras configuradas, mostrar apenas essas. Caso contrário, todas as ativas
+        if obras_configuradas:
+            obras_ids = [config.obra_id for config in obras_configuradas]
+            obras = Obra.query.filter(
+                Obra.id.in_(obras_ids),
+                Obra.admin_id == admin_id,
+                Obra.ativo == True
+            ).order_by(Obra.nome).all()
+        else:
+            # Sem configuração específica: mostrar todas as obras ativas
+            obras = Obra.query.filter_by(
+                admin_id=admin_id,
+                ativo=True
+            ).order_by(Obra.nome).all()
         
         # Horário atual
         agora = datetime.now()
