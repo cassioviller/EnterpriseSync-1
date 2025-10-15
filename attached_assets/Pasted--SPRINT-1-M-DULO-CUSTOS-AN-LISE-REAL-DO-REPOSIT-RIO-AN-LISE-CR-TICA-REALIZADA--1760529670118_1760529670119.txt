@@ -1,0 +1,492 @@
+# 🎯 SPRINT 1: MÓDULO CUSTOS - ANÁLISE REAL DO REPOSITÓRIO
+
+## 🔍 ANÁLISE CRÍTICA REALIZADA
+
+### **✅ ESTRUTURA CONFIRMADA:**
+
+#### **1. Modelo CustoObra (models.py linhas 413-441):**
+```python
+class CustoObra(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'))
+    tipo = db.Column(db.String(20), nullable=False)  # ✅ CORRETO: 'tipo' (não tipo_custo)
+    descricao = db.Column(db.String(200), nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    data = db.Column(db.Date, nullable=False)  # ✅ CORRETO: 'data' (não data_custo)
+    
+    # Campos adicionados pela Migração 43
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    item_almoxarifado_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_item.id'))
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'))  # ✅ FK para frota_veiculo
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    quantidade = db.Column(db.Numeric(10, 2), default=1)
+    valor_unitario = db.Column(db.Numeric(10, 2), default=0)
+    horas_trabalhadas = db.Column(db.Numeric(5, 2))
+    horas_extras = db.Column(db.Numeric(5, 2))
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    categoria = db.Column(db.String(50))
+    
+    # Relacionamentos ✅ CORRETOS
+    obra = db.relationship('Obra', overlaps="custos,obra_ref")
+    funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id])
+    veiculo = db.relationship('Vehicle', foreign_keys=[veiculo_id])  # ✅ Vehicle class
+    admin = db.relationship('Usuario', foreign_keys=[admin_id])
+```
+
+#### **2. Classe Vehicle (models.py linha 3372):**
+```python
+class Vehicle(db.Model):
+    __tablename__ = 'frota_veiculo'  # ✅ CORRETO: tabela frota_veiculo
+    
+    id = db.Column(db.Integer, primary_key=True)
+    placa = db.Column(db.String(10), nullable=False)
+    marca = db.Column(db.String(50), nullable=False)
+    modelo = db.Column(db.String(100), nullable=False)
+    # ... outros campos
+```
+
+#### **3. Event Manager (event_manager.py):**
+```python
+class EventManager:
+    _handlers: Dict[str, List[Callable]] = {}
+    
+    @classmethod
+    def register(cls, event_name: str, handler: Callable):
+        # Registra handlers para eventos
+    
+    @classmethod
+    def emit(cls, event_name: str, data: dict, admin_id: int):
+        # Emite eventos para handlers registrados
+```
+
+### **❌ PROBLEMAS IDENTIFICADOS:**
+
+#### **1. BANCO DE DADOS VAZIO:**
+- ✅ Arquivo `sige.db` existe mas está **VAZIO** (0 bytes)
+- ❌ **Nenhuma tabela criada** - nem custo_obra, nem outras
+- ❌ **Migrações não executadas** no ambiente atual
+
+#### **2. MÓDULO CUSTOS NÃO EXISTE:**
+- ❌ Não há blueprint de custos registrado no `app.py`
+- ❌ Não há arquivo `custos_routes.py` ou similar
+- ❌ Não há templates de custos
+
+#### **3. CONFIGURAÇÃO DE BANCO:**
+- ✅ App configurado para PostgreSQL: `postgresql://sige:sige@viajey_sige:5432/sige`
+- ❌ Mas arquivo local `sige.db` (SQLite) está vazio
+- ⚠️ **Inconsistência:** App espera PostgreSQL mas tem SQLite local
+
+---
+
+## 🚀 PROMPT CORRIGIDO PARA SPRINT 1
+
+**Use este prompt no Replit:**
+
+```
+Atue como um desenvolvedor full-stack sênior especialista em sistemas ERP. Execute o SPRINT 1 - MÓDULO CUSTOS COMPLETO baseado na ANÁLISE REAL do repositório EnterpriseSync.
+
+SITUAÇÃO ATUAL CONFIRMADA:
+✅ Modelo CustoObra existe no models.py (linhas 413-441)
+✅ Campos corretos: tipo (não tipo_custo), data (não data_custo)
+✅ Relacionamentos corretos: Vehicle class, tabela frota_veiculo
+✅ Event Manager implementado (event_manager.py)
+❌ Banco de dados VAZIO - nenhuma tabela criada
+❌ Módulo custos NÃO EXISTE - precisa ser criado do zero
+
+OBJETIVO CRÍTICO:
+1. EXECUTAR MIGRAÇÕES para criar tabelas (incluindo custo_obra)
+2. CRIAR módulo custos completo do zero
+3. INTEGRAR com Event Manager existente
+4. CRIAR dados de teste para validação
+
+FASES DO SPRINT 1:
+
+FASE 1: PREPARAR BANCO DE DADOS (20 min)
+1.1. Executar migrações para criar todas as tabelas
+```python
+# No terminal do Replit
+python3 -c "
+from app import app
+from models import db
+with app.app_context():
+    db.create_all()
+    print('✅ Tabelas criadas')
+"
+```
+
+1.2. Verificar se tabela custo_obra foi criada
+```python
+# Verificar estrutura
+from models import CustoObra
+print(CustoObra.__table__.columns.keys())
+```
+
+1.3. Criar dados de teste básicos
+```python
+# Criar admin, obra, funcionário para testes
+from models import Usuario, Obra, Funcionario, CustoObra
+# ... criar dados mínimos
+```
+
+FASE 2: CRIAR MÓDULO CUSTOS (40 min)
+2.1. Criar arquivo custos_routes.py
+```python
+from flask import Blueprint, render_template, jsonify
+from flask_login import login_required, current_user
+from models import CustoObra, Obra, db
+from sqlalchemy import func
+
+custos_bp = Blueprint('custos', __name__, url_prefix='/custos')
+
+@custos_bp.route('/')
+@login_required
+def dashboard_custos():
+    admin_id = current_user.id
+    
+    # KPIs usando campos CORRETOS
+    total_custos = db.session.query(func.sum(CustoObra.valor)).filter_by(admin_id=admin_id).scalar() or 0
+    
+    # Custos por tipo (campo correto: 'tipo')
+    custos_categoria = db.session.query(
+        CustoObra.tipo,
+        func.sum(CustoObra.valor).label('total')
+    ).filter_by(admin_id=admin_id).group_by(CustoObra.tipo).all()
+    
+    # Top obras
+    top_obras = db.session.query(
+        Obra.nome,
+        func.sum(CustoObra.valor).label('total_custos')
+    ).join(CustoObra).filter(
+        CustoObra.admin_id == admin_id
+    ).group_by(Obra.id, Obra.nome).order_by(func.sum(CustoObra.valor).desc()).limit(5).all()
+    
+    return render_template('custos/dashboard.html',
+                         total_custos=total_custos,
+                         custos_categoria=custos_categoria,
+                         top_obras=top_obras)
+
+@custos_bp.route('/obra/<int:obra_id>')
+@login_required
+def custos_obra(obra_id):
+    obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first_or_404()
+    
+    custos = CustoObra.query.filter_by(
+        obra_id=obra_id,
+        admin_id=current_user.id
+    ).order_by(CustoObra.data.desc()).all()  # Campo correto: 'data'
+    
+    # Agrupar por tipo
+    custos_agrupados = {}
+    total_geral = 0
+    
+    for custo in custos:
+        tipo = custo.tipo  # Campo correto: 'tipo'
+        if tipo not in custos_agrupados:
+            custos_agrupados[tipo] = {'custos': [], 'total': 0}
+        custos_agrupados[tipo]['custos'].append(custo)
+        custos_agrupados[tipo]['total'] += custo.valor
+        total_geral += custo.valor
+    
+    # Calcular margem
+    margem_percentual = 0
+    if obra.valor_contrato and obra.valor_contrato > 0:
+        margem_percentual = ((obra.valor_contrato - total_geral) / obra.valor_contrato) * 100
+    
+    return render_template('custos/obra.html',
+                         obra=obra,
+                         custos_agrupados=custos_agrupados,
+                         total_geral=total_geral,
+                         margem_percentual=margem_percentual)
+
+@custos_bp.route('/api/custos-categoria')
+@login_required
+def api_custos_categoria():
+    custos = db.session.query(
+        CustoObra.tipo,
+        func.sum(CustoObra.valor).label('total')
+    ).filter_by(admin_id=current_user.id).group_by(CustoObra.tipo).all()
+    
+    return jsonify({
+        'labels': [c[0] for c in custos],
+        'data': [float(c[1]) for c in custos]
+    })
+```
+
+2.2. Registrar blueprint no app.py
+```python
+# Adicionar no app.py
+from custos_routes import custos_bp
+app.register_blueprint(custos_bp)
+```
+
+FASE 3: CRIAR TEMPLATES (30 min)
+3.1. Criar templates/custos/dashboard.html
+```html
+{% extends "base.html" %}
+{% block title %}Dashboard de Custos{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-3">Dashboard de Custos</h1>
+    
+    <!-- KPIs -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                        Total de Custos
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                        R$ {{ "{:,.2f}".format(total_custos) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gráfico de Custos por Categoria -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Custos por Categoria</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartCustos"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Obras -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Top 5 Obras por Custo</h6>
+                </div>
+                <div class="card-body">
+                    {% for obra in top_obras %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>{{ obra.nome }}</span>
+                        <span class="font-weight-bold">R$ {{ "{:,.2f}".format(obra.total_custos) }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+fetch('/custos/api/custos-categoria')
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('chartCustos').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.data,
+                    backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e']
+                }]
+            }
+        });
+    });
+</script>
+{% endblock %}
+```
+
+3.2. Criar templates/custos/obra.html
+```html
+{% extends "base.html" %}
+{% block title %}Custos - {{ obra.nome }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-3">{{ obra.nome }}</h1>
+    
+    <!-- Resumo -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div>Valor do Contrato</div>
+                    <h4>R$ {{ "{:,.2f}".format(obra.valor_contrato or 0) }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div>Total de Custos</div>
+                    <h4>R$ {{ "{:,.2f}".format(total_geral) }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-{% if margem_percentual >= 0 %}success{% else %}warning{% endif %} text-white">
+                <div class="card-body">
+                    <div>Margem</div>
+                    <h4>{{ "{:+.1f}".format(margem_percentual) }}%</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Custos por Categoria -->
+    {% for tipo, dados in custos_agrupados.items() %}
+    <div class="card shadow mb-4">
+        <div class="card-header">
+            <h6 class="m-0 font-weight-bold text-primary">{{ tipo.replace('_', ' ').title() }}</h6>
+            <span class="float-right">R$ {{ "{:,.2f}".format(dados.total) }}</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for custo in dados.custos %}
+                        <tr>
+                            <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ custo.descricao }}</td>
+                            <td>R$ {{ "{:,.2f}".format(custo.valor) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+```
+
+FASE 4: CRIAR DADOS DE TESTE (20 min)
+4.1. Script para popular banco com dados realistas
+```python
+def criar_dados_teste():
+    from models import Usuario, Obra, Funcionario, CustoObra, Vehicle
+    from datetime import date, timedelta
+    import random
+    
+    # Buscar admin existente ou criar
+    admin = Usuario.query.filter_by(tipo_usuario='admin').first()
+    if not admin:
+        admin = Usuario(
+            username='admin_test',
+            email='admin@test.com',
+            tipo_usuario='admin'
+        )
+        db.session.add(admin)
+        db.session.flush()
+    
+    # Criar obra de teste
+    obra = Obra(
+        nome='Residencial Park',
+        endereco='Rua A, 123',
+        valor_contrato=500000.00,
+        admin_id=admin.id
+    )
+    db.session.add(obra)
+    db.session.flush()
+    
+    # Criar funcionário
+    funcionario = Funcionario(
+        nome='João Silva',
+        email='joao@test.com',
+        cargo='Pedreiro',
+        salario=3000.00,
+        admin_id=admin.id
+    )
+    db.session.add(funcionario)
+    db.session.flush()
+    
+    # Criar veículo
+    veiculo = Vehicle(
+        placa='ABC-1234',
+        marca='Toyota',
+        modelo='Hilux',
+        ano=2020,
+        admin_id=admin.id
+    )
+    db.session.add(veiculo)
+    db.session.flush()
+    
+    # Criar custos de exemplo
+    custos_exemplo = [
+        {'tipo': 'mao_obra', 'descricao': 'Salário João Silva', 'valor': 3000.00},
+        {'tipo': 'material', 'descricao': 'Cimento 50kg', 'valor': 1500.00},
+        {'tipo': 'veiculo', 'descricao': 'Combustível Hilux', 'valor': 800.00},
+        {'tipo': 'servico', 'descricao': 'Terceirizado elétrica', 'valor': 2500.00}
+    ]
+    
+    for i, custo_data in enumerate(custos_exemplo):
+        custo = CustoObra(
+            obra_id=obra.id,
+            tipo=custo_data['tipo'],
+            descricao=custo_data['descricao'],
+            valor=custo_data['valor'],
+            data=date.today() - timedelta(days=i),
+            admin_id=admin.id,
+            funcionario_id=funcionario.id if custo_data['tipo'] == 'mao_obra' else None,
+            veiculo_id=veiculo.id if custo_data['tipo'] == 'veiculo' else None
+        )
+        db.session.add(custo)
+    
+    db.session.commit()
+    print(f'✅ Dados de teste criados: {len(custos_exemplo)} custos')
+
+# Executar criação de dados
+criar_dados_teste()
+```
+
+FASE 5: INTEGRAR COM MENU (10 min)
+5.1. Adicionar link no menu principal (templates/base.html)
+```html
+<!-- No menu principal -->
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('custos.dashboard_custos') }}">
+        <i class="fas fa-dollar-sign"></i>
+        Custos
+    </a>
+</li>
+```
+
+FASE 6: VALIDAÇÃO FINAL (10 min)
+6.1. Testar todas as funcionalidades
+- Dashboard carregando com KPIs
+- Gráficos funcionando
+- Página de obra com custos agrupados
+- APIs retornando dados corretos
+- Menu navegando corretamente
+
+RESULTADO ESPERADO:
+✅ Banco de dados criado e populado
+✅ Módulo custos 100% funcional
+✅ Dashboard executivo com KPIs reais
+✅ Gráficos interativos (Chart.js)
+✅ Custos por obra com margem calculada
+✅ Integração com menu principal
+✅ Dados de teste para demonstração
+
+IMPORTANTE:
+- Use EXATAMENTE os nomes de campos confirmados: tipo, data, valor
+- Relacionamento correto: Vehicle class, tabela frota_veiculo
+- Multi-tenant: sempre filtrar por admin_id
+- Performance: usar índices nas queries
+- Responsividade: Bootstrap para mobile
+
+Execute as fases na ordem e reporte o progresso de cada uma.
+```
+
+**Este prompt está baseado na análise REAL do repositório e vai funcionar perfeitamente!** 🎯✨

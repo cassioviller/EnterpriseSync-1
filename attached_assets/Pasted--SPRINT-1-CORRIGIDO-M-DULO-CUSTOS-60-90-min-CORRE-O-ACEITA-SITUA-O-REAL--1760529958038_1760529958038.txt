@@ -1,0 +1,737 @@
+# 🎯 SPRINT 1 CORRIGIDO - MÓDULO CUSTOS (60-90 min)
+
+## ✅ CORREÇÃO ACEITA - SITUAÇÃO REAL:
+
+- ✅ **PostgreSQL remoto** configurado e funcionando
+- ✅ **Migrações 39-43** já executadas
+- ✅ **Tabela custo_obra** já existe com todos os campos
+- ✅ **Event Manager** funcionando (4 handlers registrados)
+- ✅ **Campos corretos:** `tipo`, `data`, `valor` (confirmados)
+
+## 🚀 PROMPT SIMPLIFICADO PARA REPLIT
+
+```
+Atue como desenvolvedor full-stack sênior. Execute SPRINT 1 - MÓDULO CUSTOS para o SIGE.
+
+SITUAÇÃO CONFIRMADA:
+✅ PostgreSQL remoto funcionando
+✅ Tabela custo_obra JÁ EXISTE (migrações 39-43 executadas)
+✅ Event Manager JÁ FUNCIONA (4 handlers registrados)
+✅ Campos corretos: tipo, data, valor, admin_id
+
+OBJETIVO: Criar módulo custos completo em 60-90 minutos
+
+FASE 1: BLUEPRINT DE CUSTOS (20 min)
+
+1.1. Criar arquivo custos_views.py:
+```python
+from flask import Blueprint, render_template, jsonify, request
+from flask_login import login_required, current_user
+from models import CustoObra, Obra, Funcionario, Vehicle, db
+from sqlalchemy import func, desc
+from datetime import datetime, date
+
+custos_bp = Blueprint('custos', __name__, url_prefix='/custos')
+
+@custos_bp.route('/')
+@login_required
+def dashboard_custos():
+    admin_id = current_user.id
+    
+    # KPIs principais
+    total_custos = db.session.query(func.sum(CustoObra.valor)).filter_by(admin_id=admin_id).scalar() or 0
+    
+    # Custos por categoria (campo correto: 'tipo')
+    custos_categoria = db.session.query(
+        CustoObra.tipo,
+        func.sum(CustoObra.valor).label('total')
+    ).filter_by(admin_id=admin_id).group_by(CustoObra.tipo).all()
+    
+    # Custos por mês (últimos 6 meses)
+    custos_mensais = db.session.query(
+        func.strftime('%Y-%m', CustoObra.data).label('mes'),
+        func.sum(CustoObra.valor).label('total')
+    ).filter_by(admin_id=admin_id).group_by(
+        func.strftime('%Y-%m', CustoObra.data)
+    ).order_by(desc('mes')).limit(6).all()
+    
+    # Top 5 obras por custo
+    top_obras = db.session.query(
+        Obra.nome,
+        Obra.id,
+        func.sum(CustoObra.valor).label('total_custos')
+    ).join(CustoObra).filter(
+        CustoObra.admin_id == admin_id
+    ).group_by(Obra.id, Obra.nome).order_by(
+        desc('total_custos')
+    ).limit(5).all()
+    
+    # Estatísticas gerais
+    total_obras = Obra.query.filter_by(admin_id=admin_id).count()
+    obras_com_custos = db.session.query(CustoObra.obra_id).filter_by(admin_id=admin_id).distinct().count()
+    
+    return render_template('custos/dashboard.html',
+                         total_custos=total_custos,
+                         custos_categoria=custos_categoria,
+                         custos_mensais=custos_mensais,
+                         top_obras=top_obras,
+                         total_obras=total_obras,
+                         obras_com_custos=obras_com_custos)
+
+@custos_bp.route('/obra/<int:obra_id>')
+@login_required
+def custos_obra(obra_id):
+    obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first_or_404()
+    
+    # Buscar todos os custos da obra
+    custos = CustoObra.query.filter_by(
+        obra_id=obra_id,
+        admin_id=current_user.id
+    ).order_by(desc(CustoObra.data)).all()
+    
+    # Agrupar custos por tipo
+    custos_agrupados = {}
+    total_geral = 0
+    
+    for custo in custos:
+        tipo = custo.tipo
+        if tipo not in custos_agrupados:
+            custos_agrupados[tipo] = {
+                'custos': [],
+                'total': 0,
+                'quantidade': 0
+            }
+        custos_agrupados[tipo]['custos'].append(custo)
+        custos_agrupados[tipo]['total'] += custo.valor
+        custos_agrupados[tipo]['quantidade'] += 1
+        total_geral += custo.valor
+    
+    # Calcular margem
+    margem_valor = 0
+    margem_percentual = 0
+    if obra.valor_contrato and obra.valor_contrato > 0:
+        margem_valor = obra.valor_contrato - total_geral
+        margem_percentual = (margem_valor / obra.valor_contrato) * 100
+    
+    # Custos por mês nesta obra
+    custos_mensais_obra = db.session.query(
+        func.strftime('%Y-%m', CustoObra.data).label('mes'),
+        func.sum(CustoObra.valor).label('total')
+    ).filter_by(
+        obra_id=obra_id,
+        admin_id=current_user.id
+    ).group_by(
+        func.strftime('%Y-%m', CustoObra.data)
+    ).order_by('mes').all()
+    
+    return render_template('custos/obra.html',
+                         obra=obra,
+                         custos_agrupados=custos_agrupados,
+                         total_geral=total_geral,
+                         margem_valor=margem_valor,
+                         margem_percentual=margem_percentual,
+                         custos_mensais_obra=custos_mensais_obra,
+                         total_custos=len(custos))
+
+@custos_bp.route('/api/custos-categoria')
+@login_required
+def api_custos_categoria():
+    custos = db.session.query(
+        CustoObra.tipo,
+        func.sum(CustoObra.valor).label('total')
+    ).filter_by(admin_id=current_user.id).group_by(CustoObra.tipo).all()
+    
+    # Mapear nomes amigáveis
+    nomes_tipos = {
+        'mao_obra': 'Mão de Obra',
+        'material': 'Material',
+        'veiculo': 'Veículo',
+        'servico': 'Serviço',
+        'alimentacao': 'Alimentação'
+    }
+    
+    return jsonify({
+        'labels': [nomes_tipos.get(c[0], c[0]) for c in custos],
+        'data': [float(c[1]) for c in custos],
+        'colors': ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b']
+    })
+
+@custos_bp.route('/api/custos-mensais')
+@login_required
+def api_custos_mensais():
+    custos = db.session.query(
+        func.strftime('%Y-%m', CustoObra.data).label('mes'),
+        func.sum(CustoObra.valor).label('total')
+    ).filter_by(admin_id=current_user.id).group_by(
+        func.strftime('%Y-%m', CustoObra.data)
+    ).order_by('mes').limit(12).all()
+    
+    return jsonify({
+        'labels': [c[0] for c in custos],
+        'data': [float(c[1]) for c in custos]
+    })
+```
+
+1.2. Registrar blueprint no app.py:
+```python
+# Adicionar no app.py após outros imports
+from custos_views import custos_bp
+
+# Adicionar após outros register_blueprint
+app.register_blueprint(custos_bp)
+```
+
+FASE 2: TEMPLATES RESPONSIVOS (25 min)
+
+2.1. Criar templates/custos/dashboard.html:
+```html
+{% extends "base.html" %}
+{% block title %}Dashboard de Custos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Dashboard de Custos</h1>
+    </div>
+
+    <!-- KPIs Row -->
+    <div class="row">
+        <!-- Total Custos -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total de Custos
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(total_custos) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Obras -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Obras com Custos
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ obras_com_custos }} / {{ total_obras }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custo Médio por Obra -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Custo Médio/Obra
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(total_custos / obras_com_custos if obras_com_custos > 0 else 0) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calculator fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Obras Ativas -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Total de Obras
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_obras }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-hammer fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- Custos por Categoria -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Custos por Categoria</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie pt-4 pb-2">
+                        <canvas id="chartCategorias"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Evolução Mensal -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Evolução Mensal</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="chartMensal"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Obras -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Top 5 Obras por Custo</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Obra</th>
+                                    <th>Total de Custos</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for obra in top_obras %}
+                                <tr>
+                                    <td>{{ obra.nome }}</td>
+                                    <td>R$ {{ "{:,.2f}".format(obra.total_custos) }}</td>
+                                    <td>
+                                        <a href="{{ url_for('custos.custos_obra', obra_id=obra.id) }}" 
+                                           class="btn btn-primary btn-sm">
+                                            <i class="fas fa-eye"></i> Ver Detalhes
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Gráfico de Categorias
+fetch('/custos/api/custos-categoria')
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('chartCategorias').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.data,
+                    backgroundColor: data.colors,
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    });
+
+// Gráfico Mensal
+fetch('/custos/api/custos-mensais')
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('chartMensal').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Custos Mensais',
+                    data: data.data,
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                    borderWidth: 2,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return 'R$ ' + value.toLocaleString('pt-BR');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
+```
+
+2.2. Criar templates/custos/obra.html:
+```html
+{% extends "base.html" %}
+{% block title %}Custos - {{ obra.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{{ obra.nome }}</h1>
+        <a href="{{ url_for('custos.dashboard_custos') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+        </a>
+    </div>
+
+    <!-- Resumo Financeiro -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white shadow">
+                <div class="card-body">
+                    <div class="text-white-50 small">Valor do Contrato</div>
+                    <div class="h4">R$ {{ "{:,.2f}".format(obra.valor_contrato or 0) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white shadow">
+                <div class="card-body">
+                    <div class="text-white-50 small">Total de Custos</div>
+                    <div class="h4">R$ {{ "{:,.2f}".format(total_geral) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-{% if margem_percentual >= 0 %}success{% else %}warning{% endif %} text-white shadow">
+                <div class="card-body">
+                    <div class="text-white-50 small">Margem</div>
+                    <div class="h4">{{ "{:+.1f}".format(margem_percentual) }}%</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white shadow">
+                <div class="card-body">
+                    <div class="text-white-50 small">Total de Lançamentos</div>
+                    <div class="h4">{{ total_custos }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custos por Categoria -->
+    {% for tipo, dados in custos_agrupados.items() %}
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">
+                {{ tipo.replace('_', ' ').title() }}
+            </h6>
+            <div class="dropdown no-arrow">
+                <span class="badge badge-primary badge-pill">
+                    {{ dados.quantidade }} lançamentos - R$ {{ "{:,.2f}".format(dados.total) }}
+                </span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Funcionário</th>
+                            <th>Quantidade</th>
+                            <th>Valor Unit.</th>
+                            <th>Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for custo in dados.custos %}
+                        <tr>
+                            <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ custo.descricao }}</td>
+                            <td>
+                                {% if custo.funcionario %}
+                                    {{ custo.funcionario.nome }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ custo.quantidade or 1 }}</td>
+                            <td>R$ {{ "{:,.2f}".format(custo.valor_unitario or custo.valor) }}</td>
+                            <td>R$ {{ "{:,.2f}".format(custo.valor) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not custos_agrupados %}
+    <div class="card shadow">
+        <div class="card-body text-center">
+            <i class="fas fa-info-circle fa-3x text-gray-300 mb-3"></i>
+            <h5>Nenhum custo registrado</h5>
+            <p class="text-muted">Esta obra ainda não possui custos registrados.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+```
+
+FASE 3: DADOS DE TESTE (15 min)
+
+3.1. Opção A - Via Event Manager (RECOMENDADO):
+```python
+# Executar no terminal do Replit
+python3 -c "
+from app import app
+from models import db, Usuario, Obra, Funcionario, Vehicle, CustoObra
+from event_manager import EventManager
+from datetime import date, timedelta
+import random
+
+with app.app_context():
+    # Buscar admin existente
+    admin = Usuario.query.filter_by(tipo_usuario='admin').first()
+    if not admin:
+        print('❌ Admin não encontrado')
+        exit()
+    
+    # Criar obra de teste
+    obra = Obra(
+        nome='Residencial Park - Teste',
+        endereco='Rua das Flores, 123',
+        valor_contrato=500000.00,
+        admin_id=admin.id
+    )
+    db.session.add(obra)
+    db.session.flush()
+    
+    # Criar funcionário
+    funcionario = Funcionario(
+        nome='João Silva - Teste',
+        email='joao.teste@sige.com',
+        cargo='Pedreiro',
+        salario=3500.00,
+        admin_id=admin.id
+    )
+    db.session.add(funcionario)
+    db.session.flush()
+    
+    # Criar veículo
+    veiculo = Vehicle(
+        placa='TST-1234',
+        marca='Toyota',
+        modelo='Hilux',
+        ano=2020,
+        admin_id=admin.id
+    )
+    db.session.add(veiculo)
+    db.session.flush()
+    
+    db.session.commit()
+    
+    # Gerar custos via Event Manager
+    eventos_teste = [
+        {
+            'evento': 'ponto_registrado',
+            'data': {
+                'funcionario_id': funcionario.id,
+                'obra_id': obra.id,
+                'horas_trabalhadas': 8.0,
+                'horas_extras': 2.0,
+                'data': date.today().isoformat()
+            }
+        },
+        {
+            'evento': 'material_usado',
+            'data': {
+                'item_id': 1,
+                'obra_id': obra.id,
+                'quantidade': 50,
+                'valor_unitario': 25.00,
+                'descricao': 'Cimento 50kg'
+            }
+        },
+        {
+            'evento': 'veiculo_usado',
+            'data': {
+                'veiculo_id': veiculo.id,
+                'obra_id': obra.id,
+                'km_percorrido': 150,
+                'combustivel_gasto': 80.00,
+                'data': date.today().isoformat()
+            }
+        }
+    ]
+    
+    for evento in eventos_teste:
+        EventManager.emit(evento['evento'], evento['data'], admin.id)
+    
+    # Verificar custos criados
+    custos_criados = CustoObra.query.filter_by(obra_id=obra.id).count()
+    print(f'✅ Dados de teste criados: {custos_criados} custos gerados')
+"
+```
+
+3.2. Opção B - SQL Direto (mais rápido):
+```python
+# Executar no terminal do Replit
+python3 -c "
+from app import app
+from models import db, Usuario, Obra, CustoObra
+from datetime import date, timedelta
+
+with app.app_context():
+    admin = Usuario.query.filter_by(tipo_usuario='admin').first()
+    if not admin:
+        print('❌ Admin não encontrado')
+        exit()
+    
+    # Buscar ou criar obra
+    obra = Obra.query.filter_by(admin_id=admin.id).first()
+    if not obra:
+        obra = Obra(
+            nome='Residencial Park',
+            endereco='Rua A, 123',
+            valor_contrato=500000.00,
+            admin_id=admin.id
+        )
+        db.session.add(obra)
+        db.session.flush()
+    
+    # Criar custos de exemplo
+    custos_exemplo = [
+        {'tipo': 'mao_obra', 'descricao': 'Salário Pedreiro', 'valor': 3500.00},
+        {'tipo': 'mao_obra', 'descricao': 'Salário Servente', 'valor': 2800.00},
+        {'tipo': 'material', 'descricao': 'Cimento 50kg (50 sacos)', 'valor': 1250.00},
+        {'tipo': 'material', 'descricao': 'Areia fina (10m³)', 'valor': 800.00},
+        {'tipo': 'material', 'descricao': 'Brita 1 (8m³)', 'valor': 640.00},
+        {'tipo': 'veiculo', 'descricao': 'Combustível Hilux', 'valor': 450.00},
+        {'tipo': 'veiculo', 'descricao': 'Manutenção preventiva', 'valor': 350.00},
+        {'tipo': 'servico', 'descricao': 'Terceirizado elétrica', 'valor': 2500.00},
+        {'tipo': 'servico', 'descricao': 'Terceirizado hidráulica', 'valor': 1800.00},
+        {'tipo': 'alimentacao', 'descricao': 'Marmitas equipe', 'valor': 420.00}
+    ]
+    
+    for i, custo_data in enumerate(custos_exemplo):
+        custo = CustoObra(
+            obra_id=obra.id,
+            tipo=custo_data['tipo'],
+            descricao=custo_data['descricao'],
+            valor=custo_data['valor'],
+            data=date.today() - timedelta(days=i*2),
+            admin_id=admin.id,
+            quantidade=1,
+            valor_unitario=custo_data['valor']
+        )
+        db.session.add(custo)
+    
+    db.session.commit()
+    print(f'✅ {len(custos_exemplo)} custos de teste criados')
+    
+    # Verificar total
+    total = db.session.query(func.sum(CustoObra.valor)).filter_by(obra_id=obra.id).scalar()
+    print(f'💰 Total de custos: R$ {total:,.2f}')
+"
+```
+
+FASE 4: INTEGRAÇÃO MENU (5 min)
+
+4.1. Adicionar link no menu principal (templates/base.html):
+```html
+<!-- Procurar pelo menu principal e adicionar -->
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('custos.dashboard_custos') }}">
+        <i class="fas fa-dollar-sign"></i>
+        <span>Custos</span>
+    </a>
+</li>
+```
+
+FASE 5: VALIDAÇÃO FINAL (10 min)
+
+5.1. Checklist de validação:
+- [ ] Dashboard carrega sem erros
+- [ ] KPIs mostram valores corretos
+- [ ] Gráfico de categorias funciona
+- [ ] Gráfico mensal funciona
+- [ ] Top obras aparece com links
+- [ ] Página de obra carrega
+- [ ] Custos agrupados por categoria
+- [ ] Margem calculada corretamente
+- [ ] Menu principal navega para custos
+- [ ] Responsividade mobile OK
+
+RESULTADO ESPERADO:
+✅ Módulo custos 100% funcional
+✅ Dashboard executivo com KPIs reais
+✅ Gráficos interativos Chart.js
+✅ Análise por obra com margem
+✅ Dados de teste para demonstração
+✅ Integração com menu principal
+✅ Interface responsiva Bootstrap
+
+TEMPO TOTAL: 60-90 minutos
+```
+
+## 💡 RECOMENDAÇÃO FINAL
+
+**Opção C - Híbrido (MELHOR ABORDAGEM):**
+1. **SQL Direto** para dados base (mais rápido)
+2. **Event Manager** para 2-3 custos (validar integração)
+3. **Resultado:** Dashboard funcional + validação de integração
+
+**Pronto para executar?** 🚀

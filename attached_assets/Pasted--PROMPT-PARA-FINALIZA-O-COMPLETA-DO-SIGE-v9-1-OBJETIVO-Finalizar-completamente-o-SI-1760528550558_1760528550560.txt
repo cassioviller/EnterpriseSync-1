@@ -1,0 +1,581 @@
+# 🚀 PROMPT PARA FINALIZAÇÃO COMPLETA DO SIGE v9.1
+
+## 🎯 OBJETIVO
+
+Finalizar completamente o SIGE v9.1 baseado no **status atual pós-correções**, implementando as **Fases 4 e 5** para transformar o sistema em um **ERP empresarial 100% funcional** e pronto para produção.
+
+---
+
+## 📊 STATUS ATUAL CONFIRMADO
+
+### **✅ FASE 3 CONCLUÍDA COM SUCESSO:**
+- **Event Manager v9.0:** 100% funcional
+- **4 handlers implementados** com operações reais no banco
+- **Bugs críticos corrigidos** (FrotaVeiculo → Vehicle)
+- **Sistema inicializa** sem erros
+- **Migrações 39-43** executadas
+
+### **✅ HANDLERS FUNCIONANDO:**
+| Handler | Evento | Status | Funcionalidade |
+|---------|--------|--------|----------------|
+| `lancar_custo_material_obra` | `material_saida` | ✅ COMPLETO | Saída almoxarifado → CustoObra automático |
+| `calcular_horas_folha` | `ponto_registrado` | ✅ COMPLETO | Ponto → Custo mão de obra (horas × salário) |
+| `lancar_custo_combustivel` | `veiculo_usado` | ✅ COMPLETO | Uso veículo → Custo combustível (km × R$0.80) |
+| `gerar_contas_receber_proposta` | `proposta_aprovada` | ✅ COMPLETO | Proposta → Obra + ContaReceber |
+
+### **⏳ PENDENTE PARA FINALIZAÇÃO:**
+- **FASE 4:** Interfaces de usuário (Custos, Financeiro)
+- **FASE 5:** Limpeza final e documentação
+- **Dados de teste** para validação E2E
+- **60 warnings LSP** para corrigir
+
+---
+
+## 🔧 PLANO DE FINALIZAÇÃO
+
+### **FASE 4: INTERFACES DE USUÁRIO COMPLETAS**
+
+#### **4.1 Módulo Custos por Obra (NOVO)**
+```python
+def implementar_modulo_custos_completo():
+    """
+    Criar interface completa para o módulo de custos
+    """
+    
+    # Blueprint de Custos
+    custos_bp = Blueprint('custos', __name__, url_prefix='/custos')
+    
+    @custos_bp.route('/')
+    @login_required
+    def dashboard_custos():
+        """Dashboard principal de custos"""
+        admin_id = current_user.id
+        
+        # KPIs principais
+        total_custos = db.session.query(func.sum(CustoObra.valor)).filter_by(admin_id=admin_id).scalar() or 0
+        custos_mes = db.session.query(func.sum(CustoObra.valor)).filter(
+            CustoObra.admin_id == admin_id,
+            CustoObra.data_custo >= date.today().replace(day=1)
+        ).scalar() or 0
+        
+        # Custos por categoria
+        custos_categoria = db.session.query(
+            CustoObra.tipo_custo,
+            func.sum(CustoObra.valor).label('total')
+        ).filter_by(admin_id=admin_id).group_by(CustoObra.tipo_custo).all()
+        
+        # Top 5 obras com mais custos
+        top_obras = db.session.query(
+            Obra.nome,
+            func.sum(CustoObra.valor).label('total_custos')
+        ).join(CustoObra).filter(
+            CustoObra.admin_id == admin_id
+        ).group_by(Obra.id, Obra.nome).order_by(desc('total_custos')).limit(5).all()
+        
+        return render_template('custos/dashboard.html',
+                             total_custos=total_custos,
+                             custos_mes=custos_mes,
+                             custos_categoria=custos_categoria,
+                             top_obras=top_obras)
+    
+    @custos_bp.route('/obra/<int:obra_id>')
+    @login_required
+    def custos_obra(obra_id):
+        """Custos detalhados de uma obra"""
+        obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first_or_404()
+        
+        # Custos agrupados por tipo
+        custos = db.session.query(CustoObra).filter_by(
+            obra_id=obra_id, 
+            admin_id=current_user.id
+        ).order_by(CustoObra.data_custo.desc()).all()
+        
+        # Agrupar por tipo
+        custos_agrupados = {}
+        total_geral = 0
+        
+        for custo in custos:
+            if custo.tipo_custo not in custos_agrupados:
+                custos_agrupados[custo.tipo_custo] = {
+                    'custos': [],
+                    'total': 0
+                }
+            custos_agrupados[custo.tipo_custo]['custos'].append(custo)
+            custos_agrupados[custo.tipo_custo]['total'] += custo.valor
+            total_geral += custo.valor
+        
+        # Calcular margem (se obra tem valor_contrato)
+        margem_percentual = 0
+        if obra.valor_contrato and obra.valor_contrato > 0:
+            margem_percentual = ((obra.valor_contrato - total_geral) / obra.valor_contrato) * 100
+        
+        return render_template('custos/obra.html',
+                             obra=obra,
+                             custos_agrupados=custos_agrupados,
+                             total_geral=total_geral,
+                             margem_percentual=margem_percentual)
+    
+    @custos_bp.route('/relatorios')
+    @login_required
+    def relatorios_custos():
+        """Relatórios de custos"""
+        # Relatório de margem por obra
+        # Relatório de produtividade
+        # Comparativo orçado vs realizado
+        # Análise de tendências
+        pass
+    
+    # Registrar blueprint
+    app.register_blueprint(custos_bp)
+```
+
+#### **4.2 Módulo Financeiro Completo**
+```python
+def implementar_modulo_financeiro_completo():
+    """
+    Completar interface do módulo financeiro
+    """
+    
+    @financeiro_bp.route('/')
+    @login_required
+    def dashboard_financeiro():
+        """Dashboard financeiro principal"""
+        admin_id = current_user.id
+        
+        # KPIs financeiros
+        total_receber = db.session.query(func.sum(ContaReceber.valor)).filter(
+            ContaReceber.admin_id == admin_id,
+            ContaReceber.status == 'PENDENTE'
+        ).scalar() or 0
+        
+        total_pagar = db.session.query(func.sum(ContaPagar.valor)).filter(
+            ContaPagar.admin_id == admin_id,
+            ContaPagar.status == 'PENDENTE'
+        ).scalar() or 0
+        
+        # Fluxo de caixa próximos 30 dias
+        data_limite = date.today() + timedelta(days=30)
+        
+        entradas_previstas = db.session.query(func.sum(ContaReceber.valor)).filter(
+            ContaReceber.admin_id == admin_id,
+            ContaReceber.status == 'PENDENTE',
+            ContaReceber.data_vencimento <= data_limite
+        ).scalar() or 0
+        
+        saidas_previstas = db.session.query(func.sum(ContaPagar.valor)).filter(
+            ContaPagar.admin_id == admin_id,
+            ContaPagar.status == 'PENDENTE',
+            ContaPagar.data_vencimento <= data_limite
+        ).scalar() or 0
+        
+        saldo_projetado = entradas_previstas - saidas_previstas
+        
+        return render_template('financeiro/dashboard.html',
+                             total_receber=total_receber,
+                             total_pagar=total_pagar,
+                             entradas_previstas=entradas_previstas,
+                             saidas_previstas=saidas_previstas,
+                             saldo_projetado=saldo_projetado)
+    
+    @financeiro_bp.route('/contas-receber')
+    @login_required
+    def contas_receber():
+        """Gestão de contas a receber"""
+        contas = ContaReceber.query.filter_by(admin_id=current_user.id).order_by(
+            ContaReceber.data_vencimento.asc()
+        ).all()
+        
+        return render_template('financeiro/contas_receber.html', contas=contas)
+    
+    @financeiro_bp.route('/contas-pagar')
+    @login_required
+    def contas_pagar():
+        """Gestão de contas a pagar"""
+        contas = ContaPagar.query.filter_by(admin_id=current_user.id).order_by(
+            ContaPagar.data_vencimento.asc()
+        ).all()
+        
+        return render_template('financeiro/contas_pagar.html', contas=contas)
+    
+    @financeiro_bp.route('/fluxo-caixa')
+    @login_required
+    def fluxo_caixa():
+        """Fluxo de caixa projetado"""
+        # Implementar projeção de fluxo de caixa
+        # Gráficos de entrada vs saída
+        # Cenários otimista/realista/pessimista
+        pass
+    
+    @financeiro_bp.route('/dre')
+    @login_required
+    def demonstracao_resultado():
+        """Demonstração de Resultado do Exercício"""
+        # Implementar DRE
+        # Receitas, custos, despesas
+        # Resultado líquido
+        pass
+```
+
+#### **4.3 Almoxarifado - Relatórios Completos**
+```python
+def completar_relatorios_almoxarifado():
+    """
+    Implementar relatórios completos do almoxarifado
+    """
+    
+    @almoxarifado_bp.route('/relatorios')
+    @login_required
+    def relatorios_almoxarifado():
+        """Central de relatórios do almoxarifado"""
+        return render_template('almoxarifado/relatorios.html')
+    
+    @almoxarifado_bp.route('/relatorios/movimentacao')
+    @login_required
+    def relatorio_movimentacao():
+        """Relatório de movimentação por período"""
+        data_inicio = request.args.get('data_inicio', date.today().replace(day=1))
+        data_fim = request.args.get('data_fim', date.today())
+        
+        movimentos = AlmoxarifadoMovimento.query.filter(
+            AlmoxarifadoMovimento.admin_id == current_user.id,
+            AlmoxarifadoMovimento.data_movimento.between(data_inicio, data_fim)
+        ).order_by(AlmoxarifadoMovimento.data_movimento.desc()).all()
+        
+        return render_template('almoxarifado/relatorio_movimentacao.html',
+                             movimentos=movimentos,
+                             data_inicio=data_inicio,
+                             data_fim=data_fim)
+    
+    @almoxarifado_bp.route('/relatorios/estoque-baixo')
+    @login_required
+    def relatorio_estoque_baixo():
+        """Relatório de itens com estoque baixo"""
+        itens_baixo = db.session.query(
+            AlmoxarifadoItem,
+            AlmoxarifadoEstoque.quantidade_atual
+        ).join(AlmoxarifadoEstoque).filter(
+            AlmoxarifadoItem.admin_id == current_user.id,
+            AlmoxarifadoEstoque.quantidade_atual <= AlmoxarifadoItem.estoque_minimo
+        ).all()
+        
+        return render_template('almoxarifado/relatorio_estoque_baixo.html',
+                             itens_baixo=itens_baixo)
+    
+    @almoxarifado_bp.route('/relatorios/funcionario/<int:funcionario_id>')
+    @login_required
+    def relatorio_funcionario(funcionario_id):
+        """Relatório de itens em posse do funcionário"""
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id, 
+            admin_id=current_user.id
+        ).first_or_404()
+        
+        # Itens serializados em posse
+        itens_serializados = db.session.query(AlmoxarifadoEstoque).filter(
+            AlmoxarifadoEstoque.admin_id == current_user.id,
+            AlmoxarifadoEstoque.funcionario_id == funcionario_id,
+            AlmoxarifadoEstoque.numero_serie.isnot(None)
+        ).all()
+        
+        return render_template('almoxarifado/relatorio_funcionario.html',
+                             funcionario=funcionario,
+                             itens_serializados=itens_serializados)
+```
+
+### **FASE 5: LIMPEZA FINAL E OTIMIZAÇÃO**
+
+#### **5.1 Corrigir 60 Warnings LSP**
+```python
+def corrigir_warnings_lsp_completo():
+    """
+    Corrigir todos os warnings detectados no código
+    """
+    
+    # 1. Remover imports não utilizados
+    # Exemplo: from datetime import datetime, date, time
+    # Manter apenas os que são realmente usados
+    
+    # 2. Adicionar type hints
+    def calcular_horas_trabalhadas(entrada: time, saida: time) -> float:
+        """Calcular horas trabalhadas com type hints"""
+        pass
+    
+    # 3. Corrigir nullable explícito
+    # Antes: db.Column(db.String(100))
+    # Depois: db.Column(db.String(100), nullable=False)
+    
+    # 4. Padronizar nomenclatura
+    # Usar snake_case consistente
+    # Evitar nomes ambíguos
+    
+    # 5. Corrigir possíveis problemas de lógica
+    # Verificar condições que sempre são True/False
+    # Corrigir comparações com None
+```
+
+#### **5.2 Corrigir movimento_id=0 no Almoxarifado**
+```python
+def corrigir_movimento_id_almoxarifado():
+    """
+    Corrigir problema de movimento_id=0 identificado
+    """
+    
+    # Investigar e corrigir onde movimento_id está sendo setado como 0
+    # Garantir que sempre seja um ID válido de AlmoxarifadoMovimento
+    
+    # Exemplo de correção:
+    def registrar_saida_material(item_id, quantidade, funcionario_id, obra_id):
+        # Criar movimento primeiro
+        movimento = AlmoxarifadoMovimento(
+            item_id=item_id,
+            tipo_movimento='SAIDA',
+            quantidade=quantidade,
+            funcionario_id=funcionario_id,
+            obra_id=obra_id,
+            admin_id=current_user.id
+        )
+        db.session.add(movimento)
+        db.session.flush()  # Para obter o ID
+        
+        # Usar movimento.id real (não 0)
+        # ... resto da lógica
+```
+
+#### **5.3 Criar Script de Dados de Teste**
+```python
+def criar_dados_teste_completos():
+    """
+    Criar script para popular banco com dados de teste
+    """
+    
+    def seed_database():
+        """Popular banco com dados realistas"""
+        
+        # Admin já existe (ID=33)
+        admin_id = 33
+        
+        # 1. Criar departamentos e funções
+        departamentos = [
+            {'nome': 'Construção Civil', 'descricao': 'Equipe de obra'},
+            {'nome': 'Administrativo', 'descricao': 'Gestão e administração'},
+            {'nome': 'Engenharia', 'descricao': 'Projetos e supervisão'}
+        ]
+        
+        # 2. Criar funcionários
+        funcionarios = [
+            {'nome': 'João Silva', 'email': 'joao@empresa.com', 'funcao': 'Pedreiro'},
+            {'nome': 'Maria Santos', 'email': 'maria@empresa.com', 'funcao': 'Engenheira'},
+            {'nome': 'Pedro Costa', 'email': 'pedro@empresa.com', 'funcao': 'Servente'}
+        ]
+        
+        # 3. Criar obras
+        obras = [
+            {'nome': 'Residencial Park', 'endereco': 'Rua A, 123', 'valor_contrato': 500000},
+            {'nome': 'Edifício Comercial', 'endereco': 'Av. B, 456', 'valor_contrato': 800000}
+        ]
+        
+        # 4. Criar materiais
+        materiais = [
+            {'nome': 'Cimento 50kg', 'categoria': 'MATERIAL', 'tipo_controle': 'CONSUMIVEL'},
+            {'nome': 'Furadeira Bosch', 'categoria': 'FERRAMENTA', 'tipo_controle': 'SERIALIZADO'},
+            {'nome': 'Capacete de Segurança', 'categoria': 'EPI', 'tipo_controle': 'SERIALIZADO'}
+        ]
+        
+        # 5. Criar veículos
+        veiculos = [
+            {'placa': 'ABC-1234', 'modelo': 'Hilux', 'ano': 2020},
+            {'placa': 'DEF-5678', 'modelo': 'Sprinter', 'ano': 2019}
+        ]
+        
+        # Executar inserções...
+```
+
+### **FASE 6: TEMPLATES E INTERFACE**
+
+#### **6.1 Templates Responsivos**
+```html
+<!-- templates/custos/dashboard.html -->
+{% extends "base.html" %}
+
+{% block title %}Dashboard de Custos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-3">Dashboard de Custos</h1>
+        </div>
+    </div>
+    
+    <!-- KPIs -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col mt-0">
+                            <h5 class="card-title">Total de Custos</h5>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stat text-primary">
+                                <i class="align-middle" data-feather="dollar-sign"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <h1 class="mt-1 mb-3">R$ {{ "{:,.2f}".format(total_custos) }}</h1>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col mt-0">
+                            <h5 class="card-title">Custos do Mês</h5>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stat text-success">
+                                <i class="align-middle" data-feather="calendar"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <h1 class="mt-1 mb-3">R$ {{ "{:,.2f}".format(custos_mes) }}</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gráficos e tabelas -->
+    <div class="row">
+        <div class="col-12 col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Custos por Categoria</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartCustoCategoria"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-12 col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Top 5 Obras</h5>
+                </div>
+                <div class="card-body">
+                    {% for obra in top_obras %}
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="bg-light rounded-2 p-2">
+                                <i class="align-middle text-muted" data-feather="home"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <strong>{{ obra.nome }}</strong>
+                            <div class="text-muted">R$ {{ "{:,.2f}".format(obra.total_custos) }}</div>
+                        </div>
+                    </div>
+                    {% if not loop.last %}<hr>{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+---
+
+## 📋 CHECKLIST DE FINALIZAÇÃO
+
+### **FASE 4: INTERFACES**
+- [ ] 🎨 Módulo Custos - Dashboard completo
+- [ ] 🎨 Módulo Custos - Custos por obra
+- [ ] 🎨 Módulo Custos - Relatórios de margem
+- [ ] 💰 Módulo Financeiro - Dashboard
+- [ ] 💰 Módulo Financeiro - Contas a pagar/receber
+- [ ] 💰 Módulo Financeiro - Fluxo de caixa
+- [ ] 💰 Módulo Financeiro - DRE
+- [ ] 📦 Almoxarifado - Relatórios completos
+- [ ] 📦 Almoxarifado - Dashboard com alertas
+
+### **FASE 5: LIMPEZA**
+- [ ] 🧹 Corrigir 60 warnings LSP
+- [ ] 🔧 Corrigir movimento_id=0
+- [ ] 📊 Criar dados de teste
+- [ ] 🎨 Templates responsivos
+- [ ] 📱 Interface mobile-friendly
+
+### **VALIDAÇÃO FINAL**
+- [ ] 🧪 Testes E2E com dados
+- [ ] 📊 Relatórios funcionando
+- [ ] 🔗 Integrações validadas
+- [ ] 🚀 Performance otimizada
+- [ ] ✅ Sistema 100% funcional
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+### **SIGE v9.1 COMPLETO:**
+- ✅ **12 módulos** 100% funcionais
+- ✅ **Event Manager** com integrações automáticas
+- ✅ **Interfaces profissionais** para todos os módulos
+- ✅ **Relatórios completos** e exportáveis
+- ✅ **Dashboard executivo** com KPIs
+- ✅ **Código limpo** sem warnings
+- ✅ **Performance otimizada**
+- ✅ **Pronto para produção**
+
+### **FUNCIONALIDADES EMPRESARIAIS:**
+- 💼 **Gestão completa de obras**
+- 👥 **Controle de funcionários e ponto**
+- 📦 **Almoxarifado com controle FIFO**
+- 🚗 **Gestão de frota integrada**
+- 💰 **Módulo financeiro completo**
+- 📊 **Custos por obra em tempo real**
+- 📋 **Propostas comerciais profissionais**
+- 🍽️ **Controle de alimentação**
+
+---
+
+## 🚀 PROMPT PARA EXECUÇÃO
+
+**Use este prompt no Replit:**
+
+```
+Atue como um desenvolvedor full-stack sênior especialista em finalização de sistemas empresariais. Execute a FINALIZAÇÃO COMPLETA do SIGE v9.1 seguindo EXATAMENTE o plano detalhado acima.
+
+BASEADO NO STATUS ATUAL CONFIRMADO:
+✅ FASE 3 concluída - Event Manager 100% funcional
+✅ 4 handlers implementados e testados
+✅ Bugs críticos corrigidos (FrotaVeiculo → Vehicle)
+✅ Sistema inicializa sem erros
+✅ Migrações 39-43 executadas
+
+OBJETIVO CRÍTICO:
+1. FASE 4: Implementar interfaces completas (Custos, Financeiro, Almoxarifado)
+2. FASE 5: Limpeza final (60 warnings LSP, movimento_id=0)
+3. FASE 6: Templates responsivos e dados de teste
+4. Validação final E2E
+
+ENTREGÁVEIS:
+1. Módulo Custos 100% funcional com dashboard
+2. Módulo Financeiro completo (DRE, Fluxo, Contas)
+3. Relatórios completos do Almoxarifado
+4. Código limpo sem warnings
+5. Sistema 100% pronto para produção
+
+Execute as fases na ordem:
+1. Interfaces de Usuário (Fase 4)
+2. Limpeza e Otimização (Fase 5)
+3. Templates e Dados de Teste (Fase 6)
+4. Validação Final
+
+IMPORTANTE: Transformar o SIGE em um ERP empresarial completamente funcional e polido.
+```
+
+**Esta finalização vai entregar um ERP de nível empresarial 100% funcional!** 🚀✨
