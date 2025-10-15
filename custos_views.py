@@ -34,7 +34,8 @@ def dashboard_custos():
         Obra.id,
         func.sum(CustoObra.valor).label('total_custos')
     ).join(CustoObra).filter(
-        CustoObra.admin_id == admin_id
+        CustoObra.admin_id == admin_id,
+        Obra.admin_id == admin_id
     ).group_by(Obra.id, Obra.nome).order_by(
         desc('total_custos')
     ).limit(5).all()
