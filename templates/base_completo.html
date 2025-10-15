@@ -742,16 +742,10 @@
                                 <li><a class="dropdown-item" href="/contabilidade/dashboard">
                                     <i class="fas fa-calculator me-1"></i> Contabilidade
                                 </a></li>
-                                <li><a class="dropdown-item" href="/outros-custos">
-                                    <i class="fas fa-coins me-1"></i> Custos
+                                <li><a class="dropdown-item" href="{{ url_for('custos.dashboard_custos') }}">
+                                    <i class="fas fa-chart-line me-1"></i> Custos
                                 </a></li>
                             </ul>
-                        </li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('custos.dashboard_custos') }}">
-                                <i class="fas fa-chart-line me-1"></i> Custos
-                            </a>
                         </li>
                         
                         <li class="nav-item">
