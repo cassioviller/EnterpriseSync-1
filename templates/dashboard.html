@@ -650,19 +650,19 @@ html[data-bs-theme="dark"] .header-btn i {
                             <div class="card-body text-center">
                                 <h6 class="text-muted mb-3">Propostas por Status</h6>
                                 <div class="mb-2">
-                                    <span class="badge bg-success">Aprovadas: 30</span>
+                                    <span class="badge bg-success">Aprovadas: {{ propostas_aprovadas }}</span>
                                 </div>
                                 <div class="mb-2">
-                                    <span class="badge bg-primary">Enviadas: 15</span>
+                                    <span class="badge bg-primary">Enviadas: {{ propostas_enviadas }}</span>
                                 </div>
                                 <div class="mb-2">
-                                    <span class="badge bg-secondary">Rascunho: 8</span>
+                                    <span class="badge bg-secondary">Rascunho: {{ propostas_rascunho }}</span>
                                 </div>
                                 <div class="mb-2">
-                                    <span class="badge bg-danger">Rejeitadas: 7</span>
+                                    <span class="badge bg-danger">Rejeitadas: {{ propostas_rejeitadas }}</span>
                                 </div>
                                 <div>
-                                    <span class="badge bg-warning">Expiradas: 5</span>
+                                    <span class="badge bg-warning">Expiradas: {{ propostas_expiradas }}</span>
                                 </div>
                             </div>
                         </div>
@@ -675,19 +675,19 @@ html[data-bs-theme="dark"] .header-btn i {
                                 <h6 class="text-muted mb-3 text-center">Performance Comercial</h6>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <small>Taxa de Conversão:</small>
-                                    <strong class="text-success">67.3%</strong>
+                                    <strong class="text-success">{{ taxa_conversao }}%</strong>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <small>Valor Médio:</small>
-                                    <strong>R$ 125.430</strong>
+                                    <strong>R$ {{ '{:,.2f}'.format(valor_medio).replace(',', '.') }}</strong>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <small>Tempo Resp. Médio:</small>
-                                    <strong>2.3 dias</strong>
+                                    <strong>{{ tempo_resposta_medio }} dias</strong>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <small>Propostas/Mês:</small>
-                                    <strong class="text-primary">13.2</strong>
+                                    <strong class="text-primary">{{ propostas_por_mes }}</strong>
                                 </div>
                             </div>
                         </div>
@@ -698,22 +698,22 @@ html[data-bs-theme="dark"] .header-btn i {
                         <div class="card bg-light h-100">
                             <div class="card-body">
                                 <h6 class="text-muted mb-3 text-center">Templates Populares</h6>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>Estrutura Metálica:</small>
-                                    <span class="badge bg-primary">18x</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>Mezanino:</small>
-                                    <span class="badge bg-secondary">12x</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>Cobertura Gourmet:</small>
-                                    <span class="badge bg-success">8x</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <small>Outros:</small>
-                                    <span class="badge bg-warning">27x</span>
-                                </div>
+                                {% if templates_populares and templates_populares|length > 0 %}
+                                    {% for template in templates_populares[:3] %}
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small>{{ template.nome }}:</small>
+                                        <span class="badge bg-primary">{{ template.uso }}x</span>
+                                    </div>
+                                    {% endfor %}
+                                    {% if outros_templates > 0 %}
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small>Outros:</small>
+                                        <span class="badge bg-warning">{{ outros_templates }}x</span>
+                                    </div>
+                                    {% endif %}
+                                {% else %}
+                                <p class="text-muted text-center mb-0">Nenhum template usado</p>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -725,19 +725,19 @@ html[data-bs-theme="dark"] .header-btn i {
                                 <h6 class="text-muted mb-3 text-center">Portal do Cliente</h6>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <small>Acessos Únicos:</small>
-                                    <strong class="text-info">156</strong>
+                                    <strong class="text-info">{{ acessos_unicos }}</strong>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <small>Tempo Médio:</small>
-                                    <strong>2h 18m</strong>
+                                    <strong>{{ tempo_medio_portal }}</strong>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <small>Feedbacks:</small>
-                                    <span class="badge bg-success">23 positivos</span>
+                                    <span class="badge bg-success">{{ feedbacks_positivos }} positivos</span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <small>Downloads PDF:</small>
-                                    <strong class="text-secondary">89</strong>
+                                    <strong class="text-secondary">{{ downloads_pdf }}</strong>
                                 </div>
                             </div>
                         </div>
