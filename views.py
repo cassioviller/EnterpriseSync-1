@@ -6879,7 +6879,7 @@ def funcionario_rdo_consolidado():
         print(f"DEBUG: Mostrando página {page} com {len(rdos_processados)} RDOs")
         
         # Buscar dados necessários para o template consolidado
-        obras = Obra.query.filter_by(admin_id=admin_id_correto).all()
+        obras = Obra.query.filter_by(admin_id=admin_id_correto, ativo=True).all()
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).all()
         
         # Extrair apenas os RDOs dos dados processados
