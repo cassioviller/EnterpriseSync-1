@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Custos - {{ obra.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{{ obra.nome }}</h1>
+        <a href="{{ url_for('custos.dashboard_custos') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+        </a>
+    </div>
+
+    <!-- Resumo Financeiro -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white shadow">
+                <div class="card-body">
+                    <div class="text-white-50 small">Valor do Contrato</div>
+                    <div class="h4">R$ {{ "{:,.2f}".format(obra.valor_contrato or 0) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white shadow">
+                <div class="card-body">
+                    <div class="text-white-50 small">Total de Custos</div>
+                    <div class="h4">R$ {{ "{:,.2f}".format(total_geral) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-{% if margem_percentual >= 0 %}success{% else %}warning{% endif %} text-white shadow">
+                <div class="card-body">
+                    <div class="text-white-50 small">Margem</div>
+                    <div class="h4">{{ "{:+.1f}".format(margem_percentual) }}%</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white shadow">
+                <div class="card-body">
+                    <div class="text-white-50 small">Total de Lançamentos</div>
+                    <div class="h4">{{ total_custos }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custos por Categoria -->
+    {% for tipo, dados in custos_agrupados.items() %}
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">
+                {{ tipo.replace('_', ' ').title() }}
+            </h6>
+            <div class="dropdown no-arrow">
+                <span class="badge badge-primary badge-pill">
+                    {{ dados.quantidade }} lançamentos - R$ {{ "{:,.2f}".format(dados.total) }}
+                </span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Funcionário</th>
+                            <th>Quantidade</th>
+                            <th>Valor Unit.</th>
+                            <th>Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for custo in dados.custos %}
+                        <tr>
+                            <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ custo.descricao }}</td>
+                            <td>
+                                {% if custo.funcionario %}
+                                    {{ custo.funcionario.nome }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ custo.quantidade or 1 }}</td>
+                            <td>R$ {{ "{:,.2f}".format(custo.valor_unitario or custo.valor) }}</td>
+                            <td>R$ {{ "{:,.2f}".format(custo.valor) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not custos_agrupados %}
+    <div class="card shadow">
+        <div class="card-body text-center">
+            <i class="fas fa-info-circle fa-3x text-gray-300 mb-3"></i>
+            <h5>Nenhum custo registrado</h5>
+            <p class="text-muted">Esta obra ainda não possui custos registrados.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
