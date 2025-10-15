@@ -20,6 +20,9 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Ambiente de produção com 80 tabelas deve ser preservado durante migrações
 
 ## Recent Changes
+- **2025-10-15:** Folha de Pagamento v2.0 - Processamento real com cálculos automáticos (INSS progressivo, IRRF com deduções, FGTS 8%, horas extras, DSR). Integração completa com Ponto Eletrônico para cálculo automático de horas trabalhadas, extras e faltas. Event-driven integration para lançamentos contábeis automáticos.
+- **2025-10-15:** Contabilidade Automática - Sistema de lançamentos contábeis com partidas dobradas automáticas a partir da folha de pagamento. Handler de eventos `folha_processada` cria lançamentos (débito em despesas, crédito em salários a pagar/INSS/IRRF) e aloca custos às obras automaticamente.
+- **2025-10-15:** DRE Automática - Demonstração do Resultado do Exercício calculada automaticamente a partir dos lançamentos contábeis. Agrupa contas por prefixo (Receitas 4.x, Custos 3.1.x, Despesas 3.2.x) e calcula lucro bruto e líquido mensalmente.
 - **2025-10-15:** Toggle Ativo/Finalizado em Obras - Botão fácil na página de detalhes permite alternar status da obra entre ATIVO (verde) e FINALIZADO (cinza). Obras finalizadas são automaticamente removidas de todos os dropdowns do sistema (RDO, Almoxarifado, Financeiro, etc).
 - **2025-10-15:** Dashboard fully dynamized - All proposal KPIs now calculated from live database (status counts, conversion rate, average value, template usage, portal analytics). Replaced all hardcoded values with real-time queries scoped by tenant admin_id.
 - **2025-10-15:** Dashboard reorganized by module - KPIs now grouped in clear sections with Financeiro e Custos as first priority, followed by Visão Geral, Recursos Humanos, Obras e RDO, and Propostas Comerciais as last. Green gradient section headers (#10b981 to #059669) for improved scannability and brand alignment.
@@ -33,8 +36,9 @@ The system uses a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with J
 -   **Event-Driven Integration System (v9.0):** `EventManager` (event_manager.py) implements Observer Pattern for automated cross-module integration. Active integrations:
     -   Almoxarifado → Custos: Material withdrawals emit `material_saida` events with cost tracking
     -   Frota → Custos: Vehicle usage emits `veiculo_usado` events calculating fuel/wear costs (R$0.80/km)
-    -   Handlers use structured logging for audit trail until full Cost Management module is implemented
-    -   4 events registered at startup: material_saida, veiculo_usado, ponto_registrado, proposta_aprovada
+    -   Folha de Pagamento → Contabilidade → Custos: Payroll processing emits `folha_processada` events creating double-entry accounting records and obra cost allocation
+    -   Handlers use structured logging for audit trail and maintain transactional integrity
+    -   5 events registered at startup: material_saida, veiculo_usado, ponto_registrado, proposta_aprovada, folha_processada
 -   **UI/UX Design:** Professional design system following modern UX/UI guidelines, including responsive grid layouts, modular components, a cohesive color palette (primary green #198754), hierarchical typography, consistent spacing, advanced visual states, real-time validation, and WCAG accessibility. Mobile-First Design is applied for modules like RDO, optimizing for touch and including PWA meta tags.
 -   **Automated Database Migrations:** `migrations.py` handles schema updates automatically at application initialization, logging all operations and optimized for quick startup.
 -   **Core Modules:**
