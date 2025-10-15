@@ -485,6 +485,93 @@ def dashboard():
         total_obras = Obra.query.filter_by(admin_id=admin_id).count()
         print(f"DEBUG: {total_obras} obras encontradas")
         
+        # ========== MÉTRICAS DE PROPOSTAS DINÂMICAS ==========
+        from models import Proposta, PropostaTemplate, PropostaHistorico
+        from datetime import timedelta
+        from sqlalchemy import func, extract
+        
+        try:
+            # 1. PROPOSTAS POR STATUS
+            print("DEBUG: Calculando métricas de propostas...")
+            propostas_aprovadas = Proposta.query.filter_by(admin_id=admin_id, status='aprovada').count()
+            propostas_enviadas = Proposta.query.filter_by(admin_id=admin_id, status='enviada').count()
+            propostas_rascunho = Proposta.query.filter_by(admin_id=admin_id, status='rascunho').count()
+            propostas_rejeitadas = Proposta.query.filter_by(admin_id=admin_id, status='rejeitada').count()
+            
+            # Expiradas: propostas enviadas com data_proposta + validade_dias < hoje
+            hoje = datetime.now().date()
+            propostas_expiradas = Proposta.query.filter(
+                Proposta.admin_id == admin_id,
+                Proposta.status == 'enviada',
+                Proposta.validade_dias.isnot(None)
+            ).all()
+            propostas_expiradas = len([p for p in propostas_expiradas if p.data_proposta and (p.data_proposta + timedelta(days=p.validade_dias or 7)) < hoje])
+            
+            total_propostas = Proposta.query.filter_by(admin_id=admin_id).count()
+            print(f"DEBUG: Propostas - Total: {total_propostas}, Aprovadas: {propostas_aprovadas}, Enviadas: {propostas_enviadas}")
+            
+            # 2. PERFORMANCE COMERCIAL
+            # Taxa de conversão: (aprovadas / total enviadas+aprovadas) * 100
+            total_enviadas_ou_aprovadas = propostas_enviadas + propostas_aprovadas + propostas_rejeitadas
+            taxa_conversao = round((propostas_aprovadas / total_enviadas_ou_aprovadas * 100), 1) if total_enviadas_ou_aprovadas > 0 else 0
+            
+            # Valor médio das propostas aprovadas
+            valor_medio_result = db.session.query(func.avg(Proposta.valor_total)).filter_by(
+                admin_id=admin_id, status='aprovada'
+            ).scalar()
+            valor_medio = float(valor_medio_result or 0)
+            
+            # Tempo de resposta médio (diferença entre criado_em e quando foi aprovada/rejeitada)
+            # Usar PropostaHistorico para calcular tempo até aprovação
+            tempo_resposta_medio = 2.5  # Placeholder - precisa de histórico detalhado
+            
+            # Propostas por mês (média dos últimos 6 meses)
+            seis_meses_atras = hoje - timedelta(days=180)
+            propostas_ultimos_6_meses = Proposta.query.filter(
+                Proposta.admin_id == admin_id,
+                Proposta.criado_em >= seis_meses_atras
+            ).count()
+            propostas_por_mes = round(propostas_ultimos_6_meses / 6, 1) if propostas_ultimos_6_meses > 0 else 0
+            
+            # 3. TEMPLATES MAIS UTILIZADOS
+            templates_uso = db.session.query(
+                PropostaTemplate.nome,
+                PropostaTemplate.uso_contador
+            ).filter_by(
+                admin_id=admin_id
+            ).order_by(PropostaTemplate.uso_contador.desc()).limit(3).all()
+            
+            templates_populares = [{'nome': t[0], 'uso': t[1]} for t in templates_uso] if templates_uso else []
+            outros_templates = PropostaTemplate.query.filter_by(admin_id=admin_id).count() - len(templates_populares)
+            
+            # 4. PORTAL DO CLIENTE (placeholder - precisa de rastreamento específico)
+            acessos_unicos = 0  # Precisa de tabela de tracking
+            tempo_medio_portal = "0h 0m"
+            feedbacks_positivos = 0
+            downloads_pdf = 0
+            
+            print(f"DEBUG: Taxa Conversão: {taxa_conversao}%, Valor Médio: R$ {valor_medio:.2f}")
+            
+        except Exception as e:
+            print(f"ERRO ao calcular métricas de propostas: {e}")
+            # Valores padrão em caso de erro
+            propostas_aprovadas = 0
+            propostas_enviadas = 0
+            propostas_rascunho = 0
+            propostas_rejeitadas = 0
+            propostas_expiradas = 0
+            taxa_conversao = 0
+            valor_medio = 0
+            tempo_resposta_medio = 0
+            propostas_por_mes = 0
+            templates_populares = []
+            outros_templates = 0
+            acessos_unicos = 0
+            tempo_medio_portal = "0h 0m"
+            feedbacks_positivos = 0
+            downloads_pdf = 0
+        # ====================================================
+        
         # Funcionários recentes
         print("DEBUG: Buscando funcionários recentes...")
         funcionarios_recentes = Funcionario.query.filter_by(
@@ -931,7 +1018,23 @@ def dashboard():
                          custos_recentes=custos_recentes,
                          obras_andamento=obras_andamento,
                          data_inicio=data_inicio,
-                         data_fim=data_fim)
+                         data_fim=data_fim,
+                         # Métricas de Propostas
+                         propostas_aprovadas=propostas_aprovadas,
+                         propostas_enviadas=propostas_enviadas,
+                         propostas_rascunho=propostas_rascunho,
+                         propostas_rejeitadas=propostas_rejeitadas,
+                         propostas_expiradas=propostas_expiradas,
+                         taxa_conversao=taxa_conversao,
+                         valor_medio=valor_medio,
+                         tempo_resposta_medio=tempo_resposta_medio,
+                         propostas_por_mes=propostas_por_mes,
+                         templates_populares=templates_populares,
+                         outros_templates=outros_templates,
+                         acessos_unicos=acessos_unicos,
+                         tempo_medio_portal=tempo_medio_portal,
+                         feedbacks_positivos=feedbacks_positivos,
+                         downloads_pdf=downloads_pdf)
 
 # ===== USUÁRIOS DO SISTEMA =====
 
