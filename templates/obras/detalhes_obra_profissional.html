@@ -977,6 +977,14 @@
                         <i class="fas fa-edit"></i>
                         Editar Obra
                     </a>
+                    
+                    <form method="POST" action="{{ url_for('main.toggle_status_obra', id=obra.id) }}" style="display: inline;">
+                        <button type="submit" class="btn-modern {% if obra.ativo %}btn-success-modern{% else %}btn-secondary{% endif %}">
+                            <i class="fas {% if obra.ativo %}fa-check-circle{% else %}fa-power-off{% endif %}"></i>
+                            {% if obra.ativo %}ATIVO{% else %}FINALIZADO{% endif %}
+                        </button>
+                    </form>
+                    
                     <button type="button" id="btnGerenciarServicosObra" class="btn-modern btn-outline-modern" data-bs-toggle="modal" data-bs-target="#modalGerenciarServicos" style="border: none;">
                         <i class="fas fa-cogs"></i>
                         Gerenciar Serviços da Obra

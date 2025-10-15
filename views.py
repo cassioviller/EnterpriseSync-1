@@ -2498,6 +2498,28 @@ def excluir_obra(id):
         flash(f'Erro ao excluir obra: {str(e)}', 'error')
         return redirect(url_for('main.obras'))
 
+# Toggle Ativo/Finalizado de Obra
+@main_bp.route('/obras/toggle-status/<int:id>', methods=['POST'])
+@login_required
+def toggle_status_obra(id):
+    """Alterna status ativo/finalizado da obra"""
+    try:
+        obra = Obra.query.get_or_404(id)
+        
+        # Alternar o status ativo
+        obra.ativo = not obra.ativo
+        db.session.commit()
+        
+        status_texto = "ATIVO" if obra.ativo else "FINALIZADO"
+        flash(f'Obra "{obra.nome}" alterada para {status_texto}!', 'success')
+        
+        return redirect(url_for('main.detalhes_obra', id=id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao alterar status da obra: {str(e)}', 'error')
+        return redirect(url_for('main.detalhes_obra', id=id))
+
 # Detalhes de uma obra específica
 @main_bp.route('/obras/<int:id>')
 @main_bp.route('/obras/detalhes/<int:id>')
