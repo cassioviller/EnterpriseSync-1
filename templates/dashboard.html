@@ -38,6 +38,7 @@
         </div>
     </div>
 </div>
+
 <style>
 /* Correção de alinhamento para botões do header */
 .header-btn {
@@ -142,6 +143,25 @@ html[data-bs-theme="dark"] .header-btn i {
     align-items: center !important;
     margin-bottom: 0 !important;
 }
+
+/* Estilo para títulos de seção */
+.section-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section-header h4 {
+    margin: 0;
+    font-weight: 600;
+}
+
+.section-header i {
+    margin-right: 8px;
+}
 </style>
 
 <div class="container-fluid">
@@ -197,576 +217,504 @@ html[data-bs-theme="dark"] .header-btn i {
         </div>
     </div>
 
-    <!-- KPIs Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h5 class="card-title mb-0">Funcionários Ativos</h5>
-                        <h2 class="mb-0">{{ total_funcionarios }}</h2>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-users fa-2x opacity-75"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <!-- 📈 VISÃO GERAL - KPIs Principais -->
+    <div class="section-header">
+        <h4><i class="fas fa-chart-line"></i> Visão Geral</h4>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h5 class="card-title mb-0">Obras Ativas</h5>
-                        <h2 class="mb-0">{{ total_obras }}</h2>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-hard-hat fa-2x opacity-75"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card bg-warning text-dark">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h5 class="card-title mb-0">Veículos</h5>
-                        <h2 class="mb-0">{{ total_veiculos }}</h2>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-truck fa-2x opacity-75"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h5 class="card-title mb-0">Custos do Período</h5>
-                        <h2 class="mb-0">R$ {{ '{:,.2f}'.format(custos_mes).replace(',', '.') }}</h2>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Custos Detalhados -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-pie"></i> Custos Detalhados do Período
-                </h5>
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h5 class="card-title mb-0">Funcionários Ativos</h5>
+                            <h2 class="mb-0">{{ total_funcionarios }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-users fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-2">
-                        <div class="text-center">
-                            <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
-                            <h6>Alimentação</h6>
-                            <h5 class="text-warning">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h5>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h5 class="card-title mb-0">Obras Ativas</h5>
+                            <h2 class="mb-0">{{ total_obras }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-hard-hat fa-2x opacity-75"></i>
                         </div>
                     </div>
-                    <div class="col-md-2">
-                        <div class="text-center">
-                            <i class="fas fa-car fa-2x text-info mb-2"></i>
-                            <h6>Transporte</h6>
-                            <h5 class="text-info">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h5>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h5 class="card-title mb-0">Veículos</h5>
+                            <h2 class="mb-0">{{ total_veiculos }}</h2>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-truck fa-2x opacity-75"></i>
                         </div>
                     </div>
-                    <div class="col-md-2">
-                        <div class="text-center">
-                            <i class="fas fa-users fa-2x text-success mb-2"></i>
-                            <h6>Mão de Obra</h6>
-                            <h5 class="text-success">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h5>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h5 class="card-title mb-0">Custos do Período</h5>
+                            <h2 class="mb-0">R$ {{ '{:,.2f}'.format(custos_mes).replace(',', '.') }}</h2>
                         </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="text-center">
-                            <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
-                            <h6>Faltas Justificadas</h6>
-                            <h5 class="text-warning">{{ custos_detalhados.faltas_justificadas_qtd if custos_detalhados.faltas_justificadas_qtd is defined else 0 }} dias</h5>
-                            <small class="text-muted">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas if custos_detalhados.faltas_justificadas is defined else 0).replace(',', '.') }}</small>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="text-center">
-                            <i class="fas fa-cogs fa-2x text-secondary mb-2"></i>
-                            <h6>Outros</h6>
-                            <h5 class="text-secondary">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</h5>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="text-center">
-                            <i class="fas fa-calculator fa-2x text-primary mb-2"></i>
-                            <h6>Total</h6>
-                            <h5 class="text-primary">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</h5>
+                        <div class="ms-3">
+                            <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Charts Row -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-pie"></i> Funcionários por Departamento
-                </h5>
-            </div>
-            <div class="card-body">
-                <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
-            </div>
-        </div>
+    <!-- 📋 PROPOSTAS COMERCIAIS -->
+    <div class="section-header">
+        <h4><i class="fas fa-file-contract"></i> Propostas Comerciais</h4>
     </div>
-    
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-bar"></i> Custos por Obra
-                </h5>
-            </div>
-            <div class="card-body">
-                <canvas id="custosObraChart" width="400" height="200"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Relatórios Comerciais Row -->
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-file-contract"></i> Status de Propostas
-                </h5>
-            </div>
-            <div class="card-body">
-                <canvas id="propostasStatusChart" width="300" height="150"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-line"></i> Taxa de Conversão
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="text-center">
-                    <h2 class="text-success mb-2">67.3%</h2>
-                    <p class="text-muted mb-0">Propostas Aprovadas</p>
-                    <div class="progress mt-2">
-                        <div class="progress-bar bg-success" role="progressbar" style="width: 67.3%"></div>
-                    </div>
-                </div>
-                <hr>
-                <div class="row text-center">
-                    <div class="col-6">
-                        <small class="text-muted d-block">Enviadas</small>
-                        <strong>45</strong>
-                    </div>
-                    <div class="col-6">
-                        <small class="text-muted d-block">Aprovadas</small>
-                        <strong>30</strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-templates"></i> Templates Populares
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="list-group list-group-flush">
-                    <div class="list-group-item d-flex justify-content-between align-items-center p-2">
-                        <small>Estrutura Metálica</small>
-                        <span class="badge bg-primary">18</span>
-                    </div>
-                    <div class="list-group-item d-flex justify-content-between align-items-center p-2">
-                        <small>Mezanino</small>
-                        <span class="badge bg-secondary">12</span>
-                    </div>
-                    <div class="list-group-item d-flex justify-content-between align-items-center p-2">
-                        <small>Cobertura Gourmet</small>
-                        <span class="badge bg-success">8</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Analytics Avançados Row -->
-<div class="row mb-4">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-area"></i> Evolução de Propostas (Últimos 6 Meses)
-                </h5>
-            </div>
-            <div class="card-body">
-                <canvas id="evolucaoPropostasChart" width="600" height="300"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-users"></i> Portal do Cliente
-                </h5>
-            </div>
-            <div class="card-body">
-                <!-- Métricas do Portal -->
-                <div class="row text-center mb-3">
-                    <div class="col-6">
-                        <h4 class="text-primary mb-1">156</h4>
-                        <small class="text-muted">Acessos Únicos</small>
-                    </div>
-                    <div class="col-6">
-                        <h4 class="text-success mb-1">2.3h</h4>
-                        <small class="text-muted">Tempo Médio</small>
-                    </div>
-                </div>
-                
-                <!-- Atividade Recente -->
-                <h6 class="text-muted mb-2">Atividade Recente</h6>
-                <div class="list-group list-group-flush">
-                    <div class="list-group-item px-0 py-2">
-                        <div class="d-flex justify-content-between">
-                            <small><strong>Cliente ABC Ltda</strong></small>
-                            <small class="text-muted">2h atrás</small>
-                        </div>
-                        <small class="text-success">✓ Proposta aprovada</small>
-                    </div>
-                    <div class="list-group-item px-0 py-2">
-                        <div class="d-flex justify-content-between">
-                            <small><strong>Construtora XYZ</strong></small>
-                            <small class="text-muted">5h atrás</small>
-                        </div>
-                        <small class="text-info">👀 Visualizou proposta</small>
-                    </div>
-                    <div class="list-group-item px-0 py-2">
-                        <div class="d-flex justify-content-between">
-                            <small><strong>Eng. João Silva</strong></small>
-                            <small class="text-muted">1d atrás</small>
-                        </div>
-                        <small class="text-warning">⏳ Aguardando resposta</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Tables Row -->
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-hard-hat"></i> Progresso das Obras
-                </h5>
-                <small class="text-muted">Baseado no último RDO</small>
-            </div>
-            <div class="card-body">
-                {% if obras_ativas %}
-                    {% for obra in obras_ativas %}
-                    <div class="mb-3 p-3 border rounded">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1">{{ obra.nome }}</h6>
-                                <div class="d-flex gap-3">
-                                    {% if obra.data_ultimo_rdo %}
-                                    <small class="text-muted">
-                                        <i class="fas fa-calendar-day"></i> 
-                                        Último RDO: {{ obra.data_ultimo_rdo.strftime('%d/%m/%Y') }}
-                                    </small>
-                                    {% endif %}
-                                    {% if obra.total_subatividades > 0 %}
-                                    <small class="text-muted">
-                                        <i class="fas fa-tasks"></i> 
-                                        {{ obra.total_subatividades }} atividades
-                                    </small>
-                                    {% endif %}
+    <!-- Métricas Detalhadas de Propostas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Resumo de Propostas -->
+                        <div class="col-md-3">
+                            <div class="card bg-light h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted mb-3">Propostas por Status</h6>
+                                    <div class="mb-2">
+                                        <span class="badge bg-success">Aprovadas: {{ propostas_aprovadas }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="badge bg-primary">Enviadas: {{ propostas_enviadas }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="badge bg-secondary">Rascunho: {{ propostas_rascunho }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="badge bg-danger">Rejeitadas: {{ propostas_rejeitadas }}</span>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-warning">Expiradas: {{ propostas_expiradas }}</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="text-end">
-                                <h5 class="mb-0 
-                                    {% if obra.progresso_atual >= 80 %}text-success
-                                    {% elif obra.progresso_atual >= 50 %}text-warning
-                                    {% elif obra.progresso_atual >= 25 %}text-info
-                                    {% else %}text-secondary
-                                    {% endif %}">
-                                    {{ obra.progresso_atual }}%
-                                </h5>
                             </div>
                         </div>
                         
-                        <!-- Barra de Progresso -->
-                        <div class="progress" style="height: 8px;">
-                            <div class="progress-bar 
-                                {% if obra.progresso_atual >= 80 %}bg-success
-                                {% elif obra.progresso_atual >= 50 %}bg-warning
-                                {% elif obra.progresso_atual >= 25 %}bg-info
-                                {% else %}bg-secondary
-                                {% endif %}" 
-                                role="progressbar" 
-                                style="width: {{ obra.progresso_atual }}%"
-                                aria-valuenow="{{ obra.progresso_atual }}" 
-                                aria-valuemin="0" 
-                                aria-valuemax="100">
-                            </div>
-                        </div>
-                        
-                        <!-- Status da obra -->
-                        <div class="mt-2 d-flex justify-content-between align-items-center">
-                            <div>
-                                {% if obra.progresso_atual == 0 %}
-                                <span class="badge bg-secondary">
-                                    <i class="fas fa-clock"></i> Sem RDO registrado
-                                </span>
-                                {% elif obra.progresso_atual < 25 %}
-                                <span class="badge bg-light text-dark">
-                                    <i class="fas fa-play"></i> Iniciada
-                                </span>
-                                {% elif obra.progresso_atual < 50 %}
-                                <span class="badge bg-info">
-                                    <i class="fas fa-cogs"></i> Em desenvolvimento
-                                </span>
-                                {% elif obra.progresso_atual < 80 %}
-                                <span class="badge bg-warning">
-                                    <i class="fas fa-forward"></i> Avançada
-                                </span>
-                                {% elif obra.progresso_atual < 100 %}
-                                <span class="badge bg-success">
-                                    <i class="fas fa-check-circle"></i> Quase concluída
-                                </span>
-                                {% else %}
-                                <span class="badge bg-success">
-                                    <i class="fas fa-trophy"></i> Concluída
-                                </span>
-                                {% endif %}
-                            </div>
-                            <div>
-                                <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-eye"></i> Ver RDOs
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-hard-hat fa-3x text-muted mb-3"></i>
-                        <h6 class="text-muted">Nenhuma obra ativa</h6>
-                        <p class="text-muted mb-0">Cadastre obras para acompanhar o progresso</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-dollar-sign"></i> Custos Recentes
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if custos_recentes %}
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Obra</th>
-                                    <th>Custo Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for custo in custos_recentes %}
-                                <tr>
-                                    <td>{{ custo.nome }}</td>
-                                    <td>R$ {{ '{:,.2f}'.format(custo.total_custo) }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <p class="text-muted mb-0">Nenhum custo registrado.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Seção de Métricas Detalhadas de Propostas -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-chart-pie"></i> Métricas Detalhadas - Sistema de Propostas
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <!-- Resumo de Propostas -->
-                    <div class="col-md-3">
-                        <div class="card bg-light h-100">
-                            <div class="card-body text-center">
-                                <h6 class="text-muted mb-3">Propostas por Status</h6>
-                                <div class="mb-2">
-                                    <span class="badge bg-success">Aprovadas: {{ propostas_aprovadas }}</span>
-                                </div>
-                                <div class="mb-2">
-                                    <span class="badge bg-primary">Enviadas: {{ propostas_enviadas }}</span>
-                                </div>
-                                <div class="mb-2">
-                                    <span class="badge bg-secondary">Rascunho: {{ propostas_rascunho }}</span>
-                                </div>
-                                <div class="mb-2">
-                                    <span class="badge bg-danger">Rejeitadas: {{ propostas_rejeitadas }}</span>
-                                </div>
-                                <div>
-                                    <span class="badge bg-warning">Expiradas: {{ propostas_expiradas }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Performance Comercial -->
-                    <div class="col-md-3">
-                        <div class="card bg-light h-100">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-3 text-center">Performance Comercial</h6>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>Taxa de Conversão:</small>
-                                    <strong class="text-success">{{ taxa_conversao }}%</strong>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>Valor Médio:</small>
-                                    <strong>R$ {{ '{:,.2f}'.format(valor_medio).replace(',', '.') }}</strong>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>Tempo Resp. Médio:</small>
-                                    <strong>{{ tempo_resposta_medio }} dias</strong>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <small>Propostas/Mês:</small>
-                                    <strong class="text-primary">{{ propostas_por_mes }}</strong>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Templates Mais Utilizados -->
-                    <div class="col-md-3">
-                        <div class="card bg-light h-100">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-3 text-center">Templates Populares</h6>
-                                {% if templates_populares and templates_populares|length > 0 %}
-                                    {% for template in templates_populares[:3] %}
+                        <!-- Performance Comercial -->
+                        <div class="col-md-3">
+                            <div class="card bg-light h-100">
+                                <div class="card-body">
+                                    <h6 class="text-muted mb-3 text-center">Performance Comercial</h6>
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <small>{{ template.nome }}:</small>
-                                        <span class="badge bg-primary">{{ template.uso }}x</span>
+                                        <small>Taxa de Conversão:</small>
+                                        <strong class="text-success">{{ taxa_conversao }}%</strong>
                                     </div>
-                                    {% endfor %}
-                                    {% if outros_templates > 0 %}
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small>Valor Médio:</small>
+                                        <strong>R$ {{ '{:,.2f}'.format(valor_medio).replace(',', '.') }}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small>Tempo Resp. Médio:</small>
+                                        <strong>{{ tempo_resposta_medio }} dias</strong>
+                                    </div>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <small>Outros:</small>
-                                        <span class="badge bg-warning">{{ outros_templates }}x</span>
+                                        <small>Propostas/Mês:</small>
+                                        <strong class="text-primary">{{ propostas_por_mes }}</strong>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Templates Mais Utilizados -->
+                        <div class="col-md-3">
+                            <div class="card bg-light h-100">
+                                <div class="card-body">
+                                    <h6 class="text-muted mb-3 text-center">Templates Populares</h6>
+                                    {% if templates_populares and templates_populares|length > 0 %}
+                                        {% for template in templates_populares[:3] %}
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <small>{{ template.nome }}:</small>
+                                            <span class="badge bg-primary">{{ template.uso }}x</span>
+                                        </div>
+                                        {% endfor %}
+                                        {% if outros_templates > 0 %}
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <small>Outros:</small>
+                                            <span class="badge bg-warning">{{ outros_templates }}x</span>
+                                        </div>
+                                        {% endif %}
+                                    {% else %}
+                                    <p class="text-muted text-center mb-0">Nenhum template usado</p>
                                     {% endif %}
-                                {% else %}
-                                <p class="text-muted text-center mb-0">Nenhum template usado</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Portal do Cliente - Métricas -->
-                    <div class="col-md-3">
-                        <div class="card bg-light h-100">
-                            <div class="card-body">
-                                <h6 class="text-muted mb-3 text-center">Portal do Cliente</h6>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>Acessos Únicos:</small>
-                                    <strong class="text-info">{{ acessos_unicos }}</strong>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>Tempo Médio:</small>
-                                    <strong>{{ tempo_medio_portal }}</strong>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <small>Feedbacks:</small>
-                                    <span class="badge bg-success">{{ feedbacks_positivos }} positivos</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <small>Downloads PDF:</small>
-                                    <strong class="text-secondary">{{ downloads_pdf }}</strong>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Botões de Ações Avançadas -->
-                <div class="row mt-3">
-                    <div class="col-12">
-                        <div class="d-flex justify-content-center gap-2 flex-wrap">
-                            <a href="#" class="btn btn-outline-success btn-sm">
-                                <i class="fas fa-file-export"></i> Exportar Relatório Completo
-                            </a>
-                            <a href="#" class="btn btn-outline-info btn-sm">
-                                <i class="fas fa-envelope-bulk"></i> Campanhas de Email
-                            </a>
-                            <a href="#" class="btn btn-outline-warning btn-sm">
-                                <i class="fas fa-cog"></i> Configurar Templates
-                            </a>
-                            <a href="#" class="btn btn-outline-primary btn-sm">
-                                <i class="fas fa-chart-line"></i> Analytics Avançado
-                            </a>
+                        
+                        <!-- Portal do Cliente - Métricas -->
+                        <div class="col-md-3">
+                            <div class="card bg-light h-100">
+                                <div class="card-body">
+                                    <h6 class="text-muted mb-3 text-center">Portal do Cliente</h6>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small>Acessos Únicos:</small>
+                                        <strong class="text-info">{{ acessos_unicos }}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small>Tempo Médio:</small>
+                                        <strong>{{ tempo_medio_portal }}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small>Feedbacks:</small>
+                                        <span class="badge bg-success">{{ feedbacks_positivos }} positivos</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small>Downloads PDF:</small>
+                                        <strong class="text-secondary">{{ downloads_pdf }}</strong>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- Gráficos de Propostas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Status de Propostas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="propostasStatusChart" width="300" height="150"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-area"></i> Evolução de Propostas (Últimos 6 Meses)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="evolucaoPropostasChart" width="600" height="150"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 👥 RECURSOS HUMANOS -->
+    <div class="section-header">
+        <h4><i class="fas fa-users"></i> Recursos Humanos</h4>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Funcionários por Departamento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user-plus"></i> Funcionários Recentes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if funcionarios_recentes %}
+                        <div class="list-group list-group-flush">
+                            {% for func in funcionarios_recentes %}
+                            <div class="list-group-item px-0 py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ func.nome }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ func.cargo }}</small>
+                                    </div>
+                                    <small class="text-muted">
+                                        {{ func.data_admissao.strftime('%d/%m/%Y') if func.data_admissao else 'N/A' }}
+                                    </small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">Nenhum funcionário recente.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🏗️ OBRAS E RDO -->
+    <div class="section-header">
+        <h4><i class="fas fa-hard-hat"></i> Obras e RDO</h4>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tasks"></i> Progresso das Obras
+                    </h5>
+                    <small class="text-muted">Baseado no último RDO</small>
+                </div>
+                <div class="card-body">
+                    {% if obras_ativas %}
+                        <div class="row">
+                        {% for obra in obras_ativas %}
+                            <div class="col-md-6 mb-3">
+                                <div class="p-3 border rounded h-100">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ obra.nome }}</h6>
+                                            <div class="d-flex gap-3">
+                                                {% if obra.data_ultimo_rdo %}
+                                                <small class="text-muted">
+                                                    <i class="fas fa-calendar-day"></i> 
+                                                    Último RDO: {{ obra.data_ultimo_rdo.strftime('%d/%m/%Y') }}
+                                                </small>
+                                                {% endif %}
+                                                {% if obra.total_subatividades > 0 %}
+                                                <small class="text-muted">
+                                                    <i class="fas fa-tasks"></i> 
+                                                    {{ obra.total_subatividades }} atividades
+                                                </small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <h5 class="mb-0 
+                                                {% if obra.progresso_atual >= 80 %}text-success
+                                                {% elif obra.progresso_atual >= 50 %}text-warning
+                                                {% elif obra.progresso_atual >= 25 %}text-info
+                                                {% else %}text-secondary
+                                                {% endif %}">
+                                                {{ obra.progresso_atual }}%
+                                            </h5>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Barra de Progresso -->
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar 
+                                            {% if obra.progresso_atual >= 80 %}bg-success
+                                            {% elif obra.progresso_atual >= 50 %}bg-warning
+                                            {% elif obra.progresso_atual >= 25 %}bg-info
+                                            {% else %}bg-secondary
+                                            {% endif %}" 
+                                            role="progressbar" 
+                                            style="width: {{ obra.progresso_atual }}%"
+                                            aria-valuenow="{{ obra.progresso_atual }}" 
+                                            aria-valuemin="0" 
+                                            aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Status da obra -->
+                                    <div class="mt-2 d-flex justify-content-between align-items-center">
+                                        <div>
+                                            {% if obra.progresso_atual == 0 %}
+                                            <span class="badge bg-secondary">
+                                                <i class="fas fa-clock"></i> Sem RDO registrado
+                                            </span>
+                                            {% elif obra.progresso_atual < 25 %}
+                                            <span class="badge bg-light text-dark">
+                                                <i class="fas fa-play"></i> Iniciada
+                                            </span>
+                                            {% elif obra.progresso_atual < 50 %}
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-cogs"></i> Em desenvolvimento
+                                            </span>
+                                            {% elif obra.progresso_atual < 80 %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-forward"></i> Avançada
+                                            </span>
+                                            {% elif obra.progresso_atual < 100 %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check-circle"></i> Quase concluída
+                                            </span>
+                                            {% else %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-trophy"></i> Concluída
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> Ver RDOs
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-hard-hat fa-3x text-muted mb-3"></i>
+                            <h6 class="text-muted">Nenhuma obra ativa</h6>
+                            <p class="text-muted mb-0">Cadastre obras para acompanhar o progresso</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 💰 FINANCEIRO E CUSTOS -->
+    <div class="section-header">
+        <h4><i class="fas fa-dollar-sign"></i> Financeiro e Custos</h4>
+    </div>
+
+    <!-- Custos Detalhados -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Custos Detalhados do Período
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
+                                <h6>Alimentação</h6>
+                                <h5 class="text-warning">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-car fa-2x text-info mb-2"></i>
+                                <h6>Transporte</h6>
+                                <h5 class="text-info">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-users fa-2x text-success mb-2"></i>
+                                <h6>Mão de Obra</h6>
+                                <h5 class="text-success">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                                <h6>Faltas Justificadas</h6>
+                                <h5 class="text-warning">{{ custos_detalhados.faltas_justificadas_qtd if custos_detalhados.faltas_justificadas_qtd is defined else 0 }} dias</h5>
+                                <small class="text-muted">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas if custos_detalhados.faltas_justificadas is defined else 0).replace(',', '.') }}</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-cogs fa-2x text-secondary mb-2"></i>
+                                <h6>Outros</h6>
+                                <h5 class="text-secondary">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-calculator fa-2x text-primary mb-2"></i>
+                                <h6>Total</h6>
+                                <h5 class="text-primary">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos de Custos -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> Custos por Obra
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="custosObraChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-receipt"></i> Custos Recentes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if custos_recentes %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Obra</th>
+                                        <th>Custo Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for custo in custos_recentes %}
+                                    <tr>
+                                        <td>{{ custo.nome }}</td>
+                                        <td>R$ {{ '{:,.2f}'.format(custo.total_custo) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">Nenhum custo registrado.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 
 </div>
 
@@ -948,14 +896,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Gráfico de Status de Propostas
+    // Gráfico de Status de Propostas (com valores dinâmicos)
     const ctxPropostasStatus = document.getElementById('propostasStatusChart').getContext('2d');
     new Chart(ctxPropostasStatus, {
         type: 'doughnut',
         data: {
             labels: ['Aprovadas', 'Enviadas', 'Rascunho', 'Rejeitadas', 'Expiradas'],
             datasets: [{
-                data: [30, 15, 8, 7, 5],
+                data: [{{ propostas_aprovadas }}, {{ propostas_enviadas }}, {{ propostas_rascunho }}, {{ propostas_rejeitadas }}, {{ propostas_expiradas }}],
                 backgroundColor: [
                     '#198754', // Verde - Aprovadas
                     '#0d6efd', // Azul - Enviadas  
@@ -987,7 +935,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const label = context.label || '';
                             const value = context.parsed;
                             const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                             return `${label}: ${value} propostas (${percentage}%)`;
                         }
                     }
