@@ -132,30 +132,21 @@ def balancete():
 @admin_required
 def dre():
     """Demonstração do Resultado do Exercício"""
+    from contabilidade_utils import calcular_dre_mensal
     
-    mes = request.args.get('mes', date.today().month, type=int)
-    ano = request.args.get('ano', date.today().year, type=int)
+    mes_atual = date.today().replace(day=1)
     
-    mes_referencia = date(ano, mes, 1)
+    # Calcular DRE do mês atual automaticamente
+    dre_atual = calcular_dre_mensal(current_user.id, mes_atual)
     
-    dre = DREMensal.query.filter_by(
-        admin_id=current_user.id,
-        mes_referencia=mes_referencia
-    ).first()
-    
-    if not dre:
-        # Criar DRE básica se não existir
-        dre = DREMensal(
-            mes_referencia=mes_referencia,
-            admin_id=current_user.id
-        )
-        db.session.add(dre)
-        db.session.commit()
-        flash('DRE criada automaticamente. Configure os valores conforme necessário.', 'info')
+    # Buscar histórico de DREs
+    dres = DREMensal.query.filter_by(
+        admin_id=current_user.id
+    ).order_by(DREMensal.mes_referencia.desc()).limit(12).all()
     
     return render_template('contabilidade/dre.html',
-                         dre=dre,
-                         mes_referencia=mes_referencia)
+                         dre_atual=dre_atual,
+                         dres=dres)
 
 @contabilidade_bp.route('/balanco-patrimonial')
 @admin_required

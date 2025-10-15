@@ -109,9 +109,11 @@ def dashboard():
 @folha_bp.route('/processar/<int:ano>/<int:mes>', methods=['POST'])
 @admin_required
 def processar_folha_mes(ano, mes):
-    """Processar folha de pagamento do mês"""
+    """Processar folha de pagamento do mês - VERSÃO COMPLETA"""
     
     try:
+        from services.folha_service import processar_folha_funcionario
+        from event_manager import EventManager
         
         mes_referencia = date(ano, mes, 1)
         
@@ -121,16 +123,88 @@ def processar_folha_mes(ano, mes):
             mes_referencia=mes_referencia
         ).count()
         
-        if folhas_existentes > 0:
-            reprocessar = request.form.get('reprocessar') == 'true'
-            if not reprocessar:
-                flash('Folha já processada para este mês. Use a opção "Reprocessar" se necessário.', 'warning')
-                return redirect(url_for('folha.dashboard'))
+        reprocessar = request.form.get('reprocessar') == 'true'
         
-        flash('Folha de pagamento será processada em breve. Funcionalidade em desenvolvimento.', 'info')
+        if folhas_existentes > 0 and not reprocessar:
+            flash('Folha já processada para este mês. Use a opção "Reprocessar" se necessário.', 'warning')
+            return redirect(url_for('folha.dashboard'))
+        
+        # Se reprocessar, deletar folhas existentes
+        if reprocessar:
+            FolhaPagamento.query.filter_by(
+                admin_id=current_user.id,
+                mes_referencia=mes_referencia
+            ).delete()
+            db.session.commit()
+        
+        # Buscar funcionários ativos
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=current_user.id,
+            ativo=True
+        ).all()
+        
+        if not funcionarios:
+            flash('Nenhum funcionário ativo encontrado para processar.', 'warning')
+            return redirect(url_for('folha.dashboard'))
+        
+        # Processar cada funcionário
+        folhas_criadas = 0
+        erros = 0
+        
+        for funcionario in funcionarios:
+            # Calcular folha do funcionário
+            dados_folha = processar_folha_funcionario(funcionario, ano, mes)
+            
+            if dados_folha:
+                # Criar registro de folha de pagamento
+                folha = FolhaPagamento(
+                    funcionario_id=funcionario.id,
+                    mes_referencia=mes_referencia,
+                    salario_base=dados_folha['salario_base'],
+                    horas_extras=dados_folha['horas_extras'],
+                    total_proventos=dados_folha['total_proventos'],
+                    inss=dados_folha['inss'],
+                    irrf=dados_folha['irrf'],
+                    outros_descontos=dados_folha['outros_descontos'],
+                    total_descontos=dados_folha['total_descontos'],
+                    salario_liquido=dados_folha['salario_liquido'],
+                    fgts=dados_folha['fgts'],
+                    admin_id=current_user.id
+                )
+                
+                db.session.add(folha)
+                db.session.flush()  # CRÍTICO: Flush para gerar o ID antes de emitir evento
+                folhas_criadas += 1
+                
+                # Emitir evento para contabilidade (agora com folha.id válido)
+                try:
+                    EventManager.emit('folha_processada', {
+                        'folha_id': folha.id,
+                        'funcionario_id': funcionario.id,
+                        'mes_referencia': mes_referencia.isoformat(),
+                        'valor_total': dados_folha['total_proventos'],
+                        'encargos': dados_folha['encargos_patronais'],
+                        'admin_id': current_user.id
+                    })
+                except Exception as e:
+                    print(f"Erro ao emitir evento folha_processada: {e}")
+            else:
+                erros += 1
+        
+        # Commit final
+        db.session.commit()
+        
+        # Mensagens de resultado
+        if folhas_criadas > 0:
+            flash(f'Folha processada com sucesso! {folhas_criadas} funcionários processados.', 'success')
+        if erros > 0:
+            flash(f'{erros} funcionários com erro no processamento.', 'warning')
+        
         return redirect(url_for('folha.dashboard'))
         
     except Exception as e:
+        db.session.rollback()
+        print(f"ERRO AO PROCESSAR FOLHA: {e}")
         flash(f'Erro ao processar folha: {str(e)}', 'danger')
         return redirect(url_for('folha.dashboard'))
 

@@ -1,0 +1,365 @@
+# 📋 PROMPT COMPLETO - FOLHA DE PAGAMENTO E CONTABILIDADE
+
+## 🎯 OBJETIVO
+Implementar completamente os módulos de **Folha de Pagamento** e **Contabilidade** no SIGE, transformando-os de protótipos em funcionalidades 100% operacionais.
+
+## 🔍 ANÁLISE DA SITUAÇÃO ATUAL
+
+### ✅ **JÁ IMPLEMENTADO:**
+- **Blueprints registrados** no app.py (`/folha-pagamento`, `/contabilidade`)
+- **Modelos completos** no models.py (FolhaPagamento, ParametrosLegais, etc.)
+- **Views básicas** com estrutura funcional
+- **Templates** criados (9 templates contabilidade, 1 template folha)
+- **Integração automática** via Event Manager
+- **Utils de contabilidade** implementados
+
+### ❌ **PENDENTE PARA IMPLEMENTAÇÃO:**
+
+#### **FOLHA DE PAGAMENTO (70% → 100%):**
+- ✅ Dashboard básico funciona
+- ❌ **Processamento real** da folha (apenas placeholder)
+- ❌ **Cálculos automáticos** (salário, INSS, FGTS, IR)
+- ❌ **Integração com ponto eletrônico** (horas trabalhadas)
+- ❌ **Templates faltantes** (8 páginas não implementadas)
+- ❌ **Relatórios** (holerite, resumo folha, encargos)
+
+#### **CONTABILIDADE (80% → 100%):**
+- ✅ Dashboard e estrutura básica funcionam
+- ✅ Templates completos criados
+- ❌ **Lançamentos automáticos** não estão funcionando
+- ❌ **Integração real** com outros módulos
+- ❌ **Cálculos de DRE** automáticos
+- ❌ **Geração de SPED** funcional
+
+## 🚀 IMPLEMENTAÇÃO COMPLETA
+
+### **FASE 1: FOLHA DE PAGAMENTO FUNCIONAL (3-4 horas)**
+
+#### **1.1 Processamento Real da Folha**
+```python
+# Implementar em folha_pagamento_views.py:
+
+@folha_bp.route('/processar/<int:ano>/<int:mes>', methods=['POST'])
+def processar_folha_mes(ano, mes):
+    """Processar folha de pagamento com cálculos reais"""
+    
+    # 1. Buscar funcionários ativos
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=current_user.id, 
+        ativo=True
+    ).all()
+    
+    # 2. Para cada funcionário:
+    for funcionario in funcionarios:
+        # 2.1 Calcular horas trabalhadas (integração com ponto)
+        horas_trabalhadas = calcular_horas_mes(funcionario.id, ano, mes)
+        
+        # 2.2 Calcular salário bruto
+        salario_bruto = calcular_salario_bruto(funcionario, horas_trabalhadas)
+        
+        # 2.3 Calcular descontos (INSS, IR, outros)
+        descontos = calcular_descontos(salario_bruto, funcionario)
+        
+        # 2.4 Calcular encargos patronais (FGTS, INSS Patronal)
+        encargos = calcular_encargos_patronais(salario_bruto)
+        
+        # 2.5 Criar/atualizar registro FolhaPagamento
+        folha = FolhaPagamento(
+            funcionario_id=funcionario.id,
+            mes_referencia=date(ano, mes, 1),
+            salario_base=funcionario.salario,
+            horas_trabalhadas=horas_trabalhadas['total'],
+            horas_extras=horas_trabalhadas['extras'],
+            total_proventos=salario_bruto,
+            inss=descontos['inss'],
+            irrf=descontos['ir'],
+            fgts=encargos['fgts'],
+            salario_liquido=salario_bruto - descontos['total'],
+            admin_id=current_user.id
+        )
+        
+        # 2.6 Emitir evento para contabilidade
+        EventManager.emit('folha_processada', {
+            'folha_id': folha.id,
+            'funcionario_id': funcionario.id,
+            'valor_total': salario_bruto,
+            'encargos': encargos['total']
+        })
+```
+
+#### **1.2 Integração com Ponto Eletrônico**
+```python
+# Criar função em folha_service.py:
+
+def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> dict:
+    """Calcular horas trabalhadas baseado nos registros de ponto"""
+    
+    from models import RegistroPonto
+    
+    # Buscar registros do mês
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.funcionario_id == funcionario_id,
+        extract('year', RegistroPonto.data) == ano,
+        extract('month', RegistroPonto.data) == mes
+    ).all()
+    
+    total_horas = 0
+    horas_extras = 0
+    
+    for registro in registros:
+        if registro.entrada and registro.saida:
+            # Calcular horas do dia
+            horas_dia = calcular_horas_dia(registro)
+            total_horas += horas_dia['normais']
+            horas_extras += horas_dia['extras']
+    
+    return {
+        'total': total_horas,
+        'extras': horas_extras,
+        'dias_trabalhados': len(registros)
+    }
+```
+
+#### **1.3 Templates Faltantes**
+```html
+<!-- Criar templates/folha_pagamento/: -->
+- processar.html          # Interface de processamento
+- configuracoes.html      # Configurações salariais
+- beneficios.html         # Gestão de benefícios
+- adiantamentos.html      # Controle de adiantamentos
+- relatorios.html         # Central de relatórios
+- holerite.html          # Visualização de holerite
+- parametros.html        # Parâmetros legais
+- resumo_folha.html      # Resumo mensal
+```
+
+### **FASE 2: CONTABILIDADE FUNCIONAL (2-3 horas)**
+
+#### **2.1 Lançamentos Automáticos Funcionais**
+```python
+# Melhorar contabilidade_utils.py:
+
+def contabilizar_folha_pagamento(admin_id: int, mes_referencia: date):
+    """Contabilizar folha de pagamento automaticamente"""
+    
+    # 1. Buscar folhas do mês
+    folhas = FolhaPagamento.query.filter_by(
+        admin_id=admin_id,
+        mes_referencia=mes_referencia
+    ).all()
+    
+    # 2. Calcular totais
+    total_salarios = sum(f.total_proventos for f in folhas)
+    total_inss = sum(f.inss for f in folhas)
+    total_fgts = sum(f.fgts for f in folhas)
+    
+    # 3. Criar lançamento contábil
+    lancamento = LancamentoContabil(
+        numero=gerar_numero_lancamento(admin_id),
+        data_lancamento=date.today(),
+        historico=f"Folha de pagamento {mes_referencia.strftime('%m/%Y')}",
+        admin_id=admin_id
+    )
+    
+    # 4. Partidas do lançamento
+    partidas = [
+        # Débito: Despesa com Salários
+        PartidaContabil(
+            conta_codigo='3.1.01.001',  # Salários e Ordenados
+            tipo='D',
+            valor=total_salarios
+        ),
+        # Crédito: Salários a Pagar
+        PartidaContabil(
+            conta_codigo='2.1.02.001',  # Salários a Pagar
+            tipo='C',
+            valor=total_salarios - total_inss
+        ),
+        # Crédito: INSS a Recolher
+        PartidaContabil(
+            conta_codigo='2.1.03.001',  # INSS a Recolher
+            tipo='C',
+            valor=total_inss
+        )
+    ]
+    
+    # 5. Salvar no banco
+    db.session.add(lancamento)
+    for partida in partidas:
+        partida.lancamento_id = lancamento.id
+        db.session.add(partida)
+    
+    db.session.commit()
+```
+
+#### **2.2 DRE Automática**
+```python
+# Implementar cálculo automático de DRE:
+
+def calcular_dre_mensal(admin_id: int, mes_referencia: date):
+    """Calcular DRE automaticamente baseado nos lançamentos"""
+    
+    # 1. Receitas (contas 4.x.x.x)
+    receitas = calcular_saldo_grupo('4', admin_id, mes_referencia)
+    
+    # 2. Custos (contas 3.1.x.x)
+    custos = calcular_saldo_grupo('3.1', admin_id, mes_referencia)
+    
+    # 3. Despesas (contas 3.2.x.x)
+    despesas = calcular_saldo_grupo('3.2', admin_id, mes_referencia)
+    
+    # 4. Atualizar DRE
+    dre = DREMensal.query.filter_by(
+        admin_id=admin_id,
+        mes_referencia=mes_referencia
+    ).first()
+    
+    if not dre:
+        dre = DREMensal(admin_id=admin_id, mes_referencia=mes_referencia)
+    
+    dre.receita_bruta = receitas
+    dre.custo_mercadorias = custos
+    dre.despesas_operacionais = despesas
+    dre.lucro_liquido = receitas - custos - despesas
+    
+    db.session.add(dre)
+    db.session.commit()
+```
+
+### **FASE 3: INTEGRAÇÃO TOTAL (1-2 horas)**
+
+#### **3.1 Event Handlers Completos**
+```python
+# Melhorar integracoes_automaticas.py:
+
+@EventManager.handler('folha_processada')
+def handle_folha_processada(data):
+    """Handler para folha processada"""
+    
+    # 1. Contabilizar automaticamente
+    folha = FolhaPagamento.query.get(data['folha_id'])
+    contabilizar_folha_pagamento(folha.admin_id, folha.mes_referencia)
+    
+    # 2. Criar custo na obra (se funcionário vinculado)
+    funcionario = Funcionario.query.get(data['funcionario_id'])
+    if funcionario.obra_id:
+        CustoObra.criar_custo_automatico(
+            obra_id=funcionario.obra_id,
+            tipo='mao_obra',
+            valor=data['valor_total'] + data['encargos'],
+            descricao=f"Folha {funcionario.nome} - {folha.mes_referencia.strftime('%m/%Y')}"
+        )
+
+@EventManager.handler('conta_paga')
+def handle_conta_paga(data):
+    """Handler para conta paga"""
+    
+    conta = ContaPagar.query.get(data['conta_id'])
+    
+    # Lançamento contábil automático
+    criar_lancamento_pagamento(
+        conta_codigo=conta.conta_contabil_codigo or '2.1.01.001',
+        valor=conta.valor,
+        historico=f"Pagamento {conta.descricao}",
+        admin_id=conta.admin_id
+    )
+```
+
+#### **3.2 Menu Principal Atualizado**
+```html
+<!-- Atualizar templates/base.html: -->
+
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+        <i class="fas fa-calculator"></i> Financeiro
+    </a>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{{ url_for('financeiro.dashboard') }}">
+            <i class="fas fa-chart-line"></i> Dashboard
+        </a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{{ url_for('folha.dashboard') }}">
+            <i class="fas fa-users"></i> Folha de Pagamento
+        </a></li>
+        <li><a class="dropdown-item" href="{{ url_for('contabilidade.dashboard_contabil') }}">
+            <i class="fas fa-book"></i> Contabilidade
+        </a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{{ url_for('financeiro.contas_pagar') }}">
+            <i class="fas fa-file-invoice-dollar"></i> Contas a Pagar
+        </a></li>
+        <li><a class="dropdown-item" href="{{ url_for('financeiro.contas_receber') }}">
+            <i class="fas fa-hand-holding-usd"></i> Contas a Receber
+        </a></li>
+    </ul>
+</li>
+```
+
+## 🎯 RESULTADO FINAL ESPERADO
+
+### **FOLHA DE PAGAMENTO 100% FUNCIONAL:**
+- ✅ **Processamento automático** baseado no ponto eletrônico
+- ✅ **Cálculos precisos** (INSS, IR, FGTS, encargos)
+- ✅ **Holerites digitais** com todos os detalhes
+- ✅ **Relatórios completos** (resumo, encargos, provisões)
+- ✅ **Integração contábil** automática
+
+### **CONTABILIDADE 100% FUNCIONAL:**
+- ✅ **Lançamentos automáticos** de todos os módulos
+- ✅ **DRE calculada** automaticamente
+- ✅ **Balancete mensal** atualizado
+- ✅ **Plano de contas** completo para construção civil
+- ✅ **Auditoria automática** com alertas
+
+### **INTEGRAÇÃO TOTAL:**
+- ✅ **Ponto → Folha → Contabilidade → Custos**
+- ✅ **Compras → Contas a Pagar → Contabilidade**
+- ✅ **Propostas → Contas a Receber → Contabilidade**
+- ✅ **Todos os custos** automaticamente contabilizados
+
+## ⏱️ CRONOGRAMA REALISTA
+
+### **DIA 1: Folha de Pagamento (3-4h)**
+- Implementar processamento real
+- Criar cálculos automáticos
+- Integração com ponto eletrônico
+- Templates faltantes
+
+### **DIA 2: Contabilidade (2-3h)**
+- Lançamentos automáticos funcionais
+- DRE automática
+- Integração com outros módulos
+- Testes de auditoria
+
+### **DIA 3: Integração e Testes (1-2h)**
+- Event handlers completos
+- Menu atualizado
+- Testes end-to-end
+- Validação final
+
+**TOTAL: 6-9 horas para módulos 100% funcionais**
+
+## 💡 VALIDAÇÃO FINAL
+
+### **Checklist de Funcionalidades:**
+- [ ] Processar folha de pagamento completa
+- [ ] Gerar holerite com todos os cálculos
+- [ ] Lançamentos contábeis automáticos
+- [ ] DRE atualizada automaticamente
+- [ ] Integração ponto → folha funcionando
+- [ ] Custos por obra atualizados
+- [ ] Relatórios exportáveis (PDF/Excel)
+- [ ] Menu navegação completo
+
+### **Teste End-to-End:**
+1. **Funcionário bate ponto** → Horas registradas
+2. **Processar folha** → Cálculos automáticos
+3. **Verificar contabilidade** → Lançamentos criados
+4. **Verificar custos obra** → Valores atualizados
+5. **Gerar relatórios** → Dados consistentes
+
+**RESULTADO: SIGE com módulos financeiros de nível empresarial!** 💰📊
+
+## 🚀 PRÓXIMO PASSO
+
+Execute este prompt para transformar os protótipos em funcionalidades 100% operacionais, completando o ERP com capacidades financeiras profissionais.

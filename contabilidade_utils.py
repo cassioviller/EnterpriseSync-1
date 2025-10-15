@@ -336,3 +336,94 @@ def executar_auditoria_automatica(admin_id):
     
     db.session.commit()
     return alertas
+
+def calcular_dre_mensal(admin_id: int, mes_referencia: date):
+    """
+    Calcula DRE automaticamente baseado nos lançamentos contábeis do mês
+    
+    Agrupa contas por tipo:
+    - Receitas: contas 4.x.x.x (CREDORA)
+    - Custos: contas 3.1.x.x (DEVEDORA)
+    - Despesas: contas 3.2.x.x (DEVEDORA)
+    
+    Args:
+        admin_id: ID do admin
+        mes_referencia: Data de referência (primeiro dia do mês)
+        
+    Returns:
+        DREMensal: Objeto DRE criado ou atualizado
+    """
+    from sqlalchemy import and_, extract, func
+    from decimal import Decimal
+    import calendar
+    
+    try:
+        # Definir período do mês
+        ano = mes_referencia.year
+        mes = mes_referencia.month
+        ultimo_dia = calendar.monthrange(ano, mes)[1]
+        data_fim = date(ano, mes, ultimo_dia)
+        
+        # Função auxiliar para calcular saldo por grupo de contas
+        def calcular_saldo_grupo(prefixo: str):
+            """Calcula saldo de um grupo de contas (ex: '4' para receitas)"""
+            partidas = PartidaContabil.query.join(
+                LancamentoContabil,
+                PartidaContabil.lancamento_id == LancamentoContabil.id
+            ).filter(
+                and_(
+                    PartidaContabil.admin_id == admin_id,
+                    PartidaContabil.conta_codigo.like(f'{prefixo}%'),
+                    LancamentoContabil.data_lancamento >= mes_referencia,
+                    LancamentoContabil.data_lancamento <= data_fim
+                )
+            ).all()
+            
+            total = Decimal('0')
+            for partida in partidas:
+                valor = Decimal(str(partida.valor))
+                if partida.tipo_partida == 'CREDITO':
+                    total += valor
+                else:
+                    total -= valor
+            
+            return total
+        
+        # Calcular valores
+        receita_bruta = calcular_saldo_grupo('4')
+        custo_mercadorias = calcular_saldo_grupo('3.1')
+        despesas_operacionais = calcular_saldo_grupo('3.2')
+        
+        # Calcular lucro
+        lucro_bruto = receita_bruta - custo_mercadorias
+        lucro_liquido = lucro_bruto - despesas_operacionais
+        
+        # Buscar ou criar DRE
+        dre = DREMensal.query.filter_by(
+            admin_id=admin_id,
+            mes_referencia=mes_referencia
+        ).first()
+        
+        if not dre:
+            dre = DREMensal(
+                admin_id=admin_id,
+                mes_referencia=mes_referencia
+            )
+        
+        # Atualizar valores
+        dre.receita_bruta = float(receita_bruta)
+        dre.custo_total = float(custo_mercadorias)
+        dre.lucro_bruto = float(lucro_bruto)
+        dre.total_despesas = float(despesas_operacionais)
+        dre.lucro_liquido = float(lucro_liquido)
+        
+        db.session.add(dre)
+        db.session.commit()
+        
+        print(f"✅ DRE calculada: Receita={receita_bruta}, Lucro Líquido={lucro_liquido}")
+        return dre
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao calcular DRE: {e}")
+        return None

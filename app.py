@@ -153,6 +153,13 @@ try:
 except Exception as e:
     logging.warning(f"⚠️ Event Manager não carregado: {e}")
 
+# Import event handlers to auto-register
+try:
+    import handlers.folha_handlers
+    logging.info("✅ Handler de folha de pagamento registrado")
+except Exception as e:
+    logging.warning(f"⚠️ Handler de folha não carregado: {e}")
+
 # Import views
 from views import main_bp
 from production_routes import production_bp
