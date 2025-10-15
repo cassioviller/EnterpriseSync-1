@@ -1,0 +1,144 @@
+# 🚨 CORREÇÃO URGENTE - ERRO DE PRODUÇÃO
+
+## 🔍 ANÁLISE DOS LOGS DE ERRO
+
+### **ERRO PRINCIPAL IDENTIFICADO:**
+```
+sqlalchemy.exc.InvalidRequestError: One or more mappers failed to initialize - can't proceed with initialization of other mappers. 
+Triggering mapper: 'Mapper[CustoObra(custo_obra)]'. 
+Original exception was: When initializing mapper Mapper[CustoObra(custo_obra)], expression 'FrotaVeiculo' failed to locate a name ('FrotaVeiculo'). 
+If this is a class name, consider adding this relationship() to the <class 'models.CustoObra'> class after both dependent classes have been defined.
+```
+
+### **CAUSA RAIZ:**
+- ❌ **Relacionamento quebrado:** `CustoObra` tenta referenciar `'FrotaVeiculo'` que não existe
+- ❌ **Nome incorreto:** Deveria ser `'Vehicle'` (classe real no models.py)
+- ❌ **Ordem de definição:** Classes não estão na ordem correta
+
+## 🚀 PROMPT DE CORREÇÃO URGENTE
+
+```
+EMERGÊNCIA: Corrigir erro crítico de produção no SIGE
+
+ERRO IDENTIFICADO:
+sqlalchemy.exc.InvalidRequestError: Mapper[CustoObra(custo_obra)] não consegue localizar 'FrotaVeiculo'
+
+CAUSA: Relacionamento incorreto no modelo CustoObra
+
+CORREÇÃO IMEDIATA:
+
+1. ABRIR models.py
+2. LOCALIZAR classe CustoObra (linha ~413)
+3. ENCONTRAR esta linha INCORRETA:
+```python
+# ❌ LINHA INCORRETA (aproximadamente linha 439):
+veiculo = db.relationship('FrotaVeiculo', foreign_keys=[veiculo_id])
+```
+
+4. SUBSTITUIR por esta linha CORRETA:
+```python
+# ✅ LINHA CORRETA:
+veiculo = db.relationship('Vehicle', foreign_keys=[veiculo_id])
+```
+
+5. VERIFICAR se existe outras referências a 'FrotaVeiculo' e corrigir para 'Vehicle'
+
+6. SALVAR e fazer DEPLOY IMEDIATO
+
+VALIDAÇÃO:
+- Sistema deve inicializar sem erros SQLAlchemy
+- Página principal deve carregar
+- Relacionamentos CustoObra → Vehicle devem funcionar
+
+URGÊNCIA: CRÍTICA - Sistema fora do ar
+TEMPO ESTIMADO: 2-3 minutos para correção
+```
+
+## 🔧 CORREÇÃO DETALHADA
+
+### **PROBLEMA ESPECÍFICO:**
+```python
+# ❌ NO models.py (INCORRETO):
+class CustoObra(db.Model):
+    # ... outros campos ...
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'))
+    
+    # ❌ RELACIONAMENTO INCORRETO:
+    veiculo = db.relationship('FrotaVeiculo', foreign_keys=[veiculo_id])
+```
+
+### **CORREÇÃO NECESSÁRIA:**
+```python
+# ✅ CORRIGIDO:
+class CustoObra(db.Model):
+    # ... outros campos ...
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'))  # ✅ FK correto
+    
+    # ✅ RELACIONAMENTO CORRETO:
+    veiculo = db.relationship('Vehicle', foreign_keys=[veiculo_id])  # Vehicle é a classe real
+```
+
+### **VERIFICAÇÕES ADICIONAIS:**
+1. **Confirmar classe Vehicle existe:**
+   ```python
+   class Vehicle(db.Model):
+       __tablename__ = 'frota_veiculo'  # ✅ Tabela correta
+   ```
+
+2. **Verificar outros relacionamentos similares:**
+   ```python
+   # Procurar por outras referências incorretas a 'FrotaVeiculo'
+   # Substituir todas por 'Vehicle'
+   ```
+
+## ⚡ AÇÃO IMEDIATA NECESSÁRIA
+
+### **PASSO 1: Correção Rápida**
+```python
+# Localizar e corrigir IMEDIATAMENTE no models.py:
+# Linha ~439: veiculo = db.relationship('FrotaVeiculo', ...)
+# Trocar para: veiculo = db.relationship('Vehicle', ...)
+```
+
+### **PASSO 2: Deploy Urgente**
+```bash
+# Fazer commit e push imediato
+git add models.py
+git commit -m "FIX: Corrigir relacionamento CustoObra -> Vehicle"
+git push origin main
+```
+
+### **PASSO 3: Validação**
+- ✅ Sistema inicializa sem erros
+- ✅ Página principal carrega
+- ✅ Logs limpos sem erros SQLAlchemy
+
+## 🎯 RESULTADO ESPERADO
+
+### **ANTES (ERRO):**
+```
+❌ Internal Server Error
+❌ sqlalchemy.exc.InvalidRequestError
+❌ Sistema fora do ar
+```
+
+### **DEPOIS (CORRIGIDO):**
+```
+✅ Sistema inicializa normalmente
+✅ Relacionamentos funcionando
+✅ Produção estável
+```
+
+## 💡 PREVENÇÃO FUTURA
+
+### **Implementar Validações:**
+1. **Testes de relacionamento** antes do deploy
+2. **Validação de nomes de classe** no CI/CD
+3. **Smoke tests** automáticos pós-deploy
+
+### **Monitoramento:**
+1. **Alertas** para erros SQLAlchemy
+2. **Health checks** automáticos
+3. **Rollback** automático em caso de erro
+
+**URGÊNCIA MÁXIMA: Corrigir AGORA para restaurar o sistema!** 🚨
