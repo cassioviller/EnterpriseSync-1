@@ -19,11 +19,15 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Links RDO devem apontar para rota moderna `/funcionario/rdo/consolidado` com funcionalidades completas
 - Ambiente de produção com 80 tabelas deve ser preservado durante migrações
 
+## Recent Changes
+- **2025-10-15:** Dashboard fully dynamized - All proposal KPIs now calculated from live database (status counts, conversion rate, average value, template usage, portal analytics). Replaced all hardcoded values with real-time queries scoped by tenant admin_id.
+
 ## System Architecture
 The system uses a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with Jinja2 templates and Bootstrap for the frontend. Docker manages deployment. A unified modern template (`base_completo.html`) ensures consistent UI/UX. Critical database transaction protection is implemented via a `safe_db_operation` function.
 
 **Key Architectural Decisions & Features:**
 -   **Multi-tenant Architecture:** Data isolation per `admin_id` with role-based access control and dynamic `admin_id` handling.
+-   **Dynamic Dashboard KPIs:** All metrics calculated in real-time from database with zero-division guards and error handling. Proposal metrics include status distribution, conversion rates, average values, and template usage analytics.
 -   **Event-Driven Integration System (v9.0):** `EventManager` (event_manager.py) implements Observer Pattern for automated cross-module integration. Active integrations:
     -   Almoxarifado → Custos: Material withdrawals emit `material_saida` events with cost tracking
     -   Frota → Custos: Vehicle usage emits `veiculo_usado` events calculating fuel/wear costs (R$0.80/km)
