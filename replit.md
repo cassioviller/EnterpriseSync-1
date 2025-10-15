@@ -21,7 +21,7 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 
 ## Recent Changes
 - **2025-10-15:** Dashboard fully dynamized - All proposal KPIs now calculated from live database (status counts, conversion rate, average value, template usage, portal analytics). Replaced all hardcoded values with real-time queries scoped by tenant admin_id.
-- **2025-10-15:** Dashboard reorganized by module - KPIs now grouped in clear sections with Financeiro e Custos as first priority, followed by Visão Geral, Propostas Comerciais, Recursos Humanos, and Obras e RDO. Green gradient section headers (#10b981 to #059669) for improved scannability and brand alignment.
+- **2025-10-15:** Dashboard reorganized by module - KPIs now grouped in clear sections with Financeiro e Custos as first priority, followed by Visão Geral, Recursos Humanos, Obras e RDO, and Propostas Comerciais as last. Green gradient section headers (#10b981 to #059669) for improved scannability and brand alignment.
 
 ## System Architecture
 The system uses a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with Jinja2 templates and Bootstrap for the frontend. Docker manages deployment. A unified modern template (`base_completo.html`) ensures consistent UI/UX. Critical database transaction protection is implemented via a `safe_db_operation` function.

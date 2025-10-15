@@ -405,6 +405,177 @@ html[data-bs-theme="dark"] .header-btn i {
     </div>
 
     <!-- 📋 PROPOSTAS COMERCIAIS -->
+
+    <div class="section-header">
+        <h4><i class="fas fa-users"></i> Recursos Humanos</h4>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Funcionários por Departamento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user-plus"></i> Funcionários Recentes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if funcionarios_recentes %}
+                        <div class="list-group list-group-flush">
+                            {% for func in funcionarios_recentes %}
+                            <div class="list-group-item px-0 py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ func.nome }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ func.cargo }}</small>
+                                    </div>
+                                    <small class="text-muted">
+                                        {{ func.data_admissao.strftime('%d/%m/%Y') if func.data_admissao else 'N/A' }}
+                                    </small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">Nenhum funcionário recente.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🏗️ OBRAS E RDO -->
+
+    <div class="section-header">
+        <h4><i class="fas fa-hard-hat"></i> Obras e RDO</h4>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tasks"></i> Progresso das Obras
+                    </h5>
+                    <small class="text-muted">Baseado no último RDO</small>
+                </div>
+                <div class="card-body">
+                    {% if obras_ativas %}
+                        <div class="row">
+                        {% for obra in obras_ativas %}
+                            <div class="col-md-6 mb-3">
+                                <div class="p-3 border rounded h-100">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ obra.nome }}</h6>
+                                            <div class="d-flex gap-3">
+                                                {% if obra.data_ultimo_rdo %}
+                                                <small class="text-muted">
+                                                    <i class="fas fa-calendar-day"></i> 
+                                                    Último RDO: {{ obra.data_ultimo_rdo.strftime('%d/%m/%Y') }}
+                                                </small>
+                                                {% endif %}
+                                                {% if obra.total_subatividades > 0 %}
+                                                <small class="text-muted">
+                                                    <i class="fas fa-tasks"></i> 
+                                                    {{ obra.total_subatividades }} atividades
+                                                </small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <h5 class="mb-0 
+                                                {% if obra.progresso_atual >= 80 %}text-success
+                                                {% elif obra.progresso_atual >= 50 %}text-warning
+                                                {% elif obra.progresso_atual >= 25 %}text-info
+                                                {% else %}text-secondary
+                                                {% endif %}">
+                                                {{ obra.progresso_atual }}%
+                                            </h5>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Barra de Progresso -->
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar 
+                                            {% if obra.progresso_atual >= 80 %}bg-success
+                                            {% elif obra.progresso_atual >= 50 %}bg-warning
+                                            {% elif obra.progresso_atual >= 25 %}bg-info
+                                            {% else %}bg-secondary
+                                            {% endif %}" 
+                                            role="progressbar" 
+                                            style="width: {{ obra.progresso_atual }}%"
+                                            aria-valuenow="{{ obra.progresso_atual }}" 
+                                            aria-valuemin="0" 
+                                            aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Status da obra -->
+                                    <div class="mt-2 d-flex justify-content-between align-items-center">
+                                        <div>
+                                            {% if obra.progresso_atual == 0 %}
+                                            <span class="badge bg-secondary">
+                                                <i class="fas fa-clock"></i> Sem RDO registrado
+                                            </span>
+                                            {% elif obra.progresso_atual < 25 %}
+                                            <span class="badge bg-light text-dark">
+                                                <i class="fas fa-play"></i> Iniciada
+                                            </span>
+                                            {% elif obra.progresso_atual < 50 %}
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-cogs"></i> Em desenvolvimento
+                                            </span>
+                                            {% elif obra.progresso_atual < 80 %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-forward"></i> Avançada
+                                            </span>
+                                            {% elif obra.progresso_atual < 100 %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check-circle"></i> Quase concluída
+                                            </span>
+                                            {% else %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-trophy"></i> Concluída
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> Ver RDOs
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-hard-hat fa-3x text-muted mb-3"></i>
+                            <h6 class="text-muted">Nenhuma obra ativa</h6>
+                            <p class="text-muted mb-0">Cadastre obras para acompanhar o progresso</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <div class="section-header">
         <h4><i class="fas fa-file-contract"></i> Propostas Comerciais</h4>
     </div>
@@ -549,174 +720,6 @@ html[data-bs-theme="dark"] .header-btn i {
     </div>
 
     <!-- 👥 RECURSOS HUMANOS -->
-    <div class="section-header">
-        <h4><i class="fas fa-users"></i> Recursos Humanos</h4>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-chart-pie"></i> Funcionários por Departamento
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-user-plus"></i> Funcionários Recentes
-                    </h5>
-                </div>
-                <div class="card-body">
-                    {% if funcionarios_recentes %}
-                        <div class="list-group list-group-flush">
-                            {% for func in funcionarios_recentes %}
-                            <div class="list-group-item px-0 py-2">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>{{ func.nome }}</strong>
-                                        <br>
-                                        <small class="text-muted">{{ func.cargo }}</small>
-                                    </div>
-                                    <small class="text-muted">
-                                        {{ func.data_admissao.strftime('%d/%m/%Y') if func.data_admissao else 'N/A' }}
-                                    </small>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-muted mb-0">Nenhum funcionário recente.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 🏗️ OBRAS E RDO -->
-    <div class="section-header">
-        <h4><i class="fas fa-hard-hat"></i> Obras e RDO</h4>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-tasks"></i> Progresso das Obras
-                    </h5>
-                    <small class="text-muted">Baseado no último RDO</small>
-                </div>
-                <div class="card-body">
-                    {% if obras_ativas %}
-                        <div class="row">
-                        {% for obra in obras_ativas %}
-                            <div class="col-md-6 mb-3">
-                                <div class="p-3 border rounded h-100">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <div class="flex-grow-1">
-                                            <h6 class="mb-1">{{ obra.nome }}</h6>
-                                            <div class="d-flex gap-3">
-                                                {% if obra.data_ultimo_rdo %}
-                                                <small class="text-muted">
-                                                    <i class="fas fa-calendar-day"></i> 
-                                                    Último RDO: {{ obra.data_ultimo_rdo.strftime('%d/%m/%Y') }}
-                                                </small>
-                                                {% endif %}
-                                                {% if obra.total_subatividades > 0 %}
-                                                <small class="text-muted">
-                                                    <i class="fas fa-tasks"></i> 
-                                                    {{ obra.total_subatividades }} atividades
-                                                </small>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <div class="text-end">
-                                            <h5 class="mb-0 
-                                                {% if obra.progresso_atual >= 80 %}text-success
-                                                {% elif obra.progresso_atual >= 50 %}text-warning
-                                                {% elif obra.progresso_atual >= 25 %}text-info
-                                                {% else %}text-secondary
-                                                {% endif %}">
-                                                {{ obra.progresso_atual }}%
-                                            </h5>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Barra de Progresso -->
-                                    <div class="progress" style="height: 8px;">
-                                        <div class="progress-bar 
-                                            {% if obra.progresso_atual >= 80 %}bg-success
-                                            {% elif obra.progresso_atual >= 50 %}bg-warning
-                                            {% elif obra.progresso_atual >= 25 %}bg-info
-                                            {% else %}bg-secondary
-                                            {% endif %}" 
-                                            role="progressbar" 
-                                            style="width: {{ obra.progresso_atual }}%"
-                                            aria-valuenow="{{ obra.progresso_atual }}" 
-                                            aria-valuemin="0" 
-                                            aria-valuemax="100">
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Status da obra -->
-                                    <div class="mt-2 d-flex justify-content-between align-items-center">
-                                        <div>
-                                            {% if obra.progresso_atual == 0 %}
-                                            <span class="badge bg-secondary">
-                                                <i class="fas fa-clock"></i> Sem RDO registrado
-                                            </span>
-                                            {% elif obra.progresso_atual < 25 %}
-                                            <span class="badge bg-light text-dark">
-                                                <i class="fas fa-play"></i> Iniciada
-                                            </span>
-                                            {% elif obra.progresso_atual < 50 %}
-                                            <span class="badge bg-info">
-                                                <i class="fas fa-cogs"></i> Em desenvolvimento
-                                            </span>
-                                            {% elif obra.progresso_atual < 80 %}
-                                            <span class="badge bg-warning">
-                                                <i class="fas fa-forward"></i> Avançada
-                                            </span>
-                                            {% elif obra.progresso_atual < 100 %}
-                                            <span class="badge bg-success">
-                                                <i class="fas fa-check-circle"></i> Quase concluída
-                                            </span>
-                                            {% else %}
-                                            <span class="badge bg-success">
-                                                <i class="fas fa-trophy"></i> Concluída
-                                            </span>
-                                            {% endif %}
-                                        </div>
-                                        <div>
-                                            <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i> Ver RDOs
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-hard-hat fa-3x text-muted mb-3"></i>
-                            <h6 class="text-muted">Nenhuma obra ativa</h6>
-                            <p class="text-muted mb-0">Cadastre obras para acompanhar o progresso</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- 💰 FINANCEIRO E CUSTOS -->
 
 <script>
