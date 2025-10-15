@@ -109,74 +109,18 @@ if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
     fi
 fi
 
-# FASE 3.4: EXECUÇÃO AUTOMÁTICA DE MIGRAÇÕES (SEMPRE)
-echo "🔄 FASE 3.4: MIGRAÇÕES AUTOMÁTICAS OBRIGATÓRIAS" | tee -a "$LOG_FILE"
-echo "===============================================" | tee -a "$LOG_FILE"
+# FASE 3.4: EXECUÇÃO AUTOMÁTICA DE MIGRAÇÕES v2.0 (COM RASTREAMENTO)
+echo "🔄 FASE 3.4: MIGRAÇÕES AUTOMÁTICAS v2.0 - RASTREAMENTO ATIVO" | tee -a "$LOG_FILE"
+echo "============================================================" | tee -a "$LOG_FILE"
 
 # Backup de segurança antes das migrações
 BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 echo "💾 Criando backup de segurança: $BACKUP_TIMESTAMP" | tee -a "$LOG_FILE"
 
-# Executar migrações com timeout e logs detalhados
-echo "🚀 Executando migrações automáticas..." | tee -a "$LOG_FILE"
+# Executar migrações via pre_start.py com timeout e logs detalhados
+echo "🚀 Executando sistema de migrações v2.0 (idempotente)..." | tee -a "$LOG_FILE"
 
-timeout "$MIGRATION_TIMEOUT" python3 -c "
-import sys
-import os
-import traceback
-from datetime import datetime
-
-sys.path.append('/app')
-
-def log_migration(message):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    with open('/tmp/sige_migrations.log', 'a') as f:
-        f.write(f'[{timestamp}] {message}\n')
-    print(f'[{timestamp}] {message}')
-
-log_migration('🔄 INICIANDO MIGRAÇÕES AUTOMÁTICAS OBRIGATÓRIAS')
-log_migration('='*50)
-
-try:
-    log_migration('📦 Importando dependências...')
-    from app import app, db
-    
-    with app.app_context():
-        log_migration('🏗️ Executando db.create_all()...')
-        db.create_all()
-        log_migration('✅ db.create_all() concluído')
-        
-        # Executar migrações customizadas
-        try:
-            log_migration('🔄 Executando migrações customizadas...')
-            from migrations import executar_migracoes
-            executar_migracoes()
-            log_migration('✅ Migrações customizadas concluídas')
-        except ImportError:
-            log_migration('⚠️ Módulo migrations não encontrado - continuando')
-        except Exception as e:
-            log_migration(f'⚠️ Erro em migrações customizadas: {e}')
-            log_migration('🔄 Continuando com aplicação...')
-        
-        # ✅ SISTEMA FROTA: Migrações automáticas via migrations.py
-        log_migration('🚗 Sistema de Frota: Migrações via migrations.py já executadas')
-        log_migration('✅ Tabelas Frota (frota_veiculo, frota_utilizacao, frota_despesa) gerenciadas automaticamente')
-        
-        log_migration('✅ TODAS AS MIGRAÇÕES PROCESSADAS COM SUCESSO')
-        
-except Exception as e:
-    log_migration(f'❌ ERRO CRÍTICO NAS MIGRAÇÕES: {e}')
-    log_migration(f'📋 Traceback: {traceback.format_exc()}')
-    
-    # Se rollback estiver habilitado, falhar
-    if os.environ.get('ENABLE_ROLLBACK', 'true').lower() == 'true':
-        log_migration('🔙 ROLLBACK ATIVADO - Abortando deploy')
-        sys.exit(1)
-    else:
-        log_migration('⚠️ ROLLBACK DESABILITADO - Continuando com risco')
-
-log_migration('✅ FASE DE MIGRAÇÕES CONCLUÍDA')
-" 2>&1 | tee -a "$MIGRATION_LOG"
+timeout "$MIGRATION_TIMEOUT" python3 /app/pre_start.py 2>&1 | tee -a "$MIGRATION_LOG"
 
 MIGRATION_EXIT_CODE=$?
 

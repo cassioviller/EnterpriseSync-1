@@ -1,14 +1,70 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for
 from flask_login import login_required, current_user
 from models import CustoObra, Obra, Funcionario, Vehicle, db
-from sqlalchemy import func, desc, extract
+from sqlalchemy import func, desc, extract, text
 from datetime import datetime, date
+import logging
+
+logger = logging.getLogger(__name__)
 
 custos_bp = Blueprint('custos', __name__, url_prefix='/custos')
+
+def verificar_schema_custos():
+    """
+    Runtime guard: Verifica se o schema da tabela custo_obra está completo
+    Retorna True se OK, False se houver problemas
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se coluna admin_id existe em custo_obra
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'custo_obra' 
+            AND column_name = 'admin_id'
+        """)
+        
+        admin_id_exists = cursor.fetchone() is not None
+        cursor.close()
+        connection.close()
+        
+        if not admin_id_exists:
+            logger.error("""
+            ❌ ERRO CRÍTICO DE SCHEMA: coluna custo_obra.admin_id não existe!
+            
+            DIAGNÓSTICO:
+            - A migração 43 não foi executada em produção
+            - O banco de dados está desatualizado
+            
+            SOLUÇÃO:
+            1. Fazer deploy do código mais recente (com migrations.py atualizado)
+            2. O sistema de migrações v2.0 detectará e aplicará a migração 43 automaticamente
+            3. Verificar logs de startup para confirmar: "Migração 43: Completar estruturas v9.0"
+            
+            AÇÃO IMEDIATA:
+            - Módulo Custos desabilitado até conclusão da migração
+            - Nenhum dado será perdido
+            """)
+            return False
+        
+        logger.debug("✅ Schema custo_obra verificado - admin_id existe")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar schema: {e}")
+        return False
 
 @custos_bp.route('/')
 @login_required
 def dashboard_custos():
+    # Runtime guard: verificar schema antes de executar queries
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível. O sistema está sendo atualizado.', 'warning')
+        logger.error("Dashboard custos bloqueado - schema incompleto")
+        return redirect(url_for('index'))
+    
     admin_id = current_user.id
     
     # KPIs principais
@@ -55,6 +111,12 @@ def dashboard_custos():
 @custos_bp.route('/obra/<int:obra_id>')
 @login_required
 def custos_obra(obra_id):
+    # Runtime guard: verificar schema antes de executar queries
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível. O sistema está sendo atualizado.', 'warning')
+        logger.error("Custos obra bloqueado - schema incompleto")
+        return redirect(url_for('index'))
+    
     obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first_or_404()
     
     # Buscar todos os custos da obra
@@ -110,6 +172,10 @@ def custos_obra(obra_id):
 @custos_bp.route('/api/custos-categoria')
 @login_required
 def api_custos_categoria():
+    # Runtime guard: verificar schema antes de executar queries
+    if not verificar_schema_custos():
+        return jsonify({'error': 'Schema incompleto - migração pendente'}), 503
+    
     custos = db.session.query(
         CustoObra.tipo,
         func.sum(CustoObra.valor).label('total')
@@ -133,6 +199,10 @@ def api_custos_categoria():
 @custos_bp.route('/api/custos-mensais')
 @login_required
 def api_custos_mensais():
+    # Runtime guard: verificar schema antes de executar queries
+    if not verificar_schema_custos():
+        return jsonify({'error': 'Schema incompleto - migração pendente'}), 503
+    
     custos = db.session.query(
         func.to_char(CustoObra.data, 'YYYY-MM').label('mes'),
         func.sum(CustoObra.valor).label('total')

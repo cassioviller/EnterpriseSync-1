@@ -18,6 +18,169 @@ def mask_database_url(url):
     masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', url)
     return masked
 
+# ============================================================================
+# SISTEMA DE RASTREAMENTO DE MIGRAÇÕES - IDEMPOTÊNCIA GARANTIDA
+# ============================================================================
+
+def ensure_migration_history_table():
+    """Cria tabela migration_history se não existir - primeira execução"""
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS migration_history (
+                id SERIAL PRIMARY KEY,
+                migration_number INTEGER UNIQUE NOT NULL,
+                migration_name VARCHAR(200) NOT NULL,
+                executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                execution_time_ms INTEGER,
+                status VARCHAR(20) DEFAULT 'success',
+                error_message TEXT
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_migration_number 
+            ON migration_history(migration_number)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_migration_executed 
+            ON migration_history(executed_at)
+        """)
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.debug("✅ Tabela migration_history verificada/criada")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar tabela migration_history: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+
+def is_migration_executed(migration_number):
+    """Verifica se uma migração já foi executada com sucesso"""
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        cursor.execute("""
+            SELECT status FROM migration_history 
+            WHERE migration_number = %s
+        """, (migration_number,))
+        
+        result = cursor.fetchone()
+        cursor.close()
+        connection.close()
+        
+        if result:
+            status = result[0]
+            return status == 'success'
+        return False
+        
+    except Exception as e:
+        logger.debug(f"Migração {migration_number} não encontrada no histórico: {e}")
+        return False
+
+def record_migration(migration_number, migration_name, status='success', execution_time_ms=None, error_message=None):
+    """Registra a execução de uma migração no histórico"""
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        cursor.execute("""
+            INSERT INTO migration_history 
+            (migration_number, migration_name, executed_at, execution_time_ms, status, error_message)
+            VALUES (%s, %s, CURRENT_TIMESTAMP, %s, %s, %s)
+            ON CONFLICT (migration_number) 
+            DO UPDATE SET 
+                executed_at = CURRENT_TIMESTAMP,
+                execution_time_ms = EXCLUDED.execution_time_ms,
+                status = EXCLUDED.status,
+                error_message = EXCLUDED.error_message
+        """, (migration_number, migration_name, execution_time_ms, status, error_message))
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.debug(f"✅ Migração {migration_number} registrada: {status}")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao registrar migração {migration_number}: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+
+def run_migration_safe(migration_number, migration_name, migration_func):
+    """
+    Executa migração com rastreamento e idempotência garantida
+    
+    Args:
+        migration_number: Número da migração (ex: 43)
+        migration_name: Nome da migração (ex: "Completar estruturas v9.0")
+        migration_func: Função da migração a ser executada
+    
+    Returns:
+        bool: True se executada com sucesso, False caso contrário
+    """
+    import time
+    
+    # Verificar se já foi executada
+    if is_migration_executed(migration_number):
+        logger.info(f"⏭️  Migração {migration_number} ({migration_name}) já executada - SKIP")
+        return True
+    
+    logger.info(f"🔄 Executando Migração {migration_number}: {migration_name}")
+    start_time = time.time()
+    
+    try:
+        # Executar migração
+        migration_func()
+        
+        # Calcular tempo de execução
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Registrar sucesso
+        record_migration(migration_number, migration_name, 'success', execution_time_ms)
+        
+        logger.info(f"✅ Migração {migration_number} concluída em {execution_time_ms}ms")
+        return True
+        
+    except Exception as e:
+        # Calcular tempo mesmo em erro
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # CRÍTICO: Fazer rollback para limpar sessão
+        try:
+            db.session.rollback()
+            logger.debug("✅ Session rollback executado após falha na migração")
+        except Exception as rollback_error:
+            logger.warning(f"⚠️ Erro ao fazer rollback: {rollback_error}")
+        
+        # Registrar falha
+        error_msg = str(e)[:500]  # Limitar tamanho do erro
+        record_migration(migration_number, migration_name, 'failed', execution_time_ms, error_msg)
+        
+        logger.error(f"❌ Migração {migration_number} falhou após {execution_time_ms}ms: {e}")
+        
+        # Não propagar exceção - apenas logar
+        return False
+
+# ============================================================================
+# MIGRAÇÕES INDIVIDUAIS
+# ============================================================================
+
 def _migration_27_alimentacao_system():
     """
     Migration 27: Sistema de Alimentação
@@ -1532,83 +1695,83 @@ def _migration_42_funcionario_obras_ponto():
 
 def executar_migracoes():
     """
-    Execute todas as migrações necessárias automaticamente
-    REATIVADO PARA DEPLOY EASYPANEL COMPLETO
+    Execute todas as migrações necessárias automaticamente com rastreamento
+    Sistema robusto com idempotência garantida via migration_history
     """
     try:
-        logger.info("🔄 Iniciando migrações automáticas COMPLETAS do banco EasyPanel...")
+        logger.info("=" * 80)
+        logger.info("🚀 SISTEMA DE MIGRAÇÕES v2.0 - RASTREAMENTO ATIVO")
+        logger.info("=" * 80)
+        
         # Mascarar credenciais por segurança
         database_url = os.environ.get('DATABASE_URL', 'postgresql://sige:sige@viajey_sige:5432/sige')
-        logger.info(f"🎯 TARGET DATABASE: {mask_database_url(database_url)}")
+        logger.info(f"🎯 DATABASE: {mask_database_url(database_url)}")
         
-        # ===== MIGRAÇÕES ANTIGAS DESATIVADAS (JÁ APLICADAS EM PRODUÇÃO) =====
-        # Migração 1-19: Comentadas para otimizar tempo de deploy
-        # garantir_tabela_proposta_templates_existe()
-        # migrar_categoria_proposta_templates()
-        # migrar_colunas_faltantes_proposta_templates()
-        # migrar_campos_opcionais_propostas()
-        # migrar_personalizacao_visual_empresa()
-        # migrar_campos_organizacao_propostas()
-        # garantir_usuarios_producao()
-        # migrar_campos_completos_templates()
-        # migrar_campos_rdo_ocorrencia()
-        # migrar_campo_admin_id_rdo()
-        # migrar_sistema_rdo_aprimorado()
-        # adicionar_admin_id_servico()
-        # corrigir_admin_id_servicos_existentes()
-        # migrar_tabela_servico_obra_real()
-        # adicionar_coluna_local_rdo()
-        # adicionar_campos_allocation_employee()
-        # migrar_sistema_veiculos_critical()
-        # corrigir_admin_id_vehicle_tables()
-        # adicionar_colunas_veiculo_completas()
+        # PASSO 1: Garantir tabela de rastreamento existe
+        logger.info("📋 Inicializando sistema de rastreamento...")
+        ensure_migration_history_table()
         
-        # ===== MIGRAÇÕES ATIVAS =====
-        # Migração 20: UNIFICADA - Sistema de Veículos Inteligente
-        _migration_20_unified_vehicle_system()
-
-        # Migração 27: Sistema de Alimentação
-        _migration_27_alimentacao_system()
-
-        # Migração 33: Recriar tabela frota_despesa com schema completo
-        _migration_33_recreate_frota_despesa()
-
-        # Migração 34: Adicionar campos de pagamento no Restaurante
-        _migration_34_restaurante_campos_pagamento()
-
-        # Migração 35: Adicionar coluna numero_nota_fiscal na tabela custo_veiculo
-        _migration_35_custo_veiculo_numero_nota_fiscal()
-
-        # Migração 36: Remover tabelas antigas do sistema de propostas legado
-        _migration_36_remove_old_propostas_tables()
-
-        # Migração 37: Renomear campos em propostas_comerciais e adicionar cliente_id FK
-        _migration_37_rename_propostas_fields()
-
-        # Migração 38: Criar tabela proposta_historico
-        _migration_38_create_proposta_historico()
-
-        # Migração 39: Sistema de Almoxarifado v3.0
-        _migration_39_create_almoxarifado_system()
-
-        # Migração 40: Sistema de Ponto Eletrônico Compartilhado
-        _migration_40_ponto_compartilhado()
-
-        # Migração 41: Sistema Financeiro v9.0
-        _migration_41_sistema_financeiro()
-
-        # Migração 42: Configuração Obras/Funcionário para Ponto
-        _migration_42_funcionario_obras_ponto()
-
-        # Migração 43: Completar estruturas v9.0
-        _migration_43_completar_estruturas_v9()
-
+        # PASSO 2: Executar migrações com rastreamento
+        logger.info("🔄 Verificando migrações pendentes...")
+        
+        # ===== MIGRAÇÕES ATIVAS COM RASTREAMENTO =====
+        migrations_to_run = [
+            (20, "Sistema de Veículos Inteligente", _migration_20_unified_vehicle_system),
+            (27, "Sistema de Alimentação", _migration_27_alimentacao_system),
+            (33, "Recriar frota_despesa", _migration_33_recreate_frota_despesa),
+            (34, "Campos pagamento Restaurante", _migration_34_restaurante_campos_pagamento),
+            (35, "Coluna numero_nota_fiscal custo_veiculo", _migration_35_custo_veiculo_numero_nota_fiscal),
+            (36, "Remover tabelas propostas legado", _migration_36_remove_old_propostas_tables),
+            (37, "Renomear campos propostas_comerciais", _migration_37_rename_propostas_fields),
+            (38, "Criar proposta_historico", _migration_38_create_proposta_historico),
+            (39, "Sistema Almoxarifado v3.0", _migration_39_create_almoxarifado_system),
+            (40, "Sistema Ponto Eletrônico Compartilhado", _migration_40_ponto_compartilhado),
+            (41, "Sistema Financeiro v9.0", _migration_41_sistema_financeiro),
+            (42, "Configuração Obras/Funcionário Ponto", _migration_42_funcionario_obras_ponto),
+            (43, "Completar estruturas v9.0", _migration_43_completar_estruturas_v9),
+        ]
+        
+        # Executar cada migração com rastreamento
+        total_migrations = len(migrations_to_run)
+        executed_count = 0
+        skipped_count = 0
+        failed_count = 0
+        
+        for migration_number, migration_name, migration_func in migrations_to_run:
+            result = run_migration_safe(migration_number, migration_name, migration_func)
+            
+            if result:
+                # Verificar se foi executada ou pulada
+                if is_migration_executed(migration_number):
+                    # Se já estava executada antes, foi skip
+                    if result and "já executada" not in str(result):
+                        executed_count += 1
+                    else:
+                        skipped_count += 1
+            else:
+                failed_count += 1
+        
+        # Resumo final
         logger.info("=" * 80)
-        logger.info("✅ Migrações automáticas concluídas com sucesso!")
+        logger.info("📊 RESUMO DAS MIGRAÇÕES")
+        logger.info("=" * 80)
+        logger.info(f"✅ Executadas: {executed_count}")
+        logger.info(f"⏭️  Puladas (já aplicadas): {skipped_count}")
+        logger.info(f"❌ Falhas: {failed_count}")
+        logger.info(f"📝 Total processadas: {total_migrations}")
+        logger.info("=" * 80)
+        
+        if failed_count > 0:
+            logger.warning(f"⚠️  {failed_count} migração(ões) falharam - verifique os logs acima")
+        else:
+            logger.info("✅ Todas as migrações foram processadas com sucesso!")
+        
         logger.info("=" * 80)
         
     except Exception as e:
-        logger.error(f"❌ Erro durante migrações automáticas: {e}")
+        logger.error(f"❌ Erro crítico durante sistema de migrações: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         # Não interromper a aplicação, apenas logar o erro
         pass
 

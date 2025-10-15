@@ -3583,6 +3583,29 @@ class AlmoxarifadoMovimento(db.Model):
     )
 
 # ================================
+# RASTREAMENTO DE MIGRAÇÕES
+# ================================
+class MigrationHistory(db.Model):
+    """Rastreamento de migrações executadas para garantir idempotência"""
+    __tablename__ = 'migration_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    migration_number = db.Column(db.Integer, unique=True, nullable=False)
+    migration_name = db.Column(db.String(200), nullable=False)
+    executed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    execution_time_ms = db.Column(db.Integer)
+    status = db.Column(db.String(20), default='success')  # success, failed, skipped
+    error_message = db.Column(db.Text)
+    
+    __table_args__ = (
+        db.Index('idx_migration_number', 'migration_number'),
+        db.Index('idx_migration_executed', 'executed_at'),
+    )
+    
+    def __repr__(self):
+        return f'<Migration #{self.migration_number}: {self.migration_name}>'
+
+# ================================
 # ALIASES PARA COMPATIBILIDADE
 # ================================
 # Manter compatibilidade com código legado que importa Frota*
