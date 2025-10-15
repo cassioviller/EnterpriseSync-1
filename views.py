@@ -423,6 +423,7 @@ def dashboard():
     
     # Sistema robusto de detecção de admin_id para produção (MESMA LÓGICA DA PÁGINA FUNCIONÁRIOS)
     try:
+        print("DEBUG: Iniciando cálculos do dashboard...")
         # Determinar admin_id - usar mesma lógica que funciona na página funcionários
         admin_id = None  # Vamos detectar dinamicamente
         
@@ -476,20 +477,29 @@ def dashboard():
                 admin_id = 1  # Fallback absoluto
         
         # Estatísticas básicas
+        print("DEBUG: Buscando funcionários...")
         total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
+        print(f"DEBUG: {total_funcionarios} funcionários encontrados")
+        
+        print("DEBUG: Buscando obras...")
         total_obras = Obra.query.filter_by(admin_id=admin_id).count()
+        print(f"DEBUG: {total_obras} obras encontradas")
         
         # Funcionários recentes
+        print("DEBUG: Buscando funcionários recentes...")
         funcionarios_recentes = Funcionario.query.filter_by(
             admin_id=admin_id, ativo=True
-        ).order_by(desc(Funcionario.created_at)).limit(5).all()
+        ).order_by(Funcionario.created_at.desc()).limit(5).all()
+        print(f"DEBUG: {len(funcionarios_recentes)} funcionários recentes")
         
         # Obras ativas com progresso baseado em RDOs
+        print("DEBUG: Buscando obras ativas...")
         obras_ativas = Obra.query.filter_by(
             admin_id=admin_id
         ).filter(
             Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
-        ).order_by(desc(Obra.created_at)).limit(5).all()
+        ).order_by(Obra.created_at.desc()).limit(5).all()
+        print(f"DEBUG: {len(obras_ativas)} obras ativas encontradas")
         
         # Calcular progresso de cada obra baseado no RDO mais recente
         for obra in obras_ativas:
@@ -497,7 +507,7 @@ def dashboard():
                 # Buscar o RDO mais recente da obra
                 rdo_mais_recente = RDO.query.filter_by(
                     obra_id=obra.id
-                ).order_by(desc(RDO.data_relatorio)).first()
+                ).order_by(RDO.data_relatorio.desc()).first()
                 
                 if rdo_mais_recente and rdo_mais_recente.servico_subatividades:
                     # FÓRMULA SIMPLES: média das subatividades
@@ -819,7 +829,7 @@ def dashboard():
     except Exception as e:
         print(f"ERRO CÁLCULO DASHBOARD: {str(e)}")
         # Em caso de erro, usar valores padrão
-        total_veiculos = 5
+        total_veiculos = 0
         custos_mes = 0
         custos_detalhados = {
             'alimentacao': 0,
@@ -832,12 +842,51 @@ def dashboard():
         }
         funcionarios_por_departamento = {}
         custos_por_obra = {}
-    # Estatísticas calculadas
-    eficiencia_geral = 85.5
-    produtividade_obra = 92.3
+    
+    # Estatísticas dinâmicas calculadas
     funcionarios_ativos = total_funcionarios
     obras_ativas_count = len(obras_ativas)
-    veiculos_disponiveis = 3
+    
+    # 1. EFICIÊNCIA GERAL - Calcular baseado em horas trabalhadas vs esperadas
+    eficiencia_geral = 0
+    try:
+        # Horas esperadas = funcionários ativos * dias úteis * 8h
+        from datetime import datetime
+        dias_uteis_mes = 22  # Média de dias úteis
+        horas_esperadas = funcionarios_ativos * dias_uteis_mes * 8
+        
+        if horas_esperadas > 0 and total_horas_real > 0:
+            eficiencia_geral = round((total_horas_real / horas_esperadas) * 100, 1)
+            # Limitar entre 0 e 100%
+            eficiencia_geral = max(0, min(100, eficiencia_geral))
+        print(f"DEBUG EFICIÊNCIA: {total_horas_real}h trabalhadas / {horas_esperadas}h esperadas = {eficiencia_geral}%")
+    except Exception as e:
+        print(f"Erro ao calcular eficiência: {e}")
+        eficiencia_geral = 0
+    
+    # 2. PRODUTIVIDADE OBRA - Calcular baseado no progresso médio das obras
+    produtividade_obra = 0
+    try:
+        if len(obras_ativas) > 0:
+            progressos = [getattr(obra, 'progresso_atual', 0) for obra in obras_ativas]
+            produtividade_obra = round(sum(progressos) / len(progressos), 1)
+        print(f"DEBUG PRODUTIVIDADE: Média de {produtividade_obra}% em {len(obras_ativas)} obras")
+    except Exception as e:
+        print(f"Erro ao calcular produtividade: {e}")
+        produtividade_obra = 0
+    
+    # 3. VEÍCULOS DISPONÍVEIS - Buscar do banco de dados
+    veiculos_disponiveis = 0
+    try:
+        from models import Veiculo
+        veiculos_disponiveis = Veiculo.query.filter_by(
+            admin_id=admin_id, 
+            ativo=True
+        ).count()
+        print(f"DEBUG VEÍCULOS: {veiculos_disponiveis} ativos para admin_id={admin_id}")
+    except Exception as e:
+        print(f"Erro ao contar veículos disponíveis: {e}")
+        veiculos_disponiveis = 0
     
     # Adicionar contagem correta de obras ativas com tratamento de erro
     obras_ativas_count = safe_db_operation(
