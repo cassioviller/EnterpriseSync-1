@@ -146,7 +146,7 @@ html[data-bs-theme="dark"] .header-btn i {
 
 /* Estilo para títulos de seção */
 .section-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     color: white;
     padding: 12px 20px;
     border-radius: 8px;
@@ -216,6 +216,122 @@ html[data-bs-theme="dark"] .header-btn i {
             </form>
         </div>
     </div>
+
+    <div class="section-header">
+        <h4><i class="fas fa-dollar-sign"></i> Financeiro e Custos</h4>
+    </div>
+
+    <!-- Custos Detalhados -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Custos Detalhados do Período
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
+                                <h6>Alimentação</h6>
+                                <h5 class="text-warning">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-car fa-2x text-info mb-2"></i>
+                                <h6>Transporte</h6>
+                                <h5 class="text-info">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-users fa-2x text-success mb-2"></i>
+                                <h6>Mão de Obra</h6>
+                                <h5 class="text-success">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                                <h6>Faltas Justificadas</h6>
+                                <h5 class="text-warning">{{ custos_detalhados.faltas_justificadas_qtd if custos_detalhados.faltas_justificadas_qtd is defined else 0 }} dias</h5>
+                                <small class="text-muted">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas if custos_detalhados.faltas_justificadas is defined else 0).replace(',', '.') }}</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-cogs fa-2x text-secondary mb-2"></i>
+                                <h6>Outros</h6>
+                                <h5 class="text-secondary">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-calculator fa-2x text-primary mb-2"></i>
+                                <h6>Total</h6>
+                                <h5 class="text-primary">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos de Custos -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> Custos por Obra
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="custosObraChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-receipt"></i> Custos Recentes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if custos_recentes %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Obra</th>
+                                        <th>Custo Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for custo in custos_recentes %}
+                                    <tr>
+                                        <td>{{ custo.nome }}</td>
+                                        <td>R$ {{ '{:,.2f}'.format(custo.total_custo) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">Nenhum custo registrado.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
 
     <!-- 📈 VISÃO GERAL - KPIs Principais -->
     <div class="section-header">
@@ -602,121 +718,6 @@ html[data-bs-theme="dark"] .header-btn i {
     </div>
 
     <!-- 💰 FINANCEIRO E CUSTOS -->
-    <div class="section-header">
-        <h4><i class="fas fa-dollar-sign"></i> Financeiro e Custos</h4>
-    </div>
-
-    <!-- Custos Detalhados -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-chart-pie"></i> Custos Detalhados do Período
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
-                                <h6>Alimentação</h6>
-                                <h5 class="text-warning">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h5>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-car fa-2x text-info mb-2"></i>
-                                <h6>Transporte</h6>
-                                <h5 class="text-info">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h5>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-users fa-2x text-success mb-2"></i>
-                                <h6>Mão de Obra</h6>
-                                <h5 class="text-success">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h5>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
-                                <h6>Faltas Justificadas</h6>
-                                <h5 class="text-warning">{{ custos_detalhados.faltas_justificadas_qtd if custos_detalhados.faltas_justificadas_qtd is defined else 0 }} dias</h5>
-                                <small class="text-muted">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas if custos_detalhados.faltas_justificadas is defined else 0).replace(',', '.') }}</small>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-cogs fa-2x text-secondary mb-2"></i>
-                                <h6>Outros</h6>
-                                <h5 class="text-secondary">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</h5>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-calculator fa-2x text-primary mb-2"></i>
-                                <h6>Total</h6>
-                                <h5 class="text-primary">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</h5>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Gráficos de Custos -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-chart-bar"></i> Custos por Obra
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="custosObraChart" width="400" height="200"></canvas>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-receipt"></i> Custos Recentes
-                    </h5>
-                </div>
-                <div class="card-body">
-                    {% if custos_recentes %}
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Obra</th>
-                                        <th>Custo Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for custo in custos_recentes %}
-                                    <tr>
-                                        <td>{{ custo.nome }}</td>
-                                        <td>R$ {{ '{:,.2f}'.format(custo.total_custo) }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-muted mb-0">Nenhum custo registrado.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-</div>
 
 <script>
 // Função específica para filtros do dashboard
