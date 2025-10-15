@@ -436,7 +436,7 @@ class CustoObra(db.Model):
     obra = db.relationship('Obra', overlaps="custos,obra_ref")
     centro_custo_ref = db.relationship('CentroCusto', backref='custos')
     funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id])
-    veiculo = db.relationship('FrotaVeiculo', foreign_keys=[veiculo_id])
+    veiculo = db.relationship('Vehicle', foreign_keys=[veiculo_id])
     admin = db.relationship('Usuario', foreign_keys=[admin_id])
 
 # Novos modelos para Gestão Financeira Avançada
