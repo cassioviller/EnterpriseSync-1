@@ -277,6 +277,14 @@ with app.app_context():
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint financeiro: {e}")
     
+    # Blueprint custos v9.0
+    try:
+        from custos_views import custos_bp
+        app.register_blueprint(custos_bp)
+        logging.info("✅ Blueprint custos v9.0 registrado")
+    except Exception as e:
+        logging.error(f"❌ Erro ao registrar blueprint custos: {e}")
+    
     # Blueprint templates de propostas
     try:
         from templates_views import templates_bp
