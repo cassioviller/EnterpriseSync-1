@@ -20,6 +20,7 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Ambiente de produção com 80 tabelas deve ser preservado durante migrações
 
 ## Recent Changes
+- **2025-10-15:** Toggle Ativo/Finalizado em Obras - Botão fácil na página de detalhes permite alternar status da obra entre ATIVO (verde) e FINALIZADO (cinza). Obras finalizadas são automaticamente removidas de todos os dropdowns do sistema (RDO, Almoxarifado, Financeiro, etc).
 - **2025-10-15:** Dashboard fully dynamized - All proposal KPIs now calculated from live database (status counts, conversion rate, average value, template usage, portal analytics). Replaced all hardcoded values with real-time queries scoped by tenant admin_id.
 - **2025-10-15:** Dashboard reorganized by module - KPIs now grouped in clear sections with Financeiro e Custos as first priority, followed by Visão Geral, Recursos Humanos, Obras e RDO, and Propostas Comerciais as last. Green gradient section headers (#10b981 to #059669) for improved scannability and brand alignment.
 
