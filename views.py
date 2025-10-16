@@ -936,7 +936,7 @@ def dashboard():
     eficiencia_geral = 0
     try:
         # Horas esperadas = funcionários ativos * dias úteis * 8h
-        from datetime import datetime
+        # datetime já importado no topo do arquivo (linha 9)
         dias_uteis_mes = 22  # Média de dias úteis
         horas_esperadas = funcionarios_ativos * dias_uteis_mes * 8
         
@@ -972,6 +972,32 @@ def dashboard():
     except Exception as e:
         print(f"Erro ao contar veículos disponíveis: {e}")
         veiculos_disponiveis = 0
+    
+    # 4. MARGEM DE LUCRO - Calcular baseado em valor de contratos vs custos
+    margem_percentual = 0
+    valor_contrato_total = 0
+    try:
+        # Buscar valor total de contratos das obras ativas (importar func explicitamente)
+        from sqlalchemy import func as sql_func
+        valor_contrato_total = db.session.query(
+            sql_func.sum(Obra.valor_contrato)
+        ).filter(
+            Obra.admin_id == admin_id,
+            Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
+        ).scalar() or 0
+        
+        # Calcular margem percentual
+        if valor_contrato_total > 0:
+            margem_percentual = round(
+                ((valor_contrato_total - custos_mes) / valor_contrato_total) * 100, 
+                1
+            )
+            # Margem pode ser >100% (se custos < 0) ou negativa (se custos > contratos)
+        print(f"DEBUG MARGEM: Contratos=R${valor_contrato_total:.2f}, Custos=R${custos_mes:.2f}, Margem={margem_percentual}%")
+    except Exception as e:
+        print(f"Erro ao calcular margem: {e}")
+        valor_contrato_total = 0
+        margem_percentual = 0
     
     # Adicionar contagem correta de obras ativas com tratamento de erro
     obras_ativas_count = safe_db_operation(
@@ -1010,6 +1036,8 @@ def dashboard():
                          funcionarios_ativos=funcionarios_ativos,
                          obras_ativas_count=obras_ativas_count,
                          veiculos_disponiveis=veiculos_disponiveis,
+                         margem_percentual=margem_percentual,
+                         valor_contrato_total=valor_contrato_total,
                          funcionarios_por_departamento=funcionarios_por_departamento,
                          custos_por_obra=custos_por_obra,
                          funcionarios_dept=funcionarios_dept,
