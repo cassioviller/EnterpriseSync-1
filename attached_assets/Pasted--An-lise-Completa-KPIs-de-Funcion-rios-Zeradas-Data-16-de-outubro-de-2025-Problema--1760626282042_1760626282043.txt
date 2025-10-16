@@ -1,0 +1,612 @@
+# Análise Completa - KPIs de Funcionários Zeradas
+
+**Data:** 16 de outubro de 2025  
+**Problema:** KPIs mostram R$ 0.00 e 0.0h apesar de ter 21 funcionários ativos  
+**Causa Raiz:** Incompatibilidade entre lançamentos manuais e sistema de ponto automatizado
+
+---
+
+## 🔍 PROBLEMA IDENTIFICADO
+
+### Sintomas:
+- ✅ **Funcionários Ativos:** 21 (OK - está contando corretamente)
+- ❌ **Custo Total:** R$ 0.00 (ERRADO - deveria mostrar soma dos custos)
+- ❌ **Total de Horas:** 0.0h (ERRADO - deveria mostrar horas trabalhadas)
+- ❌ **Faltas Justificadas:** 0 dias / R$ 0.00 (ERRADO)
+- ❌ **Faltas Normais:** 0 dias (ERRADO)
+- ❌ **Taxa de Absenteísmo:** 0.0% (ERRADO)
+- ❌ **Total de Faltas:** 0 dias (ERRADO)
+
+---
+
+## 🎯 CAUSA RAIZ IDENTIFICADA
+
+### Análise do Código (views.py, linhas 1305-1324):
+
+```python
+# Linha 1305-1309: Busca registros de ponto
+registros = RegistroPonto.query.filter(
+    RegistroPonto.funcionario_id == func.id,
+    RegistroPonto.data >= data_inicio,
+    RegistroPonto.data <= data_fim
+).all()
+
+# Linha 1311-1314: Calcula KPIs baseado nos registros
+total_horas = sum(r.horas_trabalhadas or 0 for r in registros)  # ❌ PROBLEMA 1
+total_extras = sum(r.horas_extras or 0 for r in registros)
+total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])  # ❌ PROBLEMA 2
+total_faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
+
+# Linha 1323: Calcula custo total
+'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)  # ❌ PROBLEMA 3
+```
+
+---
+
+## 🚨 3 PROBLEMAS CRÍTICOS IDENTIFICADOS
+
+### PROBLEMA 1: Campo `horas_trabalhadas` Vazio
+
+**O que acontece:**
+- O código soma `r.horas_trabalhadas` dos registros
+- Se você fez lançamentos manuais, provavelmente preencheu apenas `hora_entrada` e `hora_saida`
+- O campo `horas_trabalhadas` não foi calculado automaticamente nos lançamentos antigos
+- Resultado: `sum(r.horas_trabalhadas or 0 for r in registros)` = 0
+
+**Evidência:**
+```python
+# Estrutura do modelo RegistroPonto
+hora_entrada = db.Column(db.Time)
+hora_saida = db.Column(db.Time)
+horas_trabalhadas = db.Column(db.Float, default=0.0)  # ❌ Pode estar vazio!
+```
+
+---
+
+### PROBLEMA 2: Campo `tipo_registro` Incorreto
+
+**O que acontece:**
+- O código filtra faltas por `r.tipo_registro == 'falta'`
+- Lançamentos manuais podem ter `tipo_registro = 'trabalhado'` (padrão)
+- Ou podem ter `tipo_registro = None` se não foi preenchido
+- Resultado: Faltas não são contadas
+
+**Valores possíveis:**
+- `'trabalhado'` (padrão)
+- `'falta'`
+- `'falta_justificada'`
+- `'feriado'`
+- `'feriado_trabalhado'`
+- `'sabado_horas_extras'`
+- `'domingo_horas_extras'`
+
+---
+
+### PROBLEMA 3: Valor/Hora Fixo (220h) - JÁ IDENTIFICADO
+
+**O que acontece:**
+- Mesmo que as horas fossem calculadas, o custo estaria errado
+- Usa divisor fixo de 220h ao invés de calcular corretamente
+
+```python
+# ❌ ERRADO
+func.salario / 220
+
+# ✅ CORRETO
+calcular_valor_hora(func.salario, func.jornada_semanal)
+```
+
+---
+
+## 💡 SOLUÇÕES
+
+### SOLUÇÃO 1: Recalcular `horas_trabalhadas` dos Registros Existentes
+
+**Opção A: Script de Migração (Recomendado)**
+
+Criar um script que recalcula `horas_trabalhadas` para todos os registros que têm `hora_entrada` e `hora_saida` mas `horas_trabalhadas = 0`:
+
+```python
+# migration_recalcular_horas.py
+from app import create_app, db
+from models import RegistroPonto
+from datetime import datetime, timedelta
+
+app = create_app()
+
+def calcular_horas_trabalhadas(entrada, saida, almoco_saida=None, almoco_retorno=None):
+    """Calcula horas trabalhadas considerando intervalo de almoço"""
+    if not entrada or not saida:
+        return 0.0
+    
+    # Converte time para datetime para fazer cálculos
+    hoje = datetime.today().date()
+    dt_entrada = datetime.combine(hoje, entrada)
+    dt_saida = datetime.combine(hoje, saida)
+    
+    # Se saída é antes da entrada, assumir que passou da meia-noite
+    if dt_saida < dt_entrada:
+        dt_saida += timedelta(days=1)
+    
+    # Calcula total de horas
+    total = (dt_saida - dt_entrada).total_seconds() / 3600
+    
+    # Desconta intervalo de almoço se houver
+    if almoco_saida and almoco_retorno:
+        dt_almoco_saida = datetime.combine(hoje, almoco_saida)
+        dt_almoco_retorno = datetime.combine(hoje, almoco_retorno)
+        
+        if dt_almoco_retorno < dt_almoco_saida:
+            dt_almoco_retorno += timedelta(days=1)
+        
+        intervalo_almoco = (dt_almoco_retorno - dt_almoco_saida).total_seconds() / 3600
+        total -= intervalo_almoco
+    else:
+        # Desconta 1h de almoço padrão se trabalhou mais de 6h
+        if total > 6:
+            total -= 1
+    
+    return round(total, 2)
+
+with app.app_context():
+    # Busca todos os registros com horas_trabalhadas = 0 mas que têm entrada/saída
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.horas_trabalhadas == 0,
+        RegistroPonto.hora_entrada.isnot(None),
+        RegistroPonto.hora_saida.isnot(None)
+    ).all()
+    
+    print(f"Encontrados {len(registros)} registros para recalcular")
+    
+    contador = 0
+    for registro in registros:
+        horas = calcular_horas_trabalhadas(
+            registro.hora_entrada,
+            registro.hora_saida,
+            registro.hora_almoco_saida,
+            registro.hora_almoco_retorno
+        )
+        
+        registro.horas_trabalhadas = horas
+        contador += 1
+        
+        if contador % 100 == 0:
+            print(f"Processados {contador} registros...")
+    
+    db.session.commit()
+    print(f"✅ {contador} registros atualizados com sucesso!")
+```
+
+**Como executar:**
+1. Salvar o script como `migration_recalcular_horas.py`
+2. Executar: `python3.11 migration_recalcular_horas.py`
+3. Verificar logs
+4. Recarregar página de funcionários
+
+---
+
+**Opção B: Calcular em Tempo Real (Alternativa)**
+
+Modificar a função `funcionarios()` para calcular horas mesmo se o campo estiver vazio:
+
+```python
+# views.py, linha 1311
+# ANTES (INCORRETO):
+total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
+
+# DEPOIS (CORRETO):
+total_horas = 0
+for r in registros:
+    if r.horas_trabalhadas and r.horas_trabalhadas > 0:
+        # Usa o valor já calculado
+        total_horas += r.horas_trabalhadas
+    elif r.hora_entrada and r.hora_saida:
+        # Calcula em tempo real se não tiver valor
+        horas = calcular_horas_trabalhadas(
+            r.hora_entrada,
+            r.hora_saida,
+            r.hora_almoco_saida,
+            r.hora_almoco_retorno
+        )
+        total_horas += horas
+```
+
+---
+
+### SOLUÇÃO 2: Corrigir Detecção de Faltas
+
+**Problema:** Faltas podem não ter `tipo_registro` correto
+
+**Solução:** Detectar faltas de múltiplas formas:
+
+```python
+# views.py, linha 1313-1314
+# ANTES (INCORRETO):
+total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
+total_faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
+
+# DEPOIS (CORRETO):
+total_faltas = 0
+total_faltas_justificadas = 0
+
+for r in registros:
+    # Detecta falta de 3 formas:
+    # 1. tipo_registro explícito
+    # 2. horas_trabalhadas = 0 e não é feriado
+    # 3. sem entrada/saída em dia útil
+    
+    if r.tipo_registro == 'falta':
+        total_faltas += 1
+    elif r.tipo_registro == 'falta_justificada':
+        total_faltas_justificadas += 1
+    elif (r.horas_trabalhadas == 0 and 
+          not r.hora_entrada and 
+          not r.hora_saida and
+          r.data.weekday() < 5 and  # Segunda a sexta
+          r.tipo_registro not in ['feriado', 'feriado_trabalhado']):
+        # Provavelmente é falta não marcada
+        # Verificar se é justificada pela observação
+        if r.observacoes and 'justificad' in r.observacoes.lower():
+            total_faltas_justificadas += 1
+        else:
+            total_faltas += 1
+```
+
+---
+
+### SOLUÇÃO 3: Corrigir Cálculo de Valor/Hora (JÁ IDENTIFICADO)
+
+```python
+# views.py, linha 1323
+# ANTES (INCORRETO):
+'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)
+
+# DEPOIS (CORRETO):
+from utils import calcular_valor_hora
+
+valor_hora = calcular_valor_hora(
+    salario=func.salario,
+    jornada_semanal=func.jornada_semanal
+) if func.salario else 0
+
+'custo_total': (total_horas + total_extras * 1.5) * valor_hora
+```
+
+---
+
+### SOLUÇÃO 4: Adicionar Fallback para Período sem Registros
+
+**Problema:** Se não há registros de ponto, as KPIs ficam zeradas mesmo tendo funcionários
+
+**Solução:** Mostrar custo estimado baseado no salário:
+
+```python
+# views.py, após linha 1324
+if len(registros) == 0 and func.salario:
+    # Se não há registros, estimar baseado no salário mensal
+    from utils import calcular_dias_uteis_mes
+    
+    dias_uteis = calcular_dias_uteis_mes(
+        data_inicio.year,
+        data_inicio.month
+    )
+    
+    horas_estimadas = dias_uteis * (func.jornada_semanal / 5)  # Horas por dia
+    
+    funcionarios_kpis.append({
+        'funcionario': func,
+        'horas_trabalhadas': horas_estimadas,
+        'total_horas': horas_estimadas,
+        'total_extras': 0,
+        'total_faltas': 0,
+        'total_faltas_justificadas': 0,
+        'custo_total': func.salario,  # Custo = salário mensal
+        'estimado': True  # Flag para mostrar que é estimativa
+    })
+else:
+    # Código existente...
+```
+
+---
+
+## 🎯 PROMPT PARA REPLIT AGENT
+
+```markdown
+**CONTEXTO:**
+
+Sistema SIGE v8.0 - Página de Funcionários mostrando KPIs zeradas (R$ 0.00, 0.0h) apesar de ter 21 funcionários ativos.
+
+**CAUSA RAIZ IDENTIFICADA:**
+
+1. **Campo `horas_trabalhadas` vazio:** Lançamentos manuais antigos têm `hora_entrada` e `hora_saida`, mas `horas_trabalhadas = 0`
+2. **Campo `tipo_registro` incorreto:** Faltas não são detectadas porque `tipo_registro` não foi preenchido
+3. **Valor/hora fixo:** Usa divisor 220h ao invés de calcular corretamente
+
+**ARQUIVOS A MODIFICAR:**
+
+1. `views.py` - Função `funcionarios()` (linhas 1305-1350)
+2. Criar novo arquivo: `migration_recalcular_horas.py`
+
+---
+
+## CORREÇÃO 1: Criar Script de Migração
+
+**Criar arquivo:** `migration_recalcular_horas.py`
+
+```python
+from app import create_app, db
+from models import RegistroPonto
+from datetime import datetime, timedelta
+
+app = create_app()
+
+def calcular_horas_trabalhadas(entrada, saida, almoco_saida=None, almoco_retorno=None):
+    """Calcula horas trabalhadas considerando intervalo de almoço"""
+    if not entrada or not saida:
+        return 0.0
+    
+    # Converte time para datetime para fazer cálculos
+    hoje = datetime.today().date()
+    dt_entrada = datetime.combine(hoje, entrada)
+    dt_saida = datetime.combine(hoje, saida)
+    
+    # Se saída é antes da entrada, assumir que passou da meia-noite
+    if dt_saida < dt_entrada:
+        dt_saida += timedelta(days=1)
+    
+    # Calcula total de horas
+    total = (dt_saida - dt_entrada).total_seconds() / 3600
+    
+    # Desconta intervalo de almoço se houver
+    if almoco_saida and almoco_retorno:
+        dt_almoco_saida = datetime.combine(hoje, almoco_saida)
+        dt_almoco_retorno = datetime.combine(hoje, almoco_retorno)
+        
+        if dt_almoco_retorno < dt_almoco_saida:
+            dt_almoco_retorno += timedelta(days=1)
+        
+        intervalo_almoco = (dt_almoco_retorno - dt_almoco_saida).total_seconds() / 3600
+        total -= intervalo_almoco
+    else:
+        # Desconta 1h de almoço padrão se trabalhou mais de 6h
+        if total > 6:
+            total -= 1
+    
+    return round(total, 2)
+
+with app.app_context():
+    # Busca todos os registros com horas_trabalhadas = 0 mas que têm entrada/saída
+    registros = RegistroPonto.query.filter(
+        RegistroPonto.horas_trabalhadas == 0,
+        RegistroPonto.hora_entrada.isnot(None),
+        RegistroPonto.hora_saida.isnot(None)
+    ).all()
+    
+    print(f"Encontrados {len(registros)} registros para recalcular")
+    
+    contador = 0
+    for registro in registros:
+        horas = calcular_horas_trabalhadas(
+            registro.hora_entrada,
+            registro.hora_saida,
+            registro.hora_almoco_saida,
+            registro.hora_almoco_retorno
+        )
+        
+        registro.horas_trabalhadas = horas
+        contador += 1
+        
+        if contador % 100 == 0:
+            print(f"Processados {contador} registros...")
+    
+    db.session.commit()
+    print(f"✅ {contador} registros atualizados com sucesso!")
+```
+
+---
+
+## CORREÇÃO 2: Modificar Função funcionarios() em views.py
+
+**Localização:** `views.py`, linhas 1305-1350
+
+**MODIFICAÇÃO 1 - Calcular horas em tempo real se necessário:**
+
+**ANTES (linha 1311):**
+```python
+total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
+```
+
+**DEPOIS:**
+```python
+# Importar função auxiliar no topo do arquivo
+from utils import calcular_valor_hora, calcular_dias_uteis_mes
+
+# Calcular horas (usa valor salvo ou calcula em tempo real)
+total_horas = 0
+for r in registros:
+    if r.horas_trabalhadas and r.horas_trabalhadas > 0:
+        total_horas += r.horas_trabalhadas
+    elif r.hora_entrada and r.hora_saida:
+        # Calcula em tempo real se não tiver valor
+        hoje = datetime.today().date()
+        dt_entrada = datetime.combine(hoje, r.hora_entrada)
+        dt_saida = datetime.combine(hoje, r.hora_saida)
+        
+        if dt_saida < dt_entrada:
+            dt_saida += timedelta(days=1)
+        
+        horas = (dt_saida - dt_entrada).total_seconds() / 3600
+        
+        # Desconta 1h de almoço se trabalhou mais de 6h
+        if horas > 6:
+            horas -= 1
+        
+        total_horas += horas
+```
+
+---
+
+**MODIFICAÇÃO 2 - Detectar faltas de múltiplas formas:**
+
+**ANTES (linhas 1313-1314):**
+```python
+total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
+total_faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
+```
+
+**DEPOIS:**
+```python
+total_faltas = 0
+total_faltas_justificadas = 0
+
+for r in registros:
+    if r.tipo_registro == 'falta':
+        total_faltas += 1
+    elif r.tipo_registro == 'falta_justificada':
+        total_faltas_justificadas += 1
+    elif (r.horas_trabalhadas == 0 and 
+          not r.hora_entrada and 
+          not r.hora_saida and
+          r.data.weekday() < 5 and
+          r.tipo_registro not in ['feriado', 'feriado_trabalhado']):
+        # Falta não marcada explicitamente
+        if r.observacoes and 'justificad' in r.observacoes.lower():
+            total_faltas_justificadas += 1
+        else:
+            total_faltas += 1
+```
+
+---
+
+**MODIFICAÇÃO 3 - Corrigir cálculo de valor/hora:**
+
+**ANTES (linha 1323):**
+```python
+'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)
+```
+
+**DEPOIS:**
+```python
+# Calcula valor/hora correto baseado na jornada
+valor_hora = calcular_valor_hora(
+    salario=func.salario,
+    jornada_semanal=func.jornada_semanal
+) if func.salario else 0
+
+'custo_total': (total_horas + total_extras * 1.5) * valor_hora
+```
+
+---
+
+**MODIFICAÇÃO 4 - Adicionar fallback para período sem registros:**
+
+**ADICIONAR após linha 1335 (dentro do except):**
+
+```python
+# Se não há registros mas funcionário tem salário, estimar custo
+if len(registros) == 0 and func.salario:
+    dias_uteis = calcular_dias_uteis_mes(
+        data_inicio.year,
+        data_inicio.month
+    )
+    
+    horas_estimadas = dias_uteis * (func.jornada_semanal / 5) if func.jornada_semanal else dias_uteis * 8
+    
+    funcionarios_kpis.append({
+        'funcionario': func,
+        'horas_trabalhadas': horas_estimadas,
+        'total_horas': horas_estimadas,
+        'total_extras': 0,
+        'total_faltas': 0,
+        'total_faltas_justificadas': 0,
+        'custo_total': func.salario,
+        'estimado': True
+    })
+else:
+    # Código existente (linhas 1316-1335)
+    ...
+```
+
+---
+
+## VALIDAÇÃO
+
+Após implementar as correções:
+
+1. **Executar script de migração:**
+   ```bash
+   python3.11 migration_recalcular_horas.py
+   ```
+
+2. **Verificar logs:**
+   - Deve mostrar quantos registros foram atualizados
+   - Ex: "✅ 1.523 registros atualizados com sucesso!"
+
+3. **Recarregar página de funcionários:**
+   - Custo Total deve mostrar valor > R$ 0.00
+   - Total de Horas deve mostrar valor > 0.0h
+   - Faltas devem ser contadas corretamente
+
+4. **Testar com diferentes períodos:**
+   - Mês Atual
+   - Último Mês
+   - 3 Meses
+   - Ano Atual
+
+5. **Verificar KPIs individuais:**
+   - Clicar em um funcionário
+   - Verificar se horas e custos aparecem
+
+---
+
+## RESULTADO ESPERADO
+
+**ANTES:**
+```
+Funcionários Ativos: 21
+Custo Total: R$ 0.00          ❌
+Total de Horas: 0.0h          ❌
+Faltas Justificadas: 0 dias   ❌
+Taxa de Absenteísmo: 0.0%     ❌
+```
+
+**DEPOIS:**
+```
+Funcionários Ativos: 21
+Custo Total: R$ 45.320,00     ✅
+Total de Horas: 3.528h        ✅
+Faltas Justificadas: 12 dias  ✅
+Taxa de Absenteísmo: 2.3%     ✅
+```
+
+---
+
+## PRIORIDADE
+
+🔴 **ALTA** - Funcionalidade crítica para gestão de RH
+
+**Tempo Estimado:** 1-2 horas (incluindo testes)
+```
+
+---
+
+## 📊 RESUMO TÉCNICO
+
+### Problemas:
+1. ✅ Campo `horas_trabalhadas` vazio em lançamentos antigos
+2. ✅ Campo `tipo_registro` não preenchido corretamente
+3. ✅ Valor/hora fixo 220h (erro sistêmico)
+4. ✅ Sem fallback para períodos sem registros
+
+### Soluções:
+1. ✅ Script de migração para recalcular horas
+2. ✅ Cálculo em tempo real como fallback
+3. ✅ Detecção inteligente de faltas
+4. ✅ Uso de `calcular_valor_hora()` correto
+5. ✅ Estimativa baseada em salário quando não há registros
+
+### Impacto:
+- 🎯 KPIs voltam a funcionar corretamente
+- 📊 Dados históricos são preservados e recalculados
+- ✅ Sistema fica robusto para lançamentos futuros
+
