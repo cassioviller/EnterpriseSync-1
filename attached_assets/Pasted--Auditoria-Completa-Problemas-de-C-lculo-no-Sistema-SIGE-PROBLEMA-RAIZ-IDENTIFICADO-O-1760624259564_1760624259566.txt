@@ -1,0 +1,374 @@
+# Auditoria Completa - Problemas de Cálculo no Sistema SIGE
+
+## 🚨 PROBLEMA RAIZ IDENTIFICADO
+
+O sistema está usando **valores fixos e incorretos** para cálculos de salário, horas e custos em TODO o código.
+
+---
+
+## ❌ PROBLEMA CRÍTICO 1: Valor/Hora Fixo em 220h
+
+### Ocorrências Encontradas:
+
+| Linha | Arquivo | Código | Problema |
+|-------|---------|--------|----------|
+| 164 | views.py | `valor_hora = funcionario.salario / 220` | ❌ Fixo 220h |
+| 781 | views.py | `valor_hora = (func.salario / 220)` | ❌ Fixo 220h |
+| 1323 | views.py | `(func.salario / 220 if func.salario else 0)` | ❌ Fixo 220h |
+| 1442 | views.py | `valor_hora = (funcionario.salario / 220)` | ❌ Fixo 220h |
+| 1570 | views.py | `valor_hora = (funcionario.salario / 220)` | ❌ Fixo 220h |
+| 1733 | views.py | `valor_hora = funcionario.salario / 220` | ❌ Fixo 220h |
+| 2647 | views.py | `(COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas)` | ❌ Fixo 220h + SQL |
+| 2673 | views.py | `(COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas)` | ❌ Fixo 220h + SQL |
+| 2700 | views.py | `'salario_hora': float(salario or 1500) / 220.0` | ❌ Fixo 220h |
+
+**Total:** 9 ocorrências de cálculo incorreto
+
+---
+
+## ❌ PROBLEMA CRÍTICO 2: Valor/Dia Fixo em 22 dias
+
+### Ocorrências Encontradas:
+
+| Linha | Arquivo | Código | Problema |
+|-------|---------|--------|----------|
+| 857 | views.py | `valor_dia = (funcionario.salario / 22)` | ❌ Fixo 22 dias |
+| 1349 | views.py | `custo_dia = func.salario / 22` | ❌ Fixo 22 dias |
+
+**Total:** 2 ocorrências de cálculo incorreto de valor/dia
+
+---
+
+## 📊 IMPACTO DOS CÁLCULOS INCORRETOS
+
+### Exemplo Real:
+
+**Funcionário:** João Silva  
+**Salário:** R$ 3.000,00  
+**Horário:** 7h12 às 17h (8.8h/dia efetivas)  
+**Mês:** Outubro/2025 (23 dias úteis)
+
+#### ❌ CÁLCULO ATUAL (INCORRETO):
+```
+Horas mensais = 220h (FIXO)
+Valor/hora = R$ 3.000 / 220 = R$ 13,64
+
+Se trabalhou 184h no mês:
+Custo = 184h × R$ 13,64 = R$ 2.509,76
+```
+
+#### ✅ CÁLCULO CORRETO:
+```
+Dias úteis = 23 dias
+Horas/dia = 8.8h
+Horas mensais = 23 × 8.8 = 202.4h
+Valor/hora = R$ 3.000 / 202.4 = R$ 14,82
+
+Se trabalhou 184h no mês:
+Custo = 184h × R$ 14,82 = R$ 2.726,88
+```
+
+**Diferença:** R$ 217,12 (8.6% de erro!)
+
+---
+
+## 🔍 FUNÇÕES CORRETAS JÁ EXISTEM (MAS NÃO SÃO USADAS!)
+
+### Em `utils.py`:
+
+#### ✅ Função 1: `calcular_valor_hora_corrigido(funcionario)` - Linha 150
+```python
+def calcular_valor_hora_corrigido(funcionario):
+    """
+    Calcula o valor/hora correto baseado no horário de trabalho do funcionário
+    
+    FÓRMULA CORRIGIDA:
+    - Se funcionário tem horário cadastrado: usar horas_diarias do horário
+    - Se não tem horário: usar padrão 8.8h (7h12-17h com 1h almoço)  
+    - valor_hora = salario_mensal / horas_mensais_reais
+    """
+    # ... código correto ...
+    
+    # Determinar horas diárias baseado no horário do funcionário
+    if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+        horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
+    else:
+        horas_diarias = 8.8  # Padrão
+    
+    # Horas mensais reais = dias_úteis × horas_diarias
+    horas_mensais_reais = dias_uteis * horas_diarias
+    
+    # Valor/hora = salário ÷ horas mensais reais
+    valor_hora = float(funcionario.salario) / horas_mensais_reais
+    
+    return round(valor_hora, 2)
+```
+
+#### ✅ Função 2: `calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)` - Linha 198
+```python
+def calcular_valor_hora_periodo(funcionario, data_inicio, data_fim):
+    """
+    Calcula o valor/hora baseado no período específico (mês dos dados)
+    """
+    # ... calcula dias úteis do período específico ...
+```
+
+---
+
+## 🎯 ONDE CADA CÁLCULO INCORRETO ESTÁ SENDO USADO
+
+### 1. **Linha 164** - Função `_calcular_custos_obra()`
+```python
+def _calcular_custos_obra(admin_id, data_inicio, data_fim):
+    ...
+    valor_hora = funcionario.salario / 220  # ❌ INCORRETO
+    horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
+    custo_total_obra += horas * valor_hora
+```
+
+**Impacto:** Custos por obra calculados incorretamente
+
+---
+
+### 2. **Linha 781** - Função `dashboard()` - Cálculo de Mão de Obra
+```python
+# Valor/hora do funcionário
+valor_hora = (func.salario / 220) if func.salario else 0  # ❌ INCORRETO
+custo_func = (horas_func + extras_func * 1.5) * valor_hora
+```
+
+**Impacto:** KPI de "Mão de Obra" no dashboard está incorreto
+
+---
+
+### 3. **Linha 857** - Função `calcular_faltas_justificadas()`
+```python
+for falta in faltas_justificadas:
+    funcionario = Funcionario.query.get(falta.funcionario_id)
+    if funcionario and funcionario.salario:
+        valor_dia = (funcionario.salario / 22)  # ❌ INCORRETO
+        custo += valor_dia
+```
+
+**Impacto:** KPI de "Faltas Justificadas" no dashboard está incorreto
+
+---
+
+### 4. **Linha 1323** - Função `funcionarios()` - Lista de funcionários
+```python
+'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)  # ❌ INCORRETO
+```
+
+**Impacto:** Custo total na listagem de funcionários está incorreto
+
+---
+
+### 5. **Linha 1349** - Função `funcionarios()` - Cálculo de faltas
+```python
+custo_dia = func.salario / 22  # ❌ INCORRETO
+```
+
+**Impacto:** Custo de faltas na listagem de funcionários está incorreto
+
+---
+
+### 6. **Linha 1442** - Função `funcionario_perfil()` - Perfil do funcionário
+```python
+valor_hora = (funcionario.salario / 220) if funcionario.salario else 0  # ❌ INCORRETO
+valor_horas_extras = total_extras * valor_hora * 1.5
+valor_faltas = total_faltas * valor_hora * 8
+```
+
+**Impacto:** 
+- Valor de horas extras incorreto
+- Valor de faltas incorreto
+- Custo total do funcionário incorreto
+- **TODOS os KPIs do perfil estão errados!**
+
+---
+
+### 7. **Linha 1570** - Função `funcionario_perfil_pdf()` - PDF do funcionário
+```python
+valor_hora = (funcionario.salario / 220) if funcionario.salario else 0  # ❌ INCORRETO
+```
+
+**Impacto:** PDF exportado com valores incorretos
+
+---
+
+### 8. **Linha 1733** - Função `obras()` - Lista de obras
+```python
+valor_hora = funcionario.salario / 220  # ❌ INCORRETO
+```
+
+**Impacto:** Custos de obras na listagem estão incorretos
+
+---
+
+### 9. **Linhas 2647, 2673, 2700** - Função `detalhes_obra()` - SQL direto
+```python
+# SQL com cálculo hardcoded
+(COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas) as custo_dia  # ❌ INCORRETO
+```
+
+**Impacto:** 
+- Custos de mão de obra por dia na obra estão incorretos
+- Gráficos de custos estão incorretos
+- Relatórios de obra estão incorretos
+
+---
+
+## 🚨 OUTROS PROBLEMAS IDENTIFICADOS
+
+### PROBLEMA 3: Salário padrão hardcoded (R$ 1.500)
+
+**Linha 2647, 2673, 2700:**
+```python
+COALESCE(f.salario, 1500)  # ❌ Valor padrão arbitrário
+```
+
+**Problema:** Se funcionário não tem salário cadastrado, usa R$ 1.500 fixo
+
+---
+
+### PROBLEMA 4: Horas extras com multiplicador fixo 1.5
+
+**Múltiplas linhas:**
+```python
+total_extras * 1.5  # ⚠️ Sempre 50%
+```
+
+**Problema:** 
+- Sábados devem ser 50% (1.5x) ✅
+- Domingos/feriados devem ser 100% (2.0x) ❌
+
+**Não diferencia tipo de dia!**
+
+---
+
+### PROBLEMA 5: Dias úteis fixos em 22
+
+**Linha 857, 1349:**
+```python
+funcionario.salario / 22  # ❌ Sempre 22 dias
+```
+
+**Problema:** 
+- Meses têm entre 20-23 dias úteis
+- Usar 22 fixo causa erro de até 15%
+
+---
+
+## 📋 RESUMO DOS PROBLEMAS
+
+| Problema | Ocorrências | Impacto | Severidade |
+|----------|-------------|---------|------------|
+| **Valor/hora fixo 220h** | 9 | Todos os custos incorretos | 🔴 CRÍTICO |
+| **Valor/dia fixo 22 dias** | 2 | Custos de faltas incorretos | 🔴 CRÍTICO |
+| **Salário padrão R$ 1.500** | 3 | Custos sem salário incorretos | 🟡 ALTO |
+| **Horas extras sem diferenciação** | ~15 | Extras de domingo incorretas | 🟡 ALTO |
+| **Funções corretas não usadas** | - | Código duplicado | 🟢 MÉDIO |
+
+---
+
+## ✅ SOLUÇÃO PROPOSTA
+
+### Estratégia de Correção:
+
+1. **Substituir TODAS as ocorrências** de `salario / 220` por chamada à função `calcular_valor_hora_corrigido()`
+2. **Substituir TODAS as ocorrências** de `salario / 22` por cálculo correto de dias úteis
+3. **Remover SQL hardcoded** e usar funções Python
+4. **Adicionar diferenciação** de horas extras por tipo de dia
+5. **Testar** cada funcionalidade afetada
+
+---
+
+## 🎯 FUNÇÕES AFETADAS (PRECISAM CORREÇÃO)
+
+| Função | Linha | Problema | Prioridade |
+|--------|-------|----------|------------|
+| `_calcular_custos_obra()` | 164 | valor_hora fixo | 🔴 ALTA |
+| `dashboard()` | 781, 857 | valor_hora e valor_dia fixos | 🔴 ALTA |
+| `funcionarios()` | 1323, 1349 | valor_hora e valor_dia fixos | 🔴 ALTA |
+| `funcionario_perfil()` | 1442 | valor_hora fixo | 🔴 ALTA |
+| `funcionario_perfil_pdf()` | 1570 | valor_hora fixo | 🔴 ALTA |
+| `obras()` | 1733 | valor_hora fixo | 🔴 ALTA |
+| `detalhes_obra()` | 2647, 2673, 2700 | SQL hardcoded | 🔴 ALTA |
+
+**Total:** 7 funções críticas precisam correção
+
+---
+
+## 📊 IMPACTO ESTIMADO
+
+### Antes da Correção:
+- ❌ **100%** dos cálculos de custo estão incorretos
+- ❌ **100%** dos KPIs financeiros estão incorretos
+- ❌ **100%** dos relatórios de funcionários estão incorretos
+- ❌ **100%** dos relatórios de obras estão incorretos
+
+### Depois da Correção:
+- ✅ Cálculos precisos baseados em horário real
+- ✅ KPIs financeiros corretos
+- ✅ Relatórios confiáveis
+- ✅ Conformidade trabalhista
+
+---
+
+## 🚀 PRÓXIMOS PASSOS
+
+1. **Criar prompt** para corrigir todas as 9 ocorrências
+2. **Substituir** cálculos fixos por funções corretas
+3. **Testar** cada funcionalidade
+4. **Validar** com dados reais
+5. **Documentar** as mudanças
+
+---
+
+## 💡 OBSERVAÇÃO IMPORTANTE
+
+O sistema **JÁ TEM** as funções corretas implementadas em `utils.py`:
+- `calcular_valor_hora_corrigido()`
+- `calcular_valor_hora_periodo()`
+- `calcular_horas_trabalhadas()`
+
+**Mas elas NÃO estão sendo usadas!**
+
+A correção é simplesmente **substituir os cálculos hardcoded por chamadas a essas funções**.
+
+---
+
+## 🎯 EXEMPLO DE CORREÇÃO
+
+### ❌ ANTES (Linha 1442):
+```python
+valor_hora = (funcionario.salario / 220) if funcionario.salario else 0
+```
+
+### ✅ DEPOIS:
+```python
+from utils import calcular_valor_hora_corrigido
+valor_hora = calcular_valor_hora_corrigido(funcionario)
+```
+
+**Simples assim!**
+
+---
+
+## 📝 CONCLUSÃO
+
+O sistema tem um **problema sistêmico** de cálculos incorretos que afeta:
+- Dashboard
+- Perfil de funcionários
+- Lista de funcionários
+- Detalhes de obras
+- Custos por obra
+- Relatórios PDF
+- Todos os KPIs financeiros
+
+**Causa raiz:** Uso de valores fixos (220h, 22 dias) ao invés de cálculos dinâmicos.
+
+**Solução:** Substituir por funções corretas que já existem no código.
+
+**Urgência:** 🔴 CRÍTICA - Afeta integridade de todos os dados financeiros.
+

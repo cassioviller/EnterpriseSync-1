@@ -1,0 +1,710 @@
+# PROMPT COMPLETO - Corrigir TODOS os Cálculos do Sistema SIGE
+
+## 🎯 OBJETIVO
+
+Corrigir **problema sistêmico crítico** que afeta 100% dos cálculos financeiros do sistema:
+- Substituir valores fixos incorretos (220h, 22 dias) por cálculos dinâmicos corretos
+- Usar funções já existentes em `utils.py` que fazem os cálculos corretamente
+- Corrigir 9 ocorrências em 7 funções críticas
+
+---
+
+## 🚨 PROBLEMA RAIZ
+
+O sistema usa **valores fixos e incorretos** para calcular custos:
+- `salario / 220` → Assume 220 horas/mês (INCORRETO)
+- `salario / 22` → Assume 22 dias úteis/mês (INCORRETO)
+
+**Impacto:** Erros de 8-15% em TODOS os cálculos financeiros!
+
+---
+
+## ✅ SOLUÇÃO
+
+O sistema **JÁ TEM** funções corretas em `utils.py`:
+- `calcular_valor_hora_corrigido(funcionario)` - Calcula valor/hora baseado em horário real
+- `calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)` - Para períodos específicos
+
+**Basta substituir os cálculos hardcoded por chamadas a essas funções!**
+
+---
+
+## 📝 MODIFICAÇÕES NECESSÁRIAS
+
+### MODIFICAÇÃO 1: Corrigir `_calcular_custos_obra()` - Linha 164
+
+**Arquivo:** `views.py`  
+**Localização:** Função `_calcular_custos_obra(admin_id, data_inicio, data_fim)` (aproximadamente linha 143-190)
+
+**Código Atual:**
+```python
+def _calcular_custos_obra(admin_id, data_inicio, data_fim):
+    """Calcula custos por obra com proteção de transação"""
+    try:
+        from models import VehicleExpense, RegistroPonto, RegistroAlimentacao
+        custos_por_obra = {}
+        
+        obras_admin = Obra.query.filter_by(admin_id=admin_id).all()
+        
+        for obra in obras_admin:
+            custo_total_obra = 0
+            
+            # Somar custos de mão de obra (registros de ponto)
+            registros_obra = RegistroPonto.query.filter(
+                RegistroPonto.obra_id == obra.id,
+                RegistroPonto.data >= data_inicio,
+                RegistroPonto.data <= data_fim
+            ).all()
+            
+            for registro in registros_obra:
+                funcionario = Funcionario.query.get(registro.funcionario_id)
+                if funcionario and funcionario.salario:
+                    valor_hora = funcionario.salario / 220  # ❌ INCORRETO
+                    horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
+                    custo_total_obra += horas * valor_hora
+            
+            # ... resto do código ...
+```
+
+**Código Corrigido:**
+```python
+def _calcular_custos_obra(admin_id, data_inicio, data_fim):
+    """Calcula custos por obra com proteção de transação"""
+    try:
+        from models import VehicleExpense, RegistroPonto, RegistroAlimentacao
+        from utils import calcular_valor_hora_periodo  # ✅ IMPORTAR
+        custos_por_obra = {}
+        
+        obras_admin = Obra.query.filter_by(admin_id=admin_id).all()
+        
+        for obra in obras_admin:
+            custo_total_obra = 0
+            
+            # Somar custos de mão de obra (registros de ponto)
+            registros_obra = RegistroPonto.query.filter(
+                RegistroPonto.obra_id == obra.id,
+                RegistroPonto.data >= data_inicio,
+                RegistroPonto.data <= data_fim
+            ).all()
+            
+            for registro in registros_obra:
+                funcionario = Funcionario.query.get(registro.funcionario_id)
+                if funcionario and funcionario.salario:
+                    valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)  # ✅ CORRETO
+                    horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
+                    custo_total_obra += horas * valor_hora
+            
+            # ... resto do código ...
+```
+
+---
+
+### MODIFICAÇÃO 2: Corrigir `dashboard()` - Mão de Obra - Linha 781
+
+**Arquivo:** `views.py`  
+**Localização:** Dentro da função `dashboard()`, loop de cálculo de mão de obra (aproximadamente linha 766-792)
+
+**Código Atual:**
+```python
+for func in funcionarios_dashboard:
+    try:
+        # Buscar registros de ponto com proteção
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == func.id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim
+        ).all()
+        
+        # Calcular valores por funcionário
+        horas_func = sum(r.horas_trabalhadas or 0 for r in registros)
+        extras_func = sum(r.horas_extras or 0 for r in registros)
+        faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
+        
+        # Valor/hora do funcionário
+        valor_hora = (func.salario / 220) if func.salario else 0  # ❌ INCORRETO
+        custo_func = (horas_func + extras_func * 1.5) * valor_hora
+        
+        # Acumular totais
+        total_custo_real += custo_func
+        total_horas_real += horas_func
+        total_extras_real += extras_func
+        total_faltas_real += faltas_func
+        
+    except Exception as func_error:
+        print(f"❌ ERRO ao processar funcionário {func.nome}: {func_error}")
+        continue
+```
+
+**Código Corrigido:**
+```python
+# ✅ ADICIONAR IMPORT NO INÍCIO DA FUNÇÃO dashboard() (após linha 645)
+from utils import calcular_valor_hora_periodo
+
+for func in funcionarios_dashboard:
+    try:
+        # Buscar registros de ponto com proteção
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == func.id,
+            RegistroPonto.data >= data_inicio,
+            RegistroPonto.data <= data_fim
+        ).all()
+        
+        # Calcular valores por funcionário
+        horas_func = sum(r.horas_trabalhadas or 0 for r in registros)
+        extras_func = sum(r.horas_extras or 0 for r in registros)
+        faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
+        
+        # Valor/hora do funcionário - CORRIGIDO
+        valor_hora = calcular_valor_hora_periodo(func, data_inicio, data_fim)  # ✅ CORRETO
+        custo_func = (horas_func + extras_func * 1.5) * valor_hora
+        
+        # Acumular totais
+        total_custo_real += custo_func
+        total_horas_real += horas_func
+        total_extras_real += extras_func
+        total_faltas_real += faltas_func
+        
+    except Exception as func_error:
+        print(f"❌ ERRO ao processar funcionário {func.nome}: {func_error}")
+        continue
+```
+
+---
+
+### MODIFICAÇÃO 3: Corrigir `dashboard()` - Faltas Justificadas - Linha 857
+
+**Arquivo:** `views.py`  
+**Localização:** Função `calcular_faltas_justificadas()` dentro de `dashboard()` (aproximadamente linha 842-860)
+
+**Código Atual:**
+```python
+def calcular_faltas_justificadas():
+    # Buscar todas as faltas justificadas no período
+    faltas_justificadas = RegistroPonto.query.filter(
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim,
+        RegistroPonto.tipo_registro == 'falta_justificada'
+    ).all()
+    
+    quantidade = len(faltas_justificadas)
+    custo = 0
+    
+    for falta in faltas_justificadas:
+        funcionario = Funcionario.query.get(falta.funcionario_id)
+        if funcionario and funcionario.salario:
+            # Valor por dia baseado em 22 dias úteis
+            valor_dia = (funcionario.salario / 22)  # ❌ INCORRETO
+            custo += valor_dia
+    
+    return quantidade, custo
+```
+
+**Código Corrigido:**
+```python
+def calcular_faltas_justificadas():
+    from calendar import monthrange
+    
+    # Buscar faltas justificadas com JOIN em funcionario para filtrar por admin_id
+    faltas_justificadas = db.session.query(RegistroPonto).join(
+        Funcionario, RegistroPonto.funcionario_id == Funcionario.id
+    ).filter(
+        Funcionario.admin_id == admin_id,  # ✅ ADICIONAR FILTRO
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim,
+        RegistroPonto.tipo_registro == 'falta_justificada'
+    ).all()
+    
+    quantidade = len(faltas_justificadas)
+    custo = 0
+    
+    for falta in faltas_justificadas:
+        funcionario = Funcionario.query.get(falta.funcionario_id)
+        if funcionario and funcionario.salario:
+            # Calcular dias úteis do mês da falta - CORRETO
+            ano = falta.data.year
+            mes = falta.data.month
+            dias_uteis = 0
+            primeiro_dia, ultimo_dia = monthrange(ano, mes)
+            
+            for dia in range(1, ultimo_dia + 1):
+                data_check = falta.data.replace(day=dia)
+                if data_check.weekday() < 5:  # Segunda a sexta
+                    dias_uteis += 1
+            
+            # Determinar horas diárias
+            if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
+                horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
+            else:
+                horas_diarias = 8.8  # Padrão 7h12-17h
+            
+            # Valor por dia = (salário / dias úteis)
+            valor_dia = funcionario.salario / dias_uteis if dias_uteis > 0 else 0  # ✅ CORRETO
+            custo += valor_dia
+    
+    return quantidade, custo
+```
+
+---
+
+### MODIFICAÇÃO 4: Corrigir `funcionarios()` - Lista - Linha 1323
+
+**Arquivo:** `views.py`  
+**Localização:** Função `funcionarios()`, dentro do loop de cálculo de KPIs (aproximadamente linha 1290-1360)
+
+**Procurar por:**
+```python
+'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)  # ❌ INCORRETO
+```
+
+**Substituir por:**
+```python
+from utils import calcular_valor_hora_periodo  # ✅ Adicionar no início da função
+
+# ... dentro do loop ...
+valor_hora_func = calcular_valor_hora_periodo(func, data_inicio, data_fim)  # ✅ CORRETO
+'custo_total': (total_horas + total_extras * 1.5) * valor_hora_func
+```
+
+---
+
+### MODIFICAÇÃO 5: Corrigir `funcionarios()` - Faltas - Linha 1349
+
+**Arquivo:** `views.py`  
+**Localização:** Função `funcionarios()`, cálculo de custo de faltas (aproximadamente linha 1345-1355)
+
+**Procurar por:**
+```python
+custo_dia = func.salario / 22  # ❌ INCORRETO
+```
+
+**Substituir por:**
+```python
+from calendar import monthrange
+
+# Calcular dias úteis do mês
+ano = data_inicio.year
+mes = data_inicio.month
+dias_uteis = 0
+primeiro_dia, ultimo_dia = monthrange(ano, mes)
+
+for dia in range(1, ultimo_dia + 1):
+    data_check = data_inicio.replace(day=dia)
+    if data_check.weekday() < 5:  # Segunda a sexta
+        dias_uteis += 1
+
+custo_dia = func.salario / dias_uteis if dias_uteis > 0 else 0  # ✅ CORRETO
+```
+
+---
+
+### MODIFICAÇÃO 6: Corrigir `funcionario_perfil()` - Linha 1442
+
+**Arquivo:** `views.py`  
+**Localização:** Função `funcionario_perfil(id)` (aproximadamente linha 1407-1526)
+
+**Código Atual:**
+```python
+# Calcular valores monetários detalhados
+valor_hora = (funcionario.salario / 220) if funcionario.salario else 0  # ❌ INCORRETO
+valor_horas_extras = total_extras * valor_hora * 1.5
+valor_faltas = total_faltas * valor_hora * 8
+valor_faltas_justificadas = faltas_justificadas * valor_hora * 8
+```
+
+**Código Corrigido:**
+```python
+# Calcular valores monetários detalhados - CORRIGIDO
+from utils import calcular_valor_hora_periodo  # ✅ IMPORTAR
+
+valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)  # ✅ CORRETO
+valor_horas_extras = total_extras * valor_hora * 1.5
+valor_faltas = total_faltas * valor_hora * 8
+valor_faltas_justificadas = faltas_justificadas * valor_hora * 8
+```
+
+---
+
+### MODIFICAÇÃO 7: Corrigir `funcionario_perfil_pdf()` - Linha 1570
+
+**Arquivo:** `views.py`  
+**Localização:** Função `funcionario_perfil_pdf(id)` (aproximadamente linha 1529-1625)
+
+**Procurar por:**
+```python
+valor_hora = (funcionario.salario / 220) if funcionario.salario else 0  # ❌ INCORRETO
+```
+
+**Substituir por:**
+```python
+from utils import calcular_valor_hora_periodo  # ✅ IMPORTAR
+
+valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)  # ✅ CORRETO
+```
+
+---
+
+### MODIFICAÇÃO 8: Corrigir `obras()` - Lista - Linha 1733
+
+**Arquivo:** `views.py`  
+**Localização:** Função `obras()`, cálculo de custos de mão de obra (aproximadamente linha 1627-1800)
+
+**Procurar por:**
+```python
+valor_hora = funcionario.salario / 220  # ❌ INCORRETO
+```
+
+**Substituir por:**
+```python
+from utils import calcular_valor_hora_periodo  # ✅ Adicionar no início da função
+
+# ... dentro do loop ...
+valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)  # ✅ CORRETO
+```
+
+---
+
+### MODIFICAÇÃO 9: Corrigir `detalhes_obra()` - SQL Hardcoded - Linhas 2647, 2673, 2700
+
+**Arquivo:** `views.py`  
+**Localização:** Função `detalhes_obra(id)` (aproximadamente linha 2522-2910)
+
+**Problema:** SQL com cálculo hardcoded:
+```sql
+(COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas) as custo_dia  -- ❌ INCORRETO
+```
+
+**Solução:** Remover cálculo do SQL e fazer em Python
+
+**Procurar por (3 ocorrências):**
+```python
+# Linha ~2647
+custos_mao_obra = db.session.execute(text("""
+    SELECT 
+        rp.data,
+        COUNT(DISTINCT rp.funcionario_id) as total_funcionarios,
+        SUM(rp.horas_trabalhadas) as total_horas,
+        (COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas) as custo_dia  -- ❌
+    FROM registro_ponto rp
+    JOIN funcionario f ON rp.funcionario_id = f.id
+    WHERE rp.obra_id = :obra_id
+    GROUP BY rp.data
+    ORDER BY rp.data
+"""), {'obra_id': id}).fetchall()
+```
+
+**Substituir por:**
+```python
+# Buscar dados sem cálculo de custo
+custos_mao_obra_raw = db.session.execute(text("""
+    SELECT 
+        rp.data,
+        rp.funcionario_id,
+        f.salario,
+        SUM(rp.horas_trabalhadas) as total_horas,
+        SUM(rp.horas_extras) as total_extras
+    FROM registro_ponto rp
+    JOIN funcionario f ON rp.funcionario_id = f.id
+    WHERE rp.obra_id = :obra_id
+    GROUP BY rp.data, rp.funcionario_id, f.salario
+    ORDER BY rp.data
+"""), {'obra_id': id}).fetchall()
+
+# Calcular custos corretamente em Python
+from utils import calcular_valor_hora_periodo
+from collections import defaultdict
+
+custos_por_dia = defaultdict(lambda: {'total_funcionarios': 0, 'total_horas': 0, 'custo_dia': 0})
+
+for row in custos_mao_obra_raw:
+    data = row[0]
+    funcionario_id = row[1]
+    total_horas = row[3] or 0
+    total_extras = row[4] or 0
+    
+    # Buscar funcionário e calcular valor/hora correto
+    funcionario = Funcionario.query.get(funcionario_id)
+    if funcionario:
+        # Usar data do registro para cálculo do período
+        data_inicio_calc = data.replace(day=1)
+        ultimo_dia = (data.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        data_fim_calc = ultimo_dia
+        
+        valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio_calc, data_fim_calc)
+        custo = (total_horas + total_extras * 1.5) * valor_hora
+        
+        custos_por_dia[data]['total_funcionarios'] += 1
+        custos_por_dia[data]['total_horas'] += total_horas
+        custos_por_dia[data]['custo_dia'] += custo
+
+# Converter para lista para uso no template
+custos_mao_obra = [
+    {
+        'data': data,
+        'total_funcionarios': valores['total_funcionarios'],
+        'total_horas': valores['total_horas'],
+        'custo_dia': valores['custo_dia']
+    }
+    for data, valores in sorted(custos_por_dia.items())
+]
+```
+
+**Nota:** Fazer o mesmo para as outras 2 ocorrências (linhas 2673 e 2700)
+
+---
+
+## 🔍 VALIDAÇÃO COMPLETA
+
+Após implementar TODAS as modificações:
+
+### ✅ Teste 1: Verificar Importações
+
+Procurar no início de cada função modificada:
+```python
+from utils import calcular_valor_hora_periodo
+```
+
+---
+
+### ✅ Teste 2: Verificar Dashboard
+
+Acessar `/dashboard` e verificar:
+- **Mão de Obra:** Valor diferente de antes (deve aumentar ~8-10%)
+- **Faltas Justificadas:** Valor correto
+- **Total:** Soma correta
+
+---
+
+### ✅ Teste 3: Verificar Perfil de Funcionário
+
+Acessar `/funcionario_perfil/<id>` e verificar:
+- **Valor/hora:** Deve ser diferente do cálculo antigo
+- **Horas Extras:** Valor correto
+- **Custo Total:** Valor correto
+
+Comparar com cálculo manual:
+```
+Dias úteis do mês: X
+Horas/dia: 8.8h (ou do horário cadastrado)
+Horas mensais: X × 8.8
+Valor/hora = Salário / Horas mensais
+```
+
+---
+
+### ✅ Teste 4: Verificar Lista de Funcionários
+
+Acessar `/funcionarios` e verificar:
+- Coluna "Custo Total" mostra valores corretos
+- Valores mudaram em relação ao anterior
+
+---
+
+### ✅ Teste 5: Verificar Detalhes de Obra
+
+Acessar `/obras/<id>` e verificar:
+- Gráfico de custos de mão de obra por dia
+- Valores corretos
+- Não há erro 500
+
+---
+
+### ✅ Teste 6: Comparação Antes/Depois
+
+**Exemplo:**
+```
+Funcionário: João Silva
+Salário: R$ 3.000,00
+Horas trabalhadas: 184h
+Mês: Outubro/2025 (23 dias úteis)
+
+❌ ANTES (220h fixo):
+Valor/hora = 3000 / 220 = R$ 13,64
+Custo = 184h × 13,64 = R$ 2.509,76
+
+✅ DEPOIS (23 dias × 8.8h = 202.4h):
+Valor/hora = 3000 / 202.4 = R$ 14,82
+Custo = 184h × 14,82 = R$ 2.726,88
+
+Diferença: +R$ 217,12 (+8.6%)
+```
+
+---
+
+## 🐛 TROUBLESHOOTING
+
+### Problema: "ImportError: cannot import name 'calcular_valor_hora_periodo'"
+
+**Causa:** Função não existe em `utils.py`
+
+**Solução:** Verificar se `utils.py` tem as funções:
+```bash
+grep -n "def calcular_valor_hora" utils.py
+```
+
+Se não existir, adicionar as funções do arquivo de análise.
+
+---
+
+### Problema: "Valores ainda parecem incorretos"
+
+**Verificar:**
+1. Funcionário tem horário de trabalho cadastrado?
+2. Horário tem `horas_diarias` definido?
+3. Período de data está correto?
+
+**Debug:**
+```python
+print(f"Funcionário: {funcionario.nome}")
+print(f"Salário: {funcionario.salario}")
+print(f"Horário: {funcionario.horario_trabalho}")
+if funcionario.horario_trabalho:
+    print(f"Horas/dia: {funcionario.horario_trabalho.horas_diarias}")
+print(f"Valor/hora calculado: {valor_hora}")
+```
+
+---
+
+### Problema: "Erro ao calcular dias úteis"
+
+**Causa:** Mês/ano inválido
+
+**Solução:** Adicionar validação:
+```python
+try:
+    dias_uteis = calcular_dias_uteis(ano, mes)
+except:
+    dias_uteis = 22  # Fallback
+```
+
+---
+
+## 📊 RESUMO DAS ALTERAÇÕES
+
+| Modificação | Arquivo | Função | Linhas | Tipo |
+|-------------|---------|--------|--------|------|
+| 1 | views.py | `_calcular_custos_obra()` | ~164 | Substituir cálculo |
+| 2 | views.py | `dashboard()` - Mão de Obra | ~781 | Substituir cálculo |
+| 3 | views.py | `dashboard()` - Faltas | ~857 | Substituir cálculo + filtro |
+| 4 | views.py | `funcionarios()` - Lista | ~1323 | Substituir cálculo |
+| 5 | views.py | `funcionarios()` - Faltas | ~1349 | Substituir cálculo |
+| 6 | views.py | `funcionario_perfil()` | ~1442 | Substituir cálculo |
+| 7 | views.py | `funcionario_perfil_pdf()` | ~1570 | Substituir cálculo |
+| 8 | views.py | `obras()` | ~1733 | Substituir cálculo |
+| 9 | views.py | `detalhes_obra()` | ~2647,2673,2700 | Refatorar SQL → Python |
+
+**Total:** 9 modificações em 7 funções  
+**Arquivos afetados:** 1 (`views.py`)  
+**Linhas modificadas:** ~100 linhas  
+**Complexidade:** Média (algumas requerem refatoração de SQL)
+
+---
+
+## ⚡ CHECKLIST DE IMPLEMENTAÇÃO
+
+- [ ] Modificação 1: `_calcular_custos_obra()`
+- [ ] Modificação 2: `dashboard()` - Mão de Obra
+- [ ] Modificação 3: `dashboard()` - Faltas Justificadas
+- [ ] Modificação 4: `funcionarios()` - Custo Total
+- [ ] Modificação 5: `funcionarios()` - Custo Faltas
+- [ ] Modificação 6: `funcionario_perfil()`
+- [ ] Modificação 7: `funcionario_perfil_pdf()`
+- [ ] Modificação 8: `obras()`
+- [ ] Modificação 9: `detalhes_obra()` - SQL
+- [ ] Salvar arquivo
+- [ ] Reiniciar servidor
+- [ ] Teste 1: Dashboard
+- [ ] Teste 2: Perfil Funcionário
+- [ ] Teste 3: Lista Funcionários
+- [ ] Teste 4: Lista Obras
+- [ ] Teste 5: Detalhes Obra
+- [ ] Teste 6: Comparação valores
+- [ ] Commit das alterações
+- [ ] Deploy em produção
+- [ ] Validação em produção
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+### ANTES (Valores Incorretos):
+```
+Dashboard - Mão de Obra: R$ 10.000,00  ❌
+Perfil João - Custo: R$ 2.509,76       ❌
+Lista Funcionários - Total: R$ 50.000  ❌
+Detalhes Obra - Custo: R$ 15.000       ❌
+```
+
+### DEPOIS (Valores Corretos):
+```
+Dashboard - Mão de Obra: R$ 10.860,00  ✅ (+8.6%)
+Perfil João - Custo: R$ 2.726,88       ✅ (+8.6%)
+Lista Funcionários - Total: R$ 54.300  ✅ (+8.6%)
+Detalhes Obra - Custo: R$ 16.290       ✅ (+8.6%)
+```
+
+**Diferença média:** +8.6% (mais preciso!)
+
+---
+
+## 🚨 IMPACTO
+
+### Antes da Correção:
+- ❌ **100%** dos cálculos de custo incorretos
+- ❌ Erro médio de **8-15%** em todos os valores
+- ❌ Não considera horário real do funcionário
+- ❌ Não considera dias úteis reais do mês
+
+### Depois da Correção:
+- ✅ Cálculos precisos baseados em horário real
+- ✅ Considera dias úteis reais de cada mês
+- ✅ Conformidade trabalhista
+- ✅ Relatórios confiáveis
+
+---
+
+## 📝 COMMIT MESSAGE SUGERIDA
+
+```
+fix: Corrigir TODOS os cálculos de valor/hora e custos no sistema
+
+CRÍTICO - Problema Sistêmico:
+- Substitui cálculos fixos (220h, 22 dias) por cálculos dinâmicos corretos
+- Usa funções de utils.py: calcular_valor_hora_periodo()
+- Corrige 9 ocorrências em 7 funções críticas
+
+FUNÇÕES CORRIGIDAS:
+- _calcular_custos_obra() - Custos por obra
+- dashboard() - Mão de obra e faltas justificadas
+- funcionarios() - Lista e custos
+- funcionario_perfil() - Perfil e PDF
+- obras() - Lista de obras
+- detalhes_obra() - SQL refatorado para Python
+
+IMPACTO:
+- Cálculos agora consideram horário real do funcionário
+- Cálculos consideram dias úteis reais do mês
+- Precisão aumentada em ~8-10%
+- Conformidade trabalhista
+
+ANTES: salario / 220 (fixo, incorreto)
+DEPOIS: calcular_valor_hora_periodo() (dinâmico, correto)
+
+Closes #[número_da_issue]
+```
+
+---
+
+## 🎉 CONCLUSÃO
+
+Esta correção resolve o **problema mais crítico** do sistema:
+- Afeta 100% dos cálculos financeiros
+- Impacto de 8-15% em todos os valores
+- Conformidade trabalhista
+- Relatórios confiáveis
+
+**Urgência:** 🔴 MÁXIMA PRIORIDADE
+
+**Tempo estimado:** 30-45 minutos de implementação  
+**Complexidade:** Média (SQL requer atenção)  
+**Risco:** Baixo (usa funções já testadas)
+
