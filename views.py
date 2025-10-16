@@ -4,9 +4,11 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
+from utils import calcular_valor_hora_periodo
 
 # API RDO Refatorada integrada inline na função salvar_rdo_flexivel
 from datetime import datetime, date, timedelta
+import calendar
 from sqlalchemy import func, desc, or_, and_, text
 from sqlalchemy.exc import IntegrityError
 import os
@@ -161,7 +163,7 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim):
             for registro in registros_obra:
                 funcionario = Funcionario.query.get(registro.funcionario_id)
                 if funcionario and funcionario.salario:
-                    valor_hora = funcionario.salario / 220
+                    valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
                     horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
                     custo_total_obra += horas * valor_hora
             
@@ -778,7 +780,7 @@ def dashboard():
                     faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
                     
                     # Valor/hora do funcionário
-                    valor_hora = (func.salario / 220) if func.salario else 0
+                    valor_hora = calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0
                     custo_func = (horas_func + extras_func * 1.5) * valor_hora
                     
                     # Acumular totais
@@ -860,8 +862,12 @@ def dashboard():
             for falta in faltas_justificadas:
                 funcionario = Funcionario.query.get(falta.funcionario_id)
                 if funcionario and funcionario.salario:
-                    # Valor por dia baseado em 22 dias úteis
-                    valor_dia = (funcionario.salario / 22)
+                    # Calcular dias úteis reais do mês
+                    mes = falta.data.month
+                    ano = falta.data.year
+                    dias_uteis = sum(1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1) 
+                                    if date(ano, mes, dia).weekday() < 5)
+                    valor_dia = funcionario.salario / dias_uteis
                     custo += valor_dia
             
             return quantidade, custo
@@ -908,7 +914,8 @@ def dashboard():
         except Exception as e:
             print(f"Erro ao contar veículos: {e}")
             total_veiculos = 5  # Fallback
-        custos_mes = total_custo_real + custo_alimentacao_real + custo_transporte_real + custo_outros_real
+        # Converter todos para float antes de somar (corrige erro float + Decimal)
+        custos_mes = float(total_custo_real) + float(custo_alimentacao_real) + float(custo_transporte_real) + float(custo_outros_real)
         custos_detalhados = {
             'alimentacao': custo_alimentacao_real,
             'transporte': custo_transporte_real,
@@ -1356,7 +1363,7 @@ def funcionarios():
                     'total_extras': total_extras,
                     'total_faltas': total_faltas,
                     'total_faltas_justificadas': total_faltas_justificadas,
-                    'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)
+                    'custo_total': (total_horas + total_extras * 1.5) * (calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0)
                 })
             except Exception as e:
                 print(f"Erro KPI funcionário {func.nome}: {str(e)}")
@@ -1382,7 +1389,12 @@ def funcionarios():
         for k in funcionarios_kpis:
             func = k['funcionario']
             if func.salario and k.get('total_faltas_justificadas', 0) > 0:
-                custo_dia = func.salario / 22  # 22 dias úteis
+                # Calcular dias úteis reais do mês
+                mes = data_inicio.month
+                ano = data_inicio.year
+                dias_uteis = sum(1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1) 
+                                if date(ano, mes, dia).weekday() < 5)
+                custo_dia = func.salario / dias_uteis
                 total_custo_faltas_geral += k['total_faltas_justificadas'] * custo_dia
         
         # Calcular taxa de absenteísmo correta
@@ -1460,12 +1472,16 @@ def funcionario_perfil(id):
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
-    # Buscar registros do período
-    registros = RegistroPonto.query.filter(
+    # Buscar registros do período (com filtro admin_id para segurança)
+    admin_id = current_user.admin_id if hasattr(current_user, 'admin_id') else None
+    query = RegistroPonto.query.filter(
         RegistroPonto.funcionario_id == funcionario.id,
         RegistroPonto.data >= data_inicio,
         RegistroPonto.data <= data_fim
-    ).order_by(RegistroPonto.data.desc()).all()  # Ordenar por data decrescente
+    )
+    if admin_id:
+        query = query.filter(RegistroPonto.admin_id == admin_id)
+    registros = query.order_by(RegistroPonto.data.desc()).all()  # Ordenar por data decrescente
     
     # Calcular KPIs
     total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
@@ -1475,7 +1491,7 @@ def funcionario_perfil(id):
     total_atrasos = sum(r.total_atraso_horas or 0 for r in registros)  # Campo correto do modelo
     
     # Calcular valores monetários detalhados
-    valor_hora = (funcionario.salario / 220) if funcionario.salario else 0
+    valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim) if funcionario.salario else 0
     valor_horas_extras = total_extras * valor_hora * 1.5
     valor_faltas = total_faltas * valor_hora * 8  # Desconto de 8h por falta
     valor_faltas_justificadas = faltas_justificadas * valor_hora * 8  # Faltas justificadas
@@ -1589,12 +1605,16 @@ def funcionario_perfil_pdf(id):
     else:
         data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
     
-    # Buscar registros do período
-    registros = RegistroPonto.query.filter(
+    # Buscar registros do período (com filtro admin_id para segurança)
+    admin_id = current_user.admin_id if hasattr(current_user, 'admin_id') else None
+    query = RegistroPonto.query.filter(
         RegistroPonto.funcionario_id == funcionario.id,
         RegistroPonto.data >= data_inicio,
         RegistroPonto.data <= data_fim
-    ).order_by(RegistroPonto.data).all()
+    )
+    if admin_id:
+        query = query.filter(RegistroPonto.admin_id == admin_id)
+    registros = query.order_by(RegistroPonto.data).all()
     
     # Calcular KPIs (mesmo código da função perfil)
     total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
@@ -1603,7 +1623,7 @@ def funcionario_perfil_pdf(id):
     faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
     total_atrasos = sum(r.total_atraso_horas or 0 for r in registros)
     
-    valor_hora = (funcionario.salario / 220) if funcionario.salario else 0
+    valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim) if funcionario.salario else 0
     valor_horas_extras = total_extras * valor_hora * 1.5
     valor_faltas = total_faltas * valor_hora * 8
     
@@ -1766,7 +1786,7 @@ def obras():
             for registro in registros_obra:
                 funcionario = Funcionario.query.get(registro.funcionario_id)
                 if funcionario and funcionario.salario:
-                    valor_hora = funcionario.salario / 220  # 220 horas/mês
+                    valor_hora = calcular_valor_hora_periodo(funcionario, periodo_inicio, periodo_fim)
                     horas_trabalhadas = (registro.horas_trabalhadas or 0)
                     horas_extras = (registro.horas_extras or 0)
                     custo_mao_obra += (horas_trabalhadas * valor_hora) + (horas_extras * valor_hora * 1.5)
@@ -2668,7 +2688,7 @@ def detalhes_obra(id):
         
         print(f"DEBUG: {len(registros_periodo)} registros de ponto no período para obra {obra_id}")
         
-        # Calcular custo por funcionário usando JOIN direto - PRODUÇÃO
+        # Calcular custo por funcionário usando Python com funções corretas
         from sqlalchemy import text
         
         if admin_id is not None:
@@ -2678,8 +2698,7 @@ def detalhes_obra(id):
                     rp.funcionario_id,
                     f.nome as funcionario_nome,
                     rp.horas_trabalhadas,
-                    f.salario,
-                    (COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas) as custo_dia
+                    f.salario
                 FROM registro_ponto rp
                 JOIN funcionario f ON rp.funcionario_id = f.id
                 WHERE rp.obra_id = :obra_id 
@@ -2704,8 +2723,7 @@ def detalhes_obra(id):
                     rp.funcionario_id,
                     f.nome as funcionario_nome,
                     rp.horas_trabalhadas,
-                    f.salario,
-                    (COALESCE(f.salario, 1500) / 220.0 * rp.horas_trabalhadas) as custo_dia
+                    f.salario
                 FROM registro_ponto rp
                 JOIN funcionario f ON rp.funcionario_id = f.id
                 WHERE rp.obra_id = :obra_id 
@@ -2723,17 +2741,29 @@ def detalhes_obra(id):
         
         print(f"DEBUG SQL: {len(resultado_custos)} registros encontrados com JOIN")
         
+        # Calcular custos usando Python com função correta
         for row in resultado_custos:
-            data_reg, funcionario_id, funcionario_nome, horas, salario, custo_dia = row
-            total_custo_mao_obra += float(custo_dia)
+            data_reg, funcionario_id, funcionario_nome, horas, salario = row
+            
+            # Buscar funcionário para usar a função correta de cálculo
+            funcionario = Funcionario.query.get(funcionario_id)
+            if funcionario and funcionario.salario:
+                valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
+            else:
+                # Fallback para salário padrão
+                valor_hora = 1500 / (sum(1 for dia in range(1, calendar.monthrange(data_inicio.year, data_inicio.month)[1] + 1) 
+                                        if date(data_inicio.year, data_inicio.month, dia).weekday() < 5) * 8.8)
+            
+            custo_dia = valor_hora * float(horas)
+            total_custo_mao_obra += custo_dia
             total_horas_periodo += float(horas)
             
             custos_mao_obra.append({
                 'data': data_reg,
                 'funcionario_nome': funcionario_nome,
                 'horas_trabalhadas': float(horas),
-                'salario_hora': float(salario or 1500) / 220.0,
-                'total_dia': float(custo_dia)
+                'salario_hora': valor_hora,
+                'total_dia': custo_dia
             })
         
         print(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")

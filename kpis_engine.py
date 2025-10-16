@@ -188,8 +188,13 @@ class CalculadoraKPI:
     
     def _calcular_horas_trabalhadas(self, funcionario_id, data_inicio, data_fim):
         """1. Horas Trabalhadas: Soma das horas efetivamente trabalhadas"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return 0.0
+        
         total = db.session.query(func.sum(RegistroPonto.horas_trabalhadas)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.horas_trabalhadas.isnot(None)
@@ -200,9 +205,14 @@ class CalculadoraKPI:
     def _calcular_horas_extras(self, funcionario_id, data_inicio, data_fim):
         """2. Horas Extras: Baseado em horário padrão (07:12-17:00)"""
         
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return 0.0
+        
         # Buscar registros do período com horários válidos
         registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.hora_entrada.isnot(None),
@@ -230,8 +240,13 @@ class CalculadoraKPI:
         return round(total_horas_extras, 2)
     def _calcular_faltas(self, funcionario_id, data_inicio, data_fim):
         """3. Faltas: Número de faltas não justificadas registradas"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return 0
+        
         faltas = db.session.query(func.count(RegistroPonto.id)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.tipo_registro == 'falta'
@@ -242,8 +257,13 @@ class CalculadoraKPI:
     def _calcular_atrasos_horas(self, funcionario_id, data_inicio, data_fim):
         """4. Atrasos: Total de horas de atraso (entrada + saída antecipada)
         EXCLUINDO sábados, domingos e feriados trabalhados (onde toda hora é extra)"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return 0.0
+        
         total = db.session.query(func.sum(RegistroPonto.total_atraso_horas)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.total_atraso_horas.isnot(None),
@@ -285,6 +305,7 @@ class CalculadoraKPI:
         # 2. Buscar registros de ponto por tipo para calcular extras específicos
         registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.horas_extras.isnot(None),
@@ -373,8 +394,13 @@ class CalculadoraKPI:
     
     def _calcular_faltas_justificadas(self, funcionario_id, data_inicio, data_fim):
         """Calcular faltas justificadas (com ocorrências aprovadas)"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return 0
+        
         faltas_justificadas = db.session.query(func.count(RegistroPonto.id)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.tipo_registro == 'falta_justificada'
@@ -395,6 +421,7 @@ class CalculadoraKPI:
         # Buscar registros de ponto no período
         registros = db.session.query(RegistroPonto).filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.horas_trabalhadas.isnot(None)
@@ -486,9 +513,14 @@ class CalculadoraKPI:
     
     def _calcular_absenteismo(self, funcionario_id, data_inicio, data_fim):
         """6. Absenteísmo: Percentual de faltas não justificadas em relação aos dias com lançamento"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return 0.0
+        
         # Contar dias com lançamento (trabalho programado)
         dias_com_lancamento = db.session.query(func.count(RegistroPonto.id)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.tipo_registro.in_(['trabalho_normal', 'trabalhado', 'feriado_trabalhado', 'meio_periodo', 'falta', 'falta_justificada'])
@@ -504,10 +536,15 @@ class CalculadoraKPI:
     
     def _calcular_media_horas_diarias(self, funcionario_id, data_inicio, data_fim):
         """7. Média Diária: Média de horas trabalhadas por dia presente"""
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return 0.0
+        
         horas_total = self._calcular_horas_trabalhadas(funcionario_id, data_inicio, data_fim)
         
         dias_presenca = db.session.query(func.count(RegistroPonto.id)).filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.hora_entrada.isnot(None)
@@ -603,9 +640,14 @@ class CalculadoraKPI:
         Calcula número de dias com lançamento no período
         Conta apenas dias úteis (excluindo fins de semana não trabalhados)
         """
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return 0
+        
         # Buscar registros de ponto no período
         registros = db.session.query(RegistroPonto).filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim
         ).all()
@@ -786,6 +828,7 @@ class CalculadoraKPI:
         # Buscar registros com horas extras e percentuais - SEM FILTRO > 0
         registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim,
             RegistroPonto.horas_extras.isnot(None)
@@ -886,7 +929,12 @@ def identificar_faltas_periodo(funcionario_id, data_inicio, data_fim):
 
 def processar_registros_ponto_com_faltas(funcionario_id, data_inicio, data_fim):
     """Processa registros de ponto incluindo identificação de faltas"""
+    funcionario = Funcionario.query.get(funcionario_id)
+    if not funcionario:
+        return []
+    
     registros = RegistroPonto.query.filter_by(funcionario_id=funcionario_id).filter(
+        RegistroPonto.admin_id == funcionario.admin_id,
         RegistroPonto.data.between(data_inicio, data_fim)
     ).order_by(RegistroPonto.data).all()
     

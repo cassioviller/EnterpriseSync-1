@@ -221,6 +221,7 @@ class CalculadoraCusto:
         # Buscar registros alocados na obra específica
         registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.obra_id == obra_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim
@@ -249,6 +250,7 @@ class KPIsEngineV8_1:
         # Buscar todos os registros do período
         registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
+            RegistroPonto.admin_id == funcionario.admin_id,
             RegistroPonto.data >= data_inicio,
             RegistroPonto.data <= data_fim
         ).all()
