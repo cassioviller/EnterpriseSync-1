@@ -410,21 +410,20 @@ def index():
     fallback=lambda *args, **kwargs: {"error": "Dashboard temporariamente indisponível"}
 )
 def dashboard():
-    # DEFINIR VARIÁVEIS DE DATA NO INÍCIO (SEMPRE)
-    from datetime import date as date_class
+    # DEFINIR VARIÁVEIS DE DATA NO INÍCIO (SEMPRE) - date e datetime já importados no topo
     data_inicio_param = request.args.get('data_inicio')
     data_fim_param = request.args.get('data_fim')
     
     if data_inicio_param:
         data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
     else:
-        hoje = date_class.today()
-        data_inicio = date_class(hoje.year, hoje.month, 1)
+        hoje = date.today()
+        data_inicio = date(hoje.year, hoje.month, 1)
         
     if data_fim_param:
         data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
     else:
-        data_fim = date_class.today()
+        data_fim = date.today()
     
     # REDIRECIONAMENTO BASEADO NO TIPO DE USUÁRIO
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
@@ -644,8 +643,7 @@ def dashboard():
     
     # CÁLCULOS REAIS - Usar mesma lógica da página funcionários
     try:
-        # Imports necessários
-        from datetime import date
+        # Imports necessários (date e datetime já importados no topo)
         from models import RegistroPonto, RegistroAlimentacao
         
         # Garantir que admin_id está definido - usar valor do usuário atual
