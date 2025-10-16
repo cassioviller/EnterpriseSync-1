@@ -1351,10 +1351,53 @@ def funcionarios():
                     RegistroPonto.data <= data_fim
                 ).all()
                 
-                total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
+                # Calcular horas (usa valor salvo ou calcula em tempo real)
+                total_horas = 0
+                for r in registros:
+                    if r.horas_trabalhadas and r.horas_trabalhadas > 0:
+                        # Usa o valor já calculado
+                        total_horas += r.horas_trabalhadas
+                    elif r.hora_entrada and r.hora_saida:
+                        # Calcula em tempo real se não tiver valor (fallback para dados antigos)
+                        hoje = datetime.today().date()
+                        dt_entrada = datetime.combine(hoje, r.hora_entrada)
+                        dt_saida = datetime.combine(hoje, r.hora_saida)
+                        
+                        # Se saída é antes da entrada, passou da meia-noite
+                        if dt_saida < dt_entrada:
+                            dt_saida += timedelta(days=1)
+                        
+                        horas = (dt_saida - dt_entrada).total_seconds() / 3600
+                        
+                        # Desconta 1h de almoço se trabalhou mais de 6h
+                        if horas > 6:
+                            horas -= 1
+                        
+                        total_horas += horas
+
+                # Horas extras (mantém cálculo original)
                 total_extras = sum(r.horas_extras or 0 for r in registros)
-                total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
-                total_faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
+                # Detectar faltas de múltiplas formas (tipo_registro ou ausência de horas)
+                total_faltas = 0
+                total_faltas_justificadas = 0
+
+                for r in registros:
+                    # Método 1: tipo_registro explícito
+                    if r.tipo_registro == 'falta':
+                        total_faltas += 1
+                    elif r.tipo_registro == 'falta_justificada':
+                        total_faltas_justificadas += 1
+                    # Método 2: detectar falta implícita (sem horas em dia útil)
+                    elif (r.horas_trabalhadas == 0 and 
+                          not r.hora_entrada and 
+                          not r.hora_saida and
+                          r.data.weekday() < 5 and  # Segunda a sexta
+                          r.tipo_registro not in ['feriado', 'feriado_trabalhado', 'sabado_horas_extras', 'domingo_horas_extras']):
+                        # Falta não marcada explicitamente - verificar se é justificada
+                        if r.observacoes and ('justificad' in r.observacoes.lower() or 'atestado' in r.observacoes.lower()):
+                            total_faltas_justificadas += 1
+                        else:
+                            total_faltas += 1
                 
                 funcionarios_kpis.append({
                     'funcionario': func,
@@ -1367,15 +1410,40 @@ def funcionarios():
                 })
             except Exception as e:
                 print(f"Erro KPI funcionário {func.nome}: {str(e)}")
-                funcionarios_kpis.append({
-                    'funcionario': func,
-                    'horas_trabalhadas': 0,
-                    'total_horas': 0,
-                    'total_extras': 0,
-                    'total_faltas': 0,
-                    'total_faltas_justificadas': 0,
-                    'custo_total': 0
-                })
+                
+                # Se não há registros mas funcionário tem salário, estimar custo
+                if len(registros) == 0 and func.salario:
+                    # Calcular dias úteis do período
+                    mes = data_inicio.month
+                    ano = data_inicio.year
+                    dias_uteis = sum(1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1) 
+                                    if date(ano, mes, dia).weekday() < 5)
+                    
+                    # Estimar horas baseado na jornada
+                    horas_por_dia = (func.jornada_semanal / 5) if func.jornada_semanal else 8
+                    horas_estimadas = dias_uteis * horas_por_dia
+                    
+                    funcionarios_kpis.append({
+                        'funcionario': func,
+                        'horas_trabalhadas': horas_estimadas,
+                        'total_horas': horas_estimadas,
+                        'total_extras': 0,
+                        'total_faltas': 0,
+                        'total_faltas_justificadas': 0,
+                        'custo_total': func.salario,  # Custo = salário mensal
+                        'estimado': True  # Flag para indicar que é estimativa
+                    })
+                else:
+                    # Sem dados e sem salário - retornar zeros
+                    funcionarios_kpis.append({
+                        'funcionario': func,
+                        'horas_trabalhadas': 0,
+                        'total_horas': 0,
+                        'total_extras': 0,
+                        'total_faltas': 0,
+                        'total_faltas_justificadas': 0,
+                        'custo_total': 0
+                    })
         
         # KPIs gerais
         total_horas_geral = sum(k['total_horas'] for k in funcionarios_kpis)
