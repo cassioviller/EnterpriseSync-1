@@ -167,7 +167,7 @@ html[data-bs-theme="dark"] .header-btn i {
 }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid px-4 py-3">
     <!-- Header simplificado -->
     <div class="row mb-3">
         <div class="col-12">
@@ -334,8 +334,6 @@ html[data-bs-theme="dark"] .header-btn i {
         </div>
     </div>
 
-</div>
-
     <!-- 📈 VISÃO GERAL - KPIs Principais -->
     <div class="section-header">
         <h4><i class="fas fa-chart-line"></i> Visão Geral</h4>
@@ -407,75 +405,7 @@ html[data-bs-theme="dark"] .header-btn i {
         </div>
     </div>
 
-    <!-- Segunda linha de KPIs - Margem -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card {% if margem_percentual >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <h5 class="card-title mb-0">Margem de Lucro</h5>
-                            <h2 class="mb-0">{{ margem_percentual }}%</h2>
-                            <small>Sobre R$ {{ '{:,.2f}'.format(valor_contrato_total).replace(',', '.') }}</small>
-                        </div>
-                        <div class="ms-3">
-                            <i class="fas fa-percentage fa-2x opacity-75"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card border-success">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <h5 class="card-title mb-0 text-success">Eficiência Geral</h5>
-                            <h2 class="mb-0">{{ eficiencia_geral }}%</h2>
-                        </div>
-                        <div class="ms-3">
-                            <i class="fas fa-chart-line fa-2x text-success opacity-75"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card border-primary">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <h5 class="card-title mb-0 text-primary">Produtividade</h5>
-                            <h2 class="mb-0">{{ produtividade_obra }}%</h2>
-                        </div>
-                        <div class="ms-3">
-                            <i class="fas fa-tasks fa-2x text-primary opacity-75"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card border-warning">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <h5 class="card-title mb-0 text-warning">Veículos Disponíveis</h5>
-                            <h2 class="mb-0">{{ veiculos_disponiveis }}</h2>
-                        </div>
-                        <div class="ms-3">
-                            <i class="fas fa-car fa-2x text-warning opacity-75"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 📋 PROPOSTAS COMERCIAIS -->
+    <!-- 📋 RECURSOS HUMANOS -->
 
     <div class="section-header">
         <h4><i class="fas fa-users"></i> Recursos Humanos</h4>
@@ -790,8 +720,10 @@ html[data-bs-theme="dark"] .header-btn i {
         </div>
     </div>
 
-    <!-- 👥 RECURSOS HUMANOS -->
-    <!-- 💰 FINANCEIRO E CUSTOS -->
+</div> <!-- Fechamento do container-fluid -->
+
+<!-- 👥 RECURSOS HUMANOS -->
+<!-- 💰 FINANCEIRO E CUSTOS -->
 
 <script>
 // Função específica para filtros do dashboard
@@ -1064,6 +996,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
 {% endblock %}
 
 {% block scripts %}

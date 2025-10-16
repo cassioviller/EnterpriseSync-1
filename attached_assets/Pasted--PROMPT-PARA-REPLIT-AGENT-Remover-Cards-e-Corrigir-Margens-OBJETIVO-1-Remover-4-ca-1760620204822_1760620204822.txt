@@ -1,0 +1,320 @@
+# PROMPT PARA REPLIT AGENT - Remover Cards e Corrigir Margens
+
+## 🎯 OBJETIVO
+
+1. **Remover 4 cards** da seção "Visão Geral": Margem de Lucro, Eficiência Geral, Produtividade, Veículos Disponíveis
+2. **Manter apenas 4 cards**: Funcionários Ativos, Obras Ativas, Veículos, Custos do Período
+3. **Corrigir padding/margem** das seções para ficarem alinhadas como "Financeiro e Custos"
+
+---
+
+## 📝 MODIFICAÇÕES NECESSÁRIAS
+
+### MODIFICAÇÃO 1: Remover Segunda Linha de Cards em "Visão Geral"
+
+**Arquivo:** `templates/dashboard.html`
+
+**Localização:** Seção "Visão Geral" (procure por `<h4><i class="fas fa-chart-line"></i> Visão Geral</h4>`)
+
+**O que fazer:**
+
+1. **Localize a seção "Visão Geral"** que contém 8 cards em 2 linhas (4 + 4)
+
+2. **Mantenha APENAS a primeira `<div class="row mb-4">` com 4 cards:**
+   - Funcionários Ativos (bg-primary)
+   - Obras Ativas (bg-success)
+   - Veículos (bg-warning)
+   - Custos do Período (bg-info)
+
+3. **DELETE completamente a segunda `<div class="row mb-4">` que contém:**
+   - Margem de Lucro
+   - Eficiência Geral
+   - Produtividade
+   - Veículos Disponíveis
+
+**Estrutura esperada após a modificação:**
+
+```html
+<!-- 📈 VISÃO GERAL - KPIs Principais -->
+<div class="section-header">
+    <h4><i class="fas fa-chart-line"></i> Visão Geral</h4>
+</div>
+
+<div class="row mb-4">
+    <!-- Card 1: Funcionários Ativos -->
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Funcionários Ativos</h5>
+                        <h2 class="mb-0">{{ total_funcionarios }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-users fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 2: Obras Ativas -->
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Obras Ativas</h5>
+                        <h2 class="mb-0">{{ total_obras }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-hard-hat fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 3: Veículos -->
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Veículos</h5>
+                        <h2 class="mb-0">{{ total_veiculos }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-truck fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 4: Custos do Período -->
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-0">Custos do Período</h5>
+                        <h2 class="mb-0">R$ {{ '{:,.2f}'.format(custos_mes).replace(',', '.') }}</h2>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-dollar-sign fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ❌ DELETE TODA A SEGUNDA ROW DAQUI -->
+<!-- NÃO deve haver outra <div class="row mb-4"> aqui -->
+<!-- Próxima seção deve ser "Recursos Humanos" -->
+
+<!-- 📋 RECURSOS HUMANOS -->
+<div class="section-header">
+    <h4><i class="fas fa-users"></i> Recursos Humanos</h4>
+</div>
+```
+
+---
+
+### MODIFICAÇÃO 2: Adicionar Container com Padding Consistente
+
+**Arquivo:** `templates/dashboard.html`
+
+**Problema:** As seções estão "coladas" na lateral porque falta um container com padding adequado.
+
+**Solução:** Envolver todo o conteúdo do dashboard em um container com classe `container-fluid` e adicionar padding.
+
+**Localização:** Logo após o `<div class="content">` ou início do body do dashboard
+
+**Adicionar no início (após abertura do body/content):**
+
+```html
+<div class="container-fluid px-4 py-3">
+    <!-- Todo o conteúdo do dashboard aqui -->
+</div>
+```
+
+**OU se já existe um container, adicionar classes de padding:**
+
+```html
+<!-- Trocar -->
+<div class="container-fluid">
+
+<!-- Por -->
+<div class="container-fluid px-4 py-3">
+```
+
+**Onde:**
+- `px-4` = padding horizontal (left e right) de 1.5rem
+- `py-3` = padding vertical (top e bottom) de 1rem
+
+---
+
+### MODIFICAÇÃO 3: Garantir Margem Consistente nas Section Headers
+
+**Arquivo:** `templates/dashboard.html`
+
+**Verificar se existe CSS para `.section-header`:**
+
+Se não existir, adicionar no `<style>` ou arquivo CSS:
+
+```css
+.section-header {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    margin-top: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section-header h4 {
+    margin: 0;
+    font-weight: 600;
+}
+
+.section-header i {
+    margin-right: 8px;
+}
+```
+
+---
+
+### MODIFICAÇÃO 4: Verificar Estrutura do Layout Base
+
+**Arquivo:** `templates/dashboard.html` ou `templates/base.html`
+
+**Verificar se o layout base tem:**
+
+```html
+<body>
+    <!-- Navbar -->
+    <nav>...</nav>
+    
+    <!-- Main Content -->
+    <div class="content">
+        <div class="container-fluid px-4 py-3">
+            <!-- Aqui vai o conteúdo do dashboard -->
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+```
+
+**Se o padding estiver no base.html, não precisa adicionar novamente no dashboard.html**
+
+---
+
+## 🔍 VALIDAÇÃO
+
+Após implementar as modificações:
+
+### ✅ Visual:
+1. Seção "Visão Geral" deve ter **apenas 4 cards** em uma linha
+2. Não deve haver segunda linha com Margem de Lucro, Eficiência, etc
+3. Todas as seções devem ter **margem lateral igual** (não coladas na borda)
+4. Headers verdes devem ter **espaçamento consistente**
+
+### ✅ Estrutura:
+1. Cada seção deve ter:
+   - `<div class="section-header">` com título
+   - `<div class="row mb-4">` com cards/conteúdo
+   - Espaçamento entre seções
+
+### ✅ Responsividade:
+1. Em telas grandes: 4 cards lado a lado (col-md-3)
+2. Em telas médias: 2 cards por linha
+3. Em telas pequenas: 1 card por linha (empilhados)
+
+---
+
+## 📊 ANTES vs DEPOIS
+
+### ANTES (Problema):
+```
+┌─────────────────────────────────────────────────┐
+│Visão Geral                                      │ ← Colado na borda
+├─────────┬─────────┬─────────┬─────────────────┤
+│Func.    │Obras    │Veículos │Custos           │
+│Ativos   │Ativas   │         │do Período       │
+├─────────┼─────────┼─────────┼─────────────────┤
+│Margem   │Efic.    │Produt.  │Veículos         │ ← REMOVER ESTA LINHA
+│de Lucro │Geral    │         │Disponíveis      │
+└─────────┴─────────┴─────────┴─────────────────┘
+```
+
+### DEPOIS (Correto):
+```
+  ┌───────────────────────────────────────────┐
+  │  Visão Geral                              │ ← Com margem lateral
+  ├─────────┬─────────┬─────────┬─────────────┤
+  │Func.    │Obras    │Veículos │Custos       │
+  │Ativos   │Ativas   │         │do Período   │
+  └─────────┴─────────┴─────────┴─────────────┘
+  
+  ┌───────────────────────────────────────────┐
+  │  Recursos Humanos                         │ ← Mesma margem
+  └───────────────────────────────────────────┘
+```
+
+---
+
+## 🐛 TROUBLESHOOTING
+
+### Problema: "Ainda está colado na lateral"
+
+**Causa:** Falta container com padding
+
+**Solução:**
+1. Verificar se existe `<div class="container-fluid px-4">` envolvendo o conteúdo
+2. Se não, adicionar no início do dashboard.html
+3. Ou adicionar no base.html se for layout global
+
+---
+
+### Problema: "Cards ficaram muito pequenos"
+
+**Causa:** Remoção dos 4 cards deixou espaço vazio
+
+**Solução:** Isso é esperado! Agora você tem apenas 4 cards essenciais, deixando o dashboard mais limpo.
+
+**Alternativa:** Se quiser preencher o espaço, pode:
+- Aumentar tamanho dos cards (trocar `col-md-3` por `col-md-4` ou `col-lg-3 col-md-6`)
+- Adicionar gráficos abaixo dos cards
+- Manter como está (design minimalista)
+
+---
+
+### Problema: "Segunda linha ainda aparece"
+
+**Causa:** Não deletou completamente a segunda `<div class="row mb-4">`
+
+**Solução:**
+1. Procurar por TODAS as ocorrências de `<div class="row mb-4">` na seção "Visão Geral"
+2. Garantir que há APENAS UMA
+3. Deletar a segunda completamente (incluindo `</div>` de fechamento)
+
+---
+
+## ⚡ RESUMO DAS AÇÕES
+
+1. **templates/dashboard.html** - Deletar segunda linha de cards em "Visão Geral"
+2. **templates/dashboard.html** - Adicionar `px-4 py-3` no container principal
+3. **Verificar** se CSS de `.section-header` está aplicado
+4. **Testar** responsividade em diferentes tamanhos de tela
+
+**Tempo estimado:** 5 minutos
+
+**Arquivos modificados:** 1 (dashboard.html)
+
+**Linhas removidas:** ~50-80 linhas (segunda row de cards)
+
+**Linhas adicionadas:** ~5 linhas (padding no container)
+
