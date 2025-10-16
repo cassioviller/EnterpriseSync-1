@@ -1388,7 +1388,7 @@ def funcionarios():
                     elif r.tipo_registro == 'falta_justificada':
                         total_faltas_justificadas += 1
                     # Método 2: detectar falta implícita (sem horas em dia útil)
-                    elif (r.horas_trabalhadas == 0 and 
+                    elif ((r.horas_trabalhadas == 0 or r.horas_trabalhadas is None) and 
                           not r.hora_entrada and 
                           not r.hora_saida and
                           r.data.weekday() < 5 and  # Segunda a sexta
@@ -1399,19 +1399,7 @@ def funcionarios():
                         else:
                             total_faltas += 1
                 
-                funcionarios_kpis.append({
-                    'funcionario': func,
-                    'horas_trabalhadas': total_horas,
-                    'total_horas': total_horas,
-                    'total_extras': total_extras,
-                    'total_faltas': total_faltas,
-                    'total_faltas_justificadas': total_faltas_justificadas,
-                    'custo_total': (total_horas + total_extras * 1.5) * (calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0)
-                })
-            except Exception as e:
-                print(f"Erro KPI funcionário {func.nome}: {str(e)}")
-                
-                # Se não há registros mas funcionário tem salário, estimar custo
+                # FALLBACK: Se não há registros mas funcionário tem salário, estimar custo
                 if len(registros) == 0 and func.salario:
                     # Calcular dias úteis do período
                     mes = data_inicio.month
@@ -1434,16 +1422,28 @@ def funcionarios():
                         'estimado': True  # Flag para indicar que é estimativa
                     })
                 else:
-                    # Sem dados e sem salário - retornar zeros
+                    # Caminho normal com registros
                     funcionarios_kpis.append({
                         'funcionario': func,
-                        'horas_trabalhadas': 0,
-                        'total_horas': 0,
-                        'total_extras': 0,
-                        'total_faltas': 0,
-                        'total_faltas_justificadas': 0,
-                        'custo_total': 0
+                        'horas_trabalhadas': total_horas,
+                        'total_horas': total_horas,
+                        'total_extras': total_extras,
+                        'total_faltas': total_faltas,
+                        'total_faltas_justificadas': total_faltas_justificadas,
+                        'custo_total': (total_horas + total_extras * 1.5) * (calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0)
                     })
+            except Exception as e:
+                print(f"Erro KPI funcionário {func.nome}: {str(e)}")
+                # Em caso de erro real, retornar zeros
+                funcionarios_kpis.append({
+                    'funcionario': func,
+                    'horas_trabalhadas': 0,
+                    'total_horas': 0,
+                    'total_extras': 0,
+                    'total_faltas': 0,
+                    'total_faltas_justificadas': 0,
+                    'custo_total': 0
+                })
         
         # KPIs gerais
         total_horas_geral = sum(k['total_horas'] for k in funcionarios_kpis)
