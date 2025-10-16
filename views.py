@@ -600,9 +600,9 @@ def dashboard():
         obras_ativas = Obra.query.filter_by(
             admin_id=admin_id
         ).filter(
-            Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
+            Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
         ).order_by(Obra.created_at.desc()).limit(5).all()
-        print(f"DEBUG: {len(obras_ativas)} obras ativas encontradas")
+        print(f"DEBUG: {len(obras_ativas)} obras ativas encontradas - Status: {[o.status for o in obras_ativas]}")
         
         # Calcular progresso de cada obra baseado no RDO mais recente
         for obra in obras_ativas:
