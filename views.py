@@ -410,6 +410,22 @@ def index():
     fallback=lambda *args, **kwargs: {"error": "Dashboard temporariamente indisponível"}
 )
 def dashboard():
+    # DEFINIR VARIÁVEIS DE DATA NO INÍCIO (SEMPRE)
+    from datetime import date as date_class
+    data_inicio_param = request.args.get('data_inicio')
+    data_fim_param = request.args.get('data_fim')
+    
+    if data_inicio_param:
+        data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
+    else:
+        hoje = date_class.today()
+        data_inicio = date_class(hoje.year, hoje.month, 1)
+        
+    if data_fim_param:
+        data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
+    else:
+        data_fim = date_class.today()
+    
     # REDIRECIONAMENTO BASEADO NO TIPO DE USUÁRIO
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
         # FUNCIONÁRIO - SEMPRE vai para dashboard específico (SEGURANÇA CRÍTICA)
@@ -631,22 +647,6 @@ def dashboard():
         # Imports necessários
         from datetime import date
         from models import RegistroPonto, RegistroAlimentacao
-        
-        # Filtros de data - usar período atual por padrão
-        data_inicio_param = request.args.get('data_inicio')
-        data_fim_param = request.args.get('data_fim')
-        
-        if data_inicio_param:
-            data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
-        else:
-            # Usar último mês por padrão para capturar dados existentes
-            hoje = date.today()
-            data_inicio = date(hoje.year, hoje.month, 1)
-            
-        if data_fim_param:
-            data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
-        else:
-            data_fim = date.today()
         
         # Garantir que admin_id está definido - usar valor do usuário atual
         if 'admin_id' not in locals() or admin_id is None:
