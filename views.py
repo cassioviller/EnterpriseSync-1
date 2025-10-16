@@ -502,7 +502,7 @@ def dashboard():
         
         # ========== MÉTRICAS DE PROPOSTAS DINÂMICAS ==========
         from models import Proposta, PropostaTemplate, PropostaHistorico
-        import datetime as dt
+        # datetime já importado no topo do arquivo
         
         try:
             # 1. PROPOSTAS POR STATUS
@@ -513,13 +513,13 @@ def dashboard():
             propostas_rejeitadas = Proposta.query.filter_by(admin_id=admin_id, status='rejeitada').count()
             
             # Expiradas: propostas enviadas com data_proposta + validade_dias < hoje
-            hoje = dt.date.today()
+            hoje = date.today()
             propostas_expiradas = Proposta.query.filter(
                 Proposta.admin_id == admin_id,
                 Proposta.status == 'enviada',
                 Proposta.validade_dias.isnot(None)
             ).all()
-            propostas_expiradas = len([p for p in propostas_expiradas if p.data_proposta and (p.data_proposta + dt.timedelta(days=p.validade_dias or 7)) < hoje])
+            propostas_expiradas = len([p for p in propostas_expiradas if p.data_proposta and (p.data_proposta + timedelta(days=p.validade_dias or 7)) < hoje])
             
             total_propostas = Proposta.query.filter_by(admin_id=admin_id).count()
             print(f"DEBUG: Propostas - Total: {total_propostas}, Aprovadas: {propostas_aprovadas}, Enviadas: {propostas_enviadas}")
@@ -541,7 +541,7 @@ def dashboard():
             tempo_resposta_medio = 2.5  # Placeholder - precisa de histórico detalhado
             
             # Propostas por mês (média dos últimos 6 meses)
-            seis_meses_atras = hoje - dt.timedelta(days=180)
+            seis_meses_atras = hoje - timedelta(days=180)
             propostas_ultimos_6_meses = Proposta.query.filter(
                 Proposta.admin_id == admin_id,
                 Proposta.criado_em >= seis_meses_atras
