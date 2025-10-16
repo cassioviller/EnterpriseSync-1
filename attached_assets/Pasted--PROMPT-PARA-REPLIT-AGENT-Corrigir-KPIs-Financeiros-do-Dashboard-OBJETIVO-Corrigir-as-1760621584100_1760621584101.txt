@@ -1,0 +1,417 @@
+# PROMPT PARA REPLIT AGENT - Corrigir KPIs Financeiros do Dashboard
+
+## 🎯 OBJETIVO
+
+Corrigir as queries dos KPIs financeiros que não estão filtrando por `admin_id`, causando:
+- Valores zerados ou incorretos
+- Violação de multi-tenancy (mostrando dados de outras empresas)
+- Problemas de segurança
+
+---
+
+## 📝 MODIFICAÇÕES NECESSÁRIAS
+
+### MODIFICAÇÃO 1: Corrigir Query de Custos de Veículos
+
+**Arquivo:** `views.py`
+
+**Localização:** Função `calcular_custos_veiculo()` (aproximadamente linha 830-836)
+
+**Código Atual (PROBLEMÁTICO):**
+```python
+def calcular_custos_veiculo():
+    from models import VehicleExpense
+    custos_veiculo = VehicleExpense.query.filter(
+        VehicleExpense.data_custo >= data_inicio,
+        VehicleExpense.data_custo <= data_fim
+    ).all()
+    return sum(c.valor or 0 for c in custos_veiculo)
+```
+
+**Código Corrigido:**
+```python
+def calcular_custos_veiculo():
+    from models import VehicleExpense
+    custos_veiculo = VehicleExpense.query.filter(
+        VehicleExpense.admin_id == admin_id,  # ✅ ADICIONAR FILTRO
+        VehicleExpense.data_custo >= data_inicio,
+        VehicleExpense.data_custo <= data_fim
+    ).all()
+    return sum(c.valor or 0 for c in custos_veiculo)
+```
+
+---
+
+### MODIFICAÇÃO 2: Corrigir Query de Alimentação (RegistroAlimentacao)
+
+**Arquivo:** `views.py`
+
+**Localização:** Cálculo de `custo_alimentacao_real` (aproximadamente linha 799-820)
+
+**Código Atual (PROBLEMÁTICO):**
+```python
+custo_alimentacao_real = 0
+try:
+    # Tabela registro_alimentacao
+    alimentacao_registros = RegistroAlimentacao.query.filter(
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    ).all()
+    custo_alimentacao_real += sum(a.valor or 0 for a in alimentacao_registros)
+    
+    # Também buscar em outro_custo
+    from models import OutroCusto
+    outros_alimentacao = OutroCusto.query.filter(
+        OutroCusto.data >= data_inicio,
+        OutroCusto.data <= data_fim,
+        OutroCusto.kpi_associado == 'custo_alimentacao'
+    ).all()
+    custo_alimentacao_real += sum(o.valor or 0 for o in outros_alimentacao)
+    
+    print(f"DEBUG ALIMENTAÇÃO DASHBOARD: Registros={sum(a.valor or 0 for a in alimentacao_registros):.2f}, Outros={sum(o.valor or 0 for o in outros_alimentacao):.2f}, Total={custo_alimentacao_real:.2f}")
+except Exception as e:
+    print(f"Erro cálculo alimentação: {e}")
+    custo_alimentacao_real = 0
+```
+
+**Código Corrigido:**
+```python
+custo_alimentacao_real = 0
+try:
+    # Tabela registro_alimentacao - JOIN com funcionario para filtrar por admin_id
+    alimentacao_registros = db.session.query(RegistroAlimentacao).join(
+        Funcionario, RegistroAlimentacao.funcionario_id == Funcionario.id
+    ).filter(
+        Funcionario.admin_id == admin_id,  # ✅ FILTRAR POR ADMIN
+        RegistroAlimentacao.data >= data_inicio,
+        RegistroAlimentacao.data <= data_fim
+    ).all()
+    custo_alimentacao_real += sum(a.valor or 0 for a in alimentacao_registros)
+    
+    # Também buscar em outro_custo
+    from models import OutroCusto
+    outros_alimentacao = OutroCusto.query.filter(
+        OutroCusto.admin_id == admin_id,  # ✅ ADICIONAR FILTRO
+        OutroCusto.data >= data_inicio,
+        OutroCusto.data <= data_fim,
+        OutroCusto.kpi_associado == 'custo_alimentacao'
+    ).all()
+    custo_alimentacao_real += sum(o.valor or 0 for o in outros_alimentacao)
+    
+    print(f"DEBUG ALIMENTAÇÃO DASHBOARD: Registros={sum(a.valor or 0 for a in alimentacao_registros):.2f}, Outros={sum(o.valor or 0 for o in outros_alimentacao):.2f}, Total={custo_alimentacao_real:.2f}")
+except Exception as e:
+    print(f"Erro cálculo alimentação: {e}")
+    custo_alimentacao_real = 0
+```
+
+---
+
+### MODIFICAÇÃO 3: Corrigir Query de Faltas Justificadas
+
+**Arquivo:** `views.py`
+
+**Localização:** Função `calcular_faltas_justificadas()` (aproximadamente linha 842-860)
+
+**Código Atual (PROBLEMÁTICO):**
+```python
+def calcular_faltas_justificadas():
+    # Buscar todas as faltas justificadas no período
+    faltas_justificadas = RegistroPonto.query.filter(
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim,
+        RegistroPonto.tipo_registro == 'falta_justificada'
+    ).all()
+    
+    quantidade = len(faltas_justificadas)
+    custo = 0
+    
+    for falta in faltas_justificadas:
+        funcionario = Funcionario.query.get(falta.funcionario_id)
+        if funcionario and funcionario.salario:
+            # Valor por dia baseado em 22 dias úteis
+            valor_dia = (funcionario.salario / 22)
+            custo += valor_dia
+    
+    return quantidade, custo
+```
+
+**Código Corrigido:**
+```python
+def calcular_faltas_justificadas():
+    # Buscar faltas justificadas com JOIN em funcionario para filtrar por admin_id
+    faltas_justificadas = db.session.query(RegistroPonto).join(
+        Funcionario, RegistroPonto.funcionario_id == Funcionario.id
+    ).filter(
+        Funcionario.admin_id == admin_id,  # ✅ FILTRAR POR ADMIN
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim,
+        RegistroPonto.tipo_registro == 'falta_justificada'
+    ).all()
+    
+    quantidade = len(faltas_justificadas)
+    custo = 0
+    
+    for falta in faltas_justificadas:
+        funcionario = Funcionario.query.get(falta.funcionario_id)
+        if funcionario and funcionario.salario:
+            # Valor por dia baseado em 22 dias úteis
+            valor_dia = (funcionario.salario / 22)
+            custo += valor_dia
+    
+    return quantidade, custo
+```
+
+---
+
+### MODIFICAÇÃO 4: Corrigir Query de Outros Custos
+
+**Arquivo:** `views.py`
+
+**Localização:** Função `calcular_outros_custos()` (aproximadamente linha 867-874)
+
+**Código Atual (PROBLEMÁTICO):**
+```python
+def calcular_outros_custos():
+    from models import OutroCusto
+    outros_custos = OutroCusto.query.filter(
+        OutroCusto.data >= data_inicio,
+        OutroCusto.data <= data_fim,
+        ~OutroCusto.tipo.in_(['transporte', 'alimentacao'])
+    ).all()
+    return sum(o.valor or 0 for o in outros_custos)
+```
+
+**Código Corrigido:**
+```python
+def calcular_outros_custos():
+    from models import OutroCusto
+    outros_custos = OutroCusto.query.filter(
+        OutroCusto.admin_id == admin_id,  # ✅ ADICIONAR FILTRO
+        OutroCusto.data >= data_inicio,
+        OutroCusto.data <= data_fim,
+        ~OutroCusto.tipo.in_(['transporte', 'alimentacao'])
+    ).all()
+    return sum(o.valor or 0 for o in outros_custos)
+```
+
+---
+
+## 🔍 VALIDAÇÃO
+
+Após implementar as modificações:
+
+### ✅ Teste 1: Verificar Logs
+
+No console do Replit, procure por:
+
+```
+DEBUG ALIMENTAÇÃO DASHBOARD: Registros=150.00, Outros=0.00, Total=150.00
+DEBUG Custos veículo: R$ 200.00
+DEBUG DASHBOARD: Custo total calculado: R$ 500.00
+```
+
+Se os valores ainda estiverem zerados, verifique:
+1. Se há dados no período selecionado
+2. Se `admin_id` está correto
+3. Se as tabelas têm registros
+
+---
+
+### ✅ Teste 2: Verificar Dashboard
+
+Acesse `/dashboard` e verifique se os cards mostram valores:
+
+```
+Alimentação: R$ 150.00  (não zero)
+Transporte: R$ 200.00   (não zero)
+Mão de Obra: R$ 500.00  (não zero)
+Outros: R$ 50.00        (não zero)
+Faltas: 3 dias          (não zero)
+Total: R$ 900.00        (soma correta)
+```
+
+---
+
+### ✅ Teste 3: Verificar Filtro de Data
+
+1. Clique em "Aplicar Filtro" com datas diferentes
+2. Verifique se os valores mudam
+3. Verifique se não há erro no console
+
+---
+
+### ✅ Teste 4: Verificar Multi-tenancy
+
+Se você tiver múltiplos admins:
+
+1. Faça login com Admin A
+2. Anote os valores do dashboard
+3. Faça login com Admin B
+4. Verifique se os valores são diferentes
+
+**Valores devem ser isolados por empresa!**
+
+---
+
+## 🐛 TROUBLESHOOTING
+
+### Problema: "Ainda mostra R$ 0.00"
+
+**Causa 1:** Não há dados no período
+
+**Verificar:**
+```sql
+-- Conectar ao banco e executar
+SELECT COUNT(*), SUM(valor) 
+FROM frota_despesa 
+WHERE admin_id = <seu_admin_id> 
+AND data_custo >= '2025-10-01' 
+AND data_custo <= '2025-10-16';
+```
+
+Se retornar 0, não há dados. Cadastre custos de teste.
+
+---
+
+**Causa 2:** admin_id incorreto
+
+**Verificar logs:**
+```
+✅ DEBUG DASHBOARD KPIs: Usando admin_id=10 para cálculos
+```
+
+Confirme se esse admin_id tem dados:
+```sql
+SELECT admin_id, COUNT(*) 
+FROM funcionario 
+WHERE ativo = true 
+GROUP BY admin_id;
+```
+
+---
+
+**Causa 3:** Período de data muito restrito
+
+**Solução:** Ampliar o período ou usar "Último Mês" / "3 Meses"
+
+---
+
+### Problema: "Erro ao executar query"
+
+**Erro típico:**
+```
+AttributeError: 'NoneType' object has no attribute 'admin_id'
+```
+
+**Causa:** Variável `admin_id` não está definida no escopo da função
+
+**Solução:** As funções `calcular_custos_veiculo()`, `calcular_faltas_justificadas()`, etc. estão dentro da função `dashboard()`, então `admin_id` deve estar acessível. Verificar se não há problema de indentação.
+
+---
+
+### Problema: "Query muito lenta"
+
+**Causa:** JOINs sem índices
+
+**Solução (futura):** Adicionar índices:
+```sql
+CREATE INDEX idx_registro_alimentacao_funcionario_data 
+ON registro_alimentacao(funcionario_id, data);
+
+CREATE INDEX idx_registro_ponto_funcionario_data 
+ON registro_ponto(funcionario_id, data);
+```
+
+---
+
+## 📊 RESUMO DAS ALTERAÇÕES
+
+| Query | Linha Aprox. | Alteração | Impacto |
+|-------|--------------|-----------|---------|
+| calcular_custos_veiculo | 830-836 | + admin_id filter | Custos de transporte corretos |
+| RegistroAlimentacao | 802-806 | + JOIN Funcionario | Custos de alimentação corretos |
+| OutroCusto (alimentação) | 810-815 | + admin_id filter | Custos de alimentação completos |
+| calcular_faltas_justificadas | 842-860 | + JOIN Funcionario | Faltas corretas |
+| calcular_outros_custos | 867-874 | + admin_id filter | Outros custos corretos |
+
+**Total de linhas modificadas:** ~30 linhas
+
+**Arquivos afetados:** 1 (`views.py`)
+
+**Risco:** Baixo (apenas adiciona filtros de segurança)
+
+---
+
+## ⚡ CHECKLIST DE IMPLEMENTAÇÃO
+
+- [ ] Modificar `calcular_custos_veiculo()` - adicionar admin_id
+- [ ] Modificar query de `RegistroAlimentacao` - adicionar JOIN
+- [ ] Modificar query de `OutroCusto` (alimentação) - adicionar admin_id
+- [ ] Modificar `calcular_faltas_justificadas()` - adicionar JOIN
+- [ ] Modificar `calcular_outros_custos()` - adicionar admin_id
+- [ ] Salvar arquivo
+- [ ] Reiniciar servidor Replit
+- [ ] Acessar `/dashboard`
+- [ ] Verificar se KPIs mostram valores
+- [ ] Testar filtro de data
+- [ ] Verificar logs no console
+- [ ] Commit das alterações
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+**Antes:**
+```
+💰 Financeiro e Custos
+┌──────────────────────────────────────────────┐
+│ Alimentação: R$ 0.00                         │ ❌
+│ Transporte: R$ 0.00                          │ ❌
+│ Mão de Obra: R$ 500.00                       │ ✅
+│ Outros: R$ 0.00                              │ ❌
+│ Faltas: 0 dias                               │ ❌
+│ Total: R$ 500.00                             │ ⚠️
+└──────────────────────────────────────────────┘
+```
+
+**Depois:**
+```
+💰 Financeiro e Custos
+┌──────────────────────────────────────────────┐
+│ Alimentação: R$ 150.00                       │ ✅
+│ Transporte: R$ 200.00                        │ ✅
+│ Mão de Obra: R$ 500.00                       │ ✅
+│ Outros: R$ 50.00                             │ ✅
+│ Faltas: 3 dias (R$ 45.00)                   │ ✅
+│ Total: R$ 945.00                             │ ✅
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## 🚨 IMPORTANTE - SEGURANÇA
+
+Essas correções não são apenas para "fazer funcionar", mas também para **segurança**:
+
+- **Antes:** Queries buscavam dados de TODAS as empresas
+- **Depois:** Queries filtram apenas dados da empresa do usuário logado
+
+**Isso é crítico para multi-tenancy e LGPD!**
+
+---
+
+## 📝 COMMIT MESSAGE SUGERIDA
+
+```
+fix: Adicionar filtros de admin_id nas queries de KPIs financeiros
+
+- Adiciona filtro admin_id em calcular_custos_veiculo()
+- Adiciona JOIN com Funcionario em RegistroAlimentacao
+- Adiciona filtro admin_id em OutroCusto (alimentação e outros)
+- Adiciona JOIN com Funcionario em calcular_faltas_justificadas()
+- Corrige violação de multi-tenancy nas queries
+- Resolve problema de KPIs financeiros mostrando R$ 0.00
+
+Impacto: KPIs agora mostram valores corretos e isolados por empresa
+```
+

@@ -799,7 +799,11 @@ def dashboard():
         custo_alimentacao_real = 0
         try:
             # Tabela registro_alimentacao
-            alimentacao_registros = RegistroAlimentacao.query.filter(
+            # JOIN com Funcionario para filtrar por admin_id (RegistroAlimentacao não tem admin_id direto)
+            alimentacao_registros = db.session.query(RegistroAlimentacao).join(
+                Funcionario, RegistroAlimentacao.funcionario_id == Funcionario.id
+            ).filter(
+                Funcionario.admin_id == admin_id,
                 RegistroAlimentacao.data >= data_inicio,
                 RegistroAlimentacao.data <= data_fim
             ).all()
@@ -808,6 +812,7 @@ def dashboard():
             # Também buscar em outro_custo
             from models import OutroCusto
             outros_alimentacao = OutroCusto.query.filter(
+                OutroCusto.admin_id == admin_id,
                 OutroCusto.data >= data_inicio,
                 OutroCusto.data <= data_fim,
                 OutroCusto.kpi_associado == 'custo_alimentacao'
@@ -830,6 +835,7 @@ def dashboard():
         def calcular_custos_veiculo():
             from models import VehicleExpense
             custos_veiculo = VehicleExpense.query.filter(
+                VehicleExpense.admin_id == admin_id,
                 VehicleExpense.data_custo >= data_inicio,
                 VehicleExpense.data_custo <= data_fim
             ).all()
@@ -840,8 +846,9 @@ def dashboard():
         
         # 2. Faltas Justificadas (quantidade e valor em R$) - usar safe_db_operation
         def calcular_faltas_justificadas():
-            # Buscar todas as faltas justificadas no período
+            # Buscar todas as faltas justificadas no período (RegistroPonto tem admin_id)
             faltas_justificadas = RegistroPonto.query.filter(
+                RegistroPonto.admin_id == admin_id,
                 RegistroPonto.data >= data_inicio,
                 RegistroPonto.data <= data_fim,
                 RegistroPonto.tipo_registro == 'falta_justificada'
@@ -867,6 +874,7 @@ def dashboard():
         def calcular_outros_custos():
             from models import OutroCusto
             outros_custos = OutroCusto.query.filter(
+                OutroCusto.admin_id == admin_id,
                 OutroCusto.data >= data_inicio,
                 OutroCusto.data <= data_fim,
                 ~OutroCusto.tipo.in_(['transporte', 'alimentacao'])
