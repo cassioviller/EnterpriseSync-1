@@ -1,0 +1,248 @@
+# Análise: Erro UnboundLocalError APENAS em Produção (Docker/Easypanel)
+
+## 🔍 Contexto do Problema
+
+**Sintoma:** O erro `UnboundLocalError: cannot access local variable 'datetime'` ocorre **APENAS em produção** (Docker/Easypanel), mas **NÃO ocorre em desenvolvimento** (Replit).
+
+## 🎯 Diferenças Críticas Entre Ambientes
+
+### Replit (Desenvolvimento)
+- Execução direta via Python interpretador
+- Hot reload ativo
+- Código executado sem otimizações
+- Bytecode não é pré-compilado
+- Ambiente: `FLASK_ENV=development`
+
+### Easypanel/Docker (Produção)
+- Execução via Gunicorn com workers
+- Código pode ser otimizado/compilado
+- Bytecode pode ser cacheado
+- Ambiente: `FLASK_ENV=production`
+- **Variáveis de ambiente:**
+  - `PYTHONUNBUFFERED=1`
+  - `PYTHONDONTWRITEBYTECODE=1`
+  - `FLASK_ENV=production`
+
+## 🐛 Por Que o Erro Só Aparece em Produção?
+
+### Hipótese Principal: Ordem de Análise de Escopo pelo Python
+
+O Python determina o escopo das variáveis durante a **fase de compilação** do código, não durante a execução. Quando há uma atribuição a uma variável em qualquer lugar da função, o Python marca essa variável como **local** para toda a função.
+
+### Comportamento em Desenvolvimento (Replit):
+- O código pode ser recarregado dinamicamente
+- O interpretador pode estar em modo mais permissivo
+- Hot reload pode mascarar o problema
+- Possível que o código não seja totalmente analisado antes da execução
+
+### Comportamento em Produção (Docker/Gunicorn):
+- Código é analisado e compilado uma vez na inicialização
+- Gunicorn pré-carrega a aplicação (`preload_app`)
+- Python faz análise estática completa do escopo
+- **O erro de escopo é detectado de forma mais rigorosa**
+
+## 📊 Análise Técnica Detalhada
+
+### Código Problemático em `views.py`:
+
+```python
+# Linha 9 - Import global
+from datetime import datetime, date, timedelta
+
+# Linha 404-412 - Definição da função
+@main_bp.route('/dashboard')
+@circuit_breaker(...)
+def dashboard():
+    # Linha 418 - PRIMEIRO USO de datetime
+    if data_inicio_param:
+        data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
+    
+    # ... 500+ linhas de código ...
+    
+    # Linha 939 - REIMPORTAÇÃO LOCAL
+    from datetime import datetime
+    dias_uteis_mes = 22
+```
+
+### O Que Acontece Durante a Compilação:
+
+1. **Python analisa toda a função `dashboard()`**
+2. **Encontra `from datetime import datetime` na linha 939**
+3. **Marca `datetime` como variável LOCAL da função**
+4. **TODAS as referências a `datetime` na função são tratadas como locais**
+5. **Linha 418 tenta usar `datetime` ANTES de ser definido (linha 939)**
+6. **Resultado: UnboundLocalError**
+
+### Por Que Funciona no Replit?
+
+Possíveis razões:
+
+1. **Hot Reload Dinâmico:**
+   - Replit pode estar recarregando partes do código de forma incremental
+   - A função pode não ser totalmente recompilada a cada mudança
+
+2. **Modo de Desenvolvimento do Flask:**
+   - Flask em modo debug pode ter comportamento diferente
+   - Possível que use `importlib.reload()` que pode mascarar o problema
+
+3. **Interpretação vs Compilação:**
+   - Replit pode estar executando em modo mais interpretado
+   - Docker/Gunicorn compila bytecode de forma mais agressiva
+
+4. **Versão do Python:**
+   - Possível diferença sutil entre versões
+   - Docker usa `python:3.11-slim` específico
+
+## 🔧 Configurações do Gunicorn que Podem Influenciar
+
+```bash
+# Dockerfile - linha 49
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", 
+     "--workers", "2",           # 2 workers = 2 processos separados
+     "--timeout", "120",          # Timeout de 120s
+     "--keep-alive", "2",
+     "--worker-connections", "1000",
+     "main:app"]
+```
+
+### Impacto do Gunicorn:
+- **Pre-fork model:** Cada worker é um processo separado
+- **Código é carregado UMA VEZ por worker**
+- **Análise de escopo acontece na inicialização**
+- **Não há hot reload - código é estático**
+
+## 🎯 Por Que o Circuit Breaker Pode Estar Envolvido
+
+```python
+# Linha 405-411 em views.py
+@circuit_breaker(
+    name="database_heavy_query",
+    failure_threshold=2,
+    recovery_timeout=60,
+    expected_exception=(TimeoutError, Exception),
+    fallback=lambda *args, **kwargs: {"error": "Dashboard temporariamente indisponível"}
+)
+def dashboard():
+```
+
+### Análise do Circuit Breaker:
+
+O decorator `@circuit_breaker` envolve a função `dashboard()` e pode estar:
+
+1. **Alterando o contexto de execução**
+2. **Modificando como o Python analisa o escopo**
+3. **Causando múltiplas compilações da função**
+
+### Trace do Erro:
+
+```python
+File "/app/utils/circuit_breaker.py", line 194, in wrapper
+    return breaker.call(func, *args, **kwargs)
+File "/app/utils/circuit_breaker.py", line 93, in call
+    result = func(*args, **kwargs)
+File "/app/views.py", line 418, in dashboard
+    data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
+```
+
+**O erro acontece DENTRO do circuit breaker**, o que confirma que a função está sendo executada através do wrapper.
+
+## 🔬 Outras Reimportações Problemáticas
+
+Encontradas **13 reimportações locais** de `datetime` em `views.py`:
+
+```python
+Linha 939:  from datetime import datetime          # ← CAUSA DO ERRO
+Linha 2059: from datetime import date
+Linha 2882: from datetime import date as date_class
+Linha 3090: from datetime import datetime, date
+Linha 3937: from datetime import datetime, timedelta
+Linha 4045: from datetime import datetime, timedelta
+Linha 4142: from datetime import datetime, timedelta
+Linha 4290: from datetime import datetime, timedelta
+Linha 4473: from datetime import datetime, timedelta
+Linha 4581: from datetime import datetime, timedelta
+Linha 5037: from datetime import date
+Linha 5735: from datetime import date as date_module
+Linha 6793: from datetime import date as date_module
+```
+
+**Todas essas são desnecessárias** pois `datetime` já está importado globalmente na linha 9.
+
+## ✅ Solução Definitiva
+
+### 1. Correção Imediata (Linha 939):
+
+```python
+# REMOVER completamente a linha 939
+# from datetime import datetime  ← DELETAR
+
+# O código já funciona com o import global da linha 9
+eficiencia_geral = 0
+try:
+    # datetime já disponível globalmente
+    dias_uteis_mes = 22
+    horas_esperadas = funcionarios_ativos * dias_uteis_mes * 8
+```
+
+### 2. Limpeza Completa (Opcional mas Recomendado):
+
+Remover TODAS as 13 reimportações locais desnecessárias de `datetime` no arquivo `views.py`.
+
+### 3. Validação Específica para Produção:
+
+Após a correção, testar especificamente no ambiente Docker/Easypanel:
+
+```bash
+# Build local do Docker para teste
+docker build -t sige-test .
+docker run -p 5000:5000 sige-test
+
+# Acessar /dashboard e verificar se o erro desapareceu
+```
+
+## 🧪 Por Que a Correção Vai Funcionar
+
+1. **Remove o conflito de escopo:**
+   - Sem a reimportação local, `datetime` permanece como variável global
+   - Python não marca como local
+   - Linha 418 pode usar `datetime` normalmente
+
+2. **Funciona em AMBOS os ambientes:**
+   - Desenvolvimento (Replit): continua funcionando
+   - Produção (Docker/Easypanel): erro desaparece
+
+3. **Sem efeitos colaterais:**
+   - O import global na linha 9 já fornece tudo que é necessário
+   - Não há necessidade de reimportar
+
+## 📋 Checklist de Validação Pós-Correção
+
+### Em Desenvolvimento (Replit):
+- [ ] Dashboard carrega sem erros
+- [ ] KPIs mostram valores corretos
+- [ ] Não há regressões em outras funcionalidades
+
+### Em Produção (Docker/Easypanel):
+- [ ] Build do Docker completa sem erros
+- [ ] Container inicia sem falhas
+- [ ] Dashboard carrega sem UnboundLocalError
+- [ ] KPIs mostram valores reais (não zero)
+- [ ] Logs não mostram erros relacionados a datetime
+- [ ] Circuit breaker funciona normalmente
+
+## 🎓 Lições Aprendidas
+
+1. **Nunca reimporte dentro de funções** o que já está importado globalmente
+2. **Diferenças entre dev e prod são reais** - sempre teste em ambos
+3. **Python analisa escopo estaticamente** - não dinamicamente
+4. **Gunicorn é mais rigoroso** que o servidor de desenvolvimento do Flask
+5. **Decorators podem afetar** como o Python analisa o código
+
+## 🚀 Próximos Passos
+
+1. **Aplicar correção imediata** (remover linha 939)
+2. **Testar em produção** (deploy no Easypanel)
+3. **Monitorar logs** para confirmar que erro desapareceu
+4. **Limpar outras reimportações** (melhoria de código)
+5. **Adicionar card de margem** (feature adicional)
+

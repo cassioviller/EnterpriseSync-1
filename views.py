@@ -2084,7 +2084,6 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         # Processar novos serviços usando ServicoObraReal
         servicos_processados = 0
         
-        from datetime import date
         data_hoje = date.today()
         
         for servico_id in servicos_selecionados:
@@ -2906,15 +2905,12 @@ def detalhes_obra(id):
         print(f"DEBUG KPIs FINAIS: Total={kpis_obra['custo_total']:.2f}, Mão Obra={kpis_obra['custo_mao_obra']:.2f}, Horas={kpis_obra['total_horas']:.1f}")
         print(f"DEBUG FUNCIONÁRIOS: {kpis_obra['funcionarios_periodo']} no período, {kpis_obra['dias_trabalhados']} dias trabalhados")
         
-        # Importar date para template
-        from datetime import date as date_class
-        
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
                              kpis=kpis_obra,
                              data_inicio=data_inicio,
                              data_fim=data_fim,
-                             date=date_class,
+                             date=date,
                              servicos_obra=servicos_obra,
                              total_rdos=total_rdos,
                              rdos_finalizados=rdos_finalizados,
@@ -3115,7 +3111,6 @@ def kpis_veiculo_periodo(id):
         
         from models import Veiculo
         from sqlalchemy import text
-        from datetime import datetime, date
         
         # Verificar se o veículo pertence ao usuário
         veiculo = Veiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first_or_404()
@@ -3962,7 +3957,6 @@ def dashboard_veiculo(id):
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         from models import Veiculo, UsoVeiculo, CustoVeiculo
         from sqlalchemy import text
-        from datetime import datetime, timedelta
         from sqlalchemy import func, extract
         
         veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
@@ -4070,7 +4064,6 @@ def historico_veiculo(id):
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         from models import Veiculo, UsoVeiculo, CustoVeiculo
         from sqlalchemy import text, Funcionario, Obra
-        from datetime import datetime, timedelta
         
         veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         
@@ -4167,7 +4160,6 @@ def lista_custos_veiculo(id):
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         from models import Veiculo, CustoVeiculo
-        from datetime import datetime, timedelta
         
         veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         
@@ -4315,7 +4307,6 @@ def lancamentos_veiculos():
             
         from models import Veiculo, UsoVeiculo, CustoVeiculo, Funcionario, Obra
         from sqlalchemy import func, desc, or_, and_
-        from datetime import datetime, timedelta
         
         # Parâmetros de filtro
         filtros = {
@@ -4498,7 +4489,6 @@ def relatorios_veiculos():
             
         from models import Veiculo, UsoVeiculo, CustoVeiculo
         from sqlalchemy import func, extract
-        from datetime import datetime, timedelta
         
         # Período do relatório (últimos 3 meses por padrão)
         data_inicio = request.args.get('data_inicio')
@@ -4606,7 +4596,6 @@ def exportar_relatorio_veiculos():
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import inch
         import io
-        from datetime import datetime, timedelta
         
         # Parâmetros
         data_inicio = request.args.get('data_inicio', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
@@ -5062,7 +5051,6 @@ def lancamento_finais_semana():
         
         # Gerar todos os dias do mês
         import calendar
-        from datetime import date
         
         # Último dia do mês
         ultimo_dia = calendar.monthrange(ano, mes)[1]
@@ -5760,8 +5748,7 @@ def novo_rdo():
                     print(f"DEBUG SERVIÇO: {ativ['descricao']} - {len(ativ['subatividades'])} subatividades")
         
         # Adicionar data atual para o template
-        from datetime import date as date_module
-        data_hoje = date_module.today().strftime('%Y-%m-%d')
+        data_hoje = date.today().strftime('%Y-%m-%d')
         
         return render_template('rdo/novo.html', 
                              obras=obras,
@@ -6818,8 +6805,7 @@ def rdo_novo_unificado():
         print(f"🔒 TIPO USUÁRIO: {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'N/A'}")
         
         # Adicionar data atual para o template
-        from datetime import date as date_module
-        data_hoje = date_module.today().strftime('%Y-%m-%d')
+        data_hoje = date.today().strftime('%Y-%m-%d')
         
         return render_template(template, 
                              obras=obras, 
