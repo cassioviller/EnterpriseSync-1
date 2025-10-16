@@ -1,0 +1,337 @@
+# Prompt para Replit Agent - Correção Dashboard SIGE
+
+## 🎯 OBJETIVO
+
+Corrigir erro `UnboundLocalError` que ocorre APENAS em produção (Docker/Easypanel) e adicionar card de margem de lucro no dashboard.
+
+## 🐛 PROBLEMA IDENTIFICADO
+
+**Erro em Produção:**
+```
+UnboundLocalError: cannot access local variable 'datetime' where it is not associated with a value
+File "/app/views.py", line 418, in dashboard
+    data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
+```
+
+**Causa:** Existe uma reimportação local de `datetime` dentro da função `dashboard()` na linha 939 que causa conflito de escopo quando o código é compilado pelo Gunicorn em produção.
+
+## 📋 MODIFICAÇÕES NECESSÁRIAS
+
+### MODIFICAÇÃO 1: Remover Reimportação de datetime (CRÍTICO)
+
+**Arquivo:** `views.py`
+
+**Localização:** Dentro da função `dashboard()`, procure pelo comentário "1. EFICIÊNCIA GERAL" (aproximadamente linha 935-950)
+
+**Código Atual (PROBLEMÁTICO):**
+```python
+# 1. EFICIÊNCIA GERAL - Calcular baseado em horas trabalhadas vs esperadas
+eficiencia_geral = 0
+try:
+    # Horas esperadas = funcionários ativos * dias úteis * 8h
+    from datetime import datetime  # ❌ ESTA LINHA CAUSA O ERRO
+    dias_uteis_mes = 22  # Média de dias úteis
+    horas_esperadas = funcionarios_ativos * dias_uteis_mes * 8
+    
+    if horas_esperadas > 0 and total_horas_real > 0:
+        eficiencia_geral = round((total_horas_real / horas_esperadas) * 100, 1)
+        # Limitar entre 0 e 100%
+        eficiencia_geral = max(0, min(100, eficiencia_geral))
+    print(f"DEBUG EFICIÊNCIA: {total_horas_real}h trabalhadas / {horas_esperadas}h esperadas = {eficiencia_geral}%")
+except Exception as e:
+    print(f"Erro ao calcular eficiência: {e}")
+    eficiencia_geral = 0
+```
+
+**Código Corrigido:**
+```python
+# 1. EFICIÊNCIA GERAL - Calcular baseado em horas trabalhadas vs esperadas
+eficiencia_geral = 0
+try:
+    # Horas esperadas = funcionários ativos * dias úteis * 8h
+    # datetime já importado no topo do arquivo (linha 9) - não precisa reimportar
+    dias_uteis_mes = 22  # Média de dias úteis
+    horas_esperadas = funcionarios_ativos * dias_uteis_mes * 8
+    
+    if horas_esperadas > 0 and total_horas_real > 0:
+        eficiencia_geral = round((total_horas_real / horas_esperadas) * 100, 1)
+        # Limitar entre 0 e 100%
+        eficiencia_geral = max(0, min(100, eficiencia_geral))
+    print(f"DEBUG EFICIÊNCIA: {total_horas_real}h trabalhadas / {horas_esperadas}h esperadas = {eficiencia_geral}%")
+except Exception as e:
+    print(f"Erro ao calcular eficiência: {e}")
+    eficiencia_geral = 0
+```
+
+**Ação:** DELETAR a linha `from datetime import datetime` e adicionar comentário explicativo.
+
+---
+
+### MODIFICAÇÃO 2: Adicionar Cálculo de Margem de Lucro
+
+**Arquivo:** `views.py`
+
+**Localização:** Dentro da função `dashboard()`, APÓS o cálculo de `custos_detalhados` (aproximadamente linha 912-930)
+
+**Código a Adicionar:**
+
+```python
+        # ========== CÁLCULO DE MARGEM DE LUCRO ==========
+        # Adicionar após custos_detalhados (linha ~912)
+        margem_percentual = 0
+        valor_contrato_total = 0
+        
+        try:
+            # Buscar valor total de contratos das obras ativas
+            valor_contrato_total = db.session.query(
+                func.sum(Obra.valor_contrato)
+            ).filter(
+                Obra.admin_id == admin_id,
+                Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
+            ).scalar() or 0
+            
+            # Calcular margem percentual
+            # Margem = ((Valor Contrato - Custos Totais) / Valor Contrato) * 100
+            if valor_contrato_total > 0:
+                margem_percentual = round(
+                    ((valor_contrato_total - custos_mes) / valor_contrato_total) * 100, 
+                    1
+                )
+            else:
+                margem_percentual = 0
+                
+            print(f"DEBUG MARGEM: Contrato Total=R$ {valor_contrato_total:.2f}, Custos=R$ {custos_mes:.2f}, Margem={margem_percentual}%")
+                
+        except Exception as e:
+            print(f"❌ Erro ao calcular margem: {e}")
+            valor_contrato_total = 0
+            margem_percentual = 0
+        # ================================================
+```
+
+**Posição Exata:** Inserir APÓS o bloco `custos_detalhados = {...}` e ANTES do bloco `except Exception as e:` que trata erros gerais do dashboard.
+
+---
+
+### MODIFICAÇÃO 3: Adicionar Variáveis ao render_template
+
+**Arquivo:** `views.py`
+
+**Localização:** Final da função `dashboard()`, no `return render_template` (aproximadamente linha 1000-1035)
+
+**Código Atual:**
+```python
+return render_template('dashboard.html',
+                     total_funcionarios=total_funcionarios,
+                     total_obras=total_obras,
+                     total_veiculos=total_veiculos,
+                     funcionarios_recentes=funcionarios_recentes,
+                     obras_ativas=obras_ativas,
+                     custos_mes=custos_mes,
+                     custos_detalhados=custos_detalhados,
+                     eficiencia_geral=eficiencia_geral,
+                     produtividade_obra=produtividade_obra,
+                     funcionarios_ativos=funcionarios_ativos,
+                     obras_ativas_count=obras_ativas_count,
+                     veiculos_disponiveis=veiculos_disponiveis,
+                     funcionarios_por_departamento=funcionarios_por_departamento,
+                     custos_por_obra=custos_por_obra,
+                     funcionarios_dept=funcionarios_dept,
+                     custos_recentes=custos_recentes,
+                     obras_andamento=obras_andamento,
+                     data_inicio=data_inicio,
+                     data_fim=data_fim,
+                     # Métricas de Propostas
+                     propostas_aprovadas=propostas_aprovadas,
+                     propostas_enviadas=propostas_enviadas,
+                     propostas_rascunho=propostas_rascunho,
+                     propostas_rejeitadas=propostas_rejeitadas,
+                     propostas_expiradas=propostas_expiradas,
+                     taxa_conversao=taxa_conversao,
+                     valor_medio=valor_medio,
+                     tempo_resposta_medio=tempo_resposta_medio,
+                     propostas_por_mes=propostas_por_mes,
+                     templates_populares=templates_populares,
+                     outros_templates=outros_templates,
+                     acessos_unicos=acessos_unicos,
+                     tempo_medio_portal=tempo_medio_portal,
+                     feedbacks_positivos=feedbacks_positivos,
+                     downloads_pdf=downloads_pdf)
+```
+
+**Código Corrigido (adicionar 2 linhas):**
+```python
+return render_template('dashboard.html',
+                     total_funcionarios=total_funcionarios,
+                     total_obras=total_obras,
+                     total_veiculos=total_veiculos,
+                     funcionarios_recentes=funcionarios_recentes,
+                     obras_ativas=obras_ativas,
+                     custos_mes=custos_mes,
+                     custos_detalhados=custos_detalhados,
+                     eficiencia_geral=eficiencia_geral,
+                     produtividade_obra=produtividade_obra,
+                     funcionarios_ativos=funcionarios_ativos,
+                     obras_ativas_count=obras_ativas_count,
+                     veiculos_disponiveis=veiculos_disponiveis,
+                     funcionarios_por_departamento=funcionarios_por_departamento,
+                     custos_por_obra=custos_por_obra,
+                     funcionarios_dept=funcionarios_dept,
+                     custos_recentes=custos_recentes,
+                     obras_andamento=obras_andamento,
+                     data_inicio=data_inicio,
+                     data_fim=data_fim,
+                     # Métricas de Propostas
+                     propostas_aprovadas=propostas_aprovadas,
+                     propostas_enviadas=propostas_enviadas,
+                     propostas_rascunho=propostas_rascunho,
+                     propostas_rejeitadas=propostas_rejeitadas,
+                     propostas_expiradas=propostas_expiradas,
+                     taxa_conversao=taxa_conversao,
+                     valor_medio=valor_medio,
+                     tempo_resposta_medio=tempo_resposta_medio,
+                     propostas_por_mes=propostas_por_mes,
+                     templates_populares=templates_populares,
+                     outros_templates=outros_templates,
+                     acessos_unicos=acessos_unicos,
+                     tempo_medio_portal=tempo_medio_portal,
+                     feedbacks_positivos=feedbacks_positivos,
+                     downloads_pdf=downloads_pdf,
+                     # Margem de Lucro (NOVO)
+                     margem_percentual=margem_percentual,
+                     valor_contrato_total=valor_contrato_total)
+```
+
+**Ação:** Adicionar as duas últimas linhas antes do parêntese de fechamento.
+
+---
+
+### MODIFICAÇÃO 4: Adicionar Card de Margem no Template
+
+**Arquivo:** `templates/dashboard.html`
+
+**Localização:** Dentro da seção "Financeiro e Custos", após os cards existentes (Alimentação, Transporte, Mão de Obra, Faltas Justificadas, Outros, Total)
+
+**Código HTML a Adicionar:**
+
+```html
+<!-- Card de Margem de Lucro - Adicionar após o card "Total" -->
+<div class="col-md-2">
+    <div class="card text-center h-100 shadow-sm">
+        <div class="card-body">
+            <i class="fas fa-percentage fa-2x mb-3" 
+               style="color: {% if margem_percentual >= 20 %}#28a745{% elif margem_percentual >= 10 %}#ffc107{% else %}#dc3545{% endif %}">
+            </i>
+            <h6 class="card-title text-muted">Margem</h6>
+            <h4 class="card-text mb-0">
+                <span class="{% if margem_percentual >= 20 %}text-success{% elif margem_percentual >= 10 %}text-warning{% else %}text-danger{% endif %}">
+                    {{ margem_percentual }}%
+                </span>
+            </h4>
+            <small class="text-muted d-block mt-2">
+                Contrato: R$ {{ "{:,.2f}".format(valor_contrato_total) }}
+            </small>
+        </div>
+    </div>
+</div>
+```
+
+**Posição Exata:** Procure no template pela seção com título "Financeiro e Custos" ou "💰 Custos Detalhados do Período". Adicione o card acima APÓS o último card existente (provavelmente "Total").
+
+**Cores do Card:**
+- Verde (≥20%): Margem saudável
+- Amarelo (≥10%): Margem aceitável
+- Vermelho (<10%): Margem crítica
+
+---
+
+## 🔍 VALIDAÇÃO
+
+Após implementar as modificações, valide:
+
+### ✅ Em Desenvolvimento (Replit):
+1. Dashboard carrega sem erros
+2. Não há regressões em funcionalidades existentes
+3. Card de margem aparece na seção "Financeiro e Custos"
+
+### ✅ Em Produção (Docker/Easypanel) - CRÍTICO:
+1. Build do Docker completa sem erros
+2. Container inicia sem falhas
+3. Dashboard carrega sem `UnboundLocalError`
+4. KPIs mostram valores reais (não zero):
+   - Funcionários Ativos > 0
+   - Obras Ativas > 0
+   - Custos do Período > R$ 0.00
+5. Card de "Margem" aparece e calcula corretamente
+6. Cor do card muda conforme o valor da margem
+
+---
+
+## 📊 RESUMO DAS ALTERAÇÕES
+
+| Arquivo | Modificação | Linhas Afetadas | Prioridade |
+|---------|-------------|-----------------|------------|
+| `views.py` | Remover `from datetime import datetime` | ~939 | 🔴 CRÍTICA |
+| `views.py` | Adicionar cálculo de margem | ~912-930 | 🟡 ALTA |
+| `views.py` | Adicionar variáveis ao render_template | ~1000-1035 | 🟡 ALTA |
+| `templates/dashboard.html` | Adicionar card de margem | Seção Financeiro | 🟢 MÉDIA |
+
+---
+
+## 🎯 CONTEXTO TÉCNICO
+
+**Por que o erro só ocorre em produção:**
+- Gunicorn (produção) compila o código uma vez na inicialização
+- Python faz análise estática completa de escopo
+- A reimportação de `datetime` na linha 939 marca a variável como LOCAL
+- Linha 418 tenta usar `datetime` ANTES de ser "definido" (linha 939)
+- Resultado: `UnboundLocalError`
+
+**Por que funciona no Replit:**
+- Hot reload dinâmico
+- Modo debug mais permissivo
+- Código pode ser recarregado incrementalmente
+
+**Solução:**
+- Remover a reimportação local
+- `datetime` já está importado globalmente na linha 9 do arquivo
+
+---
+
+## 🚀 INSTRUÇÕES PARA IMPLEMENTAÇÃO
+
+1. **Abra o arquivo `views.py`**
+2. **Localize a função `dashboard()` (linha ~412)**
+3. **Procure pelo comentário "1. EFICIÊNCIA GERAL" (linha ~935)**
+4. **DELETE a linha `from datetime import datetime`**
+5. **Adicione comentário: "# datetime já importado no topo do arquivo (linha 9)"**
+6. **Procure pelo bloco `custos_detalhados = {...}` (linha ~904-912)**
+7. **APÓS esse bloco, adicione o código de cálculo de margem**
+8. **Localize o `return render_template` no final da função (linha ~1000)**
+9. **Adicione as variáveis `margem_percentual` e `valor_contrato_total`**
+10. **Abra `templates/dashboard.html`**
+11. **Localize a seção "Financeiro e Custos"**
+12. **Adicione o card de margem após o último card existente**
+13. **Salve todos os arquivos**
+14. **Teste em desenvolvimento**
+15. **Deploy em produção**
+
+---
+
+## ⚠️ IMPORTANTE
+
+- **NÃO** altere a linha 9 onde `datetime` está importado globalmente
+- **NÃO** adicione novos imports de `datetime` em nenhum lugar da função
+- **MANTENHA** a estrutura existente do código
+- **TESTE** em desenvolvimento antes de fazer deploy em produção
+- **MONITORE** os logs após deploy para confirmar que o erro desapareceu
+
+---
+
+## 📝 NOTAS ADICIONAIS
+
+**Outras reimportações encontradas:**
+Há mais 12 reimportações desnecessárias de `datetime` em outras funções do arquivo `views.py` (linhas: 2059, 2882, 3090, 3937, 4045, 4142, 4290, 4473, 4581, 5037, 5735, 6793). Essas podem ser removidas futuramente como melhoria de código, mas NÃO são críticas agora.
+
+**Foco:** Corrigir APENAS a linha 939 que está causando o erro no dashboard.
+
