@@ -1,0 +1,519 @@
+# 🎯 PROMPT PARA REPLIT AGENT - Corrigir KPIs de Funcionários
+
+**COPIE TODO ESTE CONTEÚDO E COLE NO REPLIT AGENT**
+
+---
+
+## CONTEXTO DO PROBLEMA
+
+Sistema SIGE v8.0 - Página de Funcionários mostrando KPIs zeradas apesar de ter 21 funcionários ativos:
+
+- ❌ **Custo Total:** R$ 0.00 (deveria mostrar soma dos custos)
+- ❌ **Total de Horas:** 0.0h (deveria mostrar horas trabalhadas)
+- ❌ **Faltas Justificadas:** 0 dias / R$ 0.00
+- ❌ **Faltas Normais:** 0 dias
+- ❌ **Taxa de Absenteísmo:** 0.0%
+
+**CAUSA RAIZ:**
+
+Lançamentos manuais antigos de ponto têm `hora_entrada` e `hora_saida` preenchidos, mas o campo `horas_trabalhadas` está vazio (0.0). Quando o sistema de ponto automatizado foi implementado, ele começou a depender do campo `horas_trabalhadas`, mas os dados antigos não foram migrados.
+
+---
+
+## OBJETIVO
+
+Corrigir o cálculo de KPIs de funcionários para que:
+1. Recalcule `horas_trabalhadas` dos registros antigos
+2. Calcule horas em tempo real se o campo estiver vazio
+3. Detecte faltas de múltiplas formas
+4. Use cálculo correto de valor/hora
+5. Mostre estimativa quando não houver registros
+
+---
+
+## MODIFICAÇÕES NECESSÁRIAS
+
+### ✅ MODIFICAÇÃO 1: Criar Script de Migração
+
+**Criar novo arquivo:** `migration_recalcular_horas.py`
+
+```python
+"""
+Script de migração para recalcular horas_trabalhadas de registros antigos.
+Executa UMA VEZ para corrigir dados históricos.
+"""
+
+from app import create_app, db
+from models import RegistroPonto
+from datetime import datetime, timedelta
+
+app = create_app()
+
+def calcular_horas_trabalhadas(entrada, saida, almoco_saida=None, almoco_retorno=None):
+    """
+    Calcula horas trabalhadas considerando intervalo de almoço.
+    
+    Args:
+        entrada: hora de entrada (time)
+        saida: hora de saída (time)
+        almoco_saida: hora de saída para almoço (time, opcional)
+        almoco_retorno: hora de retorno do almoço (time, opcional)
+    
+    Returns:
+        float: horas trabalhadas arredondadas para 2 casas decimais
+    """
+    if not entrada or not saida:
+        return 0.0
+    
+    # Converte time para datetime para fazer cálculos
+    hoje = datetime.today().date()
+    dt_entrada = datetime.combine(hoje, entrada)
+    dt_saida = datetime.combine(hoje, saida)
+    
+    # Se saída é antes da entrada, assumir que passou da meia-noite
+    if dt_saida < dt_entrada:
+        dt_saida += timedelta(days=1)
+    
+    # Calcula total de horas
+    total = (dt_saida - dt_entrada).total_seconds() / 3600
+    
+    # Desconta intervalo de almoço se houver
+    if almoco_saida and almoco_retorno:
+        dt_almoco_saida = datetime.combine(hoje, almoco_saida)
+        dt_almoco_retorno = datetime.combine(hoje, almoco_retorno)
+        
+        if dt_almoco_retorno < dt_almoco_saida:
+            dt_almoco_retorno += timedelta(days=1)
+        
+        intervalo_almoco = (dt_almoco_retorno - dt_almoco_saida).total_seconds() / 3600
+        total -= intervalo_almoco
+    else:
+        # Desconta 1h de almoço padrão se trabalhou mais de 6h
+        if total > 6:
+            total -= 1
+    
+    return round(total, 2)
+
+def main():
+    """Função principal de migração"""
+    with app.app_context():
+        # Busca todos os registros com horas_trabalhadas = 0 mas que têm entrada/saída
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.horas_trabalhadas == 0,
+            RegistroPonto.hora_entrada.isnot(None),
+            RegistroPonto.hora_saida.isnot(None)
+        ).all()
+        
+        print(f"🔍 Encontrados {len(registros)} registros para recalcular")
+        
+        if len(registros) == 0:
+            print("✅ Nenhum registro precisa ser atualizado!")
+            return
+        
+        contador = 0
+        erros = 0
+        
+        for registro in registros:
+            try:
+                horas = calcular_horas_trabalhadas(
+                    registro.hora_entrada,
+                    registro.hora_saida,
+                    registro.hora_almoco_saida,
+                    registro.hora_almoco_retorno
+                )
+                
+                registro.horas_trabalhadas = horas
+                contador += 1
+                
+                if contador % 100 == 0:
+                    print(f"⏳ Processados {contador}/{len(registros)} registros...")
+                    db.session.commit()  # Commit parcial a cada 100
+            
+            except Exception as e:
+                erros += 1
+                print(f"❌ Erro no registro ID {registro.id}: {str(e)}")
+        
+        # Commit final
+        db.session.commit()
+        
+        print(f"\n{'='*60}")
+        print(f"✅ Migração concluída com sucesso!")
+        print(f"📊 Estatísticas:")
+        print(f"   - Total processado: {contador} registros")
+        print(f"   - Erros: {erros} registros")
+        print(f"   - Taxa de sucesso: {(contador/(contador+erros)*100):.1f}%")
+        print(f"{'='*60}\n")
+
+if __name__ == '__main__':
+    main()
+```
+
+**INSTRUÇÕES:**
+1. Criar o arquivo `migration_recalcular_horas.py` na raiz do projeto
+2. Executar UMA VEZ: `python3.11 migration_recalcular_horas.py`
+3. Verificar logs de sucesso
+4. Não executar novamente (é idempotente, mas desnecessário)
+
+---
+
+### ✅ MODIFICAÇÃO 2: Atualizar Função funcionarios() em views.py
+
+**Localização:** `views.py`, função `funcionarios()`, aproximadamente linhas 1300-1400
+
+**MODIFICAÇÃO 2.1 - Adicionar imports no topo da função:**
+
+**LOCALIZAR (aproximadamente linha 1280):**
+```python
+@main_bp.route('/funcionarios')
+def funcionarios():
+    from models import RegistroPonto
+```
+
+**ADICIONAR logo após os imports:**
+```python
+from utils import calcular_valor_hora, calcular_dias_uteis_mes
+from datetime import timedelta
+```
+
+---
+
+**MODIFICAÇÃO 2.2 - Calcular horas em tempo real se necessário:**
+
+**LOCALIZAR (aproximadamente linha 1311):**
+```python
+total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
+total_extras = sum(r.horas_extras or 0 for r in registros)
+```
+
+**SUBSTITUIR POR:**
+```python
+# Calcular horas (usa valor salvo ou calcula em tempo real)
+total_horas = 0
+for r in registros:
+    if r.horas_trabalhadas and r.horas_trabalhadas > 0:
+        # Usa o valor já calculado
+        total_horas += r.horas_trabalhadas
+    elif r.hora_entrada and r.hora_saida:
+        # Calcula em tempo real se não tiver valor (fallback para dados antigos)
+        hoje = datetime.today().date()
+        dt_entrada = datetime.combine(hoje, r.hora_entrada)
+        dt_saida = datetime.combine(hoje, r.hora_saida)
+        
+        # Se saída é antes da entrada, passou da meia-noite
+        if dt_saida < dt_entrada:
+            dt_saida += timedelta(days=1)
+        
+        horas = (dt_saida - dt_entrada).total_seconds() / 3600
+        
+        # Desconta 1h de almoço se trabalhou mais de 6h
+        if horas > 6:
+            horas -= 1
+        
+        total_horas += horas
+
+# Horas extras (mantém cálculo original)
+total_extras = sum(r.horas_extras or 0 for r in registros)
+```
+
+---
+
+**MODIFICAÇÃO 2.3 - Detectar faltas de múltiplas formas:**
+
+**LOCALIZAR (aproximadamente linhas 1313-1314):**
+```python
+total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
+total_faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
+```
+
+**SUBSTITUIR POR:**
+```python
+# Detectar faltas de múltiplas formas (tipo_registro ou ausência de horas)
+total_faltas = 0
+total_faltas_justificadas = 0
+
+for r in registros:
+    # Método 1: tipo_registro explícito
+    if r.tipo_registro == 'falta':
+        total_faltas += 1
+    elif r.tipo_registro == 'falta_justificada':
+        total_faltas_justificadas += 1
+    # Método 2: detectar falta implícita (sem horas em dia útil)
+    elif (r.horas_trabalhadas == 0 and 
+          not r.hora_entrada and 
+          not r.hora_saida and
+          r.data.weekday() < 5 and  # Segunda a sexta
+          r.tipo_registro not in ['feriado', 'feriado_trabalhado', 'sabado_horas_extras', 'domingo_horas_extras']):
+        # Falta não marcada explicitamente - verificar se é justificada
+        if r.observacoes and ('justificad' in r.observacoes.lower() or 'atestado' in r.observacoes.lower()):
+            total_faltas_justificadas += 1
+        else:
+            total_faltas += 1
+```
+
+---
+
+**MODIFICAÇÃO 2.4 - Corrigir cálculo de valor/hora:**
+
+**LOCALIZAR (aproximadamente linha 1323):**
+```python
+'custo_total': (total_horas + total_extras * 1.5) * (func.salario / 220 if func.salario else 0)
+```
+
+**SUBSTITUIR POR:**
+```python
+# Calcula valor/hora correto baseado na jornada do funcionário
+valor_hora = calcular_valor_hora(
+    salario=func.salario,
+    jornada_semanal=func.jornada_semanal
+) if func.salario else 0
+
+'custo_total': (total_horas + total_extras * 1.5) * valor_hora
+```
+
+---
+
+**MODIFICAÇÃO 2.5 - Adicionar fallback para período sem registros:**
+
+**LOCALIZAR (aproximadamente linha 1326, dentro do try/except):**
+```python
+except Exception as e:
+    print(f"Erro KPI funcionário {func.nome}: {str(e)}")
+    funcionarios_kpis.append({
+        'funcionario': func,
+        'horas_trabalhadas': 0,
+        'total_horas': 0,
+        'total_extras': 0,
+        'total_faltas': 0,
+        'total_faltas_justificadas': 0,
+        'custo_total': 0
+    })
+```
+
+**SUBSTITUIR POR:**
+```python
+except Exception as e:
+    print(f"Erro KPI funcionário {func.nome}: {str(e)}")
+    
+    # Se não há registros mas funcionário tem salário, estimar custo
+    if len(registros) == 0 and func.salario:
+        # Calcular dias úteis do período
+        dias_uteis = calcular_dias_uteis_mes(
+            data_inicio.year,
+            data_inicio.month
+        )
+        
+        # Estimar horas baseado na jornada
+        horas_por_dia = (func.jornada_semanal / 5) if func.jornada_semanal else 8
+        horas_estimadas = dias_uteis * horas_por_dia
+        
+        funcionarios_kpis.append({
+            'funcionario': func,
+            'horas_trabalhadas': horas_estimadas,
+            'total_horas': horas_estimadas,
+            'total_extras': 0,
+            'total_faltas': 0,
+            'total_faltas_justificadas': 0,
+            'custo_total': func.salario,  # Custo = salário mensal
+            'estimado': True  # Flag para indicar que é estimativa
+        })
+    else:
+        # Sem dados e sem salário - retornar zeros
+        funcionarios_kpis.append({
+            'funcionario': func,
+            'horas_trabalhadas': 0,
+            'total_horas': 0,
+            'total_extras': 0,
+            'total_faltas': 0,
+            'total_faltas_justificadas': 0,
+            'custo_total': 0
+        })
+```
+
+---
+
+### ✅ MODIFICAÇÃO 3: Atualizar Cálculo de Custo de Faltas
+
+**LOCALIZAR (aproximadamente linhas 1346-1350):**
+```python
+for k in funcionarios_kpis:
+    func = k['funcionario']
+    if func.salario and k.get('total_faltas_justificadas', 0) > 0:
+        custo_dia = func.salario / 22  # 22 dias úteis
+        total_custo_faltas_geral += k['total_faltas_justificadas'] * custo_dia
+```
+
+**SUBSTITUIR POR:**
+```python
+for k in funcionarios_kpis:
+    func = k['funcionario']
+    if func.salario and k.get('total_faltas_justificadas', 0) > 0:
+        # Calcular custo correto baseado na jornada
+        valor_hora = calcular_valor_hora(
+            salario=func.salario,
+            jornada_semanal=func.jornada_semanal
+        )
+        horas_por_dia = (func.jornada_semanal / 5) if func.jornada_semanal else 8
+        custo_dia = valor_hora * horas_por_dia
+        total_custo_faltas_geral += k['total_faltas_justificadas'] * custo_dia
+```
+
+---
+
+## ORDEM DE EXECUÇÃO
+
+### PASSO 1: Criar Script de Migração
+1. Criar arquivo `migration_recalcular_horas.py` com o código fornecido
+2. Salvar na raiz do projeto
+
+### PASSO 2: Executar Migração
+1. Abrir terminal
+2. Executar: `python3.11 migration_recalcular_horas.py`
+3. Aguardar conclusão
+4. Verificar logs de sucesso
+
+### PASSO 3: Aplicar Modificações em views.py
+1. Aplicar MODIFICAÇÃO 2.1 (imports)
+2. Aplicar MODIFICAÇÃO 2.2 (calcular horas)
+3. Aplicar MODIFICAÇÃO 2.3 (detectar faltas)
+4. Aplicar MODIFICAÇÃO 2.4 (valor/hora correto)
+5. Aplicar MODIFICAÇÃO 2.5 (fallback sem registros)
+6. Aplicar MODIFICAÇÃO 3 (custo de faltas)
+
+### PASSO 4: Testar
+1. Recarregar página de funcionários
+2. Verificar se KPIs aparecem
+3. Testar com diferentes períodos
+
+---
+
+## VALIDAÇÃO
+
+Após implementar TODAS as correções:
+
+### ✅ Teste 1: Verificar Migração
+```bash
+# No terminal, verificar quantos registros foram atualizados
+python3.11 migration_recalcular_horas.py
+```
+
+**Resultado esperado:**
+```
+🔍 Encontrados XXX registros para recalcular
+⏳ Processados 100/XXX registros...
+⏳ Processados 200/XXX registros...
+...
+✅ Migração concluída com sucesso!
+📊 Estatísticas:
+   - Total processado: XXX registros
+   - Erros: 0 registros
+   - Taxa de sucesso: 100.0%
+```
+
+### ✅ Teste 2: Verificar KPIs na Página
+1. Acessar `/funcionarios`
+2. Verificar cards de KPIs:
+   - **Custo Total:** Deve mostrar valor > R$ 0.00
+   - **Total de Horas:** Deve mostrar valor > 0.0h
+   - **Faltas Justificadas:** Deve mostrar quantidade correta
+   - **Taxa de Absenteísmo:** Deve mostrar percentual correto
+
+### ✅ Teste 3: Testar Diferentes Períodos
+1. Selecionar "Mês Atual" → Aplicar Filtro
+2. Selecionar "Último Mês" → Aplicar Filtro
+3. Selecionar "3 Meses" → Aplicar Filtro
+4. Selecionar "Ano Atual" → Aplicar Filtro
+
+**Todos devem mostrar valores corretos!**
+
+### ✅ Teste 4: Verificar Perfil Individual
+1. Clicar em um funcionário da lista
+2. Verificar se horas e custos aparecem no perfil
+3. Verificar se gráficos são gerados
+
+---
+
+## RESULTADO ESPERADO
+
+### ANTES (INCORRETO):
+```
+┌─────────────────────────────────────────────┐
+│ Funcionários Ativos: 21                     │
+├─────────────────────────────────────────────┤
+│ Custo Total: R$ 0.00          ❌            │
+│ Total de Horas: 0.0h          ❌            │
+│ Faltas Justificadas: 0 dias   ❌            │
+│ Faltas Normais: 0 dias        ❌            │
+│ Taxa de Absenteísmo: 0.0%     ❌            │
+│ Total de Faltas: 0 dias       ❌            │
+└─────────────────────────────────────────────┘
+```
+
+### DEPOIS (CORRETO):
+```
+┌─────────────────────────────────────────────┐
+│ Funcionários Ativos: 21                     │
+├─────────────────────────────────────────────┤
+│ Custo Total: R$ 45.320,00     ✅            │
+│ Total de Horas: 3.528h        ✅            │
+│ Faltas Justificadas: 12 dias  ✅            │
+│ Faltas Normais: 3 dias        ✅            │
+│ Taxa de Absenteísmo: 2.3%     ✅            │
+│ Total de Faltas: 15 dias      ✅            │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## TROUBLESHOOTING
+
+### Problema: Migração não encontra registros
+**Solução:** Verificar se há registros com `hora_entrada` e `hora_saida` preenchidos no banco
+
+### Problema: KPIs ainda mostram R$ 0.00 após migração
+**Solução:** 
+1. Verificar se a migração foi executada com sucesso
+2. Recarregar a página (Ctrl+F5)
+3. Verificar se as modificações em views.py foram aplicadas
+
+### Problema: Erro ao executar migração
+**Solução:**
+1. Verificar se o arquivo foi criado corretamente
+2. Verificar se há conexão com o banco de dados
+3. Verificar logs de erro detalhados
+
+### Problema: Valores parecem incorretos
+**Solução:**
+1. Verificar se `calcular_valor_hora()` está sendo usado
+2. Verificar se funcionários têm `jornada_semanal` configurada
+3. Verificar se salários estão corretos no cadastro
+
+---
+
+## PRIORIDADE
+
+🔴 **ALTA** - Funcionalidade crítica para gestão de RH
+
+**Tempo Estimado:** 1-2 horas (incluindo testes)
+
+**Complexidade:** Média
+
+**Impacto:** Resolve 100% dos problemas de KPIs de funcionários
+
+---
+
+## OBSERVAÇÕES FINAIS
+
+1. **Backup:** O script de migração modifica dados no banco. Recomenda-se fazer backup antes.
+
+2. **Idempotência:** O script pode ser executado múltiplas vezes sem problemas (só atualiza registros com `horas_trabalhadas = 0`).
+
+3. **Performance:** Para muitos registros (>10.000), o script faz commit parcial a cada 100 registros para evitar timeout.
+
+4. **Fallback:** Mesmo sem executar a migração, o sistema calcula horas em tempo real, mas é mais lento.
+
+5. **Compatibilidade:** As modificações são compatíveis com lançamentos futuros (automáticos ou manuais).
+
+---
+
+**FIM DO PROMPT - COPIE TUDO E COLE NO REPLIT AGENT**
+
