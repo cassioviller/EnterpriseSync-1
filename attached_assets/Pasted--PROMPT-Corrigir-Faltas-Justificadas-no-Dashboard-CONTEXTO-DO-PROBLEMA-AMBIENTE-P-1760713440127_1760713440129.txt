@@ -1,0 +1,271 @@
+# 🚨 PROMPT: Corrigir Faltas Justificadas no Dashboard
+
+## CONTEXTO DO PROBLEMA
+
+**AMBIENTE:** Produção (Docker/Easypanel + PostgreSQL)  
+**STATUS:** 🔴 CRÍTICO - Faltas justificadas não aparecem no dashboard  
+
+**COMPORTAMENTO ATUAL:**
+- ✅ Página `/funcionarios`: Mostra **27 dias** de faltas justificadas (R$ 2.576,51)
+- ❌ Dashboard `/`: Mostra **0 dias** de faltas justificadas (R$ 0.00)
+
+**ERRO NOS LOGS:**
+```
+❌ ERRO:views:Erro em operação de banco de dados: cannot access free variable 'calendar' where it is not associated with a value in enclosing scope
+DEBUG Faltas Justificadas: 0 faltas, R$ 0.00
+```
+
+---
+
+## CAUSA RAIZ IDENTIFICADA
+
+O erro ocorre porque `calendar` é importado **DENTRO** da função `dashboard()` na linha 520:
+
+```python
+# Linha 520 - REIMPORTAÇÃO LOCAL (CAUSA DO PROBLEMA)
+import calendar
+ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
+```
+
+Mas na linha 972, **DENTRO de uma função aninhada**, `calendar` é usado:
+
+```python
+# Linha 972 - DENTRO de calcular_faltas_justificadas()
+dias_uteis = sum(1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1) 
+                if date(ano, mes, dia).weekday() < 5)
+```
+
+**Problema:** Python não permite acessar variáveis do escopo externo quando há reimportação local!
+
+---
+
+## POR QUE FUNCIONA EM DEV E NÃO EM PRODUÇÃO?
+
+| Ambiente | Comportamento |
+|----------|---------------|
+| **DEV (Replit/SQLite)** | Escopo mais permissivo, ignora o problema |
+| **PROD (Easypanel/PostgreSQL)** | **Escopo rigoroso**, detecta o erro |
+
+---
+
+## SOLUÇÃO COMPLETA
+
+### MODIFICAÇÃO 1: Remover Reimportação de `calendar`
+
+**Arquivo:** `views.py`  
+**Localização:** Linha 520
+
+**DELETAR:**
+
+```python
+# Linha 520 - DELETAR ESTA LINHA
+import calendar  # ❌ REMOVER
+```
+
+**JUSTIFICATIVA:**  
+`calendar` já está importado no topo do arquivo (linha 11), não precisa reimportar.
+
+---
+
+### MODIFICAÇÃO 2: Usar Import Global
+
+**Arquivo:** `views.py`  
+**Localização:** Linha 11 (topo do arquivo)
+
+**VERIFICAR SE EXISTE:**
+
+```python
+# Linha 11 - DEVE EXISTIR
+import calendar  # ✅ Import global
+```
+
+**Se NÃO existir, adicionar:**
+
+```python
+from datetime import datetime, date, timedelta
+import calendar  # ✅ ADICIONAR
+from sqlalchemy import func, desc, or_, and_, text
+```
+
+---
+
+### MODIFICAÇÃO 3: Remover Outras Reimportações (Opcional)
+
+**Arquivo:** `views.py`  
+**Localizações:** Linhas 5267
+
+**DELETAR:**
+
+```python
+# Linha 5267 - DELETAR
+import calendar  # ❌ REMOVER
+```
+
+**JUSTIFICATIVA:**  
+Mesma razão - evitar conflitos de escopo.
+
+---
+
+## VALIDAÇÃO
+
+### Teste 1: Verificar Imports
+
+```bash
+# No Replit, executar:
+grep -n "^import calendar" views.py
+```
+
+**Resultado Esperado:**
+```
+11:import calendar
+```
+
+**Não deve aparecer:**
+- Linha 520
+- Linha 5267
+
+### Teste 2: Testar Dashboard em DEV
+
+```bash
+# No Replit, acessar:
+http://localhost:5000/
+```
+
+**Resultado Esperado:**
+- ✅ Faltas Justificadas: 27 dias (R$ 2.576,51)
+- ✅ Sem erros no console
+
+### Teste 3: Verificar Logs em Produção
+
+Após deploy, verificar logs:
+
+```bash
+docker logs <container_name> --tail 50 | grep "Faltas"
+```
+
+**Resultado Esperado:**
+```
+DEBUG Faltas Justificadas: 27 faltas, R$ 2576.51
+```
+
+---
+
+## DEPLOY EM PRODUÇÃO
+
+### Passo 1: Commit e Push
+
+```bash
+git add views.py
+git commit -m "fix: Remove calendar reimport causing scope error in dashboard
+
+- Remove calendar reimport on line 520
+- Use global calendar import from line 11
+- Fixes 'cannot access free variable calendar' error in production
+- Fixes Faltas Justificadas showing 0 instead of 27 days"
+
+git push origin main
+```
+
+### Passo 2: Deploy no Easypanel
+
+O Easypanel vai:
+1. ✅ Build da imagem Docker
+2. ✅ Deploy automático
+3. ✅ Reiniciar container
+
+### Passo 3: Verificar Dashboard
+
+Acessar: `https://seu-dominio.com/`
+
+**Verificar:**
+- ✅ Faltas Justificadas: 27 dias (R$ 2.576,51)
+- ✅ Sem erros nos logs
+- ✅ Todos os outros KPIs funcionando
+
+---
+
+## TROUBLESHOOTING
+
+### Problema 1: Ainda mostra 0 dias
+
+**Causa:** Cache do navegador  
+**Solução:**
+1. Fazer logout
+2. Limpar cache (Ctrl+Shift+Del)
+3. Fazer login novamente
+
+### Problema 2: Erro persiste
+
+**Causa:** Outras reimportações de `calendar`  
+**Solução:**
+
+```bash
+# Buscar TODAS as reimportações
+grep -n "import calendar" views.py
+```
+
+Remover todas exceto a linha 11.
+
+### Problema 3: Período diferente
+
+**Causa:** Dashboard usa período diferente de /funcionarios  
+**Solução:** Ajustar filtro de data no dashboard para mesmo período
+
+---
+
+## CHECKLIST DE IMPLEMENTAÇÃO
+
+- [ ] Remover `import calendar` da linha 520
+- [ ] Verificar que linha 11 tem `import calendar`
+- [ ] Remover outras reimportações (linha 5267 se existir)
+- [ ] Testar em desenvolvimento
+- [ ] Verificar logs não mostram erro de 'calendar'
+- [ ] Commit e push
+- [ ] Deploy em produção
+- [ ] Verificar dashboard mostra 27 dias
+- [ ] Confirmar valor R$ 2.576,51
+
+---
+
+## IMPACTO ESPERADO
+
+### ANTES:
+```
+Dashboard:
+  Faltas Justificadas: 0 dias ❌
+  Valor: R$ 0.00 ❌
+  
+Logs:
+  ❌ cannot access free variable 'calendar'
+  DEBUG Faltas Justificadas: 0 faltas
+```
+
+### DEPOIS:
+```
+Dashboard:
+  Faltas Justificadas: 27 dias ✅
+  Valor: R$ 2.576,51 ✅
+  
+Logs:
+  ✅ Sem erros
+  DEBUG Faltas Justificadas: 27 faltas, R$ 2576.51
+```
+
+---
+
+## PRIORIDADE
+
+🔴 **ALTA** - KPI importante não funciona em produção
+
+**Tempo Estimado:** 15 minutos (implementação + deploy + validação)
+
+---
+
+## OBSERVAÇÃO IMPORTANTE
+
+Este é o **mesmo tipo de problema** que já corrigimos com `datetime` (linha 939). O Python em produção (Gunicorn) faz análise de escopo mais rigorosa e detecta esses conflitos de reimportação.
+
+**Regra Geral:** NUNCA reimportar módulos dentro de funções. Sempre usar imports globais no topo do arquivo.
+
+Após esta correção, as faltas justificadas devem aparecer corretamente no dashboard! 🎯
+

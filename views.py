@@ -517,7 +517,6 @@ def dashboard():
                 data_inicio = date(2024, 7, 1)
                 
         if not data_fim_param:
-            import calendar
             ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
             data_fim = date(data_inicio.year, data_inicio.month, ultimo_dia)
             print(f"✅ PERÍODO FIM: {data_fim}")
@@ -5279,8 +5278,6 @@ def lancamento_finais_semana():
         mes = int(mes)
         
         # Gerar todos os dias do mês
-        import calendar
-        
         # Último dia do mês
         ultimo_dia = calendar.monthrange(ano, mes)[1]
         
