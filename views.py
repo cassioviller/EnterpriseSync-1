@@ -10,6 +10,7 @@ from utils import calcular_valor_hora_periodo
 from datetime import datetime, date, timedelta
 import calendar
 from sqlalchemy import func, desc, or_, and_, text
+from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 import os
 import json
@@ -98,11 +99,11 @@ def safe_db_operation(operation, default_value=None):
     try:
         return operation()
     except Exception as e:
-        print(f"ERRO DB OPERATION: {str(e)}")
+        logger.error(f"Erro em operação de banco de dados: {e}")
         try:
             db.session.rollback()
-        except:
-            pass
+        except Exception as rollback_error:
+            logger.warning(f"Falha ao executar rollback: {rollback_error}")
         return default_value
 
 
@@ -158,10 +159,10 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim):
                 RegistroPonto.obra_id == obra.id,
                 RegistroPonto.data >= data_inicio,
                 RegistroPonto.data <= data_fim
-            ).all()
+            ).options(joinedload(RegistroPonto.funcionario_ref)).all()
             
             for registro in registros_obra:
-                funcionario = Funcionario.query.get(registro.funcionario_id)
+                funcionario = registro.funcionario_ref
                 if funcionario and funcionario.salario:
                     valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
                     horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
@@ -179,8 +180,9 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim):
                 else:
                     veiculos_obra = []  # Fallback se campo não existir
                 custo_total_obra += sum(v.valor or 0 for v in veiculos_obra)
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Erro ao calcular custos de veículos para obra {obra.nome} (ID: {obra.id}): {e}")
+                # Continuar processamento das outras obras mesmo com erro
             
             if custo_total_obra > 0:
                 custos_por_obra[obra.nome] = round(custo_total_obra, 2)
@@ -2411,12 +2413,12 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
             print(f"✅ FALLBACK: {len(servicos_lista)} serviços encontrados")
             return servicos_lista
         except Exception as e2:
-            print(f"❌ Erro no fallback: {e2}")
+            logger.error(f"Erro no fallback de busca de serviços: {e2}")
             try:
                 db.session.rollback()
                 print("🔄 ROLLBACK fallback executado")
-            except:
-                pass
+            except Exception as rollback_error:
+                logger.warning(f"Falha ao executar rollback no fallback: {rollback_error}")
             return []
 
 def obter_servicos_disponiveis(admin_id):
@@ -2451,8 +2453,8 @@ def editar_obra(id):
             # 🔧 ROLLBACK PREVENTIVO: Limpar qualquer sessão corrompida
             try:
                 db.session.rollback()
-            except:
-                pass
+            except Exception as rollback_error:
+                logger.warning(f"Falha no rollback preventivo ao editar obra: {rollback_error}")
             
             print(f"🔧 INICIANDO EDIÇÃO DA OBRA {id}: {obra.nome}")
             

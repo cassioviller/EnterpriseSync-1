@@ -49,11 +49,20 @@ def get_file_category(filename):
 @admin_required
 def index():
     """Lista todas as propostas"""
+    # Admin_id dinâmico que funciona em dev e produção
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
     page = request.args.get('page', 1, type=int)
     status_filter = request.args.get('status', '')
     cliente_filter = request.args.get('cliente', '')
     
-    query = Proposta.query
+    # Iniciar query com filtro admin_id (segurança multitenant)
+    query = Proposta.query.filter_by(admin_id=admin_id)
     
     # Filtros
     if status_filter:
@@ -238,10 +247,20 @@ def nova_proposta():
 def api_template_detalhes(template_id):
     """API para retornar detalhes de um template"""
     from models import PropostaTemplate
+    from multitenant_helper import get_admin_id
     
     try:
-        # Buscar template
-        template = PropostaTemplate.query.get(template_id)
+        # Validar autenticação para segurança multitenant
+        admin_id = get_admin_id()
+        if not admin_id:
+            return jsonify({'error': 'Erro de autenticação'}), 401
+        
+        # Buscar template validando propriedade (admin_id)
+        template = PropostaTemplate.query.filter_by(
+            id=template_id,
+            admin_id=admin_id
+        ).first()
+        
         if not template:
             return jsonify({'error': 'Template não encontrado'}), 404
         
@@ -509,7 +528,16 @@ def criar_proposta():
 @admin_required
 def visualizar_proposta(id):
     """Visualiza uma proposta específica"""
-    proposta = Proposta.query.get_or_404(id)
+    # Admin_id dinâmico que funciona em dev e produção
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # Buscar proposta validando propriedade (admin_id)
+    proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     return render_template('propostas/visualizar.html', proposta=proposta)
 
 @propostas_bp.route('/<int:id>/editar')
@@ -517,8 +545,19 @@ def visualizar_proposta(id):
 @admin_required
 def editar_proposta(id):
     """Formulário para editar proposta"""
-    proposta = Proposta.query.get_or_404(id)
-    templates = PropostaTemplate.query.filter_by(ativo=True).all()
+    # Admin_id dinâmico que funciona em dev e produção
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # Buscar proposta validando propriedade (admin_id)
+    proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    
+    # Buscar apenas templates do próprio admin
+    templates = PropostaTemplate.query.filter_by(admin_id=admin_id, ativo=True).all()
     return render_template('propostas/editar.html', proposta=proposta, templates=templates)
 
 @propostas_bp.route('/<int:id>/atualizar', methods=['POST'])
@@ -526,7 +565,16 @@ def editar_proposta(id):
 @admin_required
 def atualizar_proposta(id):
     """Atualiza uma proposta existente"""
-    proposta = Proposta.query.get_or_404(id)
+    # Admin_id dinâmico que funciona em dev e produção
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    # Buscar proposta validando propriedade (admin_id)
+    proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     try:
         # Atualizar dados da proposta
