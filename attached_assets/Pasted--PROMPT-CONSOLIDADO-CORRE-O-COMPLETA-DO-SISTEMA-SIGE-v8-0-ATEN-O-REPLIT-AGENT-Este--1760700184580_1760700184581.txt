@@ -1,0 +1,1705 @@
+# 🎯 PROMPT CONSOLIDADO - CORREÇÃO COMPLETA DO SISTEMA SIGE v8.0
+
+**ATENÇÃO REPLIT AGENT:** Este é um prompt de correção massiva que resolve **64 problemas críticos** em **11 módulos** do sistema SIGE v8.0.
+
+---
+
+## 📋 CONTEXTO DO SISTEMA
+
+**Sistema:** SIGE v8.0 - Sistema Integrado de Gestão para Construção Civil  
+**Stack:** Flask 2.3+, SQLAlchemy 2.0+, PostgreSQL 15+, Python 3.11  
+**Arquitetura:** Multi-tenant (isolamento por `admin_id`)  
+**Módulos:** 13 módulos separados + views.py principal  
+
+**Status Atual:** 🔴 **CRÍTICO**
+- 64 problemas críticos identificados
+- 41 violações de multi-tenancy (LGPD)
+- 15+ queries N+1 (performance)
+- 10+ cálculos hardcoded (precisão)
+- 8+ tratamentos de erro genéricos
+
+**Objetivo:** Corrigir TODOS os problemas em ordem de prioridade
+
+---
+
+## 🚨 FASE 0 - EMERGENCIAL (PRIORIDADE MÁXIMA)
+
+### MÓDULO: ALMOXARIFADO (30 CORREÇÕES)
+
+**Arquivo:** `almoxarifado_views.py`
+
+**Problema:** 30 violações de multi-tenancy - Queries sem filtro `admin_id`
+
+**Impacto:** 🔒 **VIOLAÇÃO CRÍTICA DE SEGURANÇA**
+- Dados de estoque de TODAS as empresas são misturados
+- Empresa A pode ver/modificar estoque da Empresa B
+- Violação de LGPD - Multa potencial até R$ 50 milhões
+
+---
+
+#### CORREÇÃO 1: Listar Itens do Almoxarifado
+
+**Localização:** Função `almoxarifado()` - Listagem de itens
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/almoxarifado')
+@login_required
+@admin_required
+def almoxarifado():
+    admin_id = get_admin_id()
+    
+    # ❌ CRÍTICO - Busca itens de TODAS as empresas
+    itens = Item.query.filter_by(ativo=True).all()
+    
+    return render_template('almoxarifado.html', itens=itens)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/almoxarifado')
+@login_required
+@admin_required
+def almoxarifado():
+    admin_id = get_admin_id()
+    
+    # ✅ CORRETO - Filtra apenas itens da empresa logada
+    itens = Item.query.filter_by(
+        admin_id=admin_id,
+        ativo=True
+    ).all()
+    
+    return render_template('almoxarifado.html', itens=itens)
+```
+
+---
+
+#### CORREÇÃO 2: Detalhes do Item
+
+**Localização:** Função `item_detalhes(item_id)`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/almoxarifado/item/<int:item_id>')
+@login_required
+@admin_required
+def item_detalhes(item_id):
+    admin_id = get_admin_id()
+    
+    # ❌ CRÍTICO - Pode acessar item de outra empresa
+    item = Item.query.get_or_404(item_id)
+    
+    # ❌ CRÍTICO - Movimentações de todas as empresas
+    movimentacoes = Movimentacao.query.filter_by(item_id=item_id).all()
+    
+    return render_template('item_detalhes.html', item=item, movimentacoes=movimentacoes)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/almoxarifado/item/<int:item_id>')
+@login_required
+@admin_required
+def item_detalhes(item_id):
+    admin_id = get_admin_id()
+    
+    # ✅ CORRETO - Verifica se item pertence à empresa
+    item = Item.query.filter_by(
+        id=item_id,
+        admin_id=admin_id
+    ).first_or_404()
+    
+    # ✅ CORRETO - Apenas movimentações da empresa
+    movimentacoes = Movimentacao.query.filter_by(
+        item_id=item_id,
+        admin_id=admin_id
+    ).order_by(Movimentacao.data.desc()).all()
+    
+    return render_template('item_detalhes.html', item=item, movimentacoes=movimentacoes)
+```
+
+---
+
+#### CORREÇÃO 3: Criar Novo Item
+
+**Localização:** Função `novo_item()` - POST
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/almoxarifado/novo', methods=['POST'])
+@login_required
+@admin_required
+def novo_item():
+    admin_id = get_admin_id()
+    
+    nome = request.form.get('nome')
+    categoria = request.form.get('categoria')
+    
+    # ❌ Falta validação de dados
+    item = Item(
+        nome=nome,
+        categoria=categoria,
+        admin_id=admin_id
+    )
+    
+    db.session.add(item)
+    db.session.commit()
+    
+    return redirect(url_for('main.almoxarifado'))
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/almoxarifado/novo', methods=['POST'])
+@login_required
+@admin_required
+def novo_item():
+    admin_id = get_admin_id()
+    
+    try:
+        nome = request.form.get('nome', '').strip()
+        categoria = request.form.get('categoria', '').strip()
+        
+        # ✅ Validação de dados
+        if not nome:
+            flash('Nome do item é obrigatório', 'error')
+            return redirect(url_for('main.almoxarifado'))
+        
+        if not categoria:
+            flash('Categoria é obrigatória', 'error')
+            return redirect(url_for('main.almoxarifado'))
+        
+        # ✅ Verifica se já existe item com mesmo nome
+        item_existente = Item.query.filter_by(
+            admin_id=admin_id,
+            nome=nome,
+            ativo=True
+        ).first()
+        
+        if item_existente:
+            flash(f'Já existe um item com o nome "{nome}"', 'warning')
+            return redirect(url_for('main.almoxarifado'))
+        
+        item = Item(
+            nome=nome,
+            categoria=categoria,
+            admin_id=admin_id,
+            ativo=True
+        )
+        
+        db.session.add(item)
+        db.session.commit()
+        
+        flash(f'Item "{nome}" criado com sucesso!', 'success')
+        return redirect(url_for('main.almoxarifado'))
+        
+    except IntegrityError as e:
+        db.session.rollback()
+        logger.error(f"Erro de integridade ao criar item: {e}")
+        flash('Erro ao criar item: dados duplicados ou inválidos', 'error')
+        return redirect(url_for('main.almoxarifado'))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f"Erro inesperado ao criar item: {e}")
+        flash('Erro inesperado ao criar item. Contate o suporte.', 'error')
+        return redirect(url_for('main.almoxarifado'))
+```
+
+---
+
+#### CORREÇÃO 4-30: Aplicar Padrão em TODAS as Funções
+
+**INSTRUÇÕES PARA REPLIT AGENT:**
+
+Aplique o mesmo padrão de correção em TODAS as funções do `almoxarifado_views.py`:
+
+1. **Adicionar filtro `admin_id`** em TODAS as queries:
+   - `Item.query.filter_by(admin_id=admin_id, ...)`
+   - `Movimentacao.query.filter_by(admin_id=admin_id, ...)`
+   - `Categoria.query.filter_by(admin_id=admin_id, ...)`
+
+2. **Validar dados de entrada** em TODAS as rotas POST:
+   - Verificar campos obrigatórios
+   - Validar tipos de dados
+   - Sanitizar strings (`.strip()`)
+
+3. **Tratamento de erro específico**:
+   ```python
+   try:
+       # código
+   except IntegrityError as e:
+       db.session.rollback()
+       logger.error(f"Erro de integridade: {e}")
+       flash('Erro: dados duplicados ou inválidos', 'error')
+   except ValueError as e:
+       flash(f'Valor inválido: {e}', 'error')
+   except Exception as e:
+       db.session.rollback()
+       logger.exception(f"Erro inesperado: {e}")
+       flash('Erro inesperado. Contate o suporte.', 'error')
+   ```
+
+4. **Verificar propriedade** antes de editar/deletar:
+   ```python
+   item = Item.query.filter_by(
+       id=item_id,
+       admin_id=admin_id  # ✅ Garante que pertence à empresa
+   ).first_or_404()
+   ```
+
+**Funções a corrigir:**
+- `almoxarifado()` - Listagem
+- `item_detalhes(item_id)` - Detalhes
+- `novo_item()` - Criar
+- `editar_item(item_id)` - Editar
+- `deletar_item(item_id)` - Deletar
+- `nova_movimentacao()` - Criar movimentação
+- `relatorio_estoque()` - Relatório
+- `exportar_estoque()` - Exportar
+- `importar_estoque()` - Importar
+- `categorias()` - Listar categorias
+- `nova_categoria()` - Criar categoria
+- `editar_categoria(categoria_id)` - Editar categoria
+- `deletar_categoria(categoria_id)` - Deletar categoria
+- `itens_baixo_estoque()` - Alertas
+- `historico_movimentacoes()` - Histórico
+- ... (todas as outras funções)
+
+---
+
+## 🔴 FASE 1 - CRÍTICA (PRIORIDADE URGENTE)
+
+### MÓDULO: PROPOSTAS (11 CORREÇÕES)
+
+**Arquivo:** `propostas_views.py`
+
+**Problemas:**
+- 11 violações de multi-tenancy
+- 10 valores hardcoded
+- 2 queries N+1
+- 2 faltas de validação
+- 8 tratamentos de erro genéricos
+
+---
+
+#### CORREÇÃO 31: Listar Propostas
+
+**Localização:** Função `propostas()`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/propostas')
+@login_required
+@admin_required
+def propostas():
+    admin_id = get_admin_id()
+    
+    # ❌ CRÍTICO - Propostas de TODAS as empresas
+    # ❌ N+1 - Faz query adicional para cada proposta.cliente
+    propostas = Proposta.query.filter_by(ativo=True).all()
+    
+    return render_template('propostas.html', propostas=propostas)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/propostas')
+@login_required
+@admin_required
+def propostas():
+    admin_id = get_admin_id()
+    
+    # ✅ CORRETO - Apenas propostas da empresa
+    # ✅ Otimizado - Carrega cliente junto (evita N+1)
+    propostas = Proposta.query.filter_by(
+        admin_id=admin_id,
+        ativo=True
+    ).options(
+        joinedload(Proposta.cliente),
+        joinedload(Proposta.obra)
+    ).order_by(Proposta.data_criacao.desc()).all()
+    
+    return render_template('propostas.html', propostas=propostas)
+```
+
+---
+
+#### CORREÇÃO 32: Criar Nova Proposta
+
+**Localização:** Função `nova_proposta()` - POST
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/propostas/nova', methods=['POST'])
+@login_required
+@admin_required
+def nova_proposta():
+    admin_id = get_admin_id()
+    
+    cliente_id = request.form.get('cliente_id')
+    valor = request.form.get('valor')
+    
+    # ❌ Valores hardcoded
+    margem_lucro = 0.15  # 15% fixo
+    prazo_entrega = 30  # 30 dias fixo
+    
+    # ❌ Falta validação
+    proposta = Proposta(
+        cliente_id=cliente_id,
+        valor=valor,
+        margem_lucro=margem_lucro,
+        prazo_entrega=prazo_entrega,
+        admin_id=admin_id
+    )
+    
+    try:
+        db.session.add(proposta)
+        db.session.commit()
+    except Exception as e:
+        # ❌ Erro genérico
+        flash('Erro ao criar proposta', 'error')
+    
+    return redirect(url_for('main.propostas'))
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/propostas/nova', methods=['POST'])
+@login_required
+@admin_required
+def nova_proposta():
+    admin_id = get_admin_id()
+    
+    try:
+        cliente_id = request.form.get('cliente_id')
+        valor_str = request.form.get('valor', '0')
+        
+        # ✅ Validação de dados
+        if not cliente_id:
+            flash('Cliente é obrigatório', 'error')
+            return redirect(url_for('main.nova_proposta_form'))
+        
+        try:
+            valor = float(valor_str.replace(',', '.'))
+            if valor <= 0:
+                raise ValueError("Valor deve ser maior que zero")
+        except ValueError as e:
+            flash(f'Valor inválido: {e}', 'error')
+            return redirect(url_for('main.nova_proposta_form'))
+        
+        # ✅ Verifica se cliente pertence à empresa
+        cliente = Cliente.query.filter_by(
+            id=cliente_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not cliente:
+            flash('Cliente não encontrado ou não pertence à sua empresa', 'error')
+            return redirect(url_for('main.nova_proposta_form'))
+        
+        # ✅ Busca configurações da empresa (não hardcoded)
+        config = ConfiguracaoProposta.query.filter_by(admin_id=admin_id).first()
+        
+        margem_lucro = config.margem_padrao if config else 0.15
+        prazo_entrega = config.prazo_padrao if config else 30
+        
+        proposta = Proposta(
+            cliente_id=cliente_id,
+            valor=valor,
+            margem_lucro=margem_lucro,
+            prazo_entrega=prazo_entrega,
+            admin_id=admin_id,
+            data_criacao=datetime.now(),
+            status='rascunho'
+        )
+        
+        db.session.add(proposta)
+        db.session.commit()
+        
+        flash(f'Proposta criada com sucesso! Valor: R$ {valor:,.2f}', 'success')
+        return redirect(url_for('main.proposta_detalhes', proposta_id=proposta.id))
+        
+    except IntegrityError as e:
+        db.session.rollback()
+        logger.error(f"Erro de integridade ao criar proposta: {e}")
+        flash('Erro ao criar proposta: dados duplicados ou inválidos', 'error')
+        return redirect(url_for('main.nova_proposta_form'))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f"Erro inesperado ao criar proposta: {e}")
+        flash('Erro inesperado ao criar proposta. Contate o suporte.', 'error')
+        return redirect(url_for('main.nova_proposta_form'))
+```
+
+---
+
+#### CORREÇÃO 33-41: Aplicar Padrão em Propostas
+
+**INSTRUÇÕES PARA REPLIT AGENT:**
+
+Aplique o mesmo padrão em TODAS as funções de `propostas_views.py`:
+
+1. **Filtrar por admin_id** (11 correções)
+2. **Remover valores hardcoded** (10 correções) - Buscar de `ConfiguracaoProposta`
+3. **Otimizar queries N+1** (2 correções) - Usar `joinedload()`
+4. **Adicionar validação** (2 correções)
+5. **Melhorar tratamento de erro** (8 correções)
+
+**Valores a buscar de configuração:**
+```python
+config = ConfiguracaoProposta.query.filter_by(admin_id=admin_id).first()
+
+margem_lucro = config.margem_padrao if config else 0.15
+prazo_entrega = config.prazo_padrao if config else 30
+validade_proposta = config.validade_dias if config else 15
+desconto_maximo = config.desconto_maximo if config else 0.10
+```
+
+---
+
+### MÓDULO: CONTABILIDADE (4 CORREÇÕES)
+
+**Arquivo:** `contabilidade_views.py`
+
+**Problemas:**
+- Queries N+1
+- Falta de tratamento de erro em API
+- Dependência de funções externas sem validação
+- Uso de valores fixos em cálculos (potencial)
+
+---
+
+#### CORREÇÃO 42: Otimizar Listagem de Lançamentos
+
+**Localização:** Função `lancamentos()`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/contabilidade/lancamentos')
+@login_required
+@admin_required
+def lancamentos():
+    admin_id = get_admin_id()
+    
+    # ❌ N+1 - Faz query adicional para cada lancamento.conta
+    lancamentos = Lancamento.query.filter_by(admin_id=admin_id).all()
+    
+    return render_template('lancamentos.html', lancamentos=lancamentos)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/contabilidade/lancamentos')
+@login_required
+@admin_required
+def lancamentos():
+    admin_id = get_admin_id()
+    
+    # ✅ Otimizado - Carrega conta junto (evita N+1)
+    lancamentos = Lancamento.query.filter_by(
+        admin_id=admin_id
+    ).options(
+        joinedload(Lancamento.conta),
+        joinedload(Lancamento.categoria)
+    ).order_by(Lancamento.data.desc()).all()
+    
+    return render_template('lancamentos.html', lancamentos=lancamentos)
+```
+
+---
+
+#### CORREÇÃO 43: API de Saldo - Tratamento de Erro
+
+**Localização:** Função `api_saldo_conta(conta_id)`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/api/contabilidade/saldo/<int:conta_id>')
+@login_required
+@admin_required
+def api_saldo_conta(conta_id):
+    admin_id = get_admin_id()
+    
+    # ❌ Falta tratamento de erro
+    conta = Conta.query.filter_by(id=conta_id, admin_id=admin_id).first()
+    saldo = calcular_saldo(conta_id)  # ❌ Função externa sem validação
+    
+    return jsonify({'saldo': saldo})
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/api/contabilidade/saldo/<int:conta_id>')
+@login_required
+@admin_required
+def api_saldo_conta(conta_id):
+    admin_id = get_admin_id()
+    
+    try:
+        # ✅ Verifica se conta existe e pertence à empresa
+        conta = Conta.query.filter_by(
+            id=conta_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not conta:
+            return jsonify({
+                'error': 'Conta não encontrada'
+            }), 404
+        
+        # ✅ Validação antes de chamar função externa
+        try:
+            saldo = calcular_saldo(conta_id, admin_id)
+        except ValueError as e:
+            logger.error(f"Erro ao calcular saldo da conta {conta_id}: {e}")
+            return jsonify({
+                'error': 'Erro ao calcular saldo'
+            }), 500
+        
+        return jsonify({
+            'conta_id': conta_id,
+            'conta_nome': conta.nome,
+            'saldo': float(saldo),
+            'moeda': 'BRL'
+        }), 200
+        
+    except Exception as e:
+        logger.exception(f"Erro inesperado na API de saldo: {e}")
+        return jsonify({
+            'error': 'Erro interno do servidor'
+        }), 500
+```
+
+---
+
+#### CORREÇÃO 44-45: Aplicar Padrão em Contabilidade
+
+**INSTRUÇÕES PARA REPLIT AGENT:**
+
+1. **Otimizar todas as queries N+1** usando `joinedload()`
+2. **Adicionar tratamento de erro** em todas as APIs
+3. **Validar dados** antes de chamar funções externas
+4. **Remover valores fixos** se houver
+
+---
+
+### MÓDULO: EQUIPE (3 CORREÇÕES)
+
+**Arquivo:** `equipe_views.py`
+
+**Problemas:**
+- Queries N+1 em listagem de funcionários alocados
+- Uso de valores padrão em vez de configuração
+- Potencial falha na validação de admin_id
+
+---
+
+#### CORREÇÃO 46: Otimizar Listagem de Equipe
+
+**Localização:** Função `equipe_obra(obra_id)`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/equipe/obra/<int:obra_id>')
+@login_required
+@admin_required
+def equipe_obra(obra_id):
+    admin_id = get_admin_id()
+    
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    
+    # ❌ N+1 - Faz query adicional para cada alocacao.funcionario
+    alocacoes = AlocacaoFuncionario.query.filter_by(obra_id=obra_id).all()
+    
+    return render_template('equipe_obra.html', obra=obra, alocacoes=alocacoes)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/equipe/obra/<int:obra_id>')
+@login_required
+@admin_required
+def equipe_obra(obra_id):
+    admin_id = get_admin_id()
+    
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    
+    # ✅ Otimizado - Carrega funcionário e cargo junto
+    alocacoes = AlocacaoFuncionario.query.filter_by(
+        obra_id=obra_id,
+        admin_id=admin_id  # ✅ Adiciona filtro
+    ).options(
+        joinedload(AlocacaoFuncionario.funcionario),
+        joinedload(AlocacaoFuncionario.cargo)
+    ).order_by(AlocacaoFuncionario.data_inicio.desc()).all()
+    
+    return render_template('equipe_obra.html', obra=obra, alocacoes=alocacoes)
+```
+
+---
+
+#### CORREÇÃO 47-48: Aplicar Padrão em Equipe
+
+**INSTRUÇÕES PARA REPLIT AGENT:**
+
+1. **Otimizar queries N+1**
+2. **Buscar valores de configuração** ao invés de usar padrões fixos
+3. **Validar admin_id** em todas as queries
+
+---
+
+### MÓDULO: FINANCEIRO (3 CORREÇÕES)
+
+**Arquivo:** `financeiro_views.py`
+
+**Problemas:**
+- Queries N+1
+- Cálculos hardcoded
+- Falta de validação
+- Potencial problema de multi-tenancy em PlanoContas
+
+---
+
+#### CORREÇÃO 49: Otimizar Listagem de Transações
+
+**Localização:** Função `transacoes()`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/financeiro/transacoes')
+@login_required
+@admin_required
+def transacoes():
+    admin_id = get_admin_id()
+    
+    # ❌ N+1 - Faz query adicional para cada transacao.conta
+    transacoes = Transacao.query.filter_by(admin_id=admin_id).all()
+    
+    return render_template('transacoes.html', transacoes=transacoes)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/financeiro/transacoes')
+@login_required
+@admin_required
+def transacoes():
+    admin_id = get_admin_id()
+    
+    # ✅ Otimizado - Carrega conta e categoria junto
+    transacoes = Transacao.query.filter_by(
+        admin_id=admin_id
+    ).options(
+        joinedload(Transacao.conta),
+        joinedload(Transacao.categoria),
+        joinedload(Transacao.fornecedor)
+    ).order_by(Transacao.data.desc()).all()
+    
+    return render_template('transacoes.html', transacoes=transacoes)
+```
+
+---
+
+#### CORREÇÃO 50: Remover Cálculos Hardcoded
+
+**Localização:** Função `calcular_juros()`
+
+**ANTES (INCORRETO):**
+```python
+def calcular_juros(valor, dias_atraso):
+    # ❌ Taxa fixa hardcoded
+    taxa_juros = 0.02  # 2% ao mês
+    taxa_multa = 0.10  # 10% fixo
+    
+    juros = valor * taxa_juros * (dias_atraso / 30)
+    multa = valor * taxa_multa if dias_atraso > 0 else 0
+    
+    return juros + multa
+```
+
+**DEPOIS (CORRETO):**
+```python
+def calcular_juros(valor, dias_atraso, admin_id):
+    # ✅ Busca configurações da empresa
+    config = ConfiguracaoFinanceira.query.filter_by(admin_id=admin_id).first()
+    
+    taxa_juros = config.taxa_juros_mes if config else 0.02
+    taxa_multa = config.taxa_multa if config else 0.10
+    
+    juros = valor * taxa_juros * (dias_atraso / 30)
+    multa = valor * taxa_multa if dias_atraso > 0 else 0
+    
+    return juros + multa
+```
+
+---
+
+#### CORREÇÃO 51: Corrigir PlanoContas Multi-Tenancy
+
+**Localização:** Função `plano_contas()`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/financeiro/plano-contas')
+@login_required
+@admin_required
+def plano_contas():
+    admin_id = get_admin_id()
+    
+    # ❌ Potencial problema - Verifica se filtra corretamente
+    contas = PlanoContas.query.filter_by(ativo=True).all()
+    
+    return render_template('plano_contas.html', contas=contas)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/financeiro/plano-contas')
+@login_required
+@admin_required
+def plano_contas():
+    admin_id = get_admin_id()
+    
+    # ✅ CORRETO - Adiciona filtro admin_id explicitamente
+    contas = PlanoContas.query.filter_by(
+        admin_id=admin_id,
+        ativo=True
+    ).order_by(PlanoContas.codigo).all()
+    
+    return render_template('plano_contas.html', contas=contas)
+```
+
+---
+
+### MÓDULO: SERVIÇOS (3 CORREÇÕES)
+
+**Arquivo:** `servicos_views.py`
+
+**Problemas:**
+- Queries sem filtro admin_id
+- Cálculos hardcoded para margem de lucro
+- Valores placeholder para tempo de execução
+
+---
+
+#### CORREÇÃO 52: Adicionar Filtro Admin em Serviços
+
+**Localização:** Função `servicos()`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/servicos')
+@login_required
+@admin_required
+def servicos():
+    admin_id = get_admin_id()
+    
+    # ❌ Falta filtro admin_id em algumas queries
+    servicos = Servico.query.filter_by(ativo=True).all()
+    
+    return render_template('servicos.html', servicos=servicos)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/servicos')
+@login_required
+@admin_required
+def servicos():
+    admin_id = get_admin_id()
+    
+    # ✅ CORRETO - Adiciona filtro admin_id
+    servicos = Servico.query.filter_by(
+        admin_id=admin_id,
+        ativo=True
+    ).order_by(Servico.nome).all()
+    
+    return render_template('servicos.html', servicos=servicos)
+```
+
+---
+
+#### CORREÇÃO 53: Remover Margem Hardcoded
+
+**Localização:** Função `calcular_preco_servico()`
+
+**ANTES (INCORRETO):**
+```python
+def calcular_preco_servico(custo_base):
+    # ❌ Margem fixa hardcoded
+    margem_lucro = 0.30  # 30% fixo
+    
+    preco = custo_base * (1 + margem_lucro)
+    return preco
+```
+
+**DEPOIS (CORRETO):**
+```python
+def calcular_preco_servico(custo_base, admin_id, categoria=None):
+    # ✅ Busca margem da configuração
+    config = ConfiguracaoServico.query.filter_by(admin_id=admin_id).first()
+    
+    # Margem pode variar por categoria
+    if categoria and config:
+        margem_lucro = config.margem_por_categoria.get(categoria, config.margem_padrao)
+    else:
+        margem_lucro = config.margem_padrao if config else 0.30
+    
+    preco = custo_base * (1 + margem_lucro)
+    return preco
+```
+
+---
+
+#### CORREÇÃO 54: Remover Placeholder de Tempo
+
+**Localização:** Função `novo_servico()` ou similar
+
+**ANTES (INCORRETO):**
+```python
+# ❌ Valor placeholder
+tempo_execucao = 2.5  # placeholder
+```
+
+**DEPOIS (CORRETO):**
+```python
+# ✅ Busca de formulário ou configuração
+tempo_execucao = float(request.form.get('tempo_execucao', 0))
+
+if tempo_execucao <= 0:
+    # Busca tempo padrão da categoria
+    config = ConfiguracaoServico.query.filter_by(admin_id=admin_id).first()
+    tempo_execucao = config.tempo_padrao if config else 1.0
+```
+
+---
+
+### MÓDULO: TEMPLATES (3 CORREÇÕES)
+
+**Arquivo:** `templates_views.py`
+
+**Problemas:**
+- Uso de admin_id hardcoded em múltiplas rotas
+- Falta de validação de dados
+- Queries N+1 em listagem de serviços
+
+---
+
+#### CORREÇÃO 55: Corrigir Admin ID Hardcoded
+
+**Localização:** Múltiplas funções
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/templates/<int:template_id>')
+@login_required
+@admin_required
+def ver_template(template_id):
+    # ❌ admin_id hardcoded ou não usado corretamente
+    template = Template.query.get_or_404(template_id)
+    
+    return render_template('template_detalhes.html', template=template)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/templates/<int:template_id>')
+@login_required
+@admin_required
+def ver_template(template_id):
+    admin_id = get_admin_id()
+    
+    # ✅ CORRETO - Verifica propriedade
+    template = Template.query.filter_by(
+        id=template_id,
+        admin_id=admin_id
+    ).first_or_404()
+    
+    return render_template('template_detalhes.html', template=template)
+```
+
+---
+
+#### CORREÇÃO 56: Adicionar Validação em Novo Template
+
+**Localização:** Função `novo_template()` - POST
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/templates/novo', methods=['POST'])
+@login_required
+@admin_required
+def novo_template():
+    admin_id = get_admin_id()
+    
+    nome = request.form.get('nome')
+    conteudo = request.form.get('conteudo')
+    
+    # ❌ Falta validação
+    template = Template(
+        nome=nome,
+        conteudo=conteudo,
+        admin_id=admin_id
+    )
+    
+    db.session.add(template)
+    db.session.commit()
+    
+    return redirect(url_for('main.templates'))
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/templates/novo', methods=['POST'])
+@login_required
+@admin_required
+def novo_template():
+    admin_id = get_admin_id()
+    
+    try:
+        nome = request.form.get('nome', '').strip()
+        conteudo = request.form.get('conteudo', '').strip()
+        
+        # ✅ Validação de dados
+        if not nome:
+            flash('Nome do template é obrigatório', 'error')
+            return redirect(url_for('main.novo_template_form'))
+        
+        if not conteudo:
+            flash('Conteúdo do template é obrigatório', 'error')
+            return redirect(url_for('main.novo_template_form'))
+        
+        # Verifica duplicação
+        template_existente = Template.query.filter_by(
+            admin_id=admin_id,
+            nome=nome
+        ).first()
+        
+        if template_existente:
+            flash(f'Já existe um template com o nome "{nome}"', 'warning')
+            return redirect(url_for('main.novo_template_form'))
+        
+        template = Template(
+            nome=nome,
+            conteudo=conteudo,
+            admin_id=admin_id,
+            data_criacao=datetime.now()
+        )
+        
+        db.session.add(template)
+        db.session.commit()
+        
+        flash(f'Template "{nome}" criado com sucesso!', 'success')
+        return redirect(url_for('main.templates'))
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f"Erro ao criar template: {e}")
+        flash('Erro inesperado ao criar template', 'error')
+        return redirect(url_for('main.novo_template_form'))
+```
+
+---
+
+#### CORREÇÃO 57: Otimizar Listagem de Serviços
+
+**Localização:** Função `api_categorias()` ou similar
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/api/templates/categorias')
+@login_required
+@admin_required
+def api_categorias():
+    admin_id = get_admin_id()
+    
+    # ❌ N+1 - Faz query adicional para cada categoria.servicos
+    categorias = Categoria.query.filter_by(admin_id=admin_id).all()
+    
+    resultado = []
+    for cat in categorias:
+        resultado.append({
+            'id': cat.id,
+            'nome': cat.nome,
+            'servicos': [s.nome for s in cat.servicos]  # ❌ N+1
+        })
+    
+    return jsonify(resultado)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/api/templates/categorias')
+@login_required
+@admin_required
+def api_categorias():
+    admin_id = get_admin_id()
+    
+    # ✅ Otimizado - Carrega servicos junto
+    categorias = Categoria.query.filter_by(
+        admin_id=admin_id
+    ).options(
+        joinedload(Categoria.servicos)
+    ).all()
+    
+    resultado = []
+    for cat in categorias:
+        resultado.append({
+            'id': cat.id,
+            'nome': cat.nome,
+            'servicos': [s.nome for s in cat.servicos]  # ✅ Já carregado
+        })
+    
+    return jsonify(resultado)
+```
+
+---
+
+### MÓDULO: FOLHA DE PAGAMENTO (2 CORREÇÕES)
+
+**Arquivo:** `folha_pagamento_views.py`
+
+**Problemas:**
+- Queries sem filtro admin_id em `admin_required`
+- Cálculos hardcoded em `processar_folha_funcionario`
+
+---
+
+#### CORREÇÃO 58: Adicionar Filtro Admin
+
+**Localização:** Função `folha_pagamento()`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/folha-pagamento')
+@login_required
+@admin_required
+def folha_pagamento():
+    admin_id = get_admin_id()
+    
+    # ❌ Falta verificar admin_id em alguma query interna
+    folhas = FolhaPagamento.query.filter_by(mes=mes_atual).all()
+    
+    return render_template('folha_pagamento.html', folhas=folhas)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/folha-pagamento')
+@login_required
+@admin_required
+def folha_pagamento():
+    admin_id = get_admin_id()
+    
+    # ✅ CORRETO - Adiciona filtro admin_id
+    folhas = FolhaPagamento.query.filter_by(
+        admin_id=admin_id,
+        mes=mes_atual
+    ).all()
+    
+    return render_template('folha_pagamento.html', folhas=folhas)
+```
+
+---
+
+#### CORREÇÃO 59: Corrigir Cálculo de Valor/Hora (JÁ IDENTIFICADO)
+
+**Localização:** Função `processar_folha_funcionario()` ou similar
+
+**ANTES (INCORRETO):**
+```python
+def processar_folha_funcionario(funcionario_id, mes, ano):
+    funcionario = Funcionario.query.get(funcionario_id)
+    
+    # ❌ CRÍTICO - Valor/hora fixo 220h
+    valor_hora = funcionario.salario / 220
+    
+    horas_trabalhadas = calcular_horas_mes(funcionario_id, mes, ano)
+    salario_mes = valor_hora * horas_trabalhadas
+    
+    return salario_mes
+```
+
+**DEPOIS (CORRETO):**
+```python
+def processar_folha_funcionario(funcionario_id, mes, ano, admin_id):
+    funcionario = Funcionario.query.filter_by(
+        id=funcionario_id,
+        admin_id=admin_id
+    ).first()
+    
+    if not funcionario:
+        raise ValueError(f"Funcionário {funcionario_id} não encontrado")
+    
+    # ✅ CORRETO - Usa função de utils.py
+    from utils import calcular_valor_hora, calcular_dias_uteis_mes
+    
+    # Calcula divisor correto baseado na jornada do funcionário
+    valor_hora = calcular_valor_hora(
+        salario=funcionario.salario,
+        jornada_semanal=funcionario.jornada_semanal
+    )
+    
+    horas_trabalhadas = calcular_horas_mes(funcionario_id, mes, ano, admin_id)
+    salario_mes = valor_hora * horas_trabalhadas
+    
+    return salario_mes
+```
+
+---
+
+## 🟡 FASE 2 - ALTA (PRIORIDADE ALTA)
+
+### MÓDULO: FROTA (2 CORREÇÕES)
+
+**Arquivo:** `frota_views.py`
+
+**Problemas:**
+- Queries N+1 em detalhes de veículo
+- Falta de validação de dados em múltiplos formulários
+
+---
+
+#### CORREÇÃO 60: Otimizar Detalhes do Veículo
+
+**Localização:** Função `veiculo_detalhes(veiculo_id)`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/frota/veiculo/<int:veiculo_id>')
+@login_required
+@admin_required
+def veiculo_detalhes(veiculo_id):
+    admin_id = get_admin_id()
+    
+    veiculo = Veiculo.query.filter_by(
+        id=veiculo_id,
+        admin_id=admin_id
+    ).first_or_404()
+    
+    # ❌ N+1 - Faz query adicional para cada despesa
+    despesas = VehicleExpense.query.filter_by(veiculo_id=veiculo_id).all()
+    
+    return render_template('veiculo_detalhes.html', veiculo=veiculo, despesas=despesas)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/frota/veiculo/<int:veiculo_id>')
+@login_required
+@admin_required
+def veiculo_detalhes(veiculo_id):
+    admin_id = get_admin_id()
+    
+    # ✅ Otimizado - Carrega veículo com relacionamentos
+    veiculo = Veiculo.query.filter_by(
+        id=veiculo_id,
+        admin_id=admin_id
+    ).options(
+        joinedload(Veiculo.motorista),
+        joinedload(Veiculo.obra_atual)
+    ).first_or_404()
+    
+    # ✅ Filtra despesas por admin_id também
+    despesas = VehicleExpense.query.filter_by(
+        veiculo_id=veiculo_id,
+        admin_id=admin_id
+    ).order_by(VehicleExpense.data_custo.desc()).all()
+    
+    return render_template('veiculo_detalhes.html', veiculo=veiculo, despesas=despesas)
+```
+
+---
+
+#### CORREÇÃO 61: Adicionar Validação em Formulários
+
+**Localização:** Função `nova_despesa_veiculo()` - POST
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/frota/despesa/nova', methods=['POST'])
+@login_required
+@admin_required
+def nova_despesa_veiculo():
+    admin_id = get_admin_id()
+    
+    veiculo_id = request.form.get('veiculo_id')
+    valor = request.form.get('valor')
+    tipo = request.form.get('tipo')
+    
+    # ❌ Falta validação
+    despesa = VehicleExpense(
+        veiculo_id=veiculo_id,
+        valor=valor,
+        tipo=tipo,
+        admin_id=admin_id
+    )
+    
+    db.session.add(despesa)
+    db.session.commit()
+    
+    return redirect(url_for('main.frota'))
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/frota/despesa/nova', methods=['POST'])
+@login_required
+@admin_required
+def nova_despesa_veiculo():
+    admin_id = get_admin_id()
+    
+    try:
+        veiculo_id = request.form.get('veiculo_id')
+        valor_str = request.form.get('valor', '0')
+        tipo = request.form.get('tipo', '').strip()
+        
+        # ✅ Validação de dados
+        if not veiculo_id:
+            flash('Veículo é obrigatório', 'error')
+            return redirect(url_for('main.nova_despesa_form'))
+        
+        if not tipo:
+            flash('Tipo de despesa é obrigatório', 'error')
+            return redirect(url_for('main.nova_despesa_form'))
+        
+        try:
+            valor = float(valor_str.replace(',', '.'))
+            if valor <= 0:
+                raise ValueError("Valor deve ser maior que zero")
+        except ValueError as e:
+            flash(f'Valor inválido: {e}', 'error')
+            return redirect(url_for('main.nova_despesa_form'))
+        
+        # Verifica se veículo pertence à empresa
+        veiculo = Veiculo.query.filter_by(
+            id=veiculo_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not veiculo:
+            flash('Veículo não encontrado ou não pertence à sua empresa', 'error')
+            return redirect(url_for('main.nova_despesa_form'))
+        
+        despesa = VehicleExpense(
+            veiculo_id=veiculo_id,
+            valor=valor,
+            tipo=tipo,
+            data_custo=datetime.now(),
+            admin_id=admin_id
+        )
+        
+        db.session.add(despesa)
+        db.session.commit()
+        
+        flash(f'Despesa de R$ {valor:,.2f} registrada com sucesso!', 'success')
+        return redirect(url_for('main.veiculo_detalhes', veiculo_id=veiculo_id))
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f"Erro ao registrar despesa: {e}")
+        flash('Erro inesperado ao registrar despesa', 'error')
+        return redirect(url_for('main.nova_despesa_form'))
+```
+
+---
+
+### MÓDULO: PONTO (2 CORREÇÕES)
+
+**Arquivo:** `ponto_views.py`
+
+**Problemas:**
+- 2 queries N+1
+- 5 problemas de ALTA prioridade (falta de validação)
+- Tratamento de erro genérico
+
+**Observação:** KPIs estão OK (não calcula valores, apenas registra horas)
+
+---
+
+#### CORREÇÃO 62: Otimizar Listagem de Pontos
+
+**Localização:** Função `pontos()` ou similar
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/ponto')
+@login_required
+@admin_required
+def pontos():
+    admin_id = get_admin_id()
+    
+    # ❌ N+1 - Faz query adicional para cada ponto.funcionario
+    pontos = RegistroPonto.query.filter_by(admin_id=admin_id).all()
+    
+    return render_template('pontos.html', pontos=pontos)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/ponto')
+@login_required
+@admin_required
+def pontos():
+    admin_id = get_admin_id()
+    
+    # ✅ Otimizado - Carrega funcionário junto
+    pontos = RegistroPonto.query.filter_by(
+        admin_id=admin_id
+    ).options(
+        joinedload(RegistroPonto.funcionario),
+        joinedload(RegistroPonto.obra)
+    ).order_by(RegistroPonto.data.desc()).all()
+    
+    return render_template('pontos.html', pontos=pontos)
+```
+
+---
+
+#### CORREÇÃO 63: Adicionar Validação em Registro de Ponto
+
+**Localização:** Função `registrar_ponto()` - POST
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/ponto/registrar', methods=['POST'])
+@login_required
+@admin_required
+def registrar_ponto():
+    admin_id = get_admin_id()
+    
+    funcionario_id = request.form.get('funcionario_id')
+    entrada = request.form.get('entrada')
+    saida = request.form.get('saida')
+    
+    # ❌ Falta validação
+    ponto = RegistroPonto(
+        funcionario_id=funcionario_id,
+        entrada=entrada,
+        saida=saida,
+        admin_id=admin_id
+    )
+    
+    try:
+        db.session.add(ponto)
+        db.session.commit()
+    except Exception as e:
+        # ❌ Erro genérico
+        flash('Erro ao registrar ponto', 'error')
+    
+    return redirect(url_for('main.pontos'))
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/ponto/registrar', methods=['POST'])
+@login_required
+@admin_required
+def registrar_ponto():
+    admin_id = get_admin_id()
+    
+    try:
+        funcionario_id = request.form.get('funcionario_id')
+        entrada_str = request.form.get('entrada', '').strip()
+        saida_str = request.form.get('saida', '').strip()
+        
+        # ✅ Validação de dados
+        if not funcionario_id:
+            flash('Funcionário é obrigatório', 'error')
+            return redirect(url_for('main.registrar_ponto_form'))
+        
+        if not entrada_str:
+            flash('Horário de entrada é obrigatório', 'error')
+            return redirect(url_for('main.registrar_ponto_form'))
+        
+        # Verifica se funcionário pertence à empresa
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            flash('Funcionário não encontrado ou não pertence à sua empresa', 'error')
+            return redirect(url_for('main.registrar_ponto_form'))
+        
+        # Converte horários
+        try:
+            entrada = datetime.strptime(entrada_str, '%H:%M').time()
+            saida = datetime.strptime(saida_str, '%H:%M').time() if saida_str else None
+        except ValueError as e:
+            flash(f'Horário inválido: {e}', 'error')
+            return redirect(url_for('main.registrar_ponto_form'))
+        
+        # Valida lógica: saída deve ser depois da entrada
+        if saida and saida <= entrada:
+            flash('Horário de saída deve ser posterior ao de entrada', 'error')
+            return redirect(url_for('main.registrar_ponto_form'))
+        
+        ponto = RegistroPonto(
+            funcionario_id=funcionario_id,
+            data=date.today(),
+            entrada=entrada,
+            saida=saida,
+            admin_id=admin_id
+        )
+        
+        db.session.add(ponto)
+        db.session.commit()
+        
+        flash(f'Ponto registrado com sucesso para {funcionario.nome}!', 'success')
+        return redirect(url_for('main.pontos'))
+        
+    except IntegrityError as e:
+        db.session.rollback()
+        logger.error(f"Erro de integridade ao registrar ponto: {e}")
+        flash('Erro: ponto já registrado para este funcionário hoje', 'error')
+        return redirect(url_for('main.registrar_ponto_form'))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f"Erro inesperado ao registrar ponto: {e}")
+        flash('Erro inesperado ao registrar ponto', 'error')
+        return redirect(url_for('main.registrar_ponto_form'))
+```
+
+---
+
+### MÓDULO: ALIMENTAÇÃO (1 CORREÇÃO)
+
+**Arquivo:** `alimentacao_views.py`
+
+**Problemas:**
+- Queries N+1 em detalhes do restaurante
+- Potencial erro em valor_por_funcionario
+
+---
+
+#### CORREÇÃO 64: Otimizar Detalhes do Restaurante
+
+**Localização:** Função `restaurante_detalhes(restaurante_id)`
+
+**ANTES (INCORRETO):**
+```python
+@main.route('/alimentacao/restaurante/<int:restaurante_id>')
+@login_required
+@admin_required
+def restaurante_detalhes(restaurante_id):
+    admin_id = get_admin_id()
+    
+    restaurante = Restaurante.query.filter_by(
+        id=restaurante_id,
+        admin_id=admin_id
+    ).first_or_404()
+    
+    # ❌ N+1 - Faz query adicional para cada registro.funcionario
+    registros = RegistroAlimentacao.query.filter_by(restaurante_id=restaurante_id).all()
+    
+    return render_template('restaurante_detalhes.html', restaurante=restaurante, registros=registros)
+```
+
+**DEPOIS (CORRETO):**
+```python
+@main.route('/alimentacao/restaurante/<int:restaurante_id>')
+@login_required
+@admin_required
+def restaurante_detalhes(restaurante_id):
+    admin_id = get_admin_id()
+    
+    restaurante = Restaurante.query.filter_by(
+        id=restaurante_id,
+        admin_id=admin_id
+    ).first_or_404()
+    
+    # ✅ Otimizado - Carrega funcionário junto
+    # ✅ Filtra por admin_id via JOIN
+    registros = db.session.query(RegistroAlimentacao).join(
+        Funcionario, RegistroAlimentacao.funcionario_id == Funcionario.id
+    ).filter(
+        RegistroAlimentacao.restaurante_id == restaurante_id,
+        Funcionario.admin_id == admin_id
+    ).options(
+        joinedload(RegistroAlimentacao.funcionario)
+    ).order_by(RegistroAlimentacao.data.desc()).all()
+    
+    return render_template('restaurante_detalhes.html', restaurante=restaurante, registros=registros)
+```
+
+---
+
+## ✅ CHECKLIST DE VALIDAÇÃO COMPLETA
+
+Após implementar TODAS as 64 correções, valide:
+
+### 1. Segurança e Multi-Tenancy (41 correções)
+- [ ] **Almoxarifado:** Todas as queries têm filtro `admin_id` (30 correções)
+- [ ] **Propostas:** Todas as queries têm filtro `admin_id` (11 correções)
+- [ ] **Teste:** Criar 2 empresas diferentes e verificar isolamento de dados
+- [ ] **Teste:** Tentar acessar recurso de outra empresa (deve dar 404)
+
+### 2. Performance - Queries N+1 (15 correções)
+- [ ] **Ponto:** Listagem otimizada com `joinedload()` (2 correções)
+- [ ] **Contabilidade:** Lançamentos otimizados (1 correção)
+- [ ] **Equipe:** Alocações otimizadas (1 correção)
+- [ ] **Financeiro:** Transações otimizadas (1 correção)
+- [ ] **Frota:** Detalhes otimizados (1 correção)
+- [ ] **Propostas:** Listagem otimizada (2 correções)
+- [ ] **Templates:** Categorias otimizadas (1 correção)
+- [ ] **Alimentação:** Restaurante otimizado (1 correção)
+- [ ] **Teste:** Verificar logs de SQL - deve ter redução de 50%+ em queries
+
+### 3. Precisão - Cálculos Hardcoded (10 correções)
+- [ ] **Propostas:** Margem/prazo vem de `ConfiguracaoProposta` (10 correções)
+- [ ] **Financeiro:** Taxa de juros vem de `ConfiguracaoFinanceira` (1 correção)
+- [ ] **Serviços:** Margem vem de `ConfiguracaoServico` (1 correção)
+- [ ] **Teste:** Alterar configuração e verificar se valores mudam
+
+### 4. Confiabilidade - Validação de Dados (8 correções)
+- [ ] **Almoxarifado:** Validação em formulários (3 correções)
+- [ ] **Propostas:** Validação em formulários (2 correções)
+- [ ] **Frota:** Validação em formulários (2 correções)
+- [ ] **Templates:** Validação em formulários (2 correções)
+- [ ] **Ponto:** Validação em formulários (5 correções)
+- [ ] **Teste:** Enviar dados inválidos e verificar mensagens de erro
+
+### 5. Observabilidade - Tratamento de Erro (8 correções)
+- [ ] **Propostas:** Erros específicos (8 correções)
+- [ ] **Contabilidade:** Erros em API (1 correção)
+- [ ] **Teste:** Forçar erro e verificar logs detalhados
+
+---
+
+## 📊 MÉTRICAS DE SUCESSO
+
+### Antes das Correções:
+```
+✅ Problemas Críticos: 64
+✅ Violações de Segurança: 41
+✅ Queries N+1: 15+
+✅ Cálculos Hardcoded: 10+
+✅ Taxa de Conformidade: 66.5%
+```
+
+### Depois das Correções (Esperado):
+```
+✅ Problemas Críticos: 0
+✅ Violações de Segurança: 0
+✅ Queries N+1: 0
+✅ Cálculos Hardcoded: 0
+✅ Taxa de Conformidade: 95%+
+```
+
+### KPIs de Performance:
+```
+✅ Tempo de resposta dashboard: < 500ms
+✅ Queries por request: Redução de 50%+
+✅ Uso de memória: Redução de 30%+
+```
+
+---
+
+## 🚀 ORDEM DE EXECUÇÃO RECOMENDADA
+
+### Etapa 1: EMERGENCIAL (1-2 dias)
+1. Implementar correções 1-30 (Almoxarifado)
+2. Testar isolamento de dados
+3. Deploy emergencial em produção
+
+### Etapa 2: CRÍTICA (3-5 dias)
+1. Implementar correções 31-41 (Propostas)
+2. Implementar correções 42-45 (Contabilidade)
+3. Implementar correções 46-48 (Equipe)
+4. Implementar correções 49-51 (Financeiro)
+5. Implementar correções 52-54 (Serviços)
+6. Implementar correções 55-57 (Templates)
+7. Implementar correções 58-59 (Folha Pagamento)
+8. Testar todas as funcionalidades
+9. Deploy em produção
+
+### Etapa 3: ALTA (2-3 dias)
+1. Implementar correções 60-61 (Frota)
+2. Implementar correções 62-63 (Ponto)
+3. Implementar correção 64 (Alimentação)
+4. Testar performance
+5. Deploy em produção
+
+### Etapa 4: VALIDAÇÃO FINAL (1 dia)
+1. Executar checklist completo
+2. Testes de carga
+3. Validação de segurança
+4. Documentação de mudanças
+
+---
+
+## 💡 DICAS PARA IMPLEMENTAÇÃO
+
+### 1. Trabalhe por Módulo
+- Não tente fazer tudo de uma vez
+- Complete um módulo antes de ir para o próximo
+- Teste cada módulo isoladamente
+
+### 2. Use Busca e Substituição
+- Muitas correções seguem o mesmo padrão
+- Use regex para encontrar padrões:
+  - `.query.filter_by\(ativo=True\)` → Adicionar `admin_id`
+  - `salario / 220` → Substituir por função
+  - `except Exception as e:` → Especificar exceções
+
+### 3. Crie Funções Auxiliares
+```python
+# utils/validators.py
+def validar_pertence_empresa(model, id, admin_id):
+    """Verifica se recurso pertence à empresa"""
+    obj = model.query.filter_by(id=id, admin_id=admin_id).first()
+    if not obj:
+        raise ValueError(f"{model.__name__} não encontrado ou não pertence à empresa")
+    return obj
+
+# Uso:
+veiculo = validar_pertence_empresa(Veiculo, veiculo_id, admin_id)
+```
+
+### 4. Configure Logging
+```python
+# config.py
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
+```
+
+### 5. Adicione Testes
+```python
+# tests/test_almoxarifado.py
+def test_isolamento_multi_tenancy():
+    """Testa se empresa A não vê dados da empresa B"""
+    # Criar empresa A e item A
+    # Criar empresa B e item B
+    # Login como empresa A
+    # Verificar que só vê item A
+    # Tentar acessar item B (deve dar 404)
+```
+
+---
+
+## 🎯 CONCLUSÃO
+
+Este prompt consolida **TODAS as 64 correções críticas** necessárias para tornar o sistema SIGE v8.0:
+
+✅ **Seguro** - Sem violações de multi-tenancy ou LGPD  
+✅ **Performático** - Sem queries N+1  
+✅ **Preciso** - Sem cálculos hardcoded  
+✅ **Confiável** - Com validação e tratamento de erro robusto  
+
+**Tempo Estimado Total:** 6-8 semanas (com 1-2 desenvolvedores)
+
+**Prioridade:** 🚨 **MÁXIMA** - Especialmente Almoxarifado (violação de segurança)
+
+**Resultado Esperado:** Sistema 95%+ conforme, pronto para produção segura
+
+---
+
+**BOA SORTE COM A IMPLEMENTAÇÃO! 🚀**
+
