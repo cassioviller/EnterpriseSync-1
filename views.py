@@ -1034,6 +1034,11 @@ def dashboard():
         print(f"ERRO CÁLCULO DASHBOARD: {str(e)}")
         # Em caso de erro, usar valores padrão
         total_veiculos = 0
+        total_custo_real = 0
+        custo_alimentacao_real = 0
+        custo_transporte_real = 0
+        custo_outros_real = 0
+        total_horas_real = 0
         custos_mes = 0
         custos_detalhados = {
             'alimentacao': 0,
