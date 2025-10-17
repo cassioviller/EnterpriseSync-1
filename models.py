@@ -80,6 +80,7 @@ class Funcionario(db.Model):
     email = db.Column(db.String(120))
     data_admissao = db.Column(db.Date, nullable=False)
     salario = db.Column(db.Float, default=0.0)
+    jornada_semanal = db.Column(db.Integer, default=44)
     ativo = db.Column(db.Boolean, default=True)
     foto = db.Column(db.String(255))  # Caminho para o arquivo de foto
     foto_base64 = db.Column(db.Text)  # Foto em base64 para persistência completa

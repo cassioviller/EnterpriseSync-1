@@ -1693,6 +1693,77 @@ def _migration_42_funcionario_obras_ponto():
         logger.error(traceback.format_exc())
 
 
+def _migration_44_adicionar_jornada_semanal():
+    """
+    MIGRAÇÃO 44: Adicionar coluna jornada_semanal à tabela funcionario
+    
+    Contexto:
+    - Commits a0b1611, 2ad22f1, ef4e42b atualizaram código para usar jornada_semanal
+    - Coluna não existe em produção, causando AttributeError
+    - Requerida por: utils.py, views.py, kpis_engine.py, folha_service.py
+    
+    Ação:
+    - Adiciona coluna jornada_semanal INTEGER DEFAULT 44
+    - Valor padrão 44h (jornada CLT padrão)
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("👷 MIGRAÇÃO 44: Adicionar jornada_semanal a funcionario")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se coluna já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'funcionario' 
+            AND column_name = 'jornada_semanal'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("🔧 Adicionando coluna jornada_semanal...")
+            
+            # Adicionar coluna com valor padrão
+            cursor.execute("""
+                ALTER TABLE funcionario 
+                ADD COLUMN jornada_semanal INTEGER DEFAULT 44
+            """)
+            
+            logger.info("✅ Coluna jornada_semanal adicionada (padrão: 44h CLT)")
+            
+            # Atualizar funcionários existentes que tenham NULL
+            cursor.execute("""
+                UPDATE funcionario 
+                SET jornada_semanal = 44 
+                WHERE jornada_semanal IS NULL
+            """)
+            
+            updated_count = cursor.rowcount
+            logger.info(f"✅ {updated_count} funcionários atualizados com jornada padrão 44h")
+        else:
+            logger.info("⏭️  Coluna jornada_semanal já existe - SKIP")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 44 CONCLUÍDA: jornada_semanal adicionada!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 44: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -1729,6 +1800,7 @@ def executar_migracoes():
             (41, "Sistema Financeiro v9.0", _migration_41_sistema_financeiro),
             (42, "Configuração Obras/Funcionário Ponto", _migration_42_funcionario_obras_ponto),
             (43, "Completar estruturas v9.0", _migration_43_completar_estruturas_v9),
+            (44, "Adicionar jornada_semanal a funcionario", _migration_44_adicionar_jornada_semanal),
         ]
         
         # Executar cada migração com rastreamento
