@@ -1,0 +1,344 @@
+# 🎯 PROMPT FINAL - Verificação e Ajustes Finais do Dashboard
+
+**COPIE TODO ESTE CONTEÚDO E COLE NO REPLIT AGENT**
+
+---
+
+## 📋 CONTEXTO ATUAL
+
+Análise do repositório mostra que **MUITAS correções já foram implementadas**:
+
+✅ Campo `jornada_semanal` adicionado ao modelo (linha 83 models.py)
+✅ Migração 44 criada e registrada
+✅ Período padrão corrigido para Jul/2024 (linhas 425, 430 views.py)
+✅ Except não reseta variáveis (linhas 716-724 views.py)
+✅ Fallback de custos implementado (linha 862-884 views.py)
+✅ Sistema de diagnóstico completo do banco (linhas 748-813 views.py)
+✅ Detecção automática de admin_id correto (linhas 819-831 views.py)
+
+**PROBLEMA ATUAL:**
+O código está buscando dados em **Jul/2025** (linha 776, 791, 803) mas os dados estão em **Jul/2024**.
+
+---
+
+## 🎯 CORREÇÕES NECESSÁRIAS
+
+### CORREÇÃO 1: Período de Diagnóstico Incorreto ⚠️ CRÍTICO
+
+**Problema:** Diagnóstico do banco busca Jul/2025, mas dados estão em Jul/2024
+
+**Arquivo:** `views.py`
+**Linhas:** 776, 791, 803
+
+**ANTES (INCORRETO):**
+```python
+# Linha 776
+registros_ponto = db.session.execute(
+    text(f"SELECT COUNT(*) FROM registro_ponto WHERE {coluna_data} >= '2025-07-01' AND {coluna_data} <= '2025-07-31'")  # ❌ 2025!
+).fetchone()
+
+# Linha 791
+custos_veiculo = db.session.execute(
+    text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM custo_veiculo WHERE data_custo >= '2025-07-01' AND data_custo <= '2025-07-31'")  # ❌ 2025!
+).fetchone()
+
+# Linha 803
+alimentacao = db.session.execute(
+    text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM registro_alimentacao WHERE data >= '2025-07-01' AND data <= '2025-07-31'")  # ❌ 2025!
+).fetchone()
+```
+
+**DEPOIS (CORRETO):**
+```python
+# Linha 776 - Usar variáveis data_inicio e data_fim do período selecionado
+registros_ponto = db.session.execute(
+    text(f"SELECT COUNT(*) FROM registro_ponto WHERE {coluna_data} >= :data_inicio AND {coluna_data} <= :data_fim"),
+    {"data_inicio": data_inicio, "data_fim": data_fim}  # ✅ Usar período correto
+).fetchone()
+
+# Linha 791
+custos_veiculo = db.session.execute(
+    text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM custo_veiculo WHERE data_custo >= :data_inicio AND data_custo <= :data_fim"),
+    {"data_inicio": data_inicio, "data_fim": data_fim}  # ✅ Usar período correto
+).fetchone()
+
+# Linha 803
+alimentacao = db.session.execute(
+    text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM registro_alimentacao WHERE data >= :data_inicio AND data >= :data_fim"),
+    {"data_inicio": data_inicio, "data_fim": data_fim}  # ✅ Usar período correto
+).fetchone()
+```
+
+**Impacto:** Diagnóstico mostrará dados reais do período selecionado
+
+---
+
+### CORREÇÃO 2: Adicionar Logs de Período Selecionado
+
+**Problema:** Difícil saber qual período está sendo usado nos logs
+
+**Arquivo:** `views.py`
+**Localização:** Após linha 746
+
+**ADICIONAR:**
+```python
+# Após linha 746 (após print do admin_id)
+print(f"📅 PERÍODO SELECIONADO: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
+print(f"📊 PERÍODO EM DIAS: {(data_fim - data_inicio).days + 1} dias")
+```
+
+**Impacto:** Facilita debug e validação do período correto
+
+---
+
+### CORREÇÃO 3: Verificar e Corrigir Cálculo de Veículos
+
+**Problema:** Código atual não mostra onde veículos são calculados
+
+**Arquivo:** `views.py`
+**Ação:** Buscar e validar cálculo de `total_veiculos`
+
+**ADICIONAR (se não existir):**
+```python
+# Após linha 902 (após cálculos de KPIs)
+
+# ✅ CORREÇÃO 4: Calcular veículos ANTES do render_template
+try:
+    from models import Veiculo
+    total_veiculos = Veiculo.query.filter_by(
+        admin_id=admin_id,
+        ativo=True  # ✅ Apenas veículos ativos
+    ).count()
+    print(f"🚗 DEBUG VEÍCULOS: {total_veiculos} ativos para admin_id={admin_id}")
+except Exception as e:
+    print(f"❌ Erro ao contar veículos: {e}")
+    total_veiculos = 0
+```
+
+**Impacto:** Garante que KPI de veículos funciona
+
+---
+
+### CORREÇÃO 4: Validar Cálculo de Obras Ativas
+
+**Problema:** Código atual não mostra filtro de status de obras
+
+**Arquivo:** `views.py`
+**Ação:** Buscar e validar cálculo de `total_obras`
+
+**VERIFICAR se existe (se não, ADICIONAR):**
+```python
+# Calcular obras ativas (apenas status ativo)
+try:
+    from models import Obra
+    total_obras = Obra.query.filter_by(admin_id=admin_id).filter(
+        Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
+    ).count()
+    print(f"🏗️ DEBUG OBRAS: {total_obras} ativas para admin_id={admin_id}")
+except Exception as e:
+    print(f"❌ Erro ao contar obras: {e}")
+    total_obras = 0
+```
+
+**Impacto:** Garante que KPI de obras funciona corretamente
+
+---
+
+### CORREÇÃO 5: Adicionar Variável de Custos Totais ao Template
+
+**Problema:** Template pode não estar recebendo `custos_mes` calculado
+
+**Arquivo:** `views.py`
+**Localização:** No `render_template` do dashboard
+
+**VERIFICAR se existe:**
+```python
+return render_template(
+    'dashboard.html',
+    # ... outras variáveis ...
+    custos_mes=total_custo_real + custo_alimentacao_real + custo_transporte_real + custo_outros_real,  # ✅ Total de custos
+    custo_mao_obra=total_custo_real,  # ✅ Mão de obra
+    custo_alimentacao=custo_alimentacao_real,  # ✅ Alimentação
+    custo_transporte=custo_transporte_real,  # ✅ Transporte
+    custo_outros=custo_outros_real,  # ✅ Outros
+    total_horas=total_horas_real,  # ✅ Total de horas
+    # ... outras variáveis ...
+)
+```
+
+**Se não existir, ADICIONAR** todas essas variáveis ao render_template
+
+**Impacto:** Garante que template recebe todos os valores calculados
+
+---
+
+## 📋 CHECKLIST DE VALIDAÇÃO
+
+Após implementar as correções, validar:
+
+### ✅ Logs de Debug
+- [ ] Logs mostram período correto (Jul/2024, não Jul/2025)
+- [ ] Logs mostram admin_id correto
+- [ ] Logs mostram quantidade de funcionários encontrados
+- [ ] Logs mostram diagnóstico do banco com dados reais
+
+### ✅ KPIs de Visão Geral
+- [ ] Funcionários Ativos mostra valor > 0
+- [ ] Obras Ativas mostra valor > 0
+- [ ] Veículos mostra valor >= 0
+- [ ] Custos do Período mostra valor > R$ 0.00
+
+### ✅ KPIs de Financeiro
+- [ ] Mão de Obra mostra valor > R$ 0.00
+- [ ] Alimentação mostra valor (pode ser R$ 0.00 se não houver dados)
+- [ ] Transporte mostra valor (pode ser R$ 0.00 se não houver dados)
+- [ ] Outros mostra valor (pode ser R$ 0.00 se não houver dados)
+- [ ] Total está correto (soma de todos)
+
+### ✅ Funcionalidades
+- [ ] Filtros de data funcionam
+- [ ] Mudar período atualiza KPIs
+- [ ] Não há erros no console
+
+---
+
+## 🧪 TESTES RECOMENDADOS
+
+### Teste 1: Período Padrão (Jul/2024)
+```
+Ação: Acessar dashboard SEM selecionar período
+
+Resultado Esperado:
+✅ Logs mostram "📅 PERÍODO SELECIONADO: 01/07/2024 a 31/07/2024"
+✅ Diagnóstico mostra registros encontrados
+✅ KPIs mostram valores reais
+```
+
+### Teste 2: Período Customizado
+```
+Ação: Selecionar período 01/01/2024 a 31/12/2024
+
+Resultado Esperado:
+✅ Logs mostram período correto
+✅ KPIs calculam para TODO o ano
+✅ Fallback estima custos para meses sem registros
+```
+
+### Teste 3: Período Sem Dados
+```
+Ação: Selecionar período 01/10/2025 a 31/10/2025
+
+Resultado Esperado:
+✅ Logs mostram "FALLBACK" para funcionários
+✅ Custos estimados baseados em salários
+✅ Funcionários e Obras ainda mostram totais (independente de período)
+```
+
+---
+
+## 📊 RESUMO DAS CORREÇÕES
+
+| # | Correção | Arquivo | Linhas | Esforço | Prioridade |
+|---|----------|---------|--------|---------|------------|
+| 1 | Período diagnóstico | views.py | 776, 791, 803 | 10min | 🔴 CRÍTICA |
+| 2 | Logs de período | views.py | ~747 | 5min | 🟡 MÉDIA |
+| 3 | Cálculo veículos | views.py | ~903 | 10min | 🟡 MÉDIA |
+| 4 | Cálculo obras | views.py | ~500 | 5min | 🟡 MÉDIA |
+| 5 | Variáveis template | views.py | render_template | 15min | 🔴 ALTA |
+
+**Total:** 5 correções, 45 minutos estimado
+
+---
+
+## 🎯 ORDEM DE IMPLEMENTAÇÃO
+
+### IMEDIATO:
+1. ✅ CORREÇÃO 1 (Período diagnóstico) - CRÍTICA
+2. ✅ CORREÇÃO 5 (Variáveis template) - ALTA
+
+### CURTO PRAZO:
+3. ✅ CORREÇÃO 2 (Logs)
+4. ✅ CORREÇÃO 3 (Veículos)
+5. ✅ CORREÇÃO 4 (Obras)
+
+---
+
+## ⚠️ OBSERVAÇÕES IMPORTANTES
+
+1. **Período Dinâmico:** O código já tem fallback para Jul/2024, mas o ideal é buscar dinamicamente o último período com dados
+
+2. **Diagnóstico:** O sistema de diagnóstico (linhas 748-813) é EXCELENTE para debug, manter ativo
+
+3. **Fallback de Custos:** Implementação atual (linhas 862-884) está CORRETA, calcula TODO o período
+
+4. **Multi-Tenancy:** Detecção automática de admin_id (linhas 819-831) está CORRETA
+
+5. **Rollback:** Sistema de proteção de transação (linha 842) está CORRETO
+
+---
+
+## 💡 MELHORIAS FUTURAS (OPCIONAL)
+
+### Melhoria 1: Busca Dinâmica de Período
+```python
+# Ao invés de hardcoded Jul/2024, buscar último período com dados
+ultimo_registro = RegistroPonto.query.join(Funcionario).filter(
+    Funcionario.admin_id == admin_id
+).order_by(RegistroPonto.data.desc()).first()
+
+if ultimo_registro:
+    import calendar
+    ano = ultimo_registro.data.year
+    mes = ultimo_registro.data.month
+    data_inicio = date(ano, mes, 1)
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_fim = date(ano, mes, ultimo_dia)
+else:
+    # Fallback
+    data_inicio = date(2024, 7, 1)
+    data_fim = date(2024, 7, 31)
+```
+
+### Melhoria 2: Indicador Visual de Fallback
+```python
+# No template, adicionar badge quando dados são estimados
+{% if usando_fallback %}
+    <span class="badge bg-warning">Dados Estimados</span>
+{% endif %}
+```
+
+### Melhoria 3: Cache de KPIs
+```python
+# Cachear KPIs por 5 minutos para melhorar performance
+from flask_caching import Cache
+cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+
+@cache.memoize(timeout=300)
+def calcular_kpis_dashboard(admin_id, data_inicio, data_fim):
+    # ... cálculos ...
+    return kpis_dict
+```
+
+---
+
+**FIM DO PROMPT - COPIE TUDO E COLE NO REPLIT AGENT**
+
+---
+
+## 📝 NOTAS ADICIONAIS
+
+**Estado Atual do Código:** 
+- ✅ 80% das correções críticas já implementadas
+- ⚠️ 20% de ajustes finos necessários
+- 🎯 Foco em período de diagnóstico e variáveis do template
+
+**Próximos Passos:**
+1. Implementar as 5 correções acima
+2. Testar em desenvolvimento
+3. Validar logs de debug
+4. Commit e push
+5. Deploy em produção
+6. Verificar se KPIs aparecem corretamente
+
+**Tempo Estimado Total:** 45 minutos + 30 minutos de testes = 1h 15min
+

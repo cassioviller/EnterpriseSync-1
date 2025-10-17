@@ -22,8 +22,8 @@
     <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js (hospedado localmente) -->
+    <script src="{{ url_for('static', filename='js/vendor/chart.js') }}"></script>
     
     <!-- Custom CSS com cache-busting -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20250918_1">
