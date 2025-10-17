@@ -19,6 +19,7 @@ Data: 04 de Julho de 2025
 """
 
 from datetime import date, datetime, time, timedelta
+from models import (
     Funcionario, RegistroPonto, RegistroAlimentacao, 
     Ocorrencia, TipoOcorrencia, CalendarioUtil, HorarioTrabalho
 )
@@ -40,34 +41,20 @@ def calcular_valor_hora_funcionario(funcionario, data_referencia):
     Returns:
         float: Valor da hora normal do funcionário
     """
+    from utils import calcular_valor_hora_periodo
     from calendar import monthrange
     
     if not funcionario.salario:
         return 0.0
     
-    # Calcular dias úteis reais do mês
+    # Calcular primeiro e último dia do mês de referência
     ano = data_referencia.year
     mes = data_referencia.month
+    primeiro_dia = data_referencia.replace(day=1)
+    ultimo_dia_num = monthrange(ano, mes)[1]
+    ultimo_dia = data_referencia.replace(day=ultimo_dia_num)
     
-    dias_uteis = 0
-    primeiro_dia, ultimo_dia = monthrange(ano, mes)
-    
-    for dia in range(1, ultimo_dia + 1):
-        data_check = data_referencia.replace(day=dia)
-        # 0=segunda, 1=terça, ..., 6=domingo
-        if data_check.weekday() < 5:  # Segunda a sexta
-            dias_uteis += 1
-    
-    # Usar horário específico do funcionário
-    if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
-        horas_diarias = funcionario.horario_trabalho.horas_diarias
-    else:
-        horas_diarias = 8.8  # Padrão baseado no horário Carlos Alberto
-    
-    # Horas mensais = horas/dia × dias úteis do mês
-    horas_mensais = horas_diarias * dias_uteis
-    
-    return funcionario.salario / horas_mensais if horas_mensais > 0 else 0.0
+    return calcular_valor_hora_periodo(funcionario, primeiro_dia, ultimo_dia)
 
 def calcular_valor_horas_extras_funcionario(funcionario, horas_extras, tipo_registro, data_referencia):
     """
@@ -334,8 +321,13 @@ class CalculadoraKPI:
         # 3. Calcular desconto por faltas
         faltas = self._calcular_faltas(funcionario_id, data_inicio, data_fim)
         
-        # Valor por dia baseado nas horas contratuais
-        valor_por_dia = (valor_hora_normal * horas_mensais) / 22  # 22 dias úteis
+        # Valor por dia baseado nas horas contratuais e dias úteis reais
+        import calendar
+        ano = data_inicio.year
+        mes = data_inicio.month
+        dias_uteis = sum(1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1)
+                         if date(ano, mes, dia).weekday() < 5)
+        valor_por_dia = (valor_hora_normal * horas_mensais) / dias_uteis if dias_uteis > 0 else 0
         desconto_faltas = valor_por_dia * faltas
         
         # 4. Custo total = salário base - descontos + extras
@@ -346,7 +338,6 @@ class CalculadoraKPI:
     def _calcular_dias_uteis_mes(self, ano, mes):
         """Calcula dias úteis reais do mês (seg-sex, excluindo feriados)"""
         import calendar
-                from models import OutroCusto
         from datetime import timedelta
         
         primeiro_dia = date(ano, mes, 1)
@@ -503,7 +494,8 @@ class CalculadoraKPI:
         if not funcionario or not funcionario.salario:
             return 0.0
         
-        valor_hora = funcionario.salario / 220  # 220 horas/mês
+        from utils import calcular_valor_hora_periodo
+        valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
         faltas_justificadas = self._calcular_faltas_justificadas(funcionario_id, data_inicio, data_fim)
         
         # Assumir 8 horas por dia de falta justificada
@@ -822,8 +814,9 @@ class CalculadoraKPI:
         if not funcionario or not funcionario.salario:
             return 0.0
         
-        # Valor hora base (padrão 220 horas/mês para simplicidade)
-        valor_hora_base = funcionario.salario / 220
+        # Calcular valor hora baseado no período real
+        from utils import calcular_valor_hora_periodo
+        valor_hora_base = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
         
         # Buscar registros com horas extras e percentuais - SEM FILTRO > 0
         registros = RegistroPonto.query.filter(

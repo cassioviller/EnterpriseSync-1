@@ -12,6 +12,7 @@ from sqlalchemy import func
 from io import BytesIO
 import csv
 import io
+from utils import calcular_valor_hora_periodo
 
 # Criar Blueprint para relatórios
 relatorios_bp = Blueprint('relatorios', __name__)
@@ -132,7 +133,11 @@ def _relatorio_horas_extras(data_inicio, data_fim, obra_id=None, departamento_id
     total_valor = 0
     
     for r in registros:
-        valor_hora = (r.funcionario.salario / 220) * 1.5 if r.funcionario.salario else 0
+        # Calcular valor/hora baseado no período do registro
+        periodo_inicio = r.data
+        periodo_fim = r.data
+        valor_hora_base = calcular_valor_hora_periodo(r.funcionario, periodo_inicio, periodo_fim) if r.funcionario.salario else 0
+        valor_hora = valor_hora_base * 1.5
         valor_extras = r.horas_extras * valor_hora
         total_horas += r.horas_extras
         total_valor += valor_extras

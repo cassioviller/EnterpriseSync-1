@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Dict, Optional
 from sqlalchemy import extract, func
 from models import db, Funcionario, RegistroPonto, ParametrosLegais, ConfiguracaoSalarial, BeneficioFuncionario
+from utils import calcular_valor_hora_periodo
 
 
 # ========================================
@@ -93,13 +94,15 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
         }
 
 
-def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict) -> Decimal:
+def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inicio: date, data_fim: date) -> Decimal:
     """
     Calcula salário bruto considerando tipo de salário e horas extras
     
     Args:
         funcionario: Objeto Funcionario
         horas_info: Dicionário com informações de horas trabalhadas
+        data_inicio: Data de início do período
+        data_fim: Data de fim do período
         
     Returns:
         Decimal: Valor do salário bruto
@@ -125,14 +128,17 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict) -> Decima
         # Calcular de acordo com o tipo
         if tipo_salario == 'HORISTA':
             # Salário = valor hora * horas trabalhadas
-            valor_hora = config.valor_hora if config else (salario_base / 220)
+            if config and config.valor_hora:
+                valor_hora = config.valor_hora
+            else:
+                valor_hora = Decimal(str(calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)))
             salario_normal = valor_hora * Decimal(str(horas_info['total']))
         else:
             # Salário mensal fixo
             salario_normal = salario_base
         
         # Adicionar horas extras (50% de adicional)
-        valor_hora_normal = salario_base / 220
+        valor_hora_normal = Decimal(str(calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)))
         valor_extras = valor_hora_normal * Decimal('1.5') * Decimal(str(horas_info['extras']))
         
         # Descontar faltas (se houver)
@@ -321,11 +327,17 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int) ->
         dict: Dados completos da folha processada
     """
     try:
+        # Calcular datas do período
+        import calendar
+        data_inicio = date(ano, mes, 1)
+        ultimo_dia = calendar.monthrange(ano, mes)[1]
+        data_fim = date(ano, mes, ultimo_dia)
+        
         # 1. Calcular horas do mês
         horas_info = calcular_horas_mes(funcionario.id, ano, mes)
         
         # 2. Calcular salário bruto
-        salario_bruto = calcular_salario_bruto(funcionario, horas_info)
+        salario_bruto = calcular_salario_bruto(funcionario, horas_info, data_inicio, data_fim)
         
         # 3. Calcular descontos
         descontos = calcular_descontos(salario_bruto, funcionario)

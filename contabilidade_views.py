@@ -4,12 +4,26 @@ Views para o Módulo 7 - Sistema Contábil Completo
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
-from models import SpedContabil, DREMensal, BalancoPatrimonial, LancamentoContabil, PlanoContas, BalanceteMensal, AuditoriaContabil
+from models import SpedContabil, DREMensal, BalancoPatrimonial, LancamentoContabil, PlanoContas, BalanceteMensal, AuditoriaContabil, TipoUsuario
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 import calendar
 
 contabilidade_bp = Blueprint('contabilidade', __name__)
+
+def get_admin_id():
+    """
+    Retorna admin_id correto independente do tipo de usuário
+    """
+    if not current_user.is_authenticated:
+        return None
+    
+    if current_user.tipo_usuario == TipoUsuario.ADMIN:
+        return current_user.id
+    elif hasattr(current_user, 'admin_id'):
+        return current_user.admin_id
+    
+    return None
 
 def admin_required(f):
     """Decorator simples para admin - implementação temporária"""
@@ -31,27 +45,32 @@ def dashboard_contabil():
     """Dashboard principal da contabilidade"""
     from contabilidade_utils import calcular_saldo_conta
     
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
     hoje = date.today()
     mes_atual = hoje.replace(day=1)
     
     # Buscar DRE do mês atual
     dre_atual = DREMensal.query.filter_by(
-        admin_id=current_user.id,
+        admin_id=admin_id,
         mes_referencia=mes_atual
     ).first()
     
     # Buscar último balanço
     balanco_atual = BalancoPatrimonial.query.filter_by(
-        admin_id=current_user.id
+        admin_id=admin_id
     ).order_by(BalancoPatrimonial.data_referencia.desc()).first()
     
     # Estatísticas rápidas
-    total_lancamentos = LancamentoContabil.query.filter_by(admin_id=current_user.id).count()
+    total_lancamentos = LancamentoContabil.query.filter_by(admin_id=admin_id).count()
     
     # Saldos principais
-    saldo_caixa = calcular_saldo_conta('1.1.01.001', current_user.id)
-    saldo_bancos = calcular_saldo_conta('1.1.01.002', current_user.id)
-    saldo_clientes = calcular_saldo_conta('1.1.02.001', current_user.id)
+    saldo_caixa = calcular_saldo_conta('1.1.01.001', admin_id)
+    saldo_bancos = calcular_saldo_conta('1.1.01.002', admin_id)
+    saldo_clientes = calcular_saldo_conta('1.1.02.001', admin_id)
     
     return render_template('contabilidade/dashboard.html',
                          dre_atual=dre_atual,
@@ -68,12 +87,17 @@ def plano_de_contas():
     """Exibir plano de contas"""
     from contabilidade_utils import criar_plano_contas_padrao
     
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
     # Criar plano de contas se não existir
-    if not PlanoContas.query.filter_by(admin_id=current_user.id).first():
-        criar_plano_contas_padrao(current_user.id)
+    if not PlanoContas.query.filter_by(admin_id=admin_id).first():
+        criar_plano_contas_padrao(admin_id)
         flash('Plano de contas padrão criado automaticamente.', 'success')
     
-    contas = PlanoContas.query.filter_by(admin_id=current_user.id).order_by(PlanoContas.codigo).all()
+    contas = PlanoContas.query.filter_by(admin_id=admin_id).order_by(PlanoContas.codigo).all()
     
     return render_template('contabilidade/plano_contas.html',
                          contas=contas)
@@ -83,10 +107,15 @@ def plano_de_contas():
 def lancamentos_contabeis():
     """Listar lançamentos contábeis"""
     
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
     page = request.args.get('page', 1, type=int)
     per_page = 20
     
-    lancamentos = LancamentoContabil.query.filter_by(admin_id=current_user.id)\
+    lancamentos = LancamentoContabil.query.filter_by(admin_id=admin_id)\
                                        .order_by(LancamentoContabil.data_lancamento.desc(), 
                                                LancamentoContabil.numero.desc())\
                                        .paginate(page=page, per_page=per_page, error_out=False)
@@ -100,6 +129,11 @@ def balancete():
     """Visualizar balancete mensal"""
     from contabilidade_utils import gerar_balancete_mensal
     
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
     # Obter mês/ano dos parâmetros ou usar atual
     mes = request.args.get('mes', date.today().month, type=int)
     ano = request.args.get('ano', date.today().year, type=int)
@@ -108,19 +142,19 @@ def balancete():
     
     # Gerar balancete se não existir
     balancetes_existentes = BalanceteMensal.query.filter_by(
-        admin_id=current_user.id,
+        admin_id=admin_id,
         mes_referencia=mes_referencia
     ).count()
     
     if balancetes_existentes == 0:
         try:
-            gerar_balancete_mensal(current_user.id, mes_referencia)
+            gerar_balancete_mensal(admin_id, mes_referencia)
             flash('Balancete gerado automaticamente.', 'success')
         except Exception as e:
             flash(f'Erro ao gerar balancete: {str(e)}', 'error')
     
     balancetes = BalanceteMensal.query.filter_by(
-        admin_id=current_user.id,
+        admin_id=admin_id,
         mes_referencia=mes_referencia
     ).join('conta').order_by('PlanoContas.codigo').all()
     
@@ -134,14 +168,19 @@ def dre():
     """Demonstração do Resultado do Exercício"""
     from contabilidade_utils import calcular_dre_mensal
     
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
     mes_atual = date.today().replace(day=1)
     
     # Calcular DRE do mês atual automaticamente
-    dre_atual = calcular_dre_mensal(current_user.id, mes_atual)
+    dre_atual = calcular_dre_mensal(admin_id, mes_atual)
     
     # Buscar histórico de DREs
     dres = DREMensal.query.filter_by(
-        admin_id=current_user.id
+        admin_id=admin_id
     ).order_by(DREMensal.mes_referencia.desc()).limit(12).all()
     
     return render_template('contabilidade/dre.html',
@@ -153,11 +192,16 @@ def dre():
 def balanco_patrimonial():
     """Balanço Patrimonial"""
     
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
     data_ref = request.args.get('data', date.today().isoformat())
     data_referencia = datetime.strptime(data_ref, '%Y-%m-%d').date()
     
     balanco = BalancoPatrimonial.query.filter_by(
-        admin_id=current_user.id,
+        admin_id=admin_id,
         data_referencia=data_referencia
     ).first()
     
@@ -165,7 +209,7 @@ def balanco_patrimonial():
         # Criar balanço básico se não existir
         balanco = BalancoPatrimonial(
             data_referencia=data_referencia,
-            admin_id=current_user.id
+            admin_id=admin_id
         )
         db.session.add(balanco)
         db.session.commit()
@@ -181,17 +225,22 @@ def auditoria_contabil():
     """Sistema de auditoria contábil"""
     from contabilidade_utils import executar_auditoria_automatica
     
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
     # Executar auditoria se solicitado
     if request.args.get('executar') == '1':
         try:
-            alertas = executar_auditoria_automatica(current_user.id)
+            alertas = executar_auditoria_automatica(admin_id)
             flash(f'Auditoria executada. {len(alertas)} alertas encontrados.', 'info')
         except Exception as e:
             flash(f'Erro na auditoria: {str(e)}', 'error')
     
     # Buscar alertas não corrigidos
     alertas = AuditoriaContabil.query.filter_by(
-        admin_id=current_user.id,
+        admin_id=admin_id,
         corrigido=False
     ).order_by(AuditoriaContabil.data_auditoria.desc()).all()
     
@@ -210,7 +259,12 @@ def relatorios():
 def sped():
     """Geração de SPED Contábil"""
     
-    speds = SpedContabil.query.filter_by(admin_id=current_user.id)\
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    speds = SpedContabil.query.filter_by(admin_id=admin_id)\
                              .order_by(SpedContabil.data_geracao.desc()).all()
     
     return render_template('contabilidade/sped.html',
@@ -226,6 +280,10 @@ def processar_integracao():
                                    contabilizar_entrada_material, 
                                    contabilizar_folha_pagamento)
     
+    admin_id = get_admin_id()
+    if not admin_id:
+        return jsonify({'success': False, 'message': 'Erro de autenticação'}), 401
+    
     try:
         data = request.json or {}
         tipo = data.get('tipo')
@@ -237,7 +295,7 @@ def processar_integracao():
             contabilizar_entrada_material(origem_id)
         elif tipo == 'folha_pagamento':
             mes_ref = datetime.strptime(data.get('mes_referencia'), '%Y-%m-%d').date()
-            contabilizar_folha_pagamento(current_user.id, mes_ref)
+            contabilizar_folha_pagamento(admin_id, mes_ref)
         
         return jsonify({'success': True, 'message': 'Integração processada com sucesso'})
     

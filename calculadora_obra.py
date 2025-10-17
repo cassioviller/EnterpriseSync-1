@@ -3,9 +3,11 @@
 
 from datetime import datetime, timedelta
 from sqlalchemy import func
+from models import (
     Obra, RegistroPonto, Funcionario, HorarioTrabalho, 
     CustoVeiculo, RegistroAlimentacao, CustoObra, OutroCusto
 )
+from utils import calcular_valor_hora_periodo
 
 class CalculadoraObra:
     """
@@ -68,8 +70,8 @@ class CalculadoraObra:
         
         horario = funcionario.horario_trabalho
         if not horario:
-            # Fallback para cálculo padrão
-            return funcionario.salario / 220  # 220h padrão
+            # Usar cálculo baseado no período real
+            return calcular_valor_hora_periodo(funcionario, self.data_inicio, self.data_fim)
         
         # Calcular baseado no horário real
         horas_diarias = horario.horas_diarias

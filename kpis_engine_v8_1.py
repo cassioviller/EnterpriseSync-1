@@ -138,33 +138,24 @@ class CalculadoraCusto:
     def __init__(self):
         self.tipos = TiposLancamento()
     
-    def calcular_valor_hora_funcionario(self, funcionario):
-        """Calcula valor/hora baseado no horário específico do funcionário"""
+    def calcular_valor_hora_funcionario(self, funcionario, data_inicio=None, data_fim=None):
+        """Calcula valor/hora baseado no horário específico do funcionário e período real"""
+        from utils import calcular_valor_hora_periodo
+        from datetime import datetime
         
         if funcionario.salario <= 0:
             # Funcionário horista - usar valor do horário
             horario = funcionario.horario_trabalho
             return float(horario.valor_hora) if horario and horario.valor_hora else 15.0
         
-        # Funcionário CLT - calcular valor/hora baseado no salário
-        horario = funcionario.horario_trabalho
-        if not horario:
-            # Padrão: 220h/mês (8h × 22 dias úteis + 20h extras)
-            return float(funcionario.salario) / 220.0
+        # Funcionário CLT - usar cálculo correto baseado em dias úteis reais
+        if not data_inicio:
+            hoje = datetime.now().date()
+            data_inicio = hoje.replace(day=1)
+        if not data_fim:
+            data_fim = datetime.now().date()
         
-        # Cálculo específico por horário de trabalho
-        horas_diarias = float(horario.horas_diarias) if horario.horas_diarias else 8.0
-        
-        # Converter dias_semana em quantidade de dias
-        try:
-            dias_semana = len(horario.dias_semana.split(',')) if horario.dias_semana else 5
-        except:
-            dias_semana = 5  # Padrão segunda a sexta
-        
-        # Considerar 4.33 semanas por mês em média
-        horas_mensais = horas_diarias * dias_semana * 4.33
-        
-        return float(funcionario.salario) / horas_mensais
+        return calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
     
     def calcular_custo_registro(self, funcionario, registro):
         """Calcula custo de um registro específico"""

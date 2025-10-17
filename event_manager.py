@@ -6,6 +6,7 @@ Gerencia comunicação entre módulos via padrão Observer/PubSub
 import logging
 from typing import Callable, Dict, List
 from datetime import datetime
+from utils import calcular_valor_hora_periodo
 
 logger = logging.getLogger(__name__)
 
@@ -188,9 +189,10 @@ def calcular_horas_folha(data: dict, admin_id: int):
             logger.error(f"❌ Funcionário {registro.funcionario_id} não encontrado")
             return
         
-        # Calcular salário por hora (assumindo 220h/mês)
-        salario_mensal = float(funcionario.salario or 0)
-        salario_hora = salario_mensal / 220 if salario_mensal > 0 else 0
+        # Calcular valor/hora baseado no período do registro
+        data_inicio = registro.data
+        data_fim = registro.data
+        salario_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
         
         if salario_hora <= 0:
             logger.warning(f"⚠️ Funcionário {funcionario.nome} sem salário configurado")
