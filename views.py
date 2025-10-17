@@ -528,8 +528,8 @@ def dashboard():
         print(f"DEBUG: {total_funcionarios} funcionários encontrados")
         
         print("DEBUG: Buscando obras...")
-        total_obras = Obra.query.filter_by(admin_id=admin_id).count()
-        print(f"DEBUG: {total_obras} obras encontradas")
+        total_obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).count()
+        print(f"DEBUG: {total_obras} obras ativas encontradas")
         
         # ✅ CORREÇÃO 4: Calcular veículos ANTES dos custos
         print("DEBUG: Buscando veículos...")
@@ -1159,6 +1159,11 @@ def dashboard():
                          obras_ativas=obras_ativas,
                          custos_mes=custos_mes,
                          custos_detalhados=custos_detalhados,
+                         custo_mao_obra=total_custo_real,
+                         custo_alimentacao=custo_alimentacao_real,
+                         custo_transporte=custo_transporte_real,
+                         custo_outros=custo_outros_real,
+                         total_horas=total_horas_real,
                          eficiencia_geral=eficiencia_geral,
                          produtividade_obra=produtividade_obra,
                          funcionarios_ativos=funcionarios_ativos,
