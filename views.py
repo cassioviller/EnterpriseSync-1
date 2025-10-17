@@ -744,6 +744,8 @@ def dashboard():
                 admin_id = funcionarios_admin[0] if funcionarios_admin else 1
             
         print(f"✅ DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
+        print(f"📅 PERÍODO SELECIONADO: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
+        print(f"📊 PERÍODO EM DIAS: {(data_fim - data_inicio).days + 1} dias")
         
         # Verificar estrutura completa do banco para diagnóstico
         try:
@@ -773,9 +775,10 @@ def dashboard():
                 # Usar coluna correta baseada na estrutura real
                 coluna_data = 'data' if 'data' in colunas_str else 'data_registro'
                 registros_ponto = db.session.execute(
-                    text(f"SELECT COUNT(*) FROM registro_ponto WHERE {coluna_data} >= '2025-07-01' AND {coluna_data} <= '2025-07-31'")
+                    text(f"SELECT COUNT(*) FROM registro_ponto WHERE {coluna_data} >= :data_inicio AND {coluna_data} <= :data_fim"),
+                    {"data_inicio": data_inicio, "data_fim": data_fim}
                 ).fetchone()
-                print(f"  ⏰ REGISTROS DE PONTO (Jul/2025): {registros_ponto[0] if registros_ponto else 0}")
+                print(f"  ⏰ REGISTROS DE PONTO ({data_inicio.strftime('%b/%Y')}): {registros_ponto[0] if registros_ponto else 0}")
             except Exception as e:
                 print(f"  ❌ ERRO registros ponto: {e}")
             
@@ -788,9 +791,10 @@ def dashboard():
                 
                 if 'custo_veiculo' in tabelas_str:
                     custos_veiculo = db.session.execute(
-                        text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM custo_veiculo WHERE data_custo >= '2025-07-01' AND data_custo <= '2025-07-31'")
+                        text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM custo_veiculo WHERE data_custo >= :data_inicio AND data_custo <= :data_fim"),
+                        {"data_inicio": data_inicio, "data_fim": data_fim}
                     ).fetchone()
-                    print(f"  🚗 CUSTOS VEÍCULOS (Jul/2025): {custos_veiculo[0] if custos_veiculo else 0} registros, R$ {custos_veiculo[1] if custos_veiculo else 0}")
+                    print(f"  🚗 CUSTOS VEÍCULOS ({data_inicio.strftime('%b/%Y')}): {custos_veiculo[0] if custos_veiculo else 0} registros, R$ {custos_veiculo[1] if custos_veiculo else 0}")
                 else:
                     print(f"  🚗 TABELA custo_veiculo NÃO EXISTE")
             except Exception as e:
@@ -800,9 +804,10 @@ def dashboard():
             try:
                 if 'registro_alimentacao' in tabelas_str:
                     alimentacao = db.session.execute(
-                        text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM registro_alimentacao WHERE data >= '2025-07-01' AND data <= '2025-07-31'")
+                        text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM registro_alimentacao WHERE data >= :data_inicio AND data <= :data_fim"),
+                        {"data_inicio": data_inicio, "data_fim": data_fim}
                     ).fetchone()
-                    print(f"  🍽️ ALIMENTAÇÃO (Jul/2025): {alimentacao[0] if alimentacao else 0} registros, R$ {alimentacao[1] if alimentacao else 0}")
+                    print(f"  🍽️ ALIMENTAÇÃO ({data_inicio.strftime('%b/%Y')}): {alimentacao[0] if alimentacao else 0} registros, R$ {alimentacao[1] if alimentacao else 0}")
                 else:
                     print(f"  🍽️ TABELA registro_alimentacao NÃO EXISTE")
             except Exception as e:
