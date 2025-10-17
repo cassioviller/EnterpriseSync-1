@@ -1764,6 +1764,131 @@ def _migration_44_adicionar_jornada_semanal():
         raise
 
 
+def _migration_45_corrigir_schema_propostas():
+    """
+    MIGRAÇÃO 45: Corrigir schema da tabela propostas_comerciais
+    
+    Problema: Modelo Python usa mapeamento de colunas mas banco não tem os nomes corretos
+    - numero = db.Column('numero_proposta', ...) → banco precisa ter coluna 'numero_proposta'
+    - assunto = db.Column('assunto', ...) → banco precisa ter coluna 'assunto'
+    - objeto = db.Column('objeto', ...) → banco precisa ter coluna 'objeto'
+    
+    Erro em Produção:
+    (psycopg2.errors.UndefinedColumn) column propostas_comerciais.numero_proposta does not exist
+    
+    Solução: Renomear colunas para match com o modelo Python
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🔧 MIGRAÇÃO 45: Corrigir schema propostas_comerciais")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # 1. Renomear 'numero' → 'numero_proposta'
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'numero'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("🔧 Renomeando coluna 'numero' para 'numero_proposta'...")
+            cursor.execute("""
+                ALTER TABLE propostas_comerciais 
+                RENAME COLUMN numero TO numero_proposta
+            """)
+            logger.info("✅ Coluna 'numero_proposta' renomeada com sucesso")
+        else:
+            # Verificar se numero_proposta já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'propostas_comerciais' 
+                AND column_name = 'numero_proposta'
+            """)
+            if cursor.fetchone():
+                logger.info("⏭️  Coluna 'numero_proposta' já existe - SKIP")
+            else:
+                logger.warning("⚠️  Coluna 'numero' não encontrada (esperado se já migrado)")
+        
+        # 2. Renomear 'titulo' → 'assunto' (se existir)
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'titulo'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("🔧 Renomeando coluna 'titulo' para 'assunto'...")
+            cursor.execute("""
+                ALTER TABLE propostas_comerciais 
+                RENAME COLUMN titulo TO assunto
+            """)
+            logger.info("✅ Coluna 'assunto' renomeada com sucesso")
+        else:
+            # Verificar se assunto já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'propostas_comerciais' 
+                AND column_name = 'assunto'
+            """)
+            if cursor.fetchone():
+                logger.info("⏭️  Coluna 'assunto' já existe - SKIP")
+            else:
+                logger.info("ℹ️  Coluna 'titulo' não encontrada (pode já ter sido migrada)")
+        
+        # 3. Renomear 'descricao' → 'objeto' (se existir)
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'descricao'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("🔧 Renomeando coluna 'descricao' para 'objeto'...")
+            cursor.execute("""
+                ALTER TABLE propostas_comerciais 
+                RENAME COLUMN descricao TO objeto
+            """)
+            logger.info("✅ Coluna 'objeto' renomeada com sucesso")
+        else:
+            # Verificar se objeto já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'propostas_comerciais' 
+                AND column_name = 'objeto'
+            """)
+            if cursor.fetchone():
+                logger.info("⏭️  Coluna 'objeto' já existe - SKIP")
+            else:
+                logger.info("ℹ️  Coluna 'descricao' não encontrada (pode já ter sido migrada)")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 45 CONCLUÍDA: Schema de propostas corrigido!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 45: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -1801,6 +1926,7 @@ def executar_migracoes():
             (42, "Configuração Obras/Funcionário Ponto", _migration_42_funcionario_obras_ponto),
             (43, "Completar estruturas v9.0", _migration_43_completar_estruturas_v9),
             (44, "Adicionar jornada_semanal a funcionario", _migration_44_adicionar_jornada_semanal),
+            (45, "Corrigir schema da tabela propostas_comerciais", _migration_45_corrigir_schema_propostas),
         ]
         
         # Executar cada migração com rastreamento

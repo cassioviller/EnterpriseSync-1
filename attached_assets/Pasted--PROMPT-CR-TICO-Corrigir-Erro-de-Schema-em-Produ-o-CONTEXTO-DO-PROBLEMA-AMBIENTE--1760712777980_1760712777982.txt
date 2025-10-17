@@ -1,0 +1,322 @@
+# 🚨 PROMPT CRÍTICO: Corrigir Erro de Schema em Produção
+
+## CONTEXTO DO PROBLEMA
+
+**AMBIENTE:** Produção (Docker/Easypanel + PostgreSQL)  
+**STATUS:** 🔴 CRÍTICO - Dashboard completamente quebrado  
+**ERRO PRINCIPAL:**
+```
+(psycopg2.errors.UndefinedColumn) column propostas_comerciais.numero_proposta does not exist
+```
+
+**CAUSA RAIZ:** O modelo Python usa mapeamento de colunas (`db.Column('numero_proposta', ...)`) mas a migração não criou a coluna com o nome correto no banco de dados PostgreSQL.
+
+---
+
+## ANÁLISE DO PROBLEMA
+
+### Modelo Python (models.py linha 2243):
+```python
+numero = db.Column('numero_proposta', db.String(50), unique=True, nullable=False)
+```
+
+**Significado:** 
+- Atributo Python: `proposta.numero`
+- Coluna no banco: `numero_proposta`
+
+### Erro em Produção:
+```sql
+SELECT propostas_comerciais.numero_proposta AS propostas_comerciais_numero_proposta
+FROM propostas_comerciais
+```
+**Resultado:** `column propostas_comerciais.numero_proposta does not exist`
+
+### Por que funciona em DEV mas não em PROD?
+
+| Ambiente | Banco | Comportamento |
+|----------|-------|---------------|
+| **DEV (Replit)** | SQLite | Cria colunas automaticamente, ignora mapeamentos |
+| **PROD (Easypanel)** | PostgreSQL | **EXIGE schema exato**, falha se coluna não existe |
+
+---
+
+## SOLUÇÃO COMPLETA
+
+### MODIFICAÇÃO 1: Criar Migração 45 - Renomear Colunas de Propostas
+
+**Arquivo:** `migrations.py`  
+**Localização:** Após migração 44 (linha ~1950)
+
+**Adicionar:**
+
+```python
+def _migration_45_corrigir_schema_propostas():
+    """
+    Migração 45: Corrigir schema da tabela propostas_comerciais
+    
+    Problema: Modelo Python usa mapeamento de colunas mas banco não tem os nomes corretos
+    Solução: Renomear colunas para match com o modelo
+    """
+    try:
+        # Verificar se coluna 'numero' existe (nome antigo)
+        result = db.session.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'numero'
+        """))
+        
+        if result.fetchone():
+            print("DEBUG: Renomeando coluna 'numero' para 'numero_proposta'...")
+            db.session.execute(text("""
+                ALTER TABLE propostas_comerciais 
+                RENAME COLUMN numero TO numero_proposta
+            """))
+            db.session.commit()
+            print("✅ Coluna 'numero_proposta' renomeada com sucesso")
+        else:
+            print("DEBUG: Coluna 'numero_proposta' já existe ou 'numero' não encontrada")
+        
+        # Verificar se coluna 'assunto' existe
+        result = db.session.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'titulo'
+        """))
+        
+        if result.fetchone():
+            print("DEBUG: Renomeando coluna 'titulo' para 'assunto'...")
+            db.session.execute(text("""
+                ALTER TABLE propostas_comerciais 
+                RENAME COLUMN titulo TO assunto
+            """))
+            db.session.commit()
+            print("✅ Coluna 'assunto' renomeada com sucesso")
+        
+        # Verificar se coluna 'objeto' existe
+        result = db.session.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'propostas_comerciais' 
+            AND column_name = 'descricao'
+        """))
+        
+        if result.fetchone():
+            print("DEBUG: Renomeando coluna 'descricao' para 'objeto'...")
+            db.session.execute(text("""
+                ALTER TABLE propostas_comerciais 
+                RENAME COLUMN descricao TO objeto
+            """))
+            db.session.commit()
+            print("✅ Coluna 'objeto' renomeada com sucesso")
+        
+        print("✅ Migração 45 concluída: Schema de propostas corrigido")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erro na migração 45: {str(e)}")
+        db.session.rollback()
+        return False
+```
+
+### MODIFICAÇÃO 2: Registrar Migração 45
+
+**Arquivo:** `migrations.py`  
+**Localização:** Lista `migrations_to_run` (linha ~1970)
+
+**Adicionar:**
+
+```python
+migrations_to_run = [
+    # ... migrações existentes ...
+    (44, "Adicionar jornada_semanal a funcionario", _migration_44_adicionar_jornada_semanal),
+    (45, "Corrigir schema da tabela propostas_comerciais", _migration_45_corrigir_schema_propostas),  # ✅ ADICIONAR
+]
+```
+
+---
+
+## MODIFICAÇÃO 3: Adicionar Imports Necessários
+
+**Arquivo:** `migrations.py`  
+**Localização:** Topo do arquivo (linha ~5)
+
+**Verificar se existe:**
+
+```python
+from sqlalchemy import text
+```
+
+**Se NÃO existir, adicionar:**
+
+```python
+from sqlalchemy import text, inspect
+```
+
+---
+
+## VALIDAÇÃO
+
+### Teste 1: Verificar Migração em DEV
+
+```bash
+# No Replit, executar:
+python3.11 pre_start.py
+```
+
+**Resultado Esperado:**
+```
+DEBUG: Executando migração 45: Corrigir schema da tabela propostas_comerciais
+DEBUG: Renomeando coluna 'numero' para 'numero_proposta'...
+✅ Coluna 'numero_proposta' renomeada com sucesso
+✅ Migração 45 concluída: Schema de propostas corrigido
+```
+
+### Teste 2: Verificar Schema no Banco
+
+```sql
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'propostas_comerciais' 
+AND column_name IN ('numero_proposta', 'assunto', 'objeto');
+```
+
+**Resultado Esperado:**
+```
+ column_name      | data_type
+------------------+-----------
+ numero_proposta  | character varying
+ assunto          | character varying
+ objeto           | text
+```
+
+### Teste 3: Dashboard em Produção
+
+Após deploy, acessar dashboard e verificar:
+
+- ✅ Seção "Propostas Comerciais" carrega sem erro
+- ✅ KPIs de propostas aparecem (Taxa de Conversão, Valor Médio, etc)
+- ✅ Logs não mostram mais `UndefinedColumn`
+
+---
+
+## DEPLOY EM PRODUÇÃO
+
+### Passo 1: Commit e Push
+
+```bash
+git add migrations.py
+git commit -m "fix: Add migration 45 to fix propostas_comerciais schema
+
+- Rename 'numero' to 'numero_proposta'
+- Rename 'titulo' to 'assunto'  
+- Rename 'descricao' to 'objeto'
+- Fixes UndefinedColumn error in production dashboard"
+
+git push origin main
+```
+
+### Passo 2: Deploy no Easypanel
+
+O Easypanel vai:
+1. ✅ Build da imagem Docker
+2. ✅ Executar `docker-entrypoint.sh`
+3. ✅ Executar `pre_start.py`
+4. ✅ Aplicar migração 45 automaticamente
+5. ✅ Iniciar Gunicorn
+
+### Passo 3: Verificar Logs
+
+```bash
+# No Easypanel, acessar logs do container
+docker logs <container_name> --tail 100
+```
+
+**Procurar por:**
+```
+✅ Migração 45 concluída: Schema de propostas corrigido
+✅ DASHBOARD: Iniciando cálculos do dashboard...
+✅ DASHBOARD: 21 funcionários encontrados
+✅ DASHBOARD: 21 obras ativas encontradas
+✅ DASHBOARD: Calculando métricas de propostas...
+```
+
+---
+
+## TROUBLESHOOTING
+
+### Problema 1: "column already exists"
+
+**Causa:** Migração já foi executada parcialmente  
+**Solução:** A migração é idempotente, vai detectar e pular
+
+### Problema 2: "relation propostas_comerciais does not exist"
+
+**Causa:** Tabela não foi criada  
+**Solução:** Verificar se migração anterior que cria a tabela foi executada
+
+### Problema 3: Dashboard ainda mostra erro
+
+**Causa:** Cache do navegador ou sessão antiga  
+**Solução:**
+1. Fazer logout
+2. Limpar cache do navegador
+3. Fazer login novamente
+4. Reiniciar container se necessário
+
+---
+
+## CHECKLIST DE IMPLEMENTAÇÃO
+
+- [ ] Adicionar função `_migration_45_corrigir_schema_propostas()` em migrations.py
+- [ ] Registrar migração 45 na lista `migrations_to_run`
+- [ ] Verificar import de `text` do sqlalchemy
+- [ ] Testar em desenvolvimento (Replit)
+- [ ] Verificar schema no banco de dados
+- [ ] Commit e push para GitHub
+- [ ] Deploy em produção (Easypanel)
+- [ ] Verificar logs de deploy
+- [ ] Acessar dashboard e confirmar que funciona
+- [ ] Verificar KPIs de propostas aparecem
+
+---
+
+## IMPACTO ESPERADO
+
+### ANTES:
+```
+❌ Dashboard quebrado em produção
+❌ Erro: UndefinedColumn numero_proposta
+❌ Transação abortada
+❌ Nenhuma KPI funciona
+```
+
+### DEPOIS:
+```
+✅ Dashboard carrega completamente
+✅ Todas as KPIs funcionam
+✅ Propostas Comerciais exibe dados
+✅ Sem erros nos logs
+```
+
+---
+
+## PRIORIDADE
+
+🔴 **CRÍTICA** - Sistema quebrado em produção
+
+**Tempo Estimado:** 30 minutos (implementação + deploy + validação)
+
+---
+
+## OBSERVAÇÃO IMPORTANTE
+
+Esta migração é **segura** e **idempotente**:
+- ✅ Verifica se coluna existe antes de renomear
+- ✅ Não perde dados (apenas renomeia)
+- ✅ Pode ser executada múltiplas vezes
+- ✅ Rollback automático em caso de erro
+
+Após esta correção, o dashboard deve funcionar 100% em produção! 🎯
+

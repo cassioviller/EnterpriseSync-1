@@ -17,6 +17,10 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Links RDO devem apontar para rota moderna `/funcionario/rdo/consolidado` com funcionalidades completas
 - Ambiente de produção com 80 tabelas deve ser preservado durante migrações
 
+## Recent Changes
+- **2025-10-17:** CRITICAL SCHEMA FIX - Migração 45 para Propostas Comerciais - Implementada correção de schema para resolver erro `psycopg2.errors.UndefinedColumn: column propostas_comerciais.numero_proposta does not exist` em produção PostgreSQL. Problema: modelo Python usa mapeamento de colunas (`numero = db.Column('numero_proposta', ...)`) mas banco não tinha nomes corretos. Solução: Migração 45 renomeia colunas automaticamente: (1) `numero` → `numero_proposta`, (2) `titulo` → `assunto`, (3) `descricao` → `objeto`. Migração é idempotente (verifica existência antes de renomear), segura (não perde dados), e executará automaticamente em deploy. Fixes dashboard quebrado em produção devido a queries SQLAlchemy incompatíveis com schema PostgreSQL real.
+- **2025-10-17:** PRODUCTION DEPLOYMENT FIX - Chart.js Local + UnboundLocalError - Resolvidos 2 problemas críticos: (1) Chart.js v4.4.0 hospedado localmente em /static/js/vendor/ - CDN bloqueado em produção, (2) UnboundLocalError corrigido adicionando variáveis de fallback ao except block (total_custo_real, custo_alimentacao_real, custo_transporte_real, custo_outros_real, total_horas_real). Dashboard validado com KPIs corretos (Mão de Obra R$193.273,61, Alimentação R$1.107,36, Total R$195.630,97). Architect-reviewed: PASS.
+
 ## System Architecture
 The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQL database. Jinja2 is used for templating, and Bootstrap for frontend styling. Docker is used for deployment. A unified `base_completo.html` template ensures consistent UI/UX across the application. Critical database operations are protected by a `safe_db_operation` function to ensure data integrity.
 
