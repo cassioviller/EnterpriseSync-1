@@ -8,7 +8,7 @@ from flask import Blueprint, request, jsonify, render_template, redirect, url_fo
 from flask_login import login_required, current_user
 from models import db, ServicoObraReal, Obra, Servico, Funcionario
 from datetime import datetime, date
-from utils.helpers import get_admin_id_robusta
+from multitenant_helper import get_admin_id
 from sqlalchemy import and_, or_
 import logging
 
@@ -24,7 +24,7 @@ servico_obra_real_bp = Blueprint('servico_obra_real', __name__)
 def listar_servicos_reais(obra_id):
     """Lista todos os serviços reais vinculados à obra"""
     try:
-        admin_id = get_admin_id_robusta()
+        admin_id = get_admin_id()
         
         # Verificar se a obra pertence ao admin
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
@@ -59,7 +59,7 @@ def listar_servicos_reais(obra_id):
 def novo_servico_real(obra_id):
     """Adiciona novo serviço real à obra"""
     try:
-        admin_id = get_admin_id_robusta()
+        admin_id = get_admin_id()
         
         # Verificar se a obra pertence ao admin
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
@@ -141,7 +141,7 @@ def novo_servico_real(obra_id):
 def atualizar_progresso(servico_real_id):
     """Atualiza o progresso do serviço real"""
     try:
-        admin_id = get_admin_id_robusta()
+        admin_id = get_admin_id()
         
         servico_real = ServicoObraReal.query.filter_by(
             id=servico_real_id,
@@ -200,7 +200,7 @@ def atualizar_progresso(servico_real_id):
 def aprovar_servico(servico_real_id):
     """Aprova um serviço real concluído"""
     try:
-        admin_id = get_admin_id_robusta()
+        admin_id = get_admin_id()
         
         servico_real = ServicoObraReal.query.filter_by(
             id=servico_real_id,
@@ -231,7 +231,7 @@ def aprovar_servico(servico_real_id):
 def api_servicos_reais(obra_id):
     """API para buscar serviços reais da obra"""
     try:
-        admin_id = get_admin_id_robusta()
+        admin_id = get_admin_id()
         
         servicos_reais = db.session.query(ServicoObraReal, Servico).join(
             Servico, ServicoObraReal.servico_id == Servico.id
