@@ -1,0 +1,481 @@
+# 🎯 PROMPT PARA REPLIT AGENT - Correção Completa do Dashboard
+
+**COPIE TODO ESTE CONTEÚDO E COLE NO REPLIT AGENT**
+
+---
+
+## 📋 CONTEXTO
+
+Baseado no **Relatório Técnico de Diagnóstico** gerado anteriormente, foram identificados 14 problemas no dashboard, todos com causa raiz mapeada.
+
+**Problema Principal:**
+- Dashboard usa período **Outubro/2025** (sem dados)
+- Dados reais estão em **Julho/2024**
+- Bloco `except` reseta variáveis já calculadas corretamente
+
+---
+
+## 🎯 OBJETIVO
+
+Implementar **TODAS as 14 correções** identificadas no relatório, priorizadas em 3 fases.
+
+---
+
+## ✅ FASE 1 - CRÍTICO (1 hora) - 4 Correções
+
+### CORREÇÃO 1: Período de Data Padrão (MAIS CRÍTICA)
+
+**Problema:** Dashboard usa mês atual (Out/2025) sem dados, deveria usar Jul/2024
+
+**Arquivo:** `views.py`  
+**Linhas:** 423-430
+
+**ANTES (INCORRETO):**
+```python
+if data_inicio_param:
+    data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
+else:
+    hoje = date.today()
+    data_inicio = date(hoje.year, hoje.month, 1)  # ❌ Mês atual (Out/2025)
+    
+if data_fim_param:
+    data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
+else:
+    data_fim = date.today()  # ❌ Hoje (Out/2025)
+```
+
+**DEPOIS (CORRETO):**
+```python
+if data_inicio_param:
+    data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
+else:
+    # ✅ Buscar dinamicamente o período com mais dados
+    # Opção 1: Usar período fixo com dados conhecidos
+    data_inicio = date(2024, 7, 1)  # Julho/2024 (onde estão os dados)
+    
+    # Opção 2 (RECOMENDADA): Buscar dinamicamente
+    # ultimo_registro = RegistroPonto.query.filter(
+    #     RegistroPonto.funcionario.has(admin_id=admin_id)
+    # ).order_by(RegistroPonto.data.desc()).first()
+    # if ultimo_registro:
+    #     data_inicio = date(ultimo_registro.data.year, ultimo_registro.data.month, 1)
+    # else:
+    #     data_inicio = date(2024, 7, 1)  # Fallback
+    
+if data_fim_param:
+    data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
+else:
+    # ✅ Final do mês com dados
+    data_fim = date(2024, 7, 31)
+    
+    # Opção 2 (RECOMENDADA): Buscar dinamicamente
+    # if ultimo_registro:
+    #     import calendar
+    #     ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
+    #     data_fim = date(data_inicio.year, data_inicio.month, ultimo_dia)
+    # else:
+    #     data_fim = date(2024, 7, 31)  # Fallback
+```
+
+**Impacto:** Resolve 6 KPIs (Custos, Mão de Obra, Alimentação, Transporte, Outros, Faltas)
+
+---
+
+### CORREÇÃO 2: Adicionar Fallback de Custos
+
+**Problema:** Quando não há registros de ponto, custo fica R$ 0.00 (deveria estimar pelo salário)
+
+**Arquivo:** `views.py`  
+**Localização:** Após linha 796 (dentro do loop de funcionários)
+
+**ADICIONAR:**
+```python
+        # Após o bloco que calcula custos com registros de ponto (linha ~796)
+        
+        # ✅ FALLBACK: Se não há registros, estimar custo baseado no salário
+        if len(registros) == 0 and func.salario:
+            import calendar
+            
+            # Calcular dias úteis do período
+            mes = data_inicio.month
+            ano = data_inicio.year
+            dias_uteis = sum(
+                1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1) 
+                if date(ano, mes, dia).weekday() < 5
+            )
+            
+            # Estimar horas baseado na jornada
+            horas_por_dia = (func.jornada_semanal / 5) if func.jornada_semanal else 8
+            horas_estimadas = dias_uteis * horas_por_dia
+            
+            # Calcular valor/hora correto
+            from utils import calcular_valor_hora_periodo
+            valor_hora = calcular_valor_hora_periodo(func, data_inicio, data_fim)
+            
+            # Adicionar aos totais
+            total_custo_real += func.salario  # Custo = salário mensal
+            total_horas_real += horas_estimadas
+            
+            print(f"  ⚠️  FALLBACK: {func.nome} - Sem registros, estimado R$ {func.salario:.2f}")
+```
+
+**Impacto:** Garante que custos sejam calculados mesmo sem registros de ponto
+
+---
+
+### CORREÇÃO 3: Não Resetar Variáveis no Except
+
+**Problema:** Bloco `except` reseta TODAS as variáveis para 0, perdendo valores já calculados
+
+**Arquivo:** `views.py`  
+**Linhas:** 639-646
+
+**ANTES (INCORRETO):**
+```python
+except Exception as e:
+    print(f"ERRO NO DASHBOARD: {str(e)}")
+    import traceback
+    traceback.print_exc()
+    
+    # ❌ RESETA TUDO PARA 0!
+    total_funcionarios = 0
+    total_obras = 0
+    total_veiculos = 5
+    funcionarios_recentes = []
+    obras_ativas = []
+```
+
+**DEPOIS (CORRETO):**
+```python
+except Exception as e:
+    print(f"ERRO NO DASHBOARD: {str(e)}")
+    import traceback
+    traceback.print_exc()
+    
+    # ✅ Só inicializar se variável não existir
+    if 'total_funcionarios' not in locals():
+        total_funcionarios = 0
+    if 'total_obras' not in locals():
+        total_obras = 0
+    if 'total_veiculos' not in locals():
+        total_veiculos = 0
+    if 'funcionarios_recentes' not in locals():
+        funcionarios_recentes = []
+    if 'obras_ativas' not in locals():
+        obras_ativas = []
+```
+
+**Impacto:** Resolve 5 KPIs (Funcionários Ativos, Obras Ativas, Funcionários Recentes, Obras Ativas lista)
+
+---
+
+### CORREÇÃO 4: Mover Cálculo de Veículos
+
+**Problema:** Veículos calculados tarde demais (linha 914), após custos que podem falhar
+
+**Arquivo:** `views.py`  
+**Ação:** MOVER de linha 914 para após linha 505
+
+**REMOVER das linhas 914-918:**
+```python
+# ❌ REMOVER DAQUI
+try:
+    from models import Veiculo
+    total_veiculos = Veiculo.query.filter_by(admin_id=admin_id).count()
+except Exception as e:
+    total_veiculos = 5  # Fallback
+```
+
+**ADICIONAR após linha 505 (junto com funcionários e obras):**
+```python
+# Após linha 505 (após calcular total_obras)
+
+# ✅ Calcular veículos ANTES dos custos
+try:
+    from models import Veiculo
+    total_veiculos = Veiculo.query.filter_by(
+        admin_id=admin_id, 
+        ativo=True  # ✅ Adicionar filtro de ativo
+    ).count()
+    print(f"DEBUG VEÍCULOS: {total_veiculos} ativos para admin_id={admin_id}")
+except Exception as e:
+    print(f"Erro ao contar veículos: {e}")
+    total_veiculos = 0
+```
+
+**Impacto:** Resolve 1 KPI (Veículos)
+
+---
+
+## ✅ FASE 2 - ALTO (45 minutos) - 3 Correções
+
+### CORREÇÃO 5: Funcionários por Departamento
+
+**Problema:** Gráfico não aparece - template pode estar usando variável incorreta
+
+**Arquivo:** `views.py`  
+**Linhas:** 1058-1060
+
+**Verificar se ambas as variáveis estão sendo passadas:**
+```python
+# Linha ~1058 - render_template
+return render_template(
+    'dashboard.html',
+    # ... outras variáveis ...
+    funcionarios_por_departamento=funcionarios_por_departamento,  # dict
+    funcionarios_dept=funcionarios_dept,  # list ✅ Template deve usar esta
+    # ... outras variáveis ...
+)
+```
+
+**Se `funcionarios_dept` não existir, criar:**
+```python
+# Antes do render_template (linha ~1028)
+
+# ✅ Converter dict para lista (formato esperado pelo template)
+if isinstance(funcionarios_por_departamento, dict):
+    funcionarios_dept = [
+        {'nome': dept, 'total': count} 
+        for dept, count in funcionarios_por_departamento.items()
+    ]
+else:
+    funcionarios_dept = []
+
+print(f"DEBUG FINAL - Funcionários por dept (lista): {funcionarios_dept}")
+```
+
+**Impacto:** Resolve 1 KPI (Funcionários por Departamento)
+
+---
+
+### CORREÇÃO 6: Filtro de Período em Propostas
+
+**Problema:** Taxa de conversão e valor médio calculados SEM filtro de período
+
+**Arquivo:** `views.py`  
+**Linhas:** 512-573
+
+**ANTES (INCORRETO):**
+```python
+# Linha ~514
+propostas_aprovadas = Proposta.query.filter_by(
+    admin_id=admin_id, 
+    status='aprovada'
+).count()  # ❌ Sem filtro de período
+
+propostas_enviadas = Proposta.query.filter_by(
+    admin_id=admin_id, 
+    status='enviada'
+).count()  # ❌ Sem filtro de período
+```
+
+**DEPOIS (CORRETO):**
+```python
+# ✅ Adicionar filtro de período
+from models import PropostaComercial as Proposta
+
+propostas_aprovadas = Proposta.query.filter(
+    Proposta.admin_id == admin_id,
+    Proposta.status == 'aprovada',
+    Proposta.data_proposta >= data_inicio,  # ✅ Filtro de período
+    Proposta.data_proposta <= data_fim
+).count()
+
+propostas_enviadas = Proposta.query.filter(
+    Proposta.admin_id == admin_id,
+    Proposta.status == 'enviada',
+    Proposta.data_proposta >= data_inicio,  # ✅ Filtro de período
+    Proposta.data_proposta <= data_fim
+).count()
+```
+
+**Impacto:** Resolve 1 KPI (Taxa de Conversão)
+
+---
+
+### CORREÇÃO 7: Valor Médio de Propostas
+
+**Problema:** Propostas sem `valor_total` preenchido resultam em média R$ 0.00
+
+**Arquivo:** `views.py`  
+**Linhas:** 536-541
+
+**ANTES (INCORRETO):**
+```python
+valor_medio_result = db.session.query(sql_func.avg(Proposta.valor_total)).filter_by(
+    admin_id=admin_id, 
+    status='aprovada'
+).scalar()  # ❌ Inclui propostas com valor NULL ou 0
+valor_medio = float(valor_medio_result or 0)
+```
+
+**DEPOIS (CORRETO):**
+```python
+# ✅ Filtrar apenas propostas com valor válido
+valor_medio_result = db.session.query(sql_func.avg(Proposta.valor_total)).filter(
+    Proposta.admin_id == admin_id,
+    Proposta.status == 'aprovada',
+    Proposta.valor_total.isnot(None),  # ✅ Ignorar NULL
+    Proposta.valor_total > 0,  # ✅ Ignorar zero
+    Proposta.data_proposta >= data_inicio,  # ✅ Filtro de período
+    Proposta.data_proposta <= data_fim
+).scalar()
+valor_medio = float(valor_medio_result or 0)
+```
+
+**Impacto:** Resolve 1 KPI (Valor Médio de Propostas)
+
+---
+
+## ✅ FASE 3 - MÉDIO (30 minutos) - 2 Correções
+
+### CORREÇÃO 8: Funcionários Recentes e Obras Ativas (lista)
+
+**Problema:** Mesma causa do KPI 1.1 - resetados no except
+
+**Já resolvido pela CORREÇÃO 3** (não resetar variáveis no except)
+
+**Validar que as variáveis estão sendo calculadas:**
+```python
+# Linha ~595
+funcionarios_recentes = Funcionario.query.filter_by(
+    admin_id=admin_id, ativo=True
+).order_by(Funcionario.created_at.desc()).limit(5).all()
+
+# Linha ~602
+obras_ativas = Obra.query.filter_by(
+    admin_id=admin_id
+).filter(
+    Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
+).order_by(Obra.created_at.desc()).limit(5).all()
+```
+
+**Impacto:** Resolve 2 KPIs (Funcionários Recentes, Progresso de Obras)
+
+---
+
+## 📋 CHECKLIST DE VALIDAÇÃO
+
+Após implementar TODAS as correções, validar:
+
+### ✅ Visão Geral
+- [ ] Funcionários Ativos mostra **47** (não 0)
+- [ ] Obras Ativas mostra **39** (não 0)
+- [ ] Veículos mostra **1+** (não 0)
+- [ ] Custos do Período mostra **R$ 60.925,64** (não R$ 0.00)
+
+### ✅ Financeiro e Custos
+- [ ] Mão de Obra mostra **R$ 60.925,64** (não R$ 0.00)
+- [ ] Alimentação mostra valor correto (não R$ 0.00)
+- [ ] Transporte mostra valor correto (não R$ 0.00)
+- [ ] Outros mostra valor correto (não R$ 0.00)
+- [ ] Total está correto
+
+### ✅ Recursos Humanos
+- [ ] Gráfico de Funcionários por Departamento **aparece**
+- [ ] Lista de Funcionários Recentes **aparece** (5 itens)
+
+### ✅ Obras e RDO
+- [ ] Progresso de Obras **aparece** (5 itens)
+
+### ✅ Propostas Comerciais
+- [ ] Taxa de Conversão está correta
+- [ ] Valor Médio está correto (não R$ 0.00)
+
+### ✅ Funcionalidades Gerais
+- [ ] Filtros de data funcionam corretamente
+- [ ] Mudar período atualiza todos os KPIs
+- [ ] Não há erros no console do navegador
+- [ ] Logs não mostram `AttributeError` ou outros erros
+
+---
+
+## 🧪 TESTES RECOMENDADOS
+
+### Teste 1: Período com Dados (Julho/2024)
+```
+Data Início: 01/07/2024
+Data Fim: 31/07/2024
+
+Resultado Esperado:
+✅ Todos os KPIs mostram valores reais
+✅ Custos: R$ 60.925,64
+✅ Funcionários: 47
+✅ Obras: 39
+```
+
+### Teste 2: Período sem Dados (Outubro/2025)
+```
+Data Início: 01/10/2025
+Data Fim: 31/10/2025
+
+Resultado Esperado:
+✅ Custos estimados via fallback (salários)
+✅ Funcionários: 47 (independente de período)
+✅ Obras: 39 (independente de período)
+⚠️  Indicador visual de "dados estimados"
+```
+
+### Teste 3: Sem Filtro (padrão)
+```
+Sem selecionar período
+
+Resultado Esperado:
+✅ Usa Julho/2024 automaticamente
+✅ Todos os KPIs funcionam
+```
+
+---
+
+## 📊 RESUMO DAS CORREÇÕES
+
+| # | Correção | Arquivo | Linhas | Esforço | Fase |
+|---|----------|---------|--------|---------|------|
+| 1 | Período padrão Julho/2024 | views.py | 423-430 | 30min | 1 |
+| 2 | Fallback de custos | views.py | ~796 | 15min | 1 |
+| 3 | Não resetar no except | views.py | 639-646 | 15min | 1 |
+| 4 | Mover cálculo veículos | views.py | 505, 914 | 10min | 1 |
+| 5 | Funcionários por dept | views.py | 1028, 1058 | 20min | 2 |
+| 6 | Filtro período propostas | views.py | 512-573 | 15min | 2 |
+| 7 | Valor médio propostas | views.py | 536-541 | 10min | 2 |
+| 8 | Validar recentes/obras | views.py | 595, 602 | 0min | 3 |
+
+**Total:** 8 correções, 2h 15min estimado
+
+---
+
+## 🎯 PRIORIDADE DE IMPLEMENTAÇÃO
+
+### IMEDIATO (HOJE):
+1. ✅ CORREÇÃO 1 (Período)
+2. ✅ CORREÇÃO 2 (Fallback)
+3. ✅ CORREÇÃO 3 (Except)
+4. ✅ CORREÇÃO 4 (Veículos)
+
+### CURTO PRAZO (ESTA SEMANA):
+5. ✅ CORREÇÃO 5 (Departamentos)
+6. ✅ CORREÇÃO 6 (Propostas período)
+7. ✅ CORREÇÃO 7 (Valor médio)
+
+### VALIDAÇÃO:
+8. ✅ CORREÇÃO 8 (já resolvida pela 3)
+9. ✅ Testes completos
+
+---
+
+## ⚠️ OBSERVAÇÕES IMPORTANTES
+
+1. **Período Dinâmico (Recomendado):** Implementar busca automática do período com mais dados ao invés de hardcoded Julho/2024
+
+2. **Indicador Visual:** Adicionar badge "Dados Estimados" quando usar fallback
+
+3. **Logging:** Manter os prints de debug para facilitar troubleshooting
+
+4. **Multi-Tenancy:** Todas as queries já estão corretas com `admin_id`, não mexer
+
+5. **Compatibilidade:** Testar em DEV antes de fazer deploy em produção
+
+---
+
+**FIM DO PROMPT - COPIE TUDO E COLE NO REPLIT AGENT**
+

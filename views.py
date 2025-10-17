@@ -421,13 +421,13 @@ def dashboard():
     if data_inicio_param:
         data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
     else:
-        hoje = date.today()
-        data_inicio = date(hoje.year, hoje.month, 1)
+        # Período será determinado depois que admin_id for identificado
+        data_inicio = date(2024, 7, 1)  # Fallback temporário
         
     if data_fim_param:
         data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
     else:
-        data_fim = date.today()
+        data_fim = date(2024, 7, 31)  # Fallback temporário
     
     # REDIRECIONAMENTO BASEADO NO TIPO DE USUÁRIO
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
@@ -495,6 +495,33 @@ def dashboard():
                 print(f"❌ Erro ao detectar admin_id automaticamente: {e}")
                 admin_id = 1  # Fallback absoluto
         
+        # ✅ CORREÇÃO: Determinar período com dados APÓS admin_id estar definido
+        if not data_inicio_param:
+            try:
+                # Buscar último registro de ponto DO ADMIN específico (multi-tenant seguro)
+                ultimo_registro = db.session.execute(
+                    text("SELECT MAX(rp.data) FROM registro_ponto rp JOIN funcionario f ON rp.funcionario_id = f.id WHERE f.admin_id = :admin_id"),
+                    {"admin_id": admin_id}
+                ).scalar()
+                
+                if ultimo_registro:
+                    # Usar o mês do último registro
+                    data_inicio = date(ultimo_registro.year, ultimo_registro.month, 1)
+                    print(f"✅ PERÍODO DINÂMICO (TENANT {admin_id}): {data_inicio} (último registro: {ultimo_registro})")
+                else:
+                    # Fallback para período conhecido com dados
+                    data_inicio = date(2024, 7, 1)
+                    print(f"✅ PERÍODO FALLBACK: Julho/2024 (sem registros para admin_id={admin_id})")
+            except Exception as e:
+                print(f"⚠️ Erro ao buscar período dinâmico: {e}")
+                data_inicio = date(2024, 7, 1)
+                
+        if not data_fim_param:
+            import calendar
+            ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
+            data_fim = date(data_inicio.year, data_inicio.month, ultimo_dia)
+            print(f"✅ PERÍODO FIM: {data_fim}")
+        
         # Estatísticas básicas
         print("DEBUG: Buscando funcionários...")
         total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
@@ -504,17 +531,50 @@ def dashboard():
         total_obras = Obra.query.filter_by(admin_id=admin_id).count()
         print(f"DEBUG: {total_obras} obras encontradas")
         
+        # ✅ CORREÇÃO 4: Calcular veículos ANTES dos custos
+        print("DEBUG: Buscando veículos...")
+        try:
+            from models import Veiculo
+            total_veiculos = Veiculo.query.filter_by(
+                admin_id=admin_id, 
+                ativo=True
+            ).count()
+            print(f"DEBUG: {total_veiculos} veículos ativos para admin_id={admin_id}")
+        except Exception as e:
+            print(f"Erro ao contar veículos: {e}")
+            total_veiculos = 0
+        
         # ========== MÉTRICAS DE PROPOSTAS DINÂMICAS ==========
         from models import Proposta, PropostaTemplate, PropostaHistorico
         # datetime já importado no topo do arquivo
         
         try:
-            # 1. PROPOSTAS POR STATUS
+            # 1. PROPOSTAS POR STATUS (✅ CORREÇÃO 6: Adicionado filtro de período)
             print("DEBUG: Calculando métricas de propostas...")
-            propostas_aprovadas = Proposta.query.filter_by(admin_id=admin_id, status='aprovada').count()
-            propostas_enviadas = Proposta.query.filter_by(admin_id=admin_id, status='enviada').count()
-            propostas_rascunho = Proposta.query.filter_by(admin_id=admin_id, status='rascunho').count()
-            propostas_rejeitadas = Proposta.query.filter_by(admin_id=admin_id, status='rejeitada').count()
+            propostas_aprovadas = Proposta.query.filter(
+                Proposta.admin_id == admin_id,
+                Proposta.status == 'aprovada',
+                Proposta.data_proposta >= data_inicio,
+                Proposta.data_proposta <= data_fim
+            ).count()
+            propostas_enviadas = Proposta.query.filter(
+                Proposta.admin_id == admin_id,
+                Proposta.status == 'enviada',
+                Proposta.data_proposta >= data_inicio,
+                Proposta.data_proposta <= data_fim
+            ).count()
+            propostas_rascunho = Proposta.query.filter(
+                Proposta.admin_id == admin_id,
+                Proposta.status == 'rascunho',
+                Proposta.data_proposta >= data_inicio,
+                Proposta.data_proposta <= data_fim
+            ).count()
+            propostas_rejeitadas = Proposta.query.filter(
+                Proposta.admin_id == admin_id,
+                Proposta.status == 'rejeitada',
+                Proposta.data_proposta >= data_inicio,
+                Proposta.data_proposta <= data_fim
+            ).count()
             
             # Expiradas: propostas enviadas com data_proposta + validade_dias < hoje
             hoje = date.today()
@@ -525,7 +585,12 @@ def dashboard():
             ).all()
             propostas_expiradas = len([p for p in propostas_expiradas if p.data_proposta and (p.data_proposta + timedelta(days=p.validade_dias or 7)) < hoje])
             
-            total_propostas = Proposta.query.filter_by(admin_id=admin_id).count()
+            # ✅ CORREÇÃO 6 COMPLETA: Total de propostas também com filtro de período
+            total_propostas = Proposta.query.filter(
+                Proposta.admin_id == admin_id,
+                Proposta.data_proposta >= data_inicio,
+                Proposta.data_proposta <= data_fim
+            ).count()
             print(f"DEBUG: Propostas - Total: {total_propostas}, Aprovadas: {propostas_aprovadas}, Enviadas: {propostas_enviadas}")
             
             # 2. PERFORMANCE COMERCIAL
@@ -533,10 +598,15 @@ def dashboard():
             total_enviadas_ou_aprovadas = propostas_enviadas + propostas_aprovadas + propostas_rejeitadas
             taxa_conversao = round((propostas_aprovadas / total_enviadas_ou_aprovadas * 100), 1) if total_enviadas_ou_aprovadas > 0 else 0
             
-            # Valor médio das propostas aprovadas
+            # Valor médio das propostas aprovadas (✅ CORREÇÃO 7: Filtrar apenas propostas com valor válido)
             from sqlalchemy import func as sql_func
-            valor_medio_result = db.session.query(sql_func.avg(Proposta.valor_total)).filter_by(
-                admin_id=admin_id, status='aprovada'
+            valor_medio_result = db.session.query(sql_func.avg(Proposta.valor_total)).filter(
+                Proposta.admin_id == admin_id,
+                Proposta.status == 'aprovada',
+                Proposta.valor_total.isnot(None),
+                Proposta.valor_total > 0,
+                Proposta.data_proposta >= data_inicio,
+                Proposta.data_proposta <= data_fim
             ).scalar()
             valor_medio = float(valor_medio_result or 0)
             
@@ -639,11 +709,18 @@ def dashboard():
     except Exception as e:
         # Log do erro para debug
         print(f"ERRO NO DASHBOARD: {str(e)}")
-        # Em caso de erro, usar dados básicos seguros
-        total_funcionarios = 0
-        total_obras = 0
-        funcionarios_recentes = []
-        obras_ativas = []
+        import traceback
+        traceback.print_exc()
+        
+        # ✅ CORREÇÃO 3: Só inicializar variáveis se não existirem (não resetar valores já calculados)
+        if 'total_funcionarios' not in locals():
+            total_funcionarios = 0
+        if 'total_obras' not in locals():
+            total_obras = 0
+        if 'funcionarios_recentes' not in locals():
+            funcionarios_recentes = []
+        if 'obras_ativas' not in locals():
+            obras_ativas = []
     
     # CÁLCULOS REAIS - Usar mesma lógica da página funcionários
     try:
@@ -781,9 +858,31 @@ def dashboard():
                     extras_func = sum(r.horas_extras or 0 for r in registros)
                     faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
                     
-                    # Valor/hora do funcionário
-                    valor_hora = calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0
-                    custo_func = (horas_func + extras_func * 1.5) * valor_hora
+                    # ✅ CORREÇÃO 2: FALLBACK quando não há registros de ponto
+                    if len(registros) == 0 and func.salario:
+                        import calendar
+                        
+                        # Calcular dias úteis do período
+                        mes = data_inicio.month
+                        ano = data_inicio.year
+                        dias_uteis = sum(
+                            1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1) 
+                            if date(ano, mes, dia).weekday() < 5
+                        )
+                        
+                        # Estimar horas baseado na jornada
+                        horas_por_dia = (func.jornada_semanal / 5) if func.jornada_semanal else 8
+                        horas_estimadas = dias_uteis * horas_por_dia
+                        
+                        # Custo = salário mensal (fallback)
+                        custo_func = func.salario
+                        horas_func = horas_estimadas
+                        
+                        print(f"  ⚠️  FALLBACK: {func.nome} - Sem registros, estimado R$ {func.salario:.2f} ({horas_estimadas:.0f}h)")
+                    else:
+                        # Cálculo normal com registros de ponto
+                        valor_hora = calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0
+                        custo_func = (horas_func + extras_func * 1.5) * valor_hora
                     
                     # Acumular totais
                     total_custo_real += custo_func
@@ -910,12 +1009,7 @@ def dashboard():
         if 'admin_id' not in locals():
             admin_id = 10  # Admin padrão com mais dados
             
-        try:
-            from models import Veiculo
-            total_veiculos = Veiculo.query.filter_by(admin_id=admin_id).count()
-        except Exception as e:
-            print(f"Erro ao contar veículos: {e}")
-            total_veiculos = 5  # Fallback
+        # ✅ CORREÇÃO 4: Veículos já calculados no início (linha 535) - removido daqui
         # Converter todos para float antes de somar (corrige erro float + Decimal)
         custos_mes = float(total_custo_real) + float(custo_alimentacao_real) + float(custo_transporte_real) + float(custo_outros_real)
         custos_detalhados = {
@@ -1024,9 +1118,18 @@ def dashboard():
         default_value=0
     )
     
-    # Converter dicionários para listas para os gráficos
-    funcionarios_dept = [{'nome': k, 'total': v} for k, v in funcionarios_por_departamento.items()]
-    custos_recentes = [{'nome': k, 'total_custo': v} for k, v in custos_por_obra.items()]
+    # ✅ CORREÇÃO 5: Converter dicionários para listas com proteção
+    if isinstance(funcionarios_por_departamento, dict) and funcionarios_por_departamento:
+        funcionarios_dept = [{'nome': k, 'total': v} for k, v in funcionarios_por_departamento.items()]
+    else:
+        funcionarios_dept = []
+        print("⚠️ funcionarios_por_departamento vazio ou inválido")
+    
+    if isinstance(custos_por_obra, dict) and custos_por_obra:
+        custos_recentes = [{'nome': k, 'total_custo': v} for k, v in custos_por_obra.items()]
+    else:
+        custos_recentes = []
+        print("⚠️ custos_por_obra vazio ou inválido")
     
     # Debug final
     print(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")

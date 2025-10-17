@@ -1,0 +1,358 @@
+# 🎯 PROMPT PARA REPLIT AGENT - Relatório de Diagnóstico do Dashboard
+
+**COPIE TODO ESTE CONTEÚDO E COLE NO REPLIT AGENT**
+
+---
+
+## 📋 CONTEXTO
+
+Sistema SIGE v8.0 - Dashboard apresentando múltiplas KPIs zeradas após correções recentes.
+
+**Status Atual:**
+- ✅ **Página de Funcionários:** FUNCIONANDO (após correção do campo `jornada_semanal`)
+- ❌ **Dashboard:** MÚLTIPLAS SEÇÕES ZERADAS
+
+---
+
+## 🎯 OBJETIVO
+
+Gerar um **RELATÓRIO TÉCNICO COMPLETO** diagnosticando TODOS os problemas do dashboard, incluindo:
+
+1. **Análise de cada seção** que está zerada
+2. **Identificação da causa raiz** de cada problema
+3. **Localização exata** no código (arquivo, linha, função)
+4. **Queries SQL** que estão falhando
+5. **Filtros de multi-tenancy** que podem estar incorretos
+6. **Dependências** entre as KPIs
+7. **Priorização** dos problemas (crítico, alto, médio, baixo)
+8. **Estimativa de esforço** para cada correção
+
+---
+
+## 📊 PROBLEMAS OBSERVADOS NO DASHBOARD
+
+### ❌ SEÇÃO 1: Visão Geral (TUDO ZERADO)
+
+**Observado:**
+- Funcionários Ativos: **0** (deveria mostrar 21)
+- Obras Ativas: **0** (deveria mostrar quantidade de obras ativas)
+- Veículos: **0** (deveria mostrar quantidade de veículos)
+- Custos do Período: **R$ 0.00** (deveria mostrar custos totais)
+
+**Comparação:**
+- Na página `/funcionarios`: mostra **21 funcionários ativos** ✅
+- No dashboard `/dashboard`: mostra **0 funcionários ativos** ❌
+
+**Hipóteses:**
+- Filtro de `admin_id` incorreto?
+- Período de data incorreto?
+- Query diferente entre dashboard e página de funcionários?
+
+---
+
+### ❌ SEÇÃO 2: Financeiro e Custos (TUDO ZERADO)
+
+**Observado:**
+- Alimentação: **R$ 0.00**
+- Transporte: **R$ 0.00**
+- Mão de Obra: **R$ 0.00**
+- Outros: **R$ 0.00**
+- Faltas Justificadas: **0 dias** / **R$ 0.00**
+- Total: **R$ 0.00**
+
+**Comparação:**
+- Na página `/funcionarios`: mostra **R$ 60.925,64** de custo total ✅
+- No dashboard `/dashboard`: mostra **R$ 0.00** ❌
+
+**Hipóteses:**
+- Mão de Obra deveria puxar dados da mesma query de `/funcionarios`?
+- Queries de Alimentação, Transporte, Outros sem filtro de `admin_id`?
+- Período de data diferente entre dashboard e funcionários?
+
+---
+
+### ❌ SEÇÃO 3: Recursos Humanos
+
+**Observado:**
+- Funcionários por Departamento: **vazio** (sem gráfico)
+- Funcionários Recentes: **"Nenhum funcionário recente"**
+
+**Comparação:**
+- Na página `/funcionarios`: lista **21 funcionários** ✅
+- No dashboard: não mostra nenhum ❌
+
+---
+
+### ❌ SEÇÃO 4: Obras e RDO
+
+**Observado:**
+- Progresso das Obras: **"Nenhuma obra ativa"**
+- Mensagem: "Cadastre obras para acompanhar o progresso"
+
+**Hipóteses:**
+- Filtro de status de obra incorreto?
+- Filtro de `admin_id` incorreto?
+- Obras existem mas não estão com status correto?
+
+---
+
+### ❌ SEÇÃO 5: Propostas Comerciais
+
+**Observado:**
+- Taxa de Conversão: **0%**
+- Valor Médio: **R$ 0.00**
+- Tempo Resp. Médio: **0 dias**
+- Propostas/Mês: **0**
+
+**Hipóteses:**
+- Não há propostas cadastradas?
+- Filtro de `admin_id` incorreto?
+- Queries sem dados no período selecionado?
+
+---
+
+## 🔍 ANÁLISE REQUERIDA
+
+Para CADA seção do dashboard, o relatório deve incluir:
+
+### 1. **Identificação da Query**
+```python
+# Exemplo:
+# Arquivo: views.py
+# Função: dashboard()
+# Linha: XXX
+# Query:
+funcionarios_ativos = Funcionario.query.filter_by(
+    admin_id=admin_id,
+    ativo=True
+).count()
+```
+
+### 2. **Verificação de Filtros**
+- ✅ Tem filtro de `admin_id`?
+- ✅ Filtro de `admin_id` está correto?
+- ✅ Tem filtro de período (data_inicio, data_fim)?
+- ✅ Período está sendo passado corretamente?
+
+### 3. **Comparação com Páginas que Funcionam**
+```python
+# Exemplo:
+# /funcionarios (FUNCIONA):
+funcionarios = Funcionario.query.filter_by(
+    admin_id=admin_id,
+    ativo=True
+).all()  # Retorna 21 funcionários
+
+# /dashboard (NÃO FUNCIONA):
+funcionarios_ativos = Funcionario.query.filter_by(
+    admin_id=admin_id,
+    ativo=True
+).count()  # Retorna 0
+
+# DIFERENÇA IDENTIFICADA: ???
+```
+
+### 4. **Teste de Hipóteses**
+- Executar query manualmente no Python
+- Verificar valor de `admin_id` no dashboard
+- Verificar valor de `data_inicio` e `data_fim`
+- Comparar com valores na página de funcionários
+
+### 5. **Causa Raiz**
+- Descrição clara do problema
+- Por que está falhando
+- Diferença entre o que está e o que deveria estar
+
+### 6. **Solução Proposta**
+- Código antes (incorreto)
+- Código depois (correto)
+- Explicação da correção
+
+### 7. **Prioridade e Esforço**
+- 🔴 Crítico / 🟡 Alto / 🟢 Médio / ⚪ Baixo
+- Tempo estimado: 15min / 1h / 4h / 1 dia
+
+---
+
+## 📂 ARQUIVOS A ANALISAR
+
+### Arquivo Principal:
+- `views.py` - Função `dashboard()` (aproximadamente linhas 350-1000)
+
+### Arquivos Auxiliares:
+- `utils.py` - Funções de cálculo
+- `kpis_engine.py` - Engine de KPIs
+- `templates/dashboard.html` - Template do dashboard
+
+### Modelos:
+- `models.py` - Modelos: Funcionario, Obra, RegistroPonto, VehicleExpense, RegistroAlimentacao, OutroCusto, PropostaComercial
+
+---
+
+## 📋 FORMATO DO RELATÓRIO
+
+O relatório deve seguir esta estrutura:
+
+```markdown
+# RELATÓRIO TÉCNICO: Diagnóstico Completo do Dashboard SIGE v8.0
+
+**Data:** [data atual]
+**Versão do Sistema:** v8.0
+**Ambiente:** Desenvolvimento (Replit)
+
+---
+
+## 📊 SUMÁRIO EXECUTIVO
+
+- Total de Seções Analisadas: X
+- Seções com Problemas: Y
+- Problemas Críticos: Z
+- Estimativa Total de Correção: Xh
+
+---
+
+## 🔍 ANÁLISE DETALHADA POR SEÇÃO
+
+### SEÇÃO 1: Visão Geral
+
+#### KPI 1.1: Funcionários Ativos
+
+**Status:** ❌ QUEBRADO
+
+**Valor Atual:** 0  
+**Valor Esperado:** 21
+
+**Localização do Código:**
+- Arquivo: `views.py`
+- Função: `dashboard()`
+- Linha: XXX
+
+**Query Atual:**
+```python
+[código da query]
+```
+
+**Problema Identificado:**
+[descrição clara do problema]
+
+**Causa Raiz:**
+[explicação técnica]
+
+**Comparação com Código que Funciona:**
+```python
+# /funcionarios (FUNCIONA):
+[código que funciona]
+
+# /dashboard (NÃO FUNCIONA):
+[código que não funciona]
+
+# DIFERENÇA:
+[explicação da diferença]
+```
+
+**Solução Proposta:**
+```python
+# ANTES (INCORRETO):
+[código incorreto]
+
+# DEPOIS (CORRETO):
+[código correto]
+```
+
+**Prioridade:** 🔴 CRÍTICA  
+**Esforço:** 15 minutos  
+**Dependências:** Nenhuma
+
+---
+
+#### KPI 1.2: Obras Ativas
+
+[mesma estrutura...]
+
+---
+
+### SEÇÃO 2: Financeiro e Custos
+
+[mesma estrutura para cada KPI...]
+
+---
+
+## 📊 RESUMO DE CORREÇÕES
+
+| Seção | KPI | Problema | Prioridade | Esforço |
+|-------|-----|----------|------------|---------|
+| Visão Geral | Funcionários Ativos | Query sem dados | 🔴 Crítica | 15min |
+| Visão Geral | Obras Ativas | Filtro incorreto | 🔴 Crítica | 30min |
+| ... | ... | ... | ... | ... |
+
+**Total de Correções:** X  
+**Tempo Total Estimado:** Yh
+
+---
+
+## 🎯 ROADMAP DE CORREÇÕES
+
+### FASE 1 - CRÍTICO (1-2 horas)
+1. Corrigir Funcionários Ativos
+2. Corrigir Obras Ativas
+3. Corrigir Custos do Período
+
+### FASE 2 - ALTO (2-4 horas)
+4. Corrigir Mão de Obra
+5. Corrigir Alimentação
+6. Corrigir Transporte
+
+### FASE 3 - MÉDIO (1-2 horas)
+7. Corrigir Outros Custos
+8. Corrigir Propostas Comerciais
+
+---
+
+## 🔍 OBSERVAÇÕES TÉCNICAS
+
+[Qualquer observação adicional relevante]
+
+---
+
+FIM DO RELATÓRIO
+```
+
+---
+
+## ⚙️ INSTRUÇÕES PARA O REPLIT AGENT
+
+1. **Analisar o arquivo `views.py`**, especialmente a função `dashboard()`
+2. **Identificar TODAS as queries** que calculam KPIs
+3. **Comparar com queries** da página `/funcionarios` que está funcionando
+4. **Verificar filtros** de `admin_id` e período
+5. **Testar hipóteses** sobre por que está zerado
+6. **Documentar TUDO** no formato especificado acima
+7. **Priorizar** os problemas por impacto e urgência
+8. **Estimar esforço** realista para cada correção
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+Um **relatório técnico completo** em Markdown que:
+
+✅ Identifica TODOS os problemas do dashboard  
+✅ Explica a causa raiz de cada um  
+✅ Compara com código que funciona  
+✅ Propõe soluções específicas  
+✅ Prioriza as correções  
+✅ Estima o esforço necessário  
+✅ Fornece um roadmap de implementação
+
+---
+
+## 📝 OBSERVAÇÃO IMPORTANTE
+
+**NÃO IMPLEMENTE AS CORREÇÕES AINDA!**
+
+Apenas gere o relatório de diagnóstico. As correções serão implementadas em uma segunda etapa, após revisão do relatório.
+
+---
+
+**FIM DO PROMPT - COPIE TUDO E COLE NO REPLIT AGENT**
+
