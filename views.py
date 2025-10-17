@@ -551,6 +551,7 @@ def dashboard():
         try:
             # 1. PROPOSTAS POR STATUS (✅ CORREÇÃO 6: Adicionado filtro de período)
             print("DEBUG: Calculando métricas de propostas...")
+            from datetime import timedelta  # Import necessário para cálculos de validade
             propostas_aprovadas = Proposta.query.filter(
                 Proposta.admin_id == admin_id,
                 Proposta.status == 'aprovada',
@@ -858,27 +859,29 @@ def dashboard():
                     extras_func = sum(r.horas_extras or 0 for r in registros)
                     faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
                     
-                    # ✅ CORREÇÃO 2: FALLBACK quando não há registros de ponto
+                    # ✅ CORREÇÃO 2: FALLBACK quando não há registros de ponto (FIX: calcular TODO o período)
                     if len(registros) == 0 and func.salario:
-                        import calendar
+                        from datetime import timedelta
                         
-                        # Calcular dias úteis do período
-                        mes = data_inicio.month
-                        ano = data_inicio.year
-                        dias_uteis = sum(
-                            1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1) 
-                            if date(ano, mes, dia).weekday() < 5
-                        )
+                        # Calcular dias úteis de TODO o período (não apenas do primeiro mês)
+                        dias_uteis = 0
+                        data_atual = data_inicio
+                        while data_atual <= data_fim:
+                            if data_atual.weekday() < 5:  # Segunda a Sexta
+                                dias_uteis += 1
+                            data_atual += timedelta(days=1)
                         
                         # Estimar horas baseado na jornada
                         horas_por_dia = (func.jornada_semanal / 5) if func.jornada_semanal else 8
                         horas_estimadas = dias_uteis * horas_por_dia
                         
-                        # Custo = salário mensal (fallback)
-                        custo_func = func.salario
+                        # Estimar custo proporcional ao período
+                        # Se período > 1 mês, multiplicar salário proporcionalmente
+                        meses_periodo = ((data_fim.year - data_inicio.year) * 12 + data_fim.month - data_inicio.month) + 1
+                        custo_func = func.salario * meses_periodo
                         horas_func = horas_estimadas
                         
-                        print(f"  ⚠️  FALLBACK: {func.nome} - Sem registros, estimado R$ {func.salario:.2f} ({horas_estimadas:.0f}h)")
+                        print(f"  ⚠️  FALLBACK: {func.nome} - Sem registros, {dias_uteis} dias úteis em {meses_periodo} mês(es), estimado R$ {custo_func:.2f} ({horas_estimadas:.0f}h)")
                     else:
                         # Cálculo normal com registros de ponto
                         valor_hora = calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0
