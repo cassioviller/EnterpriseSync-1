@@ -863,29 +863,13 @@ def dashboard():
                     extras_func = sum(r.horas_extras or 0 for r in registros)
                     faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
                     
-                    # ✅ CORREÇÃO 2: FALLBACK quando não há registros de ponto (FIX: calcular TODO o período)
-                    if len(registros) == 0 and func.salario:
-                        from datetime import timedelta
-                        
-                        # Calcular dias úteis de TODO o período (não apenas do primeiro mês)
-                        dias_uteis = 0
-                        data_atual = data_inicio
-                        while data_atual <= data_fim:
-                            if data_atual.weekday() < 5:  # Segunda a Sexta
-                                dias_uteis += 1
-                            data_atual += timedelta(days=1)
-                        
-                        # Estimar horas baseado na jornada
-                        horas_por_dia = (func.jornada_semanal / 5) if func.jornada_semanal else 8
-                        horas_estimadas = dias_uteis * horas_por_dia
-                        
-                        # Estimar custo proporcional ao período
-                        # Se período > 1 mês, multiplicar salário proporcionalmente
-                        meses_periodo = ((data_fim.year - data_inicio.year) * 12 + data_fim.month - data_inicio.month) + 1
-                        custo_func = func.salario * meses_periodo
-                        horas_func = horas_estimadas
-                        
-                        print(f"  ⚠️  FALLBACK: {func.nome} - Sem registros, {dias_uteis} dias úteis em {meses_periodo} mês(es), estimado R$ {custo_func:.2f} ({horas_estimadas:.0f}h)")
+                    # ✅ CORREÇÃO CRÍTICA: Sem registros = Sem custo (não usar fallback)
+                    # Fallback removido - se não há registros de ponto, custo = R$ 0.00
+                    # Isso evita estimativas incorretas quando período está vazio
+                    if len(registros) == 0:
+                        custo_func = 0
+                        horas_func = 0
+                        extras_func = 0
                     else:
                         # Cálculo normal com registros de ponto
                         valor_hora = calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0
