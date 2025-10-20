@@ -1505,27 +1505,18 @@ def funcionarios():
                         else:
                             total_faltas += 1
                 
-                # FALLBACK: Se não há registros mas funcionário tem salário, estimar custo
-                if len(registros) == 0 and func.salario:
-                    # Calcular dias úteis do período
-                    mes = data_inicio.month
-                    ano = data_inicio.year
-                    dias_uteis = sum(1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1) 
-                                    if date(ano, mes, dia).weekday() < 5)
-                    
-                    # Estimar horas baseado na jornada
-                    horas_por_dia = (func.jornada_semanal / 5) if func.jornada_semanal else 8
-                    horas_estimadas = dias_uteis * horas_por_dia
-                    
+                # ✅ CORREÇÃO CRÍTICA: Sem registros = Sem custo (não usar fallback)
+                # Fallback removido - se não há registros de ponto, custo = R$ 0.00
+                # Isso evita estimativas incorretas quando período está vazio
+                if len(registros) == 0:
                     funcionarios_kpis.append({
                         'funcionario': func,
-                        'horas_trabalhadas': horas_estimadas,
-                        'total_horas': horas_estimadas,
+                        'horas_trabalhadas': 0,
+                        'total_horas': 0,
                         'total_extras': 0,
                         'total_faltas': 0,
                         'total_faltas_justificadas': 0,
-                        'custo_total': func.salario,  # Custo = salário mensal
-                        'estimado': True  # Flag para indicar que é estimativa
+                        'custo_total': 0
                     })
                 else:
                     # Caminho normal com registros
