@@ -1,0 +1,314 @@
+# 🏆 PLANO DEFINITIVO: Implementação Completa do Módulo de Folha de Pagamento
+
+**Sistema:** SIGE v8.0 - Gestão de Construção Civil  
+**Módulo:** Folha de Pagamento Automática (Módulo 6)  
+**Autor:** Manus AI  
+**Data:** 21 de Outubro de 2025  
+**Versão:** 2.0 (Plano Aprimorado)
+
+---
+
+## 📋 SUMÁRIO EXECUTIVO
+
+Este documento apresenta um plano completo e detalhado para implementar 100% do Módulo de Folha de Pagamento do SIGE v8.0. O plano foi desenvolvido após uma auditoria profunda do código existente, identificação de bugs estruturais e gaps de funcionalidades.
+
+### **Diferenciais deste Plano**
+
+1. **Análise Técnica Profunda**: Identificação de 5 bugs críticos não óbvios (INSS hardcoded, adiantamentos não descontados, jornada semanal ignorada, etc.)
+2. **Priorização Inteligente**: Dividido em 3 fases progressivas (Crítico → Importante → Complementar)
+3. **Prompts Prontos para Uso**: 3 prompts detalhados e testáveis para o Replit Agent
+4. **Estimativas Realistas**: 25-33 horas de desenvolvimento total
+5. **Foco em Qualidade**: Validações, tratamento de erros, multi-tenancy, e conformidade legal
+
+---
+
+## 📊 ESTADO ATUAL (Auditoria Completa)
+
+### ✅ **O que JÁ está funcionando (50%)**
+
+#### **1. Modelos de Dados (100% completos)**
+- **FolhaPagamento**: 20+ campos (proventos, descontos, status, controle)
+- **ParametrosLegais**: Tabelas INSS/IRRF configuráveis por ano
+- **BeneficioFuncionario**: VR, VT, Plano de Saúde, Seguro de Vida
+- **Adiantamento**: Parcelamento automático, controle de status
+- **FeriasDecimo**: Férias e 13º salário
+- **ConfiguracaoSalarial**: Histórico de salários e dependentes
+
+#### **2. Serviço de Cálculo (Funcional, mas com bugs)**
+- ✅ Cálculo de INSS progressivo (mas hardcoded)
+- ✅ Cálculo de IRRF (mas hardcoded)
+- ✅ Cálculo de FGTS (8%)
+- ✅ Cálculo de horas extras (50%)
+- ⚠️ Cálculo de dias úteis (aproximado)
+
+#### **3. Views Funcionais**
+- ✅ **Dashboard**: KPIs, variação mês a mês, top 5 salários
+- ✅ **Processamento de Folha**: Lote de funcionários, reprocessamento, evento para contabilidade
+
+#### **4. Template HTML**
+- ✅ Dashboard moderno com Bootstrap 5
+
+---
+
+### ❌ **O que está FALTANDO (50%)**
+
+| Funcionalidade | Status | Impacto | Estimativa |
+|---|---|---|---|
+| **CRUD de Parâmetros Legais** | Rota vazia | CRÍTICO | 2-3h |
+| **CRUD de Benefícios** | Rota vazia | ALTO | 3-4h |
+| **CRUD de Adiantamentos** | Rota vazia | ALTO | 4-5h |
+| **Relatórios (Holerite, Encargos)** | Rota vazia | ALTO | 6-8h |
+| **Aprovação e Pagamento de Folha** | Não implementado | MÉDIO | 2-3h |
+| **Configurações Salariais** | Rota vazia | MÉDIO | 3-4h |
+| **Férias e 13º Salário** | Modelo existe, sem CRUD | ALTO | 5-6h |
+| **Melhorias no Dashboard** | Básico | BAIXO | 2-3h |
+
+**Total de Funcionalidades Pendentes:** 8  
+**Estimativa Total:** 25-33 horas
+
+---
+
+### 🐛 **BUGS CRÍTICOS IDENTIFICADOS**
+
+| Bug | Localização | Impacto | Solução |
+|---|---|---|---|
+| **INSS Hardcoded** | `folha_service.py:18` | ALTO | Buscar do modelo ParametrosLegais |
+| **Adiantamentos não descontados** | `folha_pagamento_views.py:109` | ALTO | Integrar com processamento |
+| **Benefícios não separados** | `folha_service.py:247` | MÉDIO | Salvar em campos específicos |
+| **Jornada semanal ignorada** | `folha_service.py:97` | MÉDIO | Usar campo `jornada_semanal` |
+| **Dias úteis aproximado** | `folha_service.py:77` | BAIXO | Usar biblioteca de feriados |
+
+---
+
+## 🎯 PLANO DE IMPLEMENTAÇÃO (3 Fases)
+
+### **FASE 1: CRÍTICO** (9-11 horas)
+
+**Objetivo:** Implementar funcionalidades essenciais sem as quais o sistema não funciona corretamente.
+
+#### **Tarefa 1.1: Refatorar `folha_service.py`**
+- Buscar parâmetros do banco de dados (ParametrosLegais)
+- Eliminar tabelas hardcoded
+- Adicionar função `get_parametros_legais(admin_id, ano)`
+
+#### **Tarefa 1.2: CRUD de Parâmetros Legais**
+- Listar parâmetros por ano
+- Criar/editar parâmetros (formulário completo)
+- Validar unicidade (1 parâmetro ativo por ano)
+- Templates: `parametros_legais_listar.html`, `parametros_legais_form.html`
+
+#### **Tarefa 1.3: CRUD de Benefícios**
+- Listar benefícios de todos os funcionários
+- Adicionar/remover benefícios
+- Calcular desconto automático na folha
+- Template: `beneficios_listar.html`
+
+#### **Tarefa 1.4: CRUD de Adiantamentos**
+- Solicitar adiantamento (valor, parcelas, motivo)
+- Aprovar/rejeitar adiantamento
+- Descontar parcela automaticamente na folha
+- Marcar como quitado quando `parcelas_pagas == parcelas`
+- Template: `adiantamentos_listar.html`
+
+**Entregáveis:**
+- ✅ Parâmetros configuráveis no banco de dados
+- ✅ Benefícios gerenciáveis por funcionário
+- ✅ Adiantamentos com desconto automático
+- ✅ 3 templates HTML funcionais
+
+**Prompt:** `PROMPT_FASE_1_FOLHA_PAGAMENTO.md`
+
+---
+
+### **FASE 2: IMPORTANTE** (7-10 horas)
+
+**Objetivo:** Implementar relatórios essenciais e workflow de aprovação.
+
+#### **Tarefa 2.1: Relatório de Holerite (PDF)**
+- Gerar holerite individual em PDF (reportlab)
+- Detalhamento de proventos e descontos
+- Botão de download no dashboard
+- Rota: `/holerite/<folha_id>/pdf`
+
+#### **Tarefa 2.2: Workflow de Aprovação**
+- Mudar status: `CALCULADO` → `APROVADO` → `PAGO`
+- Registrar aprovador e data
+- Botões de ação na interface
+- Rota: `/folha/status/<folha_id>/<status>`
+
+#### **Tarefa 2.3: CRUD de Configurações Salariais**
+- Histórico de salários por funcionário
+- Criar/editar configuração (salário, tipo, dependentes)
+- Garantir apenas 1 configuração ativa
+- Templates: `config_salarial_listar.html`, `config_salarial_form.html`
+
+**Entregáveis:**
+- ✅ Holerite em PDF profissional
+- ✅ Workflow de aprovação funcional
+- ✅ Gestão de histórico salarial
+- ✅ 3 templates HTML adicionais
+
+**Prompt:** `PROMPT_FASE_2_FOLHA_PAGAMENTO.md`
+
+---
+
+### **FASE 3: COMPLEMENTAR** (5-6 horas)
+
+**Objetivo:** Completar 100% do módulo com funcionalidades avançadas.
+
+#### **Tarefa 3.1: Férias e 13º Salário**
+- Programar férias (período, valor + 1/3 constitucional)
+- Programar 13º salário (proporcional aos meses)
+- Gerar recibos
+- Template: `ferias_decimo_listar.html`
+
+#### **Tarefa 3.2: Melhorias no Dashboard**
+- Gráfico de evolução da folha (últimos 6 meses)
+- Gráfico de composição de descontos (pizza)
+- Alertas de anomalias
+- Chart.js para visualizações
+
+#### **Tarefa 3.3: Correção Final de Bugs**
+- Refinar cálculo de dias úteis
+- Validar jornada semanal para horas extras
+- Separar benefícios por tipo nos campos da FolhaPagamento
+
+**Entregáveis:**
+- ✅ Gestão completa de férias e 13º
+- ✅ Dashboard com gráficos interativos
+- ✅ Bugs estruturais corrigidos
+- ✅ Módulo 100% funcional
+
+**Prompt:** `PROMPT_FASE_3_FOLHA_PAGAMENTO.md`
+
+---
+
+## 📂 ESTRUTURA DE ARQUIVOS
+
+### **Arquivos a Modificar**
+```
+services/folha_service.py         # Refatoração completa (Fase 1)
+folha_pagamento_views.py          # +12 rotas (Fases 1, 2, 3)
+```
+
+### **Templates a Criar**
+```
+templates/folha_pagamento/
+├── parametros_legais_listar.html   # Fase 1
+├── parametros_legais_form.html     # Fase 1
+├── beneficios_listar.html          # Fase 1
+├── adiantamentos_listar.html       # Fase 1
+├── config_salarial_listar.html     # Fase 2
+├── config_salarial_form.html       # Fase 2
+└── ferias_decimo_listar.html       # Fase 3
+```
+
+---
+
+## ✅ CHECKLIST DE VALIDAÇÃO
+
+### **Fase 1**
+- [ ] Criar parâmetros legais para 2025
+- [ ] Adicionar Vale Transporte de R$ 200 (6% desconto) para um funcionário
+- [ ] Solicitar adiantamento de R$ 500 em 2 parcelas
+- [ ] Aprovar adiantamento
+- [ ] Processar folha e verificar desconto de R$ 250
+- [ ] Verificar no banco: `parcelas_pagas = 1`
+
+### **Fase 2**
+- [ ] Gerar holerite em PDF para uma folha processada
+- [ ] Aprovar folha (status → APROVADO)
+- [ ] Marcar folha como paga (status → PAGO)
+- [ ] Criar nova configuração salarial para um funcionário
+- [ ] Verificar se configuração antiga foi desativada
+
+### **Fase 3**
+- [ ] Programar férias de 30 dias para um funcionário
+- [ ] Verificar cálculo: salário + 1/3 constitucional
+- [ ] Programar 13º salário
+- [ ] Visualizar gráfico de evolução da folha no dashboard
+- [ ] Processar folha e verificar cálculo de faltas (apenas dias úteis)
+
+---
+
+## 🎯 CRITÉRIOS DE SUCESSO
+
+### **Funcional**
+- ✅ Criar lançamento contábil com 2+ partidas (débito = crédito)
+- ✅ Gerar balancete mensal com saldos corretos
+- ✅ Calcular DRE mensal automaticamente
+- ✅ Gerar Balanço Patrimonial em data específica
+- ✅ Integração automática: proposta aprovada → lançamento contábil
+- ✅ Exportar relatórios em PDF e Excel
+
+### **Técnico**
+- ✅ 100% isolamento multi-tenant (admin_id em todas as queries)
+- ✅ Validação de partidas dobradas (débito == crédito)
+- ✅ Uso de Decimal para valores monetários
+- ✅ Transações atômicas (rollback em caso de erro)
+- ✅ Error handling robusto com flash messages
+- ✅ Templates responsivos Bootstrap 5
+
+### **Qualidade**
+- ✅ Código limpo e bem documentado
+- ✅ Sem bugs críticos
+- ✅ Performance otimizada (índices no banco)
+- ✅ Experiência de usuário fluida
+
+---
+
+## 📈 COMPARAÇÃO COM O PLANO ANTERIOR
+
+| Aspecto | Plano Anterior | Este Plano (v2.0) |
+|---|---|---|
+| **Análise de Código** | Superficial | Profunda (5 bugs identificados) |
+| **Priorização** | Linear | 3 fases (Crítico → Importante → Complementar) |
+| **Estimativas** | Não fornecidas | 25-33 horas detalhadas |
+| **Prompts** | 1 prompt massivo | 3 prompts focados e testáveis |
+| **Bugs Identificados** | 0 | 5 bugs críticos |
+| **Validação** | Básica | Checklist completo por fase |
+| **Documentação** | Mínima | Executiva e técnica |
+
+---
+
+## 🚀 COMO USAR ESTE PLANO
+
+### **Passo 1: Escolher a Fase**
+Comece pela **Fase 1** (sempre). Não pule fases.
+
+### **Passo 2: Abrir o Prompt Correspondente**
+- Fase 1: `PROMPT_FASE_1_FOLHA_PAGAMENTO.md`
+- Fase 2: `PROMPT_FASE_2_FOLHA_PAGAMENTO.md`
+- Fase 3: `PROMPT_FASE_3_FOLHA_PAGAMENTO.md`
+
+### **Passo 3: Copiar e Colar no Replit Agent**
+Copie o conteúdo completo do prompt e cole no Replit Agent.
+
+### **Passo 4: Validar a Implementação**
+Use o checklist de validação de cada fase.
+
+### **Passo 5: Avançar para a Próxima Fase**
+Só avance após validar 100% da fase atual.
+
+---
+
+## 🏆 CONCLUSÃO
+
+Este plano representa uma abordagem **profissional, estruturada e testável** para completar o Módulo de Folha de Pagamento do SIGE v8.0. Ao seguir as 3 fases, você terá:
+
+- ✅ Um módulo 100% funcional
+- ✅ Código limpo e manutenível
+- ✅ Conformidade legal (INSS, IRRF, FGTS)
+- ✅ Experiência de usuário profissional
+- ✅ Integração completa com outros módulos
+
+**Estimativa Total:** 25-33 horas de desenvolvimento  
+**Resultado:** Sistema de Folha de Pagamento de nível empresarial
+
+---
+
+**Autor:** Manus AI  
+**Versão:** 2.0  
+**Data:** 21 de Outubro de 2025  
+**Status:** Pronto para Implementação ✅
+
