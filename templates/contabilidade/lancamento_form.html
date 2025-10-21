@@ -1,0 +1,298 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{% if lancamento %}Editar Lançamento{% else %}Novo Lançamento{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-edit"></i> {% if lancamento %}Editar Lançamento #{{ lancamento.numero }}{% else %}Novo Lançamento Contábil{% endif %}
+        </h1>
+        <a href="{{ url_for('contabilidade.lancamentos_contabeis') }}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        Dados do Lançamento
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="lancamentoForm">
+                        <!-- Campos de cabeçalho -->
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label for="data_lancamento" class="form-label">Data do Lançamento *</label>
+                                <input type="date" class="form-control" id="data_lancamento" name="data_lancamento" 
+                                       value="{% if lancamento %}{{ lancamento.data_lancamento.strftime('%Y-%m-%d') }}{% else %}{{ today }}{% endif %}" 
+                                       required>
+                            </div>
+                            <div class="col-md-9">
+                                <label for="historico" class="form-label">Histórico *</label>
+                                <input type="text" class="form-control" id="historico" name="historico" 
+                                       value="{% if lancamento %}{{ lancamento.historico }}{% endif %}" 
+                                       placeholder="Descrição do lançamento contábil" required maxlength="500">
+                            </div>
+                        </div>
+
+                        <!-- Partidas Dinâmicas -->
+                        <div class="card bg-light mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-list"></i> Partidas (Débitos e Créditos)
+                                </h6>
+                                <button type="button" class="btn btn-sm btn-success" id="addPartida">
+                                    <i class="fas fa-plus"></i> Adicionar Partida
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered" id="partidasTable">
+                                        <thead class="bg-white">
+                                            <tr>
+                                                <th style="width: 120px;">Tipo *</th>
+                                                <th style="width: 280px;">Conta Contábil *</th>
+                                                <th style="width: 200px;">Centro de Custo</th>
+                                                <th style="width: 150px;">Valor (R$) *</th>
+                                                <th>Histórico Complementar</th>
+                                                <th style="width: 60px;">Ação</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="partidasBody">
+                                            <!-- Partidas serão inseridas aqui via JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Totalizadores -->
+                                <div class="row mt-3">
+                                    <div class="col-md-4">
+                                        <div class="alert alert-danger mb-0">
+                                            <strong>Total Débito:</strong> R$ <span id="totalDebito">0,00</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="alert alert-success mb-0">
+                                            <strong>Total Crédito:</strong> R$ <span id="totalCredito">0,00</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="alert mb-0" id="validacaoBadge">
+                                            <strong>Status:</strong> <span id="statusPartidas">Adicione partidas</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Campo oculto para número de partidas -->
+                        <input type="hidden" name="num_partidas" id="num_partidas" value="0">
+
+                        <!-- Botões de ação -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                                    <i class="fas fa-save"></i> Salvar Lançamento
+                                </button>
+                                <a href="{{ url_for('contabilidade.lancamentos_contabeis') }}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Dados das contas e centros de custo
+const contas = {{ contas|tojson }};
+const centrosCusto = {{ centros_custo|tojson }};
+const lancamentoExistente = {{ lancamento|tojson if lancamento else 'null' }};
+
+let partidaIndex = 0;
+let partidas = [];
+
+// Função para formatar moeda
+function formatarMoeda(valor) {
+    return parseFloat(valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Função para adicionar partida
+function adicionarPartida(tipo = '', contaCodigo = '', centroCustoId = '', valor = '', historicoComp = '') {
+    const tbody = document.getElementById('partidasBody');
+    const row = document.createElement('tr');
+    row.id = `partida_${partidaIndex}`;
+    row.dataset.index = partidaIndex;
+    
+    row.innerHTML = `
+        <td>
+            <select class="form-control form-control-sm partida-tipo" name="partidas[${partidaIndex}][tipo]" required>
+                <option value="">Selecione</option>
+                <option value="DEBITO" ${tipo === 'DEBITO' ? 'selected' : ''}>Débito</option>
+                <option value="CREDITO" ${tipo === 'CREDITO' ? 'selected' : ''}>Crédito</option>
+            </select>
+        </td>
+        <td>
+            <select class="form-control form-control-sm partida-conta" name="partidas[${partidaIndex}][conta]" required>
+                <option value="">Selecione a conta</option>
+                ${contas.map(c => `<option value="${c.codigo}" ${c.codigo === contaCodigo ? 'selected' : ''}>${c.codigo} - ${c.nome}</option>`).join('')}
+            </select>
+        </td>
+        <td>
+            <select class="form-control form-control-sm" name="partidas[${partidaIndex}][centro_custo]">
+                <option value="">Nenhum</option>
+                ${centrosCusto.map(cc => `<option value="${cc.id}" ${cc.id === centroCustoId ? 'selected' : ''}>${cc.codigo} - ${cc.nome}</option>`).join('')}
+            </select>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm partida-valor" 
+                   name="partidas[${partidaIndex}][valor]" 
+                   value="${valor}" 
+                   placeholder="0,00" 
+                   step="0.01" 
+                   min="0.01" 
+                   required>
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm" 
+                   name="partidas[${partidaIndex}][historico_comp]" 
+                   value="${historicoComp}" 
+                   placeholder="Complemento (opcional)" 
+                   maxlength="200">
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-danger" onclick="removerPartida(${partidaIndex})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(row);
+    
+    // Adicionar listeners para recalcular
+    row.querySelector('.partida-tipo').addEventListener('change', calcularTotais);
+    row.querySelector('.partida-valor').addEventListener('input', calcularTotais);
+    
+    partidaIndex++;
+    calcularTotais();
+}
+
+// Função para remover partida
+function removerPartida(index) {
+    const row = document.getElementById(`partida_${index}`);
+    if (row) {
+        // Verificar se há pelo menos 2 partidas antes de remover
+        const tbody = document.getElementById('partidasBody');
+        if (tbody.children.length <= 2) {
+            alert('Deve haver pelo menos 2 partidas (1 débito e 1 crédito)');
+            return;
+        }
+        row.remove();
+        calcularTotais();
+    }
+}
+
+// Função para calcular totais e validar
+function calcularTotais() {
+    let totalDebito = 0;
+    let totalCredito = 0;
+    let numPartidas = 0;
+    
+    const tbody = document.getElementById('partidasBody');
+    const rows = tbody.querySelectorAll('tr');
+    
+    rows.forEach(row => {
+        const tipo = row.querySelector('.partida-tipo').value;
+        const valor = parseFloat(row.querySelector('.partida-valor').value) || 0;
+        
+        if (tipo && valor > 0) {
+            numPartidas++;
+            if (tipo === 'DEBITO') {
+                totalDebito += valor;
+            } else if (tipo === 'CREDITO') {
+                totalCredito += valor;
+            }
+        }
+    });
+    
+    // Atualizar totalizadores
+    document.getElementById('totalDebito').textContent = formatarMoeda(totalDebito);
+    document.getElementById('totalCredito').textContent = formatarMoeda(totalCredito);
+    document.getElementById('num_partidas').value = partidaIndex;
+    
+    // Validar balanceamento
+    const badge = document.getElementById('validacaoBadge');
+    const status = document.getElementById('statusPartidas');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    const diff = Math.abs(totalDebito - totalCredito);
+    const isBalanced = diff < 0.01 && numPartidas >= 2 && totalDebito > 0;
+    
+    if (numPartidas === 0) {
+        badge.className = 'alert alert-secondary mb-0';
+        status.textContent = 'Adicione partidas';
+        submitBtn.disabled = true;
+    } else if (numPartidas < 2) {
+        badge.className = 'alert alert-warning mb-0';
+        status.textContent = 'Mínimo 2 partidas';
+        submitBtn.disabled = true;
+    } else if (isBalanced) {
+        badge.className = 'alert alert-success mb-0';
+        status.innerHTML = '<i class="fas fa-check-circle"></i> Partidas balanceadas';
+        submitBtn.disabled = false;
+    } else {
+        badge.className = 'alert alert-danger mb-0';
+        status.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Diferença: R$ ${formatarMoeda(diff)}`;
+        submitBtn.disabled = true;
+    }
+}
+
+// Inicializar formulário
+document.addEventListener('DOMContentLoaded', function() {
+    // Definir data padrão como hoje
+    if (!document.getElementById('data_lancamento').value) {
+        document.getElementById('data_lancamento').value = new Date().toISOString().split('T')[0];
+    }
+    
+    // Botão adicionar partida
+    document.getElementById('addPartida').addEventListener('click', function() {
+        adicionarPartida();
+    });
+    
+    // Carregar partidas existentes se for edição
+    {% if lancamento and lancamento.partidas %}
+        {% for partida in lancamento.partidas %}
+            adicionarPartida(
+                '{{ partida.tipo_partida }}', 
+                '{{ partida.conta_codigo }}', 
+                {% if partida.centro_custo_id %}'{{ partida.centro_custo_id }}'{% else %}''{% endif %}, 
+                '{{ partida.valor }}', 
+                '{{ partida.historico_complementar or "" }}'
+            );
+        {% endfor %}
+    {% else %}
+        // Adicionar 2 partidas vazias para iniciar
+        adicionarPartida('DEBITO');
+        adicionarPartida('CREDITO');
+    {% endif %}
+    
+    // Validação do formulário
+    document.getElementById('lancamentoForm').addEventListener('submit', function(e) {
+        const submitBtn = document.getElementById('submitBtn');
+        if (submitBtn.disabled) {
+            e.preventDefault();
+            alert('As partidas devem estar balanceadas antes de salvar!');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -9,12 +9,69 @@
         <h1 class="h3 mb-0 text-gray-800">
             <i class="fas fa-edit"></i> Lançamentos Contábeis
         </h1>
-        <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-sm btn-secondary">
-            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
-        </a>
+        <div>
+            <a href="{{ url_for('contabilidade.criar_lancamento') }}" class="btn btn-success btn-sm">
+                <i class="fas fa-plus"></i> Novo Lançamento
+            </a>
+            <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Dashboard
+            </a>
+        </div>
     </div>
 
-    <!-- DataTales Example -->
+    <!-- Filtros -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-filter"></i> Filtros
+            </h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('contabilidade.lancamentos_contabeis') }}" class="row g-3">
+                <div class="col-md-3">
+                    <label for="data_inicio" class="form-label">Data Início</label>
+                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                           value="{{ request.args.get('data_inicio', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="data_fim" class="form-label">Data Fim</label>
+                    <input type="date" class="form-control" id="data_fim" name="data_fim" 
+                           value="{{ request.args.get('data_fim', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="origem" class="form-label">Origem</label>
+                    <select class="form-control" id="origem" name="origem">
+                        <option value="">Todas</option>
+                        <option value="MANUAL" {% if request.args.get('origem') == 'MANUAL' %}selected{% endif %}>Manual</option>
+                        <option value="MODULO_1" {% if request.args.get('origem') == 'MODULO_1' %}selected{% endif %}>Módulo 1</option>
+                        <option value="MODULO_4" {% if request.args.get('origem') == 'MODULO_4' %}selected{% endif %}>Módulo 4</option>
+                        <option value="MODULO_6" {% if request.args.get('origem') == 'MODULO_6' %}selected{% endif %}>Módulo 6</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="conta_codigo" class="form-label">Conta</label>
+                    <select class="form-control" id="conta_codigo" name="conta_codigo">
+                        <option value="">Todas</option>
+                        {% for conta in contas %}
+                        <option value="{{ conta.codigo }}" {% if request.args.get('conta_codigo') == conta.codigo %}selected{% endif %}>
+                            {{ conta.codigo }} - {{ conta.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-12">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Filtrar
+                    </button>
+                    <a href="{{ url_for('contabilidade.lancamentos_contabeis') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Limpar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabela de Lançamentos -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">
@@ -23,55 +80,98 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                    <thead>
+                <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                    <thead class="bg-light">
                         <tr>
-                            <th>Número</th>
-                            <th>Data</th>
+                            <th style="width: 80px;">Número</th>
+                            <th style="width: 120px;">Data</th>
                             <th>Histórico</th>
-                            <th>Valor Total</th>
-                            <th>Origem</th>
-                            <th>Ações</th>
+                            <th style="width: 150px;" class="text-end">Valor Total</th>
+                            <th style="width: 120px;" class="text-center">Origem</th>
+                            <th style="width: 200px;" class="text-center">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for lancamento in lancamentos.items %}
-                        <tr>
-                            <td>{{ lancamento.numero }}</td>
-                            <td>{{ lancamento.data_lancamento.strftime('%d/%m/%Y') }}</td>
-                            <td>{{ lancamento.historico[:50] }}{% if lancamento.historico|length > 50 %}...{% endif %}</td>
-                            <td class="text-right">R$ {{ "%.2f"|format(lancamento.valor_total|float) }}</td>
-                            <td>
-                                <span class="badge badge-{% if lancamento.origem == 'MANUAL' %}secondary{% elif lancamento.origem == 'MODULO_1' %}primary{% elif lancamento.origem == 'MODULO_4' %}warning{% elif lancamento.origem == 'MODULO_6' %}success{% else %}info{% endif %}">
-                                    {{ lancamento.origem or 'MANUAL' }}
-                                </span>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-info" onclick="verDetalhes({{ lancamento.id }})">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                        {% if lancamentos.items %}
+                            {% for lancamento in lancamentos.items %}
+                            <tr>
+                                <td class="text-center">
+                                    <strong>{{ lancamento.numero }}</strong>
+                                </td>
+                                <td>{{ lancamento.data_lancamento.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {{ lancamento.historico[:80] }}{% if lancamento.historico|length > 80 %}...{% endif %}
+                                    {% if 'ESTORNADO' in lancamento.historico.upper() %}
+                                        <span class="badge bg-danger ms-2">ESTORNADO</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <strong>R$ {{ "{:,.2f}".format(lancamento.valor_total|float) }}</strong>
+                                </td>
+                                <td class="text-center">
+                                    {% if lancamento.origem == 'MANUAL' %}
+                                        <span class="badge bg-primary">MANUAL</span>
+                                    {% elif lancamento.origem == 'MODULO_1' %}
+                                        <span class="badge bg-success">MÓDULO 1</span>
+                                    {% elif lancamento.origem == 'MODULO_4' %}
+                                        <span class="badge bg-warning text-dark">MÓDULO 4</span>
+                                    {% elif lancamento.origem == 'MODULO_6' %}
+                                        <span class="badge bg-info text-dark">MÓDULO 6</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">SISTEMA</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('contabilidade.ver_lancamento', id=lancamento.id) }}" 
+                                       class="btn btn-sm btn-info" title="Ver Detalhes">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if 'ESTORNADO' not in lancamento.historico.upper() %}
+                                        <a href="{{ url_for('contabilidade.editar_lancamento', id=lancamento.id) }}" 
+                                           class="btn btn-sm btn-warning" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    <i class="fas fa-inbox fa-2x mb-2"></i>
+                                    <p>Nenhum lançamento encontrado</p>
+                                </td>
+                            </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
             
             <!-- Paginação -->
             {% if lancamentos.pages > 1 %}
-            <nav>
+            <nav aria-label="Paginação">
                 <ul class="pagination justify-content-center">
                     {% if lancamentos.has_prev %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('contabilidade.lancamentos_contabeis', page=lancamentos.prev_num) }}">Anterior</a>
+                            <a class="page-link" href="{{ url_for('contabilidade.lancamentos_contabeis', page=lancamentos.prev_num, **request.args.to_dict(flat=False)) }}">
+                                <i class="fas fa-chevron-left"></i> Anterior
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">
+                                <i class="fas fa-chevron-left"></i> Anterior
+                            </span>
                         </li>
                     {% endif %}
                     
-                    {% for page_num in lancamentos.iter_pages() %}
+                    {% for page_num in lancamentos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                         {% if page_num %}
                             {% if page_num != lancamentos.page %}
                                 <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('contabilidade.lancamentos_contabeis', page=page_num) }}">{{ page_num }}</a>
+                                    <a class="page-link" href="{{ url_for('contabilidade.lancamentos_contabeis', page=page_num, **request.args.to_dict(flat=False)) }}">
+                                        {{ page_num }}
+                                    </a>
                                 </li>
                             {% else %}
                                 <li class="page-item active">
@@ -87,48 +187,26 @@
                     
                     {% if lancamentos.has_next %}
                         <li class="page-item">
-                            <a class="page-link" href="{{ url_for('contabilidade.lancamentos_contabeis', page=lancamentos.next_num) }}">Próximo</a>
+                            <a class="page-link" href="{{ url_for('contabilidade.lancamentos_contabeis', page=lancamentos.next_num, **request.args.to_dict(flat=False)) }}">
+                                Próximo <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">
+                                Próximo <i class="fas fa-chevron-right"></i>
+                            </span>
                         </li>
                     {% endif %}
                 </ul>
             </nav>
+            
+            <p class="text-center text-muted">
+                Página {{ lancamentos.page }} de {{ lancamentos.pages }} - 
+                Total de {{ lancamentos.total }} lançamento(s)
+            </p>
             {% endif %}
         </div>
     </div>
 </div>
-
-<!-- Modal para detalhes do lançamento -->
-<div class="modal fade" id="detalhesModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Detalhes do Lançamento</h5>
-                <button type="button" class="close" data-dismiss="modal">
-                    <span>&times;</span>
-                </button>
-            </div>
-            <div class="modal-body" id="detalhesContent">
-                <!-- Conteúdo será carregado via AJAX -->
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-function verDetalhes(lancamentoId) {
-    // Implementar carregamento de detalhes via AJAX
-    $('#detalhesModal').modal('show');
-    $('#detalhesContent').html('<p>Carregando detalhes...</p>');
-}
-
-$(document).ready(function() {
-    $('#dataTable').DataTable({
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json"
-        },
-        "order": [[ 1, "desc" ], [ 0, "desc" ]],
-        "pageLength": 25
-    });
-});
-</script>
 {% endblock %}

@@ -337,93 +337,195 @@ def executar_auditoria_automatica(admin_id):
     db.session.commit()
     return alertas
 
-def calcular_dre_mensal(admin_id: int, mes_referencia: date):
+def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
     """
-    Calcula DRE automaticamente baseado nos lançamentos contábeis do mês
+    Calcula DRE completo baseado na estrutura contábil brasileira
     
-    Agrupa contas por tipo:
-    - Receitas: contas 4.x.x.x (CREDORA)
-    - Custos: contas 3.1.x.x (DEVEDORA)
-    - Despesas: contas 3.2.x.x (DEVEDORA)
+    Estrutura DRE (11 seções):
+    1. RECEITA BRUTA (4.1.x)
+    2. (-) DEDUÇÕES (4.2.x)
+    3. = RECEITA LÍQUIDA
+    4. (-) CMV/CPV (5.1.03.x)
+    5. = LUCRO BRUTO
+    6. (-) DESPESAS OPERACIONAIS (5.1.01, 5.1.02, 5.1.04, 5.1.05, 5.1.06)
+    7. = EBITDA
+    8. (+/-) RESULTADO FINANCEIRO (4.3.01 - 5.2.01)
+    9. = RESULTADO ANTES IR/CSLL
+    10. (-) PROVISÃO IR E CSLL (5.3.01, 5.3.02)
+    11. = LUCRO LÍQUIDO
     
     Args:
         admin_id: ID do admin
-        mes_referencia: Data de referência (primeiro dia do mês)
+        ano: Ano de referência
+        mes: Mês de referência (1-12)
         
     Returns:
-        DREMensal: Objeto DRE criado ou atualizado
+        dict: Dicionário com todos os valores do DRE
     """
-    from sqlalchemy import and_, extract, func
+    from sqlalchemy import and_
     from decimal import Decimal
-    import calendar
     
     try:
         # Definir período do mês
-        ano = mes_referencia.year
-        mes = mes_referencia.month
-        ultimo_dia = calendar.monthrange(ano, mes)[1]
-        data_fim = date(ano, mes, ultimo_dia)
+        data_inicio = date(ano, mes, 1)
+        if mes == 12:
+            data_fim = date(ano + 1, 1, 1) - timedelta(days=1)
+        else:
+            data_fim = date(ano, mes + 1, 1) - timedelta(days=1)
         
-        # Função auxiliar para calcular saldo por grupo de contas
-        def calcular_saldo_grupo(prefixo: str):
-            """Calcula saldo de um grupo de contas (ex: '4' para receitas)"""
-            partidas = PartidaContabil.query.join(
-                LancamentoContabil,
-                PartidaContabil.lancamento_id == LancamentoContabil.id
-            ).filter(
-                and_(
-                    PartidaContabil.admin_id == admin_id,
-                    PartidaContabil.conta_codigo.like(f'{prefixo}%'),
-                    LancamentoContabil.data_lancamento >= mes_referencia,
-                    LancamentoContabil.data_lancamento <= data_fim
-                )
-            ).all()
+        # Função auxiliar para calcular saldo de contas específicas
+        def calcular_valor_contas(prefixos: list, tipo_esperado: str = None):
+            """
+            Calcula o total de valores para lista de prefixos de contas
             
+            Args:
+                prefixos: Lista de prefixos de contas (ex: ['4.1.01', '4.1.02'])
+                tipo_esperado: 'CREDITO' para receitas, 'DEBITO' para despesas/custos
+            """
             total = Decimal('0')
-            for partida in partidas:
-                valor = Decimal(str(partida.valor))
-                if partida.tipo_partida == 'CREDITO':
-                    total += valor
-                else:
-                    total -= valor
+            
+            for prefixo in prefixos:
+                partidas = PartidaContabil.query.join(
+                    LancamentoContabil,
+                    PartidaContabil.lancamento_id == LancamentoContabil.id
+                ).filter(
+                    and_(
+                        PartidaContabil.admin_id == admin_id,
+                        PartidaContabil.conta_codigo.like(f'{prefixo}%'),
+                        LancamentoContabil.data_lancamento >= data_inicio,
+                        LancamentoContabil.data_lancamento <= data_fim
+                    )
+                ).all()
+                
+                for partida in partidas:
+                    valor = Decimal(str(partida.valor))
+                    
+                    # Se tipo esperado for especificado, só conta se for o tipo correto
+                    if tipo_esperado:
+                        if partida.tipo_partida == tipo_esperado:
+                            total += valor
+                    else:
+                        # Senão, credita positivo e debita negativo
+                        if partida.tipo_partida == 'CREDITO':
+                            total += valor
+                        else:
+                            total -= valor
             
             return total
         
-        # Calcular valores
-        receita_bruta = calcular_saldo_grupo('4')
-        custo_mercadorias = calcular_saldo_grupo('3.1')
-        despesas_operacionais = calcular_saldo_grupo('3.2')
+        # 1. RECEITA BRUTA (contas 4.1.x - CREDITO)
+        receita_bruta = calcular_valor_contas(['4.1.01', '4.1.02'], 'CREDITO')
         
-        # Calcular lucro
-        lucro_bruto = receita_bruta - custo_mercadorias
-        lucro_liquido = lucro_bruto - despesas_operacionais
+        # 2. DEDUÇÕES E ABATIMENTOS (contas 4.2.x - DEBITO)
+        deducoes = calcular_valor_contas(['4.2.01', '4.2.02'], 'DEBITO')
         
-        # Buscar ou criar DRE
-        dre = DREMensal.query.filter_by(
-            admin_id=admin_id,
-            mes_referencia=mes_referencia
-        ).first()
+        # 3. RECEITA LÍQUIDA
+        receita_liquida = receita_bruta - deducoes
         
-        if not dre:
-            dre = DREMensal(
-                admin_id=admin_id,
-                mes_referencia=mes_referencia
-            )
+        # 4. CMV/CPV (contas 5.1.03.x - DEBITO)
+        cmv = calcular_valor_contas(['5.1.03'], 'DEBITO')
         
-        # Atualizar valores
-        dre.receita_bruta = float(receita_bruta)
-        dre.custo_total = float(custo_mercadorias)
-        dre.lucro_bruto = float(lucro_bruto)
-        dre.total_despesas = float(despesas_operacionais)
-        dre.lucro_liquido = float(lucro_liquido)
+        # 5. LUCRO BRUTO
+        lucro_bruto = receita_liquida - cmv
         
-        db.session.add(dre)
-        db.session.commit()
+        # 6. DESPESAS OPERACIONAIS (contas 5.1.x - DEBITO, exceto 5.1.03)
+        despesas_pessoal = calcular_valor_contas(['5.1.01'], 'DEBITO')
+        despesas_materiais = calcular_valor_contas(['5.1.02'], 'DEBITO')
+        despesas_administrativas = calcular_valor_contas(['5.1.04'], 'DEBITO')
+        despesas_comerciais = calcular_valor_contas(['5.1.05'], 'DEBITO')
+        outras_despesas = calcular_valor_contas(['5.1.06'], 'DEBITO')
         
-        print(f"✅ DRE calculada: Receita={receita_bruta}, Lucro Líquido={lucro_liquido}")
-        return dre
+        total_despesas_operacionais = (
+            despesas_pessoal + despesas_materiais + despesas_administrativas + 
+            despesas_comerciais + outras_despesas
+        )
+        
+        # 7. EBITDA
+        ebitda = lucro_bruto - total_despesas_operacionais
+        
+        # 8. RESULTADO FINANCEIRO
+        receitas_financeiras = calcular_valor_contas(['4.3.01'], 'CREDITO')
+        despesas_financeiras = calcular_valor_contas(['5.2.01'], 'DEBITO')
+        resultado_financeiro = receitas_financeiras - despesas_financeiras
+        
+        # 9. RESULTADO ANTES IR/CSLL
+        resultado_antes_ir = ebitda + resultado_financeiro
+        
+        # 10. PROVISÃO IR E CSLL (contas 5.3.x - DEBITO)
+        provisao_ir = calcular_valor_contas(['5.3.01'], 'DEBITO')
+        provisao_csll = calcular_valor_contas(['5.3.02'], 'DEBITO')
+        total_provisoes = provisao_ir + provisao_csll
+        
+        # 11. LUCRO LÍQUIDO
+        lucro_liquido = resultado_antes_ir - total_provisoes
+        
+        # Calcular percentuais (sobre receita líquida)
+        def calcular_percentual(valor, base):
+            if base and base != 0:
+                return float((valor / base) * 100)
+            return 0.0
+        
+        margem_bruta = calcular_percentual(lucro_bruto, receita_liquida)
+        margem_ebitda = calcular_percentual(ebitda, receita_liquida)
+        margem_liquida = calcular_percentual(lucro_liquido, receita_liquida)
+        
+        # Montar estrutura completa do DRE
+        dre_data = {
+            'mes': mes,
+            'ano': ano,
+            'mes_referencia': data_inicio,
+            
+            # Seção 1-3: Receitas
+            'receita_bruta': float(receita_bruta),
+            'deducoes': float(deducoes),
+            'receita_liquida': float(receita_liquida),
+            
+            # Seção 4-5: CMV e Lucro Bruto
+            'cmv': float(cmv),
+            'lucro_bruto': float(lucro_bruto),
+            
+            # Seção 6: Despesas Operacionais (detalhadas)
+            'despesas_operacionais': {
+                'pessoal': float(despesas_pessoal),
+                'materiais': float(despesas_materiais),
+                'administrativas': float(despesas_administrativas),
+                'comerciais': float(despesas_comerciais),
+                'outras': float(outras_despesas),
+                'total': float(total_despesas_operacionais)
+            },
+            
+            # Seção 7: EBITDA
+            'ebitda': float(ebitda),
+            
+            # Seção 8: Resultado Financeiro
+            'resultado_financeiro': {
+                'receitas': float(receitas_financeiras),
+                'despesas': float(despesas_financeiras),
+                'total': float(resultado_financeiro)
+            },
+            
+            # Seção 9-11: Resultado Final
+            'resultado_antes_ir': float(resultado_antes_ir),
+            'provisao_ir_csll': {
+                'ir': float(provisao_ir),
+                'csll': float(provisao_csll),
+                'total': float(total_provisoes)
+            },
+            'lucro_liquido': float(lucro_liquido),
+            
+            # Percentuais
+            'percentuais': {
+                'margem_bruta': margem_bruta,
+                'margem_ebitda': margem_ebitda,
+                'margem_liquida': margem_liquida
+            }
+        }
+        
+        print(f"✅ DRE {mes}/{ano} calculada: Receita Líquida={receita_liquida}, Lucro Líquido={lucro_liquido}")
+        return dre_data
         
     except Exception as e:
-        db.session.rollback()
         print(f"❌ Erro ao calcular DRE: {e}")
+        import traceback
+        traceback.print_exc()
         return None

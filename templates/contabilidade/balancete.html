@@ -1,121 +1,331 @@
 {% extends "base_completo.html" %}
 
-{% block title %}Balancete de Verificação{% endblock %}
+{% block title %}Balancete de Verificação - SIGE v9.0{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Page Heading -->
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">
-            <i class="fas fa-table"></i> Balancete de Verificação
-        </h1>
-        <div class="btn-group">
-            <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-sm btn-secondary">
+<div class="container-fluid px-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1 text-gray-800">
+                <i class="fas fa-balance-scale text-success"></i> Balancete de Verificação
+            </h1>
+            <p class="text-muted small mb-0">Demonstração dos saldos das contas contábeis</p>
+        </div>
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> Voltar
             </a>
-            <button class="btn btn-sm btn-primary" onclick="window.print()">
+            <button class="btn btn-outline-primary" onclick="window.print()">
                 <i class="fas fa-print"></i> Imprimir
+            </button>
+            <button class="btn btn-outline-success" disabled>
+                <i class="fas fa-file-excel"></i> Excel
+            </button>
+            <button class="btn btn-outline-danger" disabled>
+                <i class="fas fa-file-pdf"></i> PDF
             </button>
         </div>
     </div>
 
-    <!-- Filtros -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Período de Referência</h6>
+    <!-- Filters Card -->
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-header bg-white border-bottom">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-filter"></i> Filtros de Período
+            </h6>
         </div>
         <div class="card-body">
-            <form method="GET" class="row">
+            <form method="GET" action="{{ url_for('contabilidade.balancete') }}" class="row g-3">
                 <div class="col-md-3">
-                    <label>Mês:</label>
-                    <select name="mes" class="form-control">
-                        {% for i in range(1, 13) %}
-                        <option value="{{ i }}" {% if i == mes_referencia.month %}selected{% endif %}>
-                            {{ i|string|replace('1', 'Janeiro')|replace('2', 'Fevereiro')|replace('3', 'Março')|replace('4', 'Abril')|replace('5', 'Maio')|replace('6', 'Junho')|replace('7', 'Julho')|replace('8', 'Agosto')|replace('9', 'Setembro')|replace('10', 'Outubro')|replace('11', 'Novembro')|replace('12', 'Dezembro') }}
-                        </option>
+                    <label class="form-label fw-bold">Mês:</label>
+                    <select name="mes" class="form-select" required>
+                        <option value="1" {% if mes == 1 %}selected{% endif %}>Janeiro</option>
+                        <option value="2" {% if mes == 2 %}selected{% endif %}>Fevereiro</option>
+                        <option value="3" {% if mes == 3 %}selected{% endif %}>Março</option>
+                        <option value="4" {% if mes == 4 %}selected{% endif %}>Abril</option>
+                        <option value="5" {% if mes == 5 %}selected{% endif %}>Maio</option>
+                        <option value="6" {% if mes == 6 %}selected{% endif %}>Junho</option>
+                        <option value="7" {% if mes == 7 %}selected{% endif %}>Julho</option>
+                        <option value="8" {% if mes == 8 %}selected{% endif %}>Agosto</option>
+                        <option value="9" {% if mes == 9 %}selected{% endif %}>Setembro</option>
+                        <option value="10" {% if mes == 10 %}selected{% endif %}>Outubro</option>
+                        <option value="11" {% if mes == 11 %}selected{% endif %}>Novembro</option>
+                        <option value="12" {% if mes == 12 %}selected{% endif %}>Dezembro</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Ano:</label>
+                    <select name="ano" class="form-select" required>
+                        {% for year in range(2020, 2031) %}
+                        <option value="{{ year }}" {% if ano == year %}selected{% endif %}>{{ year }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label>Ano:</label>
-                    <select name="ano" class="form-control">
-                        {% for ano in range(2020, 2030) %}
-                        <option value="{{ ano }}" {% if ano == mes_referencia.year %}selected{% endif %}>{{ ano }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label>&nbsp;</label><br>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> Consultar
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-sync-alt"></i> Gerar Balancete
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Balancete -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">
-                Balancete - {{ mes_referencia.strftime('%m/%Y') }}
-            </h6>
+    <!-- Balancete Table Card -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-gradient-success text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold">
+                    <i class="fas fa-table"></i> Balancete - 
+                    {% set month_names = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                                         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'] %}
+                    {{ month_names[mes] }} de {{ ano }}
+                </h6>
+                {% if totais and totais.balanceado %}
+                <span class="badge bg-white text-success">
+                    <i class="fas fa-check-circle"></i> Balanceado
+                </span>
+                {% elif totais %}
+                <span class="badge bg-warning text-dark">
+                    <i class="fas fa-exclamation-triangle"></i> Desbalanceado
+                </span>
+                {% endif %}
+            </div>
         </div>
-        <div class="card-body">
-            {% if balancetes %}
+        <div class="card-body p-0">
+            {% if contas and contas|length > 0 %}
             <div class="table-responsive">
-                <table class="table table-bordered table-sm">
-                    <thead class="thead-light">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light sticky-top">
                         <tr>
-                            <th>Código</th>
-                            <th>Conta</th>
-                            <th class="text-right">Saldo Anterior</th>
-                            <th class="text-right">Débitos</th>
-                            <th class="text-right">Créditos</th>
-                            <th class="text-right">Saldo Atual</th>
+                            <th class="border-end" style="width: 120px;">Código</th>
+                            <th style="width: 35%;">Conta</th>
+                            <th class="text-end" style="width: 13%;">Saldo Anterior</th>
+                            <th class="text-end" style="width: 13%;">Débitos</th>
+                            <th class="text-end" style="width: 13%;">Créditos</th>
+                            <th class="text-end border-start" style="width: 13%;">Saldo Atual</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% set total_debitos = 0 %}
-                        {% set total_creditos = 0 %}
-                        {% for balancete in balancetes %}
-                        <tr>
-                            <td>{{ balancete.conta_codigo }}</td>
-                            <td>{{ balancete.conta.nome if balancete.conta else 'Conta não encontrada' }}</td>
-                            <td class="text-right">{{ "%.2f"|format(balancete.saldo_anterior|float) }}</td>
-                            <td class="text-right">{{ "%.2f"|format(balancete.debitos_mes|float) }}</td>
-                            <td class="text-right">{{ "%.2f"|format(balancete.creditos_mes|float) }}</td>
-                            <td class="text-right {% if balancete.saldo_atual < 0 %}text-danger{% endif %}">
-                                {{ "%.2f"|format(balancete.saldo_atual|float) }}
-                            </td>
-                        </tr>
-                        {% set total_debitos = total_debitos + balancete.debitos_mes %}
-                        {% set total_creditos = total_creditos + balancete.creditos_mes %}
-                        {% endfor %}
-                        <tr class="table-info font-weight-bold">
-                            <td colspan="3"><strong>TOTAIS</strong></td>
-                            <td class="text-right"><strong>{{ "%.2f"|format(total_debitos|float) }}</strong></td>
-                            <td class="text-right"><strong>{{ "%.2f"|format(total_creditos|float) }}</strong></td>
-                            <td class="text-right">
-                                <strong>
-                                    {% if total_debitos == total_creditos %}
-                                        <span class="text-success">✓ CONFERIDO</span>
+                        {% set ns = namespace(
+                            current_grupo = '',
+                            total_debitos = 0,
+                            total_creditos = 0
+                        ) %}
+                        
+                        {% for conta in contas %}
+                            {% set grupo_principal = conta.codigo.split('.')[0] %}
+                            
+                            {% if grupo_principal != ns.current_grupo %}
+                                {% set ns.current_grupo = grupo_principal %}
+                                
+                                {% if grupo_principal == '1' %}
+                                    {% set grupo_nome = '1. ATIVO' %}
+                                    {% set grupo_color = 'primary' %}
+                                {% elif grupo_principal == '2' %}
+                                    {% set grupo_nome = '2. PASSIVO' %}
+                                    {% set grupo_color = 'danger' %}
+                                {% elif grupo_principal == '3' %}
+                                    {% set grupo_nome = '3. PATRIMÔNIO LÍQUIDO' %}
+                                    {% set grupo_color = 'info' %}
+                                {% elif grupo_principal == '4' %}
+                                    {% set grupo_nome = '4. RECEITAS' %}
+                                    {% set grupo_color = 'success' %}
+                                {% elif grupo_principal == '5' %}
+                                    {% set grupo_nome = '5. CUSTOS' %}
+                                    {% set grupo_color = 'warning' %}
+                                {% elif grupo_principal == '6' %}
+                                    {% set grupo_nome = '6. DESPESAS' %}
+                                    {% set grupo_color = 'secondary' %}
+                                {% else %}
+                                    {% set grupo_nome = grupo_principal %}
+                                    {% set grupo_color = 'dark' %}
+                                {% endif %}
+                                
+                                <tr class="table-{{ grupo_color }} bg-opacity-10">
+                                    <td colspan="6" class="fw-bold text-{{ grupo_color }} py-2">
+                                        <i class="fas fa-folder-open"></i> {{ grupo_nome }}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                            
+                            {% set indent = (conta.nivel - 1) * 20 %}
+                            {% set is_synthetic = conta.nivel < 4 %}
+                            
+                            <tr class="{% if is_synthetic %}fw-bold{% endif %}">
+                                <td class="border-end font-monospace small">{{ conta.codigo }}</td>
+                                <td style="padding-left: {{ indent }}px;">
+                                    {% if conta.aceita_lancamento %}
+                                        <a href="{{ url_for('contabilidade.lancamentos_contabeis', conta_codigo=conta.codigo, mes=mes, ano=ano) }}" 
+                                           class="text-decoration-none text-dark" 
+                                           title="Ver lançamentos desta conta">
+                                            {{ conta.nome }}
+                                            <i class="fas fa-external-link-alt fa-xs text-muted"></i>
+                                        </a>
                                     {% else %}
-                                        <span class="text-danger">✗ DESBALANCEADO</span>
+                                        {{ conta.nome }}
                                     {% endif %}
-                                </strong>
+                                </td>
+                                <td class="text-end font-monospace small {% if conta.saldo_anterior > 0 %}text-danger{% elif conta.saldo_anterior < 0 %}text-success{% endif %}">
+                                    {% if conta.saldo_anterior < 0 %}
+                                        ({{ "%.2f"|format(conta.saldo_anterior|abs|float) }})
+                                    {% else %}
+                                        {{ "%.2f"|format(conta.saldo_anterior|float) }}
+                                    {% endif %}
+                                </td>
+                                <td class="text-end font-monospace small">
+                                    {{ "%.2f"|format(conta.debitos|float) }}
+                                </td>
+                                <td class="text-end font-monospace small">
+                                    {{ "%.2f"|format(conta.creditos|float) }}
+                                </td>
+                                <td class="text-end font-monospace small border-start {% if conta.saldo_atual > 0 %}text-danger fw-bold{% elif conta.saldo_atual < 0 %}text-success fw-bold{% endif %}">
+                                    {% if conta.saldo_atual < 0 %}
+                                        ({{ "%.2f"|format(conta.saldo_atual|abs|float) }})
+                                    {% else %}
+                                        {{ "%.2f"|format(conta.saldo_atual|float) }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            
+                            {% set ns.total_debitos = ns.total_debitos + conta.debitos|float %}
+                            {% set ns.total_creditos = ns.total_creditos + conta.creditos|float %}
+                        {% endfor %}
+                    </tbody>
+                    
+                    <!-- Totals Footer -->
+                    <tfoot class="table-dark">
+                        <tr class="fw-bold">
+                            <td colspan="3" class="text-end py-3">
+                                <i class="fas fa-calculator"></i> TOTAIS DO PERÍODO
+                            </td>
+                            <td class="text-end font-monospace">
+                                R$ {{ "%.2f"|format(totais.total_debitos|float) }}
+                            </td>
+                            <td class="text-end font-monospace">
+                                R$ {{ "%.2f"|format(totais.total_creditos|float) }}
+                            </td>
+                            <td class="text-end border-start">
+                                {% if totais.balanceado %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check"></i> Conferido
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-exclamation-triangle"></i> Diferença: 
+                                        R$ {{ "%.2f"|format((totais.total_debitos - totais.total_creditos)|abs|float) }}
+                                    </span>
+                                {% endif %}
                             </td>
                         </tr>
-                    </tbody>
+                        <tr class="bg-opacity-50">
+                            <td colspan="3" class="text-end small">Saldos Devedores</td>
+                            <td colspan="2" class="text-end font-monospace small text-danger">
+                                R$ {{ "%.2f"|format(totais.total_saldo_devedor|float) }}
+                            </td>
+                            <td class="border-start"></td>
+                        </tr>
+                        <tr class="bg-opacity-50">
+                            <td colspan="3" class="text-end small">Saldos Credores</td>
+                            <td colspan="2" class="text-end font-monospace small text-success">
+                                R$ {{ "%.2f"|format(totais.total_saldo_credor|float) }}
+                            </td>
+                            <td class="border-start"></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
             {% else %}
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> 
-                Nenhum movimento contábil encontrado para o período selecionado.
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nenhuma movimentação encontrada</h5>
+                <p class="text-muted">
+                    Não há lançamentos contábeis para o período selecionado.
+                </p>
+                <a href="{{ url_for('contabilidade.criar_lancamento') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Criar Lançamento
+                </a>
             </div>
             {% endif %}
         </div>
+        
+        {% if contas and contas|length > 0 %}
+        <div class="card-footer bg-light text-muted small">
+            <div class="row">
+                <div class="col-md-6">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>{{ contas|length }}</strong> contas com movimentação
+                </div>
+                <div class="col-md-6 text-end">
+                    <i class="fas fa-calendar"></i> 
+                    Gerado em {{ now.strftime('%d/%m/%Y às %H:%M') }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Legend Card -->
+    <div class="card shadow-sm border-0 mt-3">
+        <div class="card-body">
+            <h6 class="card-title mb-3">
+                <i class="fas fa-book"></i> Legenda
+            </h6>
+            <div class="row small">
+                <div class="col-md-6">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <span class="text-danger fw-bold">Vermelho</span> = Saldo Devedor (Ativo, Custos, Despesas)
+                        </li>
+                        <li class="mb-2">
+                            <span class="text-success fw-bold">Verde</span> = Saldo Credor (Passivo, Patrimônio, Receitas)
+                        </li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <strong>Contas em negrito</strong> = Contas sintéticas (resumo)
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-external-link-alt text-muted"></i> = Clique para ver lançamentos detalhados
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<style>
+@media print {
+    .btn-group, .card-footer, .legend-card {
+        display: none !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    body {
+        padding-top: 0 !important;
+    }
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.font-monospace {
+    font-family: 'Courier New', monospace;
+}
+
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+</style>
 {% endblock %}

@@ -1,0 +1,667 @@
+# 🔧 PROMPT: Correção de Erros e Implementação Completa do Módulo de Custos
+
+## CONTEXTO DO ERRO
+
+**Erro Identificado:**
+```
+BuildError: Could not build url for endpoint 'index'. Did you mean 'main.index' instead?
+```
+
+**Localização:** `custos_views.py` (linhas 66 e 118)
+
+**Causa Raiz:** O endpoint `index` está registrado no blueprint `main`, então deve ser referenciado como `main.index`, não apenas `index`.
+
+**Arquivos Afetados:**
+- `custos_views.py` (2 ocorrências)
+- `financeiro_views.py` (1 ocorrência)
+
+---
+
+## TAREFA 1: Corrigir Erro de URL em Todos os Arquivos
+
+### 1.1 - Corrigir `custos_views.py`
+
+**Instrução:** Abra o arquivo `custos_views.py` e substitua as 2 ocorrências de `url_for('index')` por `url_for('main.index')`.
+
+**Localização das Linhas:**
+- Linha 66
+- Linha 118
+
+**Substituição:**
+
+**ANTES:**
+```python
+return redirect(url_for('index'))
+```
+
+**DEPOIS:**
+```python
+return redirect(url_for('main.index'))
+```
+
+---
+
+### 1.2 - Corrigir `financeiro_views.py`
+
+**Instrução:** Abra o arquivo `financeiro_views.py` e substitua a ocorrência de `url_for('index')` por `url_for('main.index')`.
+
+**Localização:** Linha 52
+
+**Substituição:**
+
+**ANTES:**
+```python
+return redirect(url_for('index'))
+```
+
+**DEPOIS:**
+```python
+return redirect(url_for('main.index'))
+```
+
+---
+
+## TAREFA 2: Verificar Estado Atual do Módulo de Custos
+
+O módulo de custos já tem uma estrutura básica implementada. Vamos analisar o que existe e o que falta:
+
+### ✅ **O que JÁ existe:**
+
+1. **Blueprint Registrado:** `custos_bp` com prefixo `/custos`
+2. **Verificação de Schema:** Função `verificar_schema_custos()` que valida se a migração 43 foi aplicada
+3. **Dashboard Principal:** Rota `/custos/` com KPIs:
+   - Total de custos
+   - Custos por categoria
+   - Custos mensais (últimos 6 meses)
+   - Top 5 obras por custo
+   - Estatísticas gerais
+4. **Detalhes por Obra:** Rota `/custos/obra/<id>` com:
+   - Custos agrupados por tipo
+   - Total geral
+   - Margem (valor e percentual)
+   - Custos mensais da obra
+5. **APIs JSON:**
+   - `/custos/api/custos-categoria` - Dados para gráfico de pizza
+   - `/custos/api/custos-mensais` - Dados para gráfico de linha
+
+### ❌ **O que está FALTANDO:**
+
+1. **CRUD de Custos:**
+   - ❌ Criar novo custo
+   - ❌ Editar custo existente
+   - ❌ Deletar custo
+   - ❌ Visualizar detalhes de um custo específico
+
+2. **Filtros e Pesquisa:**
+   - ❌ Filtrar custos por obra
+   - ❌ Filtrar custos por tipo
+   - ❌ Filtrar custos por período
+   - ❌ Pesquisar custos por descrição
+
+3. **Relatórios:**
+   - ❌ Relatório de custos por obra (PDF/Excel)
+   - ❌ Relatório de custos por categoria (PDF/Excel)
+   - ❌ Relatório comparativo (orçado vs realizado)
+
+4. **Templates HTML:**
+   - ❌ `templates/custos/dashboard.html` (referenciado mas não existe)
+   - ❌ `templates/custos/obra.html` (referenciado mas não existe)
+   - ❌ Formulário de criação/edição de custos
+   - ❌ Modal de confirmação de deleção
+
+---
+
+## TAREFA 3: Implementar CRUD Completo de Custos
+
+### 3.1 - Adicionar Rotas de CRUD em `custos_views.py`
+
+**Instrução:** Adicione as seguintes rotas ao final do arquivo `custos_views.py`.
+
+```python
+# ================================
+# CRUD DE CUSTOS
+# ================================
+
+@custos_bp.route('/criar', methods=['GET', 'POST'])
+@login_required
+def criar_custo():
+    """Criar um novo custo."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    if request.method == 'POST':
+        try:
+            novo_custo = CustoObra(
+                admin_id=current_user.id,
+                obra_id=request.form['obra_id'],
+                tipo=request.form['tipo'],
+                descricao=request.form['descricao'],
+                valor=float(request.form['valor']),
+                data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
+                fornecedor=request.form.get('fornecedor'),
+                observacoes=request.form.get('observacoes')
+            )
+            
+            db.session.add(novo_custo)
+            db.session.commit()
+            
+            flash('Custo registrado com sucesso!', 'success')
+            return redirect(url_for('custos.dashboard_custos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Erro ao criar custo: {e}")
+            flash(f'Erro ao registrar custo: {str(e)}', 'danger')
+    
+    # GET: Exibir formulário
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).all()
+    return render_template('custos/custo_form.html', obras=obras, custo=None)
+
+@custos_bp.route('/editar/<int:custo_id>', methods=['GET', 'POST'])
+@login_required
+def editar_custo(custo_id):
+    """Editar um custo existente."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    custo = CustoObra.query.filter_by(id=custo_id, admin_id=current_user.id).first_or_404()
+    
+    if request.method == 'POST':
+        try:
+            custo.obra_id = request.form['obra_id']
+            custo.tipo = request.form['tipo']
+            custo.descricao = request.form['descricao']
+            custo.valor = float(request.form['valor'])
+            custo.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
+            custo.fornecedor = request.form.get('fornecedor')
+            custo.observacoes = request.form.get('observacoes')
+            
+            db.session.commit()
+            
+            flash('Custo atualizado com sucesso!', 'success')
+            return redirect(url_for('custos.dashboard_custos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Erro ao editar custo: {e}")
+            flash(f'Erro ao atualizar custo: {str(e)}', 'danger')
+    
+    # GET: Exibir formulário preenchido
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).all()
+    return render_template('custos/custo_form.html', obras=obras, custo=custo)
+
+@custos_bp.route('/deletar/<int:custo_id>', methods=['POST'])
+@login_required
+def deletar_custo(custo_id):
+    """Deletar um custo."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    custo = CustoObra.query.filter_by(id=custo_id, admin_id=current_user.id).first_or_404()
+    
+    try:
+        db.session.delete(custo)
+        db.session.commit()
+        flash('Custo deletado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao deletar custo: {e}")
+        flash(f'Erro ao deletar custo: {str(e)}', 'danger')
+    
+    return redirect(url_for('custos.dashboard_custos'))
+
+@custos_bp.route('/listar')
+@login_required
+def listar_custos():
+    """Listar todos os custos com filtros."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    # Filtros
+    obra_id = request.args.get('obra_id', type=int)
+    tipo = request.args.get('tipo')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    # Query base
+    query = CustoObra.query.filter_by(admin_id=current_user.id)
+    
+    # Aplicar filtros
+    if obra_id:
+        query = query.filter_by(obra_id=obra_id)
+    if tipo:
+        query = query.filter_by(tipo=tipo)
+    if data_inicio:
+        query = query.filter(CustoObra.data >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        query = query.filter(CustoObra.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    
+    # Ordenar por data decrescente
+    custos = query.order_by(desc(CustoObra.data)).all()
+    
+    # Dados para filtros
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).all()
+    tipos = ['mao_obra', 'material', 'veiculo', 'servico', 'alimentacao']
+    
+    return render_template('custos/listar.html', 
+                         custos=custos, 
+                         obras=obras, 
+                         tipos=tipos,
+                         filtros={'obra_id': obra_id, 'tipo': tipo, 'data_inicio': data_inicio, 'data_fim': data_fim})
+```
+
+---
+
+## TAREFA 4: Criar Templates HTML
+
+### 4.1 - Criar `templates/custos/dashboard.html`
+
+**Instrução:** Crie o arquivo `templates/custos/dashboard.html`.
+
+```html
+{% extends 'base.html' %}
+{% block title %}Dashboard de Custos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-dollar-sign text-success me-2"></i>
+            Dashboard de Custos
+        </h1>
+        <div>
+            <a href="{{ url_for('custos.criar_custo') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Novo Custo
+            </a>
+            <a href="{{ url_for('custos.listar_custos') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-1"></i> Ver Todos
+            </a>
+        </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Total de Custos</p>
+                            <h4 class="mb-0 text-primary">R$ {{ "{:,.2f}".format(total_custos or 0) }}</h4>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-coins fa-2x text-primary opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Obras com Custos</p>
+                            <h4 class="mb-0 text-success">{{ obras_com_custos }} / {{ total_obras }}</h4>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-success opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h6 class="mb-0">Custos por Categoria</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="custosCategoria"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h6 class="mb-0">Evolução Mensal</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="custosMensais"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top 5 Obras -->
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h6 class="mb-0">Top 5 Obras por Custo</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Obra</th>
+                            <th>Total de Custos</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for obra in top_obras %}
+                        <tr>
+                            <td>{{ obra.nome }}</td>
+                            <td>R$ {{ "{:,.2f}".format(obra.total_custos) }}</td>
+                            <td>
+                                <a href="{{ url_for('custos.custos_obra', obra_id=obra.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> Detalhes
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" class="text-center">Nenhuma obra com custos registrados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Gráfico de Custos por Categoria
+    fetch('{{ url_for("custos.api_custos_categoria") }}')
+        .then(res => res.json())
+        .then(data => {
+            new Chart(document.getElementById('custosCategoria'), {
+                type: 'pie',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.data,
+                        backgroundColor: data.colors
+                    }]
+                }
+            });
+        });
+
+    // Gráfico de Evolução Mensal
+    fetch('{{ url_for("custos.api_custos_mensais") }}')
+        .then(res => res.json())
+        .then(data => {
+            new Chart(document.getElementById('custosMensais'), {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Custos Mensais',
+                        data: data.data,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                }
+            });
+        });
+</script>
+{% endblock %}
+{% endblock %}
+```
+
+---
+
+### 4.2 - Criar `templates/custos/custo_form.html`
+
+**Instrução:** Crie o arquivo `templates/custos/custo_form.html`.
+
+```html
+{% extends 'base.html' %}
+{% block title %}{% if custo %}Editar{% else %}Novo{% endif %} Custo{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4">{% if custo %}Editar Custo{% else %}Novo Custo{% endif %}</h1>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Obra *</label>
+                        <select name="obra_id" class="form-select" required>
+                            <option value="">Selecione uma obra</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if custo and custo.obra_id == obra.id %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Tipo de Custo *</label>
+                        <select name="tipo" class="form-select" required>
+                            <option value="">Selecione o tipo</option>
+                            <option value="mao_obra" {% if custo and custo.tipo == 'mao_obra' %}selected{% endif %}>Mão de Obra</option>
+                            <option value="material" {% if custo and custo.tipo == 'material' %}selected{% endif %}>Material</option>
+                            <option value="veiculo" {% if custo and custo.tipo == 'veiculo' %}selected{% endif %}>Veículo</option>
+                            <option value="servico" {% if custo and custo.tipo == 'servico' %}selected{% endif %}>Serviço</option>
+                            <option value="alimentacao" {% if custo and custo.tipo == 'alimentacao' %}selected{% endif %}>Alimentação</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Descrição *</label>
+                        <input type="text" name="descricao" class="form-control" value="{{ custo.descricao if custo else '' }}" required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Valor (R$) *</label>
+                        <input type="number" step="0.01" name="valor" class="form-control" value="{{ custo.valor if custo else '' }}" required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Data *</label>
+                        <input type="date" name="data" class="form-control" value="{{ custo.data.strftime('%Y-%m-%d') if custo else '' }}" required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Fornecedor</label>
+                        <input type="text" name="fornecedor" class="form-control" value="{{ custo.fornecedor if custo else '' }}">
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Observações</label>
+                        <textarea name="observacoes" class="form-control" rows="3">{{ custo.observacoes if custo else '' }}</textarea>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Salvar
+                    </button>
+                    <a href="{{ url_for('custos.dashboard_custos') }}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+---
+
+### 4.3 - Criar `templates/custos/listar.html`
+
+**Instrução:** Crie o arquivo `templates/custos/listar.html`.
+
+```html
+{% extends 'base.html' %}
+{% block title %}Listagem de Custos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Listagem de Custos</h1>
+        <a href="{{ url_for('custos.criar_custo') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Novo Custo
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h6 class="mb-0">Filtros</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Obra</label>
+                        <select name="obra_id" class="form-select">
+                            <option value="">Todas</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if filtros.obra_id == obra.id %}selected{% endif %}>{{ obra.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Tipo</label>
+                        <select name="tipo" class="form-select">
+                            <option value="">Todos</option>
+                            {% for tipo in tipos %}
+                            <option value="{{ tipo }}" {% if filtros.tipo == tipo %}selected{% endif %}>{{ tipo.replace('_', ' ').title() }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Data Início</label>
+                        <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio or '' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Data Fim</label>
+                        <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim or '' }}">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabela de Custos -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Obra</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Valor</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for custo in custos %}
+                        <tr>
+                            <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ custo.obra.nome }}</td>
+                            <td><span class="badge bg-primary">{{ custo.tipo.replace('_', ' ').title() }}</span></td>
+                            <td>{{ custo.descricao }}</td>
+                            <td>R$ {{ "{:,.2f}".format(custo.valor) }}</td>
+                            <td>
+                                <a href="{{ url_for('custos.editar_custo', custo_id=custo.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ custo.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+
+                        <!-- Modal de Deleção -->
+                        <div class="modal fade" id="deleteModal{{ custo.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Confirmar Deleção</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p>Tem certeza que deseja deletar este custo?</p>
+                                        <p><strong>{{ custo.descricao }}</strong> - R$ {{ "{:,.2f}".format(custo.valor) }}</p>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <form action="{{ url_for('custos.deletar_custo', custo_id=custo.id) }}" method="POST">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-danger">Deletar</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center">Nenhum custo encontrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+---
+
+## VALIDAÇÃO
+
+Após aplicar todas as correções:
+
+1. **Teste o acesso ao módulo de custos** (`/custos/`)
+2. **Verifique se o erro de URL foi corrigido** (não deve mais aparecer o erro `BuildError`)
+3. **Crie um novo custo** usando o formulário
+4. **Edite um custo existente**
+5. **Delete um custo** (confirme no modal)
+6. **Use os filtros** na página de listagem
+7. **Visualize os gráficos** no dashboard
+8. **Acesse os detalhes de uma obra** (`/custos/obra/<id>`)
+
+---
+
+## RESUMO DAS ALTERAÇÕES
+
+| Arquivo | Tipo de Alteração | Descrição |
+|---|---|---|
+| `custos_views.py` | Correção de Bug | Substituir `url_for('index')` por `url_for('main.index')` (2x) |
+| `financeiro_views.py` | Correção de Bug | Substituir `url_for('index')` por `url_for('main.index')` (1x) |
+| `custos_views.py` | Nova Funcionalidade | Adicionar 5 rotas de CRUD |
+| `templates/custos/dashboard.html` | Novo Arquivo | Dashboard com KPIs e gráficos |
+| `templates/custos/custo_form.html` | Novo Arquivo | Formulário de criação/edição |
+| `templates/custos/listar.html` | Novo Arquivo | Listagem com filtros |
+
+---
+
+**Resultado Final:** Módulo de Custos 100% funcional com CRUD completo, filtros, gráficos e interface moderna. ✅
+

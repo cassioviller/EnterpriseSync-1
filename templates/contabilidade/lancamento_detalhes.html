@@ -1,0 +1,260 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Lançamento #{{ lancamento.numero }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-file-invoice"></i> Lançamento Contábil #{{ lancamento.numero }}
+            {% if estornado %}
+                <span class="badge bg-danger ms-2">ESTORNADO</span>
+            {% endif %}
+        </h1>
+        <div>
+            {% if not estornado %}
+                <a href="{{ url_for('contabilidade.editar_lancamento', id=lancamento.id) }}" class="btn btn-warning btn-sm">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#estornarModal">
+                    <i class="fas fa-undo"></i> Estornar
+                </button>
+            {% endif %}
+            <a href="{{ url_for('contabilidade.lancamentos_contabeis') }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Informações do Lançamento -->
+        <div class="col-xl-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-info-circle"></i> Informações do Lançamento
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p class="mb-2"><strong>Número:</strong></p>
+                            <p class="text-muted">{{ lancamento.numero }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-2"><strong>Data:</strong></p>
+                            <p class="text-muted">{{ lancamento.data_lancamento.strftime('%d/%m/%Y') }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-2"><strong>Valor Total:</strong></p>
+                            <p class="text-muted"><strong class="text-primary">R$ {{ "{:,.2f}".format(lancamento.valor_total|float) }}</strong></p>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-2"><strong>Origem:</strong></p>
+                            <p class="text-muted">
+                                {% if lancamento.origem == 'MANUAL' %}
+                                    <span class="badge bg-primary">MANUAL</span>
+                                {% elif lancamento.origem == 'MODULO_1' %}
+                                    <span class="badge bg-success">MÓDULO 1</span>
+                                {% elif lancamento.origem == 'MODULO_4' %}
+                                    <span class="badge bg-warning text-dark">MÓDULO 4</span>
+                                {% elif lancamento.origem == 'MODULO_6' %}
+                                    <span class="badge bg-info text-dark">MÓDULO 6</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">SISTEMA</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <p class="mb-2"><strong>Histórico:</strong></p>
+                            <p class="text-muted">{{ lancamento.historico }}</p>
+                        </div>
+                    </div>
+                    {% if lancamento.usuario %}
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Criado por:</strong></p>
+                            <p class="text-muted">{{ lancamento.usuario.nome }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Data de criação:</strong></p>
+                            <p class="text-muted">{{ lancamento.created_at.strftime('%d/%m/%Y %H:%M') if lancamento.created_at else 'N/A' }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Partidas Contábeis -->
+        <div class="col-xl-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-list"></i> Partidas Contábeis (Débitos e Créditos)
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th style="width: 50px;">Seq.</th>
+                                    <th style="width: 120px;">Tipo</th>
+                                    <th>Conta Contábil</th>
+                                    <th>Centro de Custo</th>
+                                    <th style="width: 150px;" class="text-end">Valor (R$)</th>
+                                    <th>Histórico Complementar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for partida in lancamento.partidas|sort(attribute='sequencia') %}
+                                <tr>
+                                    <td class="text-center">{{ partida.sequencia }}</td>
+                                    <td>
+                                        {% if partida.tipo_partida == 'DEBITO' %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-minus-circle"></i> DÉBITO
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-plus-circle"></i> CRÉDITO
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ partida.conta_codigo }}</strong> - {{ partida.conta.nome if partida.conta else 'N/A' }}
+                                    </td>
+                                    <td>
+                                        {% if partida.centro_custo %}
+                                            <span class="badge bg-info text-dark">
+                                                {{ partida.centro_custo.codigo }} - {{ partida.centro_custo.nome }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>R$ {{ "{:,.2f}".format(partida.valor|float) }}</strong>
+                                    </td>
+                                    <td>
+                                        {{ partida.historico_complementar or '-' }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="bg-light">
+                                <tr>
+                                    <td colspan="4" class="text-end"><strong>Total Débitos:</strong></td>
+                                    <td class="text-end">
+                                        <strong class="text-danger">R$ {{ "{:,.2f}".format(total_debito|float) }}</strong>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" class="text-end"><strong>Total Créditos:</strong></td>
+                                    <td class="text-end">
+                                        <strong class="text-success">R$ {{ "{:,.2f}".format(total_credito|float) }}</strong>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr class="table-primary">
+                                    <td colspan="4" class="text-end"><strong>Diferença:</strong></td>
+                                    <td class="text-end">
+                                        {% set diferenca = (total_debito - total_credito)|float %}
+                                        {% if diferenca|abs < 0.01 %}
+                                            <strong class="text-success">
+                                                <i class="fas fa-check-circle"></i> R$ 0,00 (Balanceado)
+                                            </strong>
+                                        {% else %}
+                                            <strong class="text-danger">
+                                                <i class="fas fa-exclamation-triangle"></i> R$ {{ "{:,.2f}".format(diferenca|abs) }}
+                                            </strong>
+                                        {% endif %}
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação de Estorno -->
+<div class="modal fade" id="estornarModal" tabindex="-1" aria-labelledby="estornarModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="estornarModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Confirmar Estorno
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Atenção!</strong> Esta ação irá:</p>
+                <ul>
+                    <li>Criar um lançamento de estorno automático (débitos ↔ créditos invertidos)</li>
+                    <li>Marcar este lançamento como ESTORNADO</li>
+                    <li>Esta operação NÃO PODE ser desfeita</li>
+                </ul>
+                <p class="mb-0">Deseja realmente estornar o lançamento <strong>#{{ lancamento.numero }}</strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarEstorno">
+                    <i class="fas fa-undo"></i> Confirmar Estorno
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Confirmação de estorno
+document.addEventListener('DOMContentLoaded', function() {
+    const btnConfirmarEstorno = document.getElementById('btnConfirmarEstorno');
+    
+    if (btnConfirmarEstorno) {
+        btnConfirmarEstorno.addEventListener('click', function() {
+            // Desabilitar botão e mostrar loading
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Estornando...';
+            
+            // Fazer requisição para estornar
+            fetch('{{ url_for("contabilidade.estornar_lancamento", id=lancamento.id) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar mensagem de sucesso e redirecionar
+                    alert(data.message);
+                    window.location.href = '{{ url_for("contabilidade.lancamentos_contabeis") }}';
+                } else {
+                    // Mostrar erro
+                    alert('Erro: ' + data.message);
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-undo"></i> Confirmar Estorno';
+                }
+            })
+            .catch(error => {
+                alert('Erro ao estornar lançamento: ' + error);
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-undo"></i> Confirmar Estorno';
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

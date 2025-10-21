@@ -1,195 +1,452 @@
 {% extends "base_completo.html" %}
 
-{% block title %}DRE - Demonstração do Resultado do Exercício{% endblock %}
+{% block title %}DRE - {{ mes_nome }}/{{ ano }} - SIGE{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <!-- Page Heading -->
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0 text-gray-800">
-            <i class="fas fa-chart-line"></i> DRE - Demonstração do Resultado
+            <i class="fas fa-chart-line"></i> DRE - Demonstração do Resultado do Exercício
         </h1>
         <div class="btn-group">
-            <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-sm btn-secondary">
+            <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Voltar
             </a>
-            <button class="btn btn-sm btn-primary" onclick="window.print()">
+            <button class="btn btn-primary" onclick="window.print()">
                 <i class="fas fa-print"></i> Imprimir
+            </button>
+            <button class="btn btn-info" disabled>
+                <i class="fas fa-file-pdf"></i> Exportar PDF
             </button>
         </div>
     </div>
 
-    <!-- Filtros -->
+    <!-- Filtros de Período -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Período de Referência</h6>
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-calendar-alt"></i> Selecionar Período
+            </h6>
         </div>
         <div class="card-body">
-            <form method="GET" class="row">
-                <div class="col-md-3">
-                    <label>Mês:</label>
-                    <select name="mes" class="form-control">
+            <form method="GET" action="{{ url_for('contabilidade.dre') }}" class="row g-3">
+                <div class="col-md-4">
+                    <label for="mes" class="form-label">Mês:</label>
+                    <select name="mes" id="mes" class="form-select">
                         {% for i in range(1, 13) %}
-                        <option value="{{ i }}" {% if i == mes_referencia.month %}selected{% endif %}>
-                            {% if i == 1 %}Janeiro{% elif i == 2 %}Fevereiro{% elif i == 3 %}Março{% elif i == 4 %}Abril{% elif i == 5 %}Maio{% elif i == 6 %}Junho{% elif i == 7 %}Julho{% elif i == 8 %}Agosto{% elif i == 9 %}Setembro{% elif i == 10 %}Outubro{% elif i == 11 %}Novembro{% else %}Dezembro{% endif %}
+                        <option value="{{ i }}" {% if i == mes %}selected{% endif %}>
+                            {{ meses_nomes[i] }}
                         </option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label>Ano:</label>
-                    <select name="ano" class="form-control">
-                        {% for ano in range(2020, 2030) %}
-                        <option value="{{ ano }}" {% if ano == mes_referencia.year %}selected{% endif %}>{{ ano }}</option>
+                <div class="col-md-4">
+                    <label for="ano" class="form-label">Ano:</label>
+                    <select name="ano" id="ano" class="form-select">
+                        {% for a in range(2020, 2031) %}
+                        <option value="{{ a }}" {% if a == ano %}selected{% endif %}>{{ a }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label>&nbsp;</label><br>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> Consultar
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label><br>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i> Gerar DRE
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- DRE -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">
-                DRE - {{ mes_referencia.strftime('%m/%Y') }}
-            </h6>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-borderless">
-                    <tbody>
-                        <tr class="border-bottom">
-                            <td><strong>RECEITA BRUTA</strong></td>
-                            <td class="text-right"><strong>R$ {{ "%.2f"|format(dre.receita_bruta|float) }}</strong></td>
-                        </tr>
-                        <tr>
-                            <td style="padding-left: 20px;">(-) Impostos sobre Vendas</td>
-                            <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre.impostos_sobre_vendas|float) }})</td>
-                        </tr>
-                        <tr class="table-light border-bottom">
-                            <td><strong>RECEITA LÍQUIDA</strong></td>
-                            <td class="text-right"><strong>R$ {{ "%.2f"|format(dre.receita_liquida|float) }}</strong></td>
-                        </tr>
-                        <tr>
-                            <td style="padding-left: 20px;">(-) Custo dos Serviços Prestados</td>
-                            <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre.custo_total|float) }})</td>
-                        </tr>
-                        <tr class="table-success border-bottom">
-                            <td><strong>LUCRO BRUTO</strong></td>
-                            <td class="text-right"><strong>R$ {{ "%.2f"|format(dre.lucro_bruto|float) }}</strong></td>
-                        </tr>
-                        <tr>
-                            <td><strong>DESPESAS OPERACIONAIS</strong></td>
-                            <td></td>
-                        </tr>
-                        <tr>
-                            <td style="padding-left: 20px;">(-) Despesas Administrativas</td>
-                            <td class="text-right text-danger">R$ ({{ "%.2f"|format((dre.total_despesas|float) * 0.6) }})</td>
-                        </tr>
-                        <tr>
-                            <td style="padding-left: 20px;">(-) Despesas com Pessoal</td>
-                            <td class="text-right text-danger">R$ ({{ "%.2f"|format((dre.total_despesas|float) * 0.4) }})</td>
-                        </tr>
-                        <tr class="border-bottom">
-                            <td style="padding-left: 20px;"><strong>Total das Despesas</strong></td>
-                            <td class="text-right text-danger"><strong>R$ ({{ "%.2f"|format(dre.total_despesas|float) }})</strong></td>
-                        </tr>
-                        <tr class="table-info border-bottom">
-                            <td><strong>LUCRO OPERACIONAL</strong></td>
-                            <td class="text-right"><strong>R$ {{ "%.2f"|format(dre.lucro_operacional|float) }}</strong></td>
-                        </tr>
-                        <tr class="table-{% if dre.lucro_liquido >= 0 %}success{% else %}danger{% endif %} border-bottom">
-                            <td><strong>LUCRO LÍQUIDO DO PERÍODO</strong></td>
-                            <td class="text-right">
-                                <strong>
-                                    R$ {{ "%.2f"|format(dre.lucro_liquido|float) }}
-                                    {% if dre.lucro_liquido >= 0 %}
-                                        <i class="fas fa-arrow-up text-success ml-2"></i>
-                                    {% else %}
-                                        <i class="fas fa-arrow-down text-danger ml-2"></i>
-                                    {% endif %}
-                                </strong>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Indicadores -->
-            <div class="row mt-4">
-                <div class="col-md-3">
-                    <div class="card border-left-primary">
-                        <div class="card-body py-3">
+    <!-- Key Metrics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Margem Bruta
+                                Receita Líquida
                             </div>
-                            <div class="h6 mb-0 font-weight-bold text-gray-800">
-                                {% if dre.receita_liquida > 0 %}
-                                    {{ "%.1f"|format((dre.lucro_bruto / dre.receita_liquida * 100)|float) }}%
-                                {% else %}
-                                    0.0%
-                                {% endif %}
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(dre.receita_liquida) }}
                             </div>
+                            {% if comparativo.receita_liquida %}
+                            <div class="mt-2 text-xs">
+                                <span class="badge bg-{% if comparativo.receita_liquida.variacao >= 0 %}success{% else %}danger{% endif %}">
+                                    {% if comparativo.receita_liquida.variacao >= 0 %}
+                                    <i class="fas fa-arrow-up"></i>
+                                    {% else %}
+                                    <i class="fas fa-arrow-down"></i>
+                                    {% endif %}
+                                    {{ "{:+.1f}".format(comparativo.receita_liquida.variacao) }}%
+                                </span>
+                                <span class="text-muted">vs mês anterior</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card border-left-success">
-                        <div class="card-body py-3">
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Margem Líquida
+                                Lucro Bruto
                             </div>
-                            <div class="h6 mb-0 font-weight-bold text-gray-800">
-                                {% if dre.receita_liquida > 0 %}
-                                    {{ "%.1f"|format((dre.lucro_liquido / dre.receita_liquida * 100)|float) }}%
-                                {% else %}
-                                    0.0%
-                                {% endif %}
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(dre.lucro_bruto) }}
                             </div>
+                            <div class="mt-1 text-xs text-muted">
+                                Margem: {{ "{:.1f}".format(dre.percentuais.margem_bruta) }}%
+                            </div>
+                            {% if comparativo.lucro_bruto %}
+                            <div class="mt-2 text-xs">
+                                <span class="badge bg-{% if comparativo.lucro_bruto.variacao >= 0 %}success{% else %}danger{% endif %}">
+                                    {% if comparativo.lucro_bruto.variacao >= 0 %}
+                                    <i class="fas fa-arrow-up"></i>
+                                    {% else %}
+                                    <i class="fas fa-arrow-down"></i>
+                                    {% endif %}
+                                    {{ "{:+.1f}".format(comparativo.lucro_bruto.variacao) }}%
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card border-left-info">
-                        <div class="card-body py-3">
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Peso dos Custos
+                                EBITDA
                             </div>
-                            <div class="h6 mb-0 font-weight-bold text-gray-800">
-                                {% if dre.receita_liquida > 0 %}
-                                    {{ "%.1f"|format((dre.custo_total / dre.receita_liquida * 100)|float) }}%
-                                {% else %}
-                                    0.0%
-                                {% endif %}
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(dre.ebitda) }}
                             </div>
+                            <div class="mt-1 text-xs text-muted">
+                                Margem: {{ "{:.1f}".format(dre.percentuais.margem_ebitda) }}%
+                            </div>
+                            {% if comparativo.ebitda %}
+                            <div class="mt-2 text-xs">
+                                <span class="badge bg-{% if comparativo.ebitda.variacao >= 0 %}success{% else %}danger{% endif %}">
+                                    {% if comparativo.ebitda.variacao >= 0 %}
+                                    <i class="fas fa-arrow-up"></i>
+                                    {% else %}
+                                    <i class="fas fa-arrow-down"></i>
+                                    {% endif %}
+                                    {{ "{:+.1f}".format(comparativo.ebitda.variacao) }}%
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-coins fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card border-left-warning">
-                        <div class="card-body py-3">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Peso das Despesas
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-{% if dre.lucro_liquido >= 0 %}success{% else %}danger{% endif %} shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-{% if dre.lucro_liquido >= 0 %}success{% else %}danger{% endif %} text-uppercase mb-1">
+                                Lucro Líquido
                             </div>
-                            <div class="h6 mb-0 font-weight-bold text-gray-800">
-                                {% if dre.receita_liquida > 0 %}
-                                    {{ "%.1f"|format((dre.total_despesas / dre.receita_liquida * 100)|float) }}%
-                                {% else %}
-                                    0.0%
-                                {% endif %}
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(dre.lucro_liquido) }}
                             </div>
+                            <div class="mt-1 text-xs text-muted">
+                                Margem: {{ "{:.1f}".format(dre.percentuais.margem_liquida) }}%
+                            </div>
+                            {% if comparativo.lucro_liquido %}
+                            <div class="mt-2 text-xs">
+                                <span class="badge bg-{% if comparativo.lucro_liquido.variacao >= 0 %}success{% else %}danger{% endif %}">
+                                    {% if comparativo.lucro_liquido.variacao >= 0 %}
+                                    <i class="fas fa-arrow-up"></i>
+                                    {% else %}
+                                    <i class="fas fa-arrow-down"></i>
+                                    {% endif %}
+                                    {{ "{:+.1f}".format(comparativo.lucro_liquido.variacao) }}%
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-trophy fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- DRE Completa -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold">
+                <i class="fas fa-file-invoice-dollar"></i> 
+                DRE Detalhada - {{ mes_nome }}/{{ ano }}
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <tbody>
+                        <!-- 1. RECEITA BRUTA -->
+                        <tr class="table-light">
+                            <td colspan="2"><strong class="h6">1. RECEITA BRUTA</strong></td>
+                            <td class="text-end"><strong>R$ {{ "{:,.2f}".format(dre.receita_bruta) }}</strong></td>
+                        </tr>
+
+                        <!-- 2. DEDUÇÕES -->
+                        <tr class="table-light">
+                            <td colspan="2"><strong class="h6">2. (-) DEDUÇÕES E ABATIMENTOS</strong></td>
+                            <td class="text-end text-danger"><strong>(R$ {{ "{:,.2f}".format(dre.deducoes) }})</strong></td>
+                        </tr>
+
+                        <!-- 3. RECEITA LÍQUIDA -->
+                        <tr class="bg-primary text-white">
+                            <td colspan="2"><strong class="h6">3. = RECEITA LÍQUIDA</strong></td>
+                            <td class="text-end"><strong>R$ {{ "{:,.2f}".format(dre.receita_liquida) }}</strong></td>
+                        </tr>
+
+                        <!-- 4. CMV -->
+                        <tr class="table-light">
+                            <td colspan="2"><strong class="h6">4. (-) CMV/CPV</strong></td>
+                            <td class="text-end text-danger"><strong>(R$ {{ "{:,.2f}".format(dre.cmv) }})</strong></td>
+                        </tr>
+
+                        <!-- 5. LUCRO BRUTO -->
+                        <tr class="{% if dre.lucro_bruto >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white">
+                            <td colspan="2"><strong class="h6">5. = LUCRO BRUTO</strong></td>
+                            <td class="text-end">
+                                <strong>R$ {{ "{:,.2f}".format(dre.lucro_bruto) }}</strong>
+                                <small class="ms-2">({{ "{:.1f}".format(dre.percentuais.margem_bruta) }}%)</small>
+                            </td>
+                        </tr>
+
+                        <!-- 6. DESPESAS OPERACIONAIS -->
+                        <tr class="table-light">
+                            <td colspan="3"><strong class="h6">6. (-) DESPESAS OPERACIONAIS</strong></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>6.1. Despesas com Pessoal</td>
+                            <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.despesas_operacionais.pessoal) }})</td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>6.2. Despesas com Materiais</td>
+                            <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.despesas_operacionais.materiais) }})</td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>6.3. Despesas Administrativas</td>
+                            <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.despesas_operacionais.administrativas) }})</td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>6.4. Despesas Comerciais</td>
+                            <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.despesas_operacionais.comerciais) }})</td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>6.5. Outras Despesas</td>
+                            <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.despesas_operacionais.outras) }})</td>
+                        </tr>
+                        <tr class="table-secondary">
+                            <td></td>
+                            <td><strong>Total das Despesas Operacionais</strong></td>
+                            <td class="text-end text-danger"><strong>(R$ {{ "{:,.2f}".format(dre.despesas_operacionais.total) }})</strong></td>
+                        </tr>
+
+                        <!-- 7. EBITDA -->
+                        <tr class="{% if dre.ebitda >= 0 %}bg-info{% else %}bg-warning{% endif %} text-white">
+                            <td colspan="2"><strong class="h6">7. = EBITDA</strong></td>
+                            <td class="text-end">
+                                <strong>R$ {{ "{:,.2f}".format(dre.ebitda) }}</strong>
+                                <small class="ms-2">({{ "{:.1f}".format(dre.percentuais.margem_ebitda) }}%)</small>
+                            </td>
+                        </tr>
+
+                        <!-- 8. RESULTADO FINANCEIRO -->
+                        <tr class="table-light">
+                            <td colspan="3"><strong class="h6">8. (+/-) RESULTADO FINANCEIRO</strong></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>8.1. (+) Receitas Financeiras</td>
+                            <td class="text-end text-success">R$ {{ "{:,.2f}".format(dre.resultado_financeiro.receitas) }}</td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>8.2. (-) Despesas Financeiras</td>
+                            <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.resultado_financeiro.despesas) }})</td>
+                        </tr>
+                        <tr class="table-secondary">
+                            <td></td>
+                            <td><strong>Resultado Financeiro Líquido</strong></td>
+                            <td class="text-end {% if dre.resultado_financeiro.total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                <strong>
+                                    {% if dre.resultado_financeiro.total >= 0 %}
+                                    R$ {{ "{:,.2f}".format(dre.resultado_financeiro.total) }}
+                                    {% else %}
+                                    (R$ {{ "{:,.2f}".format(dre.resultado_financeiro.total|abs) }})
+                                    {% endif %}
+                                </strong>
+                            </td>
+                        </tr>
+
+                        <!-- 9. RESULTADO ANTES IR/CSLL -->
+                        <tr class="{% if dre.resultado_antes_ir >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white">
+                            <td colspan="2"><strong class="h6">9. = RESULTADO ANTES IR/CSLL</strong></td>
+                            <td class="text-end"><strong>R$ {{ "{:,.2f}".format(dre.resultado_antes_ir) }}</strong></td>
+                        </tr>
+
+                        <!-- 10. PROVISÃO IR E CSLL -->
+                        <tr class="table-light">
+                            <td colspan="3"><strong class="h6">10. (-) PROVISÃO IR E CSLL</strong></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>10.1. Imposto de Renda (IR)</td>
+                            <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.provisao_ir_csll.ir) }})</td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td>10.2. Contribuição Social (CSLL)</td>
+                            <td class="text-end text-danger">(R$ {{ "{:,.2f}".format(dre.provisao_ir_csll.csll) }})</td>
+                        </tr>
+                        <tr class="table-secondary">
+                            <td></td>
+                            <td><strong>Total de Provisões</strong></td>
+                            <td class="text-end text-danger"><strong>(R$ {{ "{:,.2f}".format(dre.provisao_ir_csll.total) }})</strong></td>
+                        </tr>
+
+                        <!-- 11. LUCRO LÍQUIDO -->
+                        <tr class="{% if dre.lucro_liquido >= 0 %}bg-success{% else %}bg-danger{% endif %} text-white border-top border-3">
+                            <td colspan="2">
+                                <strong class="h5">
+                                    <i class="fas fa-{% if dre.lucro_liquido >= 0 %}check-circle{% else %}exclamation-triangle{% endif %}"></i> 
+                                    11. = LUCRO LÍQUIDO DO PERÍODO
+                                </strong>
+                            </td>
+                            <td class="text-end">
+                                <strong class="h5">R$ {{ "{:,.2f}".format(dre.lucro_liquido) }}</strong>
+                                <br>
+                                <small>({{ "{:.1f}".format(dre.percentuais.margem_liquida) }}%)</small>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Painel Comparativo -->
+    {% if comparativo %}
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-info text-white">
+            <h6 class="m-0 font-weight-bold">
+                <i class="fas fa-chart-bar"></i> 
+                Análise Comparativa - {{ meses_nomes[mes_anterior] }}/{{ ano_anterior }} vs {{ mes_nome }}/{{ ano }}
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Indicador</th>
+                            <th class="text-end">{{ meses_nomes[mes_anterior] }}/{{ ano_anterior }}</th>
+                            <th class="text-end">{{ mes_nome }}/{{ ano }}</th>
+                            <th class="text-center">Variação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Receita Líquida</strong></td>
+                            <td class="text-end">R$ {{ "{:,.2f}".format(comparativo.receita_liquida.anterior) }}</td>
+                            <td class="text-end">R$ {{ "{:,.2f}".format(dre.receita_liquida) }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-{% if comparativo.receita_liquida.variacao >= 0 %}success{% else %}danger{% endif %}">
+                                    {% if comparativo.receita_liquida.variacao >= 0 %}↑{% else %}↓{% endif %}
+                                    {{ "{:.1f}".format(comparativo.receita_liquida.variacao|abs) }}%
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Lucro Bruto</strong></td>
+                            <td class="text-end">R$ {{ "{:,.2f}".format(comparativo.lucro_bruto.anterior) }}</td>
+                            <td class="text-end">R$ {{ "{:,.2f}".format(dre.lucro_bruto) }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-{% if comparativo.lucro_bruto.variacao >= 0 %}success{% else %}danger{% endif %}">
+                                    {% if comparativo.lucro_bruto.variacao >= 0 %}↑{% else %}↓{% endif %}
+                                    {{ "{:.1f}".format(comparativo.lucro_bruto.variacao|abs) }}%
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>EBITDA</strong></td>
+                            <td class="text-end">R$ {{ "{:,.2f}".format(comparativo.ebitda.anterior) }}</td>
+                            <td class="text-end">R$ {{ "{:,.2f}".format(dre.ebitda) }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-{% if comparativo.ebitda.variacao >= 0 %}success{% else %}danger{% endif %}">
+                                    {% if comparativo.ebitda.variacao >= 0 %}↑{% else %}↓{% endif %}
+                                    {{ "{:.1f}".format(comparativo.ebitda.variacao|abs) }}%
+                                </span>
+                            </td>
+                        </tr>
+                        <tr class="table-light">
+                            <td><strong>Lucro Líquido</strong></td>
+                            <td class="text-end"><strong>R$ {{ "{:,.2f}".format(comparativo.lucro_liquido.anterior) }}</strong></td>
+                            <td class="text-end"><strong>R$ {{ "{:,.2f}".format(dre.lucro_liquido) }}</strong></td>
+                            <td class="text-center">
+                                <span class="badge bg-{% if comparativo.lucro_liquido.variacao >= 0 %}success{% else %}danger{% endif %}">
+                                    {% if comparativo.lucro_liquido.variacao >= 0 %}↑{% else %}↓{% endif %}
+                                    {{ "{:.1f}".format(comparativo.lucro_liquido.variacao|abs) }}%
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
+
+<style>
+@media print {
+    .btn-group, .card-header, .navbar, .sidebar {
+        display: none !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+}
+</style>
 {% endblock %}
