@@ -16,9 +16,12 @@
             <button class="btn btn-primary" onclick="window.print()">
                 <i class="fas fa-print"></i> Imprimir
             </button>
-            <button class="btn btn-info" disabled>
-                <i class="fas fa-file-pdf"></i> Exportar PDF
-            </button>
+            <a href="{{ url_for('contabilidade.dre_excel', mes=mes, ano=ano) }}" class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+            <a href="{{ url_for('contabilidade.dre_pdf', mes=mes, ano=ano) }}" class="btn btn-danger">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
         </div>
     </div>
 

@@ -621,6 +621,42 @@ def balancete():
                          totais=totais,
                          now=datetime.now())
 
+@contabilidade_bp.route('/razao/<conta_codigo>')
+@admin_required
+def razao(conta_codigo):
+    """Razão Analítico - Detailed ledger for a specific account"""
+    from contabilidade_utils import gerar_razao_conta
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    data_inicio_str = request.args.get('data_inicio')
+    data_fim_str = request.args.get('data_fim')
+    
+    if data_inicio_str:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+    else:
+        data_inicio = date.today().replace(day=1)
+    
+    if data_fim_str:
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+    else:
+        data_fim = date.today()
+    
+    razao_data = gerar_razao_conta(admin_id, conta_codigo, data_inicio, data_fim)
+    
+    if not razao_data:
+        flash(f'Conta {conta_codigo} não encontrada', 'danger')
+        return redirect(url_for('contabilidade.balancete'))
+    
+    return render_template('contabilidade/razao.html',
+                         razao=razao_data,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim,
+                         conta_codigo=conta_codigo)
+
 @contabilidade_bp.route('/dre')
 @admin_required
 def dre():
@@ -750,6 +786,156 @@ def dre():
                          ano_anterior=ano_anterior,
                          comparativo=comparativo,
                          meses_nomes=meses_nomes)
+
+# ==================== EXPORTAÇÕES PDF E EXCEL ====================
+
+@contabilidade_bp.route('/balancete/pdf')
+@admin_required
+def balancete_pdf():
+    """Exportar Balancete em PDF"""
+    from flask import send_file
+    from contabilidade_utils import gerar_balancete_pdf
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    try:
+        # Obter parâmetros
+        mes = int(request.args.get('mes', date.today().month))
+        ano = int(request.args.get('ano', date.today().year))
+        
+        # Validar
+        if mes < 1 or mes > 12:
+            mes = date.today().month
+        if ano < 2020 or ano > 2030:
+            ano = date.today().year
+        
+        # Gerar PDF
+        buffer = gerar_balancete_pdf(admin_id, mes, ano)
+        
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'balancete_{mes:02d}_{ano}.pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Erro ao gerar PDF do balancete: {str(e)}', 'danger')
+        return redirect(url_for('contabilidade.balancete'))
+
+@contabilidade_bp.route('/balancete/excel')
+@admin_required
+def balancete_excel():
+    """Exportar Balancete em Excel"""
+    from flask import send_file
+    from contabilidade_utils import gerar_balancete_excel
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    try:
+        # Obter parâmetros
+        mes = int(request.args.get('mes', date.today().month))
+        ano = int(request.args.get('ano', date.today().year))
+        
+        # Validar
+        if mes < 1 or mes > 12:
+            mes = date.today().month
+        if ano < 2020 or ano > 2030:
+            ano = date.today().year
+        
+        # Gerar Excel
+        buffer = gerar_balancete_excel(admin_id, mes, ano)
+        
+        return send_file(
+            buffer,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'balancete_{mes:02d}_{ano}.xlsx'
+        )
+        
+    except Exception as e:
+        flash(f'Erro ao gerar Excel do balancete: {str(e)}', 'danger')
+        return redirect(url_for('contabilidade.balancete'))
+
+@contabilidade_bp.route('/dre/pdf')
+@admin_required
+def dre_pdf():
+    """Exportar DRE em PDF"""
+    from flask import send_file
+    from contabilidade_utils import gerar_dre_pdf
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    try:
+        # Obter parâmetros
+        mes = int(request.args.get('mes', date.today().month))
+        ano = int(request.args.get('ano', date.today().year))
+        
+        # Validar
+        if mes < 1 or mes > 12:
+            mes = date.today().month
+        if ano < 2020 or ano > 2030:
+            ano = date.today().year
+        
+        # Gerar PDF
+        buffer = gerar_dre_pdf(admin_id, mes, ano)
+        
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'dre_{mes:02d}_{ano}.pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Erro ao gerar PDF da DRE: {str(e)}', 'danger')
+        return redirect(url_for('contabilidade.dre'))
+
+@contabilidade_bp.route('/dre/excel')
+@admin_required
+def dre_excel():
+    """Exportar DRE em Excel"""
+    from flask import send_file
+    from contabilidade_utils import gerar_dre_excel
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    try:
+        # Obter parâmetros
+        mes = int(request.args.get('mes', date.today().month))
+        ano = int(request.args.get('ano', date.today().year))
+        
+        # Validar
+        if mes < 1 or mes > 12:
+            mes = date.today().month
+        if ano < 2020 or ano > 2030:
+            ano = date.today().year
+        
+        # Gerar Excel
+        buffer = gerar_dre_excel(admin_id, mes, ano)
+        
+        return send_file(
+            buffer,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'dre_{mes:02d}_{ano}.xlsx'
+        )
+        
+    except Exception as e:
+        flash(f'Erro ao gerar Excel da DRE: {str(e)}', 'danger')
+        return redirect(url_for('contabilidade.dre'))
 
 @contabilidade_bp.route('/balanco-patrimonial')
 @admin_required

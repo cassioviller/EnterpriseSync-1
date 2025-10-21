@@ -258,6 +258,92 @@ def calcular_saldo_conta(conta_codigo, admin_id, data_inicio=None, data_fim=None
     saldo = query.scalar() or Decimal('0.0')
     return saldo
 
+def gerar_razao_conta(admin_id, conta_codigo, data_inicio, data_fim):
+    """
+    Generate analytical ledger for a specific account.
+    
+    Args:
+        admin_id: Admin/tenant ID
+        conta_codigo: Account code (ex: '1.1.01.001')
+        data_inicio: Start date
+        data_fim: End date
+        
+    Returns:
+        dict with account info, movements, and totals
+    """
+    from models import PlanoContas, PartidaContabil, LancamentoContabil
+    from decimal import Decimal
+    
+    conta = PlanoContas.query.filter_by(
+        codigo=conta_codigo,
+        admin_id=admin_id
+    ).first()
+    
+    if not conta:
+        return None
+    
+    saldo_anterior = calcular_saldo_conta(conta_codigo, admin_id, None, data_inicio - timedelta(days=1))
+    
+    partidas = db.session.query(
+        PartidaContabil, LancamentoContabil
+    ).join(
+        LancamentoContabil, 
+        PartidaContabil.lancamento_id == LancamentoContabil.id
+    ).filter(
+        PartidaContabil.conta_codigo == conta_codigo,
+        PartidaContabil.admin_id == admin_id,
+        LancamentoContabil.data_lancamento >= data_inicio,
+        LancamentoContabil.data_lancamento <= data_fim
+    ).order_by(
+        LancamentoContabil.data_lancamento.asc(),
+        LancamentoContabil.numero.asc(),
+        PartidaContabil.sequencia.asc()
+    ).all()
+    
+    movimentos = []
+    saldo_acumulado = saldo_anterior
+    total_debitos = Decimal('0')
+    total_creditos = Decimal('0')
+    
+    for partida, lancamento in partidas:
+        valor_decimal = Decimal(str(partida.valor))
+        
+        if partida.tipo_partida == 'DEBITO':
+            saldo_acumulado += valor_decimal
+            total_debitos += valor_decimal
+        else:
+            saldo_acumulado -= valor_decimal
+            total_creditos += valor_decimal
+        
+        movimentos.append({
+            'data': lancamento.data_lancamento,
+            'lancamento_numero': lancamento.numero,
+            'lancamento_id': lancamento.id,
+            'historico': lancamento.historico,
+            'tipo': partida.tipo_partida,
+            'valor': valor_decimal,
+            'saldo_acumulado': saldo_acumulado
+        })
+    
+    return {
+        'conta': {
+            'codigo': conta.codigo,
+            'nome': conta.nome,
+            'tipo_saldo': 'DEVEDOR' if conta.codigo.startswith(('1', '5', '6')) else 'CREDOR'
+        },
+        'periodo': {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim
+        },
+        'saldo_anterior': saldo_anterior,
+        'movimentos': movimentos,
+        'totais': {
+            'total_debitos': total_debitos,
+            'total_creditos': total_creditos,
+            'saldo_final': saldo_acumulado
+        }
+    }
+
 def gerar_balancete_mensal(admin_id, mes_referencia):
     """Gera o balancete mensal para todas as contas."""
     # Obter todas as contas que aceitam lançamento
@@ -602,3 +688,749 @@ def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
         import traceback
         traceback.print_exc()
         return None
+
+# ===============================================================
+# == FUNÇÕES DE EXPORTAÇÃO PDF E EXCEL
+# ===============================================================
+
+def obter_dados_balancete(admin_id, mes, ano):
+    """
+    Obtém dados do balancete formatados para exportação
+    
+    Args:
+        admin_id: ID do administrador
+        mes: Mês (1-12)
+        ano: Ano
+        
+    Returns:
+        dict: Dicionário com contas e totais
+    """
+    from sqlalchemy import func
+    
+    # Definir período
+    primeiro_dia = date(ano, mes, 1)
+    ultimo_dia = date(ano, mes, calendar.monthrange(ano, mes)[1])
+    fim_mes_anterior = primeiro_dia - timedelta(days=1)
+    
+    # Buscar TODAS as contas do plano de contas
+    todas_contas = PlanoContas.query.filter_by(admin_id=admin_id).order_by(PlanoContas.codigo).all()
+    
+    contas_data = []
+    total_debitos = Decimal('0')
+    total_creditos = Decimal('0')
+    total_saldo_devedor = Decimal('0')
+    total_saldo_credor = Decimal('0')
+    
+    for conta in todas_contas:
+        # Calcular saldo anterior
+        partidas_anteriores = db.session.query(PartidaContabil).join(LancamentoContabil).filter(
+            PartidaContabil.conta_codigo == conta.codigo,
+            PartidaContabil.admin_id == admin_id,
+            LancamentoContabil.data_lancamento <= fim_mes_anterior
+        ).all()
+        
+        debito_anterior = sum(p.valor for p in partidas_anteriores if p.tipo_partida == 'DEBITO')
+        credito_anterior = sum(p.valor for p in partidas_anteriores if p.tipo_partida == 'CREDITO')
+        
+        if conta.natureza == 'DEVEDORA':
+            saldo_anterior = debito_anterior - credito_anterior
+        else:
+            saldo_anterior = credito_anterior - debito_anterior
+        
+        # Calcular movimentação do mês
+        partidas_mes = db.session.query(PartidaContabil).join(LancamentoContabil).filter(
+            PartidaContabil.conta_codigo == conta.codigo,
+            PartidaContabil.admin_id == admin_id,
+            LancamentoContabil.data_lancamento >= primeiro_dia,
+            LancamentoContabil.data_lancamento <= ultimo_dia
+        ).all()
+        
+        debitos_mes = sum(p.valor for p in partidas_mes if p.tipo_partida == 'DEBITO')
+        creditos_mes = sum(p.valor for p in partidas_mes if p.tipo_partida == 'CREDITO')
+        
+        # Calcular saldo atual
+        partidas_ate_hoje = db.session.query(PartidaContabil).join(LancamentoContabil).filter(
+            PartidaContabil.conta_codigo == conta.codigo,
+            PartidaContabil.admin_id == admin_id,
+            LancamentoContabil.data_lancamento <= ultimo_dia
+        ).all()
+        
+        debito_total = sum(p.valor for p in partidas_ate_hoje if p.tipo_partida == 'DEBITO')
+        credito_total = sum(p.valor for p in partidas_ate_hoje if p.tipo_partida == 'CREDITO')
+        
+        if conta.natureza == 'DEVEDORA':
+            saldo_atual = debito_total - credito_total
+        else:
+            saldo_atual = credito_total - debito_total
+        
+        # Só incluir contas com movimento
+        tem_movimento = (abs(saldo_anterior) > Decimal('0.01') or 
+                        abs(debitos_mes) > Decimal('0.01') or 
+                        abs(creditos_mes) > Decimal('0.01'))
+        
+        if tem_movimento:
+            contas_data.append({
+                'codigo': conta.codigo,
+                'nome': conta.nome,
+                'nivel': conta.nivel,
+                'natureza': conta.natureza,
+                'debitos': debitos_mes,
+                'creditos': creditos_mes,
+                'saldo_devedor': saldo_atual if saldo_atual > 0 else Decimal('0'),
+                'saldo_credor': abs(saldo_atual) if saldo_atual < 0 else Decimal('0')
+            })
+            
+            total_debitos += debitos_mes
+            total_creditos += creditos_mes
+            
+            if saldo_atual > 0:
+                total_saldo_devedor += saldo_atual
+            else:
+                total_saldo_credor += abs(saldo_atual)
+    
+    return {
+        'contas': contas_data,
+        'totais': {
+            'total_debitos': total_debitos,
+            'total_creditos': total_creditos,
+            'total_saldo_devedor': total_saldo_devedor,
+            'total_saldo_credor': total_saldo_credor
+        }
+    }
+
+def gerar_balancete_pdf(admin_id, mes, ano):
+    """
+    Gera PDF do Balancete de Verificação
+    
+    Args:
+        admin_id: ID do administrador
+        mes: Mês (1-12)
+        ano: Ano
+        
+    Returns:
+        BytesIO: Buffer com o PDF gerado
+    """
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from io import BytesIO
+    from datetime import datetime
+    
+    try:
+        # Obter dados
+        dados = obter_dados_balancete(admin_id, mes, ano)
+        contas = dados['contas']
+        totais = dados['totais']
+        
+        # Criar buffer
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), 
+                               topMargin=1.5*cm, bottomMargin=1.5*cm)
+        elements = []
+        
+        # Estilos
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            textColor=colors.HexColor('#1a1a1a'),
+            spaceAfter=30,
+            alignment=TA_CENTER
+        )
+        
+        # Título
+        title = Paragraph("BALANCETE DE VERIFICAÇÃO", title_style)
+        elements.append(title)
+        
+        # Período
+        period_style = ParagraphStyle('Period', parent=styles['Normal'], 
+                                     fontSize=12, alignment=TA_CENTER)
+        period = Paragraph(f"Período: {mes:02d}/{ano}", period_style)
+        elements.append(period)
+        
+        # Data de geração
+        gen_date = Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 
+                            period_style)
+        elements.append(gen_date)
+        elements.append(Spacer(1, 0.8*cm))
+        
+        # Montar tabela
+        table_data = [['Código', 'Conta', 'Débito', 'Crédito', 'Saldo Devedor', 'Saldo Credor']]
+        
+        for conta in contas:
+            # Indentação baseada no nível
+            indent = '  ' * (conta['nivel'] - 1)
+            nome_indentado = indent + conta['nome']
+            
+            table_data.append([
+                conta['codigo'],
+                nome_indentado,
+                f"R$ {float(conta['debitos']):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if conta['debitos'] > 0 else '-',
+                f"R$ {float(conta['creditos']):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if conta['creditos'] > 0 else '-',
+                f"R$ {float(conta['saldo_devedor']):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if conta['saldo_devedor'] > 0 else '-',
+                f"R$ {float(conta['saldo_credor']):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if conta['saldo_credor'] > 0 else '-'
+            ])
+        
+        # Linha de totais
+        table_data.append([
+            '',
+            'TOTAIS',
+            f"R$ {float(totais['total_debitos']):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+            f"R$ {float(totais['total_creditos']):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+            f"R$ {float(totais['total_saldo_devedor']):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+            f"R$ {float(totais['total_saldo_credor']):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        ])
+        
+        # Criar tabela
+        table = Table(table_data, colWidths=[3*cm, 8*cm, 4*cm, 4*cm, 4*cm, 4*cm])
+        table.setStyle(TableStyle([
+            # Cabeçalho
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            
+            # Dados
+            ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -2), 8),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+            ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
+            
+            # Linha de totais
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#ecf0f1')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, -1), (-1, -1), 9),
+            
+            # Bordas
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+        
+        elements.append(table)
+        
+        # Construir PDF
+        doc.build(elements)
+        
+        buffer.seek(0)
+        return buffer
+        
+    except Exception as e:
+        print(f"❌ Erro ao gerar PDF do balancete: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+def gerar_balancete_excel(admin_id, mes, ano):
+    """
+    Gera arquivo Excel do Balancete de Verificação
+    
+    Args:
+        admin_id: ID do administrador
+        mes: Mês (1-12)
+        ano: Ano
+        
+    Returns:
+        BytesIO: Buffer com o arquivo Excel
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    from io import BytesIO
+    from datetime import datetime
+    
+    try:
+        # Obter dados
+        dados = obter_dados_balancete(admin_id, mes, ano)
+        contas = dados['contas']
+        totais = dados['totais']
+        
+        # Criar workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Balancete"
+        
+        # Cabeçalho
+        ws['A1'] = "BALANCETE DE VERIFICAÇÃO"
+        ws['A1'].font = Font(size=16, bold=True, color="1a1a1a")
+        ws['A1'].alignment = Alignment(horizontal='center')
+        ws.merge_cells('A1:F1')
+        
+        ws['A2'] = f"Período: {mes:02d}/{ano}"
+        ws['A2'].font = Font(size=12)
+        ws['A2'].alignment = Alignment(horizontal='center')
+        ws.merge_cells('A2:F2')
+        
+        ws['A3'] = f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        ws['A3'].font = Font(size=10, italic=True)
+        ws['A3'].alignment = Alignment(horizontal='center')
+        ws.merge_cells('A3:F3')
+        
+        # Cabeçalhos das colunas (linha 5)
+        headers = ['Código', 'Conta', 'Débito', 'Crédito', 'Saldo Devedor', 'Saldo Credor']
+        for col, header in enumerate(headers, start=1):
+            cell = ws.cell(row=5, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+        
+        # Dados
+        row = 6
+        for conta in contas:
+            # Indentação no nome
+            indent = '  ' * (conta['nivel'] - 1)
+            
+            ws.cell(row=row, column=1, value=conta['codigo'])
+            ws.cell(row=row, column=2, value=indent + conta['nome'])
+            ws.cell(row=row, column=3, value=float(conta['debitos']) if conta['debitos'] > 0 else None)
+            ws.cell(row=row, column=4, value=float(conta['creditos']) if conta['creditos'] > 0 else None)
+            ws.cell(row=row, column=5, value=float(conta['saldo_devedor']) if conta['saldo_devedor'] > 0 else None)
+            ws.cell(row=row, column=6, value=float(conta['saldo_credor']) if conta['saldo_credor'] > 0 else None)
+            
+            # Bordas
+            for col in range(1, 7):
+                ws.cell(row=row, column=col).border = Border(
+                    left=Side(style='thin'),
+                    right=Side(style='thin'),
+                    top=Side(style='thin'),
+                    bottom=Side(style='thin')
+                )
+            
+            row += 1
+        
+        # Linha de totais
+        ws.cell(row=row, column=2, value='TOTAIS').font = Font(bold=True)
+        ws.cell(row=row, column=2).fill = PatternFill(start_color="ecf0f1", end_color="ecf0f1", fill_type="solid")
+        
+        # Fórmulas de soma
+        ws.cell(row=row, column=3, value=f'=SUM(C6:C{row-1})')
+        ws.cell(row=row, column=4, value=f'=SUM(D6:D{row-1})')
+        ws.cell(row=row, column=5, value=f'=SUM(E6:E{row-1})')
+        ws.cell(row=row, column=6, value=f'=SUM(F6:F{row-1})')
+        
+        for col in range(2, 7):
+            ws.cell(row=row, column=col).font = Font(bold=True)
+            ws.cell(row=row, column=col).fill = PatternFill(start_color="ecf0f1", end_color="ecf0f1", fill_type="solid")
+            ws.cell(row=row, column=col).border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+        
+        # Formatação de moeda
+        for r in range(6, row+1):
+            for c in [3, 4, 5, 6]:
+                ws.cell(row=r, column=c).number_format = '"R$" #,##0.00'
+                ws.cell(row=r, column=c).alignment = Alignment(horizontal='right')
+        
+        # Larguras das colunas
+        ws.column_dimensions['A'].width = 15
+        ws.column_dimensions['B'].width = 45
+        ws.column_dimensions['C'].width = 18
+        ws.column_dimensions['D'].width = 18
+        ws.column_dimensions['E'].width = 18
+        ws.column_dimensions['F'].width = 18
+        
+        # Congelar painéis
+        ws.freeze_panes = 'A6'
+        
+        # Salvar em buffer
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return buffer
+        
+    except Exception as e:
+        print(f"❌ Erro ao gerar Excel do balancete: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+def gerar_dre_pdf(admin_id, mes, ano):
+    """
+    Gera PDF da DRE
+    
+    Args:
+        admin_id: ID do administrador
+        mes: Mês (1-12)
+        ano: Ano
+        
+    Returns:
+        BytesIO: Buffer com o PDF gerado
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+    from io import BytesIO
+    from datetime import datetime
+    
+    try:
+        # Obter dados DRE
+        dre_data = calcular_dre_mensal(admin_id, ano, mes)
+        
+        if not dre_data:
+            raise ValueError("Não foi possível calcular DRE")
+        
+        # Criar buffer
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                               topMargin=2*cm, bottomMargin=2*cm,
+                               leftMargin=2*cm, rightMargin=2*cm)
+        elements = []
+        
+        # Estilos
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            textColor=colors.HexColor('#1a1a1a'),
+            spaceAfter=20,
+            alignment=TA_CENTER
+        )
+        
+        # Título
+        title = Paragraph("DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)", title_style)
+        elements.append(title)
+        
+        # Período
+        period_style = ParagraphStyle('Period', parent=styles['Normal'], 
+                                     fontSize=12, alignment=TA_CENTER)
+        period = Paragraph(f"Período: {mes:02d}/{ano}", period_style)
+        elements.append(period)
+        
+        gen_date = Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 
+                            period_style)
+        elements.append(gen_date)
+        elements.append(Spacer(1, 1*cm))
+        
+        # Função para formatar valor
+        def fmt(valor):
+            return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        
+        # Montar tabela DRE
+        table_data = []
+        
+        # Receita Bruta
+        table_data.append(['RECEITA BRUTA', fmt(dre_data['receita_bruta'])])
+        
+        # Deduções
+        if dre_data['deducoes'] > 0:
+            table_data.append(['(-) Deduções e Abatimentos', f"({fmt(dre_data['deducoes'])})"])
+        
+        # Receita Líquida
+        table_data.append(['= RECEITA LÍQUIDA', fmt(dre_data['receita_liquida'])])
+        table_data.append(['', ''])
+        
+        # CMV
+        if dre_data['cmv'] > 0:
+            table_data.append(['(-) Custo dos Serviços Prestados (CMV)', f"({fmt(dre_data['cmv'])})"])
+        
+        # Lucro Bruto
+        table_data.append(['= LUCRO BRUTO', fmt(dre_data['lucro_bruto'])])
+        table_data.append(['', ''])
+        
+        # Despesas Operacionais
+        desp_op = dre_data['despesas_operacionais']
+        table_data.append(['(-) DESPESAS OPERACIONAIS', ''])
+        if desp_op['pessoal'] > 0:
+            table_data.append(['    Despesas com Pessoal', f"({fmt(desp_op['pessoal'])})"])
+        if desp_op['materiais'] > 0:
+            table_data.append(['    Despesas com Materiais', f"({fmt(desp_op['materiais'])})"])
+        if desp_op['administrativas'] > 0:
+            table_data.append(['    Despesas Administrativas', f"({fmt(desp_op['administrativas'])})"])
+        if desp_op['comerciais'] > 0:
+            table_data.append(['    Despesas Comerciais', f"({fmt(desp_op['comerciais'])})"])
+        if desp_op['outras'] > 0:
+            table_data.append(['    Outras Despesas', f"({fmt(desp_op['outras'])})"])
+        
+        # EBITDA
+        table_data.append(['= EBITDA', fmt(dre_data['ebitda'])])
+        table_data.append(['', ''])
+        
+        # Resultado Financeiro
+        res_fin = dre_data['resultado_financeiro']
+        if res_fin['receitas'] > 0:
+            table_data.append(['(+) Receitas Financeiras', fmt(res_fin['receitas'])])
+        if res_fin['despesas'] > 0:
+            table_data.append(['(-) Despesas Financeiras', f"({fmt(res_fin['despesas'])})"])
+        
+        # Resultado Antes IR
+        table_data.append(['= RESULTADO ANTES IR/CSLL', fmt(dre_data['resultado_antes_ir'])])
+        table_data.append(['', ''])
+        
+        # Provisões
+        prov = dre_data['provisao_ir_csll']
+        if prov['total'] > 0:
+            table_data.append(['(-) Provisão IR e CSLL', f"({fmt(prov['total'])})"])
+        
+        # Lucro Líquido
+        table_data.append(['= LUCRO LÍQUIDO DO PERÍODO', fmt(dre_data['lucro_liquido'])])
+        
+        # Criar tabela
+        table = Table(table_data, colWidths=[12*cm, 5*cm])
+        table.setStyle(TableStyle([
+            # Alinhamento
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            
+            # Fontes
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            
+            # Totalizadores em negrito
+            ('FONTNAME', (0, 2), (-1, 2), 'Helvetica-Bold'),  # Receita Líquida
+            ('FONTNAME', (0, 5), (-1, 5), 'Helvetica-Bold'),  # Lucro Bruto
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),  # Lucro Líquido
+            
+            # Linhas
+            ('LINEABOVE', (0, 2), (-1, 2), 1, colors.black),
+            ('LINEABOVE', (0, 5), (-1, 5), 1, colors.black),
+            ('LINEABOVE', (0, -1), (-1, -1), 2, colors.black),
+            ('LINEBELOW', (0, -1), (-1, -1), 2, colors.black),
+            
+            # Padding
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        elements.append(table)
+        
+        # Indicadores
+        elements.append(Spacer(1, 1*cm))
+        perc = dre_data['percentuais']
+        indicadores_data = [
+            ['INDICADORES', ''],
+            ['Margem Bruta', f"{perc['margem_bruta']:.2f}%"],
+            ['Margem EBITDA', f"{perc['margem_ebitda']:.2f}%"],
+            ['Margem Líquida', f"{perc['margem_liquida']:.2f}%"]
+        ]
+        
+        ind_table = Table(indicadores_data, colWidths=[12*cm, 5*cm])
+        ind_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ecf0f1')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ]))
+        
+        elements.append(ind_table)
+        
+        # Construir PDF
+        doc.build(elements)
+        
+        buffer.seek(0)
+        return buffer
+        
+    except Exception as e:
+        print(f"❌ Erro ao gerar PDF da DRE: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+def gerar_dre_excel(admin_id, mes, ano):
+    """
+    Gera arquivo Excel da DRE
+    
+    Args:
+        admin_id: ID do administrador
+        mes: Mês (1-12)
+        ano: Ano
+        
+    Returns:
+        BytesIO: Buffer com o arquivo Excel
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    from io import BytesIO
+    from datetime import datetime
+    
+    try:
+        # Obter dados DRE
+        dre_data = calcular_dre_mensal(admin_id, ano, mes)
+        
+        if not dre_data:
+            raise ValueError("Não foi possível calcular DRE")
+        
+        # Criar workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "DRE"
+        
+        # Cabeçalho
+        ws['A1'] = "DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)"
+        ws['A1'].font = Font(size=16, bold=True, color="1a1a1a")
+        ws['A1'].alignment = Alignment(horizontal='center')
+        ws.merge_cells('A1:C1')
+        
+        ws['A2'] = f"Período: {mes:02d}/{ano}"
+        ws['A2'].font = Font(size=12)
+        ws['A2'].alignment = Alignment(horizontal='center')
+        ws.merge_cells('A2:C2')
+        
+        ws['A3'] = f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        ws['A3'].font = Font(size=10, italic=True)
+        ws['A3'].alignment = Alignment(horizontal='center')
+        ws.merge_cells('A3:C3')
+        
+        # Cabeçalhos das colunas
+        row = 5
+        ws.cell(row=row, column=1, value='DESCRIÇÃO').font = Font(bold=True)
+        ws.cell(row=row, column=2, value='VALOR (R$)').font = Font(bold=True)
+        ws.cell(row=row, column=3, value='% RECEITA').font = Font(bold=True)
+        
+        for col in range(1, 4):
+            ws.cell(row=row, column=col).fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+            ws.cell(row=row, column=col).font = Font(bold=True, color="FFFFFF")
+            ws.cell(row=row, column=col).alignment = Alignment(horizontal='center')
+        
+        row += 1
+        
+        # Helper para adicionar linha
+        def add_row(descricao, valor, formula_perc=None, bold=False, indent=0, bg_color=None):
+            nonlocal row
+            
+            # Descrição com indentação
+            ws.cell(row=row, column=1, value='  ' * indent + descricao)
+            
+            # Valor
+            if valor is not None:
+                ws.cell(row=row, column=2, value=valor)
+                ws.cell(row=row, column=2).number_format = '"R$" #,##0.00'
+            
+            # Percentual
+            if formula_perc:
+                ws.cell(row=row, column=3, value=formula_perc)
+                ws.cell(row=row, column=3).number_format = '0.00"%"'
+            
+            # Formatação
+            if bold:
+                for col in range(1, 4):
+                    ws.cell(row=row, column=col).font = Font(bold=True)
+            
+            if bg_color:
+                for col in range(1, 3):
+                    ws.cell(row=row, column=col).fill = PatternFill(start_color=bg_color, end_color=bg_color, fill_type="solid")
+            
+            for col in range(1, 4):
+                ws.cell(row=row, column=col).alignment = Alignment(horizontal='left' if col == 1 else 'right')
+            
+            row += 1
+        
+        # Receita Bruta
+        add_row('RECEITA BRUTA', dre_data['receita_bruta'], None, bold=True, bg_color="d5f4e6")
+        
+        # Deduções
+        if dre_data['deducoes'] > 0:
+            add_row('(-) Deduções e Abatimentos', -dre_data['deducoes'], None)
+        
+        # Receita Líquida
+        receita_liq_row = row
+        add_row('= RECEITA LÍQUIDA', dre_data['receita_liquida'], 100.0, bold=True, bg_color="ecf0f1")
+        row += 1
+        
+        # CMV
+        if dre_data['cmv'] > 0:
+            add_row('(-) Custo dos Serviços Prestados', -dre_data['cmv'], 
+                   f'=B{row}/B${receita_liq_row}*100')
+        
+        # Lucro Bruto
+        add_row('= LUCRO BRUTO', dre_data['lucro_bruto'], 
+               f'=B{row}/B${receita_liq_row}*100', bold=True, bg_color="ecf0f1")
+        row += 1
+        
+        # Despesas Operacionais
+        desp_op = dre_data['despesas_operacionais']
+        add_row('(-) DESPESAS OPERACIONAIS', None, None, bold=True)
+        
+        if desp_op['pessoal'] > 0:
+            add_row('Despesas com Pessoal', -desp_op['pessoal'], 
+                   f'=B{row}/B${receita_liq_row}*100', indent=1)
+        if desp_op['materiais'] > 0:
+            add_row('Despesas com Materiais', -desp_op['materiais'], 
+                   f'=B{row}/B${receita_liq_row}*100', indent=1)
+        if desp_op['administrativas'] > 0:
+            add_row('Despesas Administrativas', -desp_op['administrativas'], 
+                   f'=B{row}/B${receita_liq_row}*100', indent=1)
+        if desp_op['comerciais'] > 0:
+            add_row('Despesas Comerciais', -desp_op['comerciais'], 
+                   f'=B{row}/B${receita_liq_row}*100', indent=1)
+        if desp_op['outras'] > 0:
+            add_row('Outras Despesas', -desp_op['outras'], 
+                   f'=B{row}/B${receita_liq_row}*100', indent=1)
+        
+        # EBITDA
+        add_row('= EBITDA', dre_data['ebitda'], 
+               f'=B{row}/B${receita_liq_row}*100', bold=True, bg_color="ecf0f1")
+        row += 1
+        
+        # Resultado Financeiro
+        res_fin = dre_data['resultado_financeiro']
+        if res_fin['receitas'] > 0:
+            add_row('(+) Receitas Financeiras', res_fin['receitas'], 
+                   f'=B{row}/B${receita_liq_row}*100')
+        if res_fin['despesas'] > 0:
+            add_row('(-) Despesas Financeiras', -res_fin['despesas'], 
+                   f'=B{row}/B${receita_liq_row}*100')
+        
+        # Resultado Antes IR
+        add_row('= RESULTADO ANTES IR/CSLL', dre_data['resultado_antes_ir'], 
+               f'=B{row}/B${receita_liq_row}*100', bold=True, bg_color="ecf0f1")
+        row += 1
+        
+        # Provisões
+        prov = dre_data['provisao_ir_csll']
+        if prov['total'] > 0:
+            add_row('(-) Provisão IR e CSLL', -prov['total'], 
+                   f'=B{row}/B${receita_liq_row}*100')
+        
+        # Lucro Líquido
+        add_row('= LUCRO LÍQUIDO DO PERÍODO', dre_data['lucro_liquido'], 
+               f'=B{row}/B${receita_liq_row}*100', bold=True, bg_color="ffeaa7")
+        
+        # Adicionar indicadores
+        row += 2
+        ws.cell(row=row, column=1, value='INDICADORES').font = Font(bold=True, size=12)
+        ws.merge_cells(f'A{row}:C{row}')
+        row += 1
+        
+        perc = dre_data['percentuais']
+        add_row('Margem Bruta', None, perc['margem_bruta'], bold=True)
+        add_row('Margem EBITDA', None, perc['margem_ebitda'], bold=True)
+        add_row('Margem Líquida', None, perc['margem_liquida'], bold=True)
+        
+        # Larguras das colunas
+        ws.column_dimensions['A'].width = 45
+        ws.column_dimensions['B'].width = 20
+        ws.column_dimensions['C'].width = 15
+        
+        # Congelar painéis
+        ws.freeze_panes = 'A6'
+        
+        # Salvar em buffer
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return buffer
+        
+    except Exception as e:
+        print(f"❌ Erro ao gerar Excel da DRE: {e}")
+        import traceback
+        traceback.print_exc()
+        raise

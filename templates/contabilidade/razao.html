@@ -1,0 +1,218 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Razão Analítico - SIGE v9.0{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1 text-gray-800">
+                <i class="fas fa-book text-primary"></i> Razão Analítico
+            </h1>
+            <p class="text-muted small mb-0">
+                Conta: <strong>{{ razao.conta.codigo }} - {{ razao.conta.nome }}</strong>
+                <span class="badge bg-{% if razao.conta.tipo_saldo == 'DEVEDOR' %}info{% else %}warning{% endif %} ms-2">
+                    {{ razao.conta.tipo_saldo }}
+                </span>
+            </p>
+        </div>
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('contabilidade.balancete') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+            <button class="btn btn-outline-primary" onclick="window.print()">
+                <i class="fas fa-print"></i> Imprimir
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-header bg-white border-bottom">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-filter"></i> Filtros de Período
+            </h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('contabilidade.razao', conta_codigo=conta_codigo) }}" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Data Início:</label>
+                    <input type="date" name="data_inicio" class="form-control" 
+                           value="{{ data_inicio.strftime('%Y-%m-%d') }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Data Fim:</label>
+                    <input type="date" name="data_fim" class="form-control"
+                           value="{{ data_fim.strftime('%Y-%m-%d') }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-sync-alt"></i> Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Saldo Anterior</h6>
+                    <h4 class="mb-0">
+                        R$ {{ "{:,.2f}".format(razao.saldo_anterior|float) }}
+                    </h4>
+                    <small class="text-muted">Em {{ data_inicio.strftime('%d/%m/%Y') }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-danger">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Total Débitos</h6>
+                    <h4 class="text-danger mb-0">
+                        R$ {{ "{:,.2f}".format(razao.totais.total_debitos|float) }}
+                    </h4>
+                    <small class="text-muted">Período selecionado</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-success">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Total Créditos</h6>
+                    <h4 class="text-success mb-0">
+                        R$ {{ "{:,.2f}".format(razao.totais.total_creditos|float) }}
+                    </h4>
+                    <small class="text-muted">Período selecionado</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-primary">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Saldo Final</h6>
+                    <h4 class="text-primary mb-0">
+                        R$ {{ "{:,.2f}".format(razao.totais.saldo_final|float) }}
+                    </h4>
+                    <small class="text-muted">Em {{ data_fim.strftime('%d/%m/%Y') }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold">
+                <i class="fas fa-table"></i> Movimentações no Período
+            </h6>
+            <span class="badge bg-white text-primary">
+                {{ razao.movimentos|length }} lançamento(s)
+            </span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th style="width: 100px;">Data</th>
+                            <th style="width: 100px;">Lançamento</th>
+                            <th>Histórico</th>
+                            <th class="text-end" style="width: 130px;">Débito</th>
+                            <th class="text-end" style="width: 130px;">Crédito</th>
+                            <th class="text-end" style="width: 150px;">Saldo Acumulado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if razao.movimentos %}
+                            {% for mov in razao.movimentos %}
+                            <tr>
+                                <td class="font-monospace small">{{ mov.data.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    <a href="{{ url_for('contabilidade.ver_lancamento', id=mov.lancamento_id) }}" 
+                                       class="text-decoration-none" target="_blank">
+                                        #{{ mov.lancamento_numero }}
+                                        <i class="fas fa-external-link-alt fa-xs"></i>
+                                    </a>
+                                </td>
+                                <td class="small">{{ mov.historico }}</td>
+                                <td class="text-end {% if mov.tipo == 'DEBITO' %}text-danger fw-bold{% endif %}">
+                                    {% if mov.tipo == 'DEBITO' %}
+                                        R$ {{ "{:,.2f}".format(mov.valor|float) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="text-end {% if mov.tipo == 'CREDITO' %}text-success fw-bold{% endif %}">
+                                    {% if mov.tipo == 'CREDITO' %}
+                                        R$ {{ "{:,.2f}".format(mov.valor|float) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="text-end fw-bold {% if mov.saldo_acumulado >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                                    R$ {{ "{:,.2f}".format(mov.saldo_acumulado|float) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-5">
+                                    <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                    <p class="mb-0">Nenhuma movimentação no período selecionado</p>
+                                    <small>Tente ajustar os filtros de data acima</small>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                    {% if razao.movimentos %}
+                    <tfoot class="table-light border-top border-2">
+                        <tr class="fw-bold">
+                            <th colspan="3" class="text-end py-3">TOTAIS DO PERÍODO:</th>
+                            <th class="text-end text-danger py-3">
+                                R$ {{ "{:,.2f}".format(razao.totais.total_debitos|float) }}
+                            </th>
+                            <th class="text-end text-success py-3">
+                                R$ {{ "{:,.2f}".format(razao.totais.total_creditos|float) }}
+                            </th>
+                            <th class="text-end text-primary py-3">
+                                R$ {{ "{:,.2f}".format(razao.totais.saldo_final|float) }}
+                            </th>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style media="print">
+    @page {
+        size: A4 landscape;
+        margin: 1cm;
+    }
+    
+    .btn, .card-header, nav, .navbar, footer, .no-print {
+        display: none !important;
+    }
+    
+    .container-fluid {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    table {
+        font-size: 10px;
+    }
+    
+    h1 {
+        font-size: 18px !important;
+    }
+</style>
+{% endblock %}
