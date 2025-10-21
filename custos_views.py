@@ -63,7 +63,7 @@ def dashboard_custos():
     if not verificar_schema_custos():
         flash('⚠️ Módulo de Custos temporariamente indisponível. O sistema está sendo atualizado.', 'warning')
         logger.error("Dashboard custos bloqueado - schema incompleto")
-        return redirect(url_for('index'))
+        return redirect(url_for('main.index'))
     
     admin_id = current_user.id
     
@@ -115,7 +115,7 @@ def custos_obra(obra_id):
     if not verificar_schema_custos():
         flash('⚠️ Módulo de Custos temporariamente indisponível. O sistema está sendo atualizado.', 'warning')
         logger.error("Custos obra bloqueado - schema incompleto")
-        return redirect(url_for('index'))
+        return redirect(url_for('main.index'))
     
     obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first_or_404()
     

@@ -49,7 +49,7 @@ def dashboard():
     except Exception as e:
         logger.error(f"Erro no dashboard financeiro: {str(e)}")
         flash('Erro ao carregar dashboard financeiro', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('main.index'))
 
 
 # ==================== CONTAS A PAGAR ====================
