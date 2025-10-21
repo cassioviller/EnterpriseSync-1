@@ -1909,7 +1909,7 @@ class CentroCustoContabil(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     obra = db.relationship('Obra')
-    partidas = db.relationship('PartidaContabil', backref='centro_custo')
+    partidas = db.relationship('PartidaContabil', foreign_keys='PartidaContabil.centro_custo_id', back_populates='centro_custo')
     __table_args__ = (db.UniqueConstraint('codigo', 'admin_id', name='uq_centro_custo_contabil_codigo_admin'),)
 
 class LancamentoContabil(db.Model):
@@ -1943,7 +1943,7 @@ class PartidaContabil(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
 
     conta = db.relationship('PlanoContas')
-    centro_custo = db.relationship('CentroCustoContabil')
+    centro_custo = db.relationship('CentroCustoContabil', back_populates='partidas')
 
 class BalanceteMensal(db.Model):
     """Armazena os saldos mensais para geração rápida de relatórios."""

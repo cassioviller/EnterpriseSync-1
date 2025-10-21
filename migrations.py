@@ -1889,6 +1889,60 @@ def _migration_45_corrigir_schema_propostas():
         raise
 
 
+def _migration_46_adicionar_descricao_centro_custo():
+    """
+    MIGRAÇÃO 46: Adicionar coluna 'descricao' à tabela centro_custo_contabil
+    
+    Problema: Modelo Python define campo descricao mas a coluna não existe no banco
+    Erro: (psycopg2.errors.UndefinedColumn) column centro_custo_contabil.descricao does not exist
+    
+    Solução: Adicionar coluna descricao TEXT NULL
+    """
+    try:
+        logger.info("=" * 80)
+        logger.info("🔧 MIGRAÇÃO 46: Adicionar descrição aos centros de custo")
+        logger.info("=" * 80)
+        
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se coluna descricao já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'centro_custo_contabil' 
+            AND column_name = 'descricao'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("🔧 Adicionando coluna 'descricao' à tabela centro_custo_contabil...")
+            cursor.execute("""
+                ALTER TABLE centro_custo_contabil 
+                ADD COLUMN descricao TEXT NULL
+            """)
+            logger.info("✅ Coluna 'descricao' adicionada com sucesso")
+        else:
+            logger.info("⏭️  Coluna 'descricao' já existe - SKIP")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 46 CONCLUÍDA: Campo descricao adicionado!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 46: {str(e)}")
+        if 'connection' in locals():
+            connection.rollback()
+            cursor.close()
+            connection.close()
+        import traceback
+        logger.error(traceback.format_exc())
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -1927,6 +1981,7 @@ def executar_migracoes():
             (43, "Completar estruturas v9.0", _migration_43_completar_estruturas_v9),
             (44, "Adicionar jornada_semanal a funcionario", _migration_44_adicionar_jornada_semanal),
             (45, "Corrigir schema da tabela propostas_comerciais", _migration_45_corrigir_schema_propostas),
+            (46, "Adicionar descricao a centro_custo_contabil", _migration_46_adicionar_descricao_centro_custo),
         ]
         
         # Executar cada migração com rastreamento

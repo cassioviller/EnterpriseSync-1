@@ -937,7 +937,7 @@ def dre_excel():
         flash(f'Erro ao gerar Excel da DRE: {str(e)}', 'danger')
         return redirect(url_for('contabilidade.dre'))
 
-@contabilidade_bp.route('/balanco-patrimonial')
+@contabilidade_bp.route('/balanco')
 @admin_required
 def balanco_patrimonial():
     """Balanço Patrimonial com cálculo dinâmico baseado em lançamentos"""
