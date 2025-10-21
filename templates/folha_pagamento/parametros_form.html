@@ -1,0 +1,458 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if parametro else 'Cadastrar' }} Parâmetros Legais{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-{{ 'edit' if parametro else 'plus-circle' }} text-primary me-2"></i>
+                        {{ 'Editar' if parametro else 'Cadastrar' }} Parâmetros Legais
+                    </h1>
+                    <p class="text-muted small mb-0">
+                        {{ 'Ano ' + parametro.ano_vigencia|string if parametro else 'Configure os parâmetros para o novo ano' }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ url_for('folha.parametros_legais') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Cancelar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <form method="POST" action="{{ url_for('folha.editar_parametros', id=parametro.id) if parametro else url_for('folha.criar_parametros') }}">
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white">
+                        <div class="row align-items-center">
+                            <div class="col-md-4">
+                                <label for="ano_vigencia" class="form-label fw-bold mb-0">
+                                    <i class="fas fa-calendar-alt text-primary me-1"></i>
+                                    Ano de Vigência *
+                                </label>
+                                <input type="number" 
+                                       class="form-control form-control-lg" 
+                                       id="ano_vigencia" 
+                                       name="ano_vigencia" 
+                                       value="{{ parametro.ano_vigencia if parametro else ano_padrao }}"
+                                       {{ 'readonly' if parametro else '' }}
+                                       required
+                                       min="2020"
+                                       max="2099">
+                                <small class="text-muted">
+                                    {{ 'Não é possível alterar o ano após cadastro' if parametro else 'Digite o ano para o qual os parâmetros serão válidos' }}
+                                </small>
+                            </div>
+                            <div class="col-md-8 text-md-end mt-3 mt-md-0">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save me-2"></i>
+                                    {{ 'Atualizar Parâmetros' if parametro else 'Cadastrar Parâmetros' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <!-- Tabs de Navegação -->
+                        <ul class="nav nav-tabs nav-justified mb-4" id="parametrosTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="inss-tab" data-bs-toggle="tab" data-bs-target="#inss" type="button" role="tab">
+                                    <i class="fas fa-university me-1"></i>
+                                    INSS
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="irrf-tab" data-bs-toggle="tab" data-bs-target="#irrf" type="button" role="tab">
+                                    <i class="fas fa-receipt me-1"></i>
+                                    IRRF
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="outros-tab" data-bs-toggle="tab" data-bs-target="#outros" type="button" role="tab">
+                                    <i class="fas fa-cog me-1"></i>
+                                    Outros Parâmetros
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- Conteúdo das Tabs -->
+                        <div class="tab-content" id="parametrosTabContent">
+                            <!-- Tab INSS -->
+                            <div class="tab-pane fade show active" id="inss" role="tabpanel">
+                                <h5 class="text-primary mb-3">
+                                    <i class="fas fa-university me-2"></i>
+                                    Tabela Progressiva INSS
+                                </h5>
+                                <p class="text-muted small">Configure as 4 faixas de contribuição do INSS e o valor do teto.</p>
+                                
+                                <div class="row g-3">
+                                    <!-- Faixa 1 -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-primary">Faixa 1</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-7">
+                                                        <label class="form-label small">Limite (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="inss_faixa1_limite" 
+                                                               value="{{ parametro.inss_faixa1_limite if parametro else 1412.00 }}" required>
+                                                    </div>
+                                                    <div class="col-5">
+                                                        <label class="form-label small">Alíquota (%)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="inss_faixa1_percentual" 
+                                                               value="{{ parametro.inss_faixa1_percentual if parametro else 7.5 }}" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Faixa 2 -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-primary">Faixa 2</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-7">
+                                                        <label class="form-label small">Limite (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="inss_faixa2_limite" 
+                                                               value="{{ parametro.inss_faixa2_limite if parametro else 2666.68 }}" required>
+                                                    </div>
+                                                    <div class="col-5">
+                                                        <label class="form-label small">Alíquota (%)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="inss_faixa2_percentual" 
+                                                               value="{{ parametro.inss_faixa2_percentual if parametro else 9.0 }}" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Faixa 3 -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-primary">Faixa 3</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-7">
+                                                        <label class="form-label small">Limite (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="inss_faixa3_limite" 
+                                                               value="{{ parametro.inss_faixa3_limite if parametro else 4000.03 }}" required>
+                                                    </div>
+                                                    <div class="col-5">
+                                                        <label class="form-label small">Alíquota (%)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="inss_faixa3_percentual" 
+                                                               value="{{ parametro.inss_faixa3_percentual if parametro else 12.0 }}" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Faixa 4 -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-primary">Faixa 4</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-7">
+                                                        <label class="form-label small">Limite (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="inss_faixa4_limite" 
+                                                               value="{{ parametro.inss_faixa4_limite if parametro else 7786.02 }}" required>
+                                                    </div>
+                                                    <div class="col-5">
+                                                        <label class="form-label small">Alíquota (%)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="inss_faixa4_percentual" 
+                                                               value="{{ parametro.inss_faixa4_percentual if parametro else 14.0 }}" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Teto INSS -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-success text-white">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Teto INSS (Desconto Máximo)</h6>
+                                                <div class="input-group input-group-lg">
+                                                    <span class="input-group-text bg-white">R$</span>
+                                                    <input type="number" step="0.01" class="form-control" name="inss_teto" 
+                                                           value="{{ parametro.inss_teto if parametro else 908.85 }}" required>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tab IRRF -->
+                            <div class="tab-pane fade" id="irrf" role="tabpanel">
+                                <h5 class="text-warning mb-3">
+                                    <i class="fas fa-receipt me-2"></i>
+                                    Tabela Progressiva IRRF
+                                </h5>
+                                <p class="text-muted small">Configure a faixa de isenção, as 4 faixas de tributação e o valor do dependente.</p>
+                                
+                                <div class="row g-3">
+                                    <!-- Isenção -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-info text-white">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Faixa de Isenção</h6>
+                                                <div class="input-group input-group-lg">
+                                                    <span class="input-group-text bg-white">Até R$</span>
+                                                    <input type="number" step="0.01" class="form-control" name="irrf_isencao" 
+                                                           value="{{ parametro.irrf_isencao if parametro else 2259.20 }}" required>
+                                                </div>
+                                                <small class="text-white">Salários até este valor são isentos de IRRF</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dependente -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-warning text-dark">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Valor por Dependente</h6>
+                                                <div class="input-group input-group-lg">
+                                                    <span class="input-group-text bg-white">R$</span>
+                                                    <input type="number" step="0.01" class="form-control" name="irrf_dependente_valor" 
+                                                           value="{{ parametro.irrf_dependente_valor if parametro else 189.59 }}" required>
+                                                </div>
+                                                <small>Dedução por dependente na base de cálculo</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Faixa 1 -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-warning">Faixa 1</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label small">Até (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa1_limite" 
+                                                               value="{{ parametro.irrf_faixa1_limite if parametro else 2826.65 }}" required>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <label class="form-label small">Alíquota (%)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa1_percentual" 
+                                                               value="{{ parametro.irrf_faixa1_percentual if parametro else 7.5 }}" required>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <label class="form-label small">Dedução (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa1_deducao" 
+                                                               value="{{ parametro.irrf_faixa1_deducao if parametro else 169.44 }}" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Faixa 2 -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-warning">Faixa 2</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label small">Até (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa2_limite" 
+                                                               value="{{ parametro.irrf_faixa2_limite if parametro else 3751.05 }}" required>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <label class="form-label small">Alíquota (%)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa2_percentual" 
+                                                               value="{{ parametro.irrf_faixa2_percentual if parametro else 15.0 }}" required>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <label class="form-label small">Dedução (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa2_deducao" 
+                                                               value="{{ parametro.irrf_faixa2_deducao if parametro else 381.44 }}" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Faixa 3 -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-warning">Faixa 3</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label small">Até (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa3_limite" 
+                                                               value="{{ parametro.irrf_faixa3_limite if parametro else 4664.68 }}" required>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <label class="form-label small">Alíquota (%)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa3_percentual" 
+                                                               value="{{ parametro.irrf_faixa3_percentual if parametro else 22.5 }}" required>
+                                                    </div>
+                                                    <div class="col-3">
+                                                        <label class="form-label small">Dedução (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa3_deducao" 
+                                                               value="{{ parametro.irrf_faixa3_deducao if parametro else 662.77 }}" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Faixa 4 -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-warning">Faixa 4 (Acima da Faixa 3)</h6>
+                                                <div class="row g-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label small">Alíquota (%)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa4_percentual" 
+                                                               value="{{ parametro.irrf_faixa4_percentual if parametro else 27.5 }}" required>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label small">Dedução (R$)</label>
+                                                        <input type="number" step="0.01" class="form-control" name="irrf_faixa4_deducao" 
+                                                               value="{{ parametro.irrf_faixa4_deducao if parametro else 896.00 }}" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tab Outros -->
+                            <div class="tab-pane fade" id="outros" role="tabpanel">
+                                <h5 class="text-info mb-3">
+                                    <i class="fas fa-cog me-2"></i>
+                                    Outros Parâmetros
+                                </h5>
+                                <p class="text-muted small">Configure FGTS, salário mínimo, vale transporte e percentuais de horas extras.</p>
+                                
+                                <div class="row g-3">
+                                    <!-- FGTS -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <label class="form-label fw-bold">
+                                                    <i class="fas fa-piggy-bank text-success me-1"></i>
+                                                    Percentual FGTS (%)
+                                                </label>
+                                                <input type="number" step="0.01" class="form-control form-control-lg" name="fgts_percentual" 
+                                                       value="{{ parametro.fgts_percentual if parametro else 8.0 }}" required>
+                                                <small class="text-muted">Percentual de FGTS sobre o salário bruto</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Salário Mínimo -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <label class="form-label fw-bold">
+                                                    <i class="fas fa-dollar-sign text-primary me-1"></i>
+                                                    Salário Mínimo (R$)
+                                                </label>
+                                                <input type="number" step="0.01" class="form-control form-control-lg" name="salario_minimo" 
+                                                       value="{{ parametro.salario_minimo if parametro else 1412.00 }}" required>
+                                                <small class="text-muted">Valor do salário mínimo nacional</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Vale Transporte -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <label class="form-label fw-bold">
+                                                    <i class="fas fa-bus text-warning me-1"></i>
+                                                    Vale Transporte (%)
+                                                </label>
+                                                <input type="number" step="0.01" class="form-control form-control-lg" name="vale_transporte_percentual" 
+                                                       value="{{ parametro.vale_transporte_percentual if parametro else 6.0 }}" required>
+                                                <small class="text-muted">Percentual máximo de desconto sobre o salário</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Adicional Noturno -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <label class="form-label fw-bold">
+                                                    <i class="fas fa-moon text-dark me-1"></i>
+                                                    Adicional Noturno (%)
+                                                </label>
+                                                <input type="number" step="0.01" class="form-control form-control-lg" name="adicional_noturno_percentual" 
+                                                       value="{{ parametro.adicional_noturno_percentual if parametro else 20.0 }}" required>
+                                                <small class="text-muted">Percentual adicional para horas trabalhadas à noite</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Hora Extra 50% -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <label class="form-label fw-bold">
+                                                    <i class="fas fa-clock text-info me-1"></i>
+                                                    Hora Extra 50% (%)
+                                                </label>
+                                                <input type="number" step="0.01" class="form-control form-control-lg" name="hora_extra_50_percentual" 
+                                                       value="{{ parametro.hora_extra_50_percentual if parametro else 50.0 }}" required>
+                                                <small class="text-muted">Acréscimo para horas extras em dias úteis</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Hora Extra 100% -->
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <label class="form-label fw-bold">
+                                                    <i class="fas fa-clock text-danger me-1"></i>
+                                                    Hora Extra 100% (%)
+                                                </label>
+                                                <input type="number" step="0.01" class="form-control form-control-lg" name="hora_extra_100_percentual" 
+                                                       value="{{ parametro.hora_extra_100_percentual if parametro else 100.0 }}" required>
+                                                <small class="text-muted">Acréscimo para horas extras em domingos e feriados</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-footer bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Todos os campos são obrigatórios
+                            </small>
+                            <button type="submit" class="btn btn-primary btn-lg px-5">
+                                <i class="fas fa-save me-2"></i>
+                                {{ 'Atualizar Parâmetros' if parametro else 'Cadastrar Parâmetros' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

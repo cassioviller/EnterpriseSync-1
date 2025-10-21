@@ -264,7 +264,7 @@ with app.app_context():
     # Register additional blueprints
     try:
         from folha_pagamento_views import folha_bp
-        app.register_blueprint(folha_bp, url_prefix='/folha-pagamento')
+        app.register_blueprint(folha_bp, url_prefix='/folha')
         logging.info("✅ Blueprint folha de pagamento registrado")
     except Exception as e:
         logging.error(f"❌ Erro ao registrar blueprint folha de pagamento: {e}")

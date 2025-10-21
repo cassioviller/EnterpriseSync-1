@@ -1,0 +1,362 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if beneficio else 'Novo' }} Benefício - Folha de Pagamento{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-{{ 'edit' if beneficio else 'plus' }} text-primary me-2"></i>
+                        {{ 'Editar' if beneficio else 'Novo' }} Benefício
+                    </h1>
+                    <p class="text-muted small mb-0">Preencha os dados do benefício do funcionário</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('folha.beneficios') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="row">
+        <div class="col-lg-8 col-xl-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <form method="POST">
+                        <!-- Funcionário -->
+                        <div class="mb-3">
+                            <label for="funcionario_id" class="form-label">
+                                <i class="fas fa-user me-1"></i>
+                                Funcionário <span class="text-danger">*</span>
+                            </label>
+                            {% if beneficio %}
+                            <input type="text" class="form-control" value="{{ beneficio.funcionario.nome }}" disabled>
+                            <small class="text-muted">Código: {{ beneficio.funcionario.codigo }}</small>
+                            {% else %}
+                            <select class="form-select" id="funcionario_id" name="funcionario_id" required>
+                                <option value="">Selecione um funcionário...</option>
+                                {% for func in funcionarios %}
+                                <option value="{{ func.id }}">
+                                    {{ func.nome }} - {{ func.codigo }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% endif %}
+                        </div>
+
+                        <!-- Tipo de Benefício -->
+                        <div class="mb-3">
+                            <label for="tipo_beneficio" class="form-label">
+                                <i class="fas fa-gift me-1"></i>
+                                Tipo de Benefício <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="tipo_beneficio" name="tipo_beneficio" required onchange="ajustarCampos()">
+                                <option value="">Selecione o tipo...</option>
+                                {% for codigo, nome in tipos_beneficio %}
+                                <option value="{{ codigo }}" {{ 'selected' if beneficio and beneficio.tipo_beneficio == codigo }}>
+                                    {{ nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Valor e Percentual Desconto -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="valor" class="form-label">
+                                        <i class="fas fa-dollar-sign me-1"></i>
+                                        Valor (R$) <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="valor" 
+                                           name="valor" 
+                                           step="0.01" 
+                                           min="0" 
+                                           value="{{ '{:.2f}'.format(beneficio.valor) if beneficio else '' }}"
+                                           required>
+                                    <small class="text-muted">Valor total do benefício</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="percentual_desconto" class="form-label">
+                                        <i class="fas fa-percent me-1"></i>
+                                        % Desconto Funcionário
+                                    </label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="percentual_desconto" 
+                                           name="percentual_desconto" 
+                                           step="0.01" 
+                                           min="0" 
+                                           max="100" 
+                                           value="{{ '{:.2f}'.format(beneficio.percentual_desconto) if beneficio else '0.00' }}">
+                                    <small class="text-muted">Percentual descontado em folha</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dias por Mês (VR/VT) -->
+                        <div class="mb-3" id="campo_dias_mes" style="display: none;">
+                            <label for="dias_por_mes" class="form-label">
+                                <i class="fas fa-calendar-day me-1"></i>
+                                Dias por Mês
+                            </label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="dias_por_mes" 
+                                   name="dias_por_mes" 
+                                   min="1" 
+                                   max="31" 
+                                   value="{{ beneficio.dias_por_mes if beneficio else '22' }}">
+                            <small class="text-muted">Quantidade de dias úteis/mês (geralmente 22)</small>
+                        </div>
+
+                        <!-- Datas -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="data_inicio" class="form-label">
+                                        <i class="fas fa-calendar-alt me-1"></i>
+                                        Data Início <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="date" 
+                                           class="form-control" 
+                                           id="data_inicio" 
+                                           name="data_inicio" 
+                                           value="{{ beneficio.data_inicio.strftime('%Y-%m-%d') if beneficio else hoje.strftime('%Y-%m-%d') }}"
+                                           required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="data_fim" class="form-label">
+                                        <i class="fas fa-calendar-times me-1"></i>
+                                        Data Fim (opcional)
+                                    </label>
+                                    <input type="date" 
+                                           class="form-control" 
+                                           id="data_fim" 
+                                           name="data_fim" 
+                                           value="{{ beneficio.data_fim.strftime('%Y-%m-%d') if beneficio and beneficio.data_fim else '' }}">
+                                    <small class="text-muted">Deixe vazio se o benefício for vigente</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Observações -->
+                        <div class="mb-3">
+                            <label for="observacoes" class="form-label">
+                                <i class="fas fa-comment me-1"></i>
+                                Observações
+                            </label>
+                            <textarea class="form-control" 
+                                      id="observacoes" 
+                                      name="observacoes" 
+                                      rows="3">{{ beneficio.observacoes if beneficio else '' }}</textarea>
+                            <small class="text-muted">Informações adicionais sobre o benefício</small>
+                        </div>
+
+                        <!-- Status Ativo -->
+                        <div class="mb-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" 
+                                       type="checkbox" 
+                                       id="ativo" 
+                                       name="ativo" 
+                                       {{ 'checked' if not beneficio or beneficio.ativo }}>
+                                <label class="form-check-label" for="ativo">
+                                    <strong>Benefício Ativo</strong>
+                                    <br>
+                                    <small class="text-muted">Benefícios inativos não são considerados na folha de pagamento</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary flex-grow-1">
+                                <i class="fas fa-save me-1"></i>
+                                {{ 'Atualizar' if beneficio else 'Cadastrar' }} Benefício
+                            </button>
+                            <a href="{{ url_for('folha.beneficios') }}" class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Card de Ajuda -->
+            <div class="card border-0 shadow-sm mt-3">
+                <div class="card-body">
+                    <h6 class="text-primary">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Informações Importantes
+                    </h6>
+                    <ul class="small mb-0">
+                        <li>Os valores dos benefícios serão utilizados no cálculo da folha de pagamento</li>
+                        <li>O percentual de desconto indica quanto o funcionário paga pelo benefício</li>
+                        <li>Para VR e VT, informe a quantidade de dias úteis trabalhados por mês</li>
+                        <li>Benefícios inativos não são considerados no processamento da folha</li>
+                        <li>A data fim é opcional - deixe vazio para benefícios vigentes por tempo indeterminado</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview Card (para novos benefícios) -->
+        {% if not beneficio %}
+        <div class="col-lg-4 col-xl-6">
+            <div class="card border-0 shadow-sm sticky-top" style="top: 20px;">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">
+                        <i class="fas fa-eye me-1"></i>
+                        Preview do Benefício
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="preview-content">
+                        <p class="text-muted text-center py-3">
+                            <i class="fas fa-info-circle"></i><br>
+                            Preencha o formulário para visualizar o preview
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Ajustar campos de acordo com o tipo de benefício
+function ajustarCampos() {
+    const tipo = document.getElementById('tipo_beneficio').value;
+    const campoDiasMes = document.getElementById('campo_dias_mes');
+    
+    // Mostrar campo "Dias por Mês" apenas para VR e VT
+    if (tipo === 'VR' || tipo === 'VT') {
+        campoDiasMes.style.display = 'block';
+    } else {
+        campoDiasMes.style.display = 'none';
+    }
+    
+    atualizarPreview();
+}
+
+// Atualizar preview do benefício
+function atualizarPreview() {
+    const funcionarioSelect = document.getElementById('funcionario_id');
+    const tipoSelect = document.getElementById('tipo_beneficio');
+    const valor = document.getElementById('valor').value;
+    const percentualDesconto = document.getElementById('percentual_desconto').value;
+    const diasMes = document.getElementById('dias_por_mes').value;
+    const dataInicio = document.getElementById('data_inicio').value;
+    const dataFim = document.getElementById('data_fim').value;
+    const ativo = document.getElementById('ativo').checked;
+    
+    if (!funcionarioSelect || !tipoSelect.value || !valor) {
+        return;
+    }
+    
+    const funcionarioNome = funcionarioSelect.options[funcionarioSelect.selectedIndex].text;
+    const tipoNome = tipoSelect.options[tipoSelect.selectedIndex].text;
+    
+    const valorFloat = parseFloat(valor) || 0;
+    const percentualFloat = parseFloat(percentualDesconto) || 0;
+    const valorDesconto = valorFloat * (percentualFloat / 100);
+    const valorLiquido = valorFloat - valorDesconto;
+    
+    let html = `
+        <div class="mb-3">
+            <strong class="text-primary">${tipoNome}</strong>
+            <br>
+            <small class="text-muted">${funcionarioNome}</small>
+        </div>
+        
+        <div class="mb-2">
+            <div class="d-flex justify-content-between">
+                <span class="text-muted">Valor Total:</span>
+                <strong class="text-success">R$ ${valorFloat.toFixed(2)}</strong>
+            </div>
+        </div>
+        
+        ${percentualFloat > 0 ? `
+        <div class="mb-2">
+            <div class="d-flex justify-content-between">
+                <span class="text-muted">Desconto (${percentualFloat}%):</span>
+                <strong class="text-danger">R$ ${valorDesconto.toFixed(2)}</strong>
+            </div>
+        </div>
+        <div class="mb-3">
+            <div class="d-flex justify-content-between">
+                <span class="text-muted">Custo Empresa:</span>
+                <strong class="text-primary">R$ ${valorLiquido.toFixed(2)}</strong>
+            </div>
+        </div>
+        ` : ''}
+        
+        ${(tipoSelect.value === 'VR' || tipoSelect.value === 'VT') ? `
+        <div class="mb-3">
+            <div class="d-flex justify-content-between">
+                <span class="text-muted">Dias/Mês:</span>
+                <strong>${diasMes} dias</strong>
+            </div>
+        </div>
+        ` : ''}
+        
+        <div class="mb-2">
+            <div class="d-flex justify-content-between">
+                <span class="text-muted">Período:</span>
+                <small>${new Date(dataInicio).toLocaleDateString('pt-BR')} 
+                ${dataFim ? 'até ' + new Date(dataFim).toLocaleDateString('pt-BR') : '(vigente)'}</small>
+            </div>
+        </div>
+        
+        <div class="mt-3 text-center">
+            <span class="badge bg-${ativo ? 'success' : 'secondary'}">${ativo ? 'Ativo' : 'Inativo'}</span>
+        </div>
+    `;
+    
+    const previewContent = document.getElementById('preview-content');
+    if (previewContent) {
+        previewContent.innerHTML = html;
+    }
+}
+
+// Inicializar ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    ajustarCampos();
+    
+    // Adicionar listeners para atualizar preview
+    const campos = ['funcionario_id', 'tipo_beneficio', 'valor', 'percentual_desconto', 'dias_por_mes', 'data_inicio', 'data_fim', 'ativo'];
+    campos.forEach(campo => {
+        const elemento = document.getElementById(campo);
+        if (elemento) {
+            elemento.addEventListener('change', atualizarPreview);
+            elemento.addEventListener('input', atualizarPreview);
+        }
+    });
+});
+</script>
+
+<style>
+.sticky-top {
+    position: sticky;
+    z-index: 1020;
+}
+</style>
+{% endblock %}

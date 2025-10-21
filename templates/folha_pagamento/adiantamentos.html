@@ -1,0 +1,369 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Adiantamentos Salariais - Folha de Pagamento{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-hand-holding-usd text-warning me-2"></i>
+                        Adiantamentos Salariais
+                    </h1>
+                    <p class="text-muted small mb-0">Gestão de adiantamentos com workflow de aprovação</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('folha.dashboard') }}" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Voltar ao Dashboard
+                    </a>
+                    <a href="{{ url_for('folha.criar_adiantamento') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>
+                        Novo Adiantamento
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Totais por Status -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Solicitados</p>
+                            <h4 class="mb-0 text-warning">R$ {{ "{:,.2f}".format(totais['SOLICITADO']['valor']) }}</h4>
+                            <small class="text-muted">{{ totais['SOLICITADO']['count'] }} adiantamento(s)</small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-warning bg-soft rounded">
+                                <i class="fas fa-clock text-warning"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Aprovados</p>
+                            <h4 class="mb-0 text-success">R$ {{ "{:,.2f}".format(totais['APROVADO']['valor']) }}</h4>
+                            <small class="text-muted">{{ totais['APROVADO']['count'] }} adiantamento(s)</small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-success bg-soft rounded">
+                                <i class="fas fa-check-circle text-success"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Quitados</p>
+                            <h4 class="mb-0 text-info">R$ {{ "{:,.2f}".format(totais['QUITADO']['valor']) }}</h4>
+                            <small class="text-muted">{{ totais['QUITADO']['count'] }} adiantamento(s)</small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-info bg-soft rounded">
+                                <i class="fas fa-check-double text-info"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Cancelados</p>
+                            <h4 class="mb-0 text-danger">R$ {{ "{:,.2f}".format(totais['CANCELADO']['valor']) }}</h4>
+                            <small class="text-muted">{{ totais['CANCELADO']['count'] }} adiantamento(s)</small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-danger bg-soft rounded">
+                                <i class="fas fa-times-circle text-danger"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter me-2"></i>Filtrar por Status
+                    </h5>
+                </div>
+                <div class="col-md-6">
+                    <div class="btn-group w-100" role="group">
+                        <a href="{{ url_for('folha.adiantamentos', status='TODOS') }}" 
+                           class="btn btn-sm {{ 'btn-primary' if status_filtro == 'TODOS' else 'btn-outline-secondary' }}">
+                            Todos
+                        </a>
+                        <a href="{{ url_for('folha.adiantamentos', status='SOLICITADO') }}" 
+                           class="btn btn-sm {{ 'btn-warning' if status_filtro == 'SOLICITADO' else 'btn-outline-secondary' }}">
+                            Solicitados
+                        </a>
+                        <a href="{{ url_for('folha.adiantamentos', status='APROVADO') }}" 
+                           class="btn btn-sm {{ 'btn-success' if status_filtro == 'APROVADO' else 'btn-outline-secondary' }}">
+                            Aprovados
+                        </a>
+                        <a href="{{ url_for('folha.adiantamentos', status='QUITADO') }}" 
+                           class="btn btn-sm {{ 'btn-info' if status_filtro == 'QUITADO' else 'btn-outline-secondary' }}">
+                            Quitados
+                        </a>
+                        <a href="{{ url_for('folha.adiantamentos', status='CANCELADO') }}" 
+                           class="btn btn-sm {{ 'btn-danger' if status_filtro == 'CANCELADO' else 'btn-outline-secondary' }}">
+                            Cancelados
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Adiantamentos -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">
+                <i class="fas fa-list me-2"></i>
+                Lista de Adiantamentos
+                {% if status_filtro != 'TODOS' %}
+                <span class="badge bg-secondary ms-2">{{ status_filtro }}</span>
+                {% endif %}
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            {% if adiantamentos %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Data Solicitação</th>
+                            <th>Funcionário</th>
+                            <th>Valor Total</th>
+                            <th>Parcelas</th>
+                            <th>Valor/Parcela</th>
+                            <th>Pagas</th>
+                            <th>Motivo</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for adiantamento in adiantamentos %}
+                        <tr>
+                            <td>
+                                <small class="text-muted">
+                                    {{ adiantamento.data_solicitacao.strftime('%d/%m/%Y') }}
+                                </small>
+                            </td>
+                            <td>
+                                <strong>{{ adiantamento.funcionario.nome }}</strong>
+                                <br>
+                                <small class="text-muted">{{ adiantamento.funcionario.codigo }}</small>
+                            </td>
+                            <td>
+                                <strong class="text-primary">
+                                    R$ {{ "{:,.2f}".format(adiantamento.valor_total|float) }}
+                                </strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">
+                                    {{ adiantamento.parcelas }}x
+                                </span>
+                            </td>
+                            <td>
+                                R$ {{ "{:,.2f}".format(adiantamento.valor_parcela|float) }}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">
+                                    {{ adiantamento.parcelas_pagas }}/{{ adiantamento.parcelas }}
+                                </span>
+                            </td>
+                            <td>
+                                <small>{{ adiantamento.motivo[:30] }}{% if adiantamento.motivo|length > 30 %}...{% endif %}</small>
+                            </td>
+                            <td>
+                                {% if adiantamento.status == 'SOLICITADO' %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-clock me-1"></i>Solicitado
+                                </span>
+                                {% elif adiantamento.status == 'APROVADO' %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check-circle me-1"></i>Aprovado
+                                </span>
+                                {% elif adiantamento.status == 'QUITADO' %}
+                                <span class="badge bg-info">
+                                    <i class="fas fa-check-double me-1"></i>Quitado
+                                </span>
+                                {% elif adiantamento.status == 'CANCELADO' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-times-circle me-1"></i>Cancelado
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    {% if adiantamento.status == 'SOLICITADO' %}
+                                    <form method="POST" action="{{ url_for('folha.aprovar_adiantamento', id=adiantamento.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-success btn-sm" 
+                                                onclick="return confirm('Aprovar este adiantamento?')">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-danger btn-sm" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#modalRejeitar{{ adiantamento.id }}">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                    {% else %}
+                                    <button type="button" class="btn btn-info btn-sm" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#modalDetalhes{{ adiantamento.id }}">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Modal Rejeitar -->
+                                <div class="modal fade" id="modalRejeitar{{ adiantamento.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Rejeitar Adiantamento</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form method="POST" action="{{ url_for('folha.rejeitar_adiantamento', id=adiantamento.id) }}">
+                                                <div class="modal-body">
+                                                    <p><strong>Funcionário:</strong> {{ adiantamento.funcionario.nome }}</p>
+                                                    <p><strong>Valor:</strong> R$ {{ "{:,.2f}".format(adiantamento.valor_total|float) }}</p>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Motivo da Rejeição</label>
+                                                        <textarea class="form-control" name="motivo_rejeicao" rows="3" required></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-danger">Rejeitar</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Modal Detalhes -->
+                                <div class="modal fade" id="modalDetalhes{{ adiantamento.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Detalhes do Adiantamento</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <table class="table table-sm">
+                                                    <tr>
+                                                        <th>Funcionário:</th>
+                                                        <td>{{ adiantamento.funcionario.nome }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Valor Total:</th>
+                                                        <td>R$ {{ "{:,.2f}".format(adiantamento.valor_total|float) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Parcelas:</th>
+                                                        <td>{{ adiantamento.parcelas }}x de R$ {{ "{:,.2f}".format(adiantamento.valor_parcela|float) }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Pagas:</th>
+                                                        <td>{{ adiantamento.parcelas_pagas }}/{{ adiantamento.parcelas }}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Data Solicitação:</th>
+                                                        <td>{{ adiantamento.data_solicitacao.strftime('%d/%m/%Y') }}</td>
+                                                    </tr>
+                                                    {% if adiantamento.data_aprovacao %}
+                                                    <tr>
+                                                        <th>Data Aprovação:</th>
+                                                        <td>{{ adiantamento.data_aprovacao.strftime('%d/%m/%Y') }}</td>
+                                                    </tr>
+                                                    {% endif %}
+                                                    <tr>
+                                                        <th>Motivo:</th>
+                                                        <td>{{ adiantamento.motivo }}</td>
+                                                    </tr>
+                                                    {% if adiantamento.observacoes %}
+                                                    <tr>
+                                                        <th>Observações:</th>
+                                                        <td><pre class="mb-0" style="white-space: pre-wrap;">{{ adiantamento.observacoes }}</pre></td>
+                                                    </tr>
+                                                    {% endif %}
+                                                </table>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <p class="text-muted">
+                    {% if status_filtro != 'TODOS' %}
+                    Nenhum adiantamento com status <strong>{{ status_filtro }}</strong>
+                    {% else %}
+                    Nenhum adiantamento cadastrado
+                    {% endif %}
+                </p>
+                <a href="{{ url_for('folha.criar_adiantamento') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Criar Primeiro Adiantamento
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.avatar-sm {
+    height: 3rem;
+    width: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.bg-soft {
+    opacity: 0.15;
+}
+</style>
+{% endblock %}

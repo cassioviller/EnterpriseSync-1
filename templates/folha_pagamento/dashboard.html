@@ -141,16 +141,16 @@
     <!-- Ações Rápidas -->
     <div class="row g-3 mb-4">
         <div class="col-md-3">
-            <a href="{{ url_for('folha.listar_configuracoes') }}" class="card text-decoration-none">
+            <a href="{{ url_for('folha.parametros_legais') }}" class="card text-decoration-none">
                 <div class="card-body text-center">
                     <i class="fas fa-user-cog fa-2x text-primary mb-2"></i>
-                    <h6 class="card-title">Configurações Salariais</h6>
-                    <p class="card-text small text-muted">Gerenciar salários e benefícios</p>
+                    <h6 class="card-title">Parâmetros Legais</h6>
+                    <p class="card-text small text-muted">INSS, IRRF, FGTS</p>
                 </div>
             </a>
         </div>
         <div class="col-md-3">
-            <a href="{{ url_for('folha.listar_beneficios') }}" class="card text-decoration-none">
+            <a href="{{ url_for('folha.beneficios') }}" class="card text-decoration-none">
                 <div class="card-body text-center">
                     <i class="fas fa-gift fa-2x text-success mb-2"></i>
                     <h6 class="card-title">Benefícios</h6>
@@ -159,7 +159,7 @@
             </a>
         </div>
         <div class="col-md-3">
-            <a href="{{ url_for('folha.listar_adiantamentos') }}" class="card text-decoration-none">
+            <a href="{{ url_for('folha.adiantamentos') }}" class="card text-decoration-none">
                 <div class="card-body text-center">
                     <i class="fas fa-hand-holding-usd fa-2x text-warning mb-2"></i>
                     <h6 class="card-title">Adiantamentos</h6>

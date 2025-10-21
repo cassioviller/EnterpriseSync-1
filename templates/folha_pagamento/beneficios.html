@@ -1,0 +1,323 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Benefícios de Funcionários - Folha de Pagamento{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-gift text-info me-2"></i>
+                        Benefícios de Funcionários
+                    </h1>
+                    <p class="text-muted small mb-0">Gestão de VR, VT, Plano de Saúde e demais benefícios</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('folha.dashboard') }}" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Voltar ao Dashboard
+                    </a>
+                    <a href="{{ url_for('folha.criar_beneficio') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>
+                        Novo Benefício
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas Resumo -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Total Geral</p>
+                            <h4 class="mb-0 text-success">R$ {{ "{:,.2f}".format(total_geral) }}</h4>
+                            <small class="text-muted">Benefícios Ativos</small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-success bg-soft rounded">
+                                <i class="fas fa-coins text-success"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Funcionários</p>
+                            <h4 class="mb-0 text-primary">{{ funcionarios_com_beneficios }}</h4>
+                            <small class="text-muted">Com Benefícios</small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-primary bg-soft rounded">
+                                <i class="fas fa-users text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Vale Refeição</p>
+                            <h4 class="mb-0 text-warning">R$ {{ "{:,.2f}".format(totais_por_tipo.get('VR', 0)) }}</h4>
+                            <small class="text-muted">{{ beneficios_por_tipo.get('VR', [])|selectattr('ativo')|list|length }} ativos</small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-warning bg-soft rounded">
+                                <i class="fas fa-utensils text-warning"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <p class="text-muted mb-1 small">Vale Transporte</p>
+                            <h4 class="mb-0 text-info">R$ {{ "{:,.2f}".format(totais_por_tipo.get('VT', 0)) }}</h4>
+                            <small class="text-muted">{{ beneficios_por_tipo.get('VT', [])|selectattr('ativo')|list|length }} ativos</small>
+                        </div>
+                        <div class="col-auto">
+                            <div class="avatar-sm bg-info bg-soft rounded">
+                                <i class="fas fa-bus text-info"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards por Tipo de Benefício -->
+    {% for tipo in tipos_beneficio %}
+    {% set beneficios_tipo = beneficios_por_tipo.get(tipo, []) %}
+    {% if beneficios_tipo %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                {% if tipo == 'VR' %}
+                    <i class="fas fa-utensils text-warning me-2"></i>Vale Refeição
+                {% elif tipo == 'VT' %}
+                    <i class="fas fa-bus text-info me-2"></i>Vale Transporte
+                {% elif tipo == 'PLANO_SAUDE' %}
+                    <i class="fas fa-heartbeat text-danger me-2"></i>Plano de Saúde
+                {% elif tipo == 'PLANO_ODONTO' %}
+                    <i class="fas fa-tooth text-primary me-2"></i>Plano Odontológico
+                {% elif tipo == 'SEGURO_VIDA' %}
+                    <i class="fas fa-shield-alt text-success me-2"></i>Seguro de Vida
+                {% elif tipo == 'AUXILIO_CRECHE' %}
+                    <i class="fas fa-child text-purple me-2"></i>Auxílio Creche
+                {% else %}
+                    <i class="fas fa-gift text-secondary me-2"></i>Outro
+                {% endif %}
+            </h5>
+            <div>
+                <span class="badge bg-primary me-2">
+                    {{ beneficios_tipo|selectattr('ativo')|list|length }} ativos
+                </span>
+                <span class="badge bg-success">
+                    Total: R$ {{ "{:,.2f}".format(totais_por_tipo.get(tipo, 0)) }}
+                </span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Funcionário</th>
+                            <th>Valor</th>
+                            <th>% Desconto</th>
+                            <th>Dias/Mês</th>
+                            <th>Período</th>
+                            <th>Status</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for beneficio in beneficios_tipo %}
+                        <tr class="{{ 'table-secondary' if not beneficio.ativo }}">
+                            <td>
+                                <strong>{{ beneficio.funcionario.nome }}</strong>
+                                <br>
+                                <small class="text-muted">{{ beneficio.funcionario.codigo }}</small>
+                            </td>
+                            <td>
+                                <strong class="text-success">R$ {{ "{:,.2f}".format(beneficio.valor) }}</strong>
+                            </td>
+                            <td>
+                                {% if beneficio.percentual_desconto > 0 %}
+                                    <span class="text-danger">{{ "{:.2f}".format(beneficio.percentual_desconto) }}%</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if tipo in ['VR', 'VT'] %}
+                                    {{ beneficio.dias_por_mes }} dias
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>
+                                    <i class="fas fa-calendar-alt me-1"></i>
+                                    {{ beneficio.data_inicio.strftime('%d/%m/%Y') }}
+                                    {% if beneficio.data_fim %}
+                                        até {{ beneficio.data_fim.strftime('%d/%m/%Y') }}
+                                    {% else %}
+                                        <span class="text-success">(vigente)</span>
+                                    {% endif %}
+                                </small>
+                            </td>
+                            <td>
+                                {% if beneficio.ativo %}
+                                    <span class="badge bg-success">Ativo</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('folha.editar_beneficio', id=beneficio.id) }}" 
+                                       class="btn btn-outline-primary"
+                                       title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" 
+                                            class="btn btn-outline-danger"
+                                            onclick="confirmarDelecao({{ beneficio.id }}, '{{ beneficio.funcionario.nome }}', '{{ tipo }}')"
+                                            title="Deletar">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% if beneficio.observacoes %}
+                        <tr class="{{ 'table-secondary' if not beneficio.ativo }}">
+                            <td colspan="7" class="py-1">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <strong>Obs:</strong> {{ beneficio.observacoes }}
+                                </small>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% if not beneficios %}
+    <!-- Estado vazio -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-gift fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">Nenhum benefício cadastrado</h4>
+                    <p class="text-muted mb-4">Comece cadastrando benefícios para seus funcionários.</p>
+                    <a href="{{ url_for('folha.criar_beneficio') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus me-2"></i>
+                        Cadastrar Primeiro Benefício
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Confirmação de Deleção -->
+<div class="modal fade" id="modalDeletar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Confirmar Exclusão
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir o benefício <strong id="beneficioTipo"></strong> de <strong id="funcionarioNome"></strong>?</p>
+                <p class="text-danger mb-0">
+                    <i class="fas fa-exclamation-circle me-1"></i>
+                    Esta ação não pode ser desfeita.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form id="formDeletar" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i>
+                        Confirmar Exclusão
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmarDelecao(id, funcionarioNome, tipo) {
+    document.getElementById('funcionarioNome').textContent = funcionarioNome;
+    document.getElementById('beneficioTipo').textContent = tipo;
+    document.getElementById('formDeletar').action = `/folha/beneficios/deletar/${id}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalDeletar'));
+    modal.show();
+}
+</script>
+
+<style>
+.avatar-sm {
+    width: 3rem;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.bg-soft {
+    background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+}
+
+.bg-success.bg-soft {
+    background-color: rgba(var(--bs-success-rgb), 0.1) !important;
+}
+
+.bg-warning.bg-soft {
+    background-color: rgba(var(--bs-warning-rgb), 0.1) !important;
+}
+
+.bg-info.bg-soft {
+    background-color: rgba(var(--bs-info-rgb), 0.1) !important;
+}
+</style>
+{% endblock %}

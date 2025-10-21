@@ -1,0 +1,252 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Relatórios - Folha de Pagamento{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-chart-bar text-info me-2"></i>
+                        Relatórios de Folha de Pagamento
+                    </h1>
+                    <p class="text-muted small mb-0">Gere holerites e relatórios analíticos</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('folha.dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Voltar ao Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if meses_disponiveis %}
+    <!-- Cards de Meses Disponíveis -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-alt text-primary me-2"></i>
+                        Meses Disponíveis
+                    </h5>
+                    <p class="text-muted small mb-0">Selecione um mês para gerar relatórios</p>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        {% for mes in meses_disponiveis %}
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border shadow-sm h-100 hover-card">
+                                <div class="card-body">
+                                    <!-- Cabeçalho do Card -->
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="flex-shrink-0">
+                                            <div class="avatar-md bg-primary bg-soft rounded-circle d-flex align-items-center justify-content-center">
+                                                <i class="fas fa-calendar-check text-primary fs-4"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h5 class="mb-1">{{ mes.mes_nome }}</h5>
+                                            <p class="text-muted small mb-0">
+                                                <i class="fas fa-users me-1"></i>
+                                                {{ mes.total_folhas }} funcionário{{ 's' if mes.total_folhas != 1 else '' }}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Métricas -->
+                                    <div class="border-top pt-3 mb-3">
+                                        <div class="row text-center">
+                                            <div class="col-6 border-end">
+                                                <p class="text-muted small mb-1">Total Bruto</p>
+                                                <h6 class="mb-0 text-success">
+                                                    R$ {{ "{:,.2f}".format(mes.total_bruto) }}
+                                                </h6>
+                                            </div>
+                                            <div class="col-6">
+                                                <p class="text-muted small mb-1">Total Líquido</p>
+                                                <h6 class="mb-0 text-primary">
+                                                    R$ {{ "{:,.2f}".format(mes.total_liquido) }}
+                                                </h6>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Ações -->
+                                    <div class="d-grid gap-2">
+                                        <a href="{{ url_for('folha.relatorio_excel', ano=mes.ano, mes=mes.mes) }}" 
+                                           class="btn btn-success btn-sm">
+                                            <i class="fas fa-file-excel me-1"></i>
+                                            Baixar Excel Analítico
+                                        </a>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                                onclick="mostrarFuncionarios({{ mes.mes }}, {{ mes.ano }})">
+                                            <i class="fas fa-file-pdf me-1"></i>
+                                            Gerar Holerites (PDF)
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-light text-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Folha processada em {{ mes.mes_nome }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Selecionar Funcionário -->
+    <div class="modal fade" id="modalFuncionarios" tabindex="-1" aria-labelledby="modalFuncionariosLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="modalFuncionariosLabel">
+                        <i class="fas fa-users me-2"></i>
+                        Selecione o Funcionário
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="listaFuncionarios">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                            <p class="text-muted mt-2">Carregando funcionários...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Nenhum Mês Disponível -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-folder-open text-muted" style="font-size: 4rem;"></i>
+                    </div>
+                    <h4 class="text-muted mb-3">Nenhuma Folha Processada</h4>
+                    <p class="text-muted mb-4">
+                        Não há folhas de pagamento processadas nos últimos 6 meses.<br>
+                        Processe uma folha para gerar relatórios.
+                    </p>
+                    <a href="{{ url_for('folha.dashboard') }}" class="btn btn-primary">
+                        <i class="fas fa-calculator me-1"></i>
+                        Ir para Processamento
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.hover-card {
+    transition: all 0.3s ease;
+}
+
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.avatar-md {
+    width: 3.5rem;
+    height: 3.5rem;
+}
+
+.bg-soft {
+    background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+}
+</style>
+
+<script>
+let mesSelecionado = null;
+let anoSelecionado = null;
+
+function mostrarFuncionarios(mes, ano) {
+    mesSelecionado = mes;
+    anoSelecionado = ano;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalFuncionarios'));
+    modal.show();
+    
+    fetch(`/api/funcionarios/folha/${ano}/${mes}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.funcionarios.length > 0) {
+                let html = '<div class="list-group">';
+                
+                data.funcionarios.forEach(func => {
+                    html += `
+                        <a href="/folha/relatorios/holerite/${func.folha_id}" 
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                           target="_blank">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-user me-2 text-primary"></i>
+                                    ${func.nome}
+                                </h6>
+                                <small class="text-muted">
+                                    <i class="fas fa-id-card me-1"></i>
+                                    CPF: ${func.cpf} | 
+                                    <i class="fas fa-briefcase me-1"></i>
+                                    ${func.cargo}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-success">
+                                    R$ ${func.salario_liquido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                </span>
+                                <br>
+                                <small class="text-muted">Líquido</small>
+                            </div>
+                        </a>
+                    `;
+                });
+                
+                html += '</div>';
+                document.getElementById('listaFuncionarios').innerHTML = html;
+            } else {
+                document.getElementById('listaFuncionarios').innerHTML = `
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Nenhum funcionário encontrado para este mês.
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar funcionários:', error);
+            document.getElementById('listaFuncionarios').innerHTML = `
+                <div class="alert alert-danger text-center">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Erro ao carregar funcionários. Tente novamente.
+                </div>
+            `;
+        });
+}
+</script>
+{% endblock %}

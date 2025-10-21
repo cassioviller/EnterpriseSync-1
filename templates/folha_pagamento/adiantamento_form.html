@@ -1,0 +1,235 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if adiantamento else 'Novo' }} Adiantamento - Folha de Pagamento{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-{{ 'edit' if adiantamento else 'plus' }} text-warning me-2"></i>
+                        {{ 'Editar' if adiantamento else 'Novo' }} Adiantamento Salarial
+                    </h1>
+                    <p class="text-muted small mb-0">Preencha os dados do adiantamento</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('folha.adiantamentos') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-invoice-dollar me-2"></i>
+                        Dados do Adiantamento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <!-- Funcionário -->
+                        <div class="mb-4">
+                            <label for="funcionario_id" class="form-label">
+                                <i class="fas fa-user me-1"></i>
+                                Funcionário <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select form-select-lg" id="funcionario_id" name="funcionario_id" required 
+                                    {% if adiantamento %}disabled{% endif %}>
+                                <option value="">Selecione um funcionário...</option>
+                                {% for func in funcionarios %}
+                                <option value="{{ func.id }}" 
+                                        {% if adiantamento and adiantamento.funcionario_id == func.id %}selected{% endif %}
+                                        data-salario="{{ func.salario or 0 }}">
+                                    {{ func.nome }} - {{ func.codigo }} - Salário: R$ {{ "{:,.2f}".format(func.salario or 0) }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Selecione o funcionário que receberá o adiantamento</small>
+                        </div>
+
+                        <div class="row">
+                            <!-- Valor Total -->
+                            <div class="col-md-6 mb-4">
+                                <label for="valor_total" class="form-label">
+                                    <i class="fas fa-dollar-sign me-1"></i>
+                                    Valor Total <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text">R$</span>
+                                    <input type="number" class="form-control" id="valor_total" name="valor_total" 
+                                           step="0.01" min="0.01" required
+                                           value="{{ '%.2f'|format(adiantamento.valor_total|float) if adiantamento else '' }}"
+                                           placeholder="0,00">
+                                </div>
+                                <small class="form-text text-muted">Valor total do adiantamento</small>
+                            </div>
+
+                            <!-- Parcelas -->
+                            <div class="col-md-6 mb-4">
+                                <label for="parcelas" class="form-label">
+                                    <i class="fas fa-calendar-alt me-1"></i>
+                                    Número de Parcelas <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" class="form-control form-control-lg" id="parcelas" name="parcelas" 
+                                       min="1" max="12" required
+                                       value="{{ adiantamento.parcelas if adiantamento else '1' }}"
+                                       placeholder="1">
+                                <small class="form-text text-muted">Quantidade de parcelas (1 a 12)</small>
+                            </div>
+                        </div>
+
+                        <!-- Cálculo Automático -->
+                        <div class="alert alert-info mb-4" id="calculoAlert" style="display: none;">
+                            <i class="fas fa-calculator me-2"></i>
+                            <strong>Cálculo:</strong> 
+                            <span id="parcelasTexto"></span> parcelas de 
+                            <strong id="valorParcelaTexto">R$ 0,00</strong>
+                        </div>
+
+                        <!-- Motivo -->
+                        <div class="mb-4">
+                            <label for="motivo" class="form-label">
+                                <i class="fas fa-comment-dots me-1"></i>
+                                Motivo <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control form-control-lg" id="motivo" name="motivo" 
+                                   maxlength="200" required
+                                   value="{{ adiantamento.motivo if adiantamento else '' }}"
+                                   placeholder="Ex: Emergência médica, Despesas urgentes...">
+                            <small class="form-text text-muted">Breve descrição do motivo do adiantamento (máx. 200 caracteres)</small>
+                        </div>
+
+                        <!-- Observações -->
+                        <div class="mb-4">
+                            <label for="observacoes" class="form-label">
+                                <i class="fas fa-sticky-note me-1"></i>
+                                Observações
+                            </label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" rows="4"
+                                      placeholder="Informações adicionais sobre o adiantamento...">{{ adiantamento.observacoes if adiantamento else '' }}</textarea>
+                            <small class="form-text text-muted">Detalhes adicionais (opcional)</small>
+                        </div>
+
+                        <!-- Alertas -->
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Importante:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>O adiantamento será criado com status <strong>SOLICITADO</strong></li>
+                                <li>Será necessária aprovação para liberação do valor</li>
+                                <li>As parcelas serão descontadas automaticamente na folha de pagamento</li>
+                            </ul>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('folha.adiantamentos') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-1"></i>
+                                {{ 'Atualizar' if adiantamento else 'Solicitar' }} Adiantamento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Card Informativo -->
+            <div class="card border-0 shadow-sm mt-4 bg-light">
+                <div class="card-body">
+                    <h6 class="mb-3">
+                        <i class="fas fa-info-circle text-info me-2"></i>
+                        Informações sobre Adiantamentos
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="small mb-2">
+                                <i class="fas fa-check text-success me-1"></i>
+                                Máximo recomendado: 40% do salário
+                            </p>
+                            <p class="small mb-2">
+                                <i class="fas fa-check text-success me-1"></i>
+                                Desconto automático na folha
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="small mb-2">
+                                <i class="fas fa-check text-success me-1"></i>
+                                Workflow de aprovação obrigatório
+                            </p>
+                            <p class="small mb-2">
+                                <i class="fas fa-check text-success me-1"></i>
+                                Parcelamento em até 12x
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Calcular valor da parcela automaticamente
+document.addEventListener('DOMContentLoaded', function() {
+    const valorTotal = document.getElementById('valor_total');
+    const parcelas = document.getElementById('parcelas');
+    const calculoAlert = document.getElementById('calculoAlert');
+    const parcelasTexto = document.getElementById('parcelasTexto');
+    const valorParcelaTexto = document.getElementById('valorParcelaTexto');
+
+    function calcularParcela() {
+        const valor = parseFloat(valorTotal.value) || 0;
+        const numParcelas = parseInt(parcelas.value) || 1;
+        
+        if (valor > 0 && numParcelas > 0) {
+            const valorParcela = valor / numParcelas;
+            parcelasTexto.textContent = numParcelas;
+            valorParcelaTexto.textContent = 'R$ ' + valorParcela.toFixed(2).replace('.', ',');
+            calculoAlert.style.display = 'block';
+        } else {
+            calculoAlert.style.display = 'none';
+        }
+    }
+
+    valorTotal.addEventListener('input', calcularParcela);
+    parcelas.addEventListener('input', calcularParcela);
+    
+    // Calcular ao carregar se houver valores
+    calcularParcela();
+
+    // Validação: alertar se valor for muito alto
+    const funcionarioSelect = document.getElementById('funcionario_id');
+    valorTotal.addEventListener('blur', function() {
+        const selectedOption = funcionarioSelect.options[funcionarioSelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.salario) {
+            const salario = parseFloat(selectedOption.dataset.salario);
+            const valor = parseFloat(valorTotal.value);
+            const percentual = (valor / salario) * 100;
+            
+            if (percentual > 40) {
+                alert('⚠️ Atenção: O valor do adiantamento (' + percentual.toFixed(0) + '% do salário) é superior ao recomendado (40%).');
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.form-control-lg, .form-select-lg {
+    font-size: 1.1rem;
+}
+</style>
+{% endblock %}
