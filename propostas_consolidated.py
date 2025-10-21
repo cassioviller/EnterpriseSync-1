@@ -413,8 +413,11 @@ def get_template_data(template_id):
                 'id': template.id,
                 'nome': template.nome,
                 'categoria': template.categoria,
-                'itens_padrao': template.itens_padrao,
-                'valor_base': template.valor_base
+                'descricao': template.descricao,
+                'itens_padrao': template.itens_padrao or [],
+                'prazo_entrega_dias': template.prazo_entrega_dias,
+                'validade_dias': template.validade_dias,
+                'percentual_nota_fiscal': float(template.percentual_nota_fiscal) if template.percentual_nota_fiscal else 13.5
             }
         })
         
