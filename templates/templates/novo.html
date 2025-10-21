@@ -469,9 +469,11 @@ O prazo poderá ser alterado em função de condições climáticas adversas.</t
 
                         <!-- Lista de itens adicionados -->
                         <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0 text-success"><i class="fas fa-list-ul"></i> Itens do Template</h6>
-                                <small class="text-muted">Total de itens: <span id="contadorItens">0</span></small>
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="fas fa-list-ul me-2"></i> Itens do Template (<span id="contadorItens">0</span>)</h6>
+                                <span class="badge bg-white text-primary fs-6">
+                                    Total: R$ <span id="totalTemplateHeader">0,00</span>
+                                </span>
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
@@ -670,7 +672,9 @@ function atualizarContadorItens() {
 // Função para atualizar total
 function atualizarTotal() {
     const total = itensTemplate.reduce((sum, item) => sum + item.subtotal, 0);
-    document.getElementById('totalTemplate').textContent = total.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+    const totalFormatado = total.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+    document.getElementById('totalTemplate').textContent = totalFormatado;
+    document.getElementById('totalTemplateHeader').textContent = totalFormatado;
 }
 
 // Função para atualizar JSON dos itens

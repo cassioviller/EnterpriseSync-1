@@ -192,13 +192,18 @@
 
                 <!-- Itens do Template -->
                 <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-list text-success"></i> Itens do Template
+                            <i class="fas fa-list-ul me-2"></i> Itens do Template (<span id="contadorItens">0</span>)
                         </h5>
-                        <button type="button" class="btn btn-sm btn-success" onclick="adicionarItem()">
-                            <i class="fas fa-plus"></i> Adicionar Item
-                        </button>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span class="badge bg-white text-primary fs-6">
+                                Total: R$ <span id="totalTemplateHeader">0,00</span>
+                            </span>
+                            <button type="button" class="btn btn-sm btn-light" onclick="adicionarItem()">
+                                <i class="fas fa-plus"></i> Adicionar Item
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="row mb-3">
@@ -524,7 +529,20 @@ function atualizarItem(itemId, campo, valor) {
 
 function atualizarTotal() {
     const total = itensTemplate.reduce((soma, item) => soma + ((item.quantidade || 1) * (item.preco_unitario || 0)), 0);
-    document.getElementById('totalTemplate').textContent = total.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+    const totalFormatado = total.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+    document.getElementById('totalTemplate').textContent = totalFormatado;
+    
+    // Atualizar badge no header também
+    const headerTotal = document.getElementById('totalTemplateHeader');
+    if (headerTotal) {
+        headerTotal.textContent = totalFormatado;
+    }
+    
+    // Atualizar contador de itens
+    const contador = document.getElementById('contadorItens');
+    if (contador) {
+        contador.textContent = itensTemplate.length;
+    }
 }
 
 function atualizarJSONItens() {
