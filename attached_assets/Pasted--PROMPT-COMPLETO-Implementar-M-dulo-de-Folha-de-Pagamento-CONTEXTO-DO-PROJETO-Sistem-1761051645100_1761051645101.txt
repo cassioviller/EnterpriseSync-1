@@ -1,0 +1,695 @@
+# 🎯 PROMPT COMPLETO: Implementar Módulo de Folha de Pagamento
+
+## CONTEXTO DO PROJETO
+
+**Sistema:** SIGE v8.0 - Gestão de Construção Civil  
+**Módulo:** Folha de Pagamento Automática (Módulo 6)  
+**Status Atual:** 50% implementado  
+**Objetivo:** Implementar 100% das funcionalidades
+
+---
+
+## SITUAÇÃO ATUAL
+
+### ✅ O QUE JÁ EXISTE:
+
+**Modelos (models.py):**
+- ✅ FolhaPagamento (linha 1619) - Folha mensal por funcionário
+- ✅ ParametrosLegais (linha 1784) - INSS, IRRF, FGTS, etc
+- ✅ BeneficioFuncionario (linha 1551) - VR, VT, plano de saúde
+- ✅ Adiantamento (linha 1712) - Adiantamentos salariais
+- ✅ FeriasDecimo (linha 1747) - Férias e 13º salário
+- ✅ CalculoHorasMensal (linha 1579) - Cálculo de horas
+
+**Serviço (services/folha_service.py):**
+- ✅ Função `processar_folha_funcionario()` - Cálculo completo
+
+**Views (folha_pagamento_views.py):**
+- ✅ Dashboard (`/folha/dashboard`) - Funcionando
+- ✅ Processar Folha (`/folha/processar/<ano>/<mes>`) - Funcionando
+- ❌ Configurações Salariais - "em desenvolvimento"
+- ❌ Benefícios - "em desenvolvimento"
+- ❌ Adiantamentos - "em desenvolvimento"
+- ❌ Relatórios - "em desenvolvimento"
+
+---
+
+## OBJETIVO
+
+Implementar as **4 funcionalidades faltantes** com CRUD completo, validações e interface profissional.
+
+---
+
+## TAREFA 1: PARÂMETROS LEGAIS
+
+### Funcionalidade:
+Configurar parâmetros legais anuais (INSS, IRRF, FGTS, salário mínimo, etc)
+
+### Rotas a Implementar:
+
+#### 1.1 - Listar Parâmetros
+```python
+@folha_bp.route('/parametros-legais')
+@admin_required
+def listar_parametros_legais():
+    """Listar parâmetros legais configurados"""
+    parametros = ParametrosLegais.query.filter_by(
+        admin_id=current_user.id
+    ).order_by(ParametrosLegais.ano_vigencia.desc()).all()
+    
+    return render_template('folha_pagamento/parametros_legais.html',
+                         parametros=parametros)
+```
+
+#### 1.2 - Criar/Editar Parâmetros
+```python
+@folha_bp.route('/parametros-legais/criar', methods=['GET', 'POST'])
+@folha_bp.route('/parametros-legais/editar/<int:id>', methods=['GET', 'POST'])
+@admin_required
+def criar_editar_parametros(id=None):
+    """Criar ou editar parâmetros legais"""
+    parametro = None
+    if id:
+        parametro = ParametrosLegais.query.get_or_404(id)
+        if parametro.admin_id != current_user.id:
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('folha.listar_parametros_legais'))
+    
+    if request.method == 'POST':
+        try:
+            ano = int(request.form.get('ano_vigencia'))
+            
+            # Verificar se já existe para este ano
+            existe = ParametrosLegais.query.filter_by(
+                admin_id=current_user.id,
+                ano_vigencia=ano
+            ).first()
+            
+            if existe and (not id or existe.id != id):
+                flash(f'Já existem parâmetros configurados para {ano}.', 'warning')
+                return redirect(url_for('folha.listar_parametros_legais'))
+            
+            if not parametro:
+                parametro = ParametrosLegais(
+                    admin_id=current_user.id,
+                    ano_vigencia=ano
+                )
+            
+            # INSS
+            parametro.inss_faixa1_limite = float(request.form.get('inss_faixa1_limite'))
+            parametro.inss_faixa1_percentual = float(request.form.get('inss_faixa1_percentual'))
+            parametro.inss_faixa2_limite = float(request.form.get('inss_faixa2_limite'))
+            parametro.inss_faixa2_percentual = float(request.form.get('inss_faixa2_percentual'))
+            parametro.inss_faixa3_limite = float(request.form.get('inss_faixa3_limite'))
+            parametro.inss_faixa3_percentual = float(request.form.get('inss_faixa3_percentual'))
+            parametro.inss_faixa4_limite = float(request.form.get('inss_faixa4_limite'))
+            parametro.inss_faixa4_percentual = float(request.form.get('inss_faixa4_percentual'))
+            parametro.inss_teto = float(request.form.get('inss_teto'))
+            
+            # IRRF
+            parametro.irrf_isencao = float(request.form.get('irrf_isencao'))
+            parametro.irrf_faixa1_limite = float(request.form.get('irrf_faixa1_limite'))
+            parametro.irrf_faixa1_percentual = float(request.form.get('irrf_faixa1_percentual'))
+            parametro.irrf_faixa1_deducao = float(request.form.get('irrf_faixa1_deducao'))
+            parametro.irrf_faixa2_limite = float(request.form.get('irrf_faixa2_limite'))
+            parametro.irrf_faixa2_percentual = float(request.form.get('irrf_faixa2_percentual'))
+            parametro.irrf_faixa2_deducao = float(request.form.get('irrf_faixa2_deducao'))
+            parametro.irrf_faixa3_limite = float(request.form.get('irrf_faixa3_limite'))
+            parametro.irrf_faixa3_percentual = float(request.form.get('irrf_faixa3_percentual'))
+            parametro.irrf_faixa3_deducao = float(request.form.get('irrf_faixa3_deducao'))
+            parametro.irrf_faixa4_percentual = float(request.form.get('irrf_faixa4_percentual'))
+            parametro.irrf_faixa4_deducao = float(request.form.get('irrf_faixa4_deducao'))
+            parametro.irrf_dependente_valor = float(request.form.get('irrf_dependente_valor'))
+            
+            # Outros
+            parametro.fgts_percentual = float(request.form.get('fgts_percentual'))
+            parametro.salario_minimo = float(request.form.get('salario_minimo'))
+            parametro.vale_transporte_percentual = float(request.form.get('vale_transporte_percentual'))
+            parametro.adicional_noturno_percentual = float(request.form.get('adicional_noturno_percentual'))
+            parametro.hora_extra_50_percentual = float(request.form.get('hora_extra_50_percentual'))
+            parametro.hora_extra_100_percentual = float(request.form.get('hora_extra_100_percentual'))
+            parametro.ativo = request.form.get('ativo') == 'true'
+            
+            if not id:
+                db.session.add(parametro)
+            
+            db.session.commit()
+            flash(f'Parâmetros legais de {ano} salvos com sucesso!', 'success')
+            return redirect(url_for('folha.listar_parametros_legais'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao salvar parâmetros: {str(e)}', 'error')
+    
+    # Valores padrão 2025
+    valores_padrao = {
+        'ano_vigencia': 2025,
+        'inss_faixa1_limite': 1412.00,
+        'inss_faixa1_percentual': 7.5,
+        'inss_faixa2_limite': 2666.68,
+        'inss_faixa2_percentual': 9.0,
+        'inss_faixa3_limite': 4000.03,
+        'inss_faixa3_percentual': 12.0,
+        'inss_faixa4_limite': 7786.02,
+        'inss_faixa4_percentual': 14.0,
+        'inss_teto': 908.85,
+        'irrf_isencao': 2259.20,
+        'irrf_faixa1_limite': 2826.65,
+        'irrf_faixa1_percentual': 7.5,
+        'irrf_faixa1_deducao': 169.44,
+        'irrf_faixa2_limite': 3751.05,
+        'irrf_faixa2_percentual': 15.0,
+        'irrf_faixa2_deducao': 381.44,
+        'irrf_faixa3_limite': 4664.68,
+        'irrf_faixa3_percentual': 22.5,
+        'irrf_faixa3_deducao': 662.77,
+        'irrf_faixa4_percentual': 27.5,
+        'irrf_faixa4_deducao': 896.00,
+        'irrf_dependente_valor': 189.59,
+        'fgts_percentual': 8.0,
+        'salario_minimo': 1412.00,
+        'vale_transporte_percentual': 6.0,
+        'adicional_noturno_percentual': 20.0,
+        'hora_extra_50_percentual': 50.0,
+        'hora_extra_100_percentual': 100.0,
+    }
+    
+    return render_template('folha_pagamento/parametros_form.html',
+                         parametro=parametro,
+                         valores_padrao=valores_padrao)
+```
+
+---
+
+## TAREFA 2: BENEFÍCIOS
+
+### Funcionalidade:
+Gerenciar benefícios dos funcionários (VR, VT, plano de saúde, seguro de vida)
+
+### Rotas a Implementar:
+
+#### 2.1 - Listar Benefícios
+```python
+@folha_bp.route('/beneficios')
+@admin_required
+def listar_beneficios():
+    """Listar todos os benefícios"""
+    beneficios = BeneficioFuncionario.query.filter_by(
+        admin_id=current_user.id
+    ).join(Funcionario).order_by(Funcionario.nome).all()
+    
+    # Agrupar por tipo
+    beneficios_por_tipo = {}
+    for b in beneficios:
+        if b.tipo_beneficio not in beneficios_por_tipo:
+            beneficios_por_tipo[b.tipo_beneficio] = []
+        beneficios_por_tipo[b.tipo_beneficio].append(b)
+    
+    # Calcular totais
+    total_vr = sum(b.valor for b in beneficios if b.tipo_beneficio == 'VR' and b.ativo)
+    total_vt = sum(b.valor for b in beneficios if b.tipo_beneficio == 'VT' and b.ativo)
+    total_saude = sum(b.valor for b in beneficios if b.tipo_beneficio == 'PLANO_SAUDE' and b.ativo)
+    
+    return render_template('folha_pagamento/beneficios.html',
+                         beneficios=beneficios,
+                         beneficios_por_tipo=beneficios_por_tipo,
+                         total_vr=total_vr,
+                         total_vt=total_vt,
+                         total_saude=total_saude)
+```
+
+#### 2.2 - Criar/Editar Benefício
+```python
+@folha_bp.route('/beneficios/criar', methods=['GET', 'POST'])
+@folha_bp.route('/beneficios/editar/<int:id>', methods=['GET', 'POST'])
+@admin_required
+def criar_editar_beneficio(id=None):
+    """Criar ou editar benefício"""
+    beneficio = None
+    if id:
+        beneficio = BeneficioFuncionario.query.get_or_404(id)
+        if beneficio.admin_id != current_user.id:
+            flash('Acesso negado.', 'error')
+            return redirect(url_for('folha.listar_beneficios'))
+    
+    if request.method == 'POST':
+        try:
+            funcionario_id = int(request.form.get('funcionario_id'))
+            tipo_beneficio = request.form.get('tipo_beneficio')
+            valor = float(request.form.get('valor'))
+            percentual_desconto = float(request.form.get('percentual_desconto', 0))
+            dias_por_mes = int(request.form.get('dias_por_mes', 22))
+            data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
+            data_fim_str = request.form.get('data_fim')
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else None
+            
+            if not beneficio:
+                beneficio = BeneficioFuncionario(
+                    admin_id=current_user.id,
+                    funcionario_id=funcionario_id
+                )
+            
+            beneficio.tipo_beneficio = tipo_beneficio
+            beneficio.valor = valor
+            beneficio.percentual_desconto = percentual_desconto
+            beneficio.dias_por_mes = dias_por_mes
+            beneficio.data_inicio = data_inicio
+            beneficio.data_fim = data_fim
+            beneficio.observacoes = request.form.get('observacoes')
+            beneficio.ativo = request.form.get('ativo') == 'true'
+            
+            if not id:
+                db.session.add(beneficio)
+            
+            db.session.commit()
+            flash('Benefício salvo com sucesso!', 'success')
+            return redirect(url_for('folha.listar_beneficios'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao salvar benefício: {str(e)}', 'error')
+    
+    # Buscar funcionários ativos
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=True
+    ).order_by(Funcionario.nome).all()
+    
+    tipos_beneficio = [
+        ('VR', 'Vale Refeição'),
+        ('VT', 'Vale Transporte'),
+        ('PLANO_SAUDE', 'Plano de Saúde'),
+        ('PLANO_ODONTO', 'Plano Odontológico'),
+        ('SEGURO_VIDA', 'Seguro de Vida'),
+        ('AUXILIO_CRECHE', 'Auxílio Creche'),
+        ('OUTRO', 'Outro')
+    ]
+    
+    return render_template('folha_pagamento/beneficio_form.html',
+                         beneficio=beneficio,
+                         funcionarios=funcionarios,
+                         tipos_beneficio=tipos_beneficio)
+```
+
+#### 2.3 - Deletar Benefício
+```python
+@folha_bp.route('/beneficios/deletar/<int:id>', methods=['POST'])
+@admin_required
+def deletar_beneficio(id):
+    """Deletar benefício"""
+    beneficio = BeneficioFuncionario.query.get_or_404(id)
+    
+    if beneficio.admin_id != current_user.id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('folha.listar_beneficios'))
+    
+    try:
+        db.session.delete(beneficio)
+        db.session.commit()
+        flash('Benefício deletado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao deletar benefício: {str(e)}', 'error')
+    
+    return redirect(url_for('folha.listar_beneficios'))
+```
+
+---
+
+## TAREFA 3: ADIANTAMENTOS
+
+### Funcionalidade:
+Gerenciar adiantamentos salariais com aprovação e parcelamento
+
+### Rotas a Implementar:
+
+#### 3.1 - Listar Adiantamentos
+```python
+@folha_bp.route('/adiantamentos')
+@admin_required
+def listar_adiantamentos():
+    """Listar adiantamentos"""
+    status_filtro = request.args.get('status', 'TODOS')
+    
+    query = Adiantamento.query.filter_by(admin_id=current_user.id)
+    
+    if status_filtro != 'TODOS':
+        query = query.filter_by(status=status_filtro)
+    
+    adiantamentos = query.join(Funcionario).order_by(
+        Adiantamento.data_solicitacao.desc()
+    ).all()
+    
+    # Calcular totais
+    total_solicitado = sum(a.valor_total for a in adiantamentos if a.status == 'SOLICITADO')
+    total_aprovado = sum(a.valor_total for a in adiantamentos if a.status == 'APROVADO')
+    total_quitado = sum(a.valor_total for a in adiantamentos if a.status == 'QUITADO')
+    
+    return render_template('folha_pagamento/adiantamentos.html',
+                         adiantamentos=adiantamentos,
+                         status_filtro=status_filtro,
+                         total_solicitado=total_solicitado,
+                         total_aprovado=total_aprovado,
+                         total_quitado=total_quitado)
+```
+
+#### 3.2 - Criar Adiantamento
+```python
+@folha_bp.route('/adiantamentos/criar', methods=['GET', 'POST'])
+@admin_required
+def criar_adiantamento():
+    """Criar novo adiantamento"""
+    if request.method == 'POST':
+        try:
+            funcionario_id = int(request.form.get('funcionario_id'))
+            valor_total = float(request.form.get('valor_total'))
+            parcelas = int(request.form.get('parcelas', 1))
+            motivo = request.form.get('motivo')
+            observacoes = request.form.get('observacoes')
+            
+            # Calcular valor da parcela
+            valor_parcela = valor_total / parcelas if parcelas > 0 else valor_total
+            
+            adiantamento = Adiantamento(
+                funcionario_id=funcionario_id,
+                valor_total=valor_total,
+                data_solicitacao=date.today(),
+                parcelas=parcelas,
+                valor_parcela=valor_parcela,
+                motivo=motivo,
+                observacoes=observacoes,
+                status='SOLICITADO',
+                admin_id=current_user.id
+            )
+            
+            db.session.add(adiantamento)
+            db.session.commit()
+            
+            flash('Adiantamento solicitado com sucesso!', 'success')
+            return redirect(url_for('folha.listar_adiantamentos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao criar adiantamento: {str(e)}', 'error')
+    
+    # Buscar funcionários ativos
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=True
+    ).order_by(Funcionario.nome).all()
+    
+    return render_template('folha_pagamento/adiantamento_form.html',
+                         funcionarios=funcionarios)
+```
+
+#### 3.3 - Aprovar/Rejeitar Adiantamento
+```python
+@folha_bp.route('/adiantamentos/aprovar/<int:id>', methods=['POST'])
+@admin_required
+def aprovar_adiantamento(id):
+    """Aprovar adiantamento"""
+    adiantamento = Adiantamento.query.get_or_404(id)
+    
+    if adiantamento.admin_id != current_user.id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('folha.listar_adiantamentos'))
+    
+    try:
+        adiantamento.status = 'APROVADO'
+        adiantamento.data_aprovacao = date.today()
+        adiantamento.aprovado_por = current_user.id
+        
+        db.session.commit()
+        flash('Adiantamento aprovado!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao aprovar: {str(e)}', 'error')
+    
+    return redirect(url_for('folha.listar_adiantamentos'))
+
+@folha_bp.route('/adiantamentos/rejeitar/<int:id>', methods=['POST'])
+@admin_required
+def rejeitar_adiantamento(id):
+    """Rejeitar adiantamento"""
+    adiantamento = Adiantamento.query.get_or_404(id)
+    
+    if adiantamento.admin_id != current_user.id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('folha.listar_adiantamentos'))
+    
+    try:
+        adiantamento.status = 'CANCELADO'
+        adiantamento.observacoes = request.form.get('motivo_rejeicao', '')
+        
+        db.session.commit()
+        flash('Adiantamento rejeitado.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao rejeitar: {str(e)}', 'error')
+    
+    return redirect(url_for('folha.listar_adiantamentos'))
+```
+
+---
+
+## TAREFA 4: RELATÓRIOS
+
+### Funcionalidade:
+Gerar holerites, relatórios analíticos e exportações
+
+### Rotas a Implementar:
+
+#### 4.1 - Dashboard de Relatórios
+```python
+@folha_bp.route('/relatorios')
+@admin_required
+def relatorios():
+    """Dashboard de relatórios"""
+    # Mês atual
+    hoje = date.today()
+    mes_atual = hoje.replace(day=1)
+    
+    # Últimos 6 meses
+    meses_disponiveis = []
+    for i in range(6):
+        mes = (mes_atual - timedelta(days=i*30)).replace(day=1)
+        folhas_mes = FolhaPagamento.query.filter_by(
+            admin_id=current_user.id,
+            mes_referencia=mes
+        ).count()
+        
+        if folhas_mes > 0:
+            meses_disponiveis.append({
+                'mes': mes,
+                'mes_nome': mes.strftime('%B/%Y'),
+                'total_folhas': folhas_mes
+            })
+    
+    return render_template('folha_pagamento/relatorios.html',
+                         meses_disponiveis=meses_disponiveis)
+```
+
+#### 4.2 - Holerite Individual (PDF)
+```python
+@folha_bp.route('/relatorios/holerite/<int:folha_id>')
+@admin_required
+def gerar_holerite(folha_id):
+    """Gerar holerite individual em PDF"""
+    folha = FolhaPagamento.query.get_or_404(folha_id)
+    
+    if folha.admin_id != current_user.id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('folha.relatorios'))
+    
+    # Renderizar template HTML do holerite
+    html = render_template('folha_pagamento/holerite_pdf.html',
+                         folha=folha,
+                         funcionario=folha.funcionario,
+                         empresa=current_user)
+    
+    # Converter para PDF usando WeasyPrint
+    from weasyprint import HTML
+    pdf = HTML(string=html).write_pdf()
+    
+    # Retornar PDF
+    from flask import make_response
+    response = make_response(pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=holerite_{folha.funcionario.nome}_{folha.mes_referencia.strftime("%m_%Y")}.pdf'
+    
+    return response
+```
+
+#### 4.3 - Relatório Analítico (Excel)
+```python
+@folha_bp.route('/relatorios/analitico/<int:ano>/<int:mes>')
+@admin_required
+def relatorio_analitico(ano, mes):
+    """Gerar relatório analítico em Excel"""
+    mes_referencia = date(ano, mes, 1)
+    
+    folhas = FolhaPagamento.query.filter_by(
+        admin_id=current_user.id,
+        mes_referencia=mes_referencia
+    ).join(Funcionario).order_by(Funcionario.nome).all()
+    
+    if not folhas:
+        flash('Nenhuma folha encontrada para este período.', 'warning')
+        return redirect(url_for('folha.relatorios'))
+    
+    # Criar Excel usando openpyxl
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Folha {mes:02d}/{ano}"
+    
+    # Cabeçalho
+    headers = ['Funcionário', 'CPF', 'Cargo', 'Salário Base', 'Horas Extras', 
+               'Total Proventos', 'INSS', 'IRRF', 'Outros Desc.', 
+               'Total Desc.', 'Líquido', 'FGTS']
+    
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        cell.alignment = Alignment(horizontal='center')
+    
+    # Dados
+    for row, folha in enumerate(folhas, 2):
+        ws.cell(row=row, column=1, value=folha.funcionario.nome)
+        ws.cell(row=row, column=2, value=folha.funcionario.cpf)
+        ws.cell(row=row, column=3, value=folha.funcionario.cargo or '')
+        ws.cell(row=row, column=4, value=float(folha.salario_base or 0))
+        ws.cell(row=row, column=5, value=float(folha.horas_extras or 0))
+        ws.cell(row=row, column=6, value=float(folha.total_proventos or 0))
+        ws.cell(row=row, column=7, value=float(folha.inss or 0))
+        ws.cell(row=row, column=8, value=float(folha.irrf or 0))
+        ws.cell(row=row, column=9, value=float(folha.outros_descontos or 0))
+        ws.cell(row=row, column=10, value=float(folha.total_descontos or 0))
+        ws.cell(row=row, column=11, value=float(folha.salario_liquido or 0))
+        ws.cell(row=row, column=12, value=float(folha.fgts or 0))
+    
+    # Ajustar largura das colunas
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(cell.value)
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[column].width = adjusted_width
+    
+    # Salvar em memória
+    from io import BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    # Retornar Excel
+    from flask import send_file
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'folha_analitica_{mes:02d}_{ano}.xlsx'
+    )
+```
+
+---
+
+## MODIFICAÇÕES NECESSÁRIAS
+
+### Arquivo: `folha_pagamento_views.py`
+
+**SUBSTITUIR as linhas 215-248 (rotas "em desenvolvimento") por TODAS as rotas acima.**
+
+**Total de rotas a adicionar:** 12 novas rotas
+
+---
+
+## TEMPLATES HTML NECESSÁRIOS
+
+Criar os seguintes templates em `templates/folha_pagamento/`:
+
+1. **parametros_legais.html** - Lista de parâmetros
+2. **parametros_form.html** - Formulário de parâmetros
+3. **beneficios.html** - Lista de benefícios
+4. **beneficio_form.html** - Formulário de benefício
+5. **adiantamentos.html** - Lista de adiantamentos
+6. **adiantamento_form.html** - Formulário de adiantamento
+7. **relatorios.html** - Dashboard de relatórios
+8. **holerite_pdf.html** - Template do holerite (PDF)
+
+---
+
+## VALIDAÇÃO
+
+### Checklist de Funcionalidades:
+
+**Parâmetros Legais:**
+- [ ] Listar parâmetros configurados
+- [ ] Criar novos parâmetros para um ano
+- [ ] Editar parâmetros existentes
+- [ ] Validar unicidade (1 parâmetro por ano)
+- [ ] Valores padrão 2025 pré-preenchidos
+
+**Benefícios:**
+- [ ] Listar todos os benefícios
+- [ ] Criar novo benefício para funcionário
+- [ ] Editar benefício existente
+- [ ] Deletar benefício
+- [ ] Calcular totais por tipo (VR, VT, Saúde)
+- [ ] Filtrar benefícios ativos/inativos
+
+**Adiantamentos:**
+- [ ] Listar adiantamentos com filtro de status
+- [ ] Criar novo adiantamento
+- [ ] Aprovar adiantamento
+- [ ] Rejeitar adiantamento
+- [ ] Calcular parcelas automaticamente
+- [ ] Mostrar totais por status
+
+**Relatórios:**
+- [ ] Dashboard com meses disponíveis
+- [ ] Gerar holerite individual (PDF)
+- [ ] Gerar relatório analítico (Excel)
+- [ ] Exportar dados completos
+- [ ] Visualizar últimos 6 meses
+
+---
+
+## PRIORIDADE
+
+🔴 **ALTA** - Módulo essencial para gestão de RH
+
+**Tempo Estimado:** 4-6 horas (com Replit Agent)
+
+---
+
+## OBSERVAÇÕES IMPORTANTES
+
+1. **Multi-tenancy:** Todas as queries DEVEM filtrar por `admin_id`
+2. **Validações:** Adicionar validações de dados em todos os formulários
+3. **Segurança:** Verificar permissões em todas as rotas
+4. **UX:** Mensagens de feedback claras (flash messages)
+5. **Performance:** Usar joins eficientes nas queries
+6. **Exportações:** WeasyPrint para PDF, openpyxl para Excel
+
+---
+
+## RESULTADO ESPERADO
+
+Após implementação:
+
+✅ **Parâmetros Legais:** CRUD completo, valores 2025 padrão  
+✅ **Benefícios:** Gestão completa de VR, VT, planos  
+✅ **Adiantamentos:** Solicitação, aprovação, parcelamento  
+✅ **Relatórios:** Holerites PDF, relatórios Excel  
+
+**Status do Módulo:** 100% funcional 🎉
+
