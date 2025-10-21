@@ -1,0 +1,270 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Relatório de Custos - {{ centro.codigo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-chart-bar"></i> Relatório de Custos
+        </h1>
+        <div>
+            <a href="{{ url_for('contabilidade.editar_centro_custo', id=centro.id) }}" class="btn btn-warning btn-sm">
+                <i class="fas fa-edit"></i> Editar Centro
+            </a>
+            <a href="{{ url_for('contabilidade.centros_custo') }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <!-- Informações do Centro de Custo -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-bullseye"></i> Informações do Centro de Custo
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <p class="mb-2"><strong>Código:</strong></p>
+                    <h5 class="text-primary">{{ centro.codigo }}</h5>
+                </div>
+                <div class="col-md-5">
+                    <p class="mb-2"><strong>Nome:</strong></p>
+                    <h5>{{ centro.nome }}</h5>
+                </div>
+                <div class="col-md-2">
+                    <p class="mb-2"><strong>Tipo:</strong></p>
+                    {% if centro.tipo == 'OBRA' %}
+                        <span class="badge bg-primary fs-6">OBRA</span>
+                    {% elif centro.tipo == 'DEPARTAMENTO' %}
+                        <span class="badge bg-info text-dark fs-6">DEPARTAMENTO</span>
+                    {% elif centro.tipo == 'PROJETO' %}
+                        <span class="badge bg-warning text-dark fs-6">PROJETO</span>
+                    {% endif %}
+                </div>
+                <div class="col-md-2">
+                    <p class="mb-2"><strong>Status:</strong></p>
+                    {% if centro.ativo %}
+                        <span class="badge bg-success fs-6">Ativo</span>
+                    {% else %}
+                        <span class="badge bg-secondary fs-6">Inativo</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if centro.obra %}
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <p class="mb-2"><strong>Obra Vinculada:</strong></p>
+                    <p class="text-muted">{{ centro.obra.nome }}{% if centro.obra.codigo %} ({{ centro.obra.codigo }}){% endif %}</p>
+                </div>
+            </div>
+            {% endif %}
+            {% if centro.descricao %}
+            <div class="row mt-2">
+                <div class="col-md-12">
+                    <p class="mb-2"><strong>Descrição:</strong></p>
+                    <p class="text-muted">{{ centro.descricao }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-filter"></i> Filtros
+            </h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('contabilidade.centro_custo_custos', id=centro.id) }}" class="row g-3">
+                <div class="col-md-4">
+                    <label for="data_inicio" class="form-label">Data Início</label>
+                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" 
+                           value="{{ request.args.get('data_inicio', '') }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="data_fim" class="form-label">Data Fim</label>
+                    <input type="date" class="form-control" id="data_fim" name="data_fim" 
+                           value="{{ request.args.get('data_fim', '') }}">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search"></i> Filtrar
+                    </button>
+                    <a href="{{ url_for('contabilidade.centro_custo_custos', id=centro.id) }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Limpar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Resumo de Totais -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total Débitos
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(total_debitos|float) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-arrow-up fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                Total Créditos
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(total_creditos|float) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-arrow-down fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Saldo (Débitos - Créditos)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format((total_debitos - total_creditos)|float) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-balance-scale fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Totais por Mês -->
+    {% if por_mes %}
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-calendar-alt"></i> Totais por Mês
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>Mês/Ano</th>
+                            <th class="text-end">Débitos</th>
+                            <th class="text-end">Créditos</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mes, totais in por_mes %}
+                        <tr>
+                            <td>{{ mes.strftime('%m/%Y') }}</td>
+                            <td class="text-end">R$ {{ "{:,.2f}".format(totais.debitos|float) }}</td>
+                            <td class="text-end">R$ {{ "{:,.2f}".format(totais.creditos|float) }}</td>
+                            <td class="text-end"><strong>R$ {{ "{:,.2f}".format(totais.total|float) }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tabela de Partidas -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-list"></i> Partidas Contábeis
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th style="width: 100px;">Data</th>
+                            <th style="width: 80px;">Lançamento</th>
+                            <th>Histórico</th>
+                            <th style="width: 150px;">Conta</th>
+                            <th style="width: 100px;" class="text-center">Tipo</th>
+                            <th style="width: 130px;" class="text-end">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if partidas %}
+                            {% for partida, lancamento, conta in partidas %}
+                            <tr>
+                                <td>{{ lancamento.data_lancamento.strftime('%d/%m/%Y') }}</td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('contabilidade.ver_lancamento', id=lancamento.id) }}" 
+                                       class="badge bg-secondary" target="_blank">
+                                        #{{ lancamento.numero }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {{ lancamento.historico[:60] }}{% if lancamento.historico|length > 60 %}...{% endif %}
+                                    {% if partida.historico_complementar %}
+                                        <br><small class="text-muted">{{ partida.historico_complementar }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ conta.codigo }}</small><br>
+                                    {{ conta.nome[:25] }}{% if conta.nome|length > 25 %}...{% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if partida.tipo_partida == 'DEBITO' %}
+                                        <span class="badge bg-primary">DÉBITO</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">CRÉDITO</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <strong>R$ {{ "{:,.2f}".format(partida.valor|float) }}</strong>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                    Nenhuma partida encontrada para este centro de custo no período selecionado.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

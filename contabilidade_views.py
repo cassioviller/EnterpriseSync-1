@@ -754,7 +754,8 @@ def dre():
 @contabilidade_bp.route('/balanco-patrimonial')
 @admin_required
 def balanco_patrimonial():
-    """Balanço Patrimonial"""
+    """Balanço Patrimonial com cálculo dinâmico baseado em lançamentos"""
+    from contabilidade_utils import gerar_balanco_patrimonial
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -764,23 +765,10 @@ def balanco_patrimonial():
     data_ref = request.args.get('data', date.today().isoformat())
     data_referencia = datetime.strptime(data_ref, '%Y-%m-%d').date()
     
-    balanco = BalancoPatrimonial.query.filter_by(
-        admin_id=admin_id,
-        data_referencia=data_referencia
-    ).first()
-    
-    if not balanco:
-        # Criar balanço básico se não existir
-        balanco = BalancoPatrimonial(
-            data_referencia=data_referencia,
-            admin_id=admin_id
-        )
-        db.session.add(balanco)
-        db.session.commit()
-        flash('Balanço Patrimonial criado automaticamente.', 'info')
+    balanco_data = gerar_balanco_patrimonial(admin_id, data_referencia)
     
     return render_template('contabilidade/balanco.html',
-                         balanco=balanco,
+                         balanco=balanco_data,
                          data_referencia=data_referencia)
 
 @contabilidade_bp.route('/auditoria')
@@ -817,6 +805,330 @@ def relatorios():
     """Central de relatórios contábeis"""
     flash('Central de relatórios em desenvolvimento.', 'info')
     return render_template('contabilidade/relatorios.html')
+
+# ==================== CENTROS DE CUSTO CONTÁBIL ====================
+
+@contabilidade_bp.route('/centros-custo')
+@admin_required
+def centros_custo():
+    """Lista de Centros de Custo Contábil com filtros"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    # Query base
+    query = CentroCustoContabil.query.filter_by(admin_id=admin_id)
+    
+    # Filtro por tipo
+    tipo = request.args.get('tipo')
+    if tipo and tipo in ['OBRA', 'DEPARTAMENTO', 'PROJETO']:
+        query = query.filter_by(tipo=tipo)
+    
+    # Filtro por ativo
+    ativo = request.args.get('ativo')
+    if ativo == '1':
+        query = query.filter_by(ativo=True)
+    elif ativo == '0':
+        query = query.filter_by(ativo=False)
+    
+    # Ordenar e paginar
+    centros = query.order_by(CentroCustoContabil.codigo).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return render_template('contabilidade/centros_custo.html',
+                         centros=centros)
+
+@contabilidade_bp.route('/centros-custo/criar', methods=['GET', 'POST'])
+@admin_required
+def criar_centro_custo():
+    """Criar novo Centro de Custo"""
+    from models import Obra
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    if request.method == 'POST':
+        try:
+            codigo = request.form.get('codigo', '').strip().upper()
+            nome = request.form.get('nome', '').strip()
+            tipo = request.form.get('tipo', '').strip()
+            descricao = request.form.get('descricao', '').strip()
+            obra_id = request.form.get('obra_id')
+            ativo = request.form.get('ativo') == 'on'
+            
+            # Validações
+            if not codigo or not nome or not tipo:
+                flash('Código, Nome e Tipo são obrigatórios', 'danger')
+                return redirect(url_for('contabilidade.criar_centro_custo'))
+            
+            if tipo not in ['OBRA', 'DEPARTAMENTO', 'PROJETO']:
+                flash('Tipo inválido', 'danger')
+                return redirect(url_for('contabilidade.criar_centro_custo'))
+            
+            # Verificar unicidade do código
+            existe = CentroCustoContabil.query.filter_by(
+                codigo=codigo,
+                admin_id=admin_id
+            ).first()
+            if existe:
+                flash(f'Código {codigo} já existe. Escolha outro código.', 'danger')
+                return redirect(url_for('contabilidade.criar_centro_custo'))
+            
+            # Validar obra_id se tipo=OBRA
+            if tipo == 'OBRA' and obra_id:
+                obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+                if not obra:
+                    flash('Obra não encontrada', 'danger')
+                    return redirect(url_for('contabilidade.criar_centro_custo'))
+            elif tipo == 'OBRA':
+                obra_id = None  # Tipo OBRA mas sem obra selecionada é permitido
+            else:
+                obra_id = None  # Outros tipos não têm obra
+            
+            # Criar centro de custo
+            centro = CentroCustoContabil(
+                codigo=codigo,
+                nome=nome,
+                tipo=tipo,
+                descricao=descricao if descricao else None,
+                obra_id=int(obra_id) if obra_id else None,
+                ativo=ativo,
+                admin_id=admin_id
+            )
+            db.session.add(centro)
+            db.session.commit()
+            
+            flash(f'Centro de Custo {codigo} - {nome} criado com sucesso!', 'success')
+            return redirect(url_for('contabilidade.centros_custo'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao criar Centro de Custo: {str(e)}', 'danger')
+            return redirect(url_for('contabilidade.criar_centro_custo'))
+    
+    # GET - Sugerir próximo código
+    ultimo_centro = CentroCustoContabil.query.filter_by(admin_id=admin_id)\
+                                           .order_by(CentroCustoContabil.codigo.desc())\
+                                           .first()
+    if ultimo_centro and ultimo_centro.codigo.startswith('CC-'):
+        try:
+            num = int(ultimo_centro.codigo.split('-')[1])
+            codigo_sugerido = f'CC-{num + 1:03d}'
+        except:
+            codigo_sugerido = 'CC-001'
+    else:
+        codigo_sugerido = 'CC-001'
+    
+    # Buscar obras para o dropdown
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True)\
+                     .order_by(Obra.nome).all()
+    
+    return render_template('contabilidade/centro_custo_form.html',
+                         centro=None,
+                         codigo_sugerido=codigo_sugerido,
+                         obras=obras)
+
+@contabilidade_bp.route('/centros-custo/editar/<int:id>', methods=['GET', 'POST'])
+@admin_required
+def editar_centro_custo(id):
+    """Editar Centro de Custo existente"""
+    from models import Obra
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    centro = CentroCustoContabil.query.filter_by(id=id, admin_id=admin_id).first()
+    if not centro:
+        flash('Centro de Custo não encontrado', 'danger')
+        return redirect(url_for('contabilidade.centros_custo'))
+    
+    if request.method == 'POST':
+        try:
+            codigo = request.form.get('codigo', '').strip().upper()
+            nome = request.form.get('nome', '').strip()
+            tipo = request.form.get('tipo', '').strip()
+            descricao = request.form.get('descricao', '').strip()
+            obra_id = request.form.get('obra_id')
+            ativo = request.form.get('ativo') == 'on'
+            
+            # Validações
+            if not codigo or not nome or not tipo:
+                flash('Código, Nome e Tipo são obrigatórios', 'danger')
+                return redirect(url_for('contabilidade.editar_centro_custo', id=id))
+            
+            if tipo not in ['OBRA', 'DEPARTAMENTO', 'PROJETO']:
+                flash('Tipo inválido', 'danger')
+                return redirect(url_for('contabilidade.editar_centro_custo', id=id))
+            
+            # Verificar se código mudou e se já existe
+            if codigo != centro.codigo:
+                # Verificar se o código está sendo usado em partidas
+                partidas_count = PartidaContabil.query.filter_by(
+                    centro_custo_id=centro.id,
+                    admin_id=admin_id
+                ).count()
+                if partidas_count > 0:
+                    flash('Não é possível alterar o código. Este Centro de Custo já possui lançamentos.', 'danger')
+                    return redirect(url_for('contabilidade.editar_centro_custo', id=id))
+                
+                # Verificar unicidade do novo código
+                existe = CentroCustoContabil.query.filter_by(
+                    codigo=codigo,
+                    admin_id=admin_id
+                ).filter(CentroCustoContabil.id != id).first()
+                if existe:
+                    flash(f'Código {codigo} já existe. Escolha outro código.', 'danger')
+                    return redirect(url_for('contabilidade.editar_centro_custo', id=id))
+            
+            # Validar obra_id se tipo=OBRA
+            if tipo == 'OBRA' and obra_id:
+                obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+                if not obra:
+                    flash('Obra não encontrada', 'danger')
+                    return redirect(url_for('contabilidade.editar_centro_custo', id=id))
+            elif tipo == 'OBRA':
+                obra_id = None
+            else:
+                obra_id = None
+            
+            # Atualizar centro de custo
+            centro.codigo = codigo
+            centro.nome = nome
+            centro.tipo = tipo
+            centro.descricao = descricao if descricao else None
+            centro.obra_id = int(obra_id) if obra_id else None
+            centro.ativo = ativo
+            
+            db.session.commit()
+            
+            flash(f'Centro de Custo {codigo} - {nome} atualizado com sucesso!', 'success')
+            return redirect(url_for('contabilidade.centros_custo'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao atualizar Centro de Custo: {str(e)}', 'danger')
+            return redirect(url_for('contabilidade.editar_centro_custo', id=id))
+    
+    # GET - Buscar obras para o dropdown
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True)\
+                     .order_by(Obra.nome).all()
+    
+    return render_template('contabilidade/centro_custo_form.html',
+                         centro=centro,
+                         codigo_sugerido=None,
+                         obras=obras)
+
+@contabilidade_bp.route('/centros-custo/desativar/<int:id>', methods=['POST'])
+@admin_required
+def desativar_centro_custo(id):
+    """Desativar Centro de Custo (soft delete)"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        return jsonify({'success': False, 'message': 'Erro de autenticação'}), 401
+    
+    centro = CentroCustoContabil.query.filter_by(id=id, admin_id=admin_id).first()
+    if not centro:
+        return jsonify({'success': False, 'message': 'Centro de Custo não encontrado'}), 404
+    
+    try:
+        # Verificar se há lançamentos ativos usando este centro de custo
+        lancamentos_ativos = db.session.query(LancamentoContabil)\
+            .join(PartidaContabil)\
+            .filter(
+                PartidaContabil.centro_custo_id == centro.id,
+                LancamentoContabil.admin_id == admin_id,
+                ~LancamentoContabil.historico.ilike('%ESTORNADO%')
+            ).count()
+        
+        if lancamentos_ativos > 0:
+            return jsonify({
+                'success': False, 
+                'message': f'Não é possível desativar. Existem {lancamentos_ativos} lançamentos ativos usando este Centro de Custo.'
+            }), 400
+        
+        # Desativar
+        centro.ativo = False
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Centro de Custo {centro.codigo} - {centro.nome} desativado com sucesso!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@contabilidade_bp.route('/centros-custo/<int:id>/custos')
+@admin_required
+def centro_custo_custos(id):
+    """Relatório de custos por Centro de Custo"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    centro = CentroCustoContabil.query.filter_by(id=id, admin_id=admin_id).first()
+    if not centro:
+        flash('Centro de Custo não encontrado', 'danger')
+        return redirect(url_for('contabilidade.centros_custo'))
+    
+    # Filtros de data
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    # Query de partidas vinculadas ao centro de custo
+    query = db.session.query(PartidaContabil, LancamentoContabil, PlanoContas)\
+        .join(LancamentoContabil, PartidaContabil.lancamento_id == LancamentoContabil.id)\
+        .join(PlanoContas, PartidaContabil.conta_codigo == PlanoContas.codigo)\
+        .filter(
+            PartidaContabil.centro_custo_id == centro.id,
+            PartidaContabil.admin_id == admin_id
+        )
+    
+    if data_inicio:
+        query = query.filter(LancamentoContabil.data_lancamento >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        query = query.filter(LancamentoContabil.data_lancamento <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    
+    partidas = query.order_by(LancamentoContabil.data_lancamento.desc()).all()
+    
+    # Calcular totais
+    total_debitos = sum(p.valor for p, l, c in partidas if p.tipo_partida == 'DEBITO')
+    total_creditos = sum(p.valor for p, l, c in partidas if p.tipo_partida == 'CREDITO')
+    
+    # Agrupar por mês
+    por_mes = {}
+    for partida, lancamento, conta in partidas:
+        mes_ref = lancamento.data_lancamento.replace(day=1)
+        if mes_ref not in por_mes:
+            por_mes[mes_ref] = {'debitos': Decimal('0'), 'creditos': Decimal('0'), 'total': Decimal('0')}
+        
+        if partida.tipo_partida == 'DEBITO':
+            por_mes[mes_ref]['debitos'] += partida.valor
+            por_mes[mes_ref]['total'] += partida.valor
+        else:
+            por_mes[mes_ref]['creditos'] += partida.valor
+            por_mes[mes_ref]['total'] -= partida.valor
+    
+    # Ordenar por mês
+    por_mes_ordenado = sorted(por_mes.items(), key=lambda x: x[0])
+    
+    return render_template('contabilidade/centro_custo_custos.html',
+                         centro=centro,
+                         partidas=partidas,
+                         total_debitos=total_debitos,
+                         total_creditos=total_creditos,
+                         por_mes=por_mes_ordenado)
 
 @contabilidade_bp.route('/sped')
 @admin_required

@@ -1902,11 +1902,14 @@ class CentroCustoContabil(db.Model):
     codigo = db.Column(db.String(20), nullable=False)
     nome = db.Column(db.String(100), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)  # OBRA, DEPARTAMENTO, PROJETO
+    descricao = db.Column(db.Text)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     ativo = db.Column(db.Boolean, default=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     obra = db.relationship('Obra')
+    partidas = db.relationship('PartidaContabil', backref='centro_custo')
     __table_args__ = (db.UniqueConstraint('codigo', 'admin_id', name='uq_centro_custo_contabil_codigo_admin'),)
 
 class LancamentoContabil(db.Model):

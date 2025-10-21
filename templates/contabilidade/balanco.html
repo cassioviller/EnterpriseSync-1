@@ -1,6 +1,6 @@
 {% extends "base_completo.html" %}
 
-{% block title %}Balanço Patrimonial{% endblock %}
+{% block title %}Balanço Patrimonial - SIGE v9.0{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -22,84 +22,115 @@
     <!-- Filtros -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Data de Referência</h6>
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-calendar-alt"></i> Data de Referência
+            </h6>
         </div>
         <div class="card-body">
-            <form method="GET" class="row">
+            <form method="GET" class="row align-items-end">
                 <div class="col-md-3">
-                    <label>Data:</label>
-                    <input type="date" name="data" value="{{ data_referencia.isoformat() }}" class="form-control">
+                    <label for="data">Data:</label>
+                    <input type="date" name="data" id="data" value="{{ data_referencia.isoformat() }}" class="form-control">
                 </div>
                 <div class="col-md-3">
-                    <label>&nbsp;</label><br>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> Consultar
+                        <i class="fas fa-search"></i> Gerar Balanço
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Balanço Patrimonial -->
+    <!-- Validation Badge -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 {% if balanco.balanceado %}bg-success{% else %}bg-danger{% endif %} text-white">
+            <h6 class="m-0 font-weight-bold">
+                {% if balanco.balanceado %}
+                    <i class="fas fa-check-circle"></i> ✓ Balanceado - Ativo = Passivo + Patrimônio Líquido
+                {% else %}
+                    <i class="fas fa-exclamation-triangle"></i> ⚠ Desbalanceado - Diferença: R$ {{ "%.2f"|format((balanco.ativo.total - balanco.total_passivo_pl)|abs|float) }}
+                {% endif %}
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-4">
+                    <h4 class="text-primary mb-0">R$ {{ "{:,.2f}".format(balanco.ativo.total|float) }}</h4>
+                    <small class="text-muted">Total do Ativo</small>
+                </div>
+                <div class="col-md-4">
+                    <h4 class="{% if balanco.balanceado %}text-success{% else %}text-danger{% endif %} mb-0">
+                        {% if balanco.balanceado %}
+                            <i class="fas fa-equals"></i>
+                        {% else %}
+                            <i class="fas fa-not-equal"></i>
+                        {% endif %}
+                    </h4>
+                    <small class="text-muted">Equação Fundamental</small>
+                </div>
+                <div class="col-md-4">
+                    <h4 class="text-warning mb-0">R$ {{ "{:,.2f}".format(balanco.total_passivo_pl|float) }}</h4>
+                    <small class="text-muted">Total Passivo + PL</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Balanço Patrimonial - 2 Column Layout -->
     <div class="row">
-        <!-- ATIVO -->
+        <!-- LEFT COLUMN: ATIVO -->
         <div class="col-md-6">
             <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">ATIVO</h6>
+                <div class="card-header py-3 bg-primary text-white">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="fas fa-plus-circle"></i> ATIVO
+                    </h6>
                 </div>
-                <div class="card-body">
-                    <table class="table table-borderless table-sm">
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover mb-0">
                         <tbody>
-                            <tr class="border-bottom">
-                                <td><strong>ATIVO CIRCULANTE</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.7) }}</strong></td>
+                            <!-- ATIVO CIRCULANTE -->
+                            {% set total_circulante = balanco.ativo.circulante.values()|sum(attribute='saldo') if balanco.ativo.circulante else 0 %}
+                            <tr class="table-light border-bottom">
+                                <td class="font-weight-bold" style="padding-left: 10px;">
+                                    <i class="fas fa-angle-right"></i> ATIVO CIRCULANTE
+                                </td>
+                                <td class="text-right font-weight-bold">R$ {{ "{:,.2f}".format(total_circulante|float) }}</td>
                             </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Disponível</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.3) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 40px;">Caixa</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.1) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 40px;">Bancos</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.2) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Contas a Receber</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.25) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Estoques</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.15) }}</td>
-                            </tr>
+                            {% for codigo, conta in balanco.ativo.circulante.items()|sort %}
+                                <tr>
+                                    <td style="padding-left: {{ (conta.nivel * 15) }}px;">
+                                        {{ conta.nome }}
+                                        <small class="text-muted">({{ codigo }})</small>
+                                    </td>
+                                    <td class="text-right">R$ {{ "{:,.2f}".format(conta.saldo|float) }}</td>
+                                </tr>
+                            {% endfor %}
                             
-                            <tr class="border-bottom mt-3">
-                                <td><strong>ATIVO NÃO CIRCULANTE</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.3) }}</strong></td>
+                            <!-- ATIVO NÃO CIRCULANTE -->
+                            {% set total_nao_circulante = balanco.ativo.nao_circulante.values()|sum(attribute='saldo') if balanco.ativo.nao_circulante else 0 %}
+                            <tr class="table-light border-bottom border-top">
+                                <td class="font-weight-bold" style="padding-left: 10px;">
+                                    <i class="fas fa-angle-right"></i> ATIVO NÃO CIRCULANTE
+                                </td>
+                                <td class="text-right font-weight-bold">R$ {{ "{:,.2f}".format(total_nao_circulante|float) }}</td>
                             </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Imobilizado</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.25) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 40px;">Veículos</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.15) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 40px;">Equipamentos</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.1) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Intangível</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_ativo|float) * 0.05) }}</td>
-                            </tr>
+                            {% for codigo, conta in balanco.ativo.nao_circulante.items()|sort %}
+                                <tr>
+                                    <td style="padding-left: {{ (conta.nivel * 15) }}px;">
+                                        {{ conta.nome }}
+                                        <small class="text-muted">({{ codigo }})</small>
+                                    </td>
+                                    <td class="text-right">R$ {{ "{:,.2f}".format(conta.saldo|float) }}</td>
+                                </tr>
+                            {% endfor %}
                             
-                            <tr class="table-primary border-top">
-                                <td><strong>TOTAL DO ATIVO</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format(balanco.total_ativo|float) }}</strong></td>
+                            <!-- TOTAL ATIVO -->
+                            <tr class="table-primary border-top" style="border-top: 3px double #000 !important;">
+                                <td class="font-weight-bold">
+                                    <i class="fas fa-calculator"></i> TOTAL DO ATIVO
+                                </td>
+                                <td class="text-right font-weight-bold">R$ {{ "{:,.2f}".format(balanco.ativo.total|float) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -107,65 +138,76 @@
             </div>
         </div>
 
-        <!-- PASSIVO + PATRIMÔNIO LÍQUIDO -->
+        <!-- RIGHT COLUMN: PASSIVO + PATRIMÔNIO LÍQUIDO -->
         <div class="col-md-6">
             <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-warning">PASSIVO + PATRIMÔNIO LÍQUIDO</h6>
+                <div class="card-header py-3 bg-warning text-dark">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="fas fa-minus-circle"></i> PASSIVO + PATRIMÔNIO LÍQUIDO
+                    </h6>
                 </div>
-                <div class="card-body">
-                    <table class="table table-borderless table-sm">
+                <div class="card-body p-0">
+                    <table class="table table-sm table-hover mb-0">
                         <tbody>
-                            <tr class="border-bottom">
-                                <td><strong>PASSIVO CIRCULANTE</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.4) }}</strong></td>
+                            <!-- PASSIVO CIRCULANTE -->
+                            {% set total_passivo_circulante = balanco.passivo.circulante.values()|sum(attribute='saldo') if balanco.passivo.circulante else 0 %}
+                            <tr class="table-light border-bottom">
+                                <td class="font-weight-bold" style="padding-left: 10px;">
+                                    <i class="fas fa-angle-right"></i> PASSIVO CIRCULANTE
+                                </td>
+                                <td class="text-right font-weight-bold">R$ {{ "{:,.2f}".format(total_passivo_circulante|float) }}</td>
                             </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Fornecedores</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.15) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Obrigações Trabalhistas</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.1) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Obrigações Fiscais</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.15) }}</td>
-                            </tr>
+                            {% for codigo, conta in balanco.passivo.circulante.items()|sort %}
+                                <tr>
+                                    <td style="padding-left: {{ (conta.nivel * 15) }}px;">
+                                        {{ conta.nome }}
+                                        <small class="text-muted">({{ codigo }})</small>
+                                    </td>
+                                    <td class="text-right">R$ {{ "{:,.2f}".format(conta.saldo|float) }}</td>
+                                </tr>
+                            {% endfor %}
                             
-                            <tr class="border-bottom mt-3">
-                                <td><strong>PASSIVO NÃO CIRCULANTE</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.2) }}</strong></td>
+                            <!-- PASSIVO NÃO CIRCULANTE -->
+                            {% set total_passivo_nao_circulante = balanco.passivo.nao_circulante.values()|sum(attribute='saldo') if balanco.passivo.nao_circulante else 0 %}
+                            <tr class="table-light border-bottom border-top">
+                                <td class="font-weight-bold" style="padding-left: 10px;">
+                                    <i class="fas fa-angle-right"></i> PASSIVO NÃO CIRCULANTE
+                                </td>
+                                <td class="text-right font-weight-bold">R$ {{ "{:,.2f}".format(total_passivo_nao_circulante|float) }}</td>
                             </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Financiamentos LP</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.15) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Provisões LP</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.05) }}</td>
-                            </tr>
+                            {% for codigo, conta in balanco.passivo.nao_circulante.items()|sort %}
+                                <tr>
+                                    <td style="padding-left: {{ (conta.nivel * 15) }}px;">
+                                        {{ conta.nome }}
+                                        <small class="text-muted">({{ codigo }})</small>
+                                    </td>
+                                    <td class="text-right">R$ {{ "{:,.2f}".format(conta.saldo|float) }}</td>
+                                </tr>
+                            {% endfor %}
                             
-                            <tr class="border-bottom mt-3">
-                                <td><strong>PATRIMÔNIO LÍQUIDO</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.4) }}</strong></td>
+                            <!-- PATRIMÔNIO LÍQUIDO -->
+                            <tr class="table-light border-bottom border-top">
+                                <td class="font-weight-bold" style="padding-left: 10px;">
+                                    <i class="fas fa-angle-right"></i> PATRIMÔNIO LÍQUIDO
+                                </td>
+                                <td class="text-right font-weight-bold">R$ {{ "{:,.2f}".format(balanco.total_pl|float) }}</td>
                             </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Capital Social</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.25) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Reservas</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.1) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding-left: 20px;">Lucros Acumulados</td>
-                                <td class="text-right">R$ {{ "%.2f"|format((balanco.total_passivo_patrimonio|float) * 0.05) }}</td>
-                            </tr>
+                            {% for codigo, conta in balanco.patrimonio_liquido.items()|sort %}
+                                <tr>
+                                    <td style="padding-left: {{ (conta.nivel * 15) }}px;">
+                                        {{ conta.nome }}
+                                        <small class="text-muted">({{ codigo }})</small>
+                                    </td>
+                                    <td class="text-right">R$ {{ "{:,.2f}".format(conta.saldo|float) }}</td>
+                                </tr>
+                            {% endfor %}
                             
-                            <tr class="table-warning border-top">
-                                <td><strong>TOTAL PASSIVO + PL</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format(balanco.total_passivo_patrimonio|float) }}</strong></td>
+                            <!-- TOTAL PASSIVO + PL -->
+                            <tr class="table-warning border-top" style="border-top: 3px double #000 !important;">
+                                <td class="font-weight-bold">
+                                    <i class="fas fa-calculator"></i> TOTAL PASSIVO + PL
+                                </td>
+                                <td class="text-right font-weight-bold">R$ {{ "{:,.2f}".format(balanco.total_passivo_pl|float) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -174,47 +216,61 @@
         </div>
     </div>
 
-    <!-- Verificação de Balanceamento -->
+    <!-- Info Cards -->
     <div class="row">
         <div class="col-md-12">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-{% if balanco.total_ativo == balanco.total_passivo_patrimonio %}success{% else %}danger{% endif %}">
-                        Verificação de Balanceamento
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-info-circle"></i> Informações do Balanço
                     </h6>
                 </div>
                 <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-md-4">
-                            <h4 class="text-primary">R$ {{ "%.2f"|format(balanco.total_ativo|float) }}</h4>
-                            <small>Total do Ativo</small>
+                    <div class="row">
+                        <div class="col-md-3 text-center border-right">
+                            <h5 class="text-primary">{{ balanco.ativo.circulante|length }}</h5>
+                            <small class="text-muted">Contas Ativo Circulante</small>
                         </div>
-                        <div class="col-md-4">
-                            <h4 class="{% if balanco.total_ativo == balanco.total_passivo_patrimonio %}text-success{% else %}text-danger{% endif %}">
-                                {% if balanco.total_ativo == balanco.total_passivo_patrimonio %}
-                                    <i class="fas fa-check"></i> BALANCEADO
-                                {% else %}
-                                    <i class="fas fa-times"></i> DESBALANCEADO
-                                {% endif %}
-                            </h4>
-                            <small>Status</small>
+                        <div class="col-md-3 text-center border-right">
+                            <h5 class="text-primary">{{ balanco.ativo.nao_circulante|length }}</h5>
+                            <small class="text-muted">Contas Ativo Não Circulante</small>
                         </div>
-                        <div class="col-md-4">
-                            <h4 class="text-warning">R$ {{ "%.2f"|format(balanco.total_passivo_patrimonio|float) }}</h4>
-                            <small>Total Passivo + PL</small>
+                        <div class="col-md-3 text-center border-right">
+                            <h5 class="text-warning">{{ (balanco.passivo.circulante|length + balanco.passivo.nao_circulante|length) }}</h5>
+                            <small class="text-muted">Contas Passivo</small>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <h5 class="text-success">{{ balanco.patrimonio_liquido|length }}</h5>
+                            <small class="text-muted">Contas Patrimônio Líquido</small>
                         </div>
                     </div>
-                    
-                    {% if balanco.total_ativo != balanco.total_passivo_patrimonio %}
-                    <div class="alert alert-danger mt-3">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Atenção:</strong> O balanço está desbalanceado. 
-                        Diferença: R$ {{ "%.2f"|format((balanco.total_ativo - balanco.total_passivo_patrimonio)|abs|float) }}
+                    <hr>
+                    <div class="text-center">
+                        <p class="mb-0">
+                            <i class="fas fa-calendar-alt"></i> 
+                            <strong>Data de Referência:</strong> {{ data_referencia.strftime('%d/%m/%Y') }}
+                        </p>
                     </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+@media print {
+    .btn-group, .card-header .btn, nav, footer {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #000 !important;
+        page-break-inside: avoid;
+    }
+    
+    body {
+        padding-top: 0 !important;
+    }
+}
+</style>
 {% endblock %}

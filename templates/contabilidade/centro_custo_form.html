@@ -1,0 +1,162 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{% if centro %}Editar{% else %}Criar{% endif %} Centro de Custo{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-bullseye"></i> {% if centro %}Editar{% else %}Criar{% endif %} Centro de Custo
+        </h1>
+        <a href="{{ url_for('contabilidade.centros_custo') }}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        Dados do Centro de Custo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{% if centro %}{{ url_for('contabilidade.editar_centro_custo', id=centro.id) }}{% else %}{{ url_for('contabilidade.criar_centro_custo') }}{% endif %}">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="codigo" class="form-label">Código <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="codigo" 
+                                       name="codigo" 
+                                       value="{% if centro %}{{ centro.codigo }}{% else %}{{ codigo_sugerido }}{% endif %}" 
+                                       required 
+                                       maxlength="20"
+                                       style="text-transform: uppercase;">
+                                <small class="form-text text-muted">
+                                    Formato sugerido: CC-001, CC-002, etc.
+                                </small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="tipo" class="form-label">Tipo <span class="text-danger">*</span></label>
+                                <select class="form-control" 
+                                        id="tipo" 
+                                        name="tipo" 
+                                        required
+                                        onchange="toggleObraDropdown()">
+                                    <option value="">Selecione...</option>
+                                    <option value="OBRA" {% if centro and centro.tipo == 'OBRA' %}selected{% endif %}>Obra</option>
+                                    <option value="DEPARTAMENTO" {% if centro and centro.tipo == 'DEPARTAMENTO' %}selected{% endif %}>Departamento</option>
+                                    <option value="PROJETO" {% if centro and centro.tipo == 'PROJETO' %}selected{% endif %}>Projeto</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="nome" class="form-label">Nome <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="nome" 
+                                   name="nome" 
+                                   value="{% if centro %}{{ centro.nome }}{% endif %}" 
+                                   required 
+                                   maxlength="100">
+                        </div>
+
+                        <div class="mb-3" id="obra-container" style="display: none;">
+                            <label for="obra_id" class="form-label">Obra Vinculada</label>
+                            <select class="form-control" id="obra_id" name="obra_id">
+                                <option value="">Nenhuma (opcional)</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}" 
+                                        {% if centro and centro.obra_id == obra.id %}selected{% endif %}>
+                                    {{ obra.nome }}{% if obra.codigo %} ({{ obra.codigo }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">
+                                Vincule a uma obra para facilitar a alocação automática de custos.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="descricao" class="form-label">Descrição</label>
+                            <textarea class="form-control" 
+                                      id="descricao" 
+                                      name="descricao" 
+                                      rows="3" 
+                                      maxlength="500">{% if centro and centro.descricao %}{{ centro.descricao }}{% endif %}</textarea>
+                            <small class="form-text text-muted">Opcional - Detalhes sobre o centro de custo</small>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" 
+                                   class="form-check-input" 
+                                   id="ativo" 
+                                   name="ativo" 
+                                   {% if not centro or centro.ativo %}checked{% endif %}>
+                            <label class="form-check-label" for="ativo">
+                                Centro de Custo Ativo
+                            </label>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('contabilidade.centros_custo') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i> {% if centro %}Atualizar{% else %}Criar{% endif %} Centro de Custo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Informações Adicionais -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="fas fa-info-circle"></i> Informações
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li><strong>Código:</strong> Deve ser único para sua empresa. Sugerimos o formato CC-001, CC-002...</li>
+                        <li><strong>Tipo OBRA:</strong> Use para centros de custo vinculados a obras específicas.</li>
+                        <li><strong>Tipo DEPARTAMENTO:</strong> Use para custos administrativos, RH, vendas, etc.</li>
+                        <li><strong>Tipo PROJETO:</strong> Use para projetos internos ou iniciativas específicas.</li>
+                        <li><strong>Status Ativo:</strong> Apenas centros ativos aparecem nos lançamentos contábeis.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Mostrar/ocultar dropdown de obra baseado no tipo selecionado
+function toggleObraDropdown() {
+    const tipo = document.getElementById('tipo').value;
+    const obraContainer = document.getElementById('obra-container');
+    
+    if (tipo === 'OBRA') {
+        obraContainer.style.display = 'block';
+    } else {
+        obraContainer.style.display = 'none';
+        document.getElementById('obra_id').value = '';
+    }
+}
+
+// Executar ao carregar a página para manter o estado correto
+document.addEventListener('DOMContentLoaded', function() {
+    toggleObraDropdown();
+    
+    // Forçar uppercase no campo código
+    document.getElementById('codigo').addEventListener('input', function(e) {
+        e.target.value = e.target.value.toUpperCase();
+    });
+});
+</script>
+{% endblock %}

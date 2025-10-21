@@ -160,6 +160,18 @@ try:
 except Exception as e:
     logging.warning(f"⚠️ Handler de folha não carregado: {e}")
 
+try:
+    import handlers.propostas_handlers
+    logging.info("✅ Handler de propostas comerciais registrado")
+except Exception as e:
+    logging.warning(f"⚠️ Handler de propostas não carregado: {e}")
+
+try:
+    import handlers.financeiro_handlers
+    logging.info("✅ Handler de financeiro registrado")
+except Exception as e:
+    logging.warning(f"⚠️ Handler de financeiro não carregado: {e}")
+
 # Import views
 from views import main_bp
 from production_routes import production_bp

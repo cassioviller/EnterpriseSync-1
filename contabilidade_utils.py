@@ -312,6 +312,79 @@ def gerar_balancete_mensal(admin_id, mes_referencia):
     
     db.session.commit()
 
+def gerar_balanco_patrimonial(admin_id, data_referencia):
+    """
+    Gera o Balanço Patrimonial em uma data específica.
+    
+    Args:
+        admin_id: ID do administrador
+        data_referencia: Data de referência para o balanço (end of day)
+        
+    Returns:
+        dict: Estrutura completa do balanço patrimonial com ATIVO, PASSIVO e PL
+    """
+    contas = PlanoContas.query.filter_by(admin_id=admin_id).all()
+    
+    ativo = {'circulante': {}, 'nao_circulante': {}, 'total': Decimal('0')}
+    passivo = {'circulante': {}, 'nao_circulante': {}, 'total': Decimal('0')}
+    patrimonio_liquido = {}
+    
+    for conta in contas:
+        saldo = calcular_saldo_conta(conta.codigo, admin_id, data_inicio=None, data_fim=data_referencia)
+        
+        if saldo == 0:
+            continue
+        
+        if conta.codigo.startswith('1.1'):
+            ativo['circulante'][conta.codigo] = {
+                'nome': conta.nome,
+                'saldo': saldo,
+                'nivel': conta.nivel
+            }
+            ativo['total'] += saldo
+        elif conta.codigo.startswith('1.2'):
+            ativo['nao_circulante'][conta.codigo] = {
+                'nome': conta.nome,
+                'saldo': saldo,
+                'nivel': conta.nivel
+            }
+            ativo['total'] += saldo
+        elif conta.codigo.startswith('2.1'):
+            passivo['circulante'][conta.codigo] = {
+                'nome': conta.nome,
+                'saldo': abs(saldo),
+                'nivel': conta.nivel
+            }
+            passivo['total'] += abs(saldo)
+        elif conta.codigo.startswith('2.2'):
+            passivo['nao_circulante'][conta.codigo] = {
+                'nome': conta.nome,
+                'saldo': abs(saldo),
+                'nivel': conta.nivel
+            }
+            passivo['total'] += abs(saldo)
+        elif conta.codigo.startswith('3'):
+            patrimonio_liquido[conta.codigo] = {
+                'nome': conta.nome,
+                'saldo': abs(saldo),
+                'nivel': conta.nivel
+            }
+    
+    total_pl = sum(item['saldo'] for item in patrimonio_liquido.values())
+    
+    total_passivo_pl = passivo['total'] + total_pl
+    balanceado = abs(ativo['total'] - total_passivo_pl) < Decimal('0.01')
+    
+    return {
+        'data_referencia': data_referencia,
+        'ativo': ativo,
+        'passivo': passivo,
+        'patrimonio_liquido': patrimonio_liquido,
+        'total_pl': total_pl,
+        'total_passivo_pl': total_passivo_pl,
+        'balanceado': balanceado
+    }
+
 def executar_auditoria_automatica(admin_id):
     """Executa verificações automáticas de auditoria."""
     alertas = []
