@@ -68,8 +68,9 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('main.nova_funcao') }}" id="funcaoForm">
+            <form method="POST" action="{{ url_for('configuracoes.criar_funcao') }}" id="funcaoForm">
                 <input type="hidden" name="csrf_token" value=""/>
+                <input type="hidden" name="id" id="funcao_id" value="">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="nome" class="form-label">Nome *</label>
@@ -107,18 +108,41 @@ $(document).ready(function() {
         order: [[0, 'asc']],
         pageLength: 25
     });
+    
+    // Limpar form ao fechar modal
+    $('#funcaoModal').on('hidden.bs.modal', function () {
+        $('#funcaoForm')[0].reset();
+        $('#funcao_id').val('');
+        $('#funcaoForm').attr('action', "{{ url_for('configuracoes.criar_funcao') }}");
+        $('#modalTitle').text('Nova Função');
+    });
 });
 
 function editarFuncao(id) {
-    // Implementar edição
-    alert('Funcionalidade de edição será implementada');
+    // Buscar dados da função via DOM
+    const row = event.target.closest('tr');
+    const nome = row.cells[0].textContent;
+    const descricao = row.cells[1].textContent === '-' ? '' : row.cells[1].textContent;
+    const salario = row.cells[2].textContent.replace('R$ ', '').replace('.', '').replace(',', '.');
+    
+    // Preencher form
+    $('#nome').val(nome);
+    $('#descricao').val(descricao);
+    $('#salario_base').val(salario);
+    $('#funcao_id').val(id);
+    $('#funcaoForm').attr('action', "{{ url_for('configuracoes.editar_funcao', id=0) }}".replace('0', id));
+    $('#modalTitle').text('Editar Função');
+    
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('funcaoModal'));
+    modal.show();
 }
 
 function excluirFuncao(id) {
     if (confirm('Tem certeza que deseja excluir esta função?')) {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = '/funcoes/' + id + '/excluir';
+        form.action = "{{ url_for('configuracoes.deletar_funcao', id=0) }}".replace('0', id);
         document.body.appendChild(form);
         form.submit();
     }

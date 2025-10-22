@@ -73,7 +73,7 @@
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     {% if horario.funcionarios|length == 0 %}
-                                        <form method="POST" action="{{ url_for('main.excluir_horario', id=horario.id) }}" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir este horário?')">
+                                        <form method="POST" action="{{ url_for('configuracoes.deletar_horario', id=horario.id) }}" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir este horário?')">
                                             <button type="submit" class="btn btn-sm btn-outline-danger">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -97,8 +97,9 @@
 <div class="modal fade" id="horarioModal" tabindex="-1" aria-labelledby="horarioModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" id="horarioForm" action="{{ url_for('main.novo_horario') }}">
+            <form method="POST" id="horarioForm" action="{{ url_for('configuracoes.criar_horario') }}">
                 <input type="hidden" name="csrf_token" value=""/>
+                <input type="hidden" name="id" id="horario_id" value="">
                 <div class="modal-header">
                     <h5 class="modal-title" id="horarioModalLabel">Novo Horário de Trabalho</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -176,15 +177,17 @@
         // Limpar form ao fechar modal
         $('#horarioModal').on('hidden.bs.modal', function () {
             document.getElementById('horarioForm').reset();
-            document.getElementById('horarioForm').action = '{{ url_for("main.novo_horario") }}';
+            document.getElementById('horarioForm').action = '{{ url_for("configuracoes.criar_horario") }}';
             document.getElementById('horarioModalLabel').textContent = 'Novo Horário de Trabalho';
+            document.getElementById('horario_id').value = '';
         });
     });
 
     function editarHorario(id, nome, entrada, saida_almoco, retorno_almoco, saida, dias_semana) {
         // Atualizar form action para edição
-        document.getElementById('horarioForm').action = '{{ url_for("main.editar_horario", id=0) }}'.replace('0', id);
+        document.getElementById('horarioForm').action = '{{ url_for("configuracoes.editar_horario", id=0) }}'.replace('0', id);
         document.getElementById('horarioModalLabel').textContent = 'Editar Horário de Trabalho';
+        document.getElementById('horario_id').value = id;
         
         // Preencher campos
         document.getElementById('nome').value = nome;

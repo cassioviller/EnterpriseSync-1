@@ -66,8 +66,9 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('main.novo_departamento') }}" id="departamentoForm">
+            <form method="POST" action="{{ url_for('configuracoes.criar_departamento') }}" id="departamentoForm">
                 <input type="hidden" name="csrf_token" value=""/>
+                <input type="hidden" name="id" id="departamento_id" value="">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="nome" class="form-label">Nome *</label>
@@ -100,18 +101,39 @@ $(document).ready(function() {
         order: [[0, 'asc']],
         pageLength: 25
     });
+    
+    // Limpar form ao fechar modal
+    $('#departamentoModal').on('hidden.bs.modal', function () {
+        $('#departamentoForm')[0].reset();
+        $('#departamento_id').val('');
+        $('#departamentoForm').attr('action', "{{ url_for('configuracoes.criar_departamento') }}");
+        $('#modalTitle').text('Novo Departamento');
+    });
 });
 
 function editarDepartamento(id) {
-    // Implementar edição
-    alert('Funcionalidade de edição será implementada');
+    // Buscar dados do departamento via DOM (já estão na tabela)
+    const row = event.target.closest('tr');
+    const nome = row.cells[0].textContent;
+    const descricao = row.cells[1].textContent === '-' ? '' : row.cells[1].textContent;
+    
+    // Preencher form
+    $('#nome').val(nome);
+    $('#descricao').val(descricao);
+    $('#departamento_id').val(id);
+    $('#departamentoForm').attr('action', "{{ url_for('configuracoes.editar_departamento', id=0) }}".replace('0', id));
+    $('#modalTitle').text('Editar Departamento');
+    
+    // Mostrar modal
+    const modal = new bootstrap.Modal(document.getElementById('departamentoModal'));
+    modal.show();
 }
 
 function excluirDepartamento(id) {
     if (confirm('Tem certeza que deseja excluir este departamento?')) {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = '/departamentos/' + id + '/excluir';
+        form.action = "{{ url_for('configuracoes.deletar_departamento', id=0) }}".replace('0', id);
         document.body.appendChild(form);
         form.submit();
     }
