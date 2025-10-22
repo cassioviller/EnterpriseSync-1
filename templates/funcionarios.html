@@ -888,6 +888,48 @@ function setupPhotoUpload() {
     }
 }
 
+// Auto-preencher salário ao selecionar função
+function setupFuncaoSalarioAutocomplete() {
+    const funcaoSelect = document.getElementById('funcao_id');
+    const salarioInput = document.getElementById('salario');
+    
+    if (funcaoSelect && salarioInput) {
+        funcaoSelect.addEventListener('change', async function() {
+            const funcaoId = this.value;
+            
+            // Se nenhuma função selecionada ou "Selecione...", limpar salário
+            if (!funcaoId || funcaoId === '0') {
+                salarioInput.value = '';
+                return;
+            }
+            
+            try {
+                // Buscar dados da função via API
+                const response = await fetch(`/api/funcao/${funcaoId}`);
+                const data = await response.json();
+                
+                if (data.success && data.funcao) {
+                    // Preencher salário com o salário base da função
+                    salarioInput.value = data.funcao.salario_base.toFixed(2);
+                    
+                    // Feedback visual
+                    salarioInput.classList.add('bg-light');
+                    setTimeout(() => {
+                        salarioInput.classList.remove('bg-light');
+                    }, 300);
+                } else {
+                    // Se função não encontrada, limpar salário
+                    salarioInput.value = '';
+                }
+            } catch (error) {
+                console.error('Erro ao buscar dados da função:', error);
+                // Em caso de erro, limpar salário para evitar dados incorretos
+                salarioInput.value = '';
+            }
+        });
+    }
+}
+
 // Enhanced CPF formatting
 function formatCPF(input) {
     let value = input.value.replace(/\D/g, '');
@@ -1089,6 +1131,9 @@ $(document).ready(function() {
     
     // Setup photo upload
     setupPhotoUpload();
+    
+    // Setup função -> salário autocomplete
+    setupFuncaoSalarioAutocomplete();
     
     // Setup form validation
     const form = document.getElementById('funcionarioForm');

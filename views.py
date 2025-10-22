@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
@@ -5039,6 +5039,37 @@ def api_funcionarios_consolidada():
                 'error': str(e),
                 'funcionarios': []
             }), 500
+
+@main_bp.route('/api/funcao/<int:funcao_id>')
+@login_required
+def api_funcao(funcao_id):
+    """API para retornar dados de uma função específica"""
+    try:
+        # Funcao não tem admin_id - é compartilhado entre todos os tenants
+        funcao = Funcao.query.filter_by(id=funcao_id).first()
+        
+        if not funcao:
+            return jsonify({
+                'success': False,
+                'error': 'Função não encontrada'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'funcao': {
+                'id': funcao.id,
+                'nome': funcao.nome,
+                'descricao': funcao.descricao,
+                'salario_base': float(funcao.salario_base) if funcao.salario_base else 0.0
+            }
+        })
+        
+    except Exception as e:
+        print(f"ERRO API FUNCAO: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 # ===== NOVAS ROTAS PARA CORRIGIR FUNCIONÁRIOS =====
 
