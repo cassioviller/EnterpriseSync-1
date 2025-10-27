@@ -35,4 +35,5 @@ dependencies = [
     "flask-cors>=6.0.1",
     "matplotlib>=3.10.6",
     "seaborn>=0.13.2",
+    "python-dateutil>=2.9.0.post0",
 ]
