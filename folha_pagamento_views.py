@@ -11,6 +11,7 @@ from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 from io import BytesIO
 import calendar
+from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
 
 folha_bp = Blueprint('folha', __name__)
 
@@ -1044,10 +1045,12 @@ def api_funcionarios_folha(ano, mes):
     try:
         mes_referencia = date(ano, mes, 1)
         
-        # Buscar folhas do mês
+        # Buscar folhas do mês com eager loading (✅ OTIMIZAÇÃO: evita N+1)
         folhas = FolhaPagamento.query.filter_by(
             admin_id=current_user.id,
             mes_referencia=mes_referencia
+        ).options(
+            joinedload(FolhaPagamento.funcionario).joinedload(Funcionario.funcao_ref)
         ).all()
         
         funcionarios = []
@@ -1083,10 +1086,12 @@ def relatorio_excel(ano, mes):
         
         mes_referencia = date(ano, mes, 1)
         
-        # Buscar folhas do mês e validar admin_id
+        # Buscar folhas do mês e validar admin_id (✅ OTIMIZAÇÃO: eager loading evita N+1)
         folhas = FolhaPagamento.query.filter_by(
             admin_id=current_user.id,
             mes_referencia=mes_referencia
+        ).options(
+            joinedload(FolhaPagamento.funcionario).joinedload(Funcionario.funcao_ref)
         ).all()
         
         if not folhas:
