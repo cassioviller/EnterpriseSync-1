@@ -15,32 +15,17 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # 🔒 CRITICAL SECURITY: SESSION_SECRET handling
-secret_key = os.environ.get("SESSION_SECRET")
-is_production = os.environ.get("REPL_DEPLOYMENT") == "1" or os.environ.get("FLASK_ENV") == "production"
+# SESSION_SECRET fixo no código (pode ser sobrescrito por variável de ambiente)
+secret_key = os.environ.get("SESSION_SECRET", "Oqv_zfDLhygGT5AF8t3llIIC_qnryXzGWXxgM0jCvC4")
 
-if not secret_key:
-    if is_production:
-        # 🔴 PRODUÇÃO: FAIL FAST (multi-tenant exige secret exclusivo)
-        logger.critical("🔒 BLOQUEADOR: SESSION_SECRET não configurado em PRODUÇÃO!")
-        logger.critical("🔒 Configure SESSION_SECRET e reinicie.")
-        raise RuntimeError("SESSION_SECRET obrigatório em produção. Abortando.")
-    else:
-        # 🟡 DEV: Gerar secret temporário + warning visível
-        import secrets
-        secret_key = secrets.token_hex(32)  # 64 caracteres aleatórios
-        logger.warning("⚠️" * 20)
-        logger.warning("⚠️ DESENVOLVIMENTO: SESSION_SECRET não configurado!")
-        logger.warning("⚠️ Usando secret TEMPORÁRIO (gerado aleatoriamente)")
-        logger.warning("⚠️ Sessões serão perdidas a cada reinício!")
-        logger.warning("⚠️ Configure SESSION_SECRET no .env para persistência")
-        logger.warning("⚠️" * 20)
+if secret_key == "Oqv_zfDLhygGT5AF8t3llIIC_qnryXzGWXxgM0jCvC4":
+    logger.info("✅ Usando SESSION_SECRET padrão do código")
+else:
+    logger.info("✅ Usando SESSION_SECRET da variável de ambiente")
 
 app.secret_key = secret_key
 app.config["SECRET_KEY"] = secret_key
-if is_production:
-    logger.info(f"✅ [PROD] Secret key configurado (length: {len(secret_key)})")
-else:
-    logger.info(f"🔧 [DEV] Secret key: {'configurado' if os.environ.get('SESSION_SECRET') else 'temporário'} (length: {len(secret_key)})")
+logger.info(f"✅ Secret key configurado (length: {len(secret_key)})")
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
