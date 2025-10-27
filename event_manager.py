@@ -525,13 +525,16 @@ def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
         proximo_numero = (ultimo_numero or 0) + 1
         
         # Criar cabeçalho do lançamento
+        # IMPORTANTE: valor_total = proventos + FGTS (encargo patronal)
         mes_ref = folha.mes_referencia.strftime('%B/%Y')
+        valor_total_debito = (folha.total_proventos or 0) + (folha.fgts or 0)
+        
         lancamento = LancamentoContabil(
             admin_id=admin_id,
             numero=proximo_numero,
             data_lancamento=folha.mes_referencia,
             historico=f"Folha de Pagamento - {funcionario.nome} - {mes_ref}",
-            valor_total=folha.total_proventos or 0,  # Valor total = débito
+            valor_total=valor_total_debito,  # Total = salário bruto + FGTS patronal
             origem='FOLHA_PAGAMENTO',
             origem_id=folha_id
         )
@@ -541,14 +544,15 @@ def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
         # Criar partidas com sequência
         sequencia = 1
         
-        # DÉBITO: Despesas com Pessoal (Total Proventos)
+        # DÉBITO: Despesas com Pessoal (Total Proventos + FGTS Patronal)
+        valor_debito = (folha.total_proventos or 0) + (folha.fgts or 0)
         partida_debito = PartidaContabil(
             lancamento_id=lancamento.id,
             sequencia=sequencia,
             conta_codigo=conta_despesa_pessoal.codigo,
             tipo_partida='DEBITO',
-            valor=folha.total_proventos or 0,
-            historico_complementar=f"Despesas com pessoal - {funcionario.nome}",
+            valor=valor_debito,  # Salário bruto + FGTS (8%)
+            historico_complementar=f"Despesas com pessoal + FGTS - {funcionario.nome}",
             admin_id=admin_id
         )
         db.session.add(partida_debito)
