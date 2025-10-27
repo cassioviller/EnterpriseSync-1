@@ -9,6 +9,7 @@ from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
+from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
 import calendar
 
 contabilidade_bp = Blueprint('contabilidade', __name__)
@@ -285,7 +286,10 @@ def ver_lancamento(id):
         flash('Erro de autenticação', 'danger')
         return redirect(url_for('main.index'))
     
-    lancamento = LancamentoContabil.query.filter_by(id=id, admin_id=admin_id).first()
+    # ✅ OTIMIZAÇÃO: Eager loading de partidas evita query N+1
+    lancamento = LancamentoContabil.query.filter_by(id=id, admin_id=admin_id).options(
+        joinedload(LancamentoContabil.partidas)
+    ).first()
     if not lancamento:
         flash('Lançamento não encontrado', 'danger')
         return redirect(url_for('contabilidade.lancamentos_contabeis'))
@@ -313,7 +317,10 @@ def editar_lancamento(id):
         flash('Erro de autenticação', 'danger')
         return redirect(url_for('main.index'))
     
-    lancamento = LancamentoContabil.query.filter_by(id=id, admin_id=admin_id).first()
+    # ✅ OTIMIZAÇÃO: Eager loading de partidas
+    lancamento = LancamentoContabil.query.filter_by(id=id, admin_id=admin_id).options(
+        joinedload(LancamentoContabil.partidas)
+    ).first()
     if not lancamento:
         flash('Lançamento não encontrado', 'danger')
         return redirect(url_for('contabilidade.lancamentos_contabeis'))
@@ -439,7 +446,10 @@ def estornar_lancamento(id):
     if not admin_id:
         return jsonify({'success': False, 'message': 'Erro de autenticação'}), 401
     
-    lancamento = LancamentoContabil.query.filter_by(id=id, admin_id=admin_id).first()
+    # ✅ OTIMIZAÇÃO: Eager loading de partidas evita query N+1 no loop
+    lancamento = LancamentoContabil.query.filter_by(id=id, admin_id=admin_id).options(
+        joinedload(LancamentoContabil.partidas)
+    ).first()
     if not lancamento:
         return jsonify({'success': False, 'message': 'Lançamento não encontrado'}), 404
     
