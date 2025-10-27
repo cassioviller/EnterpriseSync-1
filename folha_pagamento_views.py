@@ -9,15 +9,18 @@ from models import (FolhaPagamento, ParametrosLegais, Funcionario, BeneficioFunc
                     Adiantamento, CalculoHorasMensal)
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
+from dateutil.relativedelta import relativedelta  # ✅ OTIMIZAÇÃO: Movido do inline (linha 41)
+from functools import wraps  # ✅ OTIMIZAÇÃO: Movido do inline (linha 20)
 from io import BytesIO
 import calendar
 from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
+from services.folha_service import processar_folha_funcionario  # ✅ OTIMIZAÇÃO: Movido do inline (linha 143)
+from event_manager import EventManager  # ✅ OTIMIZAÇÃO: Movido do inline (linha 144)
 
 folha_bp = Blueprint('folha', __name__)
 
 def admin_required(f):
     """Decorator simples para admin - implementação temporária"""
-    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
@@ -37,8 +40,6 @@ def admin_required(f):
 @admin_required
 def dashboard():
     """Dashboard principal da folha de pagamento com seletor de competência"""
-    
-    from dateutil.relativedelta import relativedelta
     
     # Mês atual
     hoje = date.today()
@@ -140,9 +141,6 @@ def processar_folha_mes(ano, mes):
     """Processar folha de pagamento do mês - VERSÃO COMPLETA"""
     
     try:
-        from services.folha_service import processar_folha_funcionario
-        from event_manager import EventManager
-        
         mes_referencia = date(ano, mes, 1)
         
         # Verificar se já foi processada

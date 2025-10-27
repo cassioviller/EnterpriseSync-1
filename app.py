@@ -14,17 +14,33 @@ logger = logging.getLogger(__name__)
 # Create app instance
 app = Flask(__name__)
 
-# 🔒 CRITICAL SECURITY: SESSION_SECRET obrigatório - FAIL FAST se ausente
+# 🔒 CRITICAL SECURITY: SESSION_SECRET handling
 secret_key = os.environ.get("SESSION_SECRET")
+is_production = os.environ.get("REPL_DEPLOYMENT") == "1" or os.environ.get("FLASK_ENV") == "production"
+
 if not secret_key:
-    logger.critical("🔒 BLOQUEADOR DE SEGURANÇA: SESSION_SECRET não configurado!")
-    logger.critical("🔒 Multi-tenant requer secret exclusivo. Impossível iniciar.")
-    logger.critical("🔒 Configure SESSION_SECRET no ambiente e reinicie.")
-    raise RuntimeError("SESSION_SECRET obrigatório não encontrado. Abortando por segurança.")
-    
+    if is_production:
+        # 🔴 PRODUÇÃO: FAIL FAST (multi-tenant exige secret exclusivo)
+        logger.critical("🔒 BLOQUEADOR: SESSION_SECRET não configurado em PRODUÇÃO!")
+        logger.critical("🔒 Configure SESSION_SECRET e reinicie.")
+        raise RuntimeError("SESSION_SECRET obrigatório em produção. Abortando.")
+    else:
+        # 🟡 DEV: Gerar secret temporário + warning visível
+        import secrets
+        secret_key = secrets.token_hex(32)  # 64 caracteres aleatórios
+        logger.warning("⚠️" * 20)
+        logger.warning("⚠️ DESENVOLVIMENTO: SESSION_SECRET não configurado!")
+        logger.warning("⚠️ Usando secret TEMPORÁRIO (gerado aleatoriamente)")
+        logger.warning("⚠️ Sessões serão perdidas a cada reinício!")
+        logger.warning("⚠️ Configure SESSION_SECRET no .env para persistência")
+        logger.warning("⚠️" * 20)
+
 app.secret_key = secret_key
-app.config["SECRET_KEY"] = secret_key  # Garantir ambas as formas
-logger.info(f"✅ Secret key configurado com segurança (length: {len(secret_key)})")
+app.config["SECRET_KEY"] = secret_key
+if is_production:
+    logger.info(f"✅ [PROD] Secret key configurado (length: {len(secret_key)})")
+else:
+    logger.info(f"🔧 [DEV] Secret key: {'configurado' if os.environ.get('SESSION_SECRET') else 'temporário'} (length: {len(secret_key)})")
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 

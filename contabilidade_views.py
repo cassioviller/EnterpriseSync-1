@@ -3,14 +3,24 @@ from models import db
 Views para o Módulo 7 - Sistema Contábil Completo
 """
 
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
-from models import SpedContabil, DREMensal, BalancoPatrimonial, LancamentoContabil, PlanoContas, BalanceteMensal, AuditoriaContabil, TipoUsuario, PartidaContabil, CentroCustoContabil, db
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, send_file
+from models import (SpedContabil, DREMensal, BalancoPatrimonial, LancamentoContabil, PlanoContas, 
+                    BalanceteMensal, AuditoriaContabil, TipoUsuario, PartidaContabil, CentroCustoContabil, 
+                    Obra, db)  # ✅ OTIMIZAÇÃO: Movido Obra do inline (linhas 1078, 1170)
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
+from functools import wraps  # ✅ OTIMIZAÇÃO: Movido do inline (linha 33)
+from sqlalchemy import func  # ✅ OTIMIZAÇÃO: Movido do inline (linha 514)
 from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
 import calendar
+# Imports de contabilidade_utils consolidados (antes espalhados em várias linhas)
+from contabilidade_utils import (
+    calcular_saldo_conta, criar_plano_contas_padrao, get_next_lancamento_numero,
+    gerar_razao_conta, calcular_dre_mensal, gerar_balancete_pdf, gerar_balancete_excel,
+    gerar_dre_pdf, gerar_dre_excel, gerar_balanco_patrimonial, executar_auditoria_automatica
+)
 
 contabilidade_bp = Blueprint('contabilidade', __name__)
 
@@ -30,7 +40,6 @@ def get_admin_id():
 
 def admin_required(f):
     """Decorator simples para admin - implementação temporária"""
-    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
@@ -149,6 +158,7 @@ def lancamentos_contabeis():
     
     return render_template('contabilidade/lancamentos.html',
                          lancamentos=lancamentos,
+                         per_page=per_page,  # ✅ OTIMIZAÇÃO: Evitar magic number no template
                          contas=contas)
 
 @contabilidade_bp.route('/lancamentos/criar', methods=['GET', 'POST'])

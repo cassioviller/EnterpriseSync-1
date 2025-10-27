@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from models import CustoObra, Obra, Funcionario, Vehicle, db
 from sqlalchemy import func, desc, extract, text
 from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
+from utils.database import db_transaction  # ✅ OTIMIZAÇÃO MÉDIO PRAZO 3: Transações atômicas
 from datetime import datetime, date
 import logging
 
