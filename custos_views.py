@@ -299,7 +299,7 @@ def deletar_custo(custo_id):
 @custos_bp.route('/listar')
 @login_required
 def listar_custos():
-    """Listar todos os custos com filtros avançados."""
+    """Listar todos os custos com filtros avançados e paginação."""
     if not verificar_schema_custos():
         flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
         return redirect(url_for('main.index'))
@@ -309,6 +309,10 @@ def listar_custos():
     tipo = request.args.get('tipo')
     data_inicio = request.args.get('data_inicio')
     data_fim = request.args.get('data_fim')
+    
+    # Paginação - ✅ OTIMIZAÇÃO MÉDIO PRAZO 1
+    page = request.args.get('page', 1, type=int)
+    per_page = 20  # 20 custos por página
     
     # Query base
     query = CustoObra.query.filter_by(admin_id=current_user.id)
@@ -323,20 +327,35 @@ def listar_custos():
     if data_fim:
         query = query.filter(CustoObra.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
     
-    # Ordenar por data decrescente (✅ OTIMIZAÇÃO: eager loading evita N+1 no template)
-    custos = query.options(
+    # ✅ OTIMIZAÇÃO: eager loading + paginação (ordem: eager → paginate)
+    custos_paginados = query.options(
         joinedload(CustoObra.obra)
-    ).order_by(desc(CustoObra.data)).all()
+    ).order_by(desc(CustoObra.data)).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
     
     # Dados para filtros
     obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
     tipos = ['mao_obra', 'material', 'veiculo', 'servico', 'alimentacao']
     
-    # Estatísticas
-    total_custos = sum(c.valor for c in custos)
+    # Estatísticas (calcular sobre resultados filtrados, NÃO sobre página atual)
+    total_custos = db.session.query(func.sum(CustoObra.valor)).filter(
+        CustoObra.admin_id == current_user.id
+    )
+    if obra_id:
+        total_custos = total_custos.filter(CustoObra.obra_id == obra_id)
+    if tipo:
+        total_custos = total_custos.filter(CustoObra.tipo == tipo)
+    if data_inicio:
+        total_custos = total_custos.filter(CustoObra.data >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        total_custos = total_custos.filter(CustoObra.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    total_custos = total_custos.scalar() or 0
     
     return render_template('custos/listar.html', 
-                         custos=custos, 
+                         custos=custos_paginados.items,  # Lista de custos da página atual
+                         pagination=custos_paginados,     # Objeto de paginação
+                         per_page=per_page,               # ✅ Evitar magic number no template
                          obras=obras, 
                          tipos=tipos,
                          total_custos=total_custos,

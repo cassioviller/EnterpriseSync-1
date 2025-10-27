@@ -94,7 +94,7 @@
                                 Quantidade
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ custos|length }} custo(s)
+                                {{ pagination.total if pagination else 0 }} custo(s)
                             </div>
                         </div>
                         <div class="col-auto">
@@ -189,6 +189,61 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Paginação - ✅ OTIMIZAÇÃO MÉDIO PRAZO 1 -->
+            {% if pagination and pagination.pages > 1 %}
+            <div class="d-flex justify-content-between align-items-center mt-3 px-3">
+                <div class="text-muted">
+                    {% set end_index = [pagination.page * per_page, pagination.total]|min %}
+                    Mostrando {{ ((pagination.page - 1) * per_page) + 1 }} a {{ end_index }} de {{ pagination.total }} custos
+                </div>
+                <nav aria-label="Navegação de páginas">
+                    <ul class="pagination mb-0">
+                        <!-- Previous -->
+                        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                            <a class="page-link" href="{% if pagination.has_prev %}{{ url_for('custos.listar_custos', page=pagination.prev_num, obra_id=filtros.obra_id, tipo=filtros.tipo, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim) }}{% else %}#{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+
+                        <!-- Números de páginas (mostrar até 5 páginas) -->
+                        {% set start_page = [1, pagination.page - 2]|max %}
+                        {% set end_page = [pagination.pages, pagination.page + 2]|min %}
+                        
+                        {% if start_page > 1 %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('custos.listar_custos', page=1, obra_id=filtros.obra_id, tipo=filtros.tipo, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim) }}">1</a>
+                        </li>
+                        {% if start_page > 2 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                        {% endif %}
+
+                        {% for p in range(start_page, end_page + 1) %}
+                        <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('custos.listar_custos', page=p, obra_id=filtros.obra_id, tipo=filtros.tipo, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim) }}">{{ p }}</a>
+                        </li>
+                        {% endfor %}
+
+                        {% if end_page < pagination.pages %}
+                        {% if end_page < pagination.pages - 1 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('custos.listar_custos', page=pagination.pages, obra_id=filtros.obra_id, tipo=filtros.tipo, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim) }}">{{ pagination.pages }}</a>
+                        </li>
+                        {% endif %}
+
+                        <!-- Next -->
+                        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                            <a class="page-link" href="{% if pagination.has_next %}{{ url_for('custos.listar_custos', page=pagination.next_num, obra_id=filtros.obra_id, tipo=filtros.tipo, data_inicio=filtros.data_inicio, data_fim=filtros.data_fim) }}{% else %}#{% endif %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
