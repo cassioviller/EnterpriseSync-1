@@ -5399,6 +5399,185 @@ def api_obras_ativas():
         print(f"❌ ERRO AO LISTAR OBRAS: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@main_bp.route('/api/obras/servicos-rdo', methods=['POST'])
+@login_required
+def api_adicionar_servico_obra():
+    """API para adicionar serviço à obra via modal de detalhes"""
+    try:
+        data = request.get_json()
+        obra_id = data.get('obra_id')
+        servico_id = data.get('servico_id')
+        
+        if not obra_id or not servico_id:
+            return jsonify({
+                'success': False,
+                'message': 'obra_id e servico_id são obrigatórios'
+            }), 400
+        
+        # Obter admin_id do usuário logado
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+        
+        # Validar que a obra pertence ao admin (segurança multi-tenant)
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id, ativo=True).first()
+        if not obra:
+            return jsonify({
+                'success': False,
+                'message': 'Obra não encontrada ou sem permissão de acesso'
+            }), 404
+        
+        # Validar que o serviço pertence ao admin (segurança multi-tenant)
+        servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id, ativo=True).first()
+        if not servico:
+            return jsonify({
+                'success': False,
+                'message': 'Serviço não encontrado ou sem permissão de acesso'
+            }), 404
+        
+        # Verificar se serviço já existe na obra
+        servico_existente = ServicoObraReal.query.filter_by(
+            obra_id=obra_id,
+            servico_id=servico_id,
+            admin_id=admin_id
+        ).first()
+        
+        if servico_existente:
+            if servico_existente.ativo:
+                return jsonify({
+                    'success': False,
+                    'message': 'Serviço já está associado a esta obra'
+                }), 409
+            else:
+                # Reativar serviço
+                servico_existente.ativo = True
+                servico_existente.observacoes = f'Serviço reativado em {date.today().strftime("%d/%m/%Y")}'
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Serviço reativado com sucesso',
+                    'servico': {
+                        'id': servico.id,
+                        'nome': servico.nome,
+                        'descricao': servico.descricao
+                    }
+                })
+        
+        # Criar novo registro em servico_obra_real
+        novo_servico_obra = ServicoObraReal(
+            obra_id=obra_id,
+            servico_id=servico_id,
+            quantidade_planejada=1.0,
+            quantidade_executada=0.0,
+            percentual_concluido=0.0,
+            valor_unitario=servico.custo_unitario or 0.0,
+            valor_total_planejado=servico.custo_unitario or 0.0,
+            valor_total_executado=0.0,
+            status='Não Iniciado',
+            prioridade=3,
+            data_inicio_planejada=date.today(),
+            observacoes=f'Serviço adicionado em {date.today().strftime("%d/%m/%Y")}',
+            admin_id=admin_id,
+            ativo=True
+        )
+        
+        db.session.add(novo_servico_obra)
+        db.session.commit()
+        
+        print(f"✅ Serviço {servico.nome} adicionado à obra {obra.nome}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Serviço adicionado com sucesso',
+            'servico': {
+                'id': servico.id,
+                'nome': servico.nome,
+                'descricao': servico.descricao
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ ERRO AO ADICIONAR SERVIÇO À OBRA: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao adicionar serviço: {str(e)}'
+        }), 500
+
+@main_bp.route('/api/obras/servicos', methods=['DELETE'])
+@login_required
+def api_remover_servico_obra():
+    """API para remover serviço da obra"""
+    try:
+        data = request.get_json()
+        obra_id = data.get('obra_id')
+        servico_id = data.get('servico_id')
+        
+        if not obra_id or not servico_id:
+            return jsonify({
+                'success': False,
+                'message': 'obra_id e servico_id são obrigatórios'
+            }), 400
+        
+        # Obter admin_id do usuário logado
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+        
+        # Validar que a obra pertence ao admin (segurança multi-tenant)
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({
+                'success': False,
+                'message': 'Obra não encontrada ou sem permissão de acesso'
+            }), 404
+        
+        # Buscar serviço na obra
+        servico_obra = ServicoObraReal.query.filter_by(
+            obra_id=obra_id,
+            servico_id=servico_id,
+            admin_id=admin_id,
+            ativo=True
+        ).first()
+        
+        if not servico_obra:
+            return jsonify({
+                'success': False,
+                'message': 'Serviço não encontrado nesta obra'
+            }), 404
+        
+        # Desativar (soft delete)
+        servico_obra.ativo = False
+        servico_obra.observacoes = f'Serviço removido em {date.today().strftime("%d/%m/%Y")}'
+        
+        # Remover registros de RDO relacionados (cascata)
+        rdos_deletados = RDOServicoSubatividade.query.filter_by(
+            servico_id=servico_id,
+            admin_id=admin_id
+        ).delete()
+        
+        db.session.commit()
+        
+        print(f"✅ Serviço ID {servico_id} removido da obra {obra.nome} ({rdos_deletados} registros RDO removidos)")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Serviço removido com sucesso'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ ERRO AO REMOVER SERVIÇO DA OBRA: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao remover serviço: {str(e)}'
+        }), 500
+
 def get_admin_id_dinamico():
     """Função helper para detectar admin_id dinamicamente no sistema multi-tenant"""
     try:
@@ -5942,12 +6121,13 @@ def novo_rdo():
                 ]
                 print(f"DEBUG: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
             else:
-                # Primeiro RDO da obra - carregar atividades dos serviços cadastrados
-                servicos_obra = db.session.query(ServicoObra, Servico).join(
-                    Servico, ServicoObra.servico_id == Servico.id
+                # Primeiro RDO da obra - carregar atividades dos serviços cadastrados via servico_obra_real
+                servicos_obra = db.session.query(ServicoObraReal, Servico).join(
+                    Servico, ServicoObraReal.servico_id == Servico.id
                 ).filter(
-                    ServicoObra.obra_id == obra_id,
-                    ServicoObra.ativo == True
+                    ServicoObraReal.obra_id == obra_id,
+                    ServicoObraReal.ativo == True,
+                    ServicoObraReal.admin_id == admin_id  # Segurança multi-tenant
                 ).all()
                 
                 for servico_obra, servico in servicos_obra:
