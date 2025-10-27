@@ -59,8 +59,9 @@ app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
-    "pool_size": 10,
-    "max_overflow": 20,
+    "pool_size": 20,        # ✅ OTIMIZAÇÃO: Dobrado de 10→20 para suportar mais concorrência
+    "max_overflow": 40,     # ✅ OTIMIZAÇÃO: Dobrado de 20→40 (total 60 conexões vs 30 anterior)
+    "pool_timeout": 30,     # ✅ OTIMIZAÇÃO: Timeout explícito para evitar deadlocks
     "echo": False  # Desabilitar logs SQL em produção
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False

@@ -439,6 +439,12 @@ class CustoObra(db.Model):
     funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id])
     veiculo = db.relationship('Vehicle', foreign_keys=[veiculo_id])
     admin = db.relationship('Usuario', foreign_keys=[admin_id])
+    
+    # ✅ OTIMIZAÇÃO: Índices compostos para queries frequentes
+    __table_args__ = (
+        db.Index('idx_custo_admin_data', 'admin_id', 'data'),  # Filtros por período
+        db.Index('idx_custo_obra_tipo', 'obra_id', 'tipo'),     # Filtros por obra e tipo
+    )
 
 # Novos modelos para Gestão Financeira Avançada
 
@@ -1677,6 +1683,7 @@ class FolhaPagamento(db.Model):
         db.Index('idx_folha_funcionario_mes', 'funcionario_id', 'mes_referencia'),
         db.Index('idx_folha_admin_status', 'admin_id', 'status'),
         db.Index('idx_folha_mes_referencia', 'mes_referencia'),
+        db.Index('idx_folha_admin_mes_status', 'admin_id', 'mes_referencia', 'status'),  # ✅ OTIMIZAÇÃO: Índice composto para filtros combinados
         db.UniqueConstraint('funcionario_id', 'mes_referencia', name='uk_folha_funcionario_mes'),
     )
 
@@ -1928,6 +1935,11 @@ class LancamentoContabil(db.Model):
 
     partidas = db.relationship('PartidaContabil', backref='lancamento', cascade="all, delete-orphan")
     usuario = db.relationship('Usuario', foreign_keys=[usuario_id])
+    
+    # ✅ OTIMIZAÇÃO: Índices compostos para queries frequentes
+    __table_args__ = (
+        db.Index('idx_lancamento_admin_data_origem', 'admin_id', 'data_lancamento', 'origem'),  # Relatórios contábeis
+    )
 
 class PartidaContabil(db.Model):
     """Itens do Lançamento Contábil (Débito e Crédito)."""
