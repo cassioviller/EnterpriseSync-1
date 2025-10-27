@@ -1,0 +1,978 @@
+# 🚀 PROMPT DEFINITIVO: Completar Sistema SIGE v9.0 (95% → 100%)
+
+**Sistema:** SIGE v9.0 - Sistema Integrado de Gestão Empresarial  
+**Repositório:** EnterpriseSync-1  
+**Data:** 27 de Outubro de 2025  
+**Objetivo:** Implementar 2 funcionalidades críticas faltantes
+
+---
+
+## 📋 CONTEXTO EXECUTIVO
+
+Após auditoria profunda do código-fonte, identificamos que o sistema está **90% completo**, mas faltam **2 funcionalidades críticas**:
+
+1. **Módulo de Custos sem CRUD** (apenas visualização)
+2. **Integração Contábil da Folha** (eventos emitidos, mas handler não implementado)
+
+**Tempo estimado:** 4-5 horas de implementação  
+**Resultado:** Sistema 100% production-ready
+
+---
+
+## ✅ O QUE JÁ ESTÁ FUNCIONANDO
+
+### **Verificado no Repositório:**
+
+✅ **Event Manager existe** (`event_manager.py` - 17.119 bytes)  
+✅ **Folha emite evento** (`folha_processada` após processamento)  
+✅ **Handler de propostas funciona** (`proposta_aprovada` → lançamento contábil)  
+✅ **Módulo de custos tem dashboard** (visualização funcional)  
+✅ **Seletor de competência** (NÃO implementado ainda - precisa ser feito)
+
+---
+
+## 🔴 PROBLEMA 1: Módulo de Custos INCOMPLETO (CRÍTICO)
+
+### **Estado Atual:**
+
+**Arquivo:** `custos_views.py` (179 linhas)  
+**Rotas:** APENAS 4 rotas
+```python
+@custos_bp.route('/')                    # Dashboard
+@custos_bp.route('/obra/<int:obra_id>')  # Visualização
+@custos_bp.route('/api/custos-categoria') # API
+@custos_bp.route('/api/custos-mensais')   # API
+```
+
+**Templates:** APENAS 2 templates
+```
+templates/custos/
+├── dashboard.html  ✅
+└── obra.html       ✅
+```
+
+### **O que está FALTANDO:**
+
+❌ Criar novo custo  
+❌ Editar custo existente  
+❌ Deletar custo  
+❌ Listar custos com filtros  
+❌ Templates de formulário  
+❌ Modal de confirmação
+
+---
+
+## 🎯 TAREFA 1: Implementar CRUD Completo de Custos
+
+### **1.1 - Adicionar Rotas em `custos_views.py`**
+
+**Instrução:** Adicione as seguintes rotas ao final do arquivo `custos_views.py` (após a linha 179).
+
+```python
+# ================================
+# CRUD DE CUSTOS - MÓDULO COMPLETO
+# ================================
+
+@custos_bp.route('/criar', methods=['GET', 'POST'])
+@login_required
+def criar_custo():
+    """Criar um novo custo."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    if request.method == 'POST':
+        try:
+            novo_custo = CustoObra(
+                admin_id=current_user.id,
+                obra_id=request.form['obra_id'],
+                tipo=request.form['tipo'],
+                descricao=request.form['descricao'],
+                valor=float(request.form['valor']),
+                data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
+                fornecedor=request.form.get('fornecedor'),
+                observacoes=request.form.get('observacoes')
+            )
+            
+            db.session.add(novo_custo)
+            db.session.commit()
+            
+            logger.info(f"✅ Custo criado: {novo_custo.descricao} - R$ {novo_custo.valor}")
+            flash('Custo registrado com sucesso!', 'success')
+            return redirect(url_for('custos.listar_custos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao criar custo: {e}")
+            flash(f'Erro ao registrar custo: {str(e)}', 'danger')
+    
+    # GET: Exibir formulário
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
+    return render_template('custos/custo_form.html', obras=obras, custo=None)
+
+@custos_bp.route('/editar/<int:custo_id>', methods=['GET', 'POST'])
+@login_required
+def editar_custo(custo_id):
+    """Editar um custo existente."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    custo = CustoObra.query.filter_by(id=custo_id, admin_id=current_user.id).first_or_404()
+    
+    if request.method == 'POST':
+        try:
+            custo.obra_id = request.form['obra_id']
+            custo.tipo = request.form['tipo']
+            custo.descricao = request.form['descricao']
+            custo.valor = float(request.form['valor'])
+            custo.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
+            custo.fornecedor = request.form.get('fornecedor')
+            custo.observacoes = request.form.get('observacoes')
+            
+            db.session.commit()
+            
+            logger.info(f"✅ Custo atualizado: {custo.descricao}")
+            flash('Custo atualizado com sucesso!', 'success')
+            return redirect(url_for('custos.listar_custos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao editar custo: {e}")
+            flash(f'Erro ao atualizar custo: {str(e)}', 'danger')
+    
+    # GET: Exibir formulário preenchido
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
+    return render_template('custos/custo_form.html', obras=obras, custo=custo)
+
+@custos_bp.route('/deletar/<int:custo_id>', methods=['POST'])
+@login_required
+def deletar_custo(custo_id):
+    """Deletar um custo."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    custo = CustoObra.query.filter_by(id=custo_id, admin_id=current_user.id).first_or_404()
+    
+    try:
+        descricao = custo.descricao
+        valor = custo.valor
+        
+        db.session.delete(custo)
+        db.session.commit()
+        
+        logger.info(f"✅ Custo deletado: {descricao} - R$ {valor}")
+        flash('Custo deletado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao deletar custo: {e}")
+        flash(f'Erro ao deletar custo: {str(e)}', 'danger')
+    
+    return redirect(url_for('custos.listar_custos'))
+
+@custos_bp.route('/listar')
+@login_required
+def listar_custos():
+    """Listar todos os custos com filtros avançados."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    # Filtros
+    obra_id = request.args.get('obra_id', type=int)
+    tipo = request.args.get('tipo')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    # Query base
+    query = CustoObra.query.filter_by(admin_id=current_user.id)
+    
+    # Aplicar filtros
+    if obra_id:
+        query = query.filter_by(obra_id=obra_id)
+    if tipo:
+        query = query.filter_by(tipo=tipo)
+    if data_inicio:
+        query = query.filter(CustoObra.data >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        query = query.filter(CustoObra.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    
+    # Ordenar por data decrescente
+    custos = query.order_by(desc(CustoObra.data)).all()
+    
+    # Dados para filtros
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
+    tipos = ['mao_obra', 'material', 'veiculo', 'servico', 'alimentacao']
+    
+    # Estatísticas
+    total_custos = sum(c.valor for c in custos)
+    
+    return render_template('custos/listar.html', 
+                         custos=custos, 
+                         obras=obras, 
+                         tipos=tipos,
+                         total_custos=total_custos,
+                         filtros={
+                             'obra_id': obra_id, 
+                             'tipo': tipo, 
+                             'data_inicio': data_inicio, 
+                             'data_fim': data_fim
+                         })
+```
+
+---
+
+### **1.2 - Criar Template `custo_form.html`**
+
+**Instrução:** Crie o arquivo `templates/custos/custo_form.html`.
+
+```html
+{% extends 'base.html' %}
+{% block title %}{% if custo %}Editar{% else %}Novo{% endif %} Custo{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-dollar-sign text-success me-2"></i>
+            {% if custo %}Editar Custo{% else %}Novo Custo{% endif %}
+        </h1>
+        <a href="{{ url_for('custos.listar_custos') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Voltar
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST">
+                <div class="row g-3">
+                    <!-- Obra -->
+                    <div class="col-md-6">
+                        <label class="form-label">Obra *</label>
+                        <select name="obra_id" class="form-select" required>
+                            <option value="">Selecione uma obra</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if custo and custo.obra_id == obra.id %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Tipo -->
+                    <div class="col-md-6">
+                        <label class="form-label">Tipo de Custo *</label>
+                        <select name="tipo" class="form-select" required>
+                            <option value="">Selecione o tipo</option>
+                            <option value="mao_obra" {% if custo and custo.tipo == 'mao_obra' %}selected{% endif %}>Mão de Obra</option>
+                            <option value="material" {% if custo and custo.tipo == 'material' %}selected{% endif %}>Material</option>
+                            <option value="veiculo" {% if custo and custo.tipo == 'veiculo' %}selected{% endif %}>Veículo</option>
+                            <option value="servico" {% if custo and custo.tipo == 'servico' %}selected{% endif %}>Serviço</option>
+                            <option value="alimentacao" {% if custo and custo.tipo == 'alimentacao' %}selected{% endif %}>Alimentação</option>
+                        </select>
+                    </div>
+
+                    <!-- Descrição -->
+                    <div class="col-md-12">
+                        <label class="form-label">Descrição *</label>
+                        <input type="text" name="descricao" class="form-control" 
+                               value="{{ custo.descricao if custo else '' }}" 
+                               placeholder="Ex: Compra de cimento Portland" required>
+                    </div>
+
+                    <!-- Valor -->
+                    <div class="col-md-4">
+                        <label class="form-label">Valor (R$) *</label>
+                        <input type="number" step="0.01" name="valor" class="form-control" 
+                               value="{{ custo.valor if custo else '' }}" 
+                               placeholder="0.00" required>
+                    </div>
+
+                    <!-- Data -->
+                    <div class="col-md-4">
+                        <label class="form-label">Data *</label>
+                        <input type="date" name="data" class="form-control" 
+                               value="{{ custo.data.strftime('%Y-%m-%d') if custo else '' }}" required>
+                    </div>
+
+                    <!-- Fornecedor -->
+                    <div class="col-md-4">
+                        <label class="form-label">Fornecedor</label>
+                        <input type="text" name="fornecedor" class="form-control" 
+                               value="{{ custo.fornecedor if custo else '' }}" 
+                               placeholder="Nome do fornecedor">
+                    </div>
+
+                    <!-- Observações -->
+                    <div class="col-md-12">
+                        <label class="form-label">Observações</label>
+                        <textarea name="observacoes" class="form-control" rows="3" 
+                                  placeholder="Informações adicionais sobre o custo">{{ custo.observacoes if custo else '' }}</textarea>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Salvar
+                    </button>
+                    <a href="{{ url_for('custos.listar_custos') }}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+---
+
+### **1.3 - Criar Template `listar.html`**
+
+**Instrução:** Crie o arquivo `templates/custos/listar.html`.
+
+```html
+{% extends 'base.html' %}
+{% block title %}Listagem de Custos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-list text-primary me-2"></i>
+            Listagem de Custos
+        </h1>
+        <a href="{{ url_for('custos.criar_custo') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Novo Custo
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Filtros</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Obra</label>
+                        <select name="obra_id" class="form-select">
+                            <option value="">Todas</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if filtros.obra_id == obra.id %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tipo</label>
+                        <select name="tipo" class="form-select">
+                            <option value="">Todos</option>
+                            {% for tipo in tipos %}
+                            <option value="{{ tipo }}" {% if filtros.tipo == tipo %}selected{% endif %}>
+                                {{ tipo.replace('_', ' ').title() }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Data Início</label>
+                        <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio or '' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Data Fim</label>
+                        <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim or '' }}">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1">
+                            <i class="fas fa-search me-1"></i> Filtrar
+                        </button>
+                        <a href="{{ url_for('custos.listar_custos') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <p class="text-muted mb-1 small">Total de Custos</p>
+                    <h4 class="mb-0 text-primary">R$ {{ "{:,.2f}".format(total_custos or 0) }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <p class="text-muted mb-1 small">Quantidade</p>
+                    <h4 class="mb-0 text-success">{{ custos|length }} custo(s)</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Custos -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Obra</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Fornecedor</th>
+                            <th class="text-end">Valor</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for custo in custos %}
+                        <tr>
+                            <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ custo.obra.nome }}</td>
+                            <td>
+                                <span class="badge bg-primary">
+                                    {{ custo.tipo.replace('_', ' ').title() }}
+                                </span>
+                            </td>
+                            <td>{{ custo.descricao }}</td>
+                            <td>{{ custo.fornecedor or '-' }}</td>
+                            <td class="text-end">R$ {{ "{:,.2f}".format(custo.valor) }}</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('custos.editar_custo', custo_id=custo.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteModal{{ custo.id }}"
+                                        title="Deletar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+
+                        <!-- Modal de Deleção -->
+                        <div class="modal fade" id="deleteModal{{ custo.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Confirmar Deleção</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p>Tem certeza que deseja deletar este custo?</p>
+                                        <div class="alert alert-warning">
+                                            <strong>{{ custo.descricao }}</strong><br>
+                                            Valor: R$ {{ "{:,.2f}".format(custo.valor) }}<br>
+                                            Data: {{ custo.data.strftime('%d/%m/%Y') }}
+                                        </div>
+                                        <p class="text-danger"><strong>Esta ação não pode ser desfeita!</strong></p>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <form action="{{ url_for('custos.deletar_custo', custo_id=custo.id) }}" method="POST">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="fas fa-trash me-1"></i> Deletar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">Nenhum custo encontrado.</p>
+                                <a href="{{ url_for('custos.criar_custo') }}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-1"></i> Criar Primeiro Custo
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+---
+
+### **1.4 - Atualizar Dashboard de Custos**
+
+**Instrução:** Adicione botão "Novo Custo" no dashboard. Edite `templates/custos/dashboard.html` e adicione no header (após a linha com o título):
+
+```html
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+        <i class="fas fa-dollar-sign text-success me-2"></i>
+        Dashboard de Custos
+    </h1>
+    <div>
+        <a href="{{ url_for('custos.criar_custo') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Novo Custo
+        </a>
+        <a href="{{ url_for('custos.listar_custos') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-list me-1"></i> Ver Todos
+        </a>
+    </div>
+</div>
+```
+
+---
+
+## 🔴 PROBLEMA 2: Integração Contábil da Folha NÃO IMPLEMENTADA
+
+### **Estado Atual:**
+
+✅ **Event Manager existe** (`event_manager.py`)  
+✅ **Folha emite evento** (`EventManager.emit('folha_processada', {...})`)  
+✅ **Handler de propostas funciona** (`@event_handler('proposta_aprovada')`)  
+❌ **Handler de folha NÃO existe** (evento emitido mas ninguém escuta)
+
+---
+
+## 🎯 TAREFA 2: Implementar Handler de Integração Contábil
+
+### **2.1 - Adicionar Handler em `event_manager.py`**
+
+**Instrução:** Adicione o seguinte código ao final do arquivo `event_manager.py` (após o handler de `proposta_aprovada`).
+
+```python
+# ================================
+# HANDLER: FOLHA DE PAGAMENTO PROCESSADA
+# ================================
+
+@event_handler('folha_processada')
+def criar_lancamento_folha_pagamento(data, admin_id):
+    """
+    Cria lançamento contábil automaticamente quando a folha é processada.
+    
+    Lançamento:
+    D - 5.1.01.001 - Despesas com Pessoal (Total Proventos)
+    C - 2.1.03.001 - Salários a Pagar (Salário Líquido)
+    C - 2.1.03.002 - INSS a Recolher (INSS Descontado)
+    C - 2.1.03.003 - IRRF a Recolher (IRRF Descontado)
+    C - 2.1.03.004 - FGTS a Recolher (FGTS)
+    """
+    try:
+        from models import (db, FolhaPagamento, LancamentoContabil, PartidaContabil, 
+                           PlanoContas, Funcionario)
+        from datetime import datetime
+        
+        folha_id = data.get('folha_id')
+        if not folha_id:
+            logger.warning("⚠️ folha_id não fornecido no evento folha_processada")
+            return
+        
+        logger.info(f"📊 Criando lançamento contábil para folha {folha_id}")
+        
+        # Buscar folha
+        folha = FolhaPagamento.query.get(folha_id)
+        if not folha:
+            logger.error(f"❌ Folha {folha_id} não encontrada")
+            return
+        
+        # Buscar funcionário
+        funcionario = Funcionario.query.get(folha.funcionario_id)
+        if not funcionario:
+            logger.error(f"❌ Funcionário {folha.funcionario_id} não encontrado")
+            return
+        
+        # Buscar contas do plano de contas
+        conta_despesa_pessoal = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='5.1.01.001',
+            ativo=True
+        ).first()
+        
+        conta_salarios_pagar = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='2.1.03.001',
+            ativo=True
+        ).first()
+        
+        conta_inss_recolher = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='2.1.03.002',
+            ativo=True
+        ).first()
+        
+        conta_irrf_recolher = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='2.1.03.003',
+            ativo=True
+        ).first()
+        
+        conta_fgts_recolher = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='2.1.03.004',
+            ativo=True
+        ).first()
+        
+        # Validar se contas essenciais existem
+        if not conta_despesa_pessoal or not conta_salarios_pagar:
+            logger.warning(f"⚠️ Plano de contas incompleto para admin {admin_id}. Lançamento não criado.")
+            logger.warning(f"   Despesa Pessoal: {'OK' if conta_despesa_pessoal else 'FALTA'}")
+            logger.warning(f"   Salários a Pagar: {'OK' if conta_salarios_pagar else 'FALTA'}")
+            return
+        
+        # Verificar se já existe lançamento para esta folha
+        lancamento_existente = LancamentoContabil.query.filter_by(
+            admin_id=admin_id,
+            origem='FOLHA_PAGAMENTO',
+            origem_id=folha_id
+        ).first()
+        
+        if lancamento_existente:
+            logger.info(f"ℹ️ Lançamento já existe para folha {folha_id} (ID {lancamento_existente.id})")
+            return
+        
+        # Criar cabeçalho do lançamento
+        mes_ref = folha.mes_referencia.strftime('%B/%Y')
+        lancamento = LancamentoContabil(
+            admin_id=admin_id,
+            data=folha.mes_referencia,
+            historico=f"Folha de Pagamento - {funcionario.nome} - {mes_ref}",
+            origem='FOLHA_PAGAMENTO',
+            origem_id=folha_id
+        )
+        db.session.add(lancamento)
+        db.session.flush()  # Gerar ID do lançamento
+        
+        # Criar partidas
+        partidas_criadas = 0
+        
+        # DÉBITO: Despesas com Pessoal (Total Proventos)
+        partida_debito = PartidaContabil(
+            lancamento_id=lancamento.id,
+            conta_id=conta_despesa_pessoal.id,
+            tipo='DEBITO',
+            valor=folha.total_proventos or 0,
+            historico=f"Despesas com pessoal - {funcionario.nome}"
+        )
+        db.session.add(partida_debito)
+        partidas_criadas += 1
+        
+        # CRÉDITO: Salários a Pagar (Salário Líquido)
+        partida_credito_salario = PartidaContabil(
+            lancamento_id=lancamento.id,
+            conta_id=conta_salarios_pagar.id,
+            tipo='CREDITO',
+            valor=folha.salario_liquido or 0,
+            historico=f"Salário líquido a pagar - {funcionario.nome}"
+        )
+        db.session.add(partida_credito_salario)
+        partidas_criadas += 1
+        
+        # CRÉDITO: INSS a Recolher (se houver)
+        if (folha.inss or 0) > 0 and conta_inss_recolher:
+            partida_credito_inss = PartidaContabil(
+                lancamento_id=lancamento.id,
+                conta_id=conta_inss_recolher.id,
+                tipo='CREDITO',
+                valor=folha.inss,
+                historico=f"INSS descontado - {funcionario.nome}"
+            )
+            db.session.add(partida_credito_inss)
+            partidas_criadas += 1
+        
+        # CRÉDITO: IRRF a Recolher (se houver)
+        if (folha.irrf or 0) > 0 and conta_irrf_recolher:
+            partida_credito_irrf = PartidaContabil(
+                lancamento_id=lancamento.id,
+                conta_id=conta_irrf_recolher.id,
+                tipo='CREDITO',
+                valor=folha.irrf,
+                historico=f"IRRF descontado - {funcionario.nome}"
+            )
+            db.session.add(partida_credito_irrf)
+            partidas_criadas += 1
+        
+        # CRÉDITO: FGTS a Recolher (se houver)
+        if (folha.fgts or 0) > 0 and conta_fgts_recolher:
+            partida_credito_fgts = PartidaContabil(
+                lancamento_id=lancamento.id,
+                conta_id=conta_fgts_recolher.id,
+                tipo='CREDITO',
+                valor=folha.fgts,
+                historico=f"FGTS - {funcionario.nome}"
+            )
+            db.session.add(partida_credito_fgts)
+            partidas_criadas += 1
+        
+        # Commit
+        db.session.commit()
+        
+        logger.info(f"✅ Lançamento contábil {lancamento.id} criado com {partidas_criadas} partidas")
+        logger.info(f"   Folha: {folha_id} | Funcionário: {funcionario.nome}")
+        logger.info(f"   Total: R$ {folha.total_proventos:,.2f}")
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao criar lançamento contábil para folha {data.get('folha_id')}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+```
+
+---
+
+## 🔴 PROBLEMA 3: Seletor de Competência Fixo (ADICIONAL)
+
+### **Estado Atual:**
+
+❌ Dashboard mostra apenas mês atual  
+❌ Não é possível selecionar outras competências
+
+---
+
+## 🎯 TAREFA 3: Implementar Seletor de Competência
+
+### **3.1 - Modificar `folha_pagamento_views.py`**
+
+**Instrução:** Substitua a função `dashboard()` (linhas 35-105) pela versão abaixo.
+
+```python
+@folha_bp.route('/dashboard')
+@admin_required
+def dashboard():
+    """Dashboard principal da folha de pagamento com seletor de competência"""
+    
+    from models import db, Funcionario
+    from dateutil.relativedelta import relativedelta
+    
+    # Mês atual
+    hoje = date.today()
+    mes_atual = hoje.replace(day=1)
+    
+    # Gerar lista de competências (últimos 12 meses + próximos 2)
+    competencias = []
+    for i in range(-12, 3):  # De 12 meses atrás até 2 meses à frente
+        mes_comp = mes_atual + relativedelta(months=i)
+        competencias.append({
+            'ano': mes_comp.year,
+            'mes': mes_comp.month,
+            'label': mes_comp.strftime('%B/%Y').capitalize(),
+            'valor': f"{mes_comp.year}-{mes_comp.month:02d}"
+        })
+    
+    # Competência selecionada (padrão: mês atual)
+    comp_selecionada = request.args.get('competencia', f"{mes_atual.year}-{mes_atual.month:02d}")
+    
+    try:
+        ano_sel, mes_sel = map(int, comp_selecionada.split('-'))
+        mes_referencia = date(ano_sel, mes_sel, 1)
+    except (ValueError, AttributeError):
+        # Se competência inválida, usar mês atual
+        mes_referencia = mes_atual
+        comp_selecionada = f"{mes_atual.year}-{mes_atual.month:02d}"
+    
+    # Obter folhas da competência selecionada
+    folhas_mes = FolhaPagamento.query.filter_by(
+        admin_id=current_user.id,
+        mes_referencia=mes_referencia
+    ).all()
+    
+    # Calcular métricas
+    total_folha = sum(f.total_proventos or 0 for f in folhas_mes)
+    total_liquido = sum(f.salario_liquido or 0 for f in folhas_mes)
+    total_encargos = sum((f.inss or 0) + (f.fgts or 0) for f in folhas_mes)
+    
+    # Mês anterior para comparação
+    mes_anterior = mes_referencia + relativedelta(months=-1)
+    folhas_anterior = FolhaPagamento.query.filter_by(
+        admin_id=current_user.id,
+        mes_referencia=mes_anterior
+    ).all()
+    
+    total_anterior = sum(f.total_proventos or 0 for f in folhas_anterior)
+    variacao = ((total_folha - total_anterior) / total_anterior * 100) if total_anterior > 0 else 0
+    
+    # Status do processamento
+    funcionarios_ativos = Funcionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=True
+    ).count()
+    
+    folhas_processadas = len(folhas_mes)
+    percentual_processado = (folhas_processadas / funcionarios_ativos * 100) if funcionarios_ativos > 0 else 0
+    
+    # Top 5 maiores salários
+    top_salarios = sorted(folhas_mes, key=lambda x: x.total_proventos or 0, reverse=True)[:5]
+    
+    # Funcionários com mais horas extras
+    top_extras = sorted(folhas_mes, key=lambda x: x.horas_extras or 0, reverse=True)[:5]
+    
+    # Verificar se parâmetros legais estão configurados para o ano selecionado
+    parametros = ParametrosLegais.query.filter_by(
+        admin_id=current_user.id,
+        ano_vigencia=ano_sel,
+        ativo=True
+    ).first()
+    
+    parametros_configurados = parametros is not None
+    if not parametros_configurados and folhas_processadas == 0:
+        flash(f'Parâmetros legais não configurados para {ano_sel}. Configure antes de processar a folha.', 'warning')
+    
+    return render_template('folha_pagamento/dashboard.html',
+                         mes_referencia=mes_referencia,
+                         competencias=competencias,
+                         comp_selecionada=comp_selecionada,
+                         total_folha=total_folha,
+                         total_liquido=total_liquido,
+                         total_encargos=total_encargos,
+                         variacao=variacao,
+                         funcionarios_ativos=funcionarios_ativos,
+                         folhas_processadas=folhas_processadas,
+                         percentual_processado=percentual_processado,
+                         top_salarios=top_salarios,
+                         top_extras=top_extras,
+                         parametros_configurados=parametros_configurados)
+```
+
+### **3.2 - Adicionar Dependência**
+
+**Instrução:** Adicione ao `requirements.txt`:
+
+```
+python-dateutil==2.8.2
+```
+
+### **3.3 - Atualizar Template `dashboard.html`**
+
+**Instrução:** Substitua o header do dashboard (linhas 8-45) por:
+
+```html
+    <!-- Header -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-money-check-alt text-success me-2"></i>
+                        Folha de Pagamento
+                    </h1>
+                    <p class="text-muted small mb-0">Módulo 6 - Sistema de Folha Automática</p>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <!-- Seletor de Competência -->
+                    <div>
+                        <label class="form-label small mb-1">Competência:</label>
+                        <select class="form-select form-select-sm" style="min-width: 180px;" onchange="window.location.href='{{ url_for('folha.dashboard') }}?competencia=' + this.value">
+                            {% for comp in competencias %}
+                            <option value="{{ comp.valor }}" {% if comp.valor == comp_selecionada %}selected{% endif %}>
+                                {{ comp.label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    {% if not parametros_configurados %}
+                    <div>
+                        <label class="form-label small mb-1">&nbsp;</label>
+                        <a href="{{ url_for('folha.parametros_legais') }}" class="btn btn-warning btn-sm d-block">
+                            <i class="fas fa-cog me-1"></i>
+                            Configurar Parâmetros
+                        </a>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Botão de Processar -->
+                    <div>
+                        <label class="form-label small mb-1">&nbsp;</label>
+                        <div class="btn-group d-block">
+                            <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="fas fa-calculator me-1"></i>
+                                Processar Folha
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="processarFolha({{ mes_referencia.year }}, {{ mes_referencia.month }})">
+                                    <i class="fas fa-play me-1"></i>
+                                    Processar {{ mes_referencia.strftime('%B/%Y').capitalize() }}
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#" onclick="processarFolha({{ mes_referencia.year }}, {{ mes_referencia.month }}, true)">
+                                    <i class="fas fa-redo me-1"></i>
+                                    Reprocessar {{ mes_referencia.strftime('%B/%Y').capitalize() }}
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+```
+
+---
+
+## ✅ CHECKLIST DE VALIDAÇÃO
+
+### **Validação 1: CRUD de Custos**
+- [ ] Acessar `/custos/listar`
+- [ ] Clicar em "Novo Custo"
+- [ ] Preencher formulário e salvar
+- [ ] Verificar custo na listagem
+- [ ] Editar custo
+- [ ] Deletar custo (confirmar modal)
+- [ ] Testar filtros (obra, tipo, período)
+
+### **Validação 2: Integração Contábil**
+- [ ] Processar folha de um funcionário
+- [ ] Verificar nos logs: "📊 Criando lançamento contábil"
+- [ ] Acessar `/contabilidade/lancamentos`
+- [ ] Verificar lançamento com origem "FOLHA_PAGAMENTO"
+- [ ] Confirmar partidas dobradas (débito = créditos)
+
+### **Validação 3: Seletor de Competência**
+- [ ] Acessar `/folha/dashboard`
+- [ ] Verificar dropdown com 15 competências
+- [ ] Selecionar competência diferente
+- [ ] Verificar URL: `/folha/dashboard?competencia=YYYY-MM`
+- [ ] Processar folha da competência selecionada
+
+---
+
+## 📊 RESULTADO ESPERADO
+
+### **Antes:**
+- Custos: 40% completo (apenas visualização)
+- Folha → Contabilidade: Manual
+- Seletor: Fixo no mês atual
+
+### **Depois:**
+- ✅ Custos: 95% completo (CRUD + filtros)
+- ✅ Folha → Contabilidade: Automático
+- ✅ Seletor: 15 competências disponíveis
+
+### **Completude do Sistema:**
+- **Antes:** 85-90%
+- **Depois:** 95-100% ✅
+
+---
+
+## 🚀 ORDEM DE EXECUÇÃO
+
+1. **Tarefa 1:** CRUD de Custos (2-3 horas)
+2. **Tarefa 2:** Integração Contábil (1-2 horas)
+3. **Tarefa 3:** Seletor de Competência (1 hora)
+
+**Total:** 4-6 horas para sistema 100% production-ready
+
+---
+
+**Pronto para implementação!** 🎯
+
