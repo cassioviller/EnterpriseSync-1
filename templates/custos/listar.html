@@ -117,7 +117,6 @@
                             <th>Obra</th>
                             <th>Tipo</th>
                             <th>Descrição</th>
-                            <th>Fornecedor</th>
                             <th class="text-end">Valor</th>
                             <th class="text-center">Ações</th>
                         </tr>
@@ -133,7 +132,6 @@
                                 </span>
                             </td>
                             <td>{{ custo.descricao }}</td>
-                            <td>{{ custo.fornecedor or '-' }}</td>
                             <td class="text-end font-weight-bold">R$ {{ "{:,.2f}".format(custo.valor) }}</td>
                             <td class="text-center">
                                 <a href="{{ url_for('custos.editar_custo', custo_id=custo.id) }}" 
@@ -179,7 +177,7 @@
                         </div>
                         {% else %}
                         <tr>
-                            <td colspan="7" class="text-center py-5">
+                            <td colspan="6" class="text-center py-5">
                                 <i class="fas fa-inbox fa-3x text-muted mb-3 d-block"></i>
                                 <p class="text-muted">Nenhum custo encontrado.</p>
                                 <a href="{{ url_for('custos.criar_custo') }}" class="btn btn-primary">

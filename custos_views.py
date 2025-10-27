@@ -208,9 +208,7 @@ def criar_custo():
                 tipo=request.form['tipo'],
                 descricao=request.form['descricao'],
                 valor=float(request.form['valor']),
-                data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
-                fornecedor=request.form.get('fornecedor'),
-                observacoes=request.form.get('observacoes')
+                data=datetime.strptime(request.form['data'], '%Y-%m-%d').date()
             )
             
             db.session.add(novo_custo)
@@ -255,8 +253,6 @@ def editar_custo(custo_id):
             custo.descricao = request.form['descricao']
             custo.valor = float(request.form['valor'])
             custo.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
-            custo.fornecedor = request.form.get('fornecedor')
-            custo.observacoes = request.form.get('observacoes')
             
             db.session.commit()
             

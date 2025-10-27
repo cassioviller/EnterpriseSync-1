@@ -206,15 +206,10 @@ def processar_folha_mes(ano, mes):
                 # Emitir evento para contabilidade (agora com folha.id válido)
                 try:
                     EventManager.emit('folha_processada', {
-                        'folha_id': folha.id,
-                        'funcionario_id': funcionario.id,
-                        'mes_referencia': mes_referencia.isoformat(),
-                        'valor_total': dados_folha['total_proventos'],
-                        'encargos': dados_folha['encargos_patronais'],
-                        'admin_id': current_user.id
-                    })
+                        'folha_id': folha.id
+                    }, admin_id=current_user.id)
                 except Exception as e:
-                    print(f"Erro ao emitir evento folha_processada: {e}")
+                    logger.error(f"❌ Erro ao emitir evento folha_processada: {e}")
             else:
                 erros += 1
         

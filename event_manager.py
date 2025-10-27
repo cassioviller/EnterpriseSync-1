@@ -519,83 +519,100 @@ def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
             logger.info(f"ℹ️ Lançamento já existe para folha {folha_id} (ID {lancamento_existente.id})")
             return
         
+        # Gerar número sequencial do lançamento
+        from sqlalchemy import func
+        ultimo_numero = db.session.query(func.max(LancamentoContabil.numero)).filter_by(admin_id=admin_id).scalar()
+        proximo_numero = (ultimo_numero or 0) + 1
+        
         # Criar cabeçalho do lançamento
         mes_ref = folha.mes_referencia.strftime('%B/%Y')
         lancamento = LancamentoContabil(
             admin_id=admin_id,
+            numero=proximo_numero,
             data_lancamento=folha.mes_referencia,
             historico=f"Folha de Pagamento - {funcionario.nome} - {mes_ref}",
+            valor_total=folha.total_proventos or 0,  # Valor total = débito
             origem='FOLHA_PAGAMENTO',
             origem_id=folha_id
         )
         db.session.add(lancamento)
         db.session.flush()  # Gerar ID do lançamento
         
-        # Criar partidas
-        partidas_criadas = 0
+        # Criar partidas com sequência
+        sequencia = 1
         
         # DÉBITO: Despesas com Pessoal (Total Proventos)
         partida_debito = PartidaContabil(
             lancamento_id=lancamento.id,
+            sequencia=sequencia,
             conta_codigo=conta_despesa_pessoal.codigo,
             tipo_partida='DEBITO',
             valor=folha.total_proventos or 0,
-            historico_complementar=f"Despesas com pessoal - {funcionario.nome}"
+            historico_complementar=f"Despesas com pessoal - {funcionario.nome}",
+            admin_id=admin_id
         )
         db.session.add(partida_debito)
-        partidas_criadas += 1
+        sequencia += 1
         
         # CRÉDITO: Salários a Pagar (Salário Líquido)
         partida_credito_salario = PartidaContabil(
             lancamento_id=lancamento.id,
+            sequencia=sequencia,
             conta_codigo=conta_salarios_pagar.codigo,
             tipo_partida='CREDITO',
             valor=folha.salario_liquido or 0,
-            historico_complementar=f"Salário líquido a pagar - {funcionario.nome}"
+            historico_complementar=f"Salário líquido a pagar - {funcionario.nome}",
+            admin_id=admin_id
         )
         db.session.add(partida_credito_salario)
-        partidas_criadas += 1
+        sequencia += 1
         
         # CRÉDITO: INSS a Recolher (se houver)
         if (folha.inss or 0) > 0 and conta_inss_recolher:
             partida_credito_inss = PartidaContabil(
                 lancamento_id=lancamento.id,
+                sequencia=sequencia,
                 conta_codigo=conta_inss_recolher.codigo,
                 tipo_partida='CREDITO',
                 valor=folha.inss,
-                historico_complementar=f"INSS descontado - {funcionario.nome}"
+                historico_complementar=f"INSS descontado - {funcionario.nome}",
+                admin_id=admin_id
             )
             db.session.add(partida_credito_inss)
-            partidas_criadas += 1
+            sequencia += 1
         
         # CRÉDITO: IRRF a Recolher (se houver)
         if (folha.irrf or 0) > 0 and conta_irrf_recolher:
             partida_credito_irrf = PartidaContabil(
                 lancamento_id=lancamento.id,
+                sequencia=sequencia,
                 conta_codigo=conta_irrf_recolher.codigo,
                 tipo_partida='CREDITO',
                 valor=folha.irrf,
-                historico_complementar=f"IRRF descontado - {funcionario.nome}"
+                historico_complementar=f"IRRF descontado - {funcionario.nome}",
+                admin_id=admin_id
             )
             db.session.add(partida_credito_irrf)
-            partidas_criadas += 1
+            sequencia += 1
         
         # CRÉDITO: FGTS a Recolher (se houver)
         if (folha.fgts or 0) > 0 and conta_fgts_recolher:
             partida_credito_fgts = PartidaContabil(
                 lancamento_id=lancamento.id,
+                sequencia=sequencia,
                 conta_codigo=conta_fgts_recolher.codigo,
                 tipo_partida='CREDITO',
                 valor=folha.fgts,
-                historico_complementar=f"FGTS - {funcionario.nome}"
+                historico_complementar=f"FGTS - {funcionario.nome}",
+                admin_id=admin_id
             )
             db.session.add(partida_credito_fgts)
-            partidas_criadas += 1
+            sequencia += 1
         
         # Commit
         db.session.commit()
         
-        logger.info(f"✅ Lançamento contábil {lancamento.id} criado com {partidas_criadas} partidas")
+        logger.info(f"✅ Lançamento contábil {lancamento.id} criado com {sequencia-1} partidas")
         logger.info(f"   Folha: {folha_id} | Funcionário: {funcionario.nome}")
         logger.info(f"   Total: R$ {folha.total_proventos:,.2f}")
         

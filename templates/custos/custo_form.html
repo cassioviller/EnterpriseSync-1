@@ -65,21 +65,6 @@
                         <input type="date" name="data" class="form-control" 
                                value="{{ custo.data.strftime('%Y-%m-%d') if custo else '' }}" required>
                     </div>
-
-                    <!-- Fornecedor -->
-                    <div class="col-md-4">
-                        <label class="form-label">Fornecedor</label>
-                        <input type="text" name="fornecedor" class="form-control" 
-                               value="{{ custo.fornecedor if custo else '' }}" 
-                               placeholder="Nome do fornecedor">
-                    </div>
-
-                    <!-- Observações -->
-                    <div class="col-md-12">
-                        <label class="form-label">Observações</label>
-                        <textarea name="observacoes" class="form-control" rows="3" 
-                                  placeholder="Informações adicionais sobre o custo">{{ custo.observacoes if custo else '' }}</textarea>
-                    </div>
                 </div>
 
                 <div class="mt-4">
