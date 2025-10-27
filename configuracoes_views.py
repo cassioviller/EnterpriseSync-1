@@ -4,7 +4,7 @@ Blueprint para configurações da empresa
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app import db
-from models import ConfiguracaoEmpresa, Departamento, Funcao, HorarioTrabalho
+from models import ConfiguracaoEmpresa, Departamento, Funcao, HorarioTrabalho, Funcionario
 from decorators import admin_required
 from datetime import datetime, time
 
@@ -255,11 +255,40 @@ def editar_funcao(id):
     
     if request.method == 'POST':
         try:
+            # Capturar salário base antigo para comparação
+            salario_base_antigo = funcao.salario_base
+            
+            # Atualizar dados da função
             funcao.nome = request.form['nome']
             funcao.descricao = request.form.get('descricao')
-            funcao.salario_base = float(request.form.get('salario_base', 0))
+            novo_salario_base = float(request.form.get('salario_base', 0))
+            funcao.salario_base = novo_salario_base
+            
+            # ATUALIZAÇÃO EM MASSA: Se salário base mudou, atualizar todos funcionários
+            funcionarios_atualizados = 0
+            if salario_base_antigo != novo_salario_base:
+                # Buscar todos os funcionários com essa função
+                funcionarios = Funcionario.query.filter_by(funcao_id=id).all()
+                
+                # Atualizar salário de cada funcionário
+                for funcionario in funcionarios:
+                    funcionario.salario = novo_salario_base
+                    funcionarios_atualizados += 1
+                
+                # Log da operação
+                print(f"ATUALIZAÇÃO MASSA SALARIAL: Função '{funcao.nome}' (ID {id})")
+                print(f"  Salário base: R$ {salario_base_antigo:.2f} → R$ {novo_salario_base:.2f}")
+                print(f"  Funcionários atualizados: {funcionarios_atualizados}")
+            
+            # Commit da transação (atômica - tudo ou nada)
             db.session.commit()
-            flash('Função atualizada com sucesso!', 'success')
+            
+            # Mensagem de sucesso informativa
+            if funcionarios_atualizados > 0:
+                flash(f'Função atualizada com sucesso! {funcionarios_atualizados} funcionário(s) tiveram seus salários atualizados automaticamente.', 'success')
+            else:
+                flash('Função atualizada com sucesso!', 'success')
+                
             return redirect(url_for('configuracoes.funcoes'))
         except Exception as e:
             db.session.rollback()
