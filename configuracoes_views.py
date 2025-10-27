@@ -267,8 +267,13 @@ def editar_funcao(id):
             # ATUALIZAÇÃO EM MASSA: Se salário base mudou, atualizar todos funcionários
             funcionarios_atualizados = 0
             if salario_base_antigo != novo_salario_base:
-                # Buscar todos os funcionários com essa função
-                funcionarios = Funcionario.query.filter_by(funcao_id=id).all()
+                # Buscar todos os funcionários com essa função (FILTRADO POR TENANT)
+                from multitenant_helper import get_admin_id
+                admin_id = get_admin_id()
+                funcionarios = Funcionario.query.filter_by(
+                    funcao_id=id, 
+                    admin_id=admin_id
+                ).all()
                 
                 # Atualizar salário de cada funcionário
                 for funcionario in funcionarios:
