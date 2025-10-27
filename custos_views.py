@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, jsonify, request, flash, redirect,
 from flask_login import login_required, current_user
 from models import CustoObra, Obra, Funcionario, Vehicle, db
 from sqlalchemy import func, desc, extract, text
+from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
 from datetime import datetime, date
 import logging
 
@@ -322,8 +323,10 @@ def listar_custos():
     if data_fim:
         query = query.filter(CustoObra.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
     
-    # Ordenar por data decrescente
-    custos = query.order_by(desc(CustoObra.data)).all()
+    # Ordenar por data decrescente (✅ OTIMIZAÇÃO: eager loading evita N+1 no template)
+    custos = query.options(
+        joinedload(CustoObra.obra)
+    ).order_by(desc(CustoObra.data)).all()
     
     # Dados para filtros
     obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
