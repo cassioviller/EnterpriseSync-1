@@ -12,7 +12,19 @@
             </h1>
             <p class="text-muted small mb-0">Demonstração dos saldos das contas contábeis</p>
         </div>
-        <div class="btn-group" role="group">
+        <div class="d-flex align-items-center gap-3">
+            <!-- Seletor de Competência -->
+            <div>
+                <label class="form-label small mb-1">Competência:</label>
+                <select class="form-select form-select-sm" style="min-width: 180px;" onchange="window.location.href='{{ url_for('contabilidade.balancete') }}?mes=' + this.value.split('-')[1] + '&ano=' + this.value.split('-')[0]">
+                    {% for comp in competencias %}
+                    <option value="{{ comp.valor }}" {% if comp.valor == comp_selecionada %}selected{% endif %}>
+                        {{ comp.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="btn-group" role="group">
             <a href="{{ url_for('contabilidade.dashboard_contabil') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> Voltar
             </a>
@@ -25,6 +37,7 @@
             <a href="{{ url_for('contabilidade.balancete_pdf', mes=mes, ano=ano) }}" class="btn btn-outline-danger">
                 <i class="fas fa-file-pdf"></i> PDF
             </a>
+            </div>
         </div>
     </div>
 

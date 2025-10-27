@@ -62,6 +62,8 @@ def dashboard():
         mes_referencia = date(ano_sel, mes_sel, 1)
     except (ValueError, AttributeError):
         # Se competência inválida, usar mês atual
+        ano_sel = mes_atual.year
+        mes_sel = mes_atual.month
         mes_referencia = mes_atual
         comp_selecionada = f"{mes_atual.year}-{mes_atual.month:02d}"
     

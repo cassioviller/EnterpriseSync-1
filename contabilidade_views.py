@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from models import SpedContabil, DREMensal, BalancoPatrimonial, LancamentoContabil, PlanoContas, BalanceteMensal, AuditoriaContabil, TipoUsuario, PartidaContabil, CentroCustoContabil, db
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
+from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 import calendar
 
@@ -516,6 +517,19 @@ def balancete():
     if ano < 2020 or ano > 2030:
         ano = date.today().year
     
+    # Gerar lista de competências
+    mes_atual = date.today().replace(day=1)
+    competencias = []
+    for i in range(-12, 3):
+        mes_comp = mes_atual + relativedelta(months=i)
+        competencias.append({
+            'ano': mes_comp.year,
+            'mes': mes_comp.month,
+            'label': mes_comp.strftime('%B/%Y').capitalize(),
+            'valor': f"{mes_comp.year}-{mes_comp.month:02d}"
+        })
+    comp_selecionada = f"{ano}-{mes:02d}"
+    
     # Definir período
     primeiro_dia = date(ano, mes, 1)
     ultimo_dia = date(ano, mes, calendar.monthrange(ano, mes)[1])
@@ -619,6 +633,8 @@ def balancete():
                          ano=ano,
                          contas=contas_data,
                          totais=totais,
+                         competencias=competencias,
+                         comp_selecionada=comp_selecionada,
                          now=datetime.now())
 
 @contabilidade_bp.route('/razao/<conta_codigo>')
@@ -676,6 +692,19 @@ def dre():
     # Validar mês (1-12)
     if mes < 1 or mes > 12:
         mes = hoje.month
+    
+    # Gerar lista de competências
+    mes_atual = date.today().replace(day=1)
+    competencias = []
+    for i in range(-12, 3):
+        mes_comp = mes_atual + relativedelta(months=i)
+        competencias.append({
+            'ano': mes_comp.year,
+            'mes': mes_comp.month,
+            'label': mes_comp.strftime('%B/%Y').capitalize(),
+            'valor': f"{mes_comp.year}-{mes_comp.month:02d}"
+        })
+    comp_selecionada = f"{ano}-{mes:02d}"
     
     # Calcular DRE do mês selecionado
     dre_data = calcular_dre_mensal(admin_id, ano, mes)
@@ -785,6 +814,8 @@ def dre():
                          mes_anterior=mes_anterior,
                          ano_anterior=ano_anterior,
                          comparativo=comparativo,
+                         competencias=competencias,
+                         comp_selecionada=comp_selecionada,
                          meses_nomes=meses_nomes)
 
 # ==================== EXPORTAÇÕES PDF E EXCEL ====================
