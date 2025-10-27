@@ -177,3 +177,173 @@ def api_custos_mensais():
         'labels': [c[0] for c in custos],
         'data': [float(c[1]) for c in custos]
     })
+
+
+# ================================
+# CRUD DE CUSTOS - MÓDULO COMPLETO
+# ================================
+
+@custos_bp.route('/criar', methods=['GET', 'POST'])
+@login_required
+def criar_custo():
+    """Criar um novo custo."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    if request.method == 'POST':
+        try:
+            # SEGURANÇA: Validar que obra pertence ao admin atual
+            obra_id = request.form.get('obra_id', type=int)
+            obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first()
+            
+            if not obra:
+                logger.warning(f"⚠️ Tentativa de criar custo em obra {obra_id} sem permissão (admin {current_user.id})")
+                flash('Obra não encontrada ou sem permissão.', 'danger')
+                return redirect(url_for('custos.listar_custos'))
+            
+            novo_custo = CustoObra(
+                admin_id=current_user.id,
+                obra_id=obra.id,  # Usar obra validada
+                tipo=request.form['tipo'],
+                descricao=request.form['descricao'],
+                valor=float(request.form['valor']),
+                data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
+                fornecedor=request.form.get('fornecedor'),
+                observacoes=request.form.get('observacoes')
+            )
+            
+            db.session.add(novo_custo)
+            db.session.commit()
+            
+            logger.info(f"✅ Custo criado: {novo_custo.descricao} - R$ {novo_custo.valor} (Obra: {obra.nome})")
+            flash('Custo registrado com sucesso!', 'success')
+            return redirect(url_for('custos.listar_custos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao criar custo: {e}")
+            flash(f'Erro ao registrar custo: {str(e)}', 'danger')
+    
+    # GET: Exibir formulário
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
+    return render_template('custos/custo_form.html', obras=obras, custo=None)
+
+@custos_bp.route('/editar/<int:custo_id>', methods=['GET', 'POST'])
+@login_required
+def editar_custo(custo_id):
+    """Editar um custo existente."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    custo = CustoObra.query.filter_by(id=custo_id, admin_id=current_user.id).first_or_404()
+    
+    if request.method == 'POST':
+        try:
+            # SEGURANÇA: Validar que obra pertence ao admin atual
+            obra_id = request.form.get('obra_id', type=int)
+            obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first()
+            
+            if not obra:
+                logger.warning(f"⚠️ Tentativa de editar custo {custo_id} para obra {obra_id} sem permissão (admin {current_user.id})")
+                flash('Obra não encontrada ou sem permissão.', 'danger')
+                return redirect(url_for('custos.listar_custos'))
+            
+            custo.obra_id = obra.id  # Usar obra validada
+            custo.tipo = request.form['tipo']
+            custo.descricao = request.form['descricao']
+            custo.valor = float(request.form['valor'])
+            custo.data = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
+            custo.fornecedor = request.form.get('fornecedor')
+            custo.observacoes = request.form.get('observacoes')
+            
+            db.session.commit()
+            
+            logger.info(f"✅ Custo atualizado: {custo.descricao} (Obra: {obra.nome})")
+            flash('Custo atualizado com sucesso!', 'success')
+            return redirect(url_for('custos.listar_custos'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao editar custo: {e}")
+            flash(f'Erro ao atualizar custo: {str(e)}', 'danger')
+    
+    # GET: Exibir formulário preenchido
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
+    return render_template('custos/custo_form.html', obras=obras, custo=custo)
+
+@custos_bp.route('/deletar/<int:custo_id>', methods=['POST'])
+@login_required
+def deletar_custo(custo_id):
+    """Deletar um custo."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    custo = CustoObra.query.filter_by(id=custo_id, admin_id=current_user.id).first_or_404()
+    
+    try:
+        descricao = custo.descricao
+        valor = custo.valor
+        
+        db.session.delete(custo)
+        db.session.commit()
+        
+        logger.info(f"✅ Custo deletado: {descricao} - R$ {valor}")
+        flash('Custo deletado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao deletar custo: {e}")
+        flash(f'Erro ao deletar custo: {str(e)}', 'danger')
+    
+    return redirect(url_for('custos.listar_custos'))
+
+@custos_bp.route('/listar')
+@login_required
+def listar_custos():
+    """Listar todos os custos com filtros avançados."""
+    if not verificar_schema_custos():
+        flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
+        return redirect(url_for('main.index'))
+    
+    # Filtros
+    obra_id = request.args.get('obra_id', type=int)
+    tipo = request.args.get('tipo')
+    data_inicio = request.args.get('data_inicio')
+    data_fim = request.args.get('data_fim')
+    
+    # Query base
+    query = CustoObra.query.filter_by(admin_id=current_user.id)
+    
+    # Aplicar filtros
+    if obra_id:
+        query = query.filter_by(obra_id=obra_id)
+    if tipo:
+        query = query.filter_by(tipo=tipo)
+    if data_inicio:
+        query = query.filter(CustoObra.data >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
+    if data_fim:
+        query = query.filter(CustoObra.data <= datetime.strptime(data_fim, '%Y-%m-%d').date())
+    
+    # Ordenar por data decrescente
+    custos = query.order_by(desc(CustoObra.data)).all()
+    
+    # Dados para filtros
+    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
+    tipos = ['mao_obra', 'material', 'veiculo', 'servico', 'alimentacao']
+    
+    # Estatísticas
+    total_custos = sum(c.valor for c in custos)
+    
+    return render_template('custos/listar.html', 
+                         custos=custos, 
+                         obras=obras, 
+                         tipos=tipos,
+                         total_custos=total_custos,
+                         filtros={
+                             'obra_id': obra_id, 
+                             'tipo': tipo, 
+                             'data_inicio': data_inicio, 
+                             'data_fim': data_fim
+                         })

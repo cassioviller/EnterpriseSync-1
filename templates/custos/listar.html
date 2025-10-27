@@ -1,0 +1,197 @@
+{% extends "base_completo.html" %}
+{% block title %}Listagem de Custos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-list text-primary me-2"></i>
+            Listagem de Custos
+        </h1>
+        <a href="{{ url_for('custos.criar_custo') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Novo Custo
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-filter me-2"></i>Filtros</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Obra</label>
+                        <select name="obra_id" class="form-select">
+                            <option value="">Todas</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if filtros.obra_id == obra.id %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tipo</label>
+                        <select name="tipo" class="form-select">
+                            <option value="">Todos</option>
+                            {% for tipo in tipos %}
+                            <option value="{{ tipo }}" {% if filtros.tipo == tipo %}selected{% endif %}>
+                                {{ tipo.replace('_', ' ').title() }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Data Início</label>
+                        <input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio or '' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Data Fim</label>
+                        <input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim or '' }}">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1">
+                            <i class="fas fa-search me-1"></i> Filtrar
+                        </button>
+                        <a href="{{ url_for('custos.listar_custos') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total de Custos
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(total_custos or 0) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Quantidade
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ custos|length }} custo(s)
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-list fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Custos -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Obra</th>
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Fornecedor</th>
+                            <th class="text-end">Valor</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for custo in custos %}
+                        <tr>
+                            <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ custo.obra.nome }}</td>
+                            <td>
+                                <span class="badge bg-primary">
+                                    {{ custo.tipo.replace('_', ' ').title() }}
+                                </span>
+                            </td>
+                            <td>{{ custo.descricao }}</td>
+                            <td>{{ custo.fornecedor or '-' }}</td>
+                            <td class="text-end font-weight-bold">R$ {{ "{:,.2f}".format(custo.valor) }}</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('custos.editar_custo', custo_id=custo.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteModal{{ custo.id }}"
+                                        title="Deletar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+
+                        <!-- Modal de Deleção -->
+                        <div class="modal fade" id="deleteModal{{ custo.id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ custo.id }}" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="deleteModalLabel{{ custo.id }}">Confirmar Deleção</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p>Tem certeza que deseja deletar este custo?</p>
+                                        <div class="alert alert-warning">
+                                            <strong>{{ custo.descricao }}</strong><br>
+                                            Valor: R$ {{ "{:,.2f}".format(custo.valor) }}<br>
+                                            Data: {{ custo.data.strftime('%d/%m/%Y') }}
+                                        </div>
+                                        <p class="text-danger"><strong>Esta ação não pode ser desfeita!</strong></p>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <form action="{{ url_for('custos.deletar_custo', custo_id=custo.id) }}" method="POST" style="display: inline;">
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="fas fa-trash me-1"></i> Deletar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <i class="fas fa-inbox fa-3x text-muted mb-3 d-block"></i>
+                                <p class="text-muted">Nenhum custo encontrado.</p>
+                                <a href="{{ url_for('custos.criar_custo') }}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-1"></i> Criar Primeiro Custo
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

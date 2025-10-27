@@ -5,7 +5,18 @@
 <div class="container-fluid">
     <!-- Header -->
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Dashboard de Custos</h1>
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-dollar-sign text-success me-2"></i>
+            Dashboard de Custos
+        </h1>
+        <div>
+            <a href="{{ url_for('custos.criar_custo') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Novo Custo
+            </a>
+            <a href="{{ url_for('custos.listar_custos') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-1"></i> Ver Todos
+            </a>
+        </div>
     </div>
 
     <!-- KPIs Row -->

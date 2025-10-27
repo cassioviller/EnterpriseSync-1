@@ -430,5 +430,181 @@ def gerar_contas_receber_proposta(data: dict, admin_id: int):
         db.session.rollback()
 
 
+# ================================
+# HANDLER: FOLHA DE PAGAMENTO PROCESSADA
+# ================================
+
+@event_handler('folha_processada')
+def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
+    """
+    Cria lançamento contábil automaticamente quando a folha é processada.
+    
+    Lançamento:
+    D - 5.1.01.001 - Despesas com Pessoal (Total Proventos)
+    C - 2.1.03.001 - Salários a Pagar (Salário Líquido)
+    C - 2.1.03.002 - INSS a Recolher (INSS Descontado)
+    C - 2.1.03.003 - IRRF a Recolher (IRRF Descontado)
+    C - 2.1.03.004 - FGTS a Recolher (FGTS)
+    """
+    try:
+        from models import (db, FolhaPagamento, LancamentoContabil, PartidaContabil, 
+                           PlanoContas, Funcionario)
+        from datetime import datetime
+        
+        folha_id = data.get('folha_id')
+        if not folha_id:
+            logger.warning("⚠️ folha_id não fornecido no evento folha_processada")
+            return
+        
+        logger.info(f"📊 Criando lançamento contábil para folha {folha_id}")
+        
+        # SEGURANÇA: Buscar folha com filtro de admin_id
+        folha = FolhaPagamento.query.filter_by(id=folha_id, admin_id=admin_id).first()
+        if not folha:
+            logger.error(f"❌ Folha {folha_id} não encontrada ou sem permissão para admin {admin_id}")
+            return
+        
+        # SEGURANÇA: Buscar funcionário com filtro de admin_id
+        funcionario = Funcionario.query.filter_by(id=folha.funcionario_id, admin_id=admin_id).first()
+        if not funcionario:
+            logger.error(f"❌ Funcionário {folha.funcionario_id} não encontrado ou sem permissão para admin {admin_id}")
+            return
+        
+        # Buscar contas do plano de contas
+        conta_despesa_pessoal = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='5.1.01.001',
+            ativo=True
+        ).first()
+        
+        conta_salarios_pagar = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='2.1.03.001',
+            ativo=True
+        ).first()
+        
+        conta_inss_recolher = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='2.1.03.002',
+            ativo=True
+        ).first()
+        
+        conta_irrf_recolher = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='2.1.03.003',
+            ativo=True
+        ).first()
+        
+        conta_fgts_recolher = PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo='2.1.03.004',
+            ativo=True
+        ).first()
+        
+        # Validar se contas essenciais existem
+        if not conta_despesa_pessoal or not conta_salarios_pagar:
+            logger.warning(f"⚠️ Plano de contas incompleto para admin {admin_id}. Lançamento não criado.")
+            logger.warning(f"   Despesa Pessoal: {'OK' if conta_despesa_pessoal else 'FALTA'}")
+            logger.warning(f"   Salários a Pagar: {'OK' if conta_salarios_pagar else 'FALTA'}")
+            return
+        
+        # Verificar se já existe lançamento para esta folha
+        lancamento_existente = LancamentoContabil.query.filter_by(
+            admin_id=admin_id,
+            origem='FOLHA_PAGAMENTO',
+            origem_id=folha_id
+        ).first()
+        
+        if lancamento_existente:
+            logger.info(f"ℹ️ Lançamento já existe para folha {folha_id} (ID {lancamento_existente.id})")
+            return
+        
+        # Criar cabeçalho do lançamento
+        mes_ref = folha.mes_referencia.strftime('%B/%Y')
+        lancamento = LancamentoContabil(
+            admin_id=admin_id,
+            data_lancamento=folha.mes_referencia,
+            historico=f"Folha de Pagamento - {funcionario.nome} - {mes_ref}",
+            origem='FOLHA_PAGAMENTO',
+            origem_id=folha_id
+        )
+        db.session.add(lancamento)
+        db.session.flush()  # Gerar ID do lançamento
+        
+        # Criar partidas
+        partidas_criadas = 0
+        
+        # DÉBITO: Despesas com Pessoal (Total Proventos)
+        partida_debito = PartidaContabil(
+            lancamento_id=lancamento.id,
+            conta_codigo=conta_despesa_pessoal.codigo,
+            tipo_partida='DEBITO',
+            valor=folha.total_proventos or 0,
+            historico_complementar=f"Despesas com pessoal - {funcionario.nome}"
+        )
+        db.session.add(partida_debito)
+        partidas_criadas += 1
+        
+        # CRÉDITO: Salários a Pagar (Salário Líquido)
+        partida_credito_salario = PartidaContabil(
+            lancamento_id=lancamento.id,
+            conta_codigo=conta_salarios_pagar.codigo,
+            tipo_partida='CREDITO',
+            valor=folha.salario_liquido or 0,
+            historico_complementar=f"Salário líquido a pagar - {funcionario.nome}"
+        )
+        db.session.add(partida_credito_salario)
+        partidas_criadas += 1
+        
+        # CRÉDITO: INSS a Recolher (se houver)
+        if (folha.inss or 0) > 0 and conta_inss_recolher:
+            partida_credito_inss = PartidaContabil(
+                lancamento_id=lancamento.id,
+                conta_codigo=conta_inss_recolher.codigo,
+                tipo_partida='CREDITO',
+                valor=folha.inss,
+                historico_complementar=f"INSS descontado - {funcionario.nome}"
+            )
+            db.session.add(partida_credito_inss)
+            partidas_criadas += 1
+        
+        # CRÉDITO: IRRF a Recolher (se houver)
+        if (folha.irrf or 0) > 0 and conta_irrf_recolher:
+            partida_credito_irrf = PartidaContabil(
+                lancamento_id=lancamento.id,
+                conta_codigo=conta_irrf_recolher.codigo,
+                tipo_partida='CREDITO',
+                valor=folha.irrf,
+                historico_complementar=f"IRRF descontado - {funcionario.nome}"
+            )
+            db.session.add(partida_credito_irrf)
+            partidas_criadas += 1
+        
+        # CRÉDITO: FGTS a Recolher (se houver)
+        if (folha.fgts or 0) > 0 and conta_fgts_recolher:
+            partida_credito_fgts = PartidaContabil(
+                lancamento_id=lancamento.id,
+                conta_codigo=conta_fgts_recolher.codigo,
+                tipo_partida='CREDITO',
+                valor=folha.fgts,
+                historico_complementar=f"FGTS - {funcionario.nome}"
+            )
+            db.session.add(partida_credito_fgts)
+            partidas_criadas += 1
+        
+        # Commit
+        db.session.commit()
+        
+        logger.info(f"✅ Lançamento contábil {lancamento.id} criado com {partidas_criadas} partidas")
+        logger.info(f"   Folha: {folha_id} | Funcionário: {funcionario.nome}")
+        logger.info(f"   Total: R$ {folha.total_proventos:,.2f}")
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao criar lançamento contábil para folha {data.get('folha_id')}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 # Log de inicialização
 logger.info(f"✅ Event Manager inicializado - {len(EventManager.list_events())} eventos registrados")

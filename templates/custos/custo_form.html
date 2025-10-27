@@ -1,0 +1,95 @@
+{% extends "base_completo.html" %}
+{% block title %}{% if custo %}Editar{% else %}Novo{% endif %} Custo{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-dollar-sign text-success me-2"></i>
+            {% if custo %}Editar Custo{% else %}Novo Custo{% endif %}
+        </h1>
+        <a href="{{ url_for('custos.listar_custos') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Voltar
+        </a>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="POST">
+                <div class="row g-3">
+                    <!-- Obra -->
+                    <div class="col-md-6">
+                        <label class="form-label">Obra *</label>
+                        <select name="obra_id" class="form-select" required>
+                            <option value="">Selecione uma obra</option>
+                            {% for obra in obras %}
+                            <option value="{{ obra.id }}" {% if custo and custo.obra_id == obra.id %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Tipo -->
+                    <div class="col-md-6">
+                        <label class="form-label">Tipo de Custo *</label>
+                        <select name="tipo" class="form-select" required>
+                            <option value="">Selecione o tipo</option>
+                            <option value="mao_obra" {% if custo and custo.tipo == 'mao_obra' %}selected{% endif %}>Mão de Obra</option>
+                            <option value="material" {% if custo and custo.tipo == 'material' %}selected{% endif %}>Material</option>
+                            <option value="veiculo" {% if custo and custo.tipo == 'veiculo' %}selected{% endif %}>Veículo</option>
+                            <option value="servico" {% if custo and custo.tipo == 'servico' %}selected{% endif %}>Serviço</option>
+                            <option value="alimentacao" {% if custo and custo.tipo == 'alimentacao' %}selected{% endif %}>Alimentação</option>
+                        </select>
+                    </div>
+
+                    <!-- Descrição -->
+                    <div class="col-md-12">
+                        <label class="form-label">Descrição *</label>
+                        <input type="text" name="descricao" class="form-control" 
+                               value="{{ custo.descricao if custo else '' }}" 
+                               placeholder="Ex: Compra de cimento Portland" required>
+                    </div>
+
+                    <!-- Valor -->
+                    <div class="col-md-4">
+                        <label class="form-label">Valor (R$) *</label>
+                        <input type="number" step="0.01" name="valor" class="form-control" 
+                               value="{{ custo.valor if custo else '' }}" 
+                               placeholder="0.00" required>
+                    </div>
+
+                    <!-- Data -->
+                    <div class="col-md-4">
+                        <label class="form-label">Data *</label>
+                        <input type="date" name="data" class="form-control" 
+                               value="{{ custo.data.strftime('%Y-%m-%d') if custo else '' }}" required>
+                    </div>
+
+                    <!-- Fornecedor -->
+                    <div class="col-md-4">
+                        <label class="form-label">Fornecedor</label>
+                        <input type="text" name="fornecedor" class="form-control" 
+                               value="{{ custo.fornecedor if custo else '' }}" 
+                               placeholder="Nome do fornecedor">
+                    </div>
+
+                    <!-- Observações -->
+                    <div class="col-md-12">
+                        <label class="form-label">Observações</label>
+                        <textarea name="observacoes" class="form-control" rows="3" 
+                                  placeholder="Informações adicionais sobre o custo">{{ custo.observacoes if custo else '' }}</textarea>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Salvar
+                    </button>
+                    <a href="{{ url_for('custos.listar_custos') }}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
