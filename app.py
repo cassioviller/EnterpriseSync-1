@@ -14,15 +14,17 @@ logger = logging.getLogger(__name__)
 # Create app instance
 app = Flask(__name__)
 
-# CRITICAL: Configurar secret_key com fallback seguro para evitar erro de sessão
+# 🔒 CRITICAL SECURITY: SESSION_SECRET obrigatório - FAIL FAST se ausente
 secret_key = os.environ.get("SESSION_SECRET")
 if not secret_key:
-    logger.error("❌ SESSION_SECRET não encontrado! Usando fallback temporário.")
-    secret_key = "fallback-dev-key-CHANGE-IN-PRODUCTION"
+    logger.critical("🔒 BLOQUEADOR DE SEGURANÇA: SESSION_SECRET não configurado!")
+    logger.critical("🔒 Multi-tenant requer secret exclusivo. Impossível iniciar.")
+    logger.critical("🔒 Configure SESSION_SECRET no ambiente e reinicie.")
+    raise RuntimeError("SESSION_SECRET obrigatório não encontrado. Abortando por segurança.")
     
 app.secret_key = secret_key
 app.config["SECRET_KEY"] = secret_key  # Garantir ambas as formas
-logger.info(f"✅ Secret key configurado (length: {len(secret_key)})")
+logger.info(f"✅ Secret key configurado com segurança (length: {len(secret_key)})")
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
