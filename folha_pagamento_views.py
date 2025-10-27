@@ -35,18 +35,40 @@ def admin_required(f):
 @folha_bp.route('/dashboard')
 @admin_required
 def dashboard():
-    """Dashboard principal da folha de pagamento"""
+    """Dashboard principal da folha de pagamento com seletor de competência"""
     
-    # Importar modelos e db dentro da função para evitar importação circular
+    from dateutil.relativedelta import relativedelta
     
     # Mês atual
     hoje = date.today()
     mes_atual = hoje.replace(day=1)
     
-    # Obter folhas do mês atual
+    # Gerar lista de competências (últimos 12 meses + próximos 2)
+    competencias = []
+    for i in range(-12, 3):  # De 12 meses atrás até 2 meses à frente
+        mes_comp = mes_atual + relativedelta(months=i)
+        competencias.append({
+            'ano': mes_comp.year,
+            'mes': mes_comp.month,
+            'label': mes_comp.strftime('%B/%Y').capitalize(),
+            'valor': f"{mes_comp.year}-{mes_comp.month:02d}"
+        })
+    
+    # Competência selecionada (padrão: mês atual)
+    comp_selecionada = request.args.get('competencia', f"{mes_atual.year}-{mes_atual.month:02d}")
+    
+    try:
+        ano_sel, mes_sel = map(int, comp_selecionada.split('-'))
+        mes_referencia = date(ano_sel, mes_sel, 1)
+    except (ValueError, AttributeError):
+        # Se competência inválida, usar mês atual
+        mes_referencia = mes_atual
+        comp_selecionada = f"{mes_atual.year}-{mes_atual.month:02d}"
+    
+    # Obter folhas da competência selecionada
     folhas_mes = FolhaPagamento.query.filter_by(
         admin_id=current_user.id,
-        mes_referencia=mes_atual
+        mes_referencia=mes_referencia
     ).all()
     
     # Calcular métricas
@@ -55,7 +77,7 @@ def dashboard():
     total_encargos = sum((f.inss or 0) + (f.fgts or 0) for f in folhas_mes)
     
     # Mês anterior para comparação
-    mes_anterior = (mes_atual - timedelta(days=1)).replace(day=1)
+    mes_anterior = mes_referencia + relativedelta(months=-1)
     folhas_anterior = FolhaPagamento.query.filter_by(
         admin_id=current_user.id,
         mes_referencia=mes_anterior
@@ -65,7 +87,6 @@ def dashboard():
     variacao = ((total_folha - total_anterior) / total_anterior * 100) if total_anterior > 0 else 0
     
     # Status do processamento
-    from models import Funcionario
     funcionarios_ativos = Funcionario.query.filter_by(
         admin_id=current_user.id,
         ativo=True
@@ -80,19 +101,21 @@ def dashboard():
     # Funcionários com mais horas extras
     top_extras = sorted(folhas_mes, key=lambda x: x.horas_extras or 0, reverse=True)[:5]
     
-    # Verificar se parâmetros legais estão configurados
+    # Verificar se parâmetros legais estão configurados para o ano selecionado
     parametros = ParametrosLegais.query.filter_by(
         admin_id=current_user.id,
-        ano_vigencia=hoje.year,
+        ano_vigencia=ano_sel,
         ativo=True
     ).first()
     
     parametros_configurados = parametros is not None
-    if not parametros_configurados:
-        flash('Parâmetros legais não configurados para este ano. Configure antes de processar a folha.', 'warning')
+    if not parametros_configurados and folhas_processadas == 0:
+        flash(f'Parâmetros legais não configurados para {ano_sel}. Configure antes de processar a folha.', 'warning')
     
     return render_template('folha_pagamento/dashboard.html',
-                         mes_referencia=mes_atual,
+                         mes_referencia=mes_referencia,
+                         competencias=competencias,
+                         comp_selecionada=comp_selecionada,
                          total_folha=total_folha,
                          total_liquido=total_liquido,
                          total_encargos=total_encargos,
