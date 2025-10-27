@@ -7,8 +7,12 @@ from sqlalchemy import func, JSON, Column, Integer, String, Text, Float, Boolean
 from enum import Enum
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, relationship, backref
+from functools import lru_cache
+import logging
 import uuid
 import secrets
+
+logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     pass
@@ -1843,6 +1847,33 @@ class ParametrosLegais(db.Model):
         db.Index('idx_parametros_admin_ano', 'admin_id', 'ano_vigencia'),
         db.UniqueConstraint('admin_id', 'ano_vigencia', name='uk_parametros_admin_ano'),
     )
+    
+    @staticmethod
+    @lru_cache(maxsize=128)
+    def get_parametros_cached(admin_id: int, ano: int):
+        """
+        Busca parâmetros legais com cache em memória
+        
+        Cache de 128 entradas (admin_id + ano)
+        Parâmetros legais mudam raramente (uma vez por ano no máximo)
+        
+        Args:
+            admin_id: ID do administrador/tenant
+            ano: Ano de vigência dos parâmetros
+            
+        Returns:
+            ParametrosLegais ou None
+        """
+        return ParametrosLegais.query.filter_by(
+            admin_id=admin_id,
+            ano_vigencia=ano
+        ).first()
+    
+    @staticmethod
+    def invalidar_cache():
+        """Limpa cache de parâmetros legais (usar ao criar/editar)"""
+        ParametrosLegais.get_parametros_cached.cache_clear()
+        logger.info("🔄 Cache de ParametrosLegais invalidado")
 
 
 # ================================
@@ -1901,6 +1932,34 @@ class PlanoContas(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
 
     conta_pai = db.relationship('PlanoContas', remote_side=[codigo])
+    
+    @staticmethod
+    @lru_cache(maxsize=256)
+    def get_conta_cached(admin_id: int, codigo: str):
+        """
+        Busca conta contábil com cache em memória
+        
+        Cache de 256 entradas (admin_id + codigo)
+        Plano de contas muda raramente (setup inicial + ajustes ocasionais)
+        
+        Args:
+            admin_id: ID do administrador/tenant
+            codigo: Código da conta (ex: '1.1.01.001')
+            
+        Returns:
+            PlanoContas ou None
+        """
+        return PlanoContas.query.filter_by(
+            admin_id=admin_id,
+            codigo=codigo,
+            ativo=True
+        ).first()
+    
+    @staticmethod
+    def invalidar_cache():
+        """Limpa cache do plano de contas (usar ao criar/editar)"""
+        PlanoContas.get_conta_cached.cache_clear()
+        logger.info("🔄 Cache de PlanoContas invalidado")
 
 class CentroCustoContabil(db.Model):
     """Centros de Custo para rateio contábil (Obras, Departamentos)."""
@@ -3570,6 +3629,7 @@ class AlmoxarifadoMovimento(db.Model):
     estoque_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_estoque.id'))
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)  # NULL permitido para ENTRADAs
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'))  # Integração com Financeiro
     quantidade = db.Column(db.Numeric(10, 2))
     valor_unitario = db.Column(db.Numeric(10, 2))
     nota_fiscal = db.Column(db.String(50))
@@ -3587,6 +3647,7 @@ class AlmoxarifadoMovimento(db.Model):
     estoque = db.relationship('AlmoxarifadoEstoque', backref='movimentos')
     funcionario = db.relationship('Funcionario', backref='movimentos_almoxarifado')
     obra = db.relationship('Obra', backref='movimentos_almoxarifado')
+    fornecedor = db.relationship('Fornecedor', backref='movimentos_almoxarifado')
     usuario = db.relationship('Usuario', foreign_keys=[usuario_id], backref='movimentos_almoxarifado_criados')
     admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='movimentos_almoxarifado_admin')
     
@@ -3595,6 +3656,7 @@ class AlmoxarifadoMovimento(db.Model):
         db.Index('idx_almox_movimento_tipo', 'tipo_movimento'),
         db.Index('idx_almox_movimento_funcionario', 'funcionario_id'),
         db.Index('idx_almox_movimento_obra', 'obra_id'),
+        db.Index('idx_almox_movimento_fornecedor', 'fornecedor_id'),
         db.Index('idx_almox_movimento_admin', 'admin_id'),
     )
 

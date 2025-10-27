@@ -105,6 +105,9 @@ def criar_plano_contas_padrao(admin_id):
         )
         db.session.add(conta)
     db.session.commit()
+    
+    # Invalidar cache após criação do plano de contas
+    PlanoContas.invalidar_cache()
 
 def get_next_lancamento_numero(admin_id):
     """Obtém o próximo número de lançamento sequencial."""

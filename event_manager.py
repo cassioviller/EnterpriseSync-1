@@ -137,12 +137,225 @@ def lancar_custo_material_obra(data: dict, admin_id: int):
         logger.info(f"✅ Custo de material lançado: R$ {valor_total:.2f} na obra {movimento.obra_id}")
         logger.info(f"   📦 Produto: {produto.nome if produto else movimento.produto_id} | Qtd: {quantidade} | Movimento: {movimento_id}")
         
+        # ✅ NOVO: Criar lançamento contábil (CMV - Custo de Materiais Vendidos)
+        try:
+            from models import LancamentoContabil, PartidaContabil
+            from sqlalchemy import func
+            
+            # Gerar número sequencial do lançamento
+            ultimo_numero = db.session.query(func.max(LancamentoContabil.numero)).filter_by(admin_id=admin_id).scalar()
+            numero_lancamento = (ultimo_numero + 1) if ultimo_numero else 1
+            
+            # Criar lançamento principal
+            lancamento = LancamentoContabil(
+                admin_id=admin_id,
+                numero=numero_lancamento,
+                data_lancamento=movimento.data_movimentacao.date() if movimento.data_movimentacao else datetime.now().date(),
+                historico=f"Saída de material para obra - {produto.nome if produto else 'Material'} (Movimento #{movimento_id})",
+                origem='ALMOXARIFADO_SAIDA',
+                origem_id=movimento_id,
+                valor_total=Decimal(str(valor_total))
+            )
+            db.session.add(lancamento)
+            db.session.flush()  # Gera lancamento.id
+            
+            # PARTIDA 1: DÉBITO - CMV (Despesa)
+            partida_debito = PartidaContabil(
+                admin_id=admin_id,
+                lancamento_id=lancamento.id,
+                conta_codigo='5.1.02.001',  # Custo de Materiais Vendidos (CMV)
+                tipo_partida='DEBITO',
+                valor=Decimal(str(valor_total)),
+                historico_complementar=f"Consumo de material - {produto.nome if produto else 'Material'}",
+                sequencia=1
+            )
+            db.session.add(partida_debito)
+            
+            # PARTIDA 2: CRÉDITO - Estoque (Ativo)
+            partida_credito = PartidaContabil(
+                admin_id=admin_id,
+                lancamento_id=lancamento.id,
+                conta_codigo='1.1.05.001',  # Estoque de Materiais
+                tipo_partida='CREDITO',
+                valor=Decimal(str(valor_total)),
+                historico_complementar=f"Baixa de estoque - Obra: {movimento.obra.nome if movimento and movimento.obra else 'N/A'}",
+                sequencia=2
+            )
+            db.session.add(partida_credito)
+            
+            db.session.commit()
+            logger.info(f"✅ Lançamento contábil CMV criado: ID {lancamento.id} (#{numero_lancamento}) - D: 5.1.02.001 / C: 1.1.05.001 - R$ {valor_total}")
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao criar lançamento contábil saída: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
     except ValueError as e:
         logger.error(f"❌ Erro de validação ao lançar custo de material: {e}")
         db.session.rollback()
     except Exception as e:
         logger.error(f"❌ Erro ao lançar custo de material: {e}", exc_info=True)
         db.session.rollback()
+
+
+@event_handler('material_entrada')
+def criar_conta_pagar_entrada_material(data: dict, admin_id: int):
+    """
+    Handler: Criar conta a pagar quando material entra no estoque com fornecedor
+    
+    Fluxo:
+    1. Buscar movimento de almoxarifado
+    2. Verificar se tem fornecedor_id
+    3. Calcular valor_total (quantidade * valor_unitario)
+    4. Verificar se NF já tem conta criada (evitar duplicação)
+    5. Criar ContaPagar automaticamente
+    
+    Args:
+        data: {movimento_id: int, item_id: int, fornecedor_id: int}
+        admin_id: ID do tenant
+    """
+    try:
+        from models import db, AlmoxarifadoMovimento, ContaPagar, Fornecedor, AlmoxarifadoItem
+        from datetime import datetime, timedelta
+        from decimal import Decimal
+        
+        movimento_id = data.get('movimento_id')
+        
+        if not movimento_id:
+            logger.warning(f"⚠️ movimento_id não fornecido no evento material_entrada")
+            return
+        
+        # Buscar movimento com validação multi-tenant
+        movimento = AlmoxarifadoMovimento.query.filter_by(
+            id=movimento_id,
+            admin_id=admin_id,
+            tipo_movimento='ENTRADA'
+        ).first()
+        
+        if not movimento:
+            logger.error(f"❌ Movimento {movimento_id} não encontrado ou tipo incorreto")
+            return
+        
+        # CRÍTICO: Validar se tem fornecedor
+        if not movimento.fornecedor_id:
+            logger.info(f"⏭️ Movimento {movimento_id}: sem fornecedor, conta a pagar não criada")
+            return
+        
+        # Calcular valor total
+        quantidade = float(movimento.quantidade or 0)
+        valor_unitario = float(movimento.valor_unitario or 0)
+        valor_total = Decimal(str(quantidade * valor_unitario))
+        
+        if valor_total <= 0:
+            logger.warning(f"⚠️ Movimento {movimento_id}: valor zerado, conta não criada")
+            return
+        
+        # EVITAR DUPLICAÇÃO: Verificar se NF já tem conta
+        if movimento.nota_fiscal:
+            conta_existente = ContaPagar.query.filter_by(
+                admin_id=admin_id,
+                fornecedor_id=movimento.fornecedor_id,
+                numero_documento=movimento.nota_fiscal
+            ).first()
+            
+            if conta_existente:
+                logger.info(f"⏭️ Conta a pagar já existe para NF {movimento.nota_fiscal} (ID: {conta_existente.id})")
+                return
+        
+        # ✅ Buscar fornecedor com validação multi-tenant
+        fornecedor = Fornecedor.query.filter_by(
+            id=movimento.fornecedor_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not fornecedor:
+            logger.error(f"❌ Fornecedor {movimento.fornecedor_id} não encontrado ou não pertence ao tenant {admin_id}")
+            return
+        
+        item = AlmoxarifadoItem.query.get(movimento.item_id)
+        
+        # Criar conta a pagar
+        conta = ContaPagar(
+            admin_id=admin_id,
+            fornecedor_id=movimento.fornecedor_id,
+            numero_documento=movimento.nota_fiscal or f"MOV-{movimento_id}",
+            descricao=f"Compra de materiais - {item.nome if item else 'Material'} (Movimento #{movimento_id})",
+            valor_original=valor_total,
+            valor_pago=Decimal('0'),
+            saldo=valor_total,
+            data_emissao=movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date(),
+            data_vencimento=(movimento.data_movimento + timedelta(days=30)).date() if movimento.data_movimento else (datetime.now() + timedelta(days=30)).date(),
+            status='PENDENTE',
+            conta_contabil_codigo='2.1.01.001'
+        )
+        
+        db.session.add(conta)
+        db.session.commit()
+        
+        logger.info(f"✅ Conta a pagar criada: ID {conta.id} - R$ {valor_total} - Fornecedor: {fornecedor.razao_social if fornecedor else movimento.fornecedor_id}")
+        
+        # ✅ NOVO: Criar lançamento contábil (partidas dobradas)
+        try:
+            from models import LancamentoContabil, PartidaContabil
+            from sqlalchemy import func
+            
+            # Gerar número sequencial do lançamento
+            ultimo_numero = db.session.query(func.max(LancamentoContabil.numero)).filter_by(admin_id=admin_id).scalar()
+            numero_lancamento = (ultimo_numero + 1) if ultimo_numero else 1
+            
+            # Criar lançamento principal
+            lancamento = LancamentoContabil(
+                admin_id=admin_id,
+                numero=numero_lancamento,
+                data_lancamento=movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date(),
+                historico=f"Entrada de material - {item.nome if item else 'Material'} (Movimento #{movimento_id})",
+                origem='ALMOXARIFADO_ENTRADA',
+                origem_id=movimento_id,
+                valor_total=valor_total
+            )
+            db.session.add(lancamento)
+            db.session.flush()  # Gera lancamento.id
+            
+            # PARTIDA 1: DÉBITO - Estoque de Materiais (Ativo)
+            partida_debito = PartidaContabil(
+                admin_id=admin_id,
+                lancamento_id=lancamento.id,
+                conta_codigo='1.1.05.001',  # Estoque de Materiais
+                tipo_partida='DEBITO',
+                valor=valor_total,
+                historico_complementar=f"Entrada de material - {item.nome if item else 'Material'}",
+                sequencia=1
+            )
+            db.session.add(partida_debito)
+            
+            # PARTIDA 2: CRÉDITO - Fornecedores a Pagar (Passivo)
+            partida_credito = PartidaContabil(
+                admin_id=admin_id,
+                lancamento_id=lancamento.id,
+                conta_codigo='2.1.01.001',  # Fornecedores a Pagar
+                tipo_partida='CREDITO',
+                valor=valor_total,
+                historico_complementar=f"Compra de material - Fornecedor: {fornecedor.razao_social if fornecedor else movimento.fornecedor_id}",
+                sequencia=2
+            )
+            db.session.add(partida_credito)
+            
+            db.session.commit()
+            logger.info(f"✅ Lançamento contábil criado: ID {lancamento.id} (#{numero_lancamento}) - D: 1.1.05.001 / C: 2.1.01.001 - R$ {valor_total}")
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao criar lançamento contábil entrada: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao criar conta a pagar para movimento {data.get('movimento_id')}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 
 @event_handler('ponto_registrado')

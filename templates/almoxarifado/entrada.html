@@ -106,6 +106,24 @@
                         </div>
 
                         <div class="mb-3">
+                            <label for="fornecedor_id" class="form-label">
+                                <i class="fas fa-truck text-info me-1"></i> Fornecedor
+                            </label>
+                            <select class="form-control" id="fornecedor_id" name="fornecedor_id">
+                                <option value="">Selecione um fornecedor (opcional)</option>
+                                {% for fornecedor in fornecedores %}
+                                <option value="{{ fornecedor.id }}">
+                                    {{ fornecedor.razao_social }} - {{ fornecedor.cnpj }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Opcional. Necessário para gerar conta a pagar automaticamente.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
                             <label for="valor_unitario" class="form-label fw-bold">
                                 <i class="fas fa-dollar-sign text-success me-1"></i> Valor Unitário (R$) *
                             </label>
@@ -228,6 +246,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnLimparCarrinho = document.getElementById('btnLimparCarrinho');
     const btnFinalizarEntrada = document.getElementById('btnFinalizarEntrada');
     const notaFiscalInput = document.getElementById('nota_fiscal');
+    const fornecedorInput = document.getElementById('fornecedor_id');
     const observacoesInput = document.getElementById('observacoes');
     const valorUnitarioInput = document.getElementById('valor_unitario');
 
@@ -399,6 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const notaFiscal = notaFiscalInput.value.trim();
+        const fornecedorId = fornecedorInput.value;
         const observacoes = observacoesInput.value.trim();
         
         btnFinalizarEntrada.disabled = true;
@@ -413,6 +433,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     itens: carrinho,
                     nota_fiscal: notaFiscal,
+                    fornecedor_id: fornecedorId || null,
                     observacoes: observacoes
                 })
             });
@@ -452,6 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function limparFormularioCompleto() {
         limparFormularioItem();
         notaFiscalInput.value = '';
+        fornecedorInput.value = '';
         observacoesInput.value = '';
     }
 

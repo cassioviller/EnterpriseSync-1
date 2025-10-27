@@ -2,9 +2,10 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app import db
 from models import AlmoxarifadoCategoria, AlmoxarifadoItem, AlmoxarifadoEstoque, AlmoxarifadoMovimento
-from models import Funcionario, Obra, Usuario
+from models import Funcionario, Obra, Usuario, Fornecedor
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_
+from event_manager import EventManager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -502,8 +503,9 @@ def entrada():
         return redirect(url_for('main.index'))
     
     itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoItem.nome).all()
+    fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(Fornecedor.razao_social).all()
     
-    return render_template('almoxarifado/entrada.html', itens=itens)
+    return render_template('almoxarifado/entrada.html', itens=itens, fornecedores=fornecedores)
 
 @almoxarifado_bp.route('/api/item/<int:id>')
 @login_required
@@ -555,6 +557,7 @@ def processar_entrada():
         nota_fiscal = request.form.get('nota_fiscal', '').strip()
         observacoes = request.form.get('observacoes', '').strip()
         valor_unitario = request.form.get('valor_unitario', type=float)
+        fornecedor_id = request.form.get('fornecedor_id', type=int)
         
         # Validações básicas
         if not item_id:
@@ -569,6 +572,18 @@ def processar_entrada():
         if not item:
             flash('Item não encontrado', 'danger')
             return redirect(url_for('almoxarifado.entrada'))
+        
+        # ✅ VALIDAÇÃO CRÍTICA DE SEGURANÇA: Se fornecedor_id fornecido, validar que pertence ao tenant
+        if fornecedor_id:
+            fornecedor = Fornecedor.query.filter_by(
+                id=fornecedor_id,
+                admin_id=admin_id
+            ).first()
+            
+            if not fornecedor:
+                logger.warning(f"⚠️ Tentativa de usar fornecedor {fornecedor_id} que não pertence ao tenant {admin_id}")
+                flash('Fornecedor não encontrado ou sem permissão.', 'danger')
+                return redirect(url_for('almoxarifado.entrada'))
         
         # LÓGICA SERIALIZADO vs CONSUMIVEL
         if tipo_controle == 'SERIALIZADO':
@@ -598,6 +613,7 @@ def processar_entrada():
             
             # Criar 1 registro de estoque por série + 1 movimento por série
             movimentos_criados = 0
+            movimentos_ids = []
             for serie in series:
                 estoque = AlmoxarifadoEstoque(
                     item_id=item_id,
@@ -618,14 +634,27 @@ def processar_entrada():
                     nota_fiscal=nota_fiscal,
                     observacao=observacoes,
                     estoque_id=None,
+                    fornecedor_id=fornecedor_id,
                     admin_id=admin_id,
                     usuario_id=current_user.id,
                     obra_id=None
                 )
                 db.session.add(movimento)
+                db.session.flush()
+                movimentos_ids.append(movimento.id)
                 movimentos_criados += 1
             
             db.session.commit()
+            
+            # EMITIR EVENTO para criar conta a pagar (se fornecedor existe)
+            if fornecedor_id:
+                for mov_id in movimentos_ids:
+                    EventManager.emit('material_entrada', {
+                        'movimento_id': mov_id,
+                        'item_id': item_id,
+                        'fornecedor_id': fornecedor_id,
+                    }, admin_id=admin_id)
+            
             flash(f'Entrada processada com sucesso! {movimentos_criados} itens serializados cadastrados.', 'success')
         
         else:  # CONSUMIVEL
@@ -654,6 +683,7 @@ def processar_entrada():
                 nota_fiscal=nota_fiscal,
                 observacao=observacoes,
                 estoque_id=estoque.id,
+                fornecedor_id=fornecedor_id,
                 admin_id=admin_id,
                 usuario_id=current_user.id,
                 obra_id=None
@@ -661,6 +691,15 @@ def processar_entrada():
             db.session.add(movimento)
             
             db.session.commit()
+            
+            # EMITIR EVENTO para criar conta a pagar (se fornecedor existe)
+            if fornecedor_id:
+                EventManager.emit('material_entrada', {
+                    'movimento_id': movimento.id,
+                    'item_id': item_id,
+                    'fornecedor_id': fornecedor_id,
+                }, admin_id=admin_id)
+            
             flash(f'Entrada processada com sucesso! {quantidade} {item.unidade} de "{item.nome}" cadastrados.', 'success')
         
         return redirect(url_for('almoxarifado.entrada'))
@@ -684,9 +723,21 @@ def processar_entrada_multipla():
         itens = data.get('itens', [])
         nota_fiscal = data.get('nota_fiscal', '').strip()
         observacoes = data.get('observacoes', '').strip()
+        fornecedor_id = data.get('fornecedor_id')
         
         if not itens or len(itens) == 0:
             return jsonify({'success': False, 'message': 'Carrinho vazio'}), 400
+        
+        # ✅ VALIDAÇÃO CRÍTICA DE SEGURANÇA: Se fornecedor_id fornecido, validar que pertence ao tenant
+        if fornecedor_id:
+            fornecedor = Fornecedor.query.filter_by(
+                id=fornecedor_id,
+                admin_id=admin_id
+            ).first()
+            
+            if not fornecedor:
+                logger.warning(f"⚠️ Tentativa de usar fornecedor {fornecedor_id} que não pertence ao tenant {admin_id}")
+                return jsonify({'success': False, 'message': 'Fornecedor não encontrado ou sem permissão'}), 403
         
         # ========================================
         # FASE 1: VALIDAÇÃO PRÉVIA COMPLETA
@@ -803,11 +854,21 @@ def processar_entrada_multipla():
                         nota_fiscal=nota_fiscal,
                         observacao=observacoes,
                         estoque_id=None,
+                        fornecedor_id=fornecedor_id,
                         admin_id=admin_id,
                         usuario_id=current_user.id,
                         obra_id=None
                     )
                     db.session.add(movimento)
+                    db.session.flush()
+                    
+                    # Emitir evento se tem fornecedor
+                    if fornecedor_id:
+                        EventManager.emit('material_entrada', {
+                            'movimento_id': movimento.id,
+                            'item_id': item.id,
+                            'fornecedor_id': fornecedor_id,
+                        }, admin_id=admin_id)
                 
                 total_processados += 1
                 
@@ -832,11 +893,22 @@ def processar_entrada_multipla():
                     nota_fiscal=nota_fiscal,
                     observacao=observacoes,
                     estoque_id=estoque.id,
+                    fornecedor_id=fornecedor_id,
                     admin_id=admin_id,
                     usuario_id=current_user.id,
                     obra_id=None
                 )
                 db.session.add(movimento)
+                db.session.flush()
+                
+                # Emitir evento se tem fornecedor
+                if fornecedor_id:
+                    EventManager.emit('material_entrada', {
+                        'movimento_id': movimento.id,
+                        'item_id': item.id,
+                        'fornecedor_id': fornecedor_id,
+                    }, admin_id=admin_id)
+                
                 total_processados += 1
         
         # Commit APENAS se TODOS itens foram processados

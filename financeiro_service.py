@@ -107,6 +107,7 @@ class FinanceiroService:
                 conta.status = 'PARCIAL'
             
             # Atualizar saldo do banco se informado
+            banco = None
             if banco_id:
                 # SEGURANÇA: Validar que banco pertence ao mesmo admin
                 banco = BancoEmpresa.query.filter_by(id=banco_id, admin_id=admin_id).first()
@@ -116,6 +117,63 @@ class FinanceiroService:
                     logger.warning(f"⚠️ Banco {banco_id} não encontrado ou sem permissão para admin {admin_id}")
             
             db.session.commit()
+            
+            # ✅ NOVO: Criar lançamento contábil se conta tem vinculação contábil
+            if conta.conta_contabil_codigo:
+                try:
+                    # Gerar numero sequencial
+                    ultimo_numero = db.session.query(func.max(LancamentoContabil.numero)).filter_by(
+                        admin_id=admin_id
+                    ).scalar() or 0
+                    proximo_numero = ultimo_numero + 1
+                    
+                    # Criar lançamento principal
+                    lancamento = LancamentoContabil(
+                        admin_id=admin_id,
+                        data_lancamento=data_pagamento,
+                        numero=proximo_numero,
+                        historico=f"Pagamento - {conta.descricao}",
+                        origem='FINANCEIRO_PAGAR',
+                        origem_id=conta_id,
+                        valor_total=Decimal(str(valor_pago))
+                    )
+                    db.session.add(lancamento)
+                    db.session.flush()
+                    
+                    # PARTIDA 1: DÉBITO - Despesa (conta contábil vinculada)
+                    partida_debito = PartidaContabil(
+                        admin_id=admin_id,
+                        lancamento_id=lancamento.id,
+                        conta_codigo=conta.conta_contabil_codigo,
+                        tipo_partida='DEBITO',
+                        valor=Decimal(str(valor_pago)),
+                        historico_complementar=f"Pagamento a {conta.fornecedor.razao_social if conta.fornecedor else 'Fornecedor'}",
+                        sequencia=1
+                    )
+                    db.session.add(partida_debito)
+                    
+                    # PARTIDA 2: CRÉDITO - Caixa/Bancos (saída de dinheiro)
+                    partida_credito = PartidaContabil(
+                        admin_id=admin_id,
+                        lancamento_id=lancamento.id,
+                        conta_codigo='1.1.01.001',  # Caixa e Equivalentes
+                        tipo_partida='CREDITO',
+                        valor=Decimal(str(valor_pago)),
+                        historico_complementar=f"Pgto via {banco.nome_banco if banco else 'Banco'}",
+                        sequencia=2
+                    )
+                    db.session.add(partida_credito)
+                    
+                    db.session.commit()
+                    logger.info(f"✅ Lançamento contábil pagamento criado: ID {lancamento.id} (#{proximo_numero}) - D: {conta.conta_contabil_codigo} / C: 1.1.01.001 - R$ {valor_pago}")
+                    
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"❌ Erro ao criar lançamento contábil pagamento: {str(e)}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    # Não interromper fluxo - pagamento já foi baixado
+            
             logger.info(f"✅ Pagamento registrado: Conta {conta_id} - R$ {valor_pago}")
             return conta
             
@@ -222,6 +280,7 @@ class FinanceiroService:
                 conta.status = 'PARCIAL'
             
             # Atualizar saldo do banco se informado
+            banco = None
             if banco_id:
                 # SEGURANÇA: Validar que banco pertence ao mesmo admin
                 banco = BancoEmpresa.query.filter_by(id=banco_id, admin_id=admin_id).first()
@@ -231,6 +290,63 @@ class FinanceiroService:
                     logger.warning(f"⚠️ Banco {banco_id} não encontrado ou sem permissão para admin {admin_id}")
             
             db.session.commit()
+            
+            # ✅ NOVO: Criar lançamento contábil se conta tem vinculação contábil
+            if conta.conta_contabil_codigo:
+                try:
+                    # Gerar numero sequencial
+                    ultimo_numero = db.session.query(func.max(LancamentoContabil.numero)).filter_by(
+                        admin_id=admin_id
+                    ).scalar() or 0
+                    proximo_numero = ultimo_numero + 1
+                    
+                    # Criar lançamento principal
+                    lancamento = LancamentoContabil(
+                        admin_id=admin_id,
+                        data_lancamento=data_recebimento,
+                        numero=proximo_numero,
+                        historico=f"Recebimento - {conta.descricao}",
+                        origem='FINANCEIRO_RECEBER',
+                        origem_id=conta_id,
+                        valor_total=Decimal(str(valor_recebido))
+                    )
+                    db.session.add(lancamento)
+                    db.session.flush()
+                    
+                    # PARTIDA 1: DÉBITO - Caixa/Bancos (entrada de dinheiro)
+                    partida_debito = PartidaContabil(
+                        admin_id=admin_id,
+                        lancamento_id=lancamento.id,
+                        conta_codigo='1.1.01.001',  # Caixa e Equivalentes
+                        tipo_partida='DEBITO',
+                        valor=Decimal(str(valor_recebido)),
+                        historico_complementar=f"Receb. via {banco.nome_banco if banco else 'Banco'}",
+                        sequencia=1
+                    )
+                    db.session.add(partida_debito)
+                    
+                    # PARTIDA 2: CRÉDITO - Receita (conta contábil vinculada)
+                    partida_credito = PartidaContabil(
+                        admin_id=admin_id,
+                        lancamento_id=lancamento.id,
+                        conta_codigo=conta.conta_contabil_codigo,
+                        tipo_partida='CREDITO',
+                        valor=Decimal(str(valor_recebido)),
+                        historico_complementar=f"Recebimento de {conta.cliente_nome or 'Cliente'}",
+                        sequencia=2
+                    )
+                    db.session.add(partida_credito)
+                    
+                    db.session.commit()
+                    logger.info(f"✅ Lançamento contábil recebimento criado: ID {lancamento.id} (#{proximo_numero}) - D: 1.1.01.001 / C: {conta.conta_contabil_codigo} - R$ {valor_recebido}")
+                    
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"❌ Erro ao criar lançamento contábil recebimento: {str(e)}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    # Não interromper fluxo - recebimento já foi baixado
+            
             logger.info(f"✅ Recebimento registrado: Conta {conta_id} - R$ {valor_recebido}")
             return conta
             

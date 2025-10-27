@@ -1943,6 +1943,68 @@ def _migration_46_adicionar_descricao_centro_custo():
         raise
 
 
+def _migration_47_almoxarifado_fornecedor():
+    """Migration 47: Adicionar fornecedor_id em almoxarifado_movimento para integração com financeiro"""
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("MIGRAÇÃO 47: Almoxarifado → Financeiro Integration")
+        logger.info("=" * 80)
+        
+        # Verificar se coluna já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'almoxarifado_movimento' 
+            AND column_name = 'fornecedor_id'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("✅ Coluna fornecedor_id já existe em almoxarifado_movimento")
+        else:
+            logger.info("🔧 Adicionando fornecedor_id a almoxarifado_movimento...")
+            cursor.execute("""
+                ALTER TABLE almoxarifado_movimento
+                ADD COLUMN fornecedor_id INTEGER REFERENCES fornecedor(id)
+            """)
+            logger.info("✅ Coluna fornecedor_id adicionada")
+        
+        # Criar índice
+        cursor.execute("""
+            SELECT indexname 
+            FROM pg_indexes 
+            WHERE tablename = 'almoxarifado_movimento' 
+            AND indexname = 'idx_almox_movimento_fornecedor'
+        """)
+        
+        if not cursor.fetchone():
+            cursor.execute("""
+                CREATE INDEX idx_almox_movimento_fornecedor 
+                ON almoxarifado_movimento(fornecedor_id)
+            """)
+            logger.info("✅ Índice idx_almox_movimento_fornecedor criado")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 47 CONCLUÍDA!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 47: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -1982,6 +2044,7 @@ def executar_migracoes():
             (44, "Adicionar jornada_semanal a funcionario", _migration_44_adicionar_jornada_semanal),
             (45, "Corrigir schema da tabela propostas_comerciais", _migration_45_corrigir_schema_propostas),
             (46, "Adicionar descricao a centro_custo_contabil", _migration_46_adicionar_descricao_centro_custo),
+            (47, "Adicionar fornecedor_id ao almoxarifado_movimento", _migration_47_almoxarifado_fornecedor),
         ]
         
         # Executar cada migração com rastreamento

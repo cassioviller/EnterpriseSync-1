@@ -311,6 +311,9 @@ def criar_parametros():
             db.session.add(parametro)
             db.session.commit()
             
+            # Invalidar cache após modificação
+            ParametrosLegais.invalidar_cache()
+            
             flash(f'Parâmetros legais para {ano_vigencia} criados com sucesso!', 'success')
             return redirect(url_for('folha.parametros_legais'))
             
@@ -374,6 +377,9 @@ def editar_parametros(id):
             
             db.session.commit()
             
+            # Invalidar cache após modificação
+            ParametrosLegais.invalidar_cache()
+            
             flash(f'Parâmetros legais de {parametro.ano_vigencia} atualizados com sucesso!', 'success')
             return redirect(url_for('folha.parametros_legais'))
             
@@ -396,6 +402,9 @@ def toggle_parametros(id):
     
     parametro.ativo = not parametro.ativo
     db.session.commit()
+    
+    # Invalidar cache após modificação
+    ParametrosLegais.invalidar_cache()
     
     status = 'ativado' if parametro.ativo else 'desativado'
     flash(f'Parâmetros de {parametro.ano_vigencia} {status} com sucesso!', 'success')

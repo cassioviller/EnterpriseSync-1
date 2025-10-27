@@ -139,6 +139,10 @@ def criar_plano_contas_padrao(admin_id):
                 contas_criadas += 1
         
         db.session.commit()
+        
+        # Invalidar cache após criação do plano de contas
+        PlanoContas.invalidar_cache()
+        
         logger.info(f"✅ {contas_criadas} contas criadas com sucesso!")
         return contas_criadas
         
