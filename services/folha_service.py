@@ -85,11 +85,16 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
         horas_extras_50 = Decimal('0')  # HE 50% (sábado ou dia útil)
         horas_extras_100 = Decimal('0')  # HE 100% (domingo ou feriado)
         dias_trabalhados = 0
+        total_minutos_atraso = 0  # Somar atrasos do mês
         
         for registro in registros:
             if registro.horas_trabalhadas:
                 total_horas += Decimal(str(registro.horas_trabalhadas))
                 dias_trabalhados += 1
+            
+            # Somar atrasos do registro
+            if registro.total_atraso_minutos:
+                total_minutos_atraso += registro.total_atraso_minutos
             
             if registro.horas_extras:
                 # Verificar tipo de hora extra pelo dia da semana, tipo_registro OU calendário
@@ -141,7 +146,8 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
             'dias_uteis_esperados': dias_uteis_esperados,
             'domingos_feriados': domingos_feriados,
             'sabados': sabados,
-            'faltas': faltas
+            'faltas': faltas,
+            'total_minutos_atraso': total_minutos_atraso
         }
         
     except Exception as e:
@@ -155,7 +161,8 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
             'dias_uteis_esperados': 0,
             'domingos_feriados': 0,
             'sabados': 0,
-            'faltas': 0
+            'faltas': 0,
+            'total_minutos_atraso': 0
         }
 
 
@@ -269,7 +276,14 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
         # Descontar faltas (se houver)
         valor_desconto_faltas = valor_hora_normal * 8 * Decimal(str(horas_info['faltas']))
         
-        salario_bruto = salario_normal + valor_extras + valor_dsr - valor_desconto_faltas
+        # Descontar atrasos (se houver) - converter minutos em horas
+        if horas_info.get('total_minutos_atraso', 0) > 0:
+            horas_atraso = Decimal(str(horas_info['total_minutos_atraso'])) / Decimal('60')
+            valor_desconto_atrasos = valor_hora_normal * horas_atraso
+        else:
+            valor_desconto_atrasos = Decimal('0')
+        
+        salario_bruto = salario_normal + valor_extras + valor_dsr - valor_desconto_faltas - valor_desconto_atrasos
         
         return salario_bruto
         

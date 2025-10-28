@@ -1,0 +1,472 @@
+# 🚀 PROMPT: Finalizar Testes Pendentes do Sistema SIGE v9.0
+
+**Objetivo:** Completar os testes pendentes identificados no relatório de testes, corrigir bugs encontrados e validar todas as integrações do sistema SIGE.
+
+---
+
+## 📊 ANÁLISE DO RELATÓRIO ATUAL
+
+Baseado no **RELATORIO_TESTES_SIGE_v9.0.md**, o sistema está com:
+
+- ✅ **Taxa de sucesso:** 89,4% (42/47 cenários)
+- ✅ **Módulos 100% funcionais:** 7/15 (46,7%)
+- ⚠️ **Módulos com gaps:** 5/15 (33,3%)
+- ❌ **Módulos não testados:** 3/15 (20%)
+
+---
+
+## 🎯 TAREFAS PRIORITÁRIAS
+
+### **PRIORIDADE 1: CORREÇÕES CRÍTICAS** 🔴
+
+#### **1.1 - Validar e Corrigir Descontos de Falta/Atraso**
+
+**Problema Identificado:**
+- Divergência de R$ 174,17 no salário líquido de Setembro
+- Descontos de falta e atraso podem não estar sendo aplicados
+
+**Ação:**
+1. Verificar o código de `calcular_salario_bruto()` em `folha_service.py`
+2. Confirmar se descontos de falta estão sendo aplicados:
+   ```python
+   if horas_info['faltas'] > 0:
+       valor_dia = salario_base / Decimal('30')
+       desconto_faltas = valor_dia * Decimal(str(horas_info['faltas']))
+   ```
+3. Confirmar se descontos de atraso estão sendo aplicados
+4. Reprocessar folha de Setembro/2025 do funcionário "João da Silva"
+5. Validar que o salário líquido está correto
+
+**Valores Esperados (Setembro/2025):**
+- Salário bruto: R$ 2.599,01
+- INSS: R$ 227,92
+- IRRF: R$ 0,00
+- **Salário líquido: R$ 2.371,09**
+
+**Critério de Sucesso:**
+- [ ] Desconto de falta (R$ 83,33) aplicado
+- [ ] Desconto de DSR por falta (R$ 83,33) aplicado
+- [ ] Desconto de atraso (R$ 2,84) aplicado
+- [ ] Salário líquido = R$ 2.371,09
+
+---
+
+#### **1.2 - Inicializar Plano de Contas**
+
+**Problema Identificado:**
+- Contabilidade automática bloqueada
+- Lançamentos contábeis não estão sendo criados
+
+**Ação:**
+1. Acessar `/contabilidade/plano-contas`
+2. Criar as contas padrão necessárias:
+
+**Contas a Criar:**
+
+| Código | Nome | Tipo | Natureza |
+|---|---|---|---|
+| 1.1.1 | Caixa | Ativo | Devedora |
+| 1.1.2 | Bancos | Ativo | Devedora |
+| 1.2.1 | Contas a Receber | Ativo | Devedora |
+| 2.1.1 | Fornecedores | Passivo | Credora |
+| 2.1.2 | Salários a Pagar | Passivo | Credora |
+| 2.1.3 | INSS a Recolher | Passivo | Credora |
+| 2.1.4 | IRRF a Recolher | Passivo | Credora |
+| 2.1.5 | FGTS a Recolher | Passivo | Credora |
+| 3.1.1 | Despesas com Pessoal | Despesa | Devedora |
+| 3.1.2 | Despesas com Materiais | Despesa | Devedora |
+| 3.1.3 | Despesas com Serviços | Despesa | Devedora |
+| 4.1.1 | Receitas de Serviços | Receita | Credora |
+
+3. Após criar, reprocessar folha de Outubro/2025
+4. Verificar se lançamento contábil foi criado automaticamente
+5. Validar partidas dobradas (débito = crédito)
+
+**Critério de Sucesso:**
+- [ ] 12 contas criadas no Plano de Contas
+- [ ] Lançamento contábil criado ao processar folha
+- [ ] Partidas dobradas corretas
+- [ ] Evento `folha_processada` dispara handler
+
+---
+
+### **PRIORIDADE 2: CRIAR DADOS DE TESTE COMPLETOS** 🟡
+
+#### **2.1 - Almoxarifado**
+
+**Status Atual:** 0 movimentos
+
+**Ação:**
+1. Criar **5 categorias** de materiais:
+   - Materiais de Construção
+   - Ferramentas
+   - EPIs
+   - Elétrica
+   - Hidráulica
+
+2. Criar **10 itens** de estoque:
+   - Cimento (50 sacos)
+   - Areia (10 m³)
+   - Brita (5 m³)
+   - Tijolo (1000 unidades)
+   - Martelo (5 unidades)
+   - Capacete (20 unidades)
+   - Luva (50 pares)
+   - Fio elétrico (100 metros)
+   - Cano PVC (50 metros)
+   - Joelho PVC (30 unidades)
+
+3. Criar **5 entradas** de materiais:
+   - Fornecedor: "Construmax Ltda"
+   - Nota fiscal: NF-001 a NF-005
+   - Valores variados (R$ 500 a R$ 5.000)
+
+4. Criar **5 saídas** de materiais para obras:
+   - Obra: "Residencial Jardim das Flores"
+   - Requisitante: Funcionários cadastrados
+   - Materiais variados
+
+**Critério de Sucesso:**
+- [ ] 5 categorias criadas
+- [ ] 10 itens criados
+- [ ] 5 entradas registradas
+- [ ] 5 saídas registradas
+- [ ] Estoque atualizado corretamente
+
+---
+
+#### **2.2 - Financeiro**
+
+**Status Atual:** 0 contas a pagar, 0 contas a receber
+
+**Ação:**
+1. Criar **5 fornecedores**:
+   - Construmax Ltda (CNPJ: 12.345.678/0001-90)
+   - Materiais São José (CNPJ: 98.765.432/0001-10)
+   - Ferragens Central (CNPJ: 11.222.333/0001-44)
+   - Elétrica Silva (CNPJ: 55.666.777/0001-88)
+   - Hidráulica Santos (CNPJ: 99.888.777/0001-66)
+
+2. Criar **10 contas a pagar**:
+   - Fornecedores variados
+   - Valores: R$ 500 a R$ 10.000
+   - Vencimentos: Setembro e Outubro 2025
+   - Status: 5 pendentes, 3 pagas, 2 vencidas
+
+3. Criar **5 clientes**:
+   - João Carlos Silva (CPF: 123.456.789-00)
+   - Maria Oliveira Santos (CPF: 987.654.321-00)
+   - Empresa ABC Ltda (CNPJ: 22.333.444/0001-55)
+   - Construtora XYZ (CNPJ: 66.777.888/0001-99)
+   - Imobiliária Boa Vista (CNPJ: 44.555.666/0001-77)
+
+4. Criar **10 contas a receber**:
+   - Clientes variados
+   - Valores: R$ 1.000 a R$ 50.000
+   - Vencimentos: Setembro e Outubro 2025
+   - Status: 6 pendentes, 3 recebidas, 1 vencida
+
+**Critério de Sucesso:**
+- [ ] 5 fornecedores criados
+- [ ] 10 contas a pagar criadas
+- [ ] 5 clientes criados
+- [ ] 10 contas a receber criadas
+- [ ] Dashboard financeiro exibe dados corretos
+
+---
+
+#### **2.3 - Propostas Comerciais**
+
+**Status Atual:** 0 propostas
+
+**Ação:**
+1. Criar **5 propostas** comerciais:
+   - Cliente: Clientes cadastrados no financeiro
+   - Serviço: Construção, Reforma, Manutenção
+   - Valor: R$ 10.000 a R$ 200.000
+   - Status: 2 pendentes, 2 aprovadas, 1 recusada
+
+2. Para propostas aprovadas:
+   - Verificar se obra foi criada automaticamente
+   - Verificar se conta a receber foi criada
+
+**Critério de Sucesso:**
+- [ ] 5 propostas criadas
+- [ ] 2 obras criadas automaticamente
+- [ ] 2 contas a receber criadas automaticamente
+- [ ] Integração Proposta → Obra → Financeiro funcionando
+
+---
+
+### **PRIORIDADE 3: TESTAR INTEGRAÇÕES NÃO VALIDADAS** 🟢
+
+#### **3.1 - Almoxarifado → Custos**
+
+**Ação:**
+1. Registrar saída de material para obra
+2. Verificar se custo foi criado automaticamente na obra
+3. Validar valor do custo (quantidade × valor unitário)
+4. Validar categoria do custo
+
+**Critério de Sucesso:**
+- [ ] Saída de material cria custo automaticamente
+- [ ] Valor do custo está correto
+- [ ] Obra associada corretamente
+- [ ] Categoria "Material" aplicada
+
+---
+
+#### **3.2 - Almoxarifado → Financeiro**
+
+**Ação:**
+1. Registrar entrada de material com fornecedor
+2. Verificar se conta a pagar foi criada automaticamente
+3. Validar valor da conta (total da nota fiscal)
+4. Validar fornecedor associado
+
+**Critério de Sucesso:**
+- [ ] Entrada de material cria conta a pagar
+- [ ] Valor da conta está correto
+- [ ] Fornecedor associado corretamente
+- [ ] Vencimento preenchido
+
+---
+
+#### **3.3 - Financeiro → Contabilidade**
+
+**Ação:**
+1. Pagar uma conta a pagar
+2. Verificar se lançamento contábil foi criado
+3. Validar partidas dobradas:
+   - **D** - Fornecedores (passivo diminui)
+   - **C** - Caixa/Banco (ativo diminui)
+
+4. Receber uma conta a receber
+5. Verificar se lançamento contábil foi criado
+6. Validar partidas dobradas:
+   - **D** - Caixa/Banco (ativo aumenta)
+   - **C** - Contas a Receber (ativo diminui)
+
+**Critério de Sucesso:**
+- [ ] Pagamento cria lançamento contábil
+- [ ] Recebimento cria lançamento contábil
+- [ ] Partidas dobradas corretas em ambos
+- [ ] Contas contábeis corretas
+
+---
+
+### **PRIORIDADE 4: TESTAR MÓDULOS NÃO TESTADOS** 🔵
+
+#### **4.1 - RDO (Relatório Diário de Obra)**
+
+**Ação:**
+1. Criar **3 RDOs** para obras diferentes
+2. Adicionar subatividades (ex: "Alvenaria", "Concretagem")
+3. Registrar mão de obra (funcionários alocados)
+4. Registrar equipamentos utilizados
+5. Listar RDOs por obra
+6. Filtrar RDOs por período
+
+**Critério de Sucesso:**
+- [ ] 3 RDOs criados
+- [ ] Subatividades adicionadas
+- [ ] Mão de obra registrada
+- [ ] Equipamentos registrados
+- [ ] Listagem e filtros funcionando
+
+---
+
+#### **4.2 - Alimentação**
+
+**Ação:**
+1. Registrar **20 refeições** para funcionários
+2. Distribuir entre Setembro e Outubro 2025
+3. Associar a obras diferentes
+4. Calcular custo total por funcionário
+5. Calcular custo total por obra
+6. Gerar relatório de alimentação
+
+**Critério de Sucesso:**
+- [ ] 20 refeições registradas
+- [ ] Custos por funcionário corretos
+- [ ] Custos por obra corretos
+- [ ] Relatório gerado com sucesso
+
+---
+
+#### **4.3 - Frota (Aprofundar)**
+
+**Ação:**
+1. Criar **3 veículos** adicionais
+2. Registrar **10 usos** de veículos em obras
+3. Registrar **5 abastecimentos** com custos
+4. Registrar **2 manutenções**
+5. Calcular custo total por veículo
+6. Gerar relatório de frota
+
+**Critério de Sucesso:**
+- [ ] 4 veículos cadastrados (total)
+- [ ] 10 usos registrados
+- [ ] 5 abastecimentos registrados
+- [ ] 2 manutenções registradas
+- [ ] Custos calculados corretamente
+- [ ] Relatório gerado
+
+---
+
+### **PRIORIDADE 5: VALIDAÇÕES E SEGURANÇA** 🔒
+
+#### **5.1 - Validações de Formulário**
+
+**Ação:**
+Testar validações em todos os formulários:
+
+1. **CPF/CNPJ:**
+   - [ ] Tentar cadastrar funcionário com CPF inválido
+   - [ ] Tentar cadastrar fornecedor com CNPJ inválido
+
+2. **Datas:**
+   - [ ] Tentar criar folha com data futura
+   - [ ] Tentar registrar ponto com data futura
+
+3. **Valores Numéricos:**
+   - [ ] Tentar criar conta com valor negativo
+   - [ ] Tentar criar salário com valor zero
+
+4. **Campos Obrigatórios:**
+   - [ ] Tentar criar funcionário sem nome
+   - [ ] Tentar criar obra sem código
+
+**Critério de Sucesso:**
+- [ ] Todas as validações funcionando
+- [ ] Mensagens de erro claras
+- [ ] Formulário não submete dados inválidos
+
+---
+
+#### **5.2 - Permissões de Acesso**
+
+**Ação:**
+1. Criar usuário **Funcionário** (não admin)
+2. Tentar acessar:
+   - [ ] Dashboard principal (deve bloquear)
+   - [ ] Perfil próprio (deve permitir)
+   - [ ] Dados de outros funcionários (deve bloquear)
+   - [ ] Folha de pagamento (deve bloquear)
+
+3. Criar usuário **Gestor de Equipes**
+4. Tentar acessar:
+   - [ ] Equipe (deve permitir)
+   - [ ] Ponto (deve permitir)
+   - [ ] Financeiro (deve bloquear)
+
+**Critério de Sucesso:**
+- [ ] Permissões corretas por tipo de usuário
+- [ ] Redirecionamento para login quando não autorizado
+- [ ] Mensagens de erro apropriadas
+
+---
+
+### **PRIORIDADE 6: PERFORMANCE E OTIMIZAÇÃO** ⚡
+
+#### **6.1 - Teste de Carga**
+
+**Ação:**
+1. Criar **100 funcionários** adicionais
+2. Criar **500 registros de ponto** para Outubro/2025
+3. Processar folha de Outubro com 105 funcionários
+4. Medir tempo de processamento
+5. Verificar uso de memória
+
+**Critério de Sucesso:**
+- [ ] Processamento completa em < 30 segundos
+- [ ] Sem erros de memória
+- [ ] Queries otimizadas (sem N+1)
+
+---
+
+#### **6.2 - Cache de Feriados**
+
+**Ação:**
+1. Verificar se `CalendarioUtil` está cacheando feriados
+2. Processar folha de 10 funcionários
+3. Verificar logs: deve buscar feriados apenas 1 vez
+4. Implementar cache se necessário
+
+**Critério de Sucesso:**
+- [ ] Feriados buscados apenas 1 vez por ano
+- [ ] Redução de 20% no tempo de processamento
+
+---
+
+## 📋 CHECKLIST FINAL DE VALIDAÇÃO
+
+Após completar todas as tarefas, validar:
+
+### **Módulos 100% Funcionais:**
+- [ ] Dashboard Principal
+- [ ] RH (Funcionários, Departamentos, Funções)
+- [ ] Obras
+- [ ] Equipe
+- [ ] Ponto Eletrônico
+- [ ] RDO
+- [ ] Frota
+- [ ] Alimentação
+- [ ] Almoxarifado
+- [ ] Financeiro
+- [ ] Custos
+- [ ] Contabilidade
+- [ ] Folha de Pagamento
+- [ ] Propostas Comerciais
+- [ ] Configurações
+
+### **Integrações 100% Funcionais:**
+- [ ] Folha → Contabilidade
+- [ ] Financeiro → Contabilidade
+- [ ] Almoxarifado → Custos
+- [ ] Almoxarifado → Financeiro
+- [ ] Propostas → Obras → Financeiro
+- [ ] Ponto → Folha
+
+### **Validações e Segurança:**
+- [ ] Multi-tenancy testado
+- [ ] Validações de formulário testadas
+- [ ] Permissões de acesso testadas
+- [ ] Rotas protegidas validadas
+
+### **Performance:**
+- [ ] Dashboards < 2s
+- [ ] Problema N+1 resolvido
+- [ ] Teste de carga com 100+ funcionários
+- [ ] Cache implementado
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+Após executar este prompt, o sistema deve atingir:
+
+✅ **Taxa de sucesso:** 95%+  
+✅ **Módulos 100% funcionais:** 15/15 (100%)  
+✅ **Integrações validadas:** 6/6 (100%)  
+✅ **Dados de teste completos:** Todos os módulos  
+✅ **Status:** **PRONTO PARA PRODUÇÃO**  
+
+---
+
+## 📊 RELATÓRIO FINAL
+
+Após completar os testes, gerar um **novo relatório** com:
+
+1. Status atualizado de cada módulo
+2. Resultados dos testes de integração
+3. Bugs encontrados e corrigidos
+4. Métricas de performance
+5. Conclusão final com confiança de deploy
+
+**Formato:** Markdown (mesmo formato do relatório anterior)
+
+---
+
+**Pronto para finalizar os testes e levar o sistema a 100%!** 🚀
+
