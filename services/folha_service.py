@@ -7,7 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Dict, Optional
 from sqlalchemy import extract, func
-from models import db, Funcionario, RegistroPonto, ParametrosLegais, ConfiguracaoSalarial, BeneficioFuncionario
+from models import db, Funcionario, RegistroPonto, ParametrosLegais, ConfiguracaoSalarial, BeneficioFuncionario, CalendarioUtil
 from utils import calcular_valor_hora_periodo
 
 
@@ -58,6 +58,22 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
         }
     """
     try:
+        import calendar
+        from datetime import timedelta
+        
+        # PRÉ-CARREGAR feriados do mês (otimização N+1)
+        primeiro_dia = date(ano, mes, 1)
+        ultimo_dia = date(ano, mes, calendar.monthrange(ano, mes)[1])
+        
+        feriados_calendario = CalendarioUtil.query.filter(
+            CalendarioUtil.data >= primeiro_dia,
+            CalendarioUtil.data <= ultimo_dia,
+            CalendarioUtil.eh_feriado == True
+        ).all()
+        
+        # Criar set de datas de feriados para lookup O(1)
+        datas_feriados = {f.data for f in feriados_calendario}
+        
         # Buscar registros de ponto do mês
         registros = RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario_id,
@@ -76,23 +92,22 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
                 dias_trabalhados += 1
             
             if registro.horas_extras:
-                # Verificar tipo de hora extra pelo dia da semana ou tipo_registro
+                # Verificar tipo de hora extra pelo dia da semana, tipo_registro OU calendário
                 dia_semana = registro.data.weekday()
                 tipo = registro.tipo_registro or ''
                 
-                # HE 100%: Domingo OU Feriado
-                if dia_semana == 6 or 'domingo' in tipo.lower() or 'feriado' in tipo.lower():
+                # Verificar se é feriado no calendário (lookup O(1) em set)
+                eh_feriado_calendario = registro.data in datas_feriados
+                
+                # HE 100%: Domingo OU Feriado (tipo_registro OU calendário)
+                if dia_semana == 6 or 'domingo' in tipo.lower() or 'feriado' in tipo.lower() or eh_feriado_calendario:
                     horas_extras_100 += Decimal(str(registro.horas_extras))
                 else:
                     # HE 50%: Sábado ou dia útil
                     horas_extras_50 += Decimal(str(registro.horas_extras))
         
         # Calcular dias úteis CORRETAMENTE (contando calendário real)
-        import calendar
-        from datetime import date, timedelta
-        
-        primeiro_dia = date(ano, mes, 1)
-        ultimo_dia = date(ano, mes, calendar.monthrange(ano, mes)[1])
+        # Já temos primeiro_dia, ultimo_dia e datas_feriados carregados acima
         
         dias_uteis_esperados = 0
         domingos_feriados = 0
@@ -100,11 +115,14 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
         dia_atual = primeiro_dia
         
         while dia_atual <= ultimo_dia:
-            if dia_atual.weekday() == 6:  # Domingo
+            # Verificar se é feriado (lookup O(1) em set)
+            eh_feriado = dia_atual in datas_feriados
+            
+            if dia_atual.weekday() == 6 or eh_feriado:  # Domingo OU Feriado
                 domingos_feriados += 1
             elif dia_atual.weekday() == 5:  # Sábado
                 sabados += 1
-            else:  # Segunda a sexta
+            else:  # Segunda a sexta (exceto feriados)
                 dias_uteis_esperados += 1
             dia_atual += timedelta(days=1)
         

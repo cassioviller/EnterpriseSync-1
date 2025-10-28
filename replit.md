@@ -30,7 +30,7 @@ The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQ
     -   **Proposal Management:** Reusable templates, automated calculations, PDF generation, history tracking.
     -   **Employee Management:** Registration, automated time clocking, overtime calculations.
     -   **Construction Project Management (RDO):** Control over projects with Daily Work Reports and dynamic service progress.
-    -   **Payroll (Folha de Pagamento):** Automated calculation based on time clock records, competency selector (15 months range), legal parameters validation, and automatic accounting integration.
+    -   **Payroll (Folha de Pagamento):** Automated calculation based on time clock records, competency selector (15 months range), legal parameters validation, and automatic accounting integration. **CLT-compliant overtime differentiation**: HE 50% for Saturdays/weekdays (1.5x pay), HE 100% for Sundays/holidays (2.0x pay) with triple detection (weekday, tipo_registro, CalendarioUtil). Optimized performance with pre-loaded holiday calendar (single query + O(1) lookups).
     -   **Costs Management (Custos):** CRUD for construction costs with multi-tenant security, filters, real-time statistics, and professional UI.
     -   **Accounting (Contabilidade):** Double-entry bookkeeping with automatic journal entries from payroll, chart of accounts, trial balance, and DRE with competency selector.
     -   **Fleet Management System:** Manages vehicles and expenses.
