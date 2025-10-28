@@ -42,11 +42,14 @@ ALIQUOTA_FGTS = Decimal('8.0')
 def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
     """
     Calcula horas trabalhadas no mês baseado nos registros de ponto (CONFORME CLT)
+    DIFERENCIA HE 50% (sábado/dia útil) de HE 100% (domingo/feriado)
     
     Returns:
         dict: {
             'total': float,
-            'extras': float, 
+            'extras': float,
+            'extras_50': float,
+            'extras_100': float,
             'dias_trabalhados': int,
             'dias_uteis_esperados': int,
             'domingos_feriados': int,
@@ -63,7 +66,8 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
         ).all()
         
         total_horas = Decimal('0')
-        horas_extras = Decimal('0')
+        horas_extras_50 = Decimal('0')  # HE 50% (sábado ou dia útil)
+        horas_extras_100 = Decimal('0')  # HE 100% (domingo ou feriado)
         dias_trabalhados = 0
         
         for registro in registros:
@@ -72,7 +76,16 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
                 dias_trabalhados += 1
             
             if registro.horas_extras:
-                horas_extras += Decimal(str(registro.horas_extras))
+                # Verificar tipo de hora extra pelo dia da semana ou tipo_registro
+                dia_semana = registro.data.weekday()
+                tipo = registro.tipo_registro or ''
+                
+                if dia_semana == 6 or 'domingo' in tipo.lower():
+                    # Domingo ou feriado = HE 100%
+                    horas_extras_100 += Decimal(str(registro.horas_extras))
+                else:
+                    # Sábado ou dia útil = HE 50%
+                    horas_extras_50 += Decimal(str(registro.horas_extras))
         
         # Calcular dias úteis CORRETAMENTE (contando calendário real)
         import calendar
@@ -98,9 +111,14 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
         # Calcular faltas (dias úteis esperados - dias trabalhados)
         faltas = max(0, dias_uteis_esperados - dias_trabalhados)
         
+        # Total de extras (compatibilidade)
+        total_extras = horas_extras_50 + horas_extras_100
+        
         return {
             'total': float(total_horas),
-            'extras': float(horas_extras),
+            'extras': float(total_extras),
+            'extras_50': float(horas_extras_50),
+            'extras_100': float(horas_extras_100),
             'dias_trabalhados': dias_trabalhados,
             'dias_uteis_esperados': dias_uteis_esperados,
             'domingos_feriados': domingos_feriados,
@@ -113,6 +131,8 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
         return {
             'total': 0,
             'extras': 0,
+            'extras_50': 0,
+            'extras_100': 0,
             'dias_trabalhados': 0,
             'dias_uteis_esperados': 0,
             'domingos_feriados': 0,
@@ -125,6 +145,7 @@ def calcular_dsr(horas_info: Dict, valor_hora_normal: Decimal) -> Decimal:
     """
     Calcula DSR (Descanso Semanal Remunerado) sobre horas extras
     Conforme Lei 605/49 - Funcionário PERDE DSR em caso de faltas injustificadas
+    CONSIDERA HE 50% E HE 100% SEPARADAMENTE
     
     Args:
         horas_info: Dicionário com informações de horas e dias
@@ -136,7 +157,8 @@ def calcular_dsr(horas_info: Dict, valor_hora_normal: Decimal) -> Decimal:
     try:
         dias_trabalhados = horas_info.get('dias_trabalhados', 0)
         domingos_feriados = horas_info.get('domingos_feriados', 0)
-        horas_extras = horas_info.get('extras', 0)
+        horas_extras_50 = horas_info.get('extras_50', 0)
+        horas_extras_100 = horas_info.get('extras_100', 0)
         faltas = horas_info.get('faltas', 0)
         
         # Se tiver faltas injustificadas, perde DSR proporcional
@@ -146,15 +168,20 @@ def calcular_dsr(horas_info: Dict, valor_hora_normal: Decimal) -> Decimal:
             domingos_perdidos = int(faltas / 6) + (1 if faltas % 6 > 0 else 0)
             domingos_feriados = max(0, domingos_feriados - domingos_perdidos)
         
-        if dias_trabalhados == 0 or domingos_feriados == 0 or horas_extras == 0:
+        if dias_trabalhados == 0 or domingos_feriados == 0:
             return Decimal('0')
         
-        # Calcular valor das horas extras
-        valor_he = valor_hora_normal * Decimal('1.5') * Decimal(str(horas_extras))
+        if horas_extras_50 == 0 and horas_extras_100 == 0:
+            return Decimal('0')
         
-        # DSR = (Valor HE / Dias TRABALHADOS) * Domingos/Feriados
+        # Calcular valor das horas extras (HE 50% e HE 100% separados)
+        valor_he_50 = valor_hora_normal * Decimal('1.5') * Decimal(str(horas_extras_50))
+        valor_he_100 = valor_hora_normal * Decimal('2.0') * Decimal(str(horas_extras_100))
+        valor_he_total = valor_he_50 + valor_he_100
+        
+        # DSR = (Valor HE Total / Dias TRABALHADOS) * Domingos/Feriados
         # CORREÇÃO: Usa dias_trabalhados, não dias_uteis_esperados
-        dsr_sobre_he = (valor_he / Decimal(str(dias_trabalhados))) * Decimal(str(domingos_feriados))
+        dsr_sobre_he = (valor_he_total / Decimal(str(dias_trabalhados))) * Decimal(str(domingos_feriados))
         
         return dsr_sobre_he.quantize(Decimal('0.01'))
         
@@ -206,9 +233,17 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
             # Salário mensal fixo
             salario_normal = salario_base
         
-        # Adicionar horas extras (50% de adicional)
+        # Calcular horas extras (DIFERENCIANDO HE 50% E HE 100%)
         valor_hora_normal = Decimal(str(calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)))
-        valor_extras = valor_hora_normal * Decimal('1.5') * Decimal(str(horas_info['extras']))
+        
+        # HE 50% (sábado ou dia útil)
+        valor_he_50 = valor_hora_normal * Decimal('1.5') * Decimal(str(horas_info.get('extras_50', 0)))
+        
+        # HE 100% (domingo ou feriado)
+        valor_he_100 = valor_hora_normal * Decimal('2.0') * Decimal(str(horas_info.get('extras_100', 0)))
+        
+        # Total de horas extras
+        valor_extras = valor_he_50 + valor_he_100
         
         # Calcular DSR sobre horas extras
         valor_dsr = calcular_dsr(horas_info, valor_hora_normal)
