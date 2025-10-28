@@ -3146,6 +3146,59 @@ def super_admin_dashboard():
                          admins=admins, 
                          total_admins=total_admins)
 
+@main_bp.route('/super-admin/criar-admin', methods=['POST'])
+@super_admin_required
+def criar_admin():
+    """Cria novo administrador (apenas superadmin pode criar)"""
+    try:
+        nome = request.form.get('nome')
+        username = request.form.get('username')
+        email = request.form.get('email')
+        senha = request.form.get('senha')
+        confirmar_senha = request.form.get('confirmar_senha')
+        
+        # Validações
+        if not all([nome, username, email, senha, confirmar_senha]):
+            flash('Todos os campos são obrigatórios.', 'danger')
+            return redirect(url_for('main.super_admin_dashboard'))
+        
+        if senha != confirmar_senha:
+            flash('As senhas não conferem.', 'danger')
+            return redirect(url_for('main.super_admin_dashboard'))
+        
+        # Verificar se email já existe
+        if Usuario.query.filter_by(email=email).first():
+            flash(f'Email {email} já está cadastrado.', 'danger')
+            return redirect(url_for('main.super_admin_dashboard'))
+        
+        # Verificar se username já existe
+        if Usuario.query.filter_by(username=username).first():
+            flash(f'Username {username} já está cadastrado.', 'danger')
+            return redirect(url_for('main.super_admin_dashboard'))
+        
+        # Criar novo admin
+        novo_admin = Usuario(
+            nome=nome,
+            username=username,
+            email=email,
+            password_hash=generate_password_hash(senha),
+            tipo_usuario=TipoUsuario.ADMIN,
+            ativo=True
+        )
+        
+        db.session.add(novo_admin)
+        db.session.commit()
+        
+        flash(f'Administrador {nome} criado com sucesso!', 'success')
+        print(f"✅ SUPER ADMIN: Novo admin criado - {nome} ({email})")
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao criar administrador: {str(e)}', 'danger')
+        print(f"❌ ERRO criar_admin: {e}")
+    
+    return redirect(url_for('main.super_admin_dashboard'))
+
 # ===== FUNCIONÁRIO DASHBOARD =====
 @main_bp.route('/funcionario-dashboard')
 @funcionario_required
