@@ -1,0 +1,213 @@
+Teste 6.1: Registrar Pontos do Mês Completo
+
+Objetivo: Simular registros de ponto de TODO o mês de Outubro/2025 (necessário para processar folha)
+
+⚠️ IMPORTANTE: Para processar a folha de Outubro/2025 corretamente, precisamos registrar pontos de TODO o mês (01/10 a 31/10).
+
+Passos:
+
+OPÇÃO A: Registro Manual Detalhado (Recomendado para teste completo)
+
+1.
+Navegar para /ponto
+
+2.
+Registrar pontos para cada funcionário nos dias úteis de Outubro/2025:
+
+•
+Dias úteis: 01, 02, 03, 06, 07, 08, 09, 10, 13, 14, 15, 16, 17, 20, 21, 22, 23, 24, 27, 28, 29, 30, 31 (23 dias)
+
+•
+Feriados/Finais de semana: 04, 05, 11, 12, 18, 19, 25, 26 (sem registro)
+
+
+
+Para João da Silva (Pedreiro):
+
+•
+Dias 01-10/10: Horário normal (08:00-12:00, 13:00-17:00) - 10 dias
+
+•
+Dia 11/10: Falta justificada (atestado médico)
+
+•
+Dias 13-20/10: Horário normal - 6 dias
+
+•
+Dia 21/10: Atraso de 15 minutos (entrada 08:15)
+
+•
+Dias 22-31/10: Horário normal - 8 dias
+
+•
+Total: 22 dias trabalhados, 1 falta justificada
+
+Para Maria Santos (Servente):
+
+•
+Dias 01-05/10: Horário normal - 4 dias
+
+•
+Dias 06-10/10: Atrasos de 5-10 minutos - 5 dias
+
+•
+Dia 13/10: Falta não justificada
+
+•
+Dias 14-20/10: Horário normal - 5 dias
+
+•
+Dias 21-31/10: Horário normal - 9 dias
+
+•
+Total: 22 dias trabalhados, 1 falta não justificada
+
+Para Pedro Oliveira (Encarregado):
+
+•
+Dias 01-31/10: Todos os dias úteis (23 dias)
+
+•
+Dias 15, 22, 29/10: Horas extras (saída 18:00 - 1h extra cada)
+
+•
+Total: 23 dias trabalhados, 3 horas extras
+
+Para Carlos Souza (Motorista):
+
+•
+Dias 01-31/10: Todos os dias úteis (23 dias)
+
+•
+Horário normal: 08:00-17:00
+
+•
+Total: 23 dias trabalhados
+
+Para Ana Costa (Administrativo):
+
+•
+Dias 01-31/10: Todos os dias úteis (23 dias)
+
+•
+Horário normal: 08:00-17:00
+
+•
+Total: 23 dias trabalhados
+
+
+
+
+OPÇÃO B: Registro em Massa via API/Script (Mais rápido)
+
+Se o sistema tiver endpoint de API ou função de importação em massa:
+
+Python
+
+
+# Script Python para registrar pontos do mês
+import requests
+from datetime import datetime, timedelta
+
+base_url = 'https://sige.cassioviller.tech'
+funcionarios = [
+    {'id': 1, 'nome': 'João da Silva'},
+    {'id': 2, 'nome': 'Maria Santos'},
+    {'id': 3, 'nome': 'Pedro Oliveira'},
+    {'id': 4, 'nome': 'Carlos Souza'},
+    {'id': 5, 'nome': 'Ana Costa'},
+]
+
+# Registrar pontos de 01/10 a 31/10
+for dia in range(1, 32):
+    data = datetime(2025, 10, dia)
+    
+    # Pular finais de semana
+    if data.weekday() >= 5:  # 5=sábado, 6=domingo
+        continue
+    
+    for func in funcionarios:
+        # Registrar 4 pontos (entrada, saída almoço, retorno, saída)
+        pontos = [
+            {'hora': '08:00', 'tipo': 'entrada'},
+            {'hora': '12:00', 'tipo': 'saida_almoco'},
+            {'hora': '13:00', 'tipo': 'retorno_almoco'},
+            {'hora': '17:00', 'tipo': 'saida'},
+        ]
+        
+        for ponto in pontos:
+            requests.post(f'{base_url}/api/ponto/registrar', json={
+                'funcionario_id': func['id'],
+                'data': data.strftime('%Y-%m-%d'),
+                'hora': ponto['hora'],
+                'tipo': ponto['tipo']
+            })
+
+
+
+
+
+OPÇÃO C: Registro Simplificado (Mínimo para teste)
+
+Se tempo for limitado, registre ao menos:
+
+1.
+Semana 1 (01-05/10): 5 dias completos para todos
+
+2.
+Semana 2 (06-10/10): 5 dias com variações (atrasos, horas extras)
+
+3.
+Semana 3 (13-17/10): 5 dias com 1 falta
+
+4.
+Semana 4 (20-24/10): 5 dias normais
+
+5.
+Última semana (27-31/10): 5 dias normais
+
+Total mínimo: 20-23 dias por funcionário
+
+
+
+
+Resultado Esperado:
+
+•
+✅ Pontos registrados para TODO o mês de Outubro/2025
+
+•
+✅ Mínimo de 20 dias úteis por funcionário
+
+•
+✅ Variações incluídas: atrasos, horas extras, faltas
+
+•
+✅ Atrasos calculados automaticamente
+
+•
+✅ Horas extras calculadas
+
+•
+✅ Faltas registradas (justificadas e não justificadas)
+
+•
+✅ Dashboard mostra estatísticas do mês:
+
+•
+Total de horas trabalhadas
+
+•
+Total de atrasos
+
+•
+Total de horas extras
+
+•
+Total de faltas
+
+
+
+•
+✅ Dados prontos para processamento de folha
+

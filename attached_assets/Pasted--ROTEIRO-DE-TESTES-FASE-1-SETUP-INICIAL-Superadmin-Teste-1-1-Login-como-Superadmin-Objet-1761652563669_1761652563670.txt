@@ -1,0 +1,2932 @@
+📋 ROTEIRO DE TESTES
+
+
+
+
+FASE 1: SETUP INICIAL (Superadmin)
+
+Teste 1.1: Login como Superadmin
+
+Objetivo: Acessar painel de superadmin
+
+Passos:
+
+1.
+Navegar para https://sige.cassioviller.tech
+
+2.
+Preencher campo "Email": superadmin@sige.com.br
+
+3.
+Preencher campo "Senha": super123
+
+4.
+Clicar em botão "Entrar"
+
+5.
+Aguardar redirecionamento
+
+Resultado Esperado:
+
+•
+✅ Redirecionado para /super-admin-dashboard
+
+•
+✅ Página exibe "Painel do Superadministrador"
+
+•
+✅ Lista de empresas/admins visível
+
+
+
+
+Teste 1.2: Criar Nova Empresa/Admin
+
+Objetivo: Cadastrar empresa de teste
+
+Passos:
+
+1.
+No dashboard de superadmin, clicar em "Criar Nova Empresa" ou "Adicionar Admin"
+
+2.
+Preencher formulário:
+
+•
+Nome Completo: Admin Teste E2E
+
+•
+Email: admin.teste@empresateste.com.br
+
+•
+Senha: Admin@123
+
+•
+Confirmar Senha: Admin@123
+
+•
+Nome da Empresa: Empresa Teste E2E Ltda
+
+•
+CNPJ: 12.345.678/0001-90
+
+•
+Telefone: (11) 98765-4321
+
+•
+Endereço: Rua Teste, 123
+
+•
+Cidade: São Paulo
+
+•
+Estado: SP
+
+•
+CEP: 01234-567
+
+
+
+3.
+Clicar em "Salvar" ou "Criar Empresa"
+
+Resultado Esperado:
+
+•
+✅ Mensagem de sucesso: "Empresa criada com sucesso!"
+
+•
+✅ Empresa aparece na lista de empresas
+
+•
+✅ Admin pode fazer login
+
+
+
+
+Teste 1.3: Logout Superadmin e Login como Admin
+
+Objetivo: Trocar para usuário admin da empresa
+
+Passos:
+
+1.
+Clicar em menu de usuário (canto superior direito)
+
+2.
+Clicar em "Sair" ou "Logout"
+
+3.
+Preencher campo "Email": admin.teste@empresateste.com.br
+
+4.
+Preencher campo "Senha": Admin@123
+
+5.
+Clicar em "Entrar"
+
+Resultado Esperado:
+
+•
+✅ Redirecionado para /dashboard (dashboard principal)
+
+•
+✅ Nome da empresa exibido: "Empresa Teste E2E Ltda"
+
+•
+✅ Menu lateral com todos os módulos visível
+
+
+
+
+FASE 2: CONFIGURAÇÕES BÁSICAS
+
+Teste 2.1: Configurar Dados da Empresa
+
+Objetivo: Preencher informações completas da empresa
+
+Passos:
+
+1.
+Navegar para /configuracoes/empresa
+
+2.
+Verificar se dados já preenchidos (do cadastro inicial)
+
+3.
+Adicionar/atualizar:
+
+•
+Logo: Upload de imagem (opcional)
+
+•
+Razão Social: Empresa Teste E2E Ltda
+
+•
+Nome Fantasia: Teste E2E
+
+•
+Inscrição Estadual: 123.456.789.012
+
+•
+Regime Tributário: Selecionar "Simples Nacional"
+
+
+
+4.
+Clicar em "Salvar"
+
+Resultado Esperado:
+
+•
+✅ Mensagem: "Dados da empresa atualizados com sucesso!"
+
+•
+✅ Dados persistem após recarregar página
+
+
+
+
+Teste 2.2: Criar Horários de Trabalho
+
+Objetivo: Cadastrar horários padrão
+
+Passos:
+
+1.
+Navegar para /configuracoes/horarios
+
+2.
+Clicar em "Novo Horário" ou "+ Adicionar"
+
+3.
+Preencher formulário:
+
+•
+Nome: Horário Comercial
+
+•
+Entrada: 08:00
+
+•
+Saída Almoço: 12:00
+
+•
+Retorno Almoço: 13:00
+
+•
+Saída: 17:00
+
+•
+Carga Horária Diária: 8h (calculado automaticamente)
+
+
+
+4.
+Clicar em "Salvar"
+
+5.
+Repetir para criar:
+
+•
+Horário Noturno: 22:00 - 06:00
+
+•
+Meio Período: 08:00 - 12:00
+
+
+
+Resultado Esperado:
+
+•
+✅ 3 horários criados
+
+•
+✅ Aparecem na listagem
+
+•
+✅ Carga horária calculada corretamente
+
+
+
+
+Teste 2.3: Criar Departamentos
+
+Objetivo: Cadastrar departamentos da empresa
+
+Passos:
+
+1.
+Navegar para /configuracoes/departamentos
+
+2.
+Criar os seguintes departamentos:
+
+•
+Nome: Administrativo, Descrição: Setor administrativo
+
+•
+Nome: Operacional, Descrição: Equipe de campo
+
+•
+Nome: Financeiro, Descrição: Setor financeiro
+
+•
+Nome: RH, Descrição: Recursos Humanos
+
+
+
+Resultado Esperado:
+
+•
+✅ 4 departamentos criados
+
+•
+✅ Listagem exibe todos os departamentos
+
+•
+✅ Possível editar e deletar
+
+
+
+
+Teste 2.4: Criar Funções/Cargos
+
+Objetivo: Cadastrar funções para funcionários
+
+Passos:
+
+1.
+Navegar para /configuracoes/funcoes
+
+2.
+Criar as seguintes funções:
+
+•
+Nome: Pedreiro, Descrição: Profissional de alvenaria, Salário Base: R$ 2.500,00
+
+•
+Nome: Servente, Descrição: Auxiliar de obras, Salário Base: R$ 1.800,00
+
+•
+Nome: Encarregado, Descrição: Supervisor de equipe, Salário Base: R$ 3.500,00
+
+•
+Nome: Motorista, Descrição: Condutor de veículos, Salário Base: R$ 2.200,00
+
+•
+Nome: Administrativo, Descrição: Auxiliar administrativo, Salário Base: R$ 2.000,00
+
+
+
+Resultado Esperado:
+
+•
+✅ 5 funções criadas
+
+•
+✅ Salários formatados corretamente
+
+•
+✅ Funções disponíveis para seleção em outros módulos
+
+
+
+
+FASE 3: CADASTRO DE FUNCIONÁRIOS
+
+Teste 3.1: Criar Funcionários
+
+Objetivo: Cadastrar funcionários de teste
+
+Passos:
+
+1.
+Navegar para /funcionarios ou /rh/funcionarios
+
+2.
+Clicar em "Novo Funcionário" ou "+ Adicionar"
+
+3.
+Criar os seguintes funcionários:
+
+Funcionário 1:
+
+•
+Nome: João da Silva
+
+•
+CPF: 123.456.789-00
+
+•
+RG: 12.345.678-9
+
+•
+Data Nascimento: 15/05/1985
+
+•
+Email: joao.silva@teste.com
+
+•
+Telefone: (11) 91234-5678
+
+•
+Endereço: Rua A, 100
+
+•
+Função: Pedreiro
+
+•
+Departamento: Operacional
+
+•
+Horário: Horário Comercial
+
+•
+Data Admissão: 01/01/2024
+
+•
+Salário: R$ 2.500,00
+
+•
+Status: Ativo
+
+Funcionário 2:
+
+•
+Nome: Maria Santos
+
+•
+CPF: 987.654.321-00
+
+•
+Função: Servente
+
+•
+Departamento: Operacional
+
+•
+Horário: Horário Comercial
+
+•
+Salário: R$ 1.800,00
+
+Funcionário 3:
+
+•
+Nome: Pedro Oliveira
+
+•
+CPF: 456.789.123-00
+
+•
+Função: Encarregado
+
+•
+Departamento: Operacional
+
+•
+Horário: Horário Comercial
+
+•
+Salário: R$ 3.500,00
+
+Funcionário 4:
+
+•
+Nome: Carlos Souza
+
+•
+CPF: 789.123.456-00
+
+•
+Função: Motorista
+
+•
+Departamento: Operacional
+
+•
+Horário: Horário Comercial
+
+•
+Salário: R$ 2.200,00
+
+Funcionário 5:
+
+•
+Nome: Ana Costa
+
+•
+CPF: 321.654.987-00
+
+•
+Função: Administrativo
+
+•
+Departamento: Administrativo
+
+•
+Horário: Horário Comercial
+
+•
+Salário: R$ 2.000,00
+
+Resultado Esperado:
+
+•
+✅ 5 funcionários criados
+
+•
+✅ Listagem exibe todos os funcionários
+
+•
+✅ Dados completos visíveis ao clicar em cada funcionário
+
+•
+✅ CPF validado (sem duplicatas)
+
+
+
+
+FASE 4: SERVIÇOS E OBRAS
+
+Teste 4.1: Criar Serviços
+
+Objetivo: Cadastrar serviços oferecidos
+
+Passos:
+
+1.
+Navegar para /servicos
+
+2.
+Criar os seguintes serviços:
+
+•
+Nome: Alvenaria, Unidade: m², Preço: R$ 150,00
+
+•
+Nome: Pintura, Unidade: m², Preço: R$ 80,00
+
+•
+Nome: Elétrica, Unidade: ponto, Preço: R$ 120,00
+
+•
+Nome: Hidráulica, Unidade: ponto, Preço: R$ 100,00
+
+•
+Nome: Reboco, Unidade: m², Preço: R$ 60,00
+
+
+
+Resultado Esperado:
+
+•
+✅ 5 serviços criados
+
+•
+✅ Preços formatados corretamente
+
+•
+✅ Serviços disponíveis para seleção em obras
+
+
+
+
+Teste 4.2: Criar Obras
+
+Objetivo: Cadastrar obras/projetos
+
+Passos:
+
+1.
+Navegar para /obras
+
+2.
+Clicar em "Nova Obra"
+
+3.
+Criar as seguintes obras:
+
+Obra 1:
+
+•
+Nome: Residência Teste 1
+
+•
+Cliente: Cliente Teste A
+
+•
+Endereço: Rua das Obras, 100 - São Paulo/SP
+
+•
+Data Início: 01/01/2025
+
+•
+Data Previsão Término: 30/06/2025
+
+•
+Valor Contrato: R$ 150.000,00
+
+•
+Status: Em Andamento
+
+•
+Descrição: Construção de residência unifamiliar
+
+Obra 2:
+
+•
+Nome: Reforma Comercial
+
+•
+Cliente: Cliente Teste B
+
+•
+Endereço: Av. Comercial, 500 - São Paulo/SP
+
+•
+Data Início: 15/01/2025
+
+•
+Valor Contrato: R$ 80.000,00
+
+•
+Status: Em Andamento
+
+Obra 3:
+
+•
+Nome: Galpão Industrial
+
+•
+Cliente: Cliente Teste C
+
+•
+Valor Contrato: R$ 300.000,00
+
+•
+Status: Planejamento
+
+Resultado Esperado:
+
+•
+✅ 3 obras criadas
+
+•
+✅ Valores formatados corretamente
+
+•
+✅ Status exibido com cores diferentes
+
+•
+✅ Obras aparecem em dashboards e relatórios
+
+
+
+
+FASE 5: ALOCAÇÃO DE EQUIPES
+
+Teste 5.1: Alocar Funcionários em Obras
+
+Objetivo: Criar equipes para obras
+
+Passos:
+
+1.
+Navegar para /equipe/alocacao
+
+2.
+Criar alocação para "Residência Teste 1":
+
+•
+Selecionar obra: Residência Teste 1
+
+•
+Adicionar funcionários:
+
+•
+Pedro Oliveira (Encarregado)
+
+•
+João da Silva (Pedreiro)
+
+•
+Maria Santos (Servente)
+
+
+
+•
+Data início: 01/01/2025
+
+•
+Data fim: 30/06/2025
+
+
+
+3.
+Criar alocação para "Reforma Comercial":
+
+•
+Selecionar obra: Reforma Comercial
+
+•
+Adicionar funcionários:
+
+•
+João da Silva (Pedreiro)
+
+
+
+•
+Data início: 15/01/2025
+
+
+
+Resultado Esperado:
+
+•
+✅ Equipes alocadas corretamente
+
+•
+✅ Funcionários aparecem na lista da obra
+
+•
+✅ Não permite alocar mesmo funcionário em horários conflitantes
+
+
+
+
+FASE 6: PONTO ELETRÔNICO
+
+Teste 6.1: Registrar Pontos
+
+Objetivo: Simular registros de ponto
+
+Passos:
+
+1.
+Navegar para /ponto
+
+2.
+Registrar pontos para João da Silva (dia 27/10/2025):
+
+•
+Entrada: 08:00
+
+•
+Saída Almoço: 12:00
+
+•
+Retorno Almoço: 13:00
+
+•
+Saída: 17:00
+
+
+
+3.
+Registrar pontos para Maria Santos:
+
+•
+Entrada: 08:05 (5 min atraso)
+
+•
+Saída Almoço: 12:00
+
+•
+Retorno Almoço: 13:10 (10 min atraso)
+
+•
+Saída: 17:00
+
+
+
+4.
+Registrar pontos para Pedro Oliveira:
+
+•
+Entrada: 07:50 (10 min antes)
+
+•
+Saída: 18:00 (1h extra)
+
+
+
+Resultado Esperado:
+
+•
+✅ Pontos registrados com sucesso
+
+•
+✅ Atrasos calculados automaticamente
+
+•
+✅ Horas extras calculadas
+
+•
+✅ Dashboard mostra estatísticas de ponto
+
+
+
+
+FASE 7: RDO (Relatórios Diários de Obra)
+
+Teste 7.1: Criar RDO
+
+Objetivo: Registrar atividades diárias da obra
+
+Passos:
+
+1.
+Navegar para /rdos ou /obras/rdos
+
+2.
+Clicar em "Novo RDO"
+
+3.
+Preencher:
+
+•
+Obra: Residência Teste 1
+
+•
+Data: 27/10/2025
+
+•
+Clima: Ensolarado
+
+•
+Funcionários Presentes: Selecionar João da Silva, Maria Santos, Pedro Oliveira
+
+•
+Serviços Executados:
+
+•
+Serviço: Alvenaria, Quantidade: 15 m²
+
+•
+Serviço: Reboco, Quantidade: 20 m²
+
+
+
+•
+Materiais Utilizados:
+
+•
+Cimento - 10 sacos
+
+•
+Areia - 2 m³
+
+
+
+•
+Observações: Trabalho dentro do cronograma
+
+
+
+4.
+Clicar em "Salvar RDO"
+
+Resultado Esperado:
+
+•
+✅ RDO criado com sucesso
+
+•
+✅ Aparece na listagem de RDOs
+
+•
+✅ Possível visualizar, editar e exportar PDF
+
+
+
+
+FASE 8: FROTA (Veículos)
+
+Teste 8.1: Cadastrar Veículos
+
+Objetivo: Registrar veículos da empresa
+
+Passos:
+
+1.
+Navegar para /veiculos ou /frota
+
+2.
+Criar veículos:
+
+Veículo 1:
+
+•
+Placa: ABC-1234
+
+•
+Modelo: Fiat Strada
+
+•
+Ano: 2020
+
+•
+Tipo: Utilitário
+
+•
+Status: Ativo
+
+•
+Motorista Padrão: Carlos Souza
+
+Veículo 2:
+
+•
+Placa: XYZ-5678
+
+•
+Modelo: Volkswagen Saveiro
+
+•
+Ano: 2019
+
+•
+Tipo: Utilitário
+
+Resultado Esperado:
+
+•
+✅ 2 veículos cadastrados
+
+•
+✅ Listagem exibe todos os veículos
+
+•
+✅ Possível vincular a obras e motoristas
+
+
+
+
+Teste 8.2: Registrar Despesas de Veículos
+
+Objetivo: Lançar custos com frota
+
+Passos:
+
+1.
+Na página do veículo ABC-1234, clicar em "Nova Despesa"
+
+2.
+Registrar:
+
+•
+Tipo: Combustível
+
+•
+Valor: R$ 250,00
+
+•
+Data: 27/10/2025
+
+•
+Km Atual: 45.000
+
+•
+Observação: Abastecimento completo
+
+
+
+3.
+Registrar manutenção:
+
+•
+Tipo: Manutenção
+
+•
+Valor: R$ 350,00
+
+•
+Descrição: Troca de óleo e filtros
+
+
+
+Resultado Esperado:
+
+•
+✅ Despesas registradas
+
+•
+✅ Total de custos atualizado
+
+•
+✅ Relatórios de frota exibem dados
+
+
+
+
+FASE 9: ALIMENTAÇÃO
+
+Teste 9.1: Registrar Refeições
+
+Objetivo: Controlar alimentação de funcionários
+
+Passos:
+
+1.
+Navegar para /alimentacao
+
+2.
+Registrar refeições do dia:
+
+•
+Funcionário: João da Silva, Refeição: Almoço, Data: 27/10/2025
+
+•
+Funcionário: Maria Santos, Refeição: Almoço
+
+•
+Funcionário: Pedro Oliveira, Refeição: Almoço
+
+•
+Funcionário: Carlos Souza, Refeição: Jantar
+
+
+
+3.
+Verificar totalizadores
+
+Resultado Esperado:
+
+•
+✅ Refeições registradas
+
+•
+✅ Dashboard mostra total de refeições do dia
+
+•
+✅ Relatórios mensais disponíveis
+
+
+
+
+FASE 10: ALMOXARIFADO
+
+Teste 10.1: Criar Categorias de Materiais
+
+Objetivo: Organizar materiais por categoria
+
+Passos:
+
+1.
+Navegar para /almoxarifado/categorias
+
+2.
+Criar categorias:
+
+•
+Nome: Materiais de Construção, Descrição: Cimento, areia, etc
+
+•
+Nome: Ferramentas, Descrição: Martelo, furadeira, etc
+
+•
+Nome: EPIs, Descrição: Capacete, luvas, etc
+
+•
+Nome: Elétrica, Descrição: Fios, disjuntores, etc
+
+
+
+Resultado Esperado:
+
+•
+✅ 4 categorias criadas
+
+•
+✅ Disponíveis para seleção ao criar itens
+
+
+
+
+Teste 10.2: Cadastrar Itens do Almoxarifado
+
+Objetivo: Registrar materiais, ferramentas e EPIs
+
+Passos:
+
+1.
+Navegar para /almoxarifado/itens
+
+2.
+Criar itens:
+
+Materiais:
+
+•
+Nome: Cimento 50kg, Categoria: Materiais de Construção, Unidade: saco, Estoque Mínimo: 10
+
+•
+Nome: Areia Média, Categoria: Materiais de Construção, Unidade: m³, Estoque Mínimo: 5
+
+•
+Nome: Tijolo Cerâmico, Categoria: Materiais de Construção, Unidade: milheiro, Estoque Mínimo: 2
+
+Ferramentas:
+
+•
+Nome: Furadeira Elétrica, Categoria: Ferramentas, Unidade: unidade, Tipo: Ferramenta
+
+•
+Nome: Martelo, Categoria: Ferramentas, Unidade: unidade, Tipo: Ferramenta
+
+EPIs:
+
+•
+Nome: Capacete de Segurança, Categoria: EPIs, Unidade: unidade, Tipo: EPI
+
+•
+Nome: Luva de Proteção, Categoria: EPIs, Unidade: par, Tipo: EPI
+
+•
+Nome: Óculos de Proteção, Categoria: EPIs, Unidade: unidade, Tipo: EPI
+
+Resultado Esperado:
+
+•
+✅ 8 itens cadastrados
+
+•
+✅ Tipos (Material/Ferramenta/EPI) identificados corretamente
+
+•
+✅ Estoque inicial em zero
+
+
+
+
+Teste 10.3: Entrada de Materiais
+
+Objetivo: Registrar compra/entrada de materiais
+
+Passos:
+
+1.
+Navegar para /almoxarifado/entrada
+
+2.
+Processar entrada:
+
+•
+Item: Cimento 50kg, Quantidade: 50, Valor Unitário: R$ 35,00, Nota Fiscal: NF-12345
+
+•
+Item: Areia Média, Quantidade: 10, Valor Unitário: R$ 150,00
+
+•
+Item: Tijolo Cerâmico, Quantidade: 5, Valor Unitário: R$ 800,00
+
+
+
+3.
+Salvar entrada
+
+Resultado Esperado:
+
+•
+✅ Entrada processada
+
+•
+✅ Estoque atualizado
+
+•
+✅ Valor total calculado: R$ 7.750,00
+
+•
+✅ Movimentação registrada
+
+
+
+
+Teste 10.4: Saída de Materiais para Obra
+
+Objetivo: Dar baixa de materiais para obra
+
+Passos:
+
+1.
+Navegar para /almoxarifado/saida
+
+2.
+Processar saída:
+
+•
+Obra: Residência Teste 1
+
+•
+Item: Cimento 50kg, Quantidade: 20
+
+•
+Item: Areia Média, Quantidade: 3
+
+
+
+3.
+Salvar saída
+
+Resultado Esperado:
+
+•
+✅ Saída processada
+
+•
+✅ Estoque atualizado (Cimento: 30, Areia: 7)
+
+•
+✅ Custo lançado automaticamente na obra
+
+•
+✅ Movimentação registrada
+
+
+
+
+Teste 10.5: Empréstimo de Ferramentas
+
+Objetivo: Emprestar ferramenta para funcionário
+
+Passos:
+
+1.
+Navegar para /almoxarifado/saida
+
+2.
+Processar saída:
+
+•
+Tipo: Empréstimo
+
+•
+Funcionário: João da Silva
+
+•
+Item: Furadeira Elétrica, Quantidade: 1
+
+•
+Data Prevista Devolução: 30/10/2025
+
+
+
+Resultado Esperado:
+
+•
+✅ Empréstimo registrado
+
+•
+✅ Ferramenta vinculada ao funcionário
+
+•
+✅ Alerta de devolução pendente
+
+
+
+
+Teste 10.6: Entrega de EPIs
+
+Objetivo: Entregar EPIs para funcionários
+
+Passos:
+
+1.
+Primeiro, dar entrada de EPIs:
+
+•
+Capacete de Segurança: 10 unidades
+
+•
+Luva de Proteção: 20 pares
+
+•
+Óculos de Proteção: 10 unidades
+
+
+
+2.
+Processar saída/entrega:
+
+•
+Funcionário: João da Silva
+
+•
+Item: Capacete de Segurança, Quantidade: 1
+
+•
+Item: Luva de Proteção, Quantidade: 2
+
+•
+Item: Óculos de Proteção, Quantidade: 1
+
+
+
+3.
+Repetir para outros funcionários
+
+Resultado Esperado:
+
+•
+✅ EPIs entregues e vinculados aos funcionários
+
+•
+✅ Estoque atualizado
+
+•
+✅ Relatório de EPIs por funcionário disponível
+
+
+
+
+FASE 11: FINANCEIRO
+
+Teste 11.1: Cadastrar Fornecedores
+
+Objetivo: Registrar fornecedores
+
+Passos:
+
+1.
+Navegar para /financeiro/fornecedores (ou criar durante conta a pagar)
+
+2.
+Criar fornecedores:
+
+•
+Razão Social: Materiais Construção Ltda, CNPJ: 11.222.333/0001-44, Telefone: (11) 3333-4444
+
+•
+Razão Social: Ferragens e Ferramentas SA, CNPJ: 22.333.444/0001-55
+
+
+
+Resultado Esperado:
+
+•
+✅ Fornecedores cadastrados
+
+•
+✅ Disponíveis para seleção em contas a pagar
+
+
+
+
+Teste 11.2: Criar Contas a Pagar
+
+Objetivo: Registrar despesas/contas a pagar
+
+Passos:
+
+1.
+Navegar para /financeiro/contas-pagar
+
+2.
+Criar contas:
+
+Conta 1:
+
+•
+Fornecedor: Materiais Construção Ltda
+
+•
+Descrição: Compra de materiais - NF 12345
+
+•
+Valor: R$ 7.750,00
+
+•
+Data Emissão: 20/10/2025
+
+•
+Data Vencimento: 20/11/2025
+
+•
+Categoria: Materiais de Construção
+
+•
+Status: Pendente
+
+Conta 2:
+
+•
+Fornecedor: Ferragens e Ferramentas SA
+
+•
+Descrição: Ferramentas diversas
+
+•
+Valor: R$ 1.200,00
+
+•
+Data Vencimento: 15/11/2025
+
+Conta 3:
+
+•
+Descrição: Aluguel de Escritório
+
+•
+Valor: R$ 3.000,00
+
+•
+Data Vencimento: 05/11/2025
+
+Resultado Esperado:
+
+•
+✅ 3 contas criadas
+
+•
+✅ Status "Pendente"
+
+•
+✅ Total a pagar calculado
+
+
+
+
+Teste 11.3: Pagar Conta
+
+Objetivo: Registrar pagamento de conta
+
+Passos:
+
+1.
+Na listagem de contas a pagar, selecionar conta de R$ 1.200,00
+
+2.
+Clicar em "Pagar" ou "Registrar Pagamento"
+
+3.
+Preencher:
+
+•
+Data Pagamento: 27/10/2025
+
+•
+Valor Pago: R$ 1.200,00
+
+•
+Forma Pagamento: Transferência Bancária
+
+•
+Conta Bancária: Banco do Brasil - CC 12345-6
+
+
+
+4.
+Confirmar pagamento
+
+Resultado Esperado:
+
+•
+✅ Status alterado para "Pago"
+
+•
+✅ Data de pagamento registrada
+
+•
+✅ Saldo da conta bancária atualizado (se integrado)
+
+•
+✅ Lançamento contábil criado automaticamente
+
+
+
+
+Teste 11.4: Criar Contas a Receber
+
+Objetivo: Registrar receitas/contas a receber
+
+Passos:
+
+1.
+Navegar para /financeiro/contas-receber
+
+2.
+Criar contas:
+
+Conta 1:
+
+•
+Cliente: Cliente Teste A
+
+•
+Descrição: Medição 1 - Residência Teste 1
+
+•
+Valor: R$ 50.000,00
+
+•
+Data Emissão: 25/10/2025
+
+•
+Data Vencimento: 10/11/2025
+
+•
+Obra: Residência Teste 1
+
+•
+Status: Pendente
+
+Conta 2:
+
+•
+Cliente: Cliente Teste B
+
+•
+Descrição: Medição 1 - Reforma Comercial
+
+•
+Valor: R$ 30.000,00
+
+•
+Data Vencimento: 15/11/2025
+
+Resultado Esperado:
+
+•
+✅ 2 contas criadas
+
+•
+✅ Vinculadas às obras
+
+•
+✅ Total a receber calculado
+
+
+
+
+Teste 11.5: Receber Pagamento
+
+Objetivo: Registrar recebimento
+
+Passos:
+
+1.
+Selecionar conta de R$ 30.000,00
+
+2.
+Clicar em "Receber"
+
+3.
+Preencher:
+
+•
+Data Recebimento: 27/10/2025
+
+•
+Valor Recebido: R$ 30.000,00
+
+•
+Forma Recebimento: PIX
+
+•
+Conta Bancária: Banco do Brasil - CC 12345-6
+
+
+
+4.
+Confirmar recebimento
+
+Resultado Esperado:
+
+•
+✅ Status alterado para "Recebido"
+
+•
+✅ Saldo bancário atualizado
+
+•
+✅ Lançamento contábil criado
+
+
+
+
+Teste 11.6: Fluxo de Caixa
+
+Objetivo: Visualizar fluxo de caixa
+
+Passos:
+
+1.
+Navegar para /financeiro/fluxo-caixa
+
+2.
+Verificar:
+
+•
+Saldo atual
+
+•
+Contas a pagar (próximos 30 dias)
+
+•
+Contas a receber (próximos 30 dias)
+
+•
+Gráfico de evolução
+
+
+
+Resultado Esperado:
+
+•
+✅ Saldo calculado corretamente
+
+•
+✅ Gráfico exibido
+
+•
+✅ Filtros funcionando (período, obra, categoria)
+
+
+
+
+FASE 12: CONTABILIDADE
+
+Teste 12.1: Verificar Plano de Contas
+
+Objetivo: Validar estrutura contábil
+
+Passos:
+
+1.
+Navegar para /contabilidade/plano-contas
+
+2.
+Verificar estrutura:
+
+•
+1.0.00.000 - ATIVO
+
+•
+2.0.00.000 - PASSIVO
+
+•
+3.0.00.000 - RECEITAS
+
+•
+4.0.00.000 - DESPESAS
+
+
+
+3.
+Expandir contas e verificar subcontas
+
+Resultado Esperado:
+
+•
+✅ Plano de contas completo
+
+•
+✅ Hierarquia correta
+
+•
+✅ Contas analíticas e sintéticas identificadas
+
+
+
+
+Teste 12.2: Criar Lançamento Manual
+
+Objetivo: Registrar lançamento contábil manual
+
+Passos:
+
+1.
+Navegar para /contabilidade/lancamentos/criar
+
+2.
+Preencher:
+
+•
+Data: 27/10/2025
+
+•
+Histórico: Teste de lançamento manual
+
+•
+Partida 1 (Débito):
+
+•
+Conta: 1.1.01.001 - Caixa
+
+•
+Valor: R$ 1.000,00
+
+
+
+•
+Partida 2 (Crédito):
+
+•
+Conta: 3.1.01.001 - Receita de Serviços
+
+•
+Valor: R$ 1.000,00
+
+
+
+
+
+3.
+Salvar lançamento
+
+Resultado Esperado:
+
+•
+✅ Lançamento criado
+
+•
+✅ Débito = Crédito (partidas dobradas)
+
+•
+✅ Aparece no balancete
+
+
+
+
+Teste 12.3: Verificar Lançamentos Automáticos
+
+Objetivo: Validar integrações automáticas
+
+Passos:
+
+1.
+Navegar para /contabilidade/lancamentos
+
+2.
+Filtrar por origem:
+
+•
+FINANCEIRO_PAGAMENTO (do pagamento de R$ 1.200,00)
+
+•
+FINANCEIRO_RECEBIMENTO (do recebimento de R$ 30.000,00)
+
+•
+ALMOXARIFADO_SAIDA (da saída de materiais) - SE IMPLEMENTADO
+
+
+
+3.
+Verificar partidas de cada lançamento
+
+Resultado Esperado:
+
+•
+✅ Lançamentos automáticos criados
+
+•
+✅ Partidas dobradas corretas
+
+•
+✅ Valores conferem com operações originais
+
+
+
+
+Teste 12.4: Gerar Balancete
+
+Objetivo: Visualizar balancete de verificação
+
+Passos:
+
+1.
+Navegar para /contabilidade/balancete
+
+2.
+Selecionar período: 01/10/2025 a 31/10/2025
+
+3.
+Clicar em "Gerar Balancete"
+
+4.
+Verificar:
+
+•
+Total de débitos
+
+•
+Total de créditos
+
+•
+Saldos por conta
+
+
+
+5.
+Exportar PDF
+
+Resultado Esperado:
+
+•
+✅ Balancete gerado
+
+•
+✅ Débitos = Créditos
+
+•
+✅ Saldos calculados corretamente
+
+•
+✅ PDF exportado com sucesso
+
+
+
+
+Teste 12.5: Gerar DRE (Demonstração do Resultado do Exercício)
+
+Objetivo: Visualizar resultado financeiro
+
+Passos:
+
+1.
+Navegar para /contabilidade/dre
+
+2.
+Selecionar período: 01/10/2025 a 31/10/2025
+
+3.
+Gerar DRE
+
+4.
+Verificar:
+
+•
+Receitas Brutas
+
+•
+Deduções
+
+•
+Receita Líquida
+
+•
+Custos
+
+•
+Despesas
+
+•
+Resultado (Lucro/Prejuízo)
+
+
+
+5.
+Exportar Excel
+
+Resultado Esperado:
+
+•
+✅ DRE gerada
+
+•
+✅ Cálculos corretos
+
+•
+✅ Resultado coerente com operações
+
+•
+✅ Excel exportado
+
+
+
+
+Teste 12.6: Gerar Balanço Patrimonial
+
+Objetivo: Visualizar situação patrimonial
+
+Passos:
+
+1.
+Navegar para /contabilidade/balanco
+
+2.
+Selecionar data: 31/10/2025
+
+3.
+Gerar balanço
+
+4.
+Verificar:
+
+•
+ATIVO: Circulante, Não Circulante
+
+•
+PASSIVO: Circulante, Não Circulante
+
+•
+PATRIMÔNIO LÍQUIDO: Capital, Lucros/Prejuízos
+
+
+
+5.
+Validar equação: ATIVO = PASSIVO + PL
+
+Resultado Esperado:
+
+•
+✅ Balanço gerado
+
+•
+✅ Equação patrimonial correta
+
+•
+✅ Valores coerentes
+
+
+
+
+FASE 13: FOLHA DE PAGAMENTO
+
+Teste 13.1: Configurar Parâmetros Legais
+
+Objetivo: Definir alíquotas de INSS, IRRF, FGTS
+
+Passos:
+
+1.
+Navegar para /folha/parametros ou botão "Configurar Parâmetros"
+
+2.
+Preencher (valores de 2025):
+
+•
+INSS:
+
+•
+Faixa 1: Até R$ 1.412,00 - 7,5%
+
+•
+Faixa 2: R$ 1.412,01 a R$ 2.666,68 - 9%
+
+•
+Faixa 3: R$ 2.666,69 a R$ 4.000,03 - 12%
+
+•
+Faixa 4: Acima de R$ 4.000,03 - 14%
+
+
+
+•
+IRRF:
+
+•
+Faixa 1: Até R$ 2.259,20 - Isento
+
+•
+Faixa 2: R$ 2.259,21 a R$ 2.826,65 - 7,5%
+
+•
+Faixa 3: R$ 2.826,66 a R$ 3.751,05 - 15%
+
+•
+Faixa 4: R$ 3.751,06 a R$ 4.664,68 - 22,5%
+
+•
+Faixa 5: Acima de R$ 4.664,68 - 27,5%
+
+
+
+•
+FGTS: 8%
+
+
+
+3.
+Salvar parâmetros
+
+Resultado Esperado:
+
+•
+✅ Parâmetros salvos
+
+•
+✅ Disponíveis para cálculo da folha
+
+
+
+
+Teste 13.2: Processar Folha de Pagamento
+
+Objetivo: Calcular folha do mês
+
+Passos:
+
+1.
+Navegar para /folha/dashboard
+
+2.
+Selecionar competência: Outubro/2025
+
+3.
+Clicar em "Processar Folha"
+
+4.
+Aguardar processamento
+
+5.
+Verificar:
+
+•
+Total de funcionários processados (5)
+
+•
+Total bruto
+
+•
+Total de descontos (INSS + IRRF)
+
+•
+Total líquido
+
+
+
+Resultado Esperado:
+
+•
+✅ Folha processada para 5 funcionários
+
+•
+✅ Cálculos corretos de INSS e IRRF
+
+•
+✅ Total líquido = Bruto - Descontos
+
+•
+✅ Lançamento contábil criado automaticamente (SE IMPLEMENTADO)
+
+
+
+
+Teste 13.3: Gerar Holerites
+
+Objetivo: Emitir comprovantes de pagamento
+
+Passos:
+
+1.
+Na folha processada, clicar em "Gerar Holerites" ou "Relatórios"
+
+2.
+Selecionar funcionário: João da Silva
+
+3.
+Visualizar holerite em PDF
+
+4.
+Verificar:
+
+•
+Dados do funcionário
+
+•
+Proventos (Salário)
+
+•
+Descontos (INSS, IRRF)
+
+•
+Líquido a receber
+
+
+
+5.
+Baixar PDF
+
+Resultado Esperado:
+
+•
+✅ Holerite gerado
+
+•
+✅ Dados corretos
+
+•
+✅ PDF formatado profissionalmente
+
+
+
+
+FASE 14: PROPOSTAS COMERCIAIS
+
+Teste 14.1: Criar Proposta
+
+Objetivo: Gerar proposta comercial
+
+Passos:
+
+1.
+Navegar para /propostas
+
+2.
+Clicar em "Nova Proposta"
+
+3.
+Preencher:
+
+•
+Cliente: Cliente Teste D
+
+•
+Obra: Projeto Novo
+
+•
+Data Validade: 30/11/2025
+
+•
+Serviços:
+
+•
+Alvenaria - 100 m² - R$ 150,00 = R$ 15.000,00
+
+•
+Pintura - 200 m² - R$ 80,00 = R$ 16.000,00
+
+•
+Elétrica - 30 pontos - R$ 120,00 = R$ 3.600,00
+
+
+
+•
+Observações: Prazo de execução: 60 dias
+
+
+
+4.
+Salvar proposta
+
+Resultado Esperado:
+
+•
+✅ Proposta criada
+
+•
+✅ Valor total: R$ 34.600,00
+
+•
+✅ Status: "Pendente"
+
+
+
+
+Teste 14.2: Gerar PDF da Proposta
+
+Objetivo: Exportar proposta
+
+Passos:
+
+1.
+Na proposta criada, clicar em "Gerar PDF"
+
+2.
+Visualizar PDF
+
+3.
+Verificar:
+
+•
+Logo da empresa
+
+•
+Dados do cliente
+
+•
+Tabela de serviços
+
+•
+Valor total
+
+•
+Condições de pagamento
+
+
+
+Resultado Esperado:
+
+•
+✅ PDF gerado
+
+•
+✅ Layout profissional
+
+•
+✅ Todas as informações presentes
+
+
+
+
+Teste 14.3: Aprovar Proposta
+
+Objetivo: Mudar status para aprovado
+
+Passos:
+
+1.
+Clicar em "Aprovar Proposta"
+
+2.
+Confirmar aprovação
+
+Resultado Esperado:
+
+•
+✅ Status alterado para "Aprovado"
+
+•
+✅ Obra criada automaticamente (SE IMPLEMENTADO)
+
+•
+✅ Conta a receber criada automaticamente (SE IMPLEMENTADO)
+
+
+
+
+FASE 15: RELATÓRIOS E DASHBOARDS
+
+Teste 15.1: Dashboard Principal
+
+Objetivo: Validar KPIs gerais
+
+Passos:
+
+1.
+Navegar para /dashboard
+
+2.
+Verificar widgets:
+
+•
+Total de obras ativas
+
+•
+Total de funcionários
+
+•
+Contas a pagar (vencidas/a vencer)
+
+•
+Contas a receber
+
+•
+Fluxo de caixa
+
+•
+Gráficos (obras, custos, receitas)
+
+
+
+Resultado Esperado:
+
+•
+✅ Todos os KPIs exibidos
+
+•
+✅ Valores corretos
+
+•
+✅ Gráficos renderizados
+
+
+
+
+Teste 15.2: Relatório de Custos por Obra
+
+Objetivo: Analisar custos detalhados
+
+Passos:
+
+1.
+Navegar para /custos/obra/1 (Residência Teste 1)
+
+2.
+Verificar:
+
+•
+Custos de materiais (saída de almoxarifado)
+
+•
+Custos de mão de obra
+
+•
+Custos de veículos
+
+•
+Total geral
+
+
+
+3.
+Filtrar por período
+
+Resultado Esperado:
+
+•
+✅ Custos categorizados
+
+•
+✅ Total calculado
+
+•
+✅ Filtros funcionando
+
+
+
+
+Teste 15.3: Relatório de Ponto
+
+Objetivo: Analisar frequência e horas
+
+Passos:
+
+1.
+Navegar para /ponto/relatorios
+
+2.
+Selecionar período: 01/10/2025 a 31/10/2025
+
+3.
+Filtrar por funcionário: Maria Santos
+
+4.
+Verificar:
+
+•
+Total de horas trabalhadas
+
+•
+Atrasos
+
+•
+Horas extras
+
+•
+Faltas
+
+
+
+Resultado Esperado:
+
+•
+✅ Relatório gerado
+
+•
+✅ Cálculos corretos
+
+•
+✅ Exportação para Excel disponível
+
+
+
+
+FASE 16: TESTES DE VALIDAÇÃO E SEGURANÇA
+
+Teste 16.1: Validação de CPF Duplicado
+
+Objetivo: Impedir cadastro duplicado
+
+Passos:
+
+1.
+Tentar criar funcionário com CPF 123.456.789-00 (já usado por João da Silva)
+
+Resultado Esperado:
+
+•
+✅ Erro: "CPF já cadastrado"
+
+•
+✅ Cadastro não permitido
+
+
+
+
+Teste 16.2: Validação de CNPJ
+
+Objetivo: Validar formato de CNPJ
+
+Passos:
+
+1.
+Tentar criar fornecedor com CNPJ inválido: 11.111.111/1111-11
+
+Resultado Esperado:
+
+•
+✅ Erro: "CNPJ inválido"
+
+•
+✅ Cadastro não permitido
+
+
+
+
+Teste 16.3: Validação de Datas
+
+Objetivo: Impedir datas inconsistentes
+
+Passos:
+
+1.
+Tentar criar obra com data término anterior à data início
+
+Resultado Esperado:
+
+•
+✅ Erro: "Data de término deve ser posterior à data de início"
+
+
+
+
+Teste 16.4: Validação de Estoque Negativo
+
+Objetivo: Impedir saída maior que estoque
+
+Passos:
+
+1.
+Tentar dar saída de 100 sacos de cimento (estoque atual: 30)
+
+Resultado Esperado:
+
+•
+✅ Erro: "Estoque insuficiente"
+
+•
+✅ Saída não permitida
+
+
+
+
+Teste 16.5: Controle de Acesso
+
+Objetivo: Validar permissões
+
+Passos:
+
+1.
+Fazer logout como admin
+
+2.
+Tentar acessar /super-admin-dashboard diretamente
+
+Resultado Esperado:
+
+•
+✅ Redirecionado para login
+
+•
+✅ Mensagem: "Acesso negado"
+
+
+
+
+FASE 17: TESTES DE PERFORMANCE
+
+Teste 17.1: Tempo de Carregamento de Páginas
+
+Objetivo: Validar performance
+
+Passos:
+
+1.
+Medir tempo de carregamento de:
+
+•
+Dashboard principal
+
+•
+Listagem de funcionários
+
+•
+Listagem de obras
+
+•
+Balancete
+
+•
+DRE
+
+
+
+Resultado Esperado:
+
+•
+✅ Todas as páginas carregam em < 3 segundos
+
+•
+✅ Sem erros de timeout
+
+
+
+
+Teste 17.2: Processamento de Folha em Massa
+
+Objetivo: Testar escalabilidade
+
+Passos:
+
+1.
+Processar folha com 5 funcionários
+
+2.
+Medir tempo de processamento
+
+Resultado Esperado:
+
+•
+✅ Processamento concluído em < 10 segundos
+
+•
+✅ Sem erros
+
+
+
+
+FASE 18: TESTES DE INTEGRAÇÃO
+
+Teste 18.1: Almoxarifado → Custos
+
+Objetivo: Validar integração automática
+
+Passos:
+
+1.
+Dar saída de material para obra
+
+2.
+Verificar se custo foi criado automaticamente em /custos/obra/X
+
+Resultado Esperado:
+
+•
+✅ Custo criado automaticamente
+
+•
+✅ Valor correto
+
+•
+✅ Tipo: "Material"
+
+
+
+
+Teste 18.2: Financeiro → Contabilidade
+
+Objetivo: Validar lançamentos automáticos
+
+Passos:
+
+1.
+Pagar uma conta a pagar
+
+2.
+Verificar lançamento em /contabilidade/lancamentos
+
+3.
+Validar partidas:
+
+•
+D - Fornecedores a Pagar
+
+•
+C - Banco
+
+
+
+Resultado Esperado:
+
+•
+✅ Lançamento criado
+
+•
+✅ Partidas corretas
+
+•
+✅ Origem: "FINANCEIRO_PAGAMENTO"
+
+
+
+
+Teste 18.3: Folha → Contabilidade (SE IMPLEMENTADO)
+
+Objetivo: Validar lançamento de folha
+
+Passos:
+
+1.
+Processar folha de pagamento
+
+2.
+Verificar lançamento contábil
+
+3.
+Validar partidas:
+
+•
+D - Despesas com Pessoal
+
+•
+C - Salários a Pagar
+
+•
+C - INSS a Recolher
+
+•
+C - IRRF a Recolher
+
+
+
+Resultado Esperado:
+
+•
+✅ Lançamento criado
+
+•
+✅ Partidas dobradas corretas
+
+•
+✅ Valores conferem com folha
+
+
+
+
+Teste 18.4: Proposta → Obra → Financeiro (SE IMPLEMENTADO)
+
+Objetivo: Validar fluxo completo
+
+Passos:
+
+1.
+Aprovar proposta
+
+2.
+Verificar se obra foi criada
+
+3.
+Verificar se conta a receber foi criada
+
+Resultado Esperado:
+
+•
+✅ Obra criada automaticamente
+
+•
+✅ Conta a receber criada
+
+•
+✅ Valores corretos
+
+
+
+
+📊 CHECKLIST FINAL DE VALIDAÇÃO
+
+Módulos Testados:
+
+
+
+
+✅ Superadmin - Criação de empresa
+
+
+
+
+✅ Configurações - Horários, departamentos, funções
+
+
+
+
+✅ RH - Funcionários (5 cadastrados)
+
+
+
+
+✅ Serviços - Serviços (5 cadastrados)
+
+
+
+
+✅ Obras - Obras (3 cadastradas)
+
+
+
+
+✅ Equipe - Alocação de funcionários
+
+
+
+
+✅ Ponto - Registro de ponto
+
+
+
+
+✅ RDO - Relatórios diários
+
+
+
+
+✅ Frota - Veículos e despesas
+
+
+
+
+✅ Alimentação - Refeições
+
+
+
+
+✅ Almoxarifado - Materiais, ferramentas, EPIs
+
+
+
+
+✅ Financeiro - Contas a pagar/receber
+
+
+
+
+✅ Contabilidade - Lançamentos, balancete, DRE, balanço
+
+
+
+
+✅ Folha - Processamento e holerites
+
+
+
+
+✅ Propostas - Criação e aprovação
+
+Funcionalidades Críticas:
+
+
+
+
+✅ CRUD completo (Create, Read, Update, Delete)
+
+
+
+
+✅ Validações de formulários
+
+
+
+
+✅ Cálculos automáticos (INSS, IRRF, totais)
+
+
+
+
+✅ Integrações automáticas (almoxarifado→custos, financeiro→contabilidade)
+
+
+
+
+✅ Exportação de relatórios (PDF, Excel)
+
+
+
+
+✅ Gráficos e dashboards
+
+
+
+
+✅ Controle de acesso e permissões
+
+
+
+
+✅ Multi-tenancy (isolamento entre empresas)
+
+Testes de Qualidade:
+
+
+
+
+✅ Validação de dados (CPF, CNPJ, datas)
+
+
+
+
+✅ Mensagens de erro claras
+
+
+
+
+✅ Mensagens de sucesso
+
+
+
+
+✅ Performance aceitável (< 3s por página)
+
+
+
+
+✅ Responsividade (mobile/desktop)
+
+
+
+
+✅ Sem erros de console JavaScript
+
+
+
+
+✅ Sem erros 500 (Internal Server Error)
+
+
+
+
+🎯 RESULTADO ESPERADO
+
+Ao final deste teste completo, você terá:
+
+1.
+1 empresa criada com dados completos
+
+2.
+5 funcionários cadastrados e alocados
+
+3.
+3 obras em diferentes status
+
+4.
+8 itens no almoxarifado com movimentações
+
+5.
+2 veículos com despesas registradas
+
+6.
+Contas a pagar e receber com pagamentos/recebimentos
+
+7.
+Lançamentos contábeis manuais e automáticos
+
+8.
+Folha de pagamento processada
+
+9.
+Proposta comercial criada e aprovada
+
+10.
+Relatórios gerados (balancete, DRE, balanço)
+
+Total de registros criados: ~100+
+
+Cobertura de funcionalidades: ~95%
+
+
+
+
+🚀 COMO EXECUTAR ESTE TESTE
+
+Opção 1: Automação com Playwright (Recomendado)
+
+Python
+
+
+# test_e2e_completo.py
+from playwright.sync_api import sync_playwright
+import time
+
+def run_test():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        page = browser.new_page()
+        
+        # Fase 1: Login Superadmin
+        page.goto('https://sige.cassioviller.tech')
+        page.fill('input[name="email"]', 'superadmin@sige.com.br')
+        page.fill('input[name="password"]', 'super123')
+        page.click('button[type="submit"]')
+        page.wait_for_url('**/super-admin-dashboard')
+        
+        # Fase 2: Criar Empresa
+        page.click('text=Criar Nova Empresa')
+        page.fill('input[name="nome"]', 'Admin Teste E2E')
+        page.fill('input[name="email"]', 'admin.teste@empresateste.com.br')
+        # ... continuar com todos os testes
+        
+        browser.close()
+
+run_test()
+
+
+Opção 2: Automação com Selenium
+
+Python
+
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+
+driver = webdriver.Chrome()
+driver.get('https://sige.cassioviller.tech')
+# ... continuar com testes
+
+
+Opção 3: Teste Manual
+
+Siga o roteiro passo a passo manualmente, marcando cada item do checklist.
+
+
+
+
+📝 RELATÓRIO DE BUGS
+
+Durante os testes, registre bugs encontrados no formato:
+
+Plain Text
+
+
+BUG #001
+Módulo: Almoxarifado
+Funcionalidade: Saída de materiais
+Descrição: Ao dar saída de quantidade maior que estoque, sistema não exibe erro
+Passos para reproduzir:
+1. Acessar /almoxarifado/saida
+2. Selecionar item com estoque 10
+3. Tentar dar saída de 20
+Resultado esperado: Erro "Estoque insuficiente"
+Resultado obtido: Saída processada, estoque negativo
+Severidade: ALTA
+
+
+
+
+
+✅ CONCLUSÃO
+
+Este prompt de teste E2E cobre TODAS as funcionalidades críticas do sistema SIGE, garantindo que:
+
+•
+✅ Todos os módulos funcionam corretamente
+
+•
+✅ Integrações automáticas estão operacionais
+
+•
+✅ Validações estão implementadas
+
+•
+✅ Relatórios são gerados corretamente
+
+•
+✅ Sistema está pronto para produção
+
+Tempo estimado: 30-45 minutos (automação) ou 2-3 horas (manual)
+
+Cobertura: ~95% das funcionalidades
+
