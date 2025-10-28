@@ -80,11 +80,11 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
                 dia_semana = registro.data.weekday()
                 tipo = registro.tipo_registro or ''
                 
-                if dia_semana == 6 or 'domingo' in tipo.lower():
-                    # Domingo ou feriado = HE 100%
+                # HE 100%: Domingo OU Feriado
+                if dia_semana == 6 or 'domingo' in tipo.lower() or 'feriado' in tipo.lower():
                     horas_extras_100 += Decimal(str(registro.horas_extras))
                 else:
-                    # Sábado ou dia útil = HE 50%
+                    # HE 50%: Sábado ou dia útil
                     horas_extras_50 += Decimal(str(registro.horas_extras))
         
         # Calcular dias úteis CORRETAMENTE (contando calendário real)
