@@ -1609,9 +1609,9 @@ def funcionarios():
                          funcionarios=funcionarios,
                          kpis_geral=kpis_geral,
                          obras_ativas=obras_ativas,
-                         departamentos=Departamento.query.all(),
+                         departamentos=Departamento.query.filter_by(admin_id=admin_id).all(),
                          funcoes=Funcao.query.all(),
-                         horarios=HorarioTrabalho.query.all(),
+                         horarios=HorarioTrabalho.query.filter_by(admin_id=admin_id).all(),
                          data_inicio=data_inicio,
                          data_fim=data_fim)
 
