@@ -1,0 +1,390 @@
+# 🚀 PROMPT: Correção Completa do Cálculo Salarial Conforme CLT
+
+**Data:** 27 de Outubro de 2025  
+**Objetivo:** Corrigir o cálculo salarial no sistema SIGE para seguir 100% das regras da CLT brasileira, incluindo dias úteis corretos, DSR, horas extras com diferentes percentuais e considerar horários de trabalho variados dos funcionários.
+
+---
+
+## 📊 PROBLEMAS IDENTIFICADOS NO CÓDIGO ATUAL
+
+### **1. Cálculo de Dias Úteis Incorreto** 🔴
+
+- **Arquivo:** `services/folha_service.py`
+- **Problema:** Usa aproximação grosseira (`dias_mes - 8`)
+- **Impacto:** Faltas e descontos calculados incorretamente
+
+---
+
+### **2. DSR (Descanso Semanal Remunerado) Faltando** 🔴
+
+- **Arquivo:** `services/folha_service.py`
+- **Problema:** Não calcula DSR sobre horas extras (mensalistas) nem DSR sobre horas normais (horistas)
+- **Impacto:** Salário menor que o devido, risco trabalhista
+
+---
+
+### **3. Horas Extras Simplificadas** 🟡
+
+- **Arquivo:** `utils.py`
+- **Problema:** Calcula apenas HE 50%, não diferencia HE 100% (domingos/feriados)
+- **Impacto:** Pagamento incorreto de horas extras
+
+---
+
+### **4. Horários de Trabalho Não Integrados** 🟡
+
+- **Arquivo:** `utils.py`
+- **Problema:** Usa valor fixo de `8.8h` para `horas_diarias`
+- **Impacto:** Não considera jornadas diferentes (6h, 8h, 12x36)
+
+---
+
+## ✅ CORREÇÃO COMPLETA (PASSO A PASSO)
+
+### **FASE 1: Refatorar `utils.py` - Funções de Cálculo de Horas**
+
+**Arquivo:** `utils.py`
+
+#### **1.1 - Corrigir `calcular_valor_hora_periodo`**
+
+**Substituir função (linha 198-233) por:**
+
+```python
+from models import ConfiguracaoSalarial, HorarioTrabalho
+
+def calcular_valor_hora_periodo(funcionario, data_inicio, data_fim):
+    """
+    Calcula o valor/hora baseado na configuração salarial e jornada de trabalho
+    """
+    if not funcionario:
+        return 0.0
+    
+    # 1. Buscar configuração salarial vigente
+    config_salarial = ConfiguracaoSalarial.query.filter(
+        ConfiguracaoSalarial.funcionario_id == funcionario.id,
+        ConfiguracaoSalarial.ativo == True,
+        ConfiguracaoSalarial.data_inicio <= data_inicio,
+        (ConfiguracaoSalarial.data_fim == None) | (ConfiguracaoSalarial.data_fim >= data_fim)
+    ).first()
+    
+    if not config_salarial:
+        return 0.0
+    
+    # 2. Se for horista, já tem o valor/hora
+    if config_salarial.tipo_salario == 'HORISTA' and config_salarial.valor_hora:
+        return float(config_salarial.valor_hora)
+    
+    # 3. Se for mensalista, calcular com base na carga horária
+    if config_salarial.tipo_salario == 'MENSAL':
+        carga_horaria_mensal = float(config_salarial.carga_horaria_mensal or 220)
+        
+        if carga_horaria_mensal > 0:
+            valor_hora = float(config_salarial.salario_base) / carga_horaria_mensal
+            return round(valor_hora, 2)
+    
+    return 0.0
+```
+
+---
+
+#### **1.2 - Corrigir `calcular_horas_trabalhadas`**
+
+**Substituir função (linha 91-196) por:**
+
+```python
+def calcular_horas_trabalhadas(hora_entrada, hora_saida, hora_almoco_saida=None, hora_almoco_retorno=None, data=None, horario_trabalho=None):
+    """
+    Calcula horas trabalhadas, extras 50% e 100% baseado no horário de trabalho
+    """
+    if not hora_entrada or not hora_saida:
+        return {
+            'horas_normais': 0.0,
+            'horas_extras_50': 0.0,
+            'horas_extras_100': 0.0,
+            'horas_noturnas': 0.0,
+            'atraso_minutos': 0
+        }
+
+    # Converter para datetime
+    base_date = data or date.today()
+    entrada_dt = datetime.combine(base_date, hora_entrada)
+    saida_dt = datetime.combine(base_date, hora_saida)
+
+    # Lógica de almoço
+    intervalo_almoco = timedelta(hours=0)
+    if hora_almoco_saida and hora_almoco_retorno:
+        almoco_saida_dt = datetime.combine(base_date, hora_almoco_saida)
+        almoco_retorno_dt = datetime.combine(base_date, hora_almoco_retorno)
+        intervalo_almoco = almoco_retorno_dt - almoco_saida_dt
+
+    # Total de horas trabalhadas
+    total_trabalhado = (saida_dt - entrada_dt) - intervalo_almoco
+    total_trabalhado_horas = total_trabalhado.total_seconds() / 3600
+
+    # Determinar jornada esperada
+    if not horario_trabalho:
+        # Fallback para jornada padrão
+        jornada_esperada_horas = 8.8  # 8h48min
+    else:
+        jornada_esperada_horas = float(horario_trabalho.horas_diarias)
+
+    # Calcular horas extras
+    horas_normais = 0.0
+    horas_extras_50 = 0.0
+    horas_extras_100 = 0.0
+
+    # Verificar dia da semana (0=seg, 6=dom)
+    dia_semana = base_date.weekday()
+
+    # TODO: Implementar lógica de feriados
+    is_feriado = False
+
+    if dia_semana == 6 or is_feriado:  # Domingo ou feriado
+        horas_extras_100 = total_trabalhado_horas
+    elif dia_semana == 5:  # Sábado
+        horas_extras_50 = total_trabalhado_horas
+    else:  # Dia de semana
+        if total_trabalhado_horas > jornada_esperada_horas:
+            horas_normais = jornada_esperada_horas
+            horas_extras_50 = total_trabalhado_horas - jornada_esperada_horas
+        else:
+            horas_normais = total_trabalhado_horas
+
+    # TODO: Implementar cálculo de horas noturnas e atrasos
+
+    return {
+        'horas_normais': round(horas_normais, 2),
+        'horas_extras_50': round(horas_extras_50, 2),
+        'horas_extras_100': round(horas_extras_100, 2),
+        'horas_noturnas': 0.0,
+        'atraso_minutos': 0
+    }
+```
+
+---
+
+### **FASE 2: Refatorar `folha_service.py` - Lógica de Cálculo Salarial**
+
+**Arquivo:** `services/folha_service.py`
+
+#### **2.1 - Corrigir `calcular_horas_mes`**
+
+**Substituir função (linha 42-94) por:**
+
+```python
+def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
+    """
+    Calcula horas trabalhadas no mês (CONFORME CLT)
+    """
+    try:
+        registros = RegistroPonto.query.filter(
+            RegistroPonto.funcionario_id == funcionario_id,
+            extract('year', RegistroPonto.data) == ano,
+            extract('month', RegistroPonto.data) == mes
+        ).all()
+
+        total_horas_normais = Decimal('0')
+        total_horas_extras_50 = Decimal('0')
+        total_horas_extras_100 = Decimal('0')
+        dias_trabalhados = 0
+
+        # Buscar horário de trabalho do funcionário
+        from models import Funcionario
+        funcionario = Funcionario.query.get(funcionario_id)
+        horario_trabalho = funcionario.horario_trabalho
+
+        for registro in registros:
+            if registro.entrada and registro.saida:
+                horas_dia = calcular_horas_trabalhadas(
+                    registro.entrada,
+                    registro.saida,
+                    registro.almoco_saida,
+                    registro.almoco_retorno,
+                    registro.data,
+                    horario_trabalho
+                )
+
+                total_horas_normais += Decimal(str(horas_dia['horas_normais']))
+                total_horas_extras_50 += Decimal(str(horas_dia['horas_extras_50']))
+                total_horas_extras_100 += Decimal(str(horas_dia['horas_extras_100']))
+                dias_trabalhados += 1
+
+        # Calcular dias úteis esperados
+        import calendar
+        from datetime import date, timedelta
+        
+        primeiro_dia = date(ano, mes, 1)
+        ultimo_dia = date(ano, mes, calendar.monthrange(ano, mes)[1])
+        
+        dias_uteis_esperados = 0
+        domingos_feriados = 0
+        dia_atual = primeiro_dia
+        
+        while dia_atual <= ultimo_dia:
+            if dia_atual.weekday() < 5:  # Segunda a sexta
+                dias_uteis_esperados += 1
+            else:
+                domingos_feriados += 1
+            dia_atual += timedelta(days=1)
+
+        faltas = max(0, dias_uteis_esperados - dias_trabalhados)
+
+        return {
+            'horas_normais': float(total_horas_normais),
+            'horas_extras_50': float(total_horas_extras_50),
+            'horas_extras_100': float(total_horas_extras_100),
+            'dias_trabalhados': dias_trabalhados,
+            'dias_uteis_esperados': dias_uteis_esperados,
+            'domingos_feriados': domingos_feriados,
+            'faltas': faltas
+        }
+
+    except Exception as e:
+        print(f"Erro ao calcular horas do mês: {e}")
+        return {
+            'horas_normais': 0, 'horas_extras_50': 0, 'horas_extras_100': 0,
+            'dias_trabalhados': 0, 'dias_uteis_esperados': 0, 'domingos_feriados': 0, 'faltas': 0
+        }
+```
+
+---
+
+#### **2.2 - Adicionar `calcular_dsr`**
+
+**Adicionar nova função:**
+
+```python
+def calcular_dsr(horas_info: Dict, valor_hora_normal: Decimal, valor_hora_extra_50: Decimal, valor_hora_extra_100: Decimal) -> Decimal:
+    """
+    Calcula DSR sobre horas extras e para horistas
+    """
+    try:
+        dias_uteis = horas_info.get('dias_uteis_esperados', 0)
+        domingos_feriados = horas_info.get('domingos_feriados', 0)
+
+        if dias_uteis == 0 or domingos_feriados == 0:
+            return Decimal('0')
+
+        # DSR sobre horas extras
+        total_he_valor = (valor_hora_extra_50 * Decimal(str(horas_info['horas_extras_50']))) + \
+                         (valor_hora_extra_100 * Decimal(str(horas_info['horas_extras_100'])))
+        
+        dsr_sobre_he = (total_he_valor / Decimal(str(dias_uteis))) * Decimal(str(domingos_feriados))
+
+        # TODO: Adicionar lógica para horistas (DSR sobre horas normais)
+
+        return dsr_sobre_he.quantize(Decimal('0.01'))
+
+    except Exception as e:
+        print(f"Erro ao calcular DSR: {e}")
+        return Decimal('0')
+```
+
+---
+
+#### **2.3 - Corrigir `calcular_salario_bruto`**
+
+**Substituir função (linha 97-153) por:**
+
+```python
+def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inicio: date, data_fim: date) -> Dict:
+    """
+    Calcula salário bruto completo (CLT)
+    """
+    try:
+        # Buscar configuração salarial
+        config = ConfiguracaoSalarial.query.filter_by(
+            funcionario_id=funcionario.id, ativo=True
+        ).first()
+
+        if not config:
+            return {'total': Decimal('0')}
+
+        salario_base = config.salario_base
+        tipo_salario = config.tipo_salario
+
+        # Calcular valor/hora
+        valor_hora = Decimal(str(calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)))
+
+        # Salário normal
+        if tipo_salario == 'HORISTA':
+            salario_normal = valor_hora * Decimal(str(horas_info['horas_normais']))
+        else:  # MENSALISTA
+            salario_normal = salario_base
+
+        # Horas extras
+        valor_he_50 = valor_hora * Decimal('1.5') * Decimal(str(horas_info['horas_extras_50']))
+        valor_he_100 = valor_hora * Decimal('2.0') * Decimal(str(horas_info['horas_extras_100']))
+
+        # DSR
+        valor_dsr = calcular_dsr(horas_info, valor_hora, valor_hora * Decimal('1.5'), valor_hora * Decimal('2.0'))
+
+        # Desconto de faltas
+        if horas_info['faltas'] > 0:
+            valor_dia = salario_base / Decimal('30')
+            desconto_faltas = valor_dia * Decimal(str(horas_info['faltas']))
+            # TODO: Descontar DSR da semana da falta
+        else:
+            desconto_faltas = Decimal('0')
+
+        # Total bruto
+        total_bruto = salario_normal + valor_he_50 + valor_he_100 + valor_dsr - desconto_faltas
+
+        return {
+            'salario_base': salario_base,
+            'salario_normal': salario_normal,
+            'horas_extras_50': valor_he_50,
+            'horas_extras_100': valor_he_100,
+            'dsr': valor_dsr,
+            'desconto_faltas': desconto_faltas,
+            'total': total_bruto.quantize(Decimal('0.01'))
+        }
+
+    except Exception as e:
+        print(f"Erro ao calcular salário bruto: {e}")
+        return {'total': Decimal('0')}
+```
+
+---
+
+## 📋 RESUMO DAS MUDANÇAS
+
+### **1. `utils.py`**
+
+- ✅ `calcular_valor_hora_periodo`: Agora usa `ConfiguracaoSalarial` e `carga_horaria_mensal` (correto)
+- ✅ `calcular_horas_trabalhadas`: Agora considera `horario_trabalho` do funcionário e diferencia HE 50% e 100%
+
+### **2. `folha_service.py`**
+
+- ✅ `calcular_horas_mes`: Agora usa `calcular_horas_trabalhadas` e calcula dias úteis e domingos corretamente
+- ✅ **NOVO:** `calcular_dsr`: Calcula DSR sobre horas extras
+- ✅ `calcular_salario_bruto`: Agora integra tudo (salário, HE 50/100, DSR, faltas)
+
+---
+
+## 🎯 RESULTADO FINAL
+
+Após aplicar este prompt, o sistema irá:
+
+1. ✅ **Calcular horas extras corretamente** (50% dias de semana, 100% domingos/feriados)
+2. ✅ **Considerar diferentes jornadas de trabalho** (6h, 8h, etc.)
+3. ✅ **Calcular DSR** sobre horas extras
+4. ✅ **Descontar faltas** com base no salário/30 (padrão CLT)
+5. ✅ **Exibir KPIs precisos** no perfil do funcionário
+6. ✅ **Processar folha de pagamento 100% conforme CLT**
+
+---
+
+## ✅ CHECKLIST DE VALIDAÇÃO
+
+- [ ] **Teste 1 (Mensalista, sem HE):** Salário bruto = Salário base
+- [ ] **Teste 2 (Mensalista, com HE):** Salário bruto = Salário base + HE 50% + DSR sobre HE
+- [ ] **Teste 3 (Mensalista, com HE em domingo):** Salário bruto = Salário base + HE 100% + DSR sobre HE
+- [ ] **Teste 4 (Mensalista, com falta):** Salário bruto = Salário base - (Salário base / 30 * faltas)
+- [ ] **Teste 5 (Horista):** Salário bruto = (Horas normais * valor/hora) + HE + DSR
+- [ ] **Teste 6 (Jornada 6h):** Horas extras calculadas após 6h diárias
+
+---
+
+**Pronto para executar no Replit Agent e deixar o cálculo salarial 100% correto!** 🚀**
+

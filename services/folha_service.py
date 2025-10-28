@@ -41,13 +41,16 @@ ALIQUOTA_FGTS = Decimal('8.0')
 
 def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
     """
-    Calcula horas trabalhadas no mês baseado nos registros de ponto
+    Calcula horas trabalhadas no mês baseado nos registros de ponto (CONFORME CLT)
     
     Returns:
         dict: {
             'total': float,
             'extras': float, 
             'dias_trabalhados': int,
+            'dias_uteis_esperados': int,
+            'domingos_feriados': int,
+            'sabados': int,
             'faltas': int
         }
     """
@@ -71,16 +74,37 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
             if registro.horas_extras:
                 horas_extras += Decimal(str(registro.horas_extras))
         
-        # Calcular faltas (dias úteis esperados - dias trabalhados)
+        # Calcular dias úteis CORRETAMENTE (contando calendário real)
         import calendar
-        dias_mes = calendar.monthrange(ano, mes)[1]
-        dias_uteis_esperados = dias_mes - 8  # Aproximado (descontando domingos e sábados)
+        from datetime import date, timedelta
+        
+        primeiro_dia = date(ano, mes, 1)
+        ultimo_dia = date(ano, mes, calendar.monthrange(ano, mes)[1])
+        
+        dias_uteis_esperados = 0
+        domingos_feriados = 0
+        sabados = 0
+        dia_atual = primeiro_dia
+        
+        while dia_atual <= ultimo_dia:
+            if dia_atual.weekday() == 6:  # Domingo
+                domingos_feriados += 1
+            elif dia_atual.weekday() == 5:  # Sábado
+                sabados += 1
+            else:  # Segunda a sexta
+                dias_uteis_esperados += 1
+            dia_atual += timedelta(days=1)
+        
+        # Calcular faltas (dias úteis esperados - dias trabalhados)
         faltas = max(0, dias_uteis_esperados - dias_trabalhados)
         
         return {
             'total': float(total_horas),
             'extras': float(horas_extras),
             'dias_trabalhados': dias_trabalhados,
+            'dias_uteis_esperados': dias_uteis_esperados,
+            'domingos_feriados': domingos_feriados,
+            'sabados': sabados,
             'faltas': faltas
         }
         
@@ -90,8 +114,44 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
             'total': 0,
             'extras': 0,
             'dias_trabalhados': 0,
+            'dias_uteis_esperados': 0,
+            'domingos_feriados': 0,
+            'sabados': 0,
             'faltas': 0
         }
+
+
+def calcular_dsr(horas_info: Dict, valor_hora_normal: Decimal) -> Decimal:
+    """
+    Calcula DSR (Descanso Semanal Remunerado) sobre horas extras
+    Conforme Lei 605/49 - Funcionário tem direito a descanso remunerado
+    
+    Args:
+        horas_info: Dicionário com informações de horas e dias
+        valor_hora_normal: Valor da hora normal
+        
+    Returns:
+        Decimal: Valor do DSR sobre horas extras
+    """
+    try:
+        dias_uteis = horas_info.get('dias_uteis_esperados', 0)
+        domingos_feriados = horas_info.get('domingos_feriados', 0)
+        horas_extras = horas_info.get('extras', 0)
+        
+        if dias_uteis == 0 or domingos_feriados == 0 or horas_extras == 0:
+            return Decimal('0')
+        
+        # Calcular valor das horas extras
+        valor_he = valor_hora_normal * Decimal('1.5') * Decimal(str(horas_extras))
+        
+        # DSR = (Valor HE / Dias Úteis) * Domingos/Feriados
+        dsr_sobre_he = (valor_he / Decimal(str(dias_uteis))) * Decimal(str(domingos_feriados))
+        
+        return dsr_sobre_he.quantize(Decimal('0.01'))
+        
+    except Exception as e:
+        print(f"Erro ao calcular DSR: {e}")
+        return Decimal('0')
 
 
 def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inicio: date, data_fim: date) -> Decimal:
@@ -141,10 +201,13 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
         valor_hora_normal = Decimal(str(calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)))
         valor_extras = valor_hora_normal * Decimal('1.5') * Decimal(str(horas_info['extras']))
         
+        # Calcular DSR sobre horas extras
+        valor_dsr = calcular_dsr(horas_info, valor_hora_normal)
+        
         # Descontar faltas (se houver)
         valor_desconto_faltas = valor_hora_normal * 8 * Decimal(str(horas_info['faltas']))
         
-        salario_bruto = salario_normal + valor_extras - valor_desconto_faltas
+        salario_bruto = salario_normal + valor_extras + valor_dsr - valor_desconto_faltas
         
         return salario_bruto
         

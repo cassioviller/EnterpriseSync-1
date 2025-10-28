@@ -1648,6 +1648,23 @@ def funcionario_perfil(id):
         query = query.filter(RegistroPonto.admin_id == admin_id)
     registros = query.order_by(RegistroPonto.data.desc()).all()  # Ordenar por data decrescente
     
+    # Calcular dias úteis CORRETAMENTE (calendário real, não aproximação)
+    from datetime import timedelta
+    
+    dias_uteis_esperados = 0
+    domingos_feriados = 0
+    sabados = 0
+    dia_atual = data_inicio
+    
+    while dia_atual <= data_fim:
+        if dia_atual.weekday() == 6:  # Domingo
+            domingos_feriados += 1
+        elif dia_atual.weekday() == 5:  # Sábado
+            sabados += 1
+        else:  # Segunda a sexta
+            dias_uteis_esperados += 1
+        dia_atual += timedelta(days=1)
+    
     # Calcular KPIs
     total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
     total_extras = sum(r.horas_extras or 0 for r in registros)
@@ -1658,20 +1675,22 @@ def funcionario_perfil(id):
     # Calcular valores monetários detalhados
     valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim) if funcionario.salario else 0
     valor_horas_extras = total_extras * valor_hora * 1.5
+    
+    # Calcular DSR sobre horas extras (Lei 605/49)
+    if dias_uteis_esperados > 0 and domingos_feriados > 0 and total_extras > 0:
+        valor_dsr_he = (valor_horas_extras / dias_uteis_esperados) * domingos_feriados
+    else:
+        valor_dsr_he = 0
+    
+    # Faltas e descontos
     valor_faltas = total_faltas * valor_hora * 8  # Desconto de 8h por falta
     valor_faltas_justificadas = faltas_justificadas * valor_hora * 8  # Faltas justificadas
-    
-    # Calcular DSR das faltas (Lei 605/49)
-    # DSR = Descanso Semanal Remunerado perdido por faltas injustificadas
-    # Para cada 6 dias trabalhados, 1 dia de DSR
-    # Faltas fazem perder proporcionalmente o DSR
-    dias_uteis_periodo = len([r for r in registros if r.data.weekday() < 5])  # Segunda a sexta
     dsr_perdido_dias = total_faltas / 6 if total_faltas > 0 else 0  # Proporção de DSR perdido
     valor_dsr_perdido = dsr_perdido_dias * valor_hora * 8  # Valor do DSR perdido
     
     # Calcular estatísticas adicionais
     dias_trabalhados = len([r for r in registros if r.horas_trabalhadas and r.horas_trabalhadas > 0])
-    taxa_absenteismo = (total_faltas / len(registros) * 100) if registros else 0
+    taxa_absenteismo = (total_faltas / dias_uteis_esperados * 100) if dias_uteis_esperados > 0 else 0
     
     kpis = {
         'horas_trabalhadas': total_horas,
@@ -1680,12 +1699,16 @@ def funcionario_perfil(id):
         'faltas_justificadas': faltas_justificadas,
         'atrasos': total_atrasos,
         'valor_horas_extras': valor_horas_extras,
+        'valor_dsr_he': valor_dsr_he,  # DSR sobre horas extras
         'valor_faltas': valor_faltas,
         'valor_faltas_justificadas': valor_faltas_justificadas,
         'dsr_perdido_dias': round(dsr_perdido_dias, 2),
         'valor_dsr_perdido': valor_dsr_perdido,
+        'dias_uteis_esperados': dias_uteis_esperados,
+        'domingos_feriados': domingos_feriados,
+        'sabados': sabados,
         'taxa_eficiencia': (total_horas / (dias_trabalhados * 8) * 100) if dias_trabalhados > 0 else 0,
-        'custo_total': (total_horas + total_extras * 1.5) * valor_hora,
+        'custo_total': (total_horas * valor_hora) + valor_horas_extras + valor_dsr_he,
         'absenteismo': taxa_absenteismo,
         'produtividade': 85.0,  # Valor calculado baseado no desempenho
         'pontualidade': max(0, 100 - (total_atrasos * 5)),  # Reduz 5% por hora de atraso
@@ -1694,11 +1717,11 @@ def funcionario_perfil(id):
         # Campos adicionais para compatibilidade com template
         'media_diaria': total_horas / dias_trabalhados if dias_trabalhados > 0 else 0,
         'dias_faltas_justificadas': faltas_justificadas,
-        'custo_mao_obra': (total_horas + total_extras * 1.5) * valor_hora,
+        'custo_mao_obra': (total_horas * valor_hora) + valor_horas_extras + valor_dsr_he,
         'custo_alimentacao': 0.0,
         'custo_transporte': 0.0,
         'outros_custos': 0.0,
-        'custo_total_geral': (total_horas + total_extras * 1.5) * valor_hora,
+        'custo_total_geral': (total_horas * valor_hora) + valor_horas_extras + valor_dsr_he,
         'horas_perdidas_total': total_faltas * 8 + total_atrasos,
         'valor_hora_atual': valor_hora,
         'custo_faltas_justificadas': valor_faltas_justificadas
