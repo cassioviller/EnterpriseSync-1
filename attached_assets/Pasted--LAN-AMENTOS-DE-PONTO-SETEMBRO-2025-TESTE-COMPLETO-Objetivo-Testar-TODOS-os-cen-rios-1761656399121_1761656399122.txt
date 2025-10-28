@@ -1,0 +1,325 @@
+# 📊 LANÇAMENTOS DE PONTO - SETEMBRO/2025 (TESTE COMPLETO)
+
+**Objetivo:** Testar TODOS os cenários de cálculo salarial conforme CLT  
+**Funcionário Teste:** João da Silva (Pedreiro)  
+**Salário Base:** R$ 2.500,00  
+**Tipo:** Mensalista  
+**Jornada:** 8h/dia (08:00-17:00, almoço 12:00-13:00)  
+**Carga Horária Mensal:** 220 horas
+
+---
+
+## 📅 CALENDÁRIO SETEMBRO/2025
+
+- **Total de dias:** 30
+- **Dias úteis (seg-sex):** 22
+- **Sábados:** 4
+- **Domingos:** 4
+- **Primeiro dia:** 01/09/2025 (Segunda-feira)
+- **Último dia:** 30/09/2025 (Terça-feira)
+
+---
+
+## 🎯 CENÁRIOS DE TESTE
+
+### **Semana 1 (01-07/09):**
+- ✅ 5 dias normais (seg-sex)
+- ✅ 1 dia com hora extra (quinta)
+
+### **Semana 2 (08-14/09):**
+- ✅ 1 falta injustificada (terça)
+- ✅ 1 atraso (quarta)
+- ✅ 1 sábado trabalhado (HE 50%)
+
+### **Semana 3 (15-21/09):**
+- ✅ 5 dias normais
+- ✅ 1 domingo trabalhado (HE 100%)
+
+### **Semana 4 (22-28/09):**
+- ✅ 4 dias normais
+- ✅ 1 dia com 2h extras (quinta)
+
+### **Semana 5 (29-30/09):**
+- ✅ 2 dias normais
+
+---
+
+## 📋 TABELA COMPLETA DE PONTOS
+
+| Data | Dia Semana | Entrada | Saída Almoço | Retorno | Saída | Horas Trab | Horas Normais | HE 50% | HE 100% | Observação |
+|---|---|---|---|---|---|---|---|---|---|
+| 01/09 | Segunda | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 02/09 | Terça | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 03/09 | Quarta | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 04/09 | Quinta | 08:00 | 12:00 | 13:00 | 19:00 | 10h | 8h | 2h | 0h | 2h extras |
+| 05/09 | Sexta | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 06/09 | Sábado | - | - | - | - | 0h | 0h | 0h | 0h | Descanso |
+| 07/09 | Domingo | - | - | - | - | 0h | 0h | 0h | 0h | Descanso |
+| 08/09 | Segunda | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 09/09 | Terça | - | - | - | - | 0h | 0h | 0h | 0h | **FALTA INJUSTIFICADA** |
+| 10/09 | Quarta | 08:15 | 12:00 | 13:00 | 17:00 | 7h45 | 7h45 | 0h | 0h | Atraso 15 min |
+| 11/09 | Quinta | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 12/09 | Sexta | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 13/09 | Sábado | 08:00 | 12:00 | - | - | 4h | 0h | 4h | 0h | Sábado trabalhado |
+| 14/09 | Domingo | - | - | - | - | 0h | 0h | 0h | 0h | Descanso |
+| 15/09 | Segunda | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 16/09 | Terça | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 17/09 | Quarta | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 18/09 | Quinta | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 19/09 | Sexta | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 20/09 | Sábado | - | - | - | - | 0h | 0h | 0h | 0h | Descanso |
+| 21/09 | Domingo | 08:00 | 12:00 | - | - | 4h | 0h | 0h | 4h | Domingo trabalhado |
+| 22/09 | Segunda | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 23/09 | Terça | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 24/09 | Quarta | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 25/09 | Quinta | 08:00 | 12:00 | 13:00 | 19:00 | 10h | 8h | 2h | 0h | 2h extras |
+| 26/09 | Sexta | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 27/09 | Sábado | - | - | - | - | 0h | 0h | 0h | 0h | Descanso |
+| 28/09 | Domingo | - | - | - | - | 0h | 0h | 0h | 0h | Descanso |
+| 29/09 | Segunda | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+| 30/09 | Terça | 08:00 | 12:00 | 13:00 | 17:00 | 8h | 8h | 0h | 0h | Dia normal |
+
+---
+
+## 📊 RESUMO DO MÊS
+
+### **Totais:**
+- **Dias trabalhados:** 21 dias
+- **Dias úteis esperados:** 22 dias
+- **Faltas:** 1 dia (09/09 - injustificada)
+- **Atrasos:** 15 minutos (10/09)
+
+### **Horas:**
+- **Horas normais:** 167h45 (21 dias × 8h - 15 min atraso)
+- **Horas extras 50%:** 8h (2h dia 04/09 + 2h dia 25/09 + 4h sábado 13/09)
+- **Horas extras 100%:** 4h (domingo 21/09)
+
+---
+
+## 💰 CÁLCULO ESPERADO DO SALÁRIO
+
+### **1. Valores Base**
+
+```
+Salário base: R$ 2.500,00
+Carga horária mensal: 220 horas
+Valor/hora: R$ 2.500 / 220 = R$ 11,36
+```
+
+---
+
+### **2. Salário Normal (Mensalista)**
+
+```
+Salário normal = R$ 2.500,00
+```
+
+---
+
+### **3. Horas Extras 50%**
+
+```
+Valor hora extra 50% = R$ 11,36 × 1,5 = R$ 17,04
+Total HE 50% = 8h × R$ 17,04 = R$ 136,32
+```
+
+**Detalhamento:**
+- 04/09 (quinta): 2h × R$ 17,04 = R$ 34,08
+- 13/09 (sábado): 4h × R$ 17,04 = R$ 68,16
+- 25/09 (quinta): 2h × R$ 17,04 = R$ 34,08
+
+---
+
+### **4. Horas Extras 100%**
+
+```
+Valor hora extra 100% = R$ 11,36 × 2,0 = R$ 22,72
+Total HE 100% = 4h × R$ 22,72 = R$ 90,88
+```
+
+**Detalhamento:**
+- 21/09 (domingo): 4h × R$ 22,72 = R$ 90,88
+
+---
+
+### **5. DSR (Descanso Semanal Remunerado)**
+
+```
+Total HE (valor) = R$ 136,32 + R$ 90,88 = R$ 227,20
+Dias úteis = 22
+Domingos/feriados = 4
+
+DSR = (R$ 227,20 / 22) × 4 = R$ 41,31
+```
+
+---
+
+### **6. Desconto de Falta**
+
+```
+Valor dia = R$ 2.500 / 30 = R$ 83,33
+Faltas = 1
+Desconto falta = R$ 83,33 × 1 = R$ 83,33
+```
+
+**OBS:** Se a falta for injustificada, também perde o DSR da semana (R$ 83,33 adicional).  
+**Desconto total por falta injustificada = R$ 83,33 + R$ 83,33 = R$ 166,66**
+
+---
+
+### **7. Desconto de Atraso**
+
+```
+Valor hora = R$ 11,36
+Atraso = 15 minutos = 0,25 horas
+Desconto atraso = R$ 11,36 × 0,25 = R$ 2,84
+```
+
+---
+
+### **8. SALÁRIO BRUTO FINAL**
+
+#### **Cenário A: Falta Injustificada (PERDE DSR da semana)**
+
+```
+Salário base:          R$ 2.500,00
++ HE 50%:              R$   136,32
++ HE 100%:             R$    90,88
++ DSR sobre HE:        R$    41,31
+- Desconto falta:      R$    83,33
+- Desconto DSR perdido: R$    83,33
+- Desconto atraso:     R$     2,84
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SALÁRIO BRUTO:         R$ 2.599,01
+```
+
+#### **Cenário B: Falta Justificada (NÃO perde DSR)**
+
+```
+Salário base:          R$ 2.500,00
++ HE 50%:              R$   136,32
++ HE 100%:             R$    90,88
++ DSR sobre HE:        R$    41,31
+- Desconto falta:      R$    83,33
+- Desconto atraso:     R$     2,84
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SALÁRIO BRUTO:         R$ 2.682,34
+```
+
+---
+
+## 🎯 VALORES ESPERADOS PARA VALIDAÇÃO
+
+### **Resumo para o Replit Agent Validar:**
+
+| Item | Valor Esperado |
+|---|---|
+| **Dias trabalhados** | 21 |
+| **Dias úteis esperados** | 22 |
+| **Faltas** | 1 |
+| **Horas normais** | 167,75h |
+| **Horas extras 50%** | 8h |
+| **Horas extras 100%** | 4h |
+| **Valor HE 50%** | R$ 136,32 |
+| **Valor HE 100%** | R$ 90,88 |
+| **DSR sobre HE** | R$ 41,31 |
+| **Desconto falta** | R$ 83,33 |
+| **Desconto DSR (se injust.)** | R$ 83,33 |
+| **Desconto atraso** | R$ 2,84 |
+| **SALÁRIO BRUTO (falta injust.)** | **R$ 2.599,01** |
+| **SALÁRIO BRUTO (falta just.)** | **R$ 2.682,34** |
+
+---
+
+## 📋 SCRIPT SQL PARA INSERIR PONTOS
+
+```sql
+-- Limpar pontos anteriores de Setembro/2025
+DELETE FROM registro_ponto 
+WHERE funcionario_id = 1 
+  AND EXTRACT(YEAR FROM data) = 2025 
+  AND EXTRACT(MONTH FROM data) = 9;
+
+-- Inserir pontos de Setembro/2025
+INSERT INTO registro_ponto (funcionario_id, data, entrada, almoco_saida, almoco_retorno, saida, admin_id, created_at) VALUES
+-- Semana 1
+(1, '2025-09-01', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-02', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-03', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-04', '08:00', '12:00', '13:00', '19:00', 2, NOW()), -- 2h extras
+(1, '2025-09-05', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+
+-- Semana 2
+(1, '2025-09-08', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+-- 09/09: FALTA (não inserir registro)
+(1, '2025-09-10', '08:15', '12:00', '13:00', '17:00', 2, NOW()), -- Atraso 15 min
+(1, '2025-09-11', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-12', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-13', '08:00', '12:00', NULL, NULL, 2, NOW()), -- Sábado 4h (sem almoço)
+
+-- Semana 3
+(1, '2025-09-15', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-16', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-17', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-18', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-19', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-21', '08:00', '12:00', NULL, NULL, 2, NOW()), -- Domingo 4h (sem almoço)
+
+-- Semana 4
+(1, '2025-09-22', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-23', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-24', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-25', '08:00', '12:00', '13:00', '19:00', 2, NOW()), -- 2h extras
+(1, '2025-09-26', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+
+-- Semana 5
+(1, '2025-09-29', '08:00', '12:00', '13:00', '17:00', 2, NOW()),
+(1, '2025-09-30', '08:00', '12:00', '13:00', '17:00', 2, NOW());
+```
+
+---
+
+## 🧪 CHECKLIST DE VALIDAÇÃO
+
+Após processar a folha de Setembro/2025, verificar:
+
+### **KPIs do Perfil do Funcionário:**
+
+- [ ] Dias trabalhados = 21
+- [ ] Horas normais = 167,75h (ou ~168h)
+- [ ] Horas extras 50% = 8h
+- [ ] Horas extras 100% = 4h
+- [ ] Faltas = 1
+
+### **Cálculo Salarial:**
+
+- [ ] Salário base = R$ 2.500,00
+- [ ] Valor HE 50% = R$ 136,32
+- [ ] Valor HE 100% = R$ 90,88
+- [ ] DSR sobre HE = R$ 41,31
+- [ ] Desconto falta = R$ 83,33 (ou R$ 166,66 se injustificada)
+- [ ] Desconto atraso = R$ 2,84
+- [ ] **Salário bruto = R$ 2.599,01 (falta injust.) ou R$ 2.682,34 (falta just.)**
+
+### **Holerite:**
+
+- [ ] Todos os valores aparecem separadamente
+- [ ] DSR aparece como linha separada
+- [ ] HE 50% e HE 100% separadas
+- [ ] Desconto de falta e atraso visíveis
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+Se o sistema estiver calculando corretamente conforme CLT, o salário bruto deve ser:
+
+- **R$ 2.599,01** (se a falta for injustificada)
+- **R$ 2.682,34** (se a falta for justificada)
+
+Qualquer valor diferente indica que há erro no cálculo!
+
+---
+
+**Dados prontos para teste completo do sistema!** 🚀
+

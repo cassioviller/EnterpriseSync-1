@@ -124,7 +124,7 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
 def calcular_dsr(horas_info: Dict, valor_hora_normal: Decimal) -> Decimal:
     """
     Calcula DSR (Descanso Semanal Remunerado) sobre horas extras
-    Conforme Lei 605/49 - Funcionário tem direito a descanso remunerado
+    Conforme Lei 605/49 - Funcionário PERDE DSR em caso de faltas injustificadas
     
     Args:
         horas_info: Dicionário com informações de horas e dias
@@ -134,18 +134,27 @@ def calcular_dsr(horas_info: Dict, valor_hora_normal: Decimal) -> Decimal:
         Decimal: Valor do DSR sobre horas extras
     """
     try:
-        dias_uteis = horas_info.get('dias_uteis_esperados', 0)
+        dias_trabalhados = horas_info.get('dias_trabalhados', 0)
         domingos_feriados = horas_info.get('domingos_feriados', 0)
         horas_extras = horas_info.get('extras', 0)
+        faltas = horas_info.get('faltas', 0)
         
-        if dias_uteis == 0 or domingos_feriados == 0 or horas_extras == 0:
+        # Se tiver faltas injustificadas, perde DSR proporcional
+        # Lei 605/49: Falta injustificada = perde DSR da semana
+        if faltas > 0:
+            # Calcular quantos domingos/sábados perder (1 DSR a cada 6 dias úteis)
+            domingos_perdidos = int(faltas / 6) + (1 if faltas % 6 > 0 else 0)
+            domingos_feriados = max(0, domingos_feriados - domingos_perdidos)
+        
+        if dias_trabalhados == 0 or domingos_feriados == 0 or horas_extras == 0:
             return Decimal('0')
         
         # Calcular valor das horas extras
         valor_he = valor_hora_normal * Decimal('1.5') * Decimal(str(horas_extras))
         
-        # DSR = (Valor HE / Dias Úteis) * Domingos/Feriados
-        dsr_sobre_he = (valor_he / Decimal(str(dias_uteis))) * Decimal(str(domingos_feriados))
+        # DSR = (Valor HE / Dias TRABALHADOS) * Domingos/Feriados
+        # CORREÇÃO: Usa dias_trabalhados, não dias_uteis_esperados
+        dsr_sobre_he = (valor_he / Decimal(str(dias_trabalhados))) * Decimal(str(domingos_feriados))
         
         return dsr_sobre_he.quantize(Decimal('0.01'))
         
