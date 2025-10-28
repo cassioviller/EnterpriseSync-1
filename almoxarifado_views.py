@@ -54,11 +54,13 @@ def dashboard():
                 admin_id=admin_id
             ).scalar() or 0
         
-        if estoque_atual < item.estoque_minimo:
+        # Tratar estoque_minimo NULL (padronizar como 0)
+        estoque_minimo = item.estoque_minimo if item.estoque_minimo is not None else 0
+        if estoque_atual < estoque_minimo:
             itens_estoque_baixo.append({
                 'item': item,
                 'estoque_atual': estoque_atual,
-                'estoque_minimo': item.estoque_minimo
+                'estoque_minimo': estoque_minimo
             })
     
     estoque_baixo = len(itens_estoque_baixo)
@@ -301,10 +303,12 @@ def itens():
                 admin_id=admin_id
             ).scalar() or 0
         
+        # Tratar estoque_minimo NULL (padronizar como 0)
+        estoque_minimo = item.estoque_minimo if item.estoque_minimo is not None else 0
         itens_com_estoque.append({
             'item': item,
             'estoque_atual': estoque_atual,
-            'status_estoque': 'baixo' if estoque_atual <= item.estoque_minimo else 'normal'
+            'status_estoque': 'baixo' if estoque_atual <= estoque_minimo else 'normal'
         })
     
     return render_template('almoxarifado/itens.html',
