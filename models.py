@@ -54,6 +54,7 @@ class Funcao(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.Text)
     salario_base = db.Column(db.Float, default=0.0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     funcionarios = db.relationship('Funcionario', backref='funcao_ref', lazy=True)

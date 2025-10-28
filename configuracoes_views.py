@@ -153,7 +153,9 @@ def api_empresa():
 @admin_required
 def departamentos():
     """Listar departamentos"""
-    departamentos = Departamento.query.all()
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    departamentos = Departamento.query.filter_by(admin_id=admin_id).all()
     return render_template('configuracoes/departamentos.html', departamentos=departamentos)
 
 @configuracoes_bp.route('/departamentos/criar', methods=['GET', 'POST'])
@@ -163,9 +165,12 @@ def criar_departamento():
     """Criar departamento"""
     if request.method == 'POST':
         try:
+            from multitenant_helper import get_admin_id
+            admin_id = get_admin_id()
             dept = Departamento(
                 nome=request.form['nome'],
-                descricao=request.form.get('descricao')
+                descricao=request.form.get('descricao'),
+                admin_id=admin_id
             )
             db.session.add(dept)
             db.session.commit()
@@ -182,7 +187,9 @@ def criar_departamento():
 @admin_required
 def editar_departamento(id):
     """Editar departamento"""
-    dept = Departamento.query.get_or_404(id)
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    dept = Departamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     if request.method == 'POST':
         try:
@@ -203,7 +210,9 @@ def editar_departamento(id):
 def deletar_departamento(id):
     """Deletar departamento"""
     try:
-        dept = Departamento.query.get_or_404(id)
+        from multitenant_helper import get_admin_id
+        admin_id = get_admin_id()
+        dept = Departamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         db.session.delete(dept)
         db.session.commit()
         flash('Departamento deletado com sucesso!', 'success')
@@ -221,7 +230,9 @@ def deletar_departamento(id):
 @admin_required
 def funcoes():
     """Listar funções"""
-    funcoes = Funcao.query.all()
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    funcoes = Funcao.query.filter_by(admin_id=admin_id).all()
     return render_template('configuracoes/funcoes.html', funcoes=funcoes)
 
 @configuracoes_bp.route('/funcoes/criar', methods=['GET', 'POST'])
@@ -231,10 +242,13 @@ def criar_funcao():
     """Criar função"""
     if request.method == 'POST':
         try:
+            from multitenant_helper import get_admin_id
+            admin_id = get_admin_id()
             funcao = Funcao(
                 nome=request.form['nome'],
                 descricao=request.form.get('descricao'),
-                salario_base=float(request.form.get('salario_base', 0))
+                salario_base=float(request.form.get('salario_base', 0)),
+                admin_id=admin_id
             )
             db.session.add(funcao)
             db.session.commit()
@@ -251,7 +265,9 @@ def criar_funcao():
 @admin_required
 def editar_funcao(id):
     """Editar função"""
-    funcao = Funcao.query.get_or_404(id)
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    funcao = Funcao.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     if request.method == 'POST':
         try:
@@ -307,7 +323,9 @@ def editar_funcao(id):
 def deletar_funcao(id):
     """Deletar função"""
     try:
-        funcao = Funcao.query.get_or_404(id)
+        from multitenant_helper import get_admin_id
+        admin_id = get_admin_id()
+        funcao = Funcao.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         db.session.delete(funcao)
         db.session.commit()
         flash('Função deletada com sucesso!', 'success')
@@ -325,7 +343,9 @@ def deletar_funcao(id):
 @admin_required
 def horarios():
     """Listar horários de trabalho"""
-    horarios = HorarioTrabalho.query.all()
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    horarios = HorarioTrabalho.query.filter_by(admin_id=admin_id).all()
     return render_template('configuracoes/horarios.html', horarios=horarios)
 
 @configuracoes_bp.route('/horarios/criar', methods=['GET', 'POST'])
@@ -335,6 +355,8 @@ def criar_horario():
     """Criar horário de trabalho"""
     if request.method == 'POST':
         try:
+            from multitenant_helper import get_admin_id
+            admin_id = get_admin_id()
             horario = HorarioTrabalho(
                 nome=request.form['nome'],
                 entrada=datetime.strptime(request.form['entrada'], '%H:%M').time(),
@@ -343,7 +365,8 @@ def criar_horario():
                 saida=datetime.strptime(request.form['saida'], '%H:%M').time(),
                 dias_semana=request.form['dias_semana'],
                 horas_diarias=float(request.form.get('horas_diarias', 8.0)),
-                valor_hora=float(request.form.get('valor_hora', 12.0))
+                valor_hora=float(request.form.get('valor_hora', 12.0)),
+                admin_id=admin_id
             )
             db.session.add(horario)
             db.session.commit()
@@ -360,7 +383,9 @@ def criar_horario():
 @admin_required
 def editar_horario(id):
     """Editar horário de trabalho"""
-    horario = HorarioTrabalho.query.get_or_404(id)
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    horario = HorarioTrabalho.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     if request.method == 'POST':
         try:
@@ -387,7 +412,9 @@ def editar_horario(id):
 def deletar_horario(id):
     """Deletar horário de trabalho"""
     try:
-        horario = HorarioTrabalho.query.get_or_404(id)
+        from multitenant_helper import get_admin_id
+        admin_id = get_admin_id()
+        horario = HorarioTrabalho.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         db.session.delete(horario)
         db.session.commit()
         flash('Horário deletado com sucesso!', 'success')
