@@ -365,7 +365,8 @@ def salvar_rdo():
                                 rdo_id=rdo.id,
                                 funcionario_id=funcionario_id,
                                 funcao_exercida=funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Geral',
-                                horas_trabalhadas=horas
+                                horas_trabalhadas=horas,
+                                admin_id=admin_id
                             )
                             db.session.add(mao_obra)
                             funcionarios_salvos += 1
@@ -387,7 +388,8 @@ def salvar_rdo():
                             nome_equipamento=nome,
                             quantidade=int(eq_data.get('quantidade', 1)),
                             horas_utilizacao=float(eq_data.get('horas', 0)),
-                            observacoes=eq_data.get('observacoes', '').strip()
+                            observacoes=eq_data.get('observacoes', '').strip(),
+                            admin_id=admin_id
                         )
                         db.session.add(equipamento)
                         equipamentos_salvos += 1
@@ -411,7 +413,8 @@ def salvar_rdo():
                             responsavel_acao=oc_data.get('responsavel', '').strip(),
                             prazo_resolucao=datetime.strptime(oc_data.get('prazo'), '%Y-%m-%d').date() if oc_data.get('prazo') else None,
                             status_resolucao='Pendente',
-                            criado_em=datetime.utcnow()
+                            criado_em=datetime.utcnow(),
+                            admin_id=admin_id
                         )
                         db.session.add(ocorrencia)
                         ocorrencias_salvas += 1

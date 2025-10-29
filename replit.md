@@ -50,21 +50,34 @@ The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQ
 
 ## Recent Changes (October 29, 2025)
 **Implemented:**
-1. ✅ **Módulo de Custos - Dashboard TCO Completo** (Tarefas 1-4)
+1. ✅ **Migração 48 - Multi-Tenancy Completo (17 Modelos)**
+   - **Objetivo:** Completar isolamento multi-tenant adicionando admin_id em 17 modelos faltantes
+   - **Modelos Atualizados:** ServicoObra, HistoricoProdutividadeServico, TipoOcorrencia, Ocorrencia, CalendarioUtil, CentroCusto, Receita, OrcamentoObra, FluxoCaixa, RegistroAlimentacao, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, NotificacaoCliente, PropostaItem, PropostaArquivo
+   - **Mudanças no Banco:**
+     - Coluna admin_id adicionada (INTEGER NOT NULL)
+     - Foreign key para usuario(id) com ON DELETE CASCADE
+     - Registros existentes preenchidos com admin_id=54
+   - **Mudanças no Código:**
+     - models.py: admin_id definido como nullable=False em todos os 17 modelos
+     - Relacionamento Ocorrencia.aprovador corrigido com foreign_keys=[aprovado_por]
+   - **Status:** 100% completo - todas as 17 tabelas validadas e funcionando
+   - **IMPORTANTE:** Ao criar novos registros nesses modelos, sempre definir admin_id=current_user.id
+
+2. ✅ **Módulo de Custos - Dashboard TCO Completo** (Tarefas 1-4)
    - Dashboard com 4 KPIs: Total do mês, Custos por categoria, Top 5 obras, Evolução mensal
    - Gráficos Chart.js: Pizza (custos por categoria), Linha (evolução mensal)
    - Filtros interativos: obra, categoria, período
    - Integração RDO→Custos: handler `rdo_finalizado` emite de ambos os caminhos (finalizar_rdo e update)
    - Integração Frota→Custos: validada (evento `veiculo_usado`)
 
-2. ✅ **Módulo de Frota - Dashboard TCO + Alertas** (Tarefas 5-7)
+3. ✅ **Módulo de Frota - Dashboard TCO + Alertas** (Tarefas 5-7)
    - Dashboard TCO com 4 KPIs: TCO Total, Custo Médio/KM, Total Veículos, Custos Mês Atual
    - 3 gráficos Chart.js: Custos por tipo (pizza), Evolução mensal (linha), Top 5 veículos (barra)
    - Campos de alerta adicionados: `data_vencimento_ipva`, `data_vencimento_seguro`
    - Função `verificar_alertas()`: classifica urgência (crítica/alta/média) para IPVA, Seguro, Manutenção
    - Filtros aplicados em TODAS as queries: tipo de veículo, status, data início/fim
 
-3. ✅ **Módulo de Alimentação - Dashboard + Integração Financeiro** (Tarefas 8-10)
+4. ✅ **Módulo de Alimentação - Dashboard + Integração Financeiro** (Tarefas 8-10)
    - Dashboard com 4 KPIs: Total Refeições, Custo Total, Custo Médio, Custos Mês Atual
    - 3 gráficos Chart.js: Top 5 Funcionários (barras), Evolução Mensal (linha), Top 5 Obras (barras)
    - Filtros interativos: restaurante, obra, data início/fim
@@ -85,6 +98,8 @@ The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQ
 **Known Issues:**
 - PlanoContas multi-tenancy limitation (codes must be unique across all admins)
 - Future migration needed for composite PK (admin_id, codigo)
+- **get_admin_id() Fallback:** Múltiplas implementações de get_admin_id() em diferentes arquivos ainda usam fallback hard-coded (valor 10). Isso pode causar IntegrityError se o usuário com id=10 não existir. **AÇÃO FUTURA:** Centralizar get_admin_id() e nunca retornar valor hard-coded - lançar erro se não conseguir determinar admin_id.
+- **Data Contamination Fixed (Oct 29, 2025):** Migração 48 inicialmente preencheu admin_id=54 em todos os registros. Correção aplicada: 36 registros em registro_alimentacao e 16 registros em rdo_mao_obra foram atualizados para admin_id correto baseado em funcionario.admin_id e RDO.admin_id.
 
 ## External Dependencies
 -   **Flask:** Web framework.
