@@ -1,0 +1,378 @@
+# 📊 PROMPT: Relatório Completo de Testes Executados no Sistema SIGE
+
+**Objetivo:** Gerar um relatório detalhado de todos os testes executados no sistema SIGE, incluindo resultados, bugs encontrados, correções aplicadas e status atual de cada módulo.
+
+---
+
+## 🎯 INSTRUÇÕES PARA O REPLIT AGENT
+
+Por favor, gere um **relatório completo e estruturado** dos testes executados no sistema SIGE, seguindo o formato abaixo:
+
+---
+
+## 📋 ESTRUTURA DO RELATÓRIO
+
+### **1. SUMÁRIO EXECUTIVO**
+
+Forneça um resumo geral contendo:
+- Data e hora do relatório
+- Versão do sistema testada
+- Total de módulos testados
+- Total de cenários de teste executados
+- Taxa de sucesso geral (%)
+- Principais problemas encontrados (top 5)
+- Status geral do sistema (Produção / Em Desenvolvimento / Crítico)
+
+---
+
+### **2. TESTES POR MÓDULO**
+
+Para cada módulo do sistema, detalhe:
+
+#### **2.1 - Módulo: [Nome do Módulo]**
+
+**Status Geral:** ✅ Aprovado / ⚠️ Parcial / ❌ Reprovado
+
+**Funcionalidades Testadas:**
+- [ ] CRUD completo (Criar, Ler, Editar, Deletar)
+- [ ] Validações de formulário
+- [ ] Filtros e busca
+- [ ] Relatórios/Exportações
+- [ ] Integrações com outros módulos
+- [ ] Performance (tempo de resposta)
+- [ ] Multi-tenancy (isolamento de dados)
+
+**Cenários de Teste Executados:**
+
+| # | Cenário | Resultado | Observações |
+|---|---|---|---|
+| 1 | Criar novo registro | ✅ Passou | - |
+| 2 | Editar registro existente | ❌ Falhou | Erro: campo X não salva |
+| 3 | Deletar registro | ✅ Passou | - |
+| ... | ... | ... | ... |
+
+**Bugs Encontrados:**
+
+| ID | Severidade | Descrição | Status | Correção Aplicada |
+|---|---|---|---|---|
+| BUG-001 | 🔴 Crítico | Campo X não salva ao editar | ✅ Corrigido | Commit #abc123 |
+| BUG-002 | 🟡 Médio | Filtro Y não funciona | ⏳ Pendente | - |
+| ... | ... | ... | ... | ... |
+
+**Métricas de Performance:**
+
+| Operação | Tempo Médio | Tempo Máximo | Status |
+|---|---|---|---|
+| Carregar dashboard | 1,2s | 2,5s | ✅ OK |
+| Criar registro | 0,5s | 1,0s | ✅ OK |
+| Listar 100 registros | 3,5s | 5,2s | ⚠️ Lento |
+| ... | ... | ... | ... |
+
+**Integrações Testadas:**
+
+| Integração | Status | Observações |
+|---|---|---|
+| Módulo A → Módulo B | ✅ OK | Evento disparado corretamente |
+| Módulo A → Módulo C | ❌ Falhou | Handler não implementado |
+| ... | ... | ... |
+
+---
+
+### **3. TESTES DE CÁLCULO SALARIAL (FOLHA DE PAGAMENTO)**
+
+**Período Testado:** Setembro/2025
+
+**Funcionário Teste:**
+- Nome: João da Silva
+- Salário Base: R$ 2.500,00
+- Tipo: Mensalista
+
+**Dados de Entrada:**
+- Dias trabalhados: 21
+- Dias úteis esperados: 22
+- Faltas: 1 (injustificada)
+- Horas normais: 167,75h
+- Horas extras 50%: 8h
+- Horas extras 100%: 4h
+- Atraso: 15 minutos
+
+**Resultados Esperados vs Obtidos:**
+
+| Item | Esperado | Obtido | Status |
+|---|---|---|---|
+| Salário base | R$ 2.500,00 | R$ ... | ✅/❌ |
+| Valor HE 50% | R$ 136,32 | R$ ... | ✅/❌ |
+| Valor HE 100% | R$ 90,88 | R$ ... | ✅/❌ |
+| DSR sobre HE | R$ 41,31 | R$ ... | ✅/❌ |
+| Desconto falta | R$ 83,33 | R$ ... | ✅/❌ |
+| Desconto DSR | R$ 83,33 | R$ ... | ✅/❌ |
+| Desconto atraso | R$ 2,84 | R$ ... | ✅/❌ |
+| **SALÁRIO BRUTO** | **R$ 2.599,01** | **R$ ...** | **✅/❌** |
+
+**Divergências Encontradas:**
+
+Se houver diferenças entre esperado e obtido, liste:
+1. Qual valor está diferente
+2. Diferença em R$ e %
+3. Possível causa do erro
+4. Correção necessária
+
+---
+
+### **4. TESTES DE INTEGRAÇÃO**
+
+**4.1 - Folha de Pagamento → Contabilidade**
+
+- [ ] Evento `folha_processada` é emitido
+- [ ] Handler `@event_handler('folha_processada')` existe
+- [ ] Lançamento contábil é criado automaticamente
+- [ ] Partidas dobradas estão corretas (débito = crédito)
+- [ ] Contas contábeis corretas (Despesas com Pessoal, Salários a Pagar, etc.)
+
+**Resultado:** ✅ Passou / ❌ Falhou / ⏳ Não implementado
+
+**Observações:**
+[Descrever o que funcionou ou não]
+
+---
+
+**4.2 - Financeiro → Contabilidade**
+
+- [ ] Pagamento de conta cria lançamento contábil
+- [ ] Recebimento de conta cria lançamento contábil
+- [ ] Partidas dobradas corretas
+
+**Resultado:** ✅ Passou / ❌ Falhou / ⏳ Não implementado
+
+**Observações:**
+[Descrever o que funcionou ou não]
+
+---
+
+**4.3 - Almoxarifado → Custos**
+
+- [ ] Saída de material gera custo na obra
+- [ ] Valor do custo está correto
+- [ ] Obra correta associada
+
+**Resultado:** ✅ Passou / ❌ Falhou / ⏳ Não implementado
+
+**Observações:**
+[Descrever o que funcionou ou não]
+
+---
+
+**4.4 - Almoxarifado → Financeiro**
+
+- [ ] Entrada de material cria conta a pagar
+- [ ] Fornecedor associado corretamente
+- [ ] Valor correto
+
+**Resultado:** ✅ Passou / ❌ Falhou / ⏳ Não implementado
+
+**Observações:**
+[Descrever o que funcionou ou não]
+
+---
+
+**4.5 - Proposta → Obra → Financeiro**
+
+- [ ] Aprovar proposta cria obra
+- [ ] Obra criada gera conta a receber
+- [ ] Valor e cliente corretos
+
+**Resultado:** ✅ Passou / ❌ Falhou / ⏳ Não implementado
+
+**Observações:**
+[Descrever o que funcionou ou não]
+
+---
+
+### **5. TESTES DE VALIDAÇÃO E SEGURANÇA**
+
+**5.1 - Multi-tenancy (Isolamento de Dados)**
+
+- [ ] Admin A não vê dados do Admin B
+- [ ] Queries filtram por `admin_id`
+- [ ] Criação de registros inclui `admin_id`
+
+**Resultado:** ✅ Passou / ❌ Falhou
+
+**Observações:**
+[Descrever testes executados]
+
+---
+
+**5.2 - Validações de Formulário**
+
+- [ ] Campos obrigatórios validados
+- [ ] Formatos de CPF/CNPJ validados
+- [ ] Datas validadas (não aceita futuro quando não deveria)
+- [ ] Valores numéricos validados (não aceita negativos quando não deveria)
+
+**Resultado:** ✅ Passou / ❌ Falhou
+
+**Bugs encontrados:**
+[Listar validações que não funcionam]
+
+---
+
+**5.3 - Permissões de Acesso**
+
+- [ ] Superadmin acessa tudo
+- [ ] Admin acessa apenas seus dados
+- [ ] Funcionário acessa apenas seu perfil
+- [ ] Rotas protegidas por `@login_required`
+
+**Resultado:** ✅ Passou / ❌ Falhou
+
+**Observações:**
+[Descrever testes de permissão]
+
+---
+
+### **6. TESTES DE PERFORMANCE**
+
+**6.1 - Dashboards**
+
+| Dashboard | Tempo de Carregamento | Queries Executadas | Status |
+|---|---|---|---|
+| Dashboard Principal | ... | ... | ✅/⚠️/❌ |
+| Dashboard Financeiro | ... | ... | ✅/⚠️/❌ |
+| Dashboard Custos | ... | ... | ✅/⚠️/❌ |
+| Dashboard Folha | ... | ... | ✅/⚠️/❌ |
+| Dashboard Contabilidade | ... | ... | ✅/⚠️/❌ |
+
+**Critério:** ✅ < 2s | ⚠️ 2-5s | ❌ > 5s
+
+---
+
+**6.2 - Problema N+1**
+
+- [ ] Verificado uso de `joinedload` ou `selectinload`
+- [ ] Loops em templates auditados
+- [ ] Queries otimizadas
+
+**Resultado:** ✅ Otimizado / ⚠️ Parcial / ❌ Problema N+1 detectado
+
+**Queries problemáticas:**
+[Listar queries que fazem N+1]
+
+---
+
+### **7. BUGS CRÍTICOS PENDENTES**
+
+Liste todos os bugs críticos que ainda não foram corrigidos:
+
+| ID | Módulo | Descrição | Impacto | Prioridade |
+|---|---|---|---|---|
+| BUG-XXX | ... | ... | ... | 🔴 Alta |
+| ... | ... | ... | ... | ... |
+
+---
+
+### **8. CORREÇÕES APLICADAS**
+
+Liste todas as correções aplicadas durante os testes:
+
+| Commit | Módulo | Descrição | Data |
+|---|---|---|---|
+| #abc123 | Folha | Corrigido cálculo de DSR | 27/10/2025 |
+| ... | ... | ... | ... |
+
+---
+
+### **9. RECOMENDAÇÕES**
+
+**9.1 - Correções Urgentes (Antes de Produção)**
+
+1. [Descrição da correção 1]
+2. [Descrição da correção 2]
+3. ...
+
+**9.2 - Melhorias Recomendadas (Pós-Produção)**
+
+1. [Descrição da melhoria 1]
+2. [Descrição da melhoria 2]
+3. ...
+
+**9.3 - Otimizações de Performance**
+
+1. [Descrição da otimização 1]
+2. [Descrição da otimização 2]
+3. ...
+
+---
+
+### **10. CONCLUSÃO**
+
+**Status Geral do Sistema:**
+- ✅ Pronto para Produção
+- ⚠️ Pronto com Ressalvas (listar ressalvas)
+- ❌ Não Pronto (listar bloqueadores)
+
+**Taxa de Sucesso Geral:** X%
+
+**Módulos 100% Funcionais:** X/15
+
+**Próximos Passos:**
+1. [Passo 1]
+2. [Passo 2]
+3. ...
+
+---
+
+## 📊 FORMATO DE SAÍDA
+
+Por favor, gere o relatório em **Markdown** com:
+
+1. ✅ Tabelas bem formatadas
+2. ✅ Emojis para status (✅ ⚠️ ❌)
+3. ✅ Seções numeradas e organizadas
+4. ✅ Dados reais do sistema (não exemplos)
+5. ✅ Screenshots ou logs quando relevante
+6. ✅ Gráficos de pizza/barras se possível (ASCII art ou descrição)
+
+---
+
+## 🎯 INFORMAÇÕES ADICIONAIS
+
+**Módulos a Incluir no Relatório:**
+
+1. Dashboard Principal
+2. RH (Funcionários, Departamentos, Funções)
+3. Obras
+4. Equipe (Alocação)
+5. Ponto Eletrônico
+6. RDO (Relatório Diário de Obra)
+7. Frota (Veículos)
+8. Alimentação
+9. Almoxarifado
+10. Financeiro (Contas a Pagar/Receber)
+11. Custos
+12. Contabilidade (Plano de Contas, Lançamentos, Balancete, DRE)
+13. Folha de Pagamento
+14. Propostas Comerciais
+15. Configurações
+
+---
+
+## ✅ CHECKLIST FINAL
+
+Certifique-se de que o relatório inclui:
+
+- [ ] Data e hora de geração
+- [ ] Sumário executivo com métricas gerais
+- [ ] Status de cada módulo (15 módulos)
+- [ ] Resultados dos testes de cálculo salarial
+- [ ] Status de todas as integrações (5 integrações)
+- [ ] Lista de bugs encontrados
+- [ ] Lista de correções aplicadas
+- [ ] Métricas de performance
+- [ ] Recomendações de correção/melhoria
+- [ ] Conclusão com status geral
+
+---
+
+**Por favor, gere o relatório completo agora com base nos testes executados no sistema SIGE.** 🚀
+
