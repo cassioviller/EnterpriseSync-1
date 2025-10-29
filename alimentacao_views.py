@@ -195,6 +195,20 @@ def lancamento_novo():
                 lancamento.funcionarios.append(funcionario)
             
             db.session.commit()
+            
+            # ✅ NOVO: Emitir evento para integração com Financeiro (Tarefa 9)
+            try:
+                from event_manager import EventManager
+                EventManager.emit('alimentacao_lancamento_criado', {
+                    'lancamento_id': lancamento.id,
+                    'restaurante_id': lancamento.restaurante_id,
+                    'obra_id': lancamento.obra_id,
+                    'valor_total': float(lancamento.valor_total)
+                }, admin_id)
+                logger.info(f"✅ Evento 'alimentacao_lancamento_criado' emitido para lançamento {lancamento.id}")
+            except Exception as e:
+                logger.error(f"❌ Erro ao emitir evento alimentacao_lancamento_criado: {e}")
+            
             flash(f'Lançamento criado! Valor por funcionário: R$ {lancamento.valor_por_funcionario:.2f}', 'success')
             return redirect(url_for('alimentacao.index'))
             

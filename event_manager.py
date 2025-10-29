@@ -946,5 +946,94 @@ def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
         logger.error(traceback.format_exc())
 
 
+@event_handler('alimentacao_lancamento_criado')
+def criar_conta_pagar_alimentacao(data: dict, admin_id: int):
+    """Handler: Criar conta a pagar quando lançamento de alimentação for criado"""
+    try:
+        from models import db, AlimentacaoLancamento, Restaurante, Fornecedor, ContaPagar
+        from datetime import datetime, timedelta
+        from decimal import Decimal
+        
+        lancamento_id = data.get('lancamento_id')
+        
+        if not lancamento_id:
+            logger.warning(f"⚠️ lancamento_id não fornecido no evento alimentacao_lancamento_criado")
+            return
+        
+        # Buscar lançamento de alimentação
+        lancamento = AlimentacaoLancamento.query.filter_by(
+            id=lancamento_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not lancamento:
+            logger.error(f"❌ Lançamento {lancamento_id} não encontrado para admin {admin_id}")
+            return
+        
+        # Buscar restaurante
+        restaurante = Restaurante.query.filter_by(
+            id=lancamento.restaurante_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not restaurante:
+            logger.error(f"❌ Restaurante {lancamento.restaurante_id} não encontrado para admin {admin_id}")
+            return
+        
+        # Verificar se já existe fornecedor para este restaurante (via CNPJ)
+        fornecedor = None
+        if restaurante.cnpj:
+            fornecedor = Fornecedor.query.filter_by(
+                cnpj=restaurante.cnpj,
+                admin_id=admin_id
+            ).first()
+        
+        # Se não existir, criar fornecedor automaticamente
+        if not fornecedor:
+            fornecedor = Fornecedor(
+                razao_social=restaurante.razao_social or restaurante.nome,
+                nome_fantasia=restaurante.nome,
+                cnpj=restaurante.cnpj or f"SEM_CNPJ_{restaurante.id}",
+                endereco=restaurante.endereco or '',
+                telefone=restaurante.telefone or '',
+                tipo='SERVICO',
+                admin_id=admin_id
+            )
+            db.session.add(fornecedor)
+            db.session.flush()  # Gera fornecedor.id
+            logger.info(f"✅ Fornecedor {fornecedor.id} criado automaticamente para restaurante {restaurante.nome}")
+        
+        # Criar conta a pagar
+        data_vencimento = lancamento.data + timedelta(days=7)  # Vence em 7 dias
+        
+        conta = ContaPagar(
+            fornecedor_id=fornecedor.id,
+            obra_id=lancamento.obra_id,
+            numero_documento=f"ALIM-{lancamento_id}",
+            descricao=f"Alimentação - {restaurante.nome} - {lancamento.data.strftime('%d/%m/%Y')}",
+            valor_original=Decimal(str(lancamento.valor_total)),
+            valor_pago=Decimal('0'),
+            saldo=Decimal(str(lancamento.valor_total)),
+            data_emissao=lancamento.data,
+            data_vencimento=data_vencimento,
+            status='PENDENTE',
+            origem_tipo='ALIMENTACAO',
+            origem_id=lancamento_id,
+            admin_id=admin_id
+        )
+        
+        db.session.add(conta)
+        db.session.commit()
+        
+        logger.info(f"✅ Conta a pagar criada: R$ {lancamento.valor_total:.2f} para {restaurante.nome}")
+        logger.info(f"   Lançamento: {lancamento_id} | Fornecedor: {fornecedor.id} | Vencimento: {data_vencimento}")
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao criar conta a pagar para lançamento {data.get('lancamento_id')}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+
 # Log de inicialização
 logger.info(f"✅ Event Manager inicializado - {len(EventManager.list_events())} eventos registrados")
