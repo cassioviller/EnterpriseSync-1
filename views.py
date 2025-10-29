@@ -892,8 +892,17 @@ def dashboard():
         # Buscar custos de alimentação TOTAL para o período (não por funcionário para evitar duplicação)
         custo_alimentacao_real = 0
         try:
-            # Tabela registro_alimentacao
-            # JOIN com Funcionario para filtrar por admin_id (RegistroAlimentacao não tem admin_id direto)
+            # 1. Tabela NOVA: alimentacao_lancamento (tem admin_id direto)
+            from models import AlimentacaoLancamento
+            lancamentos_novos = AlimentacaoLancamento.query.filter(
+                AlimentacaoLancamento.admin_id == admin_id,
+                AlimentacaoLancamento.data >= data_inicio,
+                AlimentacaoLancamento.data <= data_fim
+            ).all()
+            total_lancamentos_novos = sum(float(l.valor_total or 0) for l in lancamentos_novos)
+            custo_alimentacao_real += total_lancamentos_novos
+            
+            # 2. Tabela ANTIGA: registro_alimentacao (sem admin_id direto, precisa JOIN)
             alimentacao_registros = db.session.query(RegistroAlimentacao).join(
                 Funcionario, RegistroAlimentacao.funcionario_id == Funcionario.id
             ).filter(
@@ -901,9 +910,10 @@ def dashboard():
                 RegistroAlimentacao.data >= data_inicio,
                 RegistroAlimentacao.data <= data_fim
             ).all()
-            custo_alimentacao_real += sum(a.valor or 0 for a in alimentacao_registros)
+            total_registros_antigos = sum(a.valor or 0 for a in alimentacao_registros)
+            custo_alimentacao_real += total_registros_antigos
             
-            # Também buscar em outro_custo
+            # 3. Também buscar em outro_custo
             from models import OutroCusto
             outros_alimentacao = OutroCusto.query.filter(
                 OutroCusto.admin_id == admin_id,
@@ -911,11 +921,14 @@ def dashboard():
                 OutroCusto.data <= data_fim,
                 OutroCusto.kpi_associado == 'custo_alimentacao'
             ).all()
-            custo_alimentacao_real += sum(o.valor or 0 for o in outros_alimentacao)
+            total_outros = sum(o.valor or 0 for o in outros_alimentacao)
+            custo_alimentacao_real += total_outros
             
-            print(f"DEBUG ALIMENTAÇÃO DASHBOARD: Registros={sum(a.valor or 0 for a in alimentacao_registros):.2f}, Outros={sum(o.valor or 0 for o in outros_alimentacao):.2f}, Total={custo_alimentacao_real:.2f}")
+            print(f"DEBUG ALIMENTAÇÃO DASHBOARD: Lançamentos Novos ({len(lancamentos_novos)})=R${total_lancamentos_novos:.2f}, Registros Antigos ({len(alimentacao_registros)})=R${total_registros_antigos:.2f}, Outros ({len(outros_alimentacao)})=R${total_outros:.2f}, Total=R${custo_alimentacao_real:.2f}")
         except Exception as e:
             print(f"Erro cálculo alimentação: {e}")
+            import traceback
+            traceback.print_exc()
             custo_alimentacao_real = 0
         
         # Debug dos valores calculados
