@@ -30,7 +30,8 @@ def dashboard_custos():
         logger.error("Dashboard custos bloqueado - schema incompleto")
         return redirect(url_for('main.index'))
     
-    admin_id = current_user.id
+    # ✅ FIX: Multi-tenancy correto (admin_id do tenant, não do usuário)
+    admin_id = current_user.admin_id if current_user.admin_id else current_user.id
     
     # ✅ NOVO: Capturar filtros da URL
     filtro_obra_id = request.args.get('obra_id', type=int)
@@ -147,12 +148,15 @@ def custos_obra(obra_id):
         logger.error("Custos obra bloqueado - schema incompleto")
         return redirect(url_for('main.index'))
     
-    obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first_or_404()
+    # ✅ FIX: Multi-tenancy correto
+    admin_id = current_user.admin_id if current_user.admin_id else current_user.id
+    
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
     
     # Buscar todos os custos da obra
     custos = CustoObra.query.filter_by(
         obra_id=obra_id,
-        admin_id=current_user.id
+        admin_id=admin_id
     ).order_by(desc(CustoObra.data)).all()
     
     # Agrupar custos por tipo
@@ -185,7 +189,7 @@ def custos_obra(obra_id):
         func.sum(CustoObra.valor).label('total')
     ).filter_by(
         obra_id=obra_id,
-        admin_id=current_user.id
+        admin_id=admin_id
     ).group_by(
         func.to_char(CustoObra.data, 'YYYY-MM')
     ).order_by('mes').all()
@@ -206,10 +210,13 @@ def api_custos_categoria():
     if not verificar_schema_custos():
         return jsonify({'error': 'Schema incompleto - migração pendente'}), 503
     
+    # ✅ FIX: Multi-tenancy correto
+    admin_id = current_user.admin_id if current_user.admin_id else current_user.id
+    
     custos = db.session.query(
         CustoObra.tipo,
         func.sum(CustoObra.valor).label('total')
-    ).filter_by(admin_id=current_user.id).group_by(CustoObra.tipo).all()
+    ).filter_by(admin_id=admin_id).group_by(CustoObra.tipo).all()
     
     # Mapear nomes amigáveis
     nomes_tipos = {
@@ -233,10 +240,13 @@ def api_custos_mensais():
     if not verificar_schema_custos():
         return jsonify({'error': 'Schema incompleto - migração pendente'}), 503
     
+    # ✅ FIX: Multi-tenancy correto
+    admin_id = current_user.admin_id if current_user.admin_id else current_user.id
+    
     custos = db.session.query(
         func.to_char(CustoObra.data, 'YYYY-MM').label('mes'),
         func.sum(CustoObra.valor).label('total')
-    ).filter_by(admin_id=current_user.id).group_by(
+    ).filter_by(admin_id=admin_id).group_by(
         func.to_char(CustoObra.data, 'YYYY-MM')
     ).order_by('mes').limit(12).all()
     
@@ -258,11 +268,14 @@ def criar_custo():
         flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
         return redirect(url_for('main.index'))
     
+    # ✅ FIX: Multi-tenancy correto
+    admin_id = current_user.admin_id if current_user.admin_id else current_user.id
+    
     if request.method == 'POST':
         try:
             # SEGURANÇA: Validar que obra pertence ao admin atual
             obra_id = request.form.get('obra_id', type=int)
-            obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first()
+            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
             
             if not obra:
                 logger.warning(f"⚠️ Tentativa de criar custo em obra {obra_id} sem permissão (admin {current_user.id})")
@@ -270,7 +283,7 @@ def criar_custo():
                 return redirect(url_for('custos.listar_custos'))
             
             novo_custo = CustoObra(
-                admin_id=current_user.id,
+                admin_id=admin_id,
                 obra_id=obra.id,  # Usar obra validada
                 tipo=request.form['tipo'],
                 descricao=request.form['descricao'],
@@ -291,7 +304,7 @@ def criar_custo():
             flash(f'Erro ao registrar custo: {str(e)}', 'danger')
     
     # GET: Exibir formulário
-    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
     return render_template('custos/custo_form.html', obras=obras, custo=None)
 
 @custos_bp.route('/editar/<int:custo_id>', methods=['GET', 'POST'])
@@ -302,13 +315,16 @@ def editar_custo(custo_id):
         flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
         return redirect(url_for('main.index'))
     
-    custo = CustoObra.query.filter_by(id=custo_id, admin_id=current_user.id).first_or_404()
+    # ✅ FIX: Multi-tenancy correto
+    admin_id = current_user.admin_id if current_user.admin_id else current_user.id
+    
+    custo = CustoObra.query.filter_by(id=custo_id, admin_id=admin_id).first_or_404()
     
     if request.method == 'POST':
         try:
             # SEGURANÇA: Validar que obra pertence ao admin atual
             obra_id = request.form.get('obra_id', type=int)
-            obra = Obra.query.filter_by(id=obra_id, admin_id=current_user.id).first()
+            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
             
             if not obra:
                 logger.warning(f"⚠️ Tentativa de editar custo {custo_id} para obra {obra_id} sem permissão (admin {current_user.id})")
@@ -333,7 +349,7 @@ def editar_custo(custo_id):
             flash(f'Erro ao atualizar custo: {str(e)}', 'danger')
     
     # GET: Exibir formulário preenchido
-    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
     return render_template('custos/custo_form.html', obras=obras, custo=custo)
 
 @custos_bp.route('/deletar/<int:custo_id>', methods=['POST'])
@@ -344,7 +360,10 @@ def deletar_custo(custo_id):
         flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
         return redirect(url_for('main.index'))
     
-    custo = CustoObra.query.filter_by(id=custo_id, admin_id=current_user.id).first_or_404()
+    # ✅ FIX: Multi-tenancy correto
+    admin_id = current_user.admin_id if current_user.admin_id else current_user.id
+    
+    custo = CustoObra.query.filter_by(id=custo_id, admin_id=admin_id).first_or_404()
     
     try:
         descricao = custo.descricao
@@ -370,6 +389,9 @@ def listar_custos():
         flash('⚠️ Módulo de Custos temporariamente indisponível.', 'warning')
         return redirect(url_for('main.index'))
     
+    # ✅ FIX: Multi-tenancy correto
+    admin_id = current_user.admin_id if current_user.admin_id else current_user.id
+    
     # Filtros
     obra_id = request.args.get('obra_id', type=int)
     tipo = request.args.get('tipo')
@@ -381,7 +403,7 @@ def listar_custos():
     per_page = 20  # 20 custos por página
     
     # Query base
-    query = CustoObra.query.filter_by(admin_id=current_user.id)
+    query = CustoObra.query.filter_by(admin_id=admin_id)
     
     # Aplicar filtros
     if obra_id:
@@ -401,12 +423,12 @@ def listar_custos():
     )
     
     # Dados para filtros
-    obras = Obra.query.filter_by(admin_id=current_user.id, ativo=True).order_by(Obra.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
     tipos = ['mao_obra', 'material', 'veiculo', 'servico', 'alimentacao']
     
     # Estatísticas (calcular sobre resultados filtrados, NÃO sobre página atual)
     total_custos = db.session.query(func.sum(CustoObra.valor)).filter(
-        CustoObra.admin_id == current_user.id
+        CustoObra.admin_id == admin_id
     )
     if obra_id:
         total_custos = total_custos.filter(CustoObra.obra_id == obra_id)

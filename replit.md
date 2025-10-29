@@ -48,23 +48,38 @@ The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQ
 -   **Drag-and-Drop Organization:** Intuitive organization of proposals.
 -   **Atomic Transactions:** Ensures data integrity for critical operations using `safe_db_operation`.
 
-## Recent Changes (October 28, 2025)
+## Recent Changes (October 29, 2025)
 **Implemented:**
-1. ✅ Late deduction in payroll (`services/folha_service.py` lines 88, 97, 150, 280-286)
-   - Accumulated delay minutes converted to hours and deducted from gross salary
-   - CLT-compliant calculation: `(total_minutos_atraso ÷ 60) × valor_hora`
-2. ✅ Chart of Accounts initialized (14 accounts: ATIVO, PASSIVO, DESPESA, RECEITA)
-   - Enables automated Folha → Contabilidade integration
-   - Reverted schema to preserve referential integrity (`codigo` as PK)
+1. ✅ **Módulo de Custos - Dashboard TCO Completo** (Tarefas 1-4)
+   - Dashboard com 4 KPIs: Total do mês, Custos por categoria, Top 5 obras, Evolução mensal
+   - Gráficos Chart.js: Pizza (custos por categoria), Linha (evolução mensal)
+   - Filtros interativos: obra, categoria, período
+   - Integração RDO→Custos: handler `rdo_finalizado` emite de ambos os caminhos (finalizar_rdo e update)
+   - Integração Frota→Custos: validada (evento `veiculo_usado`)
+
+2. ✅ **Módulo de Frota - Dashboard TCO + Alertas** (Tarefas 5-7)
+   - Dashboard TCO com 4 KPIs: TCO Total, Custo Médio/KM, Total Veículos, Custos Mês Atual
+   - 3 gráficos Chart.js: Custos por tipo (pizza), Evolução mensal (linha), Top 5 veículos (barra)
+   - Campos de alerta adicionados: `data_vencimento_ipva`, `data_vencimento_seguro`
+   - Função `verificar_alertas()`: classifica urgência (crítica/alta/média) para IPVA, Seguro, Manutenção
+   - Filtros aplicados em TODAS as queries: tipo de veículo, status, data início/fim
+
+3. ✅ **Módulo de Alimentação - Dashboard + Integração Financeiro** (Tarefas 8-10)
+   - Dashboard com 4 KPIs: Total Refeições, Custo Total, Custo Médio, Custos Mês Atual
+   - 3 gráficos Chart.js: Top 5 Funcionários (barras), Evolução Mensal (linha), Top 5 Obras (barras)
+   - Filtros interativos: restaurante, obra, data início/fim
+   - **Integração Alimentação→Financeiro** (event_manager.py linhas 952-1038):
+     - Handler `alimentacao_lancamento_criado` converte Restaurante→Fornecedor→ContaPagar
+     - Reutiliza Fornecedores existentes por CNPJ, cria automaticamente se não existir
+     - Conta a pagar com vencimento em 7 dias, origem_tipo='ALIMENTACAO'
+   - Evento emitido após commit do lançamento (alimentacao_views.py linhas 202-213)
+   - CRUD completo já existente: restaurantes e lançamentos com validações multi-tenant
+
+**Previous Changes (October 28, 2025):**
+1. ✅ Late deduction in payroll (`services/folha_service.py`)
+2. ✅ Chart of Accounts initialized (14 accounts)
 3. ✅ Complete test data created
-   - Almoxarifado: 5 categories, 10 items, 10 movements (R$ 10,860)
-   - Financeiro: 5 suppliers, 5 clients, 20 accounts (R$ 339,900)
-   - Propostas: 5 commercial proposals (R$ 5,555,000)
 4. ✅ Automated integrations validated (3/3 tests passed 100%)
-   - Test script: `test_integrations.py` using EventManager.emit()
-   - Folha → Contabilidade: 2 journal entries created
-   - Almoxarifado → Custos: Handler executed successfully
-   - Almoxarifado → Financeiro: Handler executed successfully
 5. ✅ Test report updated: RELATORIO_TESTES_SIGE_v9.0.md (93.6% success rate)
 
 **Known Issues:**
