@@ -3469,6 +3469,10 @@ class Vehicle(db.Model):
     data_proxima_manutencao = db.Column(db.Date)
     km_proxima_manutencao = db.Column(db.Integer)
     
+    # Campos de alertas/vencimentos (✅ TAREFA 6)
+    data_vencimento_ipva = db.Column(db.Date)
+    data_vencimento_seguro = db.Column(db.Date)
+    
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)

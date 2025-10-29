@@ -1,0 +1,379 @@
+{% extends "base_completo.html" %}
+{% block title %}Dashboard TCO - Frota{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-truck text-primary me-2"></i>
+            Dashboard TCO (Total Cost of Ownership)
+        </h1>
+        <div>
+            <a href="{{ url_for('frota.novo') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Novo Veículo
+            </a>
+            <a href="{{ url_for('frota.lista') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-1"></i> Ver Todos
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-filter me-2"></i>Filtros
+            </h6>
+            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
+        <div class="collapse show" id="filtrosCollapse">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('frota.dashboard') }}" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="filtro_tipo" class="form-label">Tipo de Veículo</label>
+                        <select class="form-select" id="filtro_tipo" name="tipo">
+                            <option value="">Todos os Tipos</option>
+                            {% for tipo in tipos_disponiveis %}
+                            <option value="{{ tipo }}" {% if filtros.tipo == tipo %}selected{% endif %}>
+                                {{ tipo }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="filtro_status" class="form-label">Status</label>
+                        <select class="form-select" id="filtro_status" name="status">
+                            <option value="ativo" {% if filtros.status == 'ativo' %}selected{% endif %}>Apenas Ativos</option>
+                            <option value="inativo" {% if filtros.status == 'inativo' %}selected{% endif %}>Apenas Inativos</option>
+                            <option value="" {% if not filtros.status %}selected{% endif %}>Todos</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="filtro_data_inicio" class="form-label">Data Início</label>
+                        <input type="date" class="form-control" id="filtro_data_inicio" name="data_inicio" value="{{ filtros.data_inicio or '' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="filtro_data_fim" class="form-label">Data Fim</label>
+                        <input type="date" class="form-control" id="filtro_data_fim" name="data_fim" value="{{ filtros.data_fim or '' }}">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100 me-2">
+                            <i class="fas fa-search me-1"></i>Filtrar
+                        </button>
+                        <a href="{{ url_for('frota.dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs Row -->
+    <div class="row">
+        <!-- TCO Total -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                TCO Total
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(tco_total) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Custo Médio/KM -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Custo Médio por KM
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(custo_medio_km) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-road fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total de Veículos -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Total de Veículos
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_veiculos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-truck fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custos do Mês Atual -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Custos do Mês Atual
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(custos_mes_atual) }}
+                            </div>
+                            {% if variacao_percentual >= 0 %}
+                                <div class="text-xs text-danger mt-1">
+                                    <i class="fas fa-arrow-up"></i> +{{ "{:.1f}".format(variacao_percentual) }}% vs mês anterior
+                                </div>
+                            {% else %}
+                                <div class="text-xs text-success mt-1">
+                                    <i class="fas fa-arrow-down"></i> {{ "{:.1f}".format(variacao_percentual) }}% vs mês anterior
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-month fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- Custos por Tipo -->
+        <div class="col-xl-4 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Custos por Tipo de Veículo</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie pt-4 pb-2">
+                        <canvas id="chartTipos"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Evolução Mensal -->
+        <div class="col-xl-8 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Evolução Mensal de Custos</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="chartMensal"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Veículos -->
+    <div class="row">
+        <div class="col-xl-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Top 5 Veículos com Maior Custo</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="chartTopVeiculos"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+// Gráfico de Pizza: Custos por Tipo
+var ctxTipos = document.getElementById('chartTipos').getContext('2d');
+var chartTipos = new Chart(ctxTipos, {
+    type: 'pie',
+    data: {
+        labels: [
+            {% for tipo, total in custos_por_tipo %}
+            '{{ tipo }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for tipo, total in custos_por_tipo %}
+                {{ total }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: [
+                'rgba(78, 115, 223, 0.8)',
+                'rgba(28, 200, 138, 0.8)',
+                'rgba(246, 194, 62, 0.8)',
+                'rgba(231, 74, 59, 0.8)',
+                'rgba(133, 135, 150, 0.8)'
+            ],
+            borderColor: [
+                'rgba(78, 115, 223, 1)',
+                'rgba(28, 200, 138, 1)',
+                'rgba(246, 194, 62, 1)',
+                'rgba(231, 74, 59, 1)',
+                'rgba(133, 135, 150, 1)'
+            ],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        var label = context.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        label += 'R$ ' + context.parsed.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+                        return label;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Linha: Evolução Mensal
+var ctxMensal = document.getElementById('chartMensal').getContext('2d');
+var chartMensal = new Chart(ctxMensal, {
+    type: 'line',
+    data: {
+        labels: [
+            {% for mes, total in evolucao_mensal|reverse %}
+            '{{ mes }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Custos Mensais',
+            data: [
+                {% for mes, total in evolucao_mensal|reverse %}
+                {{ total }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            borderColor: 'rgba(78, 115, 223, 1)',
+            backgroundColor: 'rgba(78, 115, 223, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'R$ ' + value.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+                    }
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'R$ ' + context.parsed.y.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Barras: Top 5 Veículos
+var ctxTopVeiculos = document.getElementById('chartTopVeiculos').getContext('2d');
+var chartTopVeiculos = new Chart(ctxTopVeiculos, {
+    type: 'bar',
+    data: {
+        labels: [
+            {% for placa, id, total in top_veiculos %}
+            '{{ placa }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Custo Total',
+            data: [
+                {% for placa, id, total in top_veiculos %}
+                {{ total }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(28, 200, 138, 0.8)',
+            borderColor: 'rgba(28, 200, 138, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        scales: {
+            x: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'R$ ' + value.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+                    }
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'R$ ' + context.parsed.x.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

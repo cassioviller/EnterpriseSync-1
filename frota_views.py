@@ -838,3 +838,340 @@ def deletar_veiculo(id):
         print(f"❌ [FROTA_DELETAR_VEICULO] Erro: {str(e)}")
         flash(f'Erro ao deletar veículo: {str(e)}', 'error')
         return redirect(url_for('frota.lista'))
+
+
+# ===== ROTA: DASHBOARD TCO (TOTAL COST OF OWNERSHIP) =====
+@frota_bp.route('/dashboard')
+@login_required
+def dashboard():
+    """Dashboard TCO (Total Cost of Ownership) da Frota"""
+    try:
+        from sqlalchemy import func, desc
+        from decimal import Decimal
+        from datetime import datetime, date
+        from dateutil.relativedelta import relativedelta
+        
+        print(f"📊 [FROTA_DASHBOARD] Iniciando dashboard TCO...")
+        
+        # Proteção multi-tenant
+        tenant_admin_id = get_tenant_admin_id()
+        if not tenant_admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Capturar filtros da URL
+        filtro_tipo = request.args.get('tipo')
+        filtro_data_inicio = request.args.get('data_inicio')
+        filtro_data_fim = request.args.get('data_fim')
+        filtro_status = request.args.get('status', 'ativo')  # Padrão: apenas ativos
+        
+        # Converter datas se fornecidas
+        data_inicio = datetime.strptime(filtro_data_inicio, '%Y-%m-%d').date() if filtro_data_inicio else None
+        data_fim = datetime.strptime(filtro_data_fim, '%Y-%m-%d').date() if filtro_data_fim else None
+        
+        # Query base para despesas (custos)
+        query_custos = FrotaDespesa.query.filter_by(admin_id=tenant_admin_id)
+        
+        # Aplicar filtros de data
+        if data_inicio:
+            query_custos = query_custos.filter(FrotaDespesa.data_custo >= data_inicio)
+        if data_fim:
+            query_custos = query_custos.filter(FrotaDespesa.data_custo <= data_fim)
+        
+        # Aplicar filtro de tipo de veículo (join com Vehicle)
+        if filtro_tipo:
+            query_custos = query_custos.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+        
+        # Aplicar filtro de status (apenas veículos ativos/inativos)
+        if filtro_status == 'ativo':
+            query_custos = query_custos.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+        elif filtro_status == 'inativo':
+            query_custos = query_custos.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+        
+        # KPI 1: TCO Total (Total Cost of Ownership)
+        tco_total = db.session.query(
+            func.coalesce(func.sum(FrotaDespesa.valor), Decimal('0'))
+        ).filter(FrotaDespesa.admin_id == tenant_admin_id)
+        
+        if data_inicio:
+            tco_total = tco_total.filter(FrotaDespesa.data_custo >= data_inicio)
+        if data_fim:
+            tco_total = tco_total.filter(FrotaDespesa.data_custo <= data_fim)
+        if filtro_tipo:
+            tco_total = tco_total.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+        if filtro_status == 'ativo':
+            tco_total = tco_total.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+        elif filtro_status == 'inativo':
+            tco_total = tco_total.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+        
+        tco_total = float(tco_total.scalar() or 0)
+        
+        # KPI 2: Total de KM percorridos (para calcular custo médio/km)
+        query_km = db.session.query(
+            func.coalesce(func.sum(FrotaUtilizacao.km_percorrido), 0)
+        ).filter(FrotaUtilizacao.admin_id == tenant_admin_id)
+        
+        if data_inicio:
+            query_km = query_km.filter(FrotaUtilizacao.data_uso >= data_inicio)
+        if data_fim:
+            query_km = query_km.filter(FrotaUtilizacao.data_uso <= data_fim)
+        if filtro_tipo:
+            query_km = query_km.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+        if filtro_status == 'ativo':
+            query_km = query_km.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+        elif filtro_status == 'inativo':
+            query_km = query_km.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+        
+        total_km = query_km.scalar() or 0
+        custo_medio_km = round(tco_total / total_km, 2) if total_km > 0 else 0
+        
+        # KPI 3: Total de Veículos
+        query_veiculos = FrotaVeiculo.query.filter_by(admin_id=tenant_admin_id)
+        if filtro_tipo:
+            query_veiculos = query_veiculos.filter_by(tipo=filtro_tipo)
+        if filtro_status == 'ativo':
+            query_veiculos = query_veiculos.filter_by(ativo=True)
+        elif filtro_status == 'inativo':
+            query_veiculos = query_veiculos.filter_by(ativo=False)
+        
+        total_veiculos = query_veiculos.count()
+        
+        # KPI 4: Custos do Mês Atual (com comparação)
+        hoje = date.today()
+        inicio_mes_atual = date(hoje.year, hoje.month, 1)
+        inicio_mes_anterior = (inicio_mes_atual - relativedelta(months=1))
+        fim_mes_anterior = inicio_mes_atual - relativedelta(days=1)
+        
+        # Custos do mês atual
+        query_mes_atual = db.session.query(
+            func.coalesce(func.sum(FrotaDespesa.valor), Decimal('0'))
+        ).filter(
+            FrotaDespesa.admin_id == tenant_admin_id,
+            FrotaDespesa.data_custo >= inicio_mes_atual
+        )
+        if filtro_tipo:
+            query_mes_atual = query_mes_atual.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+        if filtro_status == 'ativo':
+            query_mes_atual = query_mes_atual.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+        elif filtro_status == 'inativo':
+            query_mes_atual = query_mes_atual.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+        
+        custos_mes_atual = float(query_mes_atual.scalar() or 0)
+        
+        # Custos do mês anterior
+        query_mes_anterior = db.session.query(
+            func.coalesce(func.sum(FrotaDespesa.valor), Decimal('0'))
+        ).filter(
+            FrotaDespesa.admin_id == tenant_admin_id,
+            FrotaDespesa.data_custo >= inicio_mes_anterior,
+            FrotaDespesa.data_custo <= fim_mes_anterior
+        )
+        if filtro_tipo:
+            query_mes_anterior = query_mes_anterior.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+        if filtro_status == 'ativo':
+            query_mes_anterior = query_mes_anterior.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+        elif filtro_status == 'inativo':
+            query_mes_anterior = query_mes_anterior.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+        
+        custos_mes_anterior = float(query_mes_anterior.scalar() or 0)
+        
+        # Calcular variação percentual
+        if custos_mes_anterior > 0:
+            variacao_percentual = round(((custos_mes_atual - custos_mes_anterior) / custos_mes_anterior) * 100, 1)
+        else:
+            variacao_percentual = 100.0 if custos_mes_atual > 0 else 0.0
+        
+        # Gráfico 1: Custos por Tipo de Veículo (Pizza)
+        custos_por_tipo = db.session.query(
+            FrotaVeiculo.tipo,
+            func.sum(FrotaDespesa.valor).label('total')
+        ).join(FrotaDespesa).filter(
+            FrotaDespesa.admin_id == tenant_admin_id
+        )
+        
+        if data_inicio:
+            custos_por_tipo = custos_por_tipo.filter(FrotaDespesa.data_custo >= data_inicio)
+        if data_fim:
+            custos_por_tipo = custos_por_tipo.filter(FrotaDespesa.data_custo <= data_fim)
+        if filtro_tipo:
+            custos_por_tipo = custos_por_tipo.filter(FrotaVeiculo.tipo == filtro_tipo)
+        if filtro_status == 'ativo':
+            custos_por_tipo = custos_por_tipo.filter(FrotaVeiculo.ativo == True)
+        elif filtro_status == 'inativo':
+            custos_por_tipo = custos_por_tipo.filter(FrotaVeiculo.ativo == False)
+        
+        custos_por_tipo = custos_por_tipo.group_by(FrotaVeiculo.tipo).all()
+        
+        # Gráfico 2: Evolução Mensal de Custos (Linha)
+        evolucao_mensal = db.session.query(
+            func.to_char(FrotaDespesa.data_custo, 'YYYY-MM').label('mes'),
+            func.sum(FrotaDespesa.valor).label('total')
+        ).filter(
+            FrotaDespesa.admin_id == tenant_admin_id
+        )
+        
+        if data_inicio:
+            evolucao_mensal = evolucao_mensal.filter(FrotaDespesa.data_custo >= data_inicio)
+        if data_fim:
+            evolucao_mensal = evolucao_mensal.filter(FrotaDespesa.data_custo <= data_fim)
+        if filtro_tipo:
+            evolucao_mensal = evolucao_mensal.join(FrotaVeiculo).filter(FrotaVeiculo.tipo == filtro_tipo)
+        if filtro_status == 'ativo':
+            evolucao_mensal = evolucao_mensal.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == True)
+        elif filtro_status == 'inativo':
+            evolucao_mensal = evolucao_mensal.join(FrotaVeiculo).filter(FrotaVeiculo.ativo == False)
+        
+        evolucao_mensal = evolucao_mensal.group_by(
+            func.to_char(FrotaDespesa.data_custo, 'YYYY-MM')
+        ).order_by(desc('mes')).limit(6).all()
+        
+        # Gráfico 3: Top 5 Veículos com Maior Custo
+        top_veiculos = db.session.query(
+            FrotaVeiculo.placa,
+            FrotaVeiculo.id,
+            func.sum(FrotaDespesa.valor).label('total_custos')
+        ).join(FrotaDespesa).filter(
+            FrotaDespesa.admin_id == tenant_admin_id,
+            FrotaVeiculo.admin_id == tenant_admin_id
+        )
+        
+        if data_inicio:
+            top_veiculos = top_veiculos.filter(FrotaDespesa.data_custo >= data_inicio)
+        if data_fim:
+            top_veiculos = top_veiculos.filter(FrotaDespesa.data_custo <= data_fim)
+        if filtro_tipo:
+            top_veiculos = top_veiculos.filter(FrotaVeiculo.tipo == filtro_tipo)
+        if filtro_status == 'ativo':
+            top_veiculos = top_veiculos.filter(FrotaVeiculo.ativo == True)
+        elif filtro_status == 'inativo':
+            top_veiculos = top_veiculos.filter(FrotaVeiculo.ativo == False)
+        
+        top_veiculos = top_veiculos.group_by(FrotaVeiculo.id, FrotaVeiculo.placa).order_by(
+            desc('total_custos')
+        ).limit(5).all()
+        
+        # Buscar tipos de veículos disponíveis para o filtro
+        tipos_disponiveis = db.session.query(FrotaVeiculo.tipo).filter_by(
+            admin_id=tenant_admin_id
+        ).distinct().all()
+        tipos_disponiveis = [t[0] for t in tipos_disponiveis]
+        
+        print(f"✅ [FROTA_DASHBOARD] KPIs calculados: TCO={tco_total}, Custo/km={custo_medio_km}, Veículos={total_veiculos}")
+        
+        return render_template('frota/dashboard.html',
+                             tco_total=tco_total,
+                             custo_medio_km=custo_medio_km,
+                             total_veiculos=total_veiculos,
+                             custos_mes_atual=custos_mes_atual,
+                             variacao_percentual=variacao_percentual,
+                             custos_por_tipo=custos_por_tipo,
+                             evolucao_mensal=evolucao_mensal,
+                             top_veiculos=top_veiculos,
+                             tipos_disponiveis=tipos_disponiveis,
+                             filtros={
+                                 'tipo': filtro_tipo,
+                                 'data_inicio': filtro_data_inicio,
+                                 'data_fim': filtro_data_fim,
+                                 'status': filtro_status
+                             })
+        
+    except Exception as e:
+        print(f"❌ [FROTA_DASHBOARD] Erro: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash('Erro ao carregar dashboard de frota. Tente novamente.', 'error')
+        return redirect(url_for('frota.lista'))
+
+
+# ===== FUNÇÃO AUXILIAR: VERIFICAR ALERTAS DE VEÍCULOS =====
+def verificar_alertas(admin_id):
+    """
+    Verifica alertas de manutenção e vencimentos para veículos da frota.
+    Retorna lista de veículos que precisam de atenção.
+    
+    ✅ TAREFA 6: Sistema de alertas implementado
+    """
+    from datetime import date, timedelta
+    
+    alertas = []
+    hoje = date.today()
+    prazo_alerta = hoje + timedelta(days=30)  # Alertar com 30 dias de antecedência
+    
+    # Buscar veículos ativos do admin
+    veiculos = FrotaVeiculo.query.filter_by(admin_id=admin_id, ativo=True).all()
+    
+    for veiculo in veiculos:
+        alerta_veiculo = {
+            'veiculo_id': veiculo.id,
+            'placa': veiculo.placa,
+            'modelo': f"{veiculo.marca} {veiculo.modelo}",
+            'alertas': []
+        }
+        
+        # Alerta 1: Manutenção por KM
+        if veiculo.km_proxima_manutencao and veiculo.km_atual:
+            km_restantes = veiculo.km_proxima_manutencao - veiculo.km_atual
+            if km_restantes <= 500:  # Alertar quando faltam 500km ou menos
+                alerta_veiculo['alertas'].append({
+                    'tipo': 'manutencao_km',
+                    'mensagem': f'Manutenção próxima: faltam {km_restantes}km',
+                    'urgencia': 'alta' if km_restantes <= 100 else 'media'
+                })
+        
+        # Alerta 2: Manutenção por Data
+        if veiculo.data_proxima_manutencao:
+            if veiculo.data_proxima_manutencao <= hoje:
+                alerta_veiculo['alertas'].append({
+                    'tipo': 'manutencao_vencida',
+                    'mensagem': f'Manutenção VENCIDA desde {veiculo.data_proxima_manutencao.strftime("%d/%m/%Y")}',
+                    'urgencia': 'critica'
+                })
+            elif veiculo.data_proxima_manutencao <= prazo_alerta:
+                dias_restantes = (veiculo.data_proxima_manutencao - hoje).days
+                alerta_veiculo['alertas'].append({
+                    'tipo': 'manutencao_proxima',
+                    'mensagem': f'Manutenção em {dias_restantes} dias',
+                    'urgencia': 'media' if dias_restantes > 15 else 'alta'
+                })
+        
+        # Alerta 3: IPVA Vencido/Próximo
+        if veiculo.data_vencimento_ipva:
+            if veiculo.data_vencimento_ipva <= hoje:
+                alerta_veiculo['alertas'].append({
+                    'tipo': 'ipva_vencido',
+                    'mensagem': f'IPVA VENCIDO desde {veiculo.data_vencimento_ipva.strftime("%d/%m/%Y")}',
+                    'urgencia': 'critica'
+                })
+            elif veiculo.data_vencimento_ipva <= prazo_alerta:
+                dias_restantes = (veiculo.data_vencimento_ipva - hoje).days
+                alerta_veiculo['alertas'].append({
+                    'tipo': 'ipva_proximo',
+                    'mensagem': f'IPVA vence em {dias_restantes} dias',
+                    'urgencia': 'media' if dias_restantes > 15 else 'alta'
+                })
+        
+        # Alerta 4: Seguro Vencido/Próximo
+        if veiculo.data_vencimento_seguro:
+            if veiculo.data_vencimento_seguro <= hoje:
+                alerta_veiculo['alertas'].append({
+                    'tipo': 'seguro_vencido',
+                    'mensagem': f'Seguro VENCIDO desde {veiculo.data_vencimento_seguro.strftime("%d/%m/%Y")}',
+                    'urgencia': 'critica'
+                })
+            elif veiculo.data_vencimento_seguro <= prazo_alerta:
+                dias_restantes = (veiculo.data_vencimento_seguro - hoje).days
+                alerta_veiculo['alertas'].append({
+                    'tipo': 'seguro_proximo',
+                    'mensagem': f'Seguro vence em {dias_restantes} dias',
+                    'urgencia': 'media' if dias_restantes > 15 else 'alta'
+                })
+        
+        # Adicionar veículo à lista apenas se tiver alertas
+        if alerta_veiculo['alertas']:
+            alertas.append(alerta_veiculo)
+    
+    # Ordenar alertas por urgência (crítica > alta > média)
+    urgencia_ordem = {'critica': 0, 'alta': 1, 'media': 2}
+    alertas.sort(key=lambda x: min([urgencia_ordem.get(a['urgencia'], 3) for a in x['alertas']]))
+    
+    return alertas
