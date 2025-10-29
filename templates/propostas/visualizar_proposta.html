@@ -8,19 +8,19 @@
     <div class="row mb-4">
         <div class="col-md-8">
             <h2><i class="fas fa-file-contract"></i> Proposta {{ proposta.numero }}</h2>
-            <p class="text-muted">{{ proposta.titulo_projeto }} - {{ proposta.cliente_nome }}</p>
+            <p class="text-muted">{{ proposta.titulo or 'Sem título' }} - {{ proposta.cliente_nome }}</p>
         </div>
         <div class="col-md-4 text-end">
             <div class="btn-group" role="group">
                 <a href="{{ url_for('propostas.index') }}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Voltar
                 </a>
-                {% if proposta.status == StatusProposta.RASCUNHO %}
-                <a href="{{ url_for('main.editar_proposta', id=proposta.id) }}" class="btn btn-primary">
+                {% if proposta.status == 'rascunho' %}
+                <a href="{{ url_for('propostas.editar', id=proposta.id) }}" class="btn btn-primary">
                     <i class="fas fa-edit"></i> Editar
                 </a>
                 {% endif %}
-                <a href="{{ url_for('main.gerar_pdf_proposta', id=proposta.id) }}" class="btn btn-success">
+                <a href="{{ url_for('propostas.gerar_pdf', id=proposta.id) }}" class="btn btn-success">
                     <i class="fas fa-file-pdf"></i> PDF
                 </a>
             </div>
@@ -38,15 +38,9 @@
                 'rejeitada': 'danger',
                 'expirada': 'dark'
             } %}
-            <span class="badge bg-{{ status_colors.get(proposta.status.value, 'secondary') }} fs-6">
-                {{ proposta.status.value|title|replace('_', ' ') }}
+            <span class="badge bg-{{ status_colors.get(proposta.status|lower, 'secondary') }} fs-6">
+                {{ proposta.status|title|replace('_', ' ') }}
             </span>
-            
-            {% if proposta.data_validade < date.today() %}
-            <span class="badge bg-danger fs-6 ms-2">
-                <i class="fas fa-exclamation-triangle"></i> Expirada
-            </span>
-            {% endif %}
             
             {% if proposta.obra_gerada_id %}
             <span class="badge bg-info fs-6 ms-2">
@@ -55,25 +49,25 @@
             {% endif %}
         </div>
         <div class="col-md-4 text-end">
-            {% if proposta.status == StatusProposta.RASCUNHO %}
+            {% if proposta.status == 'rascunho' %}
             <button class="btn btn-primary btn-sm" onclick="alterarStatus('enviada')">
                 <i class="fas fa-paper-plane"></i> Enviar
             </button>
             <button class="btn btn-danger btn-sm" onclick="excluirProposta()">
                 <i class="fas fa-trash"></i> Excluir
             </button>
-            {% elif proposta.status == StatusProposta.ENVIADA %}
+            {% elif proposta.status == 'enviada' %}
             <button class="btn btn-warning btn-sm" onclick="alterarStatus('em_analise')">
                 <i class="fas fa-clock"></i> Em Análise
             </button>
-            {% elif proposta.status == StatusProposta.EM_ANALISE %}
+            {% elif proposta.status == 'em_analise' %}
             <button class="btn btn-success btn-sm" onclick="alterarStatus('aprovada')">
                 <i class="fas fa-check"></i> Aprovar
             </button>
             <button class="btn btn-danger btn-sm" onclick="alterarStatus('rejeitada')">
                 <i class="fas fa-times"></i> Rejeitar
             </button>
-            {% elif proposta.status == StatusProposta.APROVADA and not proposta.obra_gerada_id %}
+            {% elif proposta.status == 'aprovada' and not proposta.obra_gerada_id %}
             <button class="btn btn-success btn-sm" onclick="converterParaObra()">
                 <i class="fas fa-hammer"></i> Converter em Obra
             </button>
@@ -96,9 +90,9 @@
                             {{ proposta.cliente_nome }}
                         </div>
                         <div class="col-md-6">
-                            {% if proposta.cliente_documento %}
-                            <strong>CPF/CNPJ:</strong><br>
-                            {{ proposta.cliente_documento }}
+                            {% if proposta.cliente_email %}
+                            <strong>E-mail:</strong><br>
+                            {{ proposta.cliente_email }}
                             {% endif %}
                         </div>
                     </div>
@@ -136,46 +130,29 @@
                     <div class="row">
                         <div class="col-md-12">
                             <strong>Título:</strong><br>
-                            {{ proposta.titulo_projeto }}
+                            {{ proposta.titulo or 'Sem título' }}
                         </div>
                     </div>
-                    <div class="row mt-3">
-                        <div class="col-md-12">
-                            <strong>Local de Execução:</strong><br>
-                            {{ proposta.local_execucao }}
-                        </div>
-                    </div>
-                    {% if proposta.descricao_projeto %}
+                    {% if proposta.descricao %}
                     <div class="row mt-3">
                         <div class="col-md-12">
                             <strong>Descrição:</strong><br>
-                            {{ proposta.descricao_projeto|nl2br|safe }}
+                            {{ proposta.descricao }}
                         </div>
                     </div>
                     {% endif %}
                     <div class="row mt-3">
-                        <div class="col-md-3">
-                            {% if proposta.area_total_m2 > 0 %}
-                            <strong>Área Total:</strong><br>
-                            {{ proposta.area_total_m2 }} m²
-                            {% endif %}
+                        <div class="col-md-4">
+                            <strong>Prazo de Entrega:</strong><br>
+                            {{ proposta.prazo_entrega_dias or 0 }} dias
                         </div>
-                        <div class="col-md-3">
-                            {% if proposta.peso_total_kg > 0 %}
-                            <strong>Peso Total:</strong><br>
-                            {{ proposta.peso_total_kg }} kg
-                            {% endif %}
+                        <div class="col-md-4">
+                            <strong>Validade da Proposta:</strong><br>
+                            {{ proposta.validade_dias or 0 }} dias
                         </div>
-                        <div class="col-md-3">
-                            <strong>Prazo:</strong><br>
-                            {{ proposta.prazo_execucao_dias }} dias
-                        </div>
-                        <div class="col-md-3">
-                            <strong>Validade:</strong><br>
-                            {{ proposta.data_validade.strftime('%d/%m/%Y') }}
-                            {% if proposta.data_validade < date.today() %}
-                            <br><small class="text-danger">Expirada</small>
-                            {% endif %}
+                        <div class="col-md-4">
+                            <strong>Data da Proposta:</strong><br>
+                            {{ proposta.data_proposta.strftime('%d/%m/%Y') if proposta.data_proposta else '-' }}
                         </div>
                     </div>
                 </div>

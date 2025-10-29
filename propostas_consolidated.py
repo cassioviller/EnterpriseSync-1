@@ -52,7 +52,7 @@ except ImportError as e:
 # Importar modelos necessários
 from app import db
 from models import (
-    Proposta, PropostaItem, PropostaTemplate, PropostaHistorico,
+    Proposta, PropostaItem, PropostaTemplate, PropostaHistorico, PropostaArquivo,
     ConfiguracaoEmpresa, Usuario, TipoUsuario, Obra, Servico, Cliente
 )
 
@@ -285,10 +285,11 @@ def visualizar(id):
         
         print(f"DEBUG VISUALIZAR: Proposta {proposta.numero} - {len(itens)} itens")
         
-        return render_template('propostas/visualizar_proposta.html',
+        return render_template('propostas/detalhes_proposta.html',
                              proposta=proposta,
                              itens=itens,
-                             arquivos=arquivos)
+                             arquivos=arquivos,
+                             date=date)
         
     except Exception as e:
         print(f"ERRO VISUALIZAR PROPOSTA: {str(e)}")
