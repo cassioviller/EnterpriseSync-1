@@ -2005,6 +2005,124 @@ def _migration_47_almoxarifado_fornecedor():
                 pass
 
 
+def _migration_48_adicionar_admin_id_modelos_faltantes():
+    """
+    Migração 48: Adicionar admin_id em 17 modelos que estavam sem multi-tenancy
+    
+    CRÍTICO: Esta migração corrige inconsistência entre desenvolvimento e produção
+    que causava erro "column admin_id does not exist"
+    
+    Data: 29/10/2025
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("🔄 MIGRAÇÃO 48: Adicionando admin_id em 17 modelos...")
+        logger.info("=" * 80)
+        
+        # Lista de tabelas que precisam de admin_id
+        tabelas = [
+            'servico_obra',
+            'historico_produtividade_servico',
+            'tipo_ocorrencia',
+            'ocorrencia',
+            'calendario_util',
+            'centro_custo',
+            'receita',
+            'orcamento_obra',
+            'fluxo_caixa',
+            'registro_alimentacao',
+            'rdo_mao_obra',
+            'rdo_equipamento',
+            'rdo_ocorrencia',
+            'rdo_foto',
+            'notificacao_cliente',
+            'proposta_itens',
+            'proposta_arquivos'
+        ]
+        
+        for tabela in tabelas:
+            try:
+                # Verificar se a coluna já existe
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = %s
+                      AND column_name = 'admin_id'
+                """, (tabela,))
+                
+                if cursor.fetchone() is None:
+                    logger.info(f"  ➕ Adicionando admin_id em {tabela}...")
+                    
+                    # Adicionar coluna admin_id (permitir NULL temporariamente)
+                    cursor.execute(f"""
+                        ALTER TABLE {tabela} 
+                        ADD COLUMN IF NOT EXISTS admin_id INTEGER
+                    """)
+                    
+                    # Preencher com valor padrão (primeiro admin não-superadmin)
+                    cursor.execute("""
+                        SELECT id FROM usuario 
+                        WHERE is_superadmin = false 
+                        ORDER BY id 
+                        LIMIT 1
+                    """)
+                    result = cursor.fetchone()
+                    default_admin_id = result[0] if result else 1
+                    
+                    cursor.execute(f"""
+                        UPDATE {tabela} 
+                        SET admin_id = %s
+                        WHERE admin_id IS NULL
+                    """, (default_admin_id,))
+                    
+                    # Tornar NOT NULL
+                    cursor.execute(f"""
+                        ALTER TABLE {tabela} 
+                        ALTER COLUMN admin_id SET NOT NULL
+                    """)
+                    
+                    # Adicionar foreign key (com nome único)
+                    constraint_name = f"fk_{tabela}_admin_id"
+                    cursor.execute(f"""
+                        ALTER TABLE {tabela} 
+                        ADD CONSTRAINT {constraint_name} 
+                        FOREIGN KEY (admin_id) 
+                        REFERENCES usuario(id) 
+                        ON DELETE CASCADE
+                    """)
+                    
+                    logger.info(f"  ✅ admin_id adicionado em {tabela}")
+                else:
+                    logger.info(f"  ⏭️  admin_id já existe em {tabela}, pulando...")
+                    
+            except Exception as e:
+                logger.warning(f"  ⚠️  Erro ao processar {tabela}: {e}")
+                # Continuar com próxima tabela
+                continue
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 48 CONCLUÍDA com sucesso!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro crítico na migração 48: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2045,6 +2163,7 @@ def executar_migracoes():
             (45, "Corrigir schema da tabela propostas_comerciais", _migration_45_corrigir_schema_propostas),
             (46, "Adicionar descricao a centro_custo_contabil", _migration_46_adicionar_descricao_centro_custo),
             (47, "Adicionar fornecedor_id ao almoxarifado_movimento", _migration_47_almoxarifado_fornecedor),
+            (48, "Adicionar admin_id em 17 modelos faltantes", _migration_48_adicionar_admin_id_modelos_faltantes),
         ]
         
         # Executar cada migração com rastreamento
