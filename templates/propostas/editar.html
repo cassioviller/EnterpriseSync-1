@@ -11,7 +11,7 @@
                     <small class="text-muted">Cliente: {{ proposta.cliente_nome }}</small>
                 </div>
                 <div>
-                    <a href="{{ url_for('propostas.visualizar_proposta', id=proposta.id) }}" class="btn btn-outline-secondary btn-sm">
+                    <a href="{{ url_for('propostas.visualizar', id=proposta.id) }}" class="btn btn-outline-secondary btn-sm">
                         <i class="fas fa-eye me-1"></i> Visualizar
                     </a>
                     <a href="{{ url_for('propostas.index') }}" class="btn btn-outline-primary btn-sm">
@@ -21,7 +21,7 @@
             </div>
         </div>
         <div class="card-body">
-            <form method="POST" action="{{ url_for('propostas.atualizar_proposta', id=proposta.id) }}" id="formEditarProposta">
+            <form method="POST" action="{{ url_for('propostas.editar', id=proposta.id) }}" id="formEditarProposta">
                 <div class="row">
                     <!-- Dados do Cliente -->
                     <div class="col-md-6">
@@ -55,20 +55,24 @@
                         <h6 class="text-primary mb-3">Dados da Obra</h6>
                         <div class="mb-3">
                             <label class="form-label">Número da Proposta *</label>
-                            <input type="text" class="form-control" name="numero_proposta" value="{{ proposta.numero }}" required>
+                            <input type="text" class="form-control" name="numero" value="{{ proposta.numero }}" required>
                             <small class="text-muted">Altere o número da proposta se necessário</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Assunto da Proposta</label>
-                            <input type="text" class="form-control" name="assunto" value="{{ proposta.titulo or '' }}" placeholder="Ex: Estrutura Metálica Residencial">
+                            <input type="text" class="form-control" name="titulo" value="{{ proposta.titulo or '' }}" placeholder="Ex: Estrutura Metálica Residencial">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Objeto/Descrição da Obra</label>
-                            <textarea class="form-control" name="objeto" rows="3" placeholder="Descreva os serviços a serem executados...">{{ proposta.descricao or '' }}</textarea>
+                            <textarea class="form-control" name="descricao" rows="3" placeholder="Descreva os serviços a serem executados...">{{ proposta.descricao or '' }}</textarea>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Endereço da Obra</label>
                             <textarea class="form-control" name="cliente_endereco" rows="2">{{ proposta.cliente_endereco or '' }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Valor Total *</label>
+                            <input type="number" class="form-control" name="valor_total" value="{{ proposta.valor_total or 0 }}" step="0.01" required>
                         </div>
                     </div>
                 </div>
