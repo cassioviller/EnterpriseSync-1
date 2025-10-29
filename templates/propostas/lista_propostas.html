@@ -41,7 +41,7 @@
                                         <small class="text-muted">{{ proposta.cliente_email }}</small>
                                     </div>
                                 </td>
-                                <td><strong>R$ {{ "%.2f"|format(proposta.valor_proposta) }}</strong></td>
+                                <td><strong>R$ {{ "%.2f"|format(proposta.valor_total) }}</strong></td>
                                 <td>
                                     {% set status_class = {
                                         'Rascunho': 'secondary',
@@ -55,7 +55,7 @@
                                         {{ proposta.status }}
                                     </span>
                                 </td>
-                                <td>{{ proposta.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>{{ proposta.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
                                 <td>
                                     {% if proposta.data_envio %}
                                         {{ proposta.data_envio.strftime('%d/%m/%Y %H:%M') }}

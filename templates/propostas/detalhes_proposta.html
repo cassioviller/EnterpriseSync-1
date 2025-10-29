@@ -100,7 +100,7 @@
                             <tfoot>
                                 <tr class="table-primary">
                                     <th colspan="4">Total</th>
-                                    <th>R$ {{ "%.2f"|format(proposta.valor_proposta) }}</th>
+                                    <th>R$ {{ "%.2f"|format(proposta.valor_total) }}</th>
                                 </tr>
                             </tfoot>
                         </table>
@@ -127,7 +127,7 @@
                             </div>
                             <div class="timeline-content">
                                 <h6 class="mb-1">{{ log.acao.title() }}</h6>
-                                <p class="mb-1">{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                                <p class="mb-1">{{ log.criado_em.strftime('%d/%m/%Y %H:%M') }}</p>
                                 {% if log.observacoes %}
                                 <p class="mb-0 text-muted">{{ log.observacoes }}</p>
                                 {% endif %}
@@ -160,8 +160,8 @@
                     
                     <hr>
                     
-                    <p><strong>Valor:</strong><br>R$ {{ "%.2f"|format(proposta.valor_proposta) }}</p>
-                    <p><strong>Criada em:</strong><br>{{ proposta.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                    <p><strong>Valor:</strong><br>R$ {{ "%.2f"|format(proposta.valor_total) }}</p>
+                    <p><strong>Criada em:</strong><br>{{ proposta.criado_em.strftime('%d/%m/%Y %H:%M') }}</p>
                     
                     {% if proposta.data_envio %}
                     <p><strong>Enviada em:</strong><br>{{ proposta.data_envio.strftime('%d/%m/%Y %H:%M') }}</p>

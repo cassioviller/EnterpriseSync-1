@@ -100,7 +100,7 @@
                     </div>
                     <div class="card-body text-center">
                         <div class="valor-destaque">
-                            R$ {{ "%.2f"|format(proposta.valor_proposta) }}
+                            R$ {{ "%.2f"|format(proposta.valor_total) }}
                         </div>
                         <hr>
                         <p class="mb-0"><strong>Data de Envio:</strong><br>
@@ -151,7 +151,7 @@
                         <tfoot class="table-success">
                             <tr>
                                 <th colspan="4" class="text-end">Total Geral:</th>
-                                <th class="text-center">R$ {{ "%.2f"|format(proposta.valor_proposta) }}</th>
+                                <th class="text-center">R$ {{ "%.2f"|format(proposta.valor_total) }}</th>
                             </tr>
                         </tfoot>
                     </table>

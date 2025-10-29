@@ -318,7 +318,7 @@
                 <!-- Valor Manual (alternativo) -->
                 <div class="mb-3">
                     <label class="form-label">Valor Total Manual (opcional)</label>
-                    <input type="number" class="form-control" name="valor_proposta" 
+                    <input type="number" class="form-control" name="valor_total" 
                            step="0.01" placeholder="Use este campo se não detalhar os serviços">
                 </div>
 
@@ -899,7 +899,7 @@ function atualizarTotalGeral() {
     document.getElementById('totalProposta').textContent = 'R$ ' + totalGeral.toFixed(2).replace('.', ',');
     
     // Atualizar input hidden para o formulário
-    const inputValor = document.querySelector('input[name="valor_proposta"]');
+    const inputValor = document.querySelector('input[name="valor_total"]');
     if (inputValor) {
         inputValor.value = totalGeral.toFixed(2);
     }

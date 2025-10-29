@@ -89,10 +89,11 @@ def safe_db_operation(operation, default_value=None):
             pass
         return default_value
 
-def propostas_key_generator(request, *args, **kwargs):
+def propostas_key_generator(*args, **kwargs):
     """Gerador de chave idempotente para operações de propostas"""
+    from flask import request as flask_request
     admin_id = get_admin_id()
-    cliente_id = request.form.get('cliente_id', 'sem_cliente')
+    cliente_id = flask_request.form.get('cliente_id', 'sem_cliente')
     timestamp = int(datetime.now().timestamp() // 3600)  # Janela de 1 hora
     return f"proposta_{admin_id}_{cliente_id}_{timestamp}"
 
@@ -194,11 +195,6 @@ def nova():
 @propostas_bp.route('/criar', methods=['POST'])
 @login_required
 @admin_required
-@idempotent(
-    operation_type='proposta_create',
-    ttl_seconds=3600,  # 1 hora
-    key_generator=propostas_key_generator
-)
 def criar():
     """Criar nova proposta com proteção idempotente"""
     try:
@@ -207,8 +203,9 @@ def criar():
         # Dados do formulário
         cliente_nome = request.form.get('cliente_nome', '').strip()
         cliente_email = request.form.get('cliente_email', '').strip()
-        titulo = request.form.get('titulo', '').strip()
-        descricao = request.form.get('descricao', '').strip()
+        # Aceitar 'assunto' ou 'titulo' (compatibilidade)
+        titulo = request.form.get('assunto', request.form.get('titulo', '')).strip()
+        descricao = request.form.get('objeto', request.form.get('descricao', '')).strip()
         valor_total = request.form.get('valor_total', '0').replace(',', '.')
         
         # Validações básicas
@@ -217,7 +214,7 @@ def criar():
             return redirect(url_for('propostas.nova'))
         
         if not titulo:
-            flash('Título da proposta é obrigatório', 'error')
+            flash('Assunto da proposta é obrigatório', 'error')
             return redirect(url_for('propostas.nova'))
         
         try:
