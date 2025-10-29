@@ -1,0 +1,367 @@
+{% extends "base_completo.html" %}
+{% block title %}Dashboard de Alimentação{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-utensils text-warning me-2"></i>
+            Dashboard de Alimentação
+        </h1>
+        <div>
+            <a href="{{ url_for('alimentacao.lancamento_novo') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Novo Lançamento
+            </a>
+            <a href="{{ url_for('alimentacao.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-1"></i> Ver Todos
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-filter me-2"></i>Filtros
+            </h6>
+            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
+        <div class="collapse show" id="filtrosCollapse">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('alimentacao.dashboard') }}" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="filtro_restaurante" class="form-label">Restaurante</label>
+                        <select class="form-select" id="filtro_restaurante" name="restaurante_id">
+                            <option value="">Todos os Restaurantes</option>
+                            {% for rest in restaurantes_disponiveis %}
+                            <option value="{{ rest.id }}" {% if filtros.restaurante_id == rest.id %}selected{% endif %}>
+                                {{ rest.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filtro_obra" class="form-label">Obra</label>
+                        <select class="form-select" id="filtro_obra" name="obra_id">
+                            <option value="">Todas as Obras</option>
+                            {% for obra in obras_disponiveis %}
+                            <option value="{{ obra.id }}" {% if filtros.obra_id == obra.id %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="filtro_data_inicio" class="form-label">Data Início</label>
+                        <input type="date" class="form-control" id="filtro_data_inicio" name="data_inicio" value="{{ filtros.data_inicio or '' }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="filtro_data_fim" class="form-label">Data Fim</label>
+                        <input type="date" class="form-control" id="filtro_data_fim" name="data_fim" value="{{ filtros.data_fim or '' }}">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100 me-2">
+                            <i class="fas fa-search me-1"></i>Filtrar
+                        </button>
+                        <a href="{{ url_for('alimentacao.dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIs Row -->
+    <div class="row">
+        <!-- Total de Refeições -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total de Refeições
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ total_refeicoes }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-utensils fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Custo Total -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Custo Total
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(custo_total) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custo Médio por Refeição -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Custo Médio/Refeição
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(custo_medio_refeicao) }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calculator fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custos do Mês Atual -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Custos do Mês Atual
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(custos_mes_atual) }}
+                            </div>
+                            {% if variacao_percentual >= 0 %}
+                                <div class="text-xs text-danger mt-1">
+                                    <i class="fas fa-arrow-up"></i> +{{ "{:.1f}".format(variacao_percentual) }}% vs mês anterior
+                                </div>
+                            {% else %}
+                                <div class="text-xs text-success mt-1">
+                                    <i class="fas fa-arrow-down"></i> {{ "{:.1f}".format(variacao_percentual) }}% vs mês anterior
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-month fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- Top 5 Funcionários -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Top 5 Funcionários (mais refeições)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="chartTopFuncionarios"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Evolução Mensal -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Evolução Mensal de Custos</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="chartMensal"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Obras -->
+    <div class="row">
+        <div class="col-xl-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Top 5 Obras (mais gastos)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="chartTopObras"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+// Gráfico de Barras: Top 5 Funcionários
+var ctxTopFuncionarios = document.getElementById('chartTopFuncionarios').getContext('2d');
+var chartTopFuncionarios = new Chart(ctxTopFuncionarios, {
+    type: 'bar',
+    data: {
+        labels: [
+            {% for nome, id, total in top_funcionarios %}
+            '{{ nome }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Total de Refeições',
+            data: [
+                {% for nome, id, total in top_funcionarios %}
+                {{ total }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(78, 115, 223, 0.8)',
+            borderColor: 'rgba(78, 115, 223, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        scales: {
+            x: {
+                beginAtZero: true
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+
+// Gráfico de Linha: Evolução Mensal
+var ctxMensal = document.getElementById('chartMensal').getContext('2d');
+var chartMensal = new Chart(ctxMensal, {
+    type: 'line',
+    data: {
+        labels: [
+            {% for mes, total in evolucao_mensal|reverse %}
+            '{{ mes }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Custos Mensais',
+            data: [
+                {% for mes, total in evolucao_mensal|reverse %}
+                {{ total }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            borderColor: 'rgba(28, 200, 138, 1)',
+            backgroundColor: 'rgba(28, 200, 138, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'R$ ' + value.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+                    }
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'R$ ' + context.parsed.y.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Barras: Top 5 Obras
+var ctxTopObras = document.getElementById('chartTopObras').getContext('2d');
+var chartTopObras = new Chart(ctxTopObras, {
+    type: 'bar',
+    data: {
+        labels: [
+            {% for nome, id, total in top_obras %}
+            '{{ nome }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Total de Gastos',
+            data: [
+                {% for nome, id, total in top_obras %}
+                {{ total }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(246, 194, 62, 0.8)',
+            borderColor: 'rgba(246, 194, 62, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        scales: {
+            x: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'R$ ' + value.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+                    }
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'R$ ' + context.parsed.x.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

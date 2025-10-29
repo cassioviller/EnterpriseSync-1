@@ -212,3 +212,213 @@ def lancamento_novo():
                          restaurantes=restaurantes, 
                          obras=obras, 
                          funcionarios=funcionarios)
+
+
+# ===== DASHBOARD DE ALIMENTAÇÃO (TAREFA 8) =====
+@alimentacao_bp.route('/dashboard')
+@login_required
+def dashboard():
+    """Dashboard de Alimentação com KPIs e gráficos"""
+    try:
+        from datetime import date
+        from dateutil.relativedelta import relativedelta
+        
+        logger.info("📊 [ALIMENTACAO_DASHBOARD] Iniciando dashboard...")
+        admin_id = get_admin_id()
+        
+        if not admin_id:
+            flash('Acesso negado. Faça login novamente.', 'error')
+            return redirect(url_for('auth.login'))
+        
+        # Capturar filtros da URL
+        filtro_data_inicio = request.args.get('data_inicio')
+        filtro_data_fim = request.args.get('data_fim')
+        filtro_restaurante_id = request.args.get('restaurante_id', type=int)
+        filtro_obra_id = request.args.get('obra_id', type=int)
+        
+        # Converter datas se fornecidas
+        data_inicio = datetime.strptime(filtro_data_inicio, '%Y-%m-%d').date() if filtro_data_inicio else None
+        data_fim = datetime.strptime(filtro_data_fim, '%Y-%m-%d').date() if filtro_data_fim else None
+        
+        # Query base para lançamentos
+        query_base = AlimentacaoLancamento.query.filter_by(admin_id=admin_id)
+        
+        # Aplicar filtros
+        if data_inicio:
+            query_base = query_base.filter(AlimentacaoLancamento.data >= data_inicio)
+        if data_fim:
+            query_base = query_base.filter(AlimentacaoLancamento.data <= data_fim)
+        if filtro_restaurante_id:
+            query_base = query_base.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            query_base = query_base.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        
+        # KPI 1: Total de Refeições (contagem de lançamentos)
+        total_refeicoes = query_base.count()
+        
+        # KPI 2: Custo Total
+        custo_total = db.session.query(
+            func.coalesce(func.sum(AlimentacaoLancamento.valor_total), Decimal('0'))
+        ).filter(AlimentacaoLancamento.admin_id == admin_id)
+        
+        if data_inicio:
+            custo_total = custo_total.filter(AlimentacaoLancamento.data >= data_inicio)
+        if data_fim:
+            custo_total = custo_total.filter(AlimentacaoLancamento.data <= data_fim)
+        if filtro_restaurante_id:
+            custo_total = custo_total.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            custo_total = custo_total.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        
+        custo_total = float(custo_total.scalar() or 0)
+        
+        # KPI 3: Custo Médio por Refeição
+        custo_medio_refeicao = round(custo_total / total_refeicoes, 2) if total_refeicoes > 0 else 0
+        
+        # KPI 4: Custos do Mês Atual (com comparação)
+        hoje = date.today()
+        inicio_mes_atual = date(hoje.year, hoje.month, 1)
+        inicio_mes_anterior = (inicio_mes_atual - relativedelta(months=1))
+        fim_mes_anterior = inicio_mes_atual - relativedelta(days=1)
+        
+        # Custos do mês atual
+        custos_mes_atual = db.session.query(
+            func.coalesce(func.sum(AlimentacaoLancamento.valor_total), Decimal('0'))
+        ).filter(
+            AlimentacaoLancamento.admin_id == admin_id,
+            AlimentacaoLancamento.data >= inicio_mes_atual
+        )
+        if filtro_restaurante_id:
+            custos_mes_atual = custos_mes_atual.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            custos_mes_atual = custos_mes_atual.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        
+        custos_mes_atual = float(custos_mes_atual.scalar() or 0)
+        
+        # Custos do mês anterior
+        custos_mes_anterior = db.session.query(
+            func.coalesce(func.sum(AlimentacaoLancamento.valor_total), Decimal('0'))
+        ).filter(
+            AlimentacaoLancamento.admin_id == admin_id,
+            AlimentacaoLancamento.data >= inicio_mes_anterior,
+            AlimentacaoLancamento.data <= fim_mes_anterior
+        )
+        if filtro_restaurante_id:
+            custos_mes_anterior = custos_mes_anterior.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            custos_mes_anterior = custos_mes_anterior.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        
+        custos_mes_anterior = float(custos_mes_anterior.scalar() or 0)
+        
+        # Calcular variação percentual
+        if custos_mes_anterior > 0:
+            variacao_percentual = round(((custos_mes_atual - custos_mes_anterior) / custos_mes_anterior) * 100, 1)
+        else:
+            variacao_percentual = 100.0 if custos_mes_atual > 0 else 0.0
+        
+        # Gráfico 1: Top 5 Funcionários (mais refeições)
+        # Usar a tabela de associação para contar
+        from models import alimentacao_funcionarios_assoc
+        
+        top_funcionarios = db.session.query(
+            Funcionario.nome,
+            Funcionario.id,
+            func.count(alimentacao_funcionarios_assoc.c.lancamento_id).label('total_refeicoes')
+        ).join(
+            alimentacao_funcionarios_assoc,
+            Funcionario.id == alimentacao_funcionarios_assoc.c.funcionario_id
+        ).join(
+            AlimentacaoLancamento,
+            AlimentacaoLancamento.id == alimentacao_funcionarios_assoc.c.lancamento_id
+        ).filter(
+            AlimentacaoLancamento.admin_id == admin_id,
+            Funcionario.admin_id == admin_id
+        )
+        
+        if data_inicio:
+            top_funcionarios = top_funcionarios.filter(AlimentacaoLancamento.data >= data_inicio)
+        if data_fim:
+            top_funcionarios = top_funcionarios.filter(AlimentacaoLancamento.data <= data_fim)
+        if filtro_restaurante_id:
+            top_funcionarios = top_funcionarios.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            top_funcionarios = top_funcionarios.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        
+        top_funcionarios = top_funcionarios.group_by(
+            Funcionario.id, Funcionario.nome
+        ).order_by(func.count(alimentacao_funcionarios_assoc.c.lancamento_id).desc()).limit(5).all()
+        
+        # Gráfico 2: Top 5 Obras (mais gastos)
+        top_obras = db.session.query(
+            Obra.nome,
+            Obra.id,
+            func.sum(AlimentacaoLancamento.valor_total).label('total_gastos')
+        ).join(AlimentacaoLancamento).filter(
+            AlimentacaoLancamento.admin_id == admin_id,
+            Obra.admin_id == admin_id
+        )
+        
+        if data_inicio:
+            top_obras = top_obras.filter(AlimentacaoLancamento.data >= data_inicio)
+        if data_fim:
+            top_obras = top_obras.filter(AlimentacaoLancamento.data <= data_fim)
+        if filtro_restaurante_id:
+            top_obras = top_obras.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            top_obras = top_obras.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        
+        top_obras = top_obras.group_by(Obra.id, Obra.nome).order_by(
+            func.sum(AlimentacaoLancamento.valor_total).desc()
+        ).limit(5).all()
+        
+        # Gráfico 3: Evolução Mensal
+        evolucao_mensal = db.session.query(
+            func.to_char(AlimentacaoLancamento.data, 'YYYY-MM').label('mes'),
+            func.sum(AlimentacaoLancamento.valor_total).label('total')
+        ).filter(
+            AlimentacaoLancamento.admin_id == admin_id
+        )
+        
+        if data_inicio:
+            evolucao_mensal = evolucao_mensal.filter(AlimentacaoLancamento.data >= data_inicio)
+        if data_fim:
+            evolucao_mensal = evolucao_mensal.filter(AlimentacaoLancamento.data <= data_fim)
+        if filtro_restaurante_id:
+            evolucao_mensal = evolucao_mensal.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            evolucao_mensal = evolucao_mensal.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        
+        evolucao_mensal = evolucao_mensal.group_by(
+            func.to_char(AlimentacaoLancamento.data, 'YYYY-MM')
+        ).order_by(func.to_char(AlimentacaoLancamento.data, 'YYYY-MM').desc()).limit(6).all()
+        
+        # Buscar restaurantes e obras para os filtros
+        restaurantes_disponiveis = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
+        obras_disponiveis = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+        
+        logger.info(f"✅ [ALIMENTACAO_DASHBOARD] KPIs calculados: Refeições={total_refeicoes}, Custo Total={custo_total}")
+        
+        return render_template('alimentacao/dashboard.html',
+                             total_refeicoes=total_refeicoes,
+                             custo_total=custo_total,
+                             custo_medio_refeicao=custo_medio_refeicao,
+                             custos_mes_atual=custos_mes_atual,
+                             variacao_percentual=variacao_percentual,
+                             top_funcionarios=top_funcionarios,
+                             top_obras=top_obras,
+                             evolucao_mensal=evolucao_mensal,
+                             restaurantes_disponiveis=restaurantes_disponiveis,
+                             obras_disponiveis=obras_disponiveis,
+                             filtros={
+                                 'restaurante_id': filtro_restaurante_id,
+                                 'obra_id': filtro_obra_id,
+                                 'data_inicio': filtro_data_inicio,
+                                 'data_fim': filtro_data_fim
+                             })
+        
+    except Exception as e:
+        logger.error(f"❌ [ALIMENTACAO_DASHBOARD] Erro: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash('Erro ao carregar dashboard de alimentação. Tente novamente.', 'error')
+        return redirect(url_for('alimentacao.index'))
