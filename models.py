@@ -410,7 +410,7 @@ class Ocorrencia(db.Model):
     # Relacionamentos
     funcionario = db.relationship('Funcionario', backref='ocorrencias', lazy=True, overlaps="ocorrencias")
     tipo_ocorrencia = db.relationship('TipoOcorrencia', backref='ocorrencias', lazy=True, overlaps="ocorrencias")
-    aprovador = db.relationship('Usuario', backref='ocorrencias_aprovadas', lazy=True, overlaps="ocorrencias_aprovadas")
+    aprovador = db.relationship('Usuario', foreign_keys=[aprovado_por], backref='ocorrencias_aprovadas', lazy=True, overlaps="ocorrencias_aprovadas")
 
 # ===== MÓDULO 3: GESTÃO DE EQUIPES - SISTEMAS KANBAN/CALENDÁRIO =====
 
