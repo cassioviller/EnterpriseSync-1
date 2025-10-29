@@ -140,6 +140,7 @@ class ServicoObra(db.Model):
     __tablename__ = 'servico_obra'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
     servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
     quantidade_planejada = db.Column(db.Numeric(10, 4), nullable=False)  # Quantidade total planejada
@@ -254,6 +255,7 @@ class HistoricoProdutividadeServico(db.Model):
     __tablename__ = 'historico_produtividade_servico'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
     # Removido: referência à tabela obsoleta sub_atividade
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
@@ -383,6 +385,7 @@ class FuncionarioObrasPonto(db.Model):
 # Novos modelos conforme especificação v3.0
 class TipoOcorrencia(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     nome = db.Column(db.String(50), unique=True, nullable=False)  # Atestado Médico, Atraso Justificado, etc.
     descricao = db.Column(db.Text)
     requer_documento = db.Column(db.Boolean, default=False)
@@ -392,6 +395,7 @@ class TipoOcorrencia(db.Model):
 
 class Ocorrencia(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     tipo_ocorrencia_id = db.Column(db.Integer, db.ForeignKey('tipo_ocorrencia.id'), nullable=False)
     data_inicio = db.Column(db.Date, nullable=False)
@@ -412,6 +416,7 @@ class Ocorrencia(db.Model):
 
 class CalendarioUtil(db.Model):
     data = db.Column(db.Date, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     dia_semana = db.Column(db.Integer)  # 1=Segunda, 7=Domingo
     eh_util = db.Column(db.Boolean, default=True)
     eh_feriado = db.Column(db.Boolean, default=False)
@@ -460,6 +465,7 @@ class CentroCusto(db.Model):
     __tablename__ = 'centro_custo'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     codigo = db.Column(db.String(20), unique=True, nullable=False)  # CC001, CC002, etc.
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.Text)
@@ -478,6 +484,7 @@ class Receita(db.Model):
     __tablename__ = 'receita'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     numero_receita = db.Column(db.String(20), unique=True, nullable=False)  # REC001, REC002, etc.
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'))
@@ -500,6 +507,7 @@ class OrcamentoObra(db.Model):
     __tablename__ = 'orcamento_obra'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
     categoria = db.Column(db.String(30), nullable=False)  # 'mao_obra', 'material', 'equipamento', 'outros'
     orcamento_planejado = db.Column(db.Float, nullable=False, default=0.0)
@@ -532,6 +540,7 @@ class FluxoCaixa(db.Model):
     __tablename__ = 'fluxo_caixa'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     data_movimento = db.Column(db.Date, nullable=False)
     tipo_movimento = db.Column(db.String(10), nullable=False)  # 'ENTRADA', 'SAIDA'
     categoria = db.Column(db.String(30), nullable=False)  # 'receita', 'custo_obra', 'custo_veiculo', 'alimentacao', 'salario'
@@ -550,6 +559,7 @@ class FluxoCaixa(db.Model):
 
 class RegistroAlimentacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     restaurante_id = db.Column(db.Integer, db.ForeignKey('restaurante.id'))
@@ -654,6 +664,7 @@ class RDOMaoObra(db.Model):
     __tablename__ = 'rdo_mao_obra'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     funcao_exercida = db.Column(db.String(100), nullable=False)  # Nome correto do database
@@ -676,6 +687,7 @@ class RDOEquipamento(db.Model):
     __tablename__ = 'rdo_equipamento'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
     nome_equipamento = db.Column(db.String(100), nullable=False)
     quantidade = db.Column(db.Integer, nullable=False)
@@ -690,6 +702,7 @@ class RDOOcorrencia(db.Model):
     __tablename__ = 'rdo_ocorrencia'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
     tipo_ocorrencia = db.Column(db.String(50), nullable=False)  # "Problema", "Observação", "Melhoria", "Segurança"
     severidade = db.Column(db.String(20), default='Baixa')  # "Baixa", "Média", "Alta", "Crítica"
@@ -707,6 +720,7 @@ class RDOFoto(db.Model):
     __tablename__ = 'rdo_foto'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
     nome_arquivo = db.Column(db.String(255), nullable=False)
     caminho_arquivo = db.Column(db.String(500), nullable=False)
@@ -1888,6 +1902,7 @@ class NotificacaoCliente(db.Model):
     __tablename__ = 'notificacao_cliente'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
     
     # Tipo e conteúdo
@@ -2462,6 +2477,7 @@ class PropostaItem(db.Model):
     __tablename__ = 'proposta_itens'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     proposta_id = db.Column(db.Integer, db.ForeignKey('propostas_comerciais.id'), nullable=False)
     item_numero = db.Column(db.Integer, nullable=False)
     descricao = db.Column(db.String(500), nullable=False)
@@ -2507,6 +2523,7 @@ class PropostaArquivo(db.Model):
     __tablename__ = 'proposta_arquivos'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     proposta_id = db.Column(db.Integer, db.ForeignKey('propostas_comerciais.id'), nullable=False)
     nome_arquivo = db.Column(db.String(255), nullable=False)
     nome_original = db.Column(db.String(255), nullable=False)
