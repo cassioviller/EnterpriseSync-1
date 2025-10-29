@@ -527,6 +527,112 @@ def lancar_custo_combustivel(data: dict, admin_id: int):
         db.session.rollback()
 
 
+@event_handler('rdo_finalizado')
+def lancar_custos_rdo(data: dict, admin_id: int):
+    """Handler: Lançar custos de mão de obra quando RDO é finalizado"""
+    try:
+        from models import db, RDO, RDOMaoObra, Funcionario, CustoObra
+        from decimal import Decimal
+        
+        rdo_id = data.get('rdo_id')
+        
+        if not rdo_id:
+            logger.warning(f"⚠️ rdo_id não fornecido no evento rdo_finalizado")
+            return
+        
+        # Buscar RDO com validação multi-tenant
+        rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
+        
+        if not rdo:
+            logger.error(f"❌ RDO {rdo_id} não encontrado para admin {admin_id}")
+            return
+        
+        # Validar se tem obra vinculada
+        if not rdo.obra_id:
+            logger.info(f"⏭️ Custos não lançados: RDO {rdo_id} sem obra vinculada")
+            return
+        
+        # Buscar todos os registros de mão de obra do RDO
+        mao_obra_registros = RDOMaoObra.query.filter_by(rdo_id=rdo_id).all()
+        
+        if not mao_obra_registros:
+            logger.info(f"⏭️ Nenhuma mão de obra registrada no RDO {rdo_id}")
+            return
+        
+        custos_criados = 0
+        valor_total_custos = 0
+        
+        for mao_obra in mao_obra_registros:
+            # Buscar funcionário para obter salário
+            funcionario = Funcionario.query.get(mao_obra.funcionario_id)
+            
+            if not funcionario:
+                logger.warning(f"⚠️ Funcionário {mao_obra.funcionario_id} não encontrado")
+                continue
+            
+            # Calcular valor/hora do funcionário no período
+            data_rdo = rdo.data_relatorio
+            salario_hora = calcular_valor_hora_periodo(funcionario, data_rdo, data_rdo)
+            
+            if salario_hora <= 0:
+                logger.warning(f"⚠️ Funcionário {funcionario.nome} sem salário configurado")
+                salario_hora = 0
+            
+            # Calcular valores
+            horas_trabalhadas = float(mao_obra.horas_trabalhadas or 0)
+            horas_extras = float(mao_obra.horas_extras or 0)
+            
+            if horas_trabalhadas <= 0:
+                logger.info(f"⏭️ Mão de obra sem horas trabalhadas - funcionário {funcionario.nome}")
+                continue
+            
+            # Calcular custo total
+            valor_horas_normais = horas_trabalhadas * salario_hora
+            valor_horas_extras = horas_extras * salario_hora * 1.5
+            valor_total = valor_horas_normais + valor_horas_extras
+            
+            # Criar descrição detalhada
+            descricao = f"RDO #{rdo.numero_rdo} - {funcionario.nome}"
+            if mao_obra.funcao_exercida:
+                descricao += f" ({mao_obra.funcao_exercida})"
+            descricao += f" - {data_rdo.strftime('%d/%m/%Y')}"
+            
+            if horas_extras > 0:
+                descricao += f" ({horas_trabalhadas}h normais + {horas_extras}h extras)"
+            else:
+                descricao += f" ({horas_trabalhadas}h)"
+            
+            # Criar registro de custo
+            custo = CustoObra(
+                obra_id=rdo.obra_id,
+                tipo='mao_obra',
+                descricao=descricao,
+                valor=valor_total,
+                data=data_rdo,
+                funcionario_id=mao_obra.funcionario_id,
+                rdo_id=rdo.id,
+                admin_id=admin_id,
+                horas_trabalhadas=Decimal(str(horas_trabalhadas)),
+                horas_extras=Decimal(str(horas_extras)),
+                valor_unitario=Decimal(str(salario_hora)),
+                quantidade=Decimal(str(horas_trabalhadas + horas_extras)),
+                categoria='RDO'
+            )
+            
+            db.session.add(custo)
+            custos_criados += 1
+            valor_total_custos += valor_total
+        
+        # Commit de todos os custos de uma vez
+        db.session.commit()
+        
+        logger.info(f"✅ RDO {rdo.numero_rdo} finalizado: {custos_criados} custos de mão de obra lançados (Total: R$ {valor_total_custos:.2f})")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao lançar custos do RDO: {e}", exc_info=True)
+        db.session.rollback()
+
+
 @event_handler('proposta_aprovada')
 def gerar_contas_receber_proposta(data: dict, admin_id: int):
     """Handler: Gerar contas a receber quando proposta é aprovada"""

@@ -6786,6 +6786,18 @@ def finalizar_rdo(id):
         rdo.status = 'Finalizado'
         db.session.commit()
         
+        # ✅ NOVO: Emitir evento rdo_finalizado para integração com módulo de custos
+        try:
+            from event_manager import EventManager
+            EventManager.emit('rdo_finalizado', {
+                'rdo_id': rdo.id,
+                'obra_id': rdo.obra_id,
+                'data_relatorio': str(rdo.data_relatorio)
+            }, admin_id)
+            logger.info(f"🔔 Evento rdo_finalizado emitido para RDO {rdo.id}")
+        except Exception as e:
+            logger.error(f"❌ Erro ao emitir evento rdo_finalizado: {e}")
+        
         flash(f'RDO {rdo.numero_rdo} finalizado com sucesso!', 'success')
         return redirect(url_for('main.visualizar_rdo', id=id))
         
@@ -6980,10 +6992,25 @@ def atualizar_rdo(id):
         
         # Verificar se deve finalizar
         finalizar = request.form.get('finalizar') == 'true'
+        foi_finalizado = False
         if finalizar and rdo.status == 'Rascunho':
             rdo.status = 'Finalizado'
+            foi_finalizado = True
         
         db.session.commit()
+        
+        # ✅ NOVO: Emitir evento rdo_finalizado se acabou de finalizar
+        if foi_finalizado:
+            try:
+                from event_manager import EventManager
+                EventManager.emit('rdo_finalizado', {
+                    'rdo_id': rdo.id,
+                    'obra_id': rdo.obra_id,
+                    'data_relatorio': str(rdo.data_relatorio)
+                }, admin_id)
+                logger.info(f"🔔 Evento rdo_finalizado emitido para RDO {rdo.id}")
+            except Exception as e:
+                logger.error(f"❌ Erro ao emitir evento rdo_finalizado: {e}")
         
         if finalizar:
             flash(f'RDO {rdo.numero_rdo} atualizado e finalizado com sucesso!', 'success')

@@ -19,16 +19,102 @@
         </div>
     </div>
 
+    <!-- Filtros -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-filter me-2"></i>Filtros
+            </h6>
+            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
+        <div class="collapse show" id="filtrosCollapse">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('custos.dashboard_custos') }}" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="filtro_obra" class="form-label">Obra</label>
+                        <select class="form-select" id="filtro_obra" name="obra_id">
+                            <option value="">Todas as Obras</option>
+                            {% for obra in todas_obras %}
+                            <option value="{{ obra.id }}" {% if request.args.get('obra_id') == obra.id|string %}selected{% endif %}>
+                                {{ obra.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filtro_tipo" class="form-label">Categoria</label>
+                        <select class="form-select" id="filtro_tipo" name="tipo">
+                            <option value="">Todas as Categorias</option>
+                            <option value="mao_obra" {% if request.args.get('tipo') == 'mao_obra' %}selected{% endif %}>Mão de Obra</option>
+                            <option value="material" {% if request.args.get('tipo') == 'material' %}selected{% endif %}>Material</option>
+                            <option value="veiculo" {% if request.args.get('tipo') == 'veiculo' %}selected{% endif %}>Veículo</option>
+                            <option value="servico" {% if request.args.get('tipo') == 'servico' %}selected{% endif %}>Serviço</option>
+                            <option value="alimentacao" {% if request.args.get('tipo') == 'alimentacao' %}selected{% endif %}>Alimentação</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="filtro_data_inicio" class="form-label">Data Início</label>
+                        <input type="date" class="form-control" id="filtro_data_inicio" name="data_inicio" value="{{ request.args.get('data_inicio', '') }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="filtro_data_fim" class="form-label">Data Fim</label>
+                        <input type="date" class="form-control" id="filtro_data_fim" name="data_fim" value="{{ request.args.get('data_fim', '') }}">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100 me-2">
+                            <i class="fas fa-search me-1"></i>Filtrar
+                        </button>
+                        <a href="{{ url_for('custos.dashboard_custos') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- KPIs Row -->
     <div class="row">
-        <!-- Total Custos -->
+        <!-- Total do Mês Atual -->
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Total de Custos
+                                Total do Mês Atual
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ "{:,.2f}".format(total_mes_atual) }}
+                            </div>
+                            {% if variacao_percentual >= 0 %}
+                                <div class="text-xs text-success mt-1">
+                                    <i class="fas fa-arrow-up"></i> +{{ "{:.1f}".format(variacao_percentual) }}% vs mês anterior
+                                </div>
+                            {% else %}
+                                <div class="text-xs text-danger mt-1">
+                                    <i class="fas fa-arrow-down"></i> {{ "{:.1f}".format(variacao_percentual) }}% vs mês anterior
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-month fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Total Geral -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Total Geral de Custos
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 R$ {{ "{:,.2f}".format(total_custos) }}

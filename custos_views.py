@@ -4,7 +4,7 @@ from models import CustoObra, Obra, Funcionario, Vehicle, db
 from sqlalchemy import func, desc, extract, text
 from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
 from utils.database import db_transaction  # ✅ OTIMIZAÇÃO MÉDIO PRAZO 3: Transações atômicas
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,46 +32,111 @@ def dashboard_custos():
     
     admin_id = current_user.id
     
-    # KPIs principais
-    total_custos = db.session.query(func.sum(CustoObra.valor)).filter_by(admin_id=admin_id).scalar() or 0
+    # ✅ NOVO: Capturar filtros da URL
+    filtro_obra_id = request.args.get('obra_id', type=int)
+    filtro_tipo = request.args.get('tipo')
+    filtro_data_inicio = request.args.get('data_inicio')
+    filtro_data_fim = request.args.get('data_fim')
     
-    # Custos por categoria (campo correto: 'tipo')
-    custos_categoria = db.session.query(
+    # Construir query base com filtros
+    query_base = db.session.query(CustoObra).filter_by(admin_id=admin_id)
+    
+    if filtro_obra_id:
+        query_base = query_base.filter_by(obra_id=filtro_obra_id)
+    if filtro_tipo:
+        query_base = query_base.filter_by(tipo=filtro_tipo)
+    if filtro_data_inicio:
+        data_inicio = datetime.strptime(filtro_data_inicio, '%Y-%m-%d').date()
+        query_base = query_base.filter(CustoObra.data >= data_inicio)
+    if filtro_data_fim:
+        data_fim = datetime.strptime(filtro_data_fim, '%Y-%m-%d').date()
+        query_base = query_base.filter(CustoObra.data <= data_fim)
+    
+    # KPIs principais (com filtros aplicados)
+    total_custos = query_base.with_entities(func.sum(CustoObra.valor)).scalar() or 0
+    
+    # ✅ Total do mês atual (com filtros)
+    hoje = date.today()
+    primeiro_dia_mes = date(hoje.year, hoje.month, 1)
+    query_mes_atual = query_base.filter(CustoObra.data >= primeiro_dia_mes)
+    total_mes_atual = query_mes_atual.with_entities(func.sum(CustoObra.valor)).scalar() or 0
+    
+    # ✅ Total do mês anterior para comparação (com filtros)
+    if hoje.month == 1:
+        primeiro_dia_mes_anterior = date(hoje.year - 1, 12, 1)
+        ultimo_dia_mes_anterior = date(hoje.year - 1, 12, 31)
+    else:
+        primeiro_dia_mes_anterior = date(hoje.year, hoje.month - 1, 1)
+        ultimo_dia_mes_anterior = primeiro_dia_mes - timedelta(days=1)
+    
+    query_mes_anterior = query_base.filter(
+        CustoObra.data >= primeiro_dia_mes_anterior,
+        CustoObra.data <= ultimo_dia_mes_anterior
+    )
+    total_mes_anterior = query_mes_anterior.with_entities(func.sum(CustoObra.valor)).scalar() or 0
+    
+    # Calcular variação percentual
+    if total_mes_anterior > 0:
+        variacao_percentual = ((total_mes_atual - total_mes_anterior) / total_mes_anterior) * 100
+    else:
+        variacao_percentual = 100 if total_mes_atual > 0 else 0
+    
+    # Custos por categoria (com filtros)
+    custos_categoria = query_base.with_entities(
         CustoObra.tipo,
         func.sum(CustoObra.valor).label('total')
-    ).filter_by(admin_id=admin_id).group_by(CustoObra.tipo).all()
+    ).group_by(CustoObra.tipo).all()
     
-    # Custos por mês (últimos 6 meses) - PostgreSQL compatible
-    custos_mensais = db.session.query(
+    # Custos por mês (últimos 6 meses, com filtros) - PostgreSQL compatible
+    custos_mensais = query_base.with_entities(
         func.to_char(CustoObra.data, 'YYYY-MM').label('mes'),
         func.sum(CustoObra.valor).label('total')
-    ).filter_by(admin_id=admin_id).group_by(
+    ).group_by(
         func.to_char(CustoObra.data, 'YYYY-MM')
     ).order_by(desc('mes')).limit(6).all()
     
-    # Top 5 obras por custo
-    top_obras = db.session.query(
+    # Top 5 obras por custo (com filtros)
+    query_top_obras = db.session.query(
         Obra.nome,
         Obra.id,
         func.sum(CustoObra.valor).label('total_custos')
     ).join(CustoObra).filter(
         CustoObra.admin_id == admin_id,
         Obra.admin_id == admin_id
-    ).group_by(Obra.id, Obra.nome).order_by(
+    )
+    
+    # ✅ CORRIGIDO: Aplicar filtros adicionais para top obras (incluindo obra_id)
+    if filtro_obra_id:
+        query_top_obras = query_top_obras.filter(CustoObra.obra_id == filtro_obra_id)
+    if filtro_tipo:
+        query_top_obras = query_top_obras.filter(CustoObra.tipo == filtro_tipo)
+    if filtro_data_inicio:
+        query_top_obras = query_top_obras.filter(CustoObra.data >= data_inicio)
+    if filtro_data_fim:
+        query_top_obras = query_top_obras.filter(CustoObra.data <= data_fim)
+    
+    top_obras = query_top_obras.group_by(Obra.id, Obra.nome).order_by(
         desc('total_custos')
     ).limit(5).all()
     
     # Estatísticas gerais
     total_obras = Obra.query.filter_by(admin_id=admin_id).count()
-    obras_com_custos = db.session.query(CustoObra.obra_id).filter_by(admin_id=admin_id).distinct().count()
+    obras_com_custos = query_base.with_entities(CustoObra.obra_id).distinct().count()
+    
+    # Lista de obras para o filtro
+    todas_obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
     
     return render_template('custos/dashboard.html',
                          total_custos=total_custos,
+                         total_mes_atual=total_mes_atual,
+                         total_mes_anterior=total_mes_anterior,
+                         variacao_percentual=variacao_percentual,
                          custos_categoria=custos_categoria,
                          custos_mensais=custos_mensais,
                          top_obras=top_obras,
                          total_obras=total_obras,
-                         obras_com_custos=obras_com_custos)
+                         obras_com_custos=obras_com_custos,
+                         todas_obras=todas_obras)
 
 @custos_bp.route('/obra/<int:obra_id>')
 @login_required

@@ -1,0 +1,552 @@
+# 🚀 PROMPT FINAL: Completar 4 Módulos Pendentes do SIGE v9.0
+
+**Objetivo:** Finalizar os 4 módulos incompletos (Custos, Frota, Alimentação e RDO) para atingir 100% de completude e deixar o sistema pronto para produção.
+
+---
+
+## 📊 ANÁLISE DOS RELATÓRIOS
+
+Baseado nos relatórios **RELATORIO_TESTES_SIGE_v9.0(1).md** e **RELATORIO_MODULOS_INCOMPLETOS.md**:
+
+### **Status Atual do Sistema:**
+
+✅ **Taxa de sucesso:** 93,6% (44/47 cenários)  
+✅ **Módulos 100% funcionais:** 11/15 (73,3%)  
+⚠️ **Módulos incompletos:** 4/15 (26,7%)  
+✅ **Integrações validadas:** 6/6 (100%)  
+
+### **Módulos Incompletos:**
+
+| Módulo | Completude | Esforço Restante | Bloqueador? |
+|---|---|---|---|
+| **Custos** | 40% | 7 horas | ✅ SIM |
+| **Frota** | 60% | 5 horas | ✅ SIM |
+| **Alimentação** | 50% | 5 horas | ✅ SIM |
+| **RDO** | 75% | 2 horas | ❌ NÃO |
+
+**Total de trabalho pendente:** 19 horas (2,5 dias úteis)
+
+---
+
+## 🎯 PLANO DE EXECUÇÃO (19 HORAS)
+
+### **DIA 1: MÓDULO DE CUSTOS (7 HORAS)** 🔴
+
+#### **Manhã (4 horas): Dashboard e Gráficos**
+
+**Tarefa 1.1 - Criar Dashboard de Custos** ⏱️ 2h
+
+**O que fazer:**
+1. Criar rota `/custos/dashboard`
+2. Implementar KPIs:
+   - Total de custos do mês
+   - Custos por categoria (Mão de Obra, Material, Veículo, Serviço, Alimentação)
+   - Top 5 obras com mais custos
+   - Evolução mensal (últimos 6 meses)
+
+3. Criar template `templates/custos/dashboard.html`:
+   ```html
+   <!-- KPIs -->
+   <div class="row">
+     <div class="col-md-3">
+       <div class="card">
+         <h3>Total de Custos</h3>
+         <p>R$ {{ total_custos }}</p>
+       </div>
+     </div>
+     <!-- Mais KPIs... -->
+   </div>
+   
+   <!-- Gráficos -->
+   <canvas id="custosPorCategoria"></canvas>
+   <canvas id="evolucaoMensal"></canvas>
+   ```
+
+4. Adicionar gráficos com Chart.js:
+   - Gráfico de pizza: Custos por categoria
+   - Gráfico de linha: Evolução mensal
+
+**Critério de Sucesso:**
+- [ ] Dashboard carrega em < 2s
+- [ ] KPIs exibem valores corretos
+- [ ] Gráficos renderizam corretamente
+- [ ] Multi-tenancy validado
+
+---
+
+**Tarefa 1.2 - Criar Gráficos Interativos** ⏱️ 2h
+
+**O que fazer:**
+1. Implementar filtros no dashboard:
+   - Filtro por obra
+   - Filtro por categoria
+   - Filtro por período (mês/ano)
+
+2. Adicionar tabela de custos recentes:
+   - Últimos 10 custos
+   - Colunas: Data, Obra, Categoria, Valor, Responsável
+
+3. Adicionar botão "Exportar para Excel"
+
+4. Implementar API `/api/custos/dashboard-data`:
+   ```json
+   {
+     "total_custos": 125000.50,
+     "custos_por_categoria": {...},
+     "evolucao_mensal": [...],
+     "top_obras": [...]
+   }
+   ```
+
+**Critério de Sucesso:**
+- [ ] Filtros funcionam corretamente
+- [ ] Tabela exibe dados corretos
+- [ ] Exportação para Excel funciona
+- [ ] API retorna dados corretos
+
+---
+
+#### **Tarde (3 horas): Integrações**
+
+**Tarefa 1.3 - Integração com RDO** ⏱️ 1,5h
+
+**O que fazer:**
+1. Criar event handler `rdo_finalizado` em `event_manager.py`:
+   ```python
+   @event_handler('rdo_finalizado')
+   def criar_custo_rdo(data):
+       """Cria custos automaticamente quando RDO é finalizado"""
+       rdo_id = data['rdo_id']
+       rdo = RDO.query.get(rdo_id)
+       
+       # Criar custo de mão de obra
+       for mao_obra in rdo.mao_obra:
+           custo = CustoObra(
+               obra_id=rdo.obra_id,
+               tipo='mao_obra',
+               valor=calcular_valor_mao_obra(mao_obra),
+               data_custo=rdo.data_relatorio,
+               descricao=f'Mão de obra - {mao_obra.funcionario.nome}',
+               origem='rdo',
+               origem_id=rdo.id,
+               admin_id=rdo.admin_id
+           )
+           db.session.add(custo)
+       
+       db.session.commit()
+   ```
+
+2. Atualizar `rdo_validator.py` para emitir evento:
+   ```python
+   def finalizar_rdo(rdo_id):
+       rdo = RDO.query.get(rdo_id)
+       rdo.status = 'Finalizado'
+       db.session.commit()
+       
+       # Emitir evento
+       EventManager.emit('rdo_finalizado', {
+           'rdo_id': rdo.id,
+           'obra_id': rdo.obra_id,
+           'data': rdo.data_relatorio
+       })
+   ```
+
+**Critério de Sucesso:**
+- [ ] Evento `rdo_finalizado` é emitido
+- [ ] Handler cria custos automaticamente
+- [ ] Custos têm origem='rdo' e origem_id correto
+- [ ] Multi-tenancy preservado
+
+---
+
+**Tarefa 1.4 - Integração com Frota** ⏱️ 1,5h
+
+**O que fazer:**
+1. Criar event handler `frota_custo_criado` em `event_manager.py`:
+   ```python
+   @event_handler('frota_custo_criado')
+   def criar_custo_frota(data):
+       """Cria custo na obra quando veículo é usado"""
+       utilizacao_id = data['utilizacao_id']
+       utilizacao = FrotaUtilizacao.query.get(utilizacao_id)
+       
+       if utilizacao.obra_id:
+           # Calcular custo (combustível + depreciação)
+           custo_total = calcular_custo_utilizacao(utilizacao)
+           
+           custo = CustoObra(
+               obra_id=utilizacao.obra_id,
+               tipo='veiculo',
+               valor=custo_total,
+               data_custo=utilizacao.data_uso,
+               descricao=f'Veículo {utilizacao.veiculo.placa} - {utilizacao.km_percorrido}km',
+               origem='frota',
+               origem_id=utilizacao.id,
+               admin_id=utilizacao.admin_id
+           )
+           db.session.add(custo)
+           db.session.commit()
+   ```
+
+2. Atualizar `frota_views.py` para emitir evento ao registrar uso
+
+**Critério de Sucesso:**
+- [ ] Evento `frota_custo_criado` é emitido
+- [ ] Handler cria custos automaticamente
+- [ ] Custos têm origem='frota' e origem_id correto
+
+---
+
+### **DIA 2: MÓDULOS FROTA E ALIMENTAÇÃO (10 HORAS)** 🟡
+
+#### **Manhã (5 horas): Frota**
+
+**Tarefa 2.1 - Dashboard TCO (Total Cost of Ownership)** ⏱️ 2h
+
+**O que fazer:**
+1. Criar rota `/frota/dashboard`
+2. Implementar KPIs:
+   - TCO por veículo (custo total / km rodado)
+   - Custo médio por km
+   - Custo total por tipo (combustível, manutenção, IPVA)
+   - Veículos com maior custo
+
+3. Criar gráficos:
+   - Gráfico de barras: TCO por veículo
+   - Gráfico de pizza: Custos por tipo
+   - Gráfico de linha: Evolução de custos
+
+**Critério de Sucesso:**
+- [ ] Dashboard exibe TCO correto
+- [ ] Gráficos renderizam
+- [ ] Filtros por período funcionam
+
+---
+
+**Tarefa 2.2 - Alertas de Manutenção** ⏱️ 2h
+
+**O que fazer:**
+1. Adicionar campos em `FrotaVeiculo`:
+   ```python
+   km_proxima_manutencao = db.Column(db.Integer)
+   data_proxima_revisao = db.Column(db.Date)
+   data_vencimento_ipva = db.Column(db.Date)
+   data_vencimento_seguro = db.Column(db.Date)
+   ```
+
+2. Criar função `verificar_alertas()`:
+   ```python
+   def verificar_alertas(veiculo):
+       alertas = []
+       
+       # Alerta de KM
+       if veiculo.km_atual >= veiculo.km_proxima_manutencao - 500:
+           alertas.append({
+               'tipo': 'manutencao',
+               'mensagem': f'Manutenção próxima em {veiculo.km_proxima_manutencao - veiculo.km_atual}km'
+           })
+       
+       # Alerta de IPVA
+       if veiculo.data_vencimento_ipva <= date.today() + timedelta(days=30):
+           alertas.append({
+               'tipo': 'ipva',
+               'mensagem': 'IPVA vence em menos de 30 dias'
+           })
+       
+       return alertas
+   ```
+
+3. Exibir alertas no dashboard com badges coloridos
+
+**Critério de Sucesso:**
+- [ ] Alertas aparecem no dashboard
+- [ ] Cores corretas (verde/amarelo/vermelho)
+- [ ] Notificações por e-mail (opcional)
+
+---
+
+**Tarefa 2.3 - Integração com EventManager** ⏱️ 1h
+
+**O que fazer:**
+1. Emitir evento `frota_custo_criado` ao registrar uso
+2. Emitir evento `frota_manutencao_vencida` quando alerta crítico
+3. Registrar handler em `event_manager.py`
+
+**Critério de Sucesso:**
+- [ ] Eventos emitidos corretamente
+- [ ] Handlers registrados
+- [ ] Logs de eventos visíveis
+
+---
+
+#### **Tarde (5 horas): Alimentação**
+
+**Tarefa 2.4 - Dashboard de Alimentação** ⏱️ 2h
+
+**O que fazer:**
+1. Criar rota `/alimentacao/dashboard`
+2. Implementar KPIs:
+   - Total de refeições do mês
+   - Custo total de alimentação
+   - Custo médio por refeição
+   - Top 5 funcionários (mais refeições)
+   - Top 5 obras (mais refeições)
+
+3. Criar gráficos:
+   - Gráfico de barras: Refeições por obra
+   - Gráfico de linha: Evolução mensal
+   - Gráfico de pizza: Refeições por tipo (café, almoço, jantar)
+
+**Critério de Sucesso:**
+- [ ] Dashboard carrega em < 2s
+- [ ] KPIs corretos
+- [ ] Gráficos funcionam
+
+---
+
+**Tarefa 2.5 - Integração com Financeiro** ⏱️ 2h
+
+**O que fazer:**
+1. Criar event handler `refeicao_registrada`:
+   ```python
+   @event_handler('refeicao_registrada')
+   def criar_conta_pagar_alimentacao(data):
+       """Cria conta a pagar quando refeição é registrada"""
+       refeicao_id = data['refeicao_id']
+       refeicao = Alimentacao.query.get(refeicao_id)
+       
+       # Verificar se já existe conta para este dia/restaurante
+       conta_existente = ContaPagar.query.filter_by(
+           origem='alimentacao',
+           origem_id=refeicao.id
+       ).first()
+       
+       if not conta_existente:
+           conta = ContaPagar(
+               fornecedor_id=refeicao.restaurante_id,
+               valor=refeicao.valor,
+               data_vencimento=refeicao.data + timedelta(days=7),
+               descricao=f'Refeição - {refeicao.tipo}',
+               origem='alimentacao',
+               origem_id=refeicao.id,
+               admin_id=refeicao.admin_id
+           )
+           db.session.add(conta)
+           db.session.commit()
+   ```
+
+2. Atualizar `alimentacao_views.py` para emitir evento
+
+**Critério de Sucesso:**
+- [ ] Evento emitido ao registrar refeição
+- [ ] Conta a pagar criada automaticamente
+- [ ] Fornecedor associado corretamente
+
+---
+
+**Tarefa 2.6 - CRUD Completo** ⏱️ 1h
+
+**O que fazer:**
+1. Criar rotas:
+   - `/alimentacao/` - Listar refeições
+   - `/alimentacao/nova` - Registrar refeição
+   - `/alimentacao/<id>/editar` - Editar
+   - `/alimentacao/<id>/deletar` - Deletar
+
+2. Criar templates correspondentes
+
+3. Validações:
+   - Data não pode ser futura
+   - Valor deve ser positivo
+   - Funcionário e obra obrigatórios
+
+**Critério de Sucesso:**
+- [ ] CRUD completo funciona
+- [ ] Validações aplicadas
+- [ ] Multi-tenancy validado
+
+---
+
+### **DIA 3: RDO E VALIDAÇÃO FINAL (2 HORAS)** 🟢
+
+#### **Manhã (2 horas): Testes E2E do RDO**
+
+**Tarefa 3.1 - Criar Testes E2E com Playwright** ⏱️ 2h
+
+**O que fazer:**
+1. Criar arquivo `tests/e2e/test_rdo.py`:
+   ```python
+   def test_criar_rdo(page):
+       """Testa criação completa de RDO"""
+       # Login
+       page.goto('/login')
+       page.fill('#username', 'admin@test.com')
+       page.fill('#password', 'senha123')
+       page.click('button[type="submit"]')
+       
+       # Navegar para RDO
+       page.goto('/rdo/novo')
+       
+       # Preencher formulário
+       page.select_option('#obra_id', '1')
+       page.fill('#data_relatorio', '2025-10-29')
+       page.select_option('#clima', 'Ensolarado')
+       
+       # Adicionar mão de obra
+       page.click('#add-mao-obra')
+       page.select_option('#funcionario_id_0', '1')
+       page.fill('#horas_trabalhadas_0', '8')
+       
+       # Salvar
+       page.click('button[type="submit"]')
+       
+       # Verificar sucesso
+       assert 'RDO criado com sucesso' in page.content()
+   
+   def test_finalizar_rdo(page):
+       """Testa finalização e integração com custos"""
+       # ... (similar ao anterior)
+       
+       # Finalizar RDO
+       page.click('#finalizar-rdo')
+       
+       # Verificar que custo foi criado
+       page.goto('/custos/')
+       assert 'Mão de obra' in page.content()
+   ```
+
+2. Executar testes:
+   ```bash
+   pytest tests/e2e/test_rdo.py -v
+   ```
+
+**Critério de Sucesso:**
+- [ ] Teste de criação passa
+- [ ] Teste de finalização passa
+- [ ] Teste de integração com custos passa
+- [ ] Cobertura > 90%
+
+---
+
+## 📋 CHECKLIST FINAL DE VALIDAÇÃO
+
+Após completar todas as tarefas, validar:
+
+### **Módulo de Custos:**
+- [ ] Dashboard funcional com KPIs
+- [ ] Gráficos renderizam corretamente
+- [ ] Integração com RDO funciona
+- [ ] Integração com Frota funciona
+- [ ] Filtros e exportação funcionam
+
+### **Módulo de Frota:**
+- [ ] Dashboard TCO funcional
+- [ ] Alertas de manutenção aparecem
+- [ ] Integração com EventManager funciona
+- [ ] Custos calculados corretamente
+
+### **Módulo de Alimentação:**
+- [ ] Dashboard funcional
+- [ ] CRUD completo funciona
+- [ ] Integração com Financeiro funciona
+- [ ] Conta a pagar criada automaticamente
+
+### **Módulo de RDO:**
+- [ ] Testes E2E passam
+- [ ] Integração com Custos validada
+- [ ] Cobertura de testes > 90%
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+Após executar este prompt, o sistema deve atingir:
+
+✅ **Taxa de sucesso:** 98%+  
+✅ **Módulos 100% funcionais:** 15/15 (100%)  
+✅ **Integrações validadas:** 9/9 (100%)  
+✅ **Dados de teste completos:** Todos os módulos  
+✅ **Status:** **PRONTO PARA PRODUÇÃO**  
+✅ **Confiança de deploy:** 98%+  
+
+---
+
+## 📊 COMPARAÇÃO ANTES/DEPOIS
+
+### **ANTES (Relatório Atual):**
+```
+Taxa de sucesso: 93,6%
+Módulos 100% funcionais: 11/15 (73,3%)
+Módulos incompletos: 4/15 (26,7%)
+Trabalho pendente: 19 horas
+Status: Pronto com Ressalvas
+Confiança: 85%
+```
+
+### **DEPOIS (Após Prompt):**
+```
+Taxa de sucesso: 98%+
+Módulos 100% funcionais: 15/15 (100%)
+Módulos incompletos: 0/15 (0%)
+Trabalho pendente: 0 horas
+Status: Pronto para Produção
+Confiança: 98%+
+```
+
+---
+
+## ⏱️ CRONOGRAMA DETALHADO
+
+### **Dia 1 (7 horas) - Custos**
+```
+09:00-11:00 → Dashboard e KPIs (2h)
+11:00-13:00 → Gráficos e filtros (2h)
+14:00-15:30 → Integração RDO (1,5h)
+15:30-17:00 → Integração Frota (1,5h)
+```
+
+### **Dia 2 (10 horas) - Frota + Alimentação**
+```
+09:00-11:00 → Dashboard TCO Frota (2h)
+11:00-13:00 → Alertas de manutenção (2h)
+14:00-15:00 → EventManager Frota (1h)
+15:00-17:00 → Dashboard Alimentação (2h)
+17:00-19:00 → Integração Financeiro (2h)
+19:00-20:00 → CRUD Alimentação (1h)
+```
+
+### **Dia 3 (2 horas) - RDO**
+```
+09:00-11:00 → Testes E2E RDO (2h)
+```
+
+**Total:** 19 horas (2,5 dias úteis)
+
+---
+
+## 📁 ARQUIVOS A MODIFICAR
+
+### **Custos:**
+- `custos_views.py` (adicionar rotas de dashboard)
+- `templates/custos/dashboard.html` (criar)
+- `event_manager.py` (adicionar handlers)
+
+### **Frota:**
+- `frota_views.py` (adicionar dashboard TCO)
+- `models.py` (adicionar campos de alerta)
+- `templates/frota/dashboard.html` (criar)
+
+### **Alimentação:**
+- `alimentacao_views.py` (CRUD completo)
+- `templates/alimentacao/dashboard.html` (criar)
+- `event_manager.py` (handler de refeição)
+
+### **RDO:**
+- `tests/e2e/test_rdo.py` (criar)
+
+---
+
+**Pronto para completar os 4 módulos e atingir 100% de completude!** 🚀
+
+Este prompt é executável, detalhado e inclui código pronto para copiar e colar. O Replit Agent pode seguir passo a passo para finalizar o sistema SIGE v9.0.
+
