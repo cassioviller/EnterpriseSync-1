@@ -12,7 +12,7 @@
         </div>
         <div class="col-md-4 text-end">
             <div class="btn-group" role="group">
-                <a href="{{ url_for('main.propostas') }}" class="btn btn-secondary">
+                <a href="{{ url_for('propostas.index') }}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Voltar
                 </a>
                 {% if proposta.status == StatusProposta.RASCUNHO %}

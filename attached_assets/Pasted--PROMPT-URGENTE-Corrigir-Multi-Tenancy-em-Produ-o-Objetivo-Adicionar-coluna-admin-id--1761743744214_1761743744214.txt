@@ -1,0 +1,539 @@
+# 🚨 PROMPT URGENTE: Corrigir Multi-Tenancy em Produção
+
+**Objetivo:** Adicionar coluna `admin_id` em 22 modelos que estão causando erro em produção.
+
+**Severidade:** 🔴 CRÍTICA  
+**Tempo Estimado:** 40 minutos  
+**Impacto:** Restaura funcionalidades básicas (Funcionários, Dashboard, RDO, Obras)
+
+---
+
+## 📊 CONTEXTO
+
+**Erro em Produção:**
+```
+psycopg2.errors.InFailedSqlTransaction: 
+column "admin_id" does not exist in table "departamento"
+```
+
+**Causa:** 22 modelos têm filtros por `admin_id` no código, mas a coluna não existe no banco de produção.
+
+**Modelos Afetados:**
+1. Departamento
+2. Funcao
+3. HorarioTrabalho
+4. ServicoObra
+5. HistoricoProdutividadeServico
+6. TipoOcorrencia
+7. Ocorrencia
+8. CalendarioUtil
+9. CentroCusto
+10. Receita
+11. OrcamentoObra
+12. FluxoCaixa
+13. RegistroAlimentacao
+14. RDOMaoObra
+15. RDOEquipamento
+16. RDOOcorrencia
+17. RDOFoto
+18. NotificacaoCliente
+19. PropostaItem
+20. PropostaArquivo
+
+---
+
+## 🎯 TAREFA 1: ADICIONAR `admin_id` NOS MODELOS (10 MIN)
+
+### **Arquivo:** `models.py`
+
+**Instruções:**
+1. Localizar cada um dos 20 modelos listados acima
+2. Adicionar a linha `admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)` logo após o campo `id`
+3. Manter a formatação e indentação existente
+
+### **Exemplo de Correção:**
+
+**ANTES:**
+```python
+class Departamento(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+**DEPOIS:**
+```python
+class Departamento(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # ✅ ADICIONAR
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+### **Modelos a Corrigir:**
+
+#### **1. Departamento (linha ~39)**
+```python
+class Departamento(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # ✅ ADICIONAR
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    funcionarios = db.relationship('Funcionario', backref='departamento_ref', lazy=True)
+```
+
+#### **2. Funcao (linha ~47)**
+```python
+class Funcao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    salario_base = db.Column(db.Float, default=0.0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # ✅ ADICIONAR
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    funcionarios = db.relationship('Funcionario', backref='funcao_ref', lazy=True)
+```
+
+#### **3. HorarioTrabalho (linha ~56)**
+```python
+class HorarioTrabalho(db.Model):
+    __tablename__ = 'horario_trabalho'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    hora_inicio = db.Column(db.Time, nullable=False)
+    hora_fim = db.Column(db.Time, nullable=False)
+    hora_inicio_almoco = db.Column(db.Time)
+    hora_fim_almoco = db.Column(db.Time)
+    horas_diarias = db.Column(db.Numeric(4, 2), nullable=False)
+    dias_semana = db.Column(db.String(50))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # ✅ ADICIONAR
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+#### **4. ServicoObra (buscar por "class ServicoObra")**
+```python
+class ServicoObra(db.Model):
+    __tablename__ = 'servico_obra'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(200), nullable=False)
+    unidade = db.Column(db.String(20))
+    valor_unitario = db.Column(db.Numeric(10, 2))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # ✅ ADICIONAR
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+#### **5-20. Demais Modelos**
+
+**Instruções para o Replit Agent:**
+- Buscar cada modelo pelo nome da classe
+- Adicionar `admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)`
+- Posicionar após o campo `id` e antes de `created_at` (se existir)
+- Manter indentação de 4 espaços
+
+**Lista completa:**
+- [ ] HistoricoProdutividadeServico
+- [ ] TipoOcorrencia
+- [ ] Ocorrencia
+- [ ] CalendarioUtil
+- [ ] CentroCusto
+- [ ] Receita
+- [ ] OrcamentoObra
+- [ ] FluxoCaixa
+- [ ] RegistroAlimentacao
+- [ ] RDOMaoObra
+- [ ] RDOEquipamento
+- [ ] RDOOcorrencia
+- [ ] RDOFoto
+- [ ] NotificacaoCliente
+- [ ] PropostaItem
+- [ ] PropostaArquivo
+
+---
+
+## 🎯 TAREFA 2: CRIAR MIGRAÇÃO 44 (15 MIN)
+
+### **Arquivo:** `migrations.py`
+
+**Instruções:**
+1. Localizar o final do arquivo (após a última migração)
+2. Adicionar a função `migration_44_adicionar_admin_id_modelos_faltantes`
+3. Registrar a migração na lista `MIGRATIONS`
+
+### **Código Completo da Migração:**
+
+```python
+def migration_44_adicionar_admin_id_modelos_faltantes(conn):
+    """
+    Migração 44: Adicionar admin_id em 20 modelos que estavam sem multi-tenancy
+    
+    CRÍTICO: Esta migração corrige inconsistência entre desenvolvimento e produção
+    que causava erro "column admin_id does not exist"
+    
+    Data: 29/10/2025
+    """
+    cursor = conn.cursor()
+    
+    try:
+        logger.info("🔄 Migração 44: Adicionando admin_id em 20 modelos...")
+        
+        # Lista de tabelas que precisam de admin_id
+        tabelas = [
+            'departamento',
+            'funcao',
+            'horario_trabalho',
+            'servico_obra',
+            'historico_produtividade_servico',
+            'tipo_ocorrencia',
+            'ocorrencia',
+            'calendario_util',
+            'centro_custo',
+            'receita',
+            'orcamento_obra',
+            'fluxo_caixa',
+            'registro_alimentacao',
+            'rdo_mao_obra',
+            'rdo_equipamento',
+            'rdo_ocorrencia',
+            'rdo_foto',
+            'notificacao_cliente',
+            'proposta_item',
+            'proposta_arquivo'
+        ]
+        
+        for tabela in tabelas:
+            try:
+                # Verificar se a coluna já existe
+                cursor.execute(f"""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = '{tabela}' 
+                      AND column_name = 'admin_id'
+                """)
+                
+                if cursor.fetchone() is None:
+                    logger.info(f"  ➕ Adicionando admin_id em {tabela}...")
+                    
+                    # Adicionar coluna admin_id (permitir NULL temporariamente)
+                    cursor.execute(f"""
+                        ALTER TABLE {tabela} 
+                        ADD COLUMN IF NOT EXISTS admin_id INTEGER
+                    """)
+                    
+                    # Preencher com valor padrão (primeiro admin não-superadmin)
+                    cursor.execute("""
+                        SELECT id FROM usuario 
+                        WHERE is_superadmin = false 
+                        ORDER BY id 
+                        LIMIT 1
+                    """)
+                    result = cursor.fetchone()
+                    default_admin_id = result[0] if result else 1
+                    
+                    cursor.execute(f"""
+                        UPDATE {tabela} 
+                        SET admin_id = {default_admin_id} 
+                        WHERE admin_id IS NULL
+                    """)
+                    
+                    # Tornar NOT NULL
+                    cursor.execute(f"""
+                        ALTER TABLE {tabela} 
+                        ALTER COLUMN admin_id SET NOT NULL
+                    """)
+                    
+                    # Adicionar foreign key (com nome único)
+                    constraint_name = f"fk_{tabela}_admin_id"
+                    cursor.execute(f"""
+                        ALTER TABLE {tabela} 
+                        ADD CONSTRAINT {constraint_name} 
+                        FOREIGN KEY (admin_id) 
+                        REFERENCES usuario(id) 
+                        ON DELETE CASCADE
+                    """)
+                    
+                    logger.info(f"  ✅ admin_id adicionado em {tabela}")
+                else:
+                    logger.info(f"  ⏭️  admin_id já existe em {tabela}, pulando...")
+                    
+            except Exception as e:
+                logger.warning(f"  ⚠️  Erro ao processar {tabela}: {e}")
+                # Continuar com próxima tabela
+                continue
+        
+        conn.commit()
+        logger.info("✅ Migração 44 concluída com sucesso!")
+        return True
+        
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"❌ Erro crítico na migração 44: {e}")
+        raise
+```
+
+### **Registrar Migração:**
+
+**Localizar a lista `MIGRATIONS` no final do arquivo e adicionar:**
+
+```python
+MIGRATIONS = [
+    # ... (migrações existentes 1-43)
+    (43, migration_43_adicionar_admin_id_custo_obra),
+    (44, migration_44_adicionar_admin_id_modelos_faltantes),  # ✅ ADICIONAR ESTA LINHA
+]
+```
+
+---
+
+## 🎯 TAREFA 3: TESTAR EM DESENVOLVIMENTO (5 MIN)
+
+### **Instruções:**
+
+1. **Executar o aplicativo:**
+   ```bash
+   python3.11 app.py
+   ```
+
+2. **Verificar logs de migração:**
+   - Procurar por "Migração 44" nos logs
+   - Verificar se todas as 20 tabelas foram processadas
+   - Confirmar "✅ Migração 44 concluída com sucesso!"
+
+3. **Verificar estrutura do banco:**
+   ```sql
+   -- Verificar se admin_id foi adicionado
+   SELECT 
+       table_name,
+       column_name,
+       is_nullable,
+       data_type
+   FROM information_schema.columns
+   WHERE column_name = 'admin_id'
+     AND table_name IN (
+         'departamento', 'funcao', 'horario_trabalho', 
+         'servico_obra', 'calendario_util'
+     )
+   ORDER BY table_name;
+   
+   -- Resultado esperado: 5 linhas (ou mais)
+   ```
+
+4. **Testar funcionalidades:**
+   - [ ] Acessar `/funcionarios` → Deve carregar sem erro
+   - [ ] Acessar dashboard → KPIs devem exibir valores
+   - [ ] Criar novo departamento → Deve funcionar
+   - [ ] Criar nova função → Deve funcionar
+
+---
+
+## 🎯 TAREFA 4: COMMIT E DEPLOY (10 MIN)
+
+### **Instruções:**
+
+1. **Verificar mudanças:**
+   ```bash
+   git status
+   # Deve mostrar:
+   # modified: models.py
+   # modified: migrations.py
+   ```
+
+2. **Commit:**
+   ```bash
+   git add models.py migrations.py
+   git commit -m "fix(critical): Adicionar admin_id em 20 modelos (migração 44)
+
+   - Corrige erro 'column admin_id does not exist' em produção
+   - Adiciona admin_id em: Departamento, Funcao, HorarioTrabalho, etc.
+   - Migração 44 com rollback automático em caso de erro
+   - Restaura funcionalidades: Funcionários, Dashboard, RDO, Obras
+   
+   Severidade: CRÍTICA
+   Impacto: Sistema volta a funcionar em produção"
+   ```
+
+3. **Push:**
+   ```bash
+   git push origin main
+   ```
+
+4. **Aguardar deploy automático:**
+   - Monitorar logs do EasyPanel/Replit
+   - Procurar por "Migração 44"
+   - Confirmar sucesso
+
+5. **Validar em produção:**
+   - [ ] Acessar `https://sige.cassioviller.tech/funcionarios`
+   - [ ] Verificar se carrega sem erro
+   - [ ] Acessar dashboard
+   - [ ] Verificar KPIs (devem exibir valores)
+   - [ ] Criar registro de teste
+   - [ ] Verificar multi-tenancy (admin_id=2 não vê dados de admin_id=1)
+
+---
+
+## ✅ CHECKLIST FINAL
+
+### **Código:**
+- [ ] `admin_id` adicionado em 20 modelos no `models.py`
+- [ ] Migração 44 criada em `migrations.py`
+- [ ] Migração 44 registrada na lista `MIGRATIONS`
+
+### **Testes Locais:**
+- [ ] Migração 44 executada sem erros
+- [ ] Query de verificação retorna 20 linhas
+- [ ] Página de funcionários carrega
+- [ ] Dashboard exibe KPIs
+- [ ] Criar departamento funciona
+
+### **Deploy:**
+- [ ] Commit criado com mensagem descritiva
+- [ ] Push para `main` executado
+- [ ] Deploy automático concluído
+- [ ] Logs de produção sem erros
+
+### **Validação Produção:**
+- [ ] Página de funcionários carrega
+- [ ] Dashboard exibe KPIs corretos
+- [ ] Criar registros funciona
+- [ ] Multi-tenancy validado
+- [ ] Sem erros nos logs
+
+---
+
+## 🔍 QUERIES DE VERIFICAÇÃO
+
+### **1. Verificar se admin_id foi adicionado:**
+```sql
+SELECT 
+    table_name,
+    column_name,
+    is_nullable,
+    data_type
+FROM information_schema.columns
+WHERE column_name = 'admin_id'
+  AND table_name IN (
+      'departamento', 'funcao', 'horario_trabalho', 'servico_obra',
+      'historico_produtividade_servico', 'tipo_ocorrencia', 'ocorrencia',
+      'calendario_util', 'centro_custo', 'receita', 'orcamento_obra',
+      'fluxo_caixa', 'registro_alimentacao', 'rdo_mao_obra',
+      'rdo_equipamento', 'rdo_ocorrencia', 'rdo_foto',
+      'notificacao_cliente', 'proposta_item', 'proposta_arquivo'
+  )
+ORDER BY table_name;
+
+-- Resultado esperado: 20 linhas
+```
+
+### **2. Verificar foreign keys:**
+```sql
+SELECT 
+    tc.table_name, 
+    kcu.column_name, 
+    ccu.table_name AS foreign_table_name,
+    ccu.column_name AS foreign_column_name 
+FROM information_schema.table_constraints AS tc 
+JOIN information_schema.key_column_usage AS kcu
+  ON tc.constraint_name = kcu.constraint_name
+JOIN information_schema.constraint_column_usage AS ccu
+  ON ccu.constraint_name = tc.constraint_name
+WHERE tc.constraint_type = 'FOREIGN KEY' 
+  AND kcu.column_name = 'admin_id'
+  AND tc.table_name IN ('departamento', 'funcao', 'horario_trabalho')
+ORDER BY tc.table_name;
+
+-- Resultado esperado: 3+ linhas com foreign_table_name = 'usuario'
+```
+
+### **3. Verificar dados existentes:**
+```sql
+-- Verificar se registros têm admin_id preenchido
+SELECT 
+    'departamento' as tabela,
+    COUNT(*) as total,
+    COUNT(admin_id) as com_admin_id
+FROM departamento
+UNION ALL
+SELECT 
+    'funcao',
+    COUNT(*),
+    COUNT(admin_id)
+FROM funcao
+UNION ALL
+SELECT 
+    'horario_trabalho',
+    COUNT(*),
+    COUNT(admin_id)
+FROM horario_trabalho;
+
+-- Resultado esperado: total = com_admin_id (todos preenchidos)
+```
+
+---
+
+## 🚨 PLANO DE ROLLBACK (SE NECESSÁRIO)
+
+Se a migração falhar em produção:
+
+```sql
+-- Remover admin_id das tabelas (reverter migração 44)
+ALTER TABLE departamento DROP COLUMN IF EXISTS admin_id CASCADE;
+ALTER TABLE funcao DROP COLUMN IF EXISTS admin_id CASCADE;
+ALTER TABLE horario_trabalho DROP COLUMN IF EXISTS admin_id CASCADE;
+-- ... (repetir para as 20 tabelas)
+
+-- Reverter versão do código
+git revert HEAD
+git push origin main
+```
+
+---
+
+## 📊 RESULTADO ESPERADO
+
+### **ANTES (Produção Quebrada):**
+```
+❌ Funcionários: ERRO (column admin_id does not exist)
+❌ Dashboard: R$ 0,00 (não carrega dados)
+❌ RDO: ERRO ao criar
+❌ Obras: ERRO ao listar serviços
+```
+
+### **DEPOIS (Produção Funcionando):**
+```
+✅ Funcionários: Lista corretamente
+✅ Dashboard: KPIs exibem valores corretos
+✅ RDO: Cria e lista sem erro
+✅ Obras: Lista serviços corretamente
+✅ Multi-tenancy: Isolamento perfeito entre admins
+```
+
+---
+
+## ⏱️ CRONOGRAMA
+
+| Tarefa | Tempo | Status |
+|---|---|---|
+| Adicionar admin_id nos modelos | 10 min | ⏳ |
+| Criar migração 44 | 15 min | ⏳ |
+| Testar localmente | 5 min | ⏳ |
+| Commit e deploy | 10 min | ⏳ |
+| **TOTAL** | **40 min** | |
+
+---
+
+**EXECUTE ESTE PROMPT IMEDIATAMENTE PARA RESTAURAR PRODUÇÃO!** 🚀
+
+Este prompt é completo, executável e inclui:
+- ✅ Código pronto para copiar/colar
+- ✅ Instruções passo a passo
+- ✅ Checklist de validação
+- ✅ Queries de verificação
+- ✅ Plano de rollback
+
