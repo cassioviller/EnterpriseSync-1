@@ -241,8 +241,12 @@ def api_registrar_falta():
         funcionario_id = data.get('funcionario_id')
         data_falta_str = data.get('data')
         data_falta = datetime.strptime(data_falta_str, '%Y-%m-%d').date()
-        motivo = data.get('motivo', 'falta')  # 'falta' ou 'falta_justificada'
+        
+        # ✅ FIX: Aceitar 'motivo' OU 'tipo_registro' para compatibilidade
+        motivo = data.get('motivo') or data.get('tipo_registro', 'falta')  # 'falta' ou 'falta_justificada'
         observacoes = data.get('observacoes')
+        
+        logger.info(f"📝 Registrando falta: funcionario={funcionario_id}, data={data_falta}, tipo={motivo}")
         
         resultado = PontoService.registrar_falta(
             funcionario_id=funcionario_id,

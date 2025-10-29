@@ -940,16 +940,31 @@ def dashboard():
         # Calcular KPIs específicos corretamente
         # 1. Custos de Transporte (veículos) - usar safe_db_operation para evitar transaction abort
         def calcular_custos_veiculo():
-            from models import VehicleExpense
+            from models import VehicleExpense, CustoObra
+            
+            # 1.1. Tabela VehicleExpense (frota)
             custos_veiculo = VehicleExpense.query.filter(
                 VehicleExpense.admin_id == admin_id,
                 VehicleExpense.data_custo >= data_inicio,
                 VehicleExpense.data_custo <= data_fim
             ).all()
-            return sum(c.valor or 0 for c in custos_veiculo)
+            total_vehicle_expense = sum(c.valor or 0 for c in custos_veiculo)
+            
+            # 1.2. Tabela CustoObra (tipo='transporte')
+            custos_obra_transporte = CustoObra.query.filter(
+                CustoObra.admin_id == admin_id,
+                CustoObra.data >= data_inicio,
+                CustoObra.data <= data_fim,
+                CustoObra.tipo == 'transporte'
+            ).all()
+            total_custo_obra = sum(float(c.valor or 0) for c in custos_obra_transporte)
+            
+            total = total_vehicle_expense + total_custo_obra
+            print(f"  DEBUG TRANSPORTE: VehicleExpense ({len(custos_veiculo)})=R${total_vehicle_expense:.2f}, CustoObra ({len(custos_obra_transporte)})=R${total_custo_obra:.2f}, Total=R${total:.2f}")
+            return total
         
         custo_transporte_real = safe_db_operation(calcular_custos_veiculo, 0)
-        print(f"DEBUG Custos veículo: R$ {custo_transporte_real:.2f}")
+        print(f"DEBUG Custos Transporte FINAL: R$ {custo_transporte_real:.2f}")
         
         # 2. Faltas Justificadas (quantidade e valor em R$) - usar safe_db_operation
         def calcular_faltas_justificadas():
@@ -983,16 +998,32 @@ def dashboard():
         
         # 3. Outros Custos (não transporte nem alimentação) - usar safe_db_operation
         def calcular_outros_custos():
-            from models import OutroCusto
+            from models import OutroCusto, CustoObra
+            
+            # 3.1. Tabela OutroCusto (genérica)
             outros_custos = OutroCusto.query.filter(
                 OutroCusto.admin_id == admin_id,
                 OutroCusto.data >= data_inicio,
                 OutroCusto.data <= data_fim,
                 ~OutroCusto.tipo.in_(['transporte', 'alimentacao'])
             ).all()
-            return sum(o.valor or 0 for o in outros_custos)
+            total_outro_custo = sum(o.valor or 0 for o in outros_custos)
+            
+            # 3.2. Tabela CustoObra (tipo='outros' ou 'servico' ou 'material')
+            custos_obra_outros = CustoObra.query.filter(
+                CustoObra.admin_id == admin_id,
+                CustoObra.data >= data_inicio,
+                CustoObra.data <= data_fim,
+                CustoObra.tipo.in_(['outros', 'servico', 'material'])
+            ).all()
+            total_custo_obra = sum(float(c.valor or 0) for c in custos_obra_outros)
+            
+            total = total_outro_custo + total_custo_obra
+            print(f"  DEBUG OUTROS: OutroCusto ({len(outros_custos)})=R${total_outro_custo:.2f}, CustoObra ({len(custos_obra_outros)})=R${total_custo_obra:.2f}, Total=R${total:.2f}")
+            return total
         
         custo_outros_real = safe_db_operation(calcular_outros_custos, 0)
+        print(f"DEBUG Custos Outros FINAL: R$ {custo_outros_real:.2f}")
         
         # 4. Funcionários por Departamento - com proteção de transação
         funcionarios_por_departamento = safe_db_operation(

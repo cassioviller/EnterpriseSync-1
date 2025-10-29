@@ -1,0 +1,416 @@
+# 🧪 PROMPT: Testar KPIs do Dashboard de Custos - Outubro/2025
+
+**Objetivo:** Criar lançamentos de custos (Alimentação, Transporte, Faltas Justificadas e Outros) para todos os funcionários em Outubro/2025 e validar se as KPIs do dashboard estão calculando corretamente.
+
+---
+
+## 📊 ANÁLISE DO DASHBOARD ATUAL
+
+**Imagem fornecida mostra:**
+- ✅ Mão de Obra: R$ 12.767,59 (já calculado)
+- ❌ Alimentação: R$ 0,00 (falta criar lançamentos)
+- ❌ Transporte: R$ 0,00 (falta criar lançamentos)
+- ❌ Faltas Justificadas: 0 dias (falta criar lançamentos)
+- ❌ Outros: R$ 0,00 (falta criar lançamentos)
+
+**Total Atual:** R$ 12.767,59 (apenas mão de obra)
+
+---
+
+## 🎯 OBJETIVO DO TESTE
+
+Criar lançamentos realistas para **5 funcionários** em **Outubro/2025** (01/10 a 31/10) para validar que as KPIs exibem valores corretos.
+
+---
+
+## 📋 DADOS DOS FUNCIONÁRIOS
+
+Assumindo que o sistema tem 5 funcionários cadastrados:
+
+| ID | Nome | Função | Salário | Obra |
+|---|---|---|---|---|
+| 1 | João da Silva | Pedreiro | R$ 2.500,00 | Residencial Jardim das Flores |
+| 2 | Maria Santos | Servente | R$ 1.800,00 | Residencial Jardim das Flores |
+| 3 | Pedro Oliveira | Encarregado | R$ 3.500,00 | Edifício Comercial Centro |
+| 4 | Carlos Souza | Motorista | R$ 2.200,00 | Edifício Comercial Centro |
+| 5 | Ana Costa | Administrativo | R$ 2.800,00 | Sede Administrativa |
+
+---
+
+## 🍽️ TAREFA 1: CRIAR LANÇAMENTOS DE ALIMENTAÇÃO
+
+### **Regra de Negócio:**
+- Funcionários de obra recebem vale-refeição diário
+- Valor: R$ 25,00 por dia trabalhado
+- Outubro/2025: 22 dias úteis
+
+### **Lançamentos a Criar:**
+
+**Para cada funcionário:**
+- Dias trabalhados em Outubro: 22 dias (considerar faltas se houver)
+- Valor por refeição: R$ 25,00
+- Total por funcionário: 22 × R$ 25,00 = R$ 550,00
+
+**Script SQL:**
+
+```sql
+-- Limpar lançamentos anteriores de alimentação (se necessário)
+DELETE FROM custo_obra 
+WHERE tipo = 'alimentacao' 
+  AND EXTRACT(YEAR FROM data_custo) = 2025 
+  AND EXTRACT(MONTH FROM data_custo) = 10;
+
+-- Inserir lançamentos de alimentação para Outubro/2025
+-- Funcionário 1: João da Silva (22 dias)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(1, 'alimentacao', 'Alimentação', 550.00, '2025-10-31', 'Vale-refeição Outubro/2025 - João da Silva', 1, 54, NOW());
+
+-- Funcionário 2: Maria Santos (21 dias - 1 falta)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(1, 'alimentacao', 'Alimentação', 525.00, '2025-10-31', 'Vale-refeição Outubro/2025 - Maria Santos', 2, 54, NOW());
+
+-- Funcionário 3: Pedro Oliveira (22 dias)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(2, 'alimentacao', 'Alimentação', 550.00, '2025-10-31', 'Vale-refeição Outubro/2025 - Pedro Oliveira', 3, 54, NOW());
+
+-- Funcionário 4: Carlos Souza (22 dias)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(2, 'alimentacao', 'Alimentação', 550.00, '2025-10-31', 'Vale-refeição Outubro/2025 - Carlos Souza', 4, 54, NOW());
+
+-- Funcionário 5: Ana Costa (não recebe - trabalha na sede)
+-- (não criar lançamento)
+```
+
+**Total Esperado de Alimentação:** R$ 2.175,00
+
+---
+
+## 🚗 TAREFA 2: CRIAR LANÇAMENTOS DE TRANSPORTE
+
+### **Regra de Negócio:**
+- Funcionários de obra recebem vale-transporte diário
+- Valor: R$ 8,00 por dia trabalhado (ida + volta)
+- Outubro/2025: 22 dias úteis
+
+### **Lançamentos a Criar:**
+
+**Para cada funcionário:**
+- Dias trabalhados em Outubro: 22 dias
+- Valor por dia: R$ 8,00
+- Total por funcionário: 22 × R$ 8,00 = R$ 176,00
+
+**Script SQL:**
+
+```sql
+-- Limpar lançamentos anteriores de transporte (se necessário)
+DELETE FROM custo_obra 
+WHERE tipo = 'transporte' 
+  AND EXTRACT(YEAR FROM data_custo) = 2025 
+  AND EXTRACT(MONTH FROM data_custo) = 10;
+
+-- Inserir lançamentos de transporte para Outubro/2025
+-- Funcionário 1: João da Silva (22 dias)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(1, 'transporte', 'Transporte', 176.00, '2025-10-31', 'Vale-transporte Outubro/2025 - João da Silva', 1, 54, NOW());
+
+-- Funcionário 2: Maria Santos (21 dias - 1 falta)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(1, 'transporte', 'Transporte', 168.00, '2025-10-31', 'Vale-transporte Outubro/2025 - Maria Santos', 2, 54, NOW());
+
+-- Funcionário 3: Pedro Oliveira (22 dias)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(2, 'transporte', 'Transporte', 176.00, '2025-10-31', 'Vale-transporte Outubro/2025 - Pedro Oliveira', 3, 54, NOW());
+
+-- Funcionário 4: Carlos Souza (22 dias)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(2, 'transporte', 'Transporte', 176.00, '2025-10-31', 'Vale-transporte Outubro/2025 - Carlos Souza', 4, 54, NOW());
+
+-- Funcionário 5: Ana Costa (usa carro próprio - não recebe)
+-- (não criar lançamento)
+```
+
+**Total Esperado de Transporte:** R$ 696,00
+
+---
+
+## 📅 TAREFA 3: CRIAR LANÇAMENTOS DE FALTAS JUSTIFICADAS
+
+### **Regra de Negócio:**
+- Faltas justificadas não geram desconto no salário
+- Mas são registradas como custo (salário pago sem trabalho)
+- Valor: Salário diário do funcionário (salário / 30)
+
+### **Cenários:**
+
+**Funcionário 2: Maria Santos**
+- 1 falta justificada em 13/10/2025 (atestado médico)
+- Salário diário: R$ 1.800 / 30 = R$ 60,00
+
+**Script SQL:**
+
+```sql
+-- Limpar lançamentos anteriores de faltas justificadas (se necessário)
+DELETE FROM custo_obra 
+WHERE tipo = 'falta_justificada' 
+  AND EXTRACT(YEAR FROM data_custo) = 2025 
+  AND EXTRACT(MONTH FROM data_custo) = 10;
+
+-- Inserir lançamento de falta justificada
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(1, 'falta_justificada', 'Faltas Justificadas', 60.00, '2025-10-13', 'Falta justificada (atestado médico) - Maria Santos', 2, 54, NOW());
+```
+
+**Total Esperado de Faltas Justificadas:** R$ 60,00  
+**Total de Dias:** 1 dia
+
+---
+
+## 🔧 TAREFA 4: CRIAR LANÇAMENTOS DE OUTROS CUSTOS
+
+### **Regra de Negócio:**
+- Custos diversos: EPIs, ferramentas, uniformes, treinamentos
+- Valores variados
+
+### **Lançamentos a Criar:**
+
+**Outubro/2025:**
+
+1. **EPIs (Equipamentos de Proteção Individual)**
+   - Capacetes, luvas, botas
+   - Valor: R$ 450,00
+
+2. **Ferramentas**
+   - Martelo, trena, nível
+   - Valor: R$ 320,00
+
+3. **Uniformes**
+   - Camisas, calças
+   - Valor: R$ 280,00
+
+4. **Treinamento de Segurança**
+   - Curso NR-18
+   - Valor: R$ 500,00
+
+**Script SQL:**
+
+```sql
+-- Limpar lançamentos anteriores de outros custos (se necessário)
+DELETE FROM custo_obra 
+WHERE tipo = 'outros' 
+  AND EXTRACT(YEAR FROM data_custo) = 2025 
+  AND EXTRACT(MONTH FROM data_custo) = 10;
+
+-- Inserir lançamentos de outros custos
+-- EPIs
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, admin_id, created_at) VALUES
+(1, 'outros', 'Outros', 250.00, '2025-10-05', 'EPIs - Capacetes, luvas, botas (Obra 1)', 54, NOW()),
+(2, 'outros', 'Outros', 200.00, '2025-10-05', 'EPIs - Capacetes, luvas, botas (Obra 2)', 54, NOW());
+
+-- Ferramentas
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, admin_id, created_at) VALUES
+(1, 'outros', 'Outros', 180.00, '2025-10-10', 'Ferramentas - Martelo, trena, nível (Obra 1)', 54, NOW()),
+(2, 'outros', 'Outros', 140.00, '2025-10-10', 'Ferramentas - Martelo, trena, nível (Obra 2)', 54, NOW());
+
+-- Uniformes
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, admin_id, created_at) VALUES
+(1, 'outros', 'Outros', 150.00, '2025-10-15', 'Uniformes - Camisas, calças (Obra 1)', 54, NOW()),
+(2, 'outros', 'Outros', 130.00, '2025-10-15', 'Uniformes - Camisas, calças (Obra 2)', 54, NOW());
+
+-- Treinamento
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, admin_id, created_at) VALUES
+(1, 'outros', 'Outros', 300.00, '2025-10-20', 'Treinamento NR-18 (Obra 1)', 54, NOW()),
+(2, 'outros', 'Outros', 200.00, '2025-10-20', 'Treinamento NR-18 (Obra 2)', 54, NOW());
+```
+
+**Total Esperado de Outros:** R$ 1.550,00
+
+---
+
+## 📊 RESUMO DOS VALORES ESPERADOS
+
+| Categoria | Valor Esperado | Observação |
+|---|---|---|
+| **Mão de Obra** | R$ 12.767,59 | Já existe (folha processada) |
+| **Alimentação** | R$ 2.175,00 | 4 funcionários × ~R$ 540 |
+| **Transporte** | R$ 696,00 | 4 funcionários × ~R$ 174 |
+| **Faltas Justificadas** | R$ 60,00 (1 dia) | 1 falta de Maria Santos |
+| **Outros** | R$ 1.550,00 | EPIs, ferramentas, uniformes, treinamento |
+| **TOTAL** | **R$ 17.248,59** | Soma de todas as categorias |
+
+---
+
+## ✅ SCRIPT SQL COMPLETO (COPIAR E EXECUTAR)
+
+```sql
+-- ============================================
+-- SCRIPT COMPLETO: LANÇAMENTOS DE CUSTOS OUTUBRO/2025
+-- ============================================
+
+-- 1. ALIMENTAÇÃO (R$ 2.175,00)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(1, 'alimentacao', 'Alimentação', 550.00, '2025-10-31', 'Vale-refeição Outubro/2025 - João da Silva', 1, 54, NOW()),
+(1, 'alimentacao', 'Alimentação', 525.00, '2025-10-31', 'Vale-refeição Outubro/2025 - Maria Santos', 2, 54, NOW()),
+(2, 'alimentacao', 'Alimentação', 550.00, '2025-10-31', 'Vale-refeição Outubro/2025 - Pedro Oliveira', 3, 54, NOW()),
+(2, 'alimentacao', 'Alimentação', 550.00, '2025-10-31', 'Vale-refeição Outubro/2025 - Carlos Souza', 4, 54, NOW());
+
+-- 2. TRANSPORTE (R$ 696,00)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(1, 'transporte', 'Transporte', 176.00, '2025-10-31', 'Vale-transporte Outubro/2025 - João da Silva', 1, 54, NOW()),
+(1, 'transporte', 'Transporte', 168.00, '2025-10-31', 'Vale-transporte Outubro/2025 - Maria Santos', 2, 54, NOW()),
+(2, 'transporte', 'Transporte', 176.00, '2025-10-31', 'Vale-transporte Outubro/2025 - Pedro Oliveira', 3, 54, NOW()),
+(2, 'transporte', 'Transporte', 176.00, '2025-10-31', 'Vale-transporte Outubro/2025 - Carlos Souza', 4, 54, NOW());
+
+-- 3. FALTAS JUSTIFICADAS (R$ 60,00 - 1 dia)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, funcionario_id, admin_id, created_at) VALUES
+(1, 'falta_justificada', 'Faltas Justificadas', 60.00, '2025-10-13', 'Falta justificada (atestado médico) - Maria Santos', 2, 54, NOW());
+
+-- 4. OUTROS (R$ 1.550,00)
+INSERT INTO custo_obra (obra_id, tipo, categoria, valor, data_custo, descricao, admin_id, created_at) VALUES
+(1, 'outros', 'Outros', 250.00, '2025-10-05', 'EPIs - Capacetes, luvas, botas (Obra 1)', 54, NOW()),
+(2, 'outros', 'Outros', 200.00, '2025-10-05', 'EPIs - Capacetes, luvas, botas (Obra 2)', 54, NOW()),
+(1, 'outros', 'Outros', 180.00, '2025-10-10', 'Ferramentas - Martelo, trena, nível (Obra 1)', 54, NOW()),
+(2, 'outros', 'Outros', 140.00, '2025-10-10', 'Ferramentas - Martelo, trena, nível (Obra 2)', 54, NOW()),
+(1, 'outros', 'Outros', 150.00, '2025-10-15', 'Uniformes - Camisas, calças (Obra 1)', 54, NOW()),
+(2, 'outros', 'Outros', 130.00, '2025-10-15', 'Uniformes - Camisas, calças (Obra 2)', 54, NOW()),
+(1, 'outros', 'Outros', 300.00, '2025-10-20', 'Treinamento NR-18 (Obra 1)', 54, NOW()),
+(2, 'outros', 'Outros', 200.00, '2025-10-20', 'Treinamento NR-18 (Obra 2)', 54, NOW());
+
+-- Verificar totais
+SELECT 
+    tipo,
+    categoria,
+    COUNT(*) as quantidade,
+    SUM(valor) as total
+FROM custo_obra
+WHERE EXTRACT(YEAR FROM data_custo) = 2025 
+  AND EXTRACT(MONTH FROM data_custo) = 10
+  AND admin_id = 54
+GROUP BY tipo, categoria
+ORDER BY tipo;
+```
+
+---
+
+## 🧪 VALIDAÇÃO DAS KPIS
+
+Após executar o script SQL, acessar o dashboard e verificar:
+
+### **1. KPI de Alimentação:**
+- [ ] Valor exibido: **R$ 2.175,00**
+- [ ] Ícone de garfo e faca visível
+- [ ] Cor correta
+
+### **2. KPI de Transporte:**
+- [ ] Valor exibido: **R$ 696,00**
+- [ ] Ícone de carro visível
+- [ ] Cor correta
+
+### **3. KPI de Faltas Justificadas:**
+- [ ] Valor exibido: **1 dia** (ou R$ 60,00 se mostrar valor)
+- [ ] Ícone de alerta visível
+- [ ] Cor correta
+
+### **4. KPI de Outros:**
+- [ ] Valor exibido: **R$ 1.550,00**
+- [ ] Ícone de engrenagem visível
+- [ ] Cor correta
+
+### **5. KPI de Total:**
+- [ ] Valor exibido: **R$ 17.248,59**
+- [ ] Soma correta de todas as categorias
+- [ ] Ícone de calculadora visível
+
+---
+
+## 🔍 QUERY DE VERIFICAÇÃO
+
+Para verificar se os lançamentos foram criados corretamente:
+
+```sql
+-- Verificar totais por categoria
+SELECT 
+    tipo,
+    categoria,
+    COUNT(*) as qtd_lancamentos,
+    SUM(valor) as total,
+    MIN(data_custo) as data_inicio,
+    MAX(data_custo) as data_fim
+FROM custo_obra
+WHERE EXTRACT(YEAR FROM data_custo) = 2025 
+  AND EXTRACT(MONTH FROM data_custo) = 10
+  AND admin_id = 54
+GROUP BY tipo, categoria
+ORDER BY tipo;
+
+-- Resultado esperado:
+-- tipo              | categoria           | qtd | total      | data_inicio | data_fim
+-- -----------------|---------------------|-----|------------|-------------|------------
+-- alimentacao      | Alimentação         | 4   | 2175.00    | 2025-10-31  | 2025-10-31
+-- transporte       | Transporte          | 4   | 696.00     | 2025-10-31  | 2025-10-31
+-- falta_justificada| Faltas Justificadas | 1   | 60.00      | 2025-10-13  | 2025-10-13
+-- outros           | Outros              | 8   | 1550.00    | 2025-10-05  | 2025-10-20
+-- mao_obra         | Mão de Obra         | X   | 12767.59   | ...         | ...
+
+-- Total geral
+SELECT SUM(valor) as total_geral
+FROM custo_obra
+WHERE EXTRACT(YEAR FROM data_custo) = 2025 
+  AND EXTRACT(MONTH FROM data_custo) = 10
+  AND admin_id = 54;
+-- Resultado esperado: R$ 17.248,59
+```
+
+---
+
+## 📊 TESTE DE FILTROS
+
+Após validar os valores, testar os filtros do dashboard:
+
+### **1. Filtro de Data:**
+- [ ] Selecionar "Mês Atual" → Deve mostrar Outubro/2025
+- [ ] Selecionar "Último Mês" → Deve mostrar Setembro/2025
+- [ ] Selecionar "3 Meses" → Deve mostrar Ago-Out/2025
+- [ ] Selecionar "Ano Atual" → Deve mostrar Jan-Out/2025
+
+### **2. Filtro de Obra:**
+- [ ] Selecionar "Todas as Obras" → Total R$ 17.248,59
+- [ ] Selecionar "Obra 1" → Verificar valores proporcionais
+- [ ] Selecionar "Obra 2" → Verificar valores proporcionais
+
+---
+
+## 🎯 RESULTADO ESPERADO
+
+Após executar este prompt, o dashboard deve exibir:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Custos Detalhados do Período                 │
+├─────────────────────────────────────────────────────────────────┤
+│  🍽️           🚗          👥           ⚠️          ⚙️         🧮   │
+│ Alimentação  Transporte  Mão de Obra  Faltas    Outros     Total │
+│ R$ 2.175,00  R$ 696,00   R$ 12.767,59 1 dia    R$ 1.550,00      │
+│                                       R$ 60,00                   │
+│                                                  R$ 17.248,59    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✅ CHECKLIST FINAL
+
+- [ ] Script SQL executado sem erros
+- [ ] 17 lançamentos criados (4 alimentação + 4 transporte + 1 falta + 8 outros)
+- [ ] KPI Alimentação = R$ 2.175,00
+- [ ] KPI Transporte = R$ 696,00
+- [ ] KPI Faltas Justificadas = 1 dia (R$ 60,00)
+- [ ] KPI Outros = R$ 1.550,00
+- [ ] KPI Total = R$ 17.248,59
+- [ ] Filtros de data funcionam
+- [ ] Filtros de obra funcionam
+- [ ] Gráficos atualizam corretamente
+
+---
+
+**Pronto para testar as KPIs do dashboard!** 🚀
+
