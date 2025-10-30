@@ -7419,6 +7419,7 @@ def rdo_novo_unificado():
 
 # RDO Lista Consolidada
 @main_bp.route('/funcionario/rdo/consolidado')
+@capture_db_errors
 def funcionario_rdo_consolidado():
     """Lista RDOs consolidada - página original que estava funcionando"""
     try:
@@ -7455,19 +7456,28 @@ def funcionario_rdo_consolidado():
         # Enriquecer dados dos RDOs  
         rdos_processados = []
         for rdo, obra in rdos_paginated.items:
-            # Contadores básicos
-            total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
-            total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
-            
-            # 🔧 CALCULAR HORAS TRABALHADAS REAIS
-            mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
-            total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
-            
-            # Calcular progresso médio
-            subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
-            progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades) if subatividades else 0
-            
-            print(f"DEBUG RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {total_horas_trabalhadas}h trabalhadas, {progresso_medio}% progresso")
+            # Contadores básicos com proteção contra erros de schema
+            try:
+                total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
+                total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
+                
+                # 🔧 CALCULAR HORAS TRABALHADAS REAIS
+                mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
+                total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
+                
+                # Calcular progresso médio
+                subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+                progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades) if subatividades else 0
+                
+                print(f"DEBUG RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {total_horas_trabalhadas}h trabalhadas, {progresso_medio}% progresso")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao calcular métricas do RDO {rdo.id}: {str(e)}. Migração 48 pode não ter sido executada.")
+                db.session.rollback()
+                # Valores padrão quando há erro de schema
+                total_subatividades = 0
+                total_funcionarios = 0
+                total_horas_trabalhadas = 0
+                progresso_medio = 0
             
             rdos_processados.append({
                 'rdo': rdo,
