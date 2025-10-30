@@ -1,0 +1,11 @@
+[
+{"id":2,"nome":"Estagiario","descricao":"","salario_base":1250,"created_at":"2025-07-24 11:56:39.83991"},
+{"id":1,"nome":"Serralheiro","descricao":"","salario_base":2153.26,"created_at":"2025-07-24 11:47:16.916765"},
+{"id":6,"nome":"Ajudante Geral","descricao":"","salario_base":2036.5,"created_at":"2025-07-24 11:59:52.179597"},
+{"id":7,"nome":"Pintor ","descricao":"","salario_base":2151.48,"created_at":"2025-07-24 12:04:44.000944"},
+{"id":3,"nome":"Almoxarife","descricao":"","salario_base":2106,"created_at":"2025-07-24 11:56:54.878494"},
+{"id":9,"nome":"Gerente de Operações","descricao":"","salario_base":3500,"created_at":"2025-07-24 12:07:07.67489"},
+{"id":4,"nome":"Líder de Montagem","descricao":"","salario_base":3106.12,"created_at":"2025-07-24 11:57:13.342968"},
+{"id":5,"nome":"Soldador","descricao":"","salario_base":2308.5,"created_at":"2025-07-24 11:58:14.832599"},
+{"id":8,"nome":"Marketing","descricao":"","salario_base":2036.5,"created_at":"2025-07-24 12:05:41.267934"}
+]

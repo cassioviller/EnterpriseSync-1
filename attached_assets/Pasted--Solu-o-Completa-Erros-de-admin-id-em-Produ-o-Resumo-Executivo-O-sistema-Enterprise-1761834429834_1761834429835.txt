@@ -1,0 +1,624 @@
+# Solução Completa: Erros de `admin_id` em Produção
+
+## Resumo Executivo
+
+O sistema **EnterpriseSync (SIGE)** está com **3 tabelas críticas sem a coluna `admin_id`** no banco de dados de produção, causando múltiplos erros em cascata que impedem o funcionamento normal da aplicação.
+
+---
+
+## Tabelas Afetadas
+
+| Tabela | Modelo tem `admin_id` | DB tem `admin_id` | Status | Severidade |
+|--------|----------------------|-------------------|--------|------------|
+| `rdo` | ✅ | ✅ | ✅ OK | - |
+| `rdo_servico_subatividade` | ✅ | ✅ | ✅ OK | - |
+| **`funcao`** | ✅ | ❌ | ❌ **ERRO** | 🔴 **CRÍTICO** |
+| **`rdo_mao_obra`** | ✅ | ❌ | ❌ **ERRO** | 🔴 **CRÍTICO** |
+| **`registro_alimentacao`** | ✅ | ❌ | ❌ **ERRO** | 🔴 **CRÍTICO** |
+
+---
+
+## Erros em Produção
+
+### 1. Página de Funcionários Quebrada
+
+**Erro:**
+```
+psycopg2.errors.UndefinedColumn: column funcao.admin_id does not exist
+```
+
+**Origem:**
+- Arquivo: `/app/views.py`, linha 1680
+- Template: `/app/templates/funcionarios.html`, linha 479
+- Código: `{{ kpi.funcionario.funcao_ref.nome.lower() if kpi.funcionario.funcao_ref else '' }}`
+
+**Causa:**
+- Lazy loading do relacionamento `funcao_ref`
+- SQLAlchemy tenta carregar a tabela `funcao` com `admin_id`
+- Coluna não existe no banco de dados
+
+**Impacto:**
+- ❌ Página de funcionários completamente quebrada
+- ❌ Impossível visualizar KPIs de funcionários
+- ❌ Impossível visualizar funções dos funcionários
+
+---
+
+### 2. Cálculo de Métricas do RDO Quebrado
+
+**Erro:**
+```
+ERRO cálculo RDO 104: (psycopg2.errors.UndefinedColumn) column rdo_mao_obra.admin_id does not exist
+```
+
+**Origem:**
+- Arquivo: `/app/crud_rdo_completo.py`, linha 66
+- Código: `RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()`
+
+**Causa:**
+- Query tenta contar registros de mão de obra
+- SQLAlchemy inclui `admin_id` no SELECT
+- Coluna não existe no banco de dados
+
+**Impacto:**
+- ❌ Impossível calcular métricas de mão de obra
+- ❌ Dashboards de RDO não funcionam
+- ❌ Relatórios de progresso quebrados
+
+---
+
+### 3. Detalhes da Obra Quebrados
+
+**Erro:**
+```
+psycopg2.errors.UndefinedColumn: column registro_alimentacao.admin_id does not exist
+```
+
+**Origem:**
+- Arquivo: `/app/views.py`, linha 3051
+- View: `detalhes_obra`
+
+**Causa:**
+- Query busca registros de alimentação por obra e período
+- SQLAlchemy inclui `admin_id` no SELECT
+- Coluna não existe no banco de dados
+
+**Impacto:**
+- ❌ Página de detalhes da obra quebrada
+- ❌ Impossível visualizar registros de alimentação
+- ❌ Relatórios de custos com alimentação não funcionam
+
+---
+
+### 4. Transação SQL Abortada (Efeito Cascata)
+
+**Erro:**
+```
+psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, 
+commands ignored until end of transaction block
+```
+
+**Causa:**
+- Uma query falha (ex: `rdo_mao_obra.admin_id` não existe)
+- PostgreSQL aborta a transação automaticamente
+- Queries subsequentes são rejeitadas até ROLLBACK
+
+**Impacto:**
+- ❌ Efeito cascata: queries em tabelas corretas também falham
+- ❌ Mensagens de erro confusas (erro aparece em tabela diferente da causa)
+- ❌ Sistema instável e imprevisível
+
+---
+
+## Causa Raiz
+
+### Migration 48 Não Foi Executada
+
+A **Migration 48** foi criada para adicionar `admin_id` em múltiplas tabelas (arquivo `migrations.py`, linhas 3980-4380), mas **não foi executada no banco de produção**.
+
+**Evidências:**
+
+1. ✅ Migration 48 existe no código
+2. ✅ Inclui as 3 tabelas problemáticas
+3. ✅ Tem estratégias de backfill inteligentes
+4. ❌ Não foi registrada na tabela `migration_history`
+5. ❌ Colunas não existem no banco de dados
+
+**Estratégias de backfill da Migration 48:**
+
+```python
+# funcao (linha 4016-4023)
+'funcao': ("""
+    UPDATE funcao fu
+    SET admin_id = f.admin_id
+    FROM funcionario f
+    WHERE f.funcao_id = fu.id
+      AND fu.admin_id IS NULL
+      AND f.admin_id IS NOT NULL
+""", "via funcionario.funcao_id"),
+
+# registro_alimentacao (linha 4144-4151)
+'registro_alimentacao': ("""
+    UPDATE registro_alimentacao ra
+    SET admin_id = f.admin_id
+    FROM funcionario f
+    WHERE ra.funcionario_id = f.id
+      AND ra.admin_id IS NULL
+      AND f.admin_id IS NOT NULL
+""", "via funcionario_id"),
+
+# rdo_mao_obra (linha 4153-4161)
+'rdo_mao_obra': ("""
+    UPDATE rdo_mao_obra rm
+    SET admin_id = o.admin_id
+    FROM rdo r
+    JOIN obra o ON r.obra_id = o.id
+    WHERE rm.rdo_id = r.id
+      AND rm.admin_id IS NULL
+      AND o.admin_id IS NOT NULL
+""", "via rdo → obra"),
+```
+
+---
+
+## Solução Completa
+
+### Passo 1: Verificar Estado Atual
+
+Execute este script para confirmar quais tabelas têm problema:
+
+```python
+# check_admin_id_status.py
+from app import app, db
+
+with app.app_context():
+    connection = db.engine.raw_connection()
+    cursor = connection.cursor()
+    
+    tabelas = ['funcao', 'rdo_mao_obra', 'registro_alimentacao']
+    
+    print("=" * 80)
+    print("🔍 VERIFICAÇÃO DE COLUNA admin_id")
+    print("=" * 80)
+    
+    for tabela in tabelas:
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s AND column_name = 'admin_id'
+        """, (tabela,))
+        
+        if cursor.fetchone():
+            print(f"✅ {tabela}: admin_id EXISTE")
+        else:
+            print(f"❌ {tabela}: admin_id NÃO EXISTE")
+    
+    print("=" * 80)
+    
+    cursor.close()
+    connection.close()
+```
+
+---
+
+### Passo 2: Aplicar Correção SQL (RECOMENDADO)
+
+Use este script SQL idempotente que pode ser executado múltiplas vezes:
+
+```sql
+-- fix_admin_id_production.sql
+
+BEGIN;
+
+-- ============================================================================
+-- 1. TABELA: funcao
+-- ============================================================================
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'funcao' AND column_name = 'admin_id'
+    ) THEN
+        RAISE NOTICE '🔄 Adicionando admin_id na tabela funcao...';
+        
+        -- Adicionar coluna
+        ALTER TABLE funcao ADD COLUMN admin_id INTEGER;
+        
+        -- Backfill baseado em funcionario.funcao_id
+        UPDATE funcao fu
+        SET admin_id = f.admin_id
+        FROM funcionario f
+        WHERE f.funcao_id = fu.id
+          AND fu.admin_id IS NULL
+          AND f.admin_id IS NOT NULL;
+        
+        -- Verificar registros órfãos
+        DECLARE
+            orfaos INTEGER;
+        BEGIN
+            SELECT COUNT(*) INTO orfaos FROM funcao WHERE admin_id IS NULL;
+            
+            IF orfaos > 0 THEN
+                RAISE NOTICE '⚠️  % registros órfãos em funcao - usando admin_id padrão', orfaos;
+                -- Usar admin_id padrão (2) para registros órfãos
+                UPDATE funcao SET admin_id = 2 WHERE admin_id IS NULL;
+            END IF;
+        END;
+        
+        -- Aplicar NOT NULL
+        ALTER TABLE funcao ALTER COLUMN admin_id SET NOT NULL;
+        
+        -- Adicionar foreign key
+        ALTER TABLE funcao
+        ADD CONSTRAINT fk_funcao_admin_id
+        FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+        
+        -- Criar índice
+        CREATE INDEX idx_funcao_admin_id ON funcao(admin_id);
+        
+        RAISE NOTICE '✅ funcao.admin_id criada com sucesso';
+    ELSE
+        RAISE NOTICE '⏭️  funcao.admin_id já existe';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- 2. TABELA: registro_alimentacao
+-- ============================================================================
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'registro_alimentacao' AND column_name = 'admin_id'
+    ) THEN
+        RAISE NOTICE '🔄 Adicionando admin_id na tabela registro_alimentacao...';
+        
+        -- Adicionar coluna
+        ALTER TABLE registro_alimentacao ADD COLUMN admin_id INTEGER;
+        
+        -- Backfill baseado em funcionario_id
+        UPDATE registro_alimentacao ra
+        SET admin_id = f.admin_id
+        FROM funcionario f
+        WHERE ra.funcionario_id = f.id
+          AND ra.admin_id IS NULL
+          AND f.admin_id IS NOT NULL;
+        
+        -- Verificar registros órfãos
+        DECLARE
+            orfaos INTEGER;
+        BEGIN
+            SELECT COUNT(*) INTO orfaos FROM registro_alimentacao WHERE admin_id IS NULL;
+            
+            IF orfaos > 0 THEN
+                RAISE NOTICE '⚠️  % registros órfãos em registro_alimentacao - usando admin_id padrão', orfaos;
+                UPDATE registro_alimentacao SET admin_id = 2 WHERE admin_id IS NULL;
+            END IF;
+        END;
+        
+        -- Aplicar NOT NULL
+        ALTER TABLE registro_alimentacao ALTER COLUMN admin_id SET NOT NULL;
+        
+        -- Adicionar foreign key
+        ALTER TABLE registro_alimentacao
+        ADD CONSTRAINT fk_registro_alimentacao_admin_id
+        FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+        
+        -- Criar índice
+        CREATE INDEX idx_registro_alimentacao_admin_id ON registro_alimentacao(admin_id);
+        
+        RAISE NOTICE '✅ registro_alimentacao.admin_id criada com sucesso';
+    ELSE
+        RAISE NOTICE '⏭️  registro_alimentacao.admin_id já existe';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- 3. TABELA: rdo_mao_obra
+-- ============================================================================
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'rdo_mao_obra' AND column_name = 'admin_id'
+    ) THEN
+        RAISE NOTICE '🔄 Adicionando admin_id na tabela rdo_mao_obra...';
+        
+        -- Adicionar coluna
+        ALTER TABLE rdo_mao_obra ADD COLUMN admin_id INTEGER;
+        
+        -- Backfill baseado em rdo → obra
+        UPDATE rdo_mao_obra rm
+        SET admin_id = o.admin_id
+        FROM rdo r
+        JOIN obra o ON r.obra_id = o.id
+        WHERE rm.rdo_id = r.id
+          AND rm.admin_id IS NULL
+          AND o.admin_id IS NOT NULL;
+        
+        -- Verificar registros órfãos
+        DECLARE
+            orfaos INTEGER;
+        BEGIN
+            SELECT COUNT(*) INTO orfaos FROM rdo_mao_obra WHERE admin_id IS NULL;
+            
+            IF orfaos > 0 THEN
+                RAISE NOTICE '⚠️  % registros órfãos em rdo_mao_obra - usando admin_id padrão', orfaos;
+                UPDATE rdo_mao_obra SET admin_id = 2 WHERE admin_id IS NULL;
+            END IF;
+        END;
+        
+        -- Aplicar NOT NULL
+        ALTER TABLE rdo_mao_obra ALTER COLUMN admin_id SET NOT NULL;
+        
+        -- Adicionar foreign key
+        ALTER TABLE rdo_mao_obra
+        ADD CONSTRAINT fk_rdo_mao_obra_admin_id
+        FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+        
+        -- Criar índice
+        CREATE INDEX idx_rdo_mao_obra_admin_id ON rdo_mao_obra(admin_id);
+        
+        RAISE NOTICE '✅ rdo_mao_obra.admin_id criada com sucesso';
+    ELSE
+        RAISE NOTICE '⏭️  rdo_mao_obra.admin_id já existe';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- 4. REGISTRAR NO HISTÓRICO DE MIGRATIONS
+-- ============================================================================
+
+INSERT INTO migration_history 
+    (migration_number, migration_name, executed_at, status)
+VALUES 
+    (48, 'Adicionar admin_id em funcao, registro_alimentacao, rdo_mao_obra', NOW(), 'success')
+ON CONFLICT (migration_number) DO UPDATE 
+SET executed_at = NOW(), status = 'success';
+
+COMMIT;
+
+-- ============================================================================
+-- 5. VALIDAÇÃO
+-- ============================================================================
+
+SELECT 
+    'funcao' as tabela,
+    COUNT(*) as total_registros,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id
+FROM funcao
+
+UNION ALL
+
+SELECT 
+    'registro_alimentacao' as tabela,
+    COUNT(*) as total_registros,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id
+FROM registro_alimentacao
+
+UNION ALL
+
+SELECT 
+    'rdo_mao_obra' as tabela,
+    COUNT(*) as total_registros,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id
+FROM rdo_mao_obra;
+```
+
+**Executar:**
+```bash
+psql -U usuario -d nome_banco -f fix_admin_id_production.sql
+```
+
+---
+
+### Passo 3: Validar Resultado
+
+Execute este script para confirmar que tudo foi corrigido:
+
+```python
+# validate_fix.py
+from app import app, db
+
+with app.app_context():
+    connection = db.engine.raw_connection()
+    cursor = connection.cursor()
+    
+    tabelas = ['funcao', 'rdo_mao_obra', 'registro_alimentacao']
+    
+    print("=" * 80)
+    print("🔍 VALIDAÇÃO PÓS-CORREÇÃO")
+    print("=" * 80)
+    
+    all_ok = True
+    
+    for tabela in tabelas:
+        print(f"\n📋 Tabela: {tabela}")
+        
+        # 1. Verificar coluna
+        cursor.execute("""
+            SELECT column_name, data_type, is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = %s AND column_name = 'admin_id'
+        """, (tabela,))
+        
+        col = cursor.fetchone()
+        if col:
+            print(f"  ✅ Coluna admin_id existe ({col[1]}, nullable={col[2]})")
+        else:
+            print(f"  ❌ Coluna admin_id NÃO existe")
+            all_ok = False
+            continue
+        
+        # 2. Verificar foreign key
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = %s 
+              AND constraint_type = 'FOREIGN KEY'
+              AND constraint_name LIKE '%%admin_id%%'
+        """, (tabela,))
+        
+        fk = cursor.fetchone()
+        if fk:
+            print(f"  ✅ Foreign key: {fk[0]}")
+        else:
+            print(f"  ⚠️  Foreign key não encontrada")
+        
+        # 3. Verificar índice
+        cursor.execute("""
+            SELECT indexname 
+            FROM pg_indexes 
+            WHERE tablename = %s 
+              AND indexname LIKE '%%admin_id%%'
+        """, (tabela,))
+        
+        idx = cursor.fetchone()
+        if idx:
+            print(f"  ✅ Índice: {idx[0]}")
+        else:
+            print(f"  ⚠️  Índice não encontrado")
+        
+        # 4. Verificar dados
+        cursor.execute(f"""
+            SELECT 
+                COUNT(*) as total,
+                COUNT(admin_id) as com_admin_id,
+                COUNT(*) - COUNT(admin_id) as sem_admin_id
+            FROM {tabela}
+        """)
+        
+        stats = cursor.fetchone()
+        print(f"  📊 Dados:")
+        print(f"     Total: {stats[0]}")
+        print(f"     Com admin_id: {stats[1]}")
+        print(f"     Sem admin_id: {stats[2]}")
+        
+        if stats[2] > 0:
+            print(f"  ❌ {stats[2]} registros sem admin_id!")
+            all_ok = False
+    
+    print("\n" + "=" * 80)
+    if all_ok:
+        print("✅ TODAS AS TABELAS CORRIGIDAS COM SUCESSO!")
+    else:
+        print("❌ AINDA HÁ PROBLEMAS - REVISAR ACIMA")
+    print("=" * 80)
+    
+    cursor.close()
+    connection.close()
+```
+
+---
+
+### Passo 4: Adicionar Tratamento de Erros (Preventivo)
+
+Para evitar efeito cascata de transações abortadas, adicione tratamento de erro:
+
+```python
+# crud_rdo_completo.py - CORREÇÃO
+
+# Adicionar no início do arquivo
+from functools import wraps
+import logging
+
+logger = logging.getLogger(__name__)
+
+def safe_db_operation(default_value=None):
+    """Decorator para operações de banco com rollback automático"""
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Erro em {f.__name__}: {e}", exc_info=True)
+                if default_value is not None:
+                    return default_value
+                raise
+        return wrapped
+    return decorator
+
+# Aplicar no loop de processamento (linha 63)
+rdos_processados = []
+for rdo, obra in rdos_paginated.items:
+    try:
+        # Contadores
+        total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
+        total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
+        
+        # FÓRMULA SIMPLES PROGRESSO
+        subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+        if subatividades:
+            soma_perc = sum(s.percentual_conclusao for s in subatividades)
+            total_sub = len(subatividades)
+            progresso_medio = round(soma_perc / total_sub, 1)
+        else:
+            progresso_medio = 0.0
+    
+    except Exception as e:
+        # ROLLBACK para evitar InFailedSqlTransaction
+        db.session.rollback()
+        logger.error(f"Erro ao processar RDO {rdo.id}: {e}", exc_info=True)
+        
+        # Valores padrão
+        total_subatividades = 0
+        total_funcionarios = 0
+        progresso_medio = 0.0
+    
+    # ... resto do código ...
+```
+
+---
+
+## Checklist de Deploy
+
+### Pré-Deploy
+- [ ] Criar backup completo do banco de dados
+- [ ] Executar `check_admin_id_status.py` em produção
+- [ ] Testar script SQL em ambiente de staging
+- [ ] Comunicar janela de manutenção aos usuários
+
+### Deploy
+- [ ] Colocar aplicação em modo manutenção
+- [ ] Executar `fix_admin_id_production.sql`
+- [ ] Executar `validate_fix.py`
+- [ ] Verificar logs de erro
+- [ ] Testar funcionalidades críticas:
+  - [ ] Página de funcionários
+  - [ ] Visualizar RDO
+  - [ ] Calcular métricas de mão de obra
+  - [ ] Detalhes da obra
+  - [ ] Registros de alimentação
+
+### Pós-Deploy
+- [ ] Remover modo manutenção
+- [ ] Monitorar logs por 1 hora
+- [ ] Verificar métricas de erro
+- [ ] Confirmar com usuários que sistema está funcionando
+
+### Em Caso de Problema
+- [ ] Colocar aplicação em modo manutenção
+- [ ] Restaurar backup
+- [ ] Investigar causa raiz
+- [ ] Comunicar usuários
+
+---
+
+## Conclusão
+
+O sistema está com **3 tabelas críticas sem `admin_id`** devido à **não execução da Migration 48**. A solução é:
+
+1. ✅ **Executar script SQL** para adicionar colunas
+2. ✅ **Validar resultado** com script de verificação
+3. ✅ **Adicionar tratamento de erro** para prevenir efeito cascata
+4. ✅ **Monitorar** logs após deploy
+
+Com essas correções, todas as funcionalidades voltarão a funcionar normalmente.
