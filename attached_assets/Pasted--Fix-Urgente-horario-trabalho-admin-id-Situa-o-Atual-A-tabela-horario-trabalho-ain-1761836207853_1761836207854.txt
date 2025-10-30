@@ -1,0 +1,422 @@
+# Fix Urgente: `horario_trabalho.admin_id`
+
+## Situação Atual
+
+A tabela `horario_trabalho` **ainda não tem a coluna `admin_id`** no banco de produção, causando erros em **2 páginas diferentes**.
+
+---
+
+## Erros Confirmados
+
+### Erro 1: Página de Configurações de Horários
+
+**Origem:**
+- Arquivo: `/app/configuracoes_views.py`, linha 348
+- Código: `HorarioTrabalho.query.filter_by(admin_id=admin_id).all()`
+
+**SQL que falha:**
+```sql
+SELECT horario_trabalho.id, horario_trabalho.nome, ..., horario_trabalho.admin_id
+FROM horario_trabalho 
+WHERE horario_trabalho.admin_id = 2
+```
+
+**Erro:**
+```
+psycopg2.errors.UndefinedColumn: column horario_trabalho.admin_id does not exist
+```
+
+---
+
+### Erro 2: Página de Funcionários (Lazy Loading)
+
+**Origem:**
+- Arquivo: `/app/views.py`, linha 1680
+- Template: `/app/templates/funcionarios.html`, linha 504
+- Código: `{{ kpi.funcionario.horario_trabalho.nome if kpi.funcionario.horario_trabalho else 'Não definido' }}`
+
+**SQL que falha:**
+```sql
+SELECT horario_trabalho.id, horario_trabalho.nome, ..., horario_trabalho.admin_id
+FROM horario_trabalho 
+WHERE horario_trabalho.id = 1
+```
+
+**Erro:**
+```
+psycopg2.errors.UndefinedColumn: column horario_trabalho.admin_id does not exist
+```
+
+**Causa:**
+- SQLAlchemy faz **lazy loading** do relacionamento `funcionario.horario_trabalho`
+- Tenta carregar a tabela `horario_trabalho` incluindo `admin_id`
+- Coluna não existe no banco
+
+---
+
+## Dados Atuais no Banco
+
+```json
+[
+  {
+    "id": 1,
+    "nome": "Seg a Sex ",
+    "entrada": "07:12:00",
+    "saida_almoco": "12:00:00",
+    "retorno_almoco": "13:00:00",
+    "saida": "17:00:00",
+    "dias_semana": "1,2,3,4,5",
+    "horas_diarias": 8.8,
+    "valor_hora": 12,
+    "created_at": "2025-07-24 11:50:29.715057"
+    // ❌ SEM admin_id
+  },
+  {
+    "id": 2,
+    "nome": "Estagiario",
+    "entrada": "07:12:00",
+    "saida_almoco": "12:11:00",
+    "retorno_almoco": "12:11:00",
+    "saida": "12:12:00",
+    "dias_semana": "1,2,3,4,5",
+    "horas_diarias": 5,
+    "valor_hora": 12,
+    "created_at": "2025-07-24 12:09:47.818042"
+    // ❌ SEM admin_id
+  }
+]
+```
+
+---
+
+## Solução: Script SQL Simplificado
+
+### Arquivo: `fix_horario_trabalho_urgente.sql`
+
+```sql
+-- ============================================================================
+-- FIX URGENTE: horario_trabalho.admin_id
+-- ============================================================================
+
+BEGIN;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'horario_trabalho' AND column_name = 'admin_id'
+    ) THEN
+        RAISE NOTICE '⏭️  horario_trabalho.admin_id já existe - nada a fazer';
+        RETURN;
+    END IF;
+    
+    RAISE NOTICE '🔄 Corrigindo tabela horario_trabalho...';
+    
+    -- PASSO 1: Adicionar coluna
+    ALTER TABLE horario_trabalho ADD COLUMN admin_id INTEGER;
+    RAISE NOTICE '   ✅ Coluna adicionada';
+    
+    -- PASSO 2: Backfill via funcionario.horario_trabalho_id
+    UPDATE horario_trabalho ht
+    SET admin_id = f.admin_id
+    FROM funcionario f
+    WHERE f.horario_trabalho_id = ht.id
+      AND ht.admin_id IS NULL
+      AND f.admin_id IS NOT NULL;
+    
+    RAISE NOTICE '   ✅ Backfill via funcionario concluído';
+    
+    -- PASSO 3: Aplicar admin_id padrão (2) para registros órfãos
+    UPDATE horario_trabalho 
+    SET admin_id = 2 
+    WHERE admin_id IS NULL;
+    
+    RAISE NOTICE '   ✅ Registros órfãos corrigidos (admin_id = 2)';
+    
+    -- PASSO 4: Aplicar NOT NULL
+    ALTER TABLE horario_trabalho ALTER COLUMN admin_id SET NOT NULL;
+    RAISE NOTICE '   ✅ Constraint NOT NULL aplicada';
+    
+    -- PASSO 5: Adicionar foreign key
+    ALTER TABLE horario_trabalho
+    ADD CONSTRAINT fk_horario_trabalho_admin_id
+    FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+    
+    RAISE NOTICE '   ✅ Foreign key criada';
+    
+    -- PASSO 6: Criar índice
+    CREATE INDEX idx_horario_trabalho_admin_id ON horario_trabalho(admin_id);
+    RAISE NOTICE '   ✅ Índice criado';
+    
+    RAISE NOTICE '';
+    RAISE NOTICE '✅ horario_trabalho CORRIGIDA COM SUCESSO!';
+    
+END $$;
+
+COMMIT;
+
+-- Validação
+SELECT 
+    'horario_trabalho' as tabela,
+    COUNT(*) as total,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id,
+    COUNT(DISTINCT admin_id) as admins_distintos
+FROM horario_trabalho;
+
+-- Mostrar dados
+SELECT id, nome, admin_id FROM horario_trabalho ORDER BY id;
+```
+
+---
+
+## Como Executar
+
+### Opção 1: Via psql (Recomendado)
+
+```bash
+psql -U usuario -d nome_banco -f fix_horario_trabalho_urgente.sql
+```
+
+### Opção 2: Via pgAdmin ou DBeaver
+
+1. Abrir o arquivo `fix_horario_trabalho_urgente.sql`
+2. Copiar todo o conteúdo
+3. Colar na janela de query
+4. Executar
+
+### Opção 3: Via Python (Flask Shell)
+
+```python
+from app import app, db
+
+with app.app_context():
+    connection = db.engine.raw_connection()
+    cursor = connection.cursor()
+    
+    # Ler e executar o script
+    with open('fix_horario_trabalho_urgente.sql', 'r') as f:
+        sql = f.read()
+        cursor.execute(sql)
+    
+    connection.commit()
+    cursor.close()
+    connection.close()
+    
+    print("✅ Script executado com sucesso!")
+```
+
+---
+
+## Resultado Esperado
+
+### Saída do Script
+
+```
+🔄 Corrigindo tabela horario_trabalho...
+   ✅ Coluna adicionada
+   ✅ Backfill via funcionario concluído
+   ✅ Registros órfãos corrigidos (admin_id = 2)
+   ✅ Constraint NOT NULL aplicada
+   ✅ Foreign key criada
+   ✅ Índice criado
+
+✅ horario_trabalho CORRIGIDA COM SUCESSO!
+
+      tabela       | total | com_admin_id | sem_admin_id | admins_distintos
+-------------------+-------+--------------+--------------+------------------
+ horario_trabalho  |     2 |            2 |            0 |                1
+
+ id |     nome      | admin_id
+----+---------------+----------
+  1 | Seg a Sex     |        2
+  2 | Estagiario    |        2
+```
+
+---
+
+## Validação Pós-Execução
+
+### 1. Verificar Estrutura da Tabela
+
+```sql
+SELECT 
+    column_name, 
+    data_type, 
+    is_nullable,
+    column_default
+FROM information_schema.columns 
+WHERE table_name = 'horario_trabalho' 
+ORDER BY ordinal_position;
+```
+
+**Resultado esperado:**
+```
+   column_name    | data_type | is_nullable | column_default
+------------------+-----------+-------------+----------------
+ id               | integer   | NO          | nextval(...)
+ nome             | varchar   | YES         | NULL
+ entrada          | time      | YES         | NULL
+ saida_almoco     | time      | YES         | NULL
+ retorno_almoco   | time      | YES         | NULL
+ saida            | time      | YES         | NULL
+ dias_semana      | varchar   | YES         | NULL
+ horas_diarias    | numeric   | YES         | NULL
+ valor_hora       | numeric   | YES         | NULL
+ admin_id         | integer   | NO          | NULL  ✅ ADICIONADO
+ created_at       | timestamp | YES         | NULL
+```
+
+### 2. Verificar Foreign Key
+
+```sql
+SELECT 
+    constraint_name,
+    table_name,
+    constraint_type
+FROM information_schema.table_constraints
+WHERE table_name = 'horario_trabalho'
+  AND constraint_type = 'FOREIGN KEY';
+```
+
+**Resultado esperado:**
+```
+        constraint_name         |    table_name     | constraint_type
+--------------------------------+-------------------+-----------------
+ fk_horario_trabalho_admin_id   | horario_trabalho  | FOREIGN KEY  ✅
+```
+
+### 3. Verificar Índice
+
+```sql
+SELECT 
+    indexname,
+    indexdef
+FROM pg_indexes
+WHERE tablename = 'horario_trabalho'
+  AND indexname LIKE '%admin_id%';
+```
+
+**Resultado esperado:**
+```
+         indexname              |                    indexdef
+--------------------------------+------------------------------------------------
+ idx_horario_trabalho_admin_id  | CREATE INDEX ... ON horario_trabalho(admin_id)  ✅
+```
+
+### 4. Testar Query que Estava Falhando
+
+```sql
+-- Query da página de configurações
+SELECT * FROM horario_trabalho WHERE admin_id = 2;
+```
+
+**Resultado esperado:**
+```
+ id |     nome      | entrada  | saida_almoco | retorno_almoco |  saida   | dias_semana | horas_diarias | valor_hora | admin_id |       created_at
+----+---------------+----------+--------------+----------------+----------+-------------+---------------+------------+----------+---------------------
+  1 | Seg a Sex     | 07:12:00 | 12:00:00     | 13:00:00       | 17:00:00 | 1,2,3,4,5   |           8.8 |         12 |        2 | 2025-07-24 11:50:29
+  2 | Estagiario    | 07:12:00 | 12:11:00     | 12:11:00       | 12:12:00 | 1,2,3,4,5   |             5 |         12 |        2 | 2025-07-24 12:09:47
+```
+
+✅ **Query funciona!**
+
+---
+
+## Testes Funcionais
+
+Após executar o script, testar:
+
+### ✅ Teste 1: Página de Configurações de Horários
+
+1. Acessar `/configuracoes/horarios`
+2. Verificar que a página carrega sem erros
+3. Verificar que os 2 horários são exibidos:
+   - "Seg a Sex"
+   - "Estagiario"
+
+### ✅ Teste 2: Página de Funcionários
+
+1. Acessar `/funcionarios`
+2. Verificar que a página carrega sem erros
+3. Verificar que o horário de trabalho é exibido nos KPIs
+4. Verificar que não há erro de lazy loading
+
+### ✅ Teste 3: Criar Novo Horário
+
+1. Acessar `/configuracoes/horarios`
+2. Clicar em "Novo Horário"
+3. Preencher dados e salvar
+4. Verificar que `admin_id` é preenchido automaticamente
+
+---
+
+## Troubleshooting
+
+### Problema: Script não executa
+
+**Causa:** Permissões insuficientes
+
+**Solução:**
+```bash
+# Executar como superuser
+psql -U postgres -d nome_banco -f fix_horario_trabalho_urgente.sql
+```
+
+### Problema: Erro "relation does not exist"
+
+**Causa:** Nome do banco de dados incorreto
+
+**Solução:**
+```bash
+# Listar bancos disponíveis
+psql -U usuario -l
+
+# Conectar ao banco correto
+psql -U usuario -d nome_correto -f fix_horario_trabalho_urgente.sql
+```
+
+### Problema: Erro "column already exists"
+
+**Causa:** Script já foi executado anteriormente
+
+**Solução:**
+- ✅ Isso é esperado! O script é idempotente
+- Verificar com: `SELECT * FROM horario_trabalho LIMIT 1;`
+- Se `admin_id` aparece, está tudo OK
+
+### Problema: Registros com admin_id NULL
+
+**Causa:** Backfill não funcionou
+
+**Solução:**
+```sql
+-- Aplicar admin_id padrão manualmente
+UPDATE horario_trabalho SET admin_id = 2 WHERE admin_id IS NULL;
+```
+
+---
+
+## Resumo
+
+### Problema
+- Tabela `horario_trabalho` sem coluna `admin_id`
+- Quebra 2 páginas: configurações de horários e funcionários
+
+### Solução
+- Script SQL simples e direto: `fix_horario_trabalho_urgente.sql`
+- Adiciona coluna + backfill + constraints + FK + índice
+- Idempotente e seguro
+
+### Execução
+```bash
+psql -U usuario -d nome_banco -f fix_horario_trabalho_urgente.sql
+```
+
+### Validação
+- Verificar estrutura da tabela
+- Testar queries
+- Testar páginas afetadas
+
+### Resultado
+✅ Sistema funcionando normalmente
