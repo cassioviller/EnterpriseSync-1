@@ -5,6 +5,7 @@ from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Obra, RDO, RDO
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
+from utils.database_diagnostics import capture_db_errors
 
 # API RDO Refatorada integrada inline na função salvar_rdo_flexivel
 from datetime import datetime, date, timedelta
@@ -1318,6 +1319,7 @@ def editar_usuario(user_id):
 
 # ===== FUNCIONÁRIOS =====
 @main_bp.route('/funcionarios', methods=['GET', 'POST'])
+@capture_db_errors
 def funcionarios():
     # Temporariamente remover decorator para testar
     # @admin_required
@@ -1552,9 +1554,19 @@ def funcionarios():
                 # ✅ CORREÇÃO CRÍTICA: Sem registros = Sem custo (não usar fallback)
                 # Fallback removido - se não há registros de ponto, custo = R$ 0.00
                 # Isso evita estimativas incorretas quando período está vazio
+                
+                # 🔒 PROTEÇÃO: Acessar funcao_ref com proteção contra erro de schema (Migração 48)
+                try:
+                    funcao_nome = func.funcao_ref.nome if hasattr(func, 'funcao_ref') and func.funcao_ref else "N/A"
+                except Exception as e:
+                    logger.warning(f"Erro ao acessar funcao_ref para {func.nome}: {e}. Migração 48 pode não ter sido executada.")
+                    funcao_nome = "N/A (erro de schema)"
+                    db.session.rollback()  # Evitar InFailedSqlTransaction
+                
                 if len(registros) == 0:
                     funcionarios_kpis.append({
                         'funcionario': func,
+                        'funcao_nome': funcao_nome,
                         'horas_trabalhadas': 0,
                         'total_horas': 0,
                         'total_extras': 0,
@@ -1566,6 +1578,7 @@ def funcionarios():
                     # Caminho normal com registros
                     funcionarios_kpis.append({
                         'funcionario': func,
+                        'funcao_nome': funcao_nome,
                         'horas_trabalhadas': total_horas,
                         'total_horas': total_horas,
                         'total_extras': total_extras,
@@ -1575,9 +1588,11 @@ def funcionarios():
                     })
             except Exception as e:
                 print(f"Erro KPI funcionário {func.nome}: {str(e)}")
+                db.session.rollback()  # CRÍTICO: Fechar transação após erro
                 # Em caso de erro real, retornar zeros
                 funcionarios_kpis.append({
                     'funcionario': func,
+                    'funcao_nome': "N/A (erro)",
                     'horas_trabalhadas': 0,
                     'total_horas': 0,
                     'total_extras': 0,
@@ -2822,6 +2837,7 @@ def toggle_status_obra(id):
 # Detalhes de uma obra específica
 @main_bp.route('/obras/<int:id>')
 @main_bp.route('/obras/detalhes/<int:id>')
+@capture_db_errors
 def detalhes_obra(id):
     try:
         # DEFINIR DATAS PRIMEIRO - CRÍTICO
@@ -3043,12 +3059,18 @@ def detalhes_obra(id):
             
         custos_transporte = custos_query.all()
         
-        # Buscar custos de alimentação da tabela específica com detalhes
-        registros_alimentacao = RegistroAlimentacao.query.filter(
-            RegistroAlimentacao.obra_id == obra_id,
-            RegistroAlimentacao.data >= data_inicio,
-            RegistroAlimentacao.data <= data_fim
-        ).order_by(RegistroAlimentacao.data.desc()).all()
+        # 🔒 PROTEÇÃO: Buscar custos de alimentação com proteção contra erro de schema (Migração 48)
+        try:
+            registros_alimentacao = RegistroAlimentacao.query.filter(
+                RegistroAlimentacao.obra_id == obra_id,
+                RegistroAlimentacao.data >= data_inicio,
+                RegistroAlimentacao.data <= data_fim
+            ).order_by(RegistroAlimentacao.data.desc()).all()
+        except Exception as e:
+            logger.error(f"Erro ao carregar registros de alimentação: {e}. Migração 48 pode não ter sido executada.")
+            flash('⚠️ Erro ao carregar registros de alimentação. Migração 48 pode não ter sido executada em produção.', 'warning')
+            db.session.rollback()  # CRÍTICO: Evitar InFailedSqlTransaction
+            registros_alimentacao = []
         
         # Criar lista detalhada dos lançamentos de alimentação
         custos_alimentacao_detalhados = []
