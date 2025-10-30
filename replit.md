@@ -50,17 +50,24 @@ The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQ
 
 ## Recent Changes (October 30, 2025)
 **Implemented:**
-1. ✅ **Migração 48 - Multi-Tenancy Completo (20 Modelos)** [APROVADO ARCHITECT]
+1. ✅ **Migração 48 - Multi-Tenancy Completo (20 Modelos)** [APROVADO ARCHITECT - PRODUCTION READY]
    - **Objetivo:** Completar isolamento multi-tenant adicionando admin_id em 20 modelos faltantes
-   - **Modelos Atualizados:** Departamento, Funcao, HorarioTrabalho, ServicoObra, HistoricoProdutividadeServico, TipoOcorrencia, Ocorrencia, CalendarioUtil, CentroCusto, Receita, OrcamentoObra, FluxoCaixa, RegistroAlimentacao, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, NotificacaoCliente, PropostaItem, PropostaArquivo
-   - **Estratégia de Backfill (4 Grupos):**
+   - **Modelos Atualizados:** Departamento, Funcao, HorarioTrabalho, ServicoObra, HistoricoProdutividadeServico, TipoOcorrencia, Ocorrencia, CalendarioUtil, CentroCusto, Receita, OrcamentoObra, FluxoCaixa, RegistroAlimentacao, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, NotificacaoCliente, PropostaItens, PropostaArquivos
+   
+   - **⚠️ CORREÇÃO CRÍTICA DE SEGURANÇA (Oct 30, 2025):**
+     - ❌ Versão simplificada inicial causava vazamento de dados (UPDATE genérico com admin_id padrão)
+     - ✅ Versão tenant-aware restaurada com backfill inteligente via FK
+     - ✅ Validações pós-backfill adicionadas para detecção de colapso de tenants
+     - ✅ Architect aprovou: isolamento multi-tenant preservado
+   
+   - **Estratégia de Backfill Tenant-Aware (4 Grupos):**
      - **Grupo 1 (14 tabelas):** Backfill via FK simples preservando isolamento
        - departamento, funcao, horario_trabalho → funcionario.admin_id
        - servico_obra, ocorrencia, receita, orcamento_obra, notificacao_cliente → obra.admin_id
        - historico_produtividade_servico → servico_obra → obra.admin_id
        - registro_alimentacao → funcionario.admin_id
        - rdo_mao_obra, rdo_equipamento, rdo_ocorrencia, rdo_foto → rdo → obra.admin_id
-       - proposta_item, proposta_arquivo → propostas_comerciais.admin_id
+       - proposta_itens, proposta_arquivos → propostas_comerciais.admin_id
      - **Grupo 2 (2 tabelas):** Backfill via COALESCE multi-FK
        - centro_custo → COALESCE(obra.admin_id, departamento.admin_id)
        - fluxo_caixa → COALESCE(obra.admin_id, centro_custo.admin_id)
@@ -69,18 +76,43 @@ The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQ
        - calendario_util → duplica todas as datas para cada admin
      - **Grupo 4 (2 tabelas):** Correção de nullable em models.py
        - departamento, funcao, horario_trabalho: nullable=True → nullable=False
+   
+   - **Validações Pós-Backfill (Segurança Multi-Tenant):**
+     - 🔍 Contagem de admins distintos por tabela
+     - ⚠️ Detecção de colapso de tenants (alerta se múltiplos admins colapsam em um)
+     - 📊 Logs detalhados de distribuição de admin_id por tabela
+     - 🔴 ABORTA migração se registros órfãos detectados
+     - ✅ Commit só ocorre após todas as validações passarem
+   
    - **Proteções Implementadas:**
+     - ✅ Backfill tenant-aware via FK (preserva isolamento)
      - ✅ Órfãos em qualquer tabela ABORTAM migração (via Exception)
      - ✅ Seeds duplicados para cada admin (não compartilhados entre tenants)
-     - ✅ Logs detalhados de órfãos encontrados
+     - ✅ Logs detalhados de órfãos e distribuição de tenants
      - ✅ Rollback automático em caso de erro por tabela
      - ✅ Índices criados automaticamente para performance
+     - ✅ Idempotência total (pula tabelas que já têm admin_id)
+   
    - **Mudanças no Banco:**
      - Coluna admin_id adicionada (INTEGER NOT NULL)
      - Foreign key para usuario(id) com ON DELETE CASCADE
      - Índices idx_{tabela}_admin_id para todas as 20 tabelas
      - Constraints de integridade referencial
-   - **Status:** ✅ APROVADO ARCHITECT após 3 iterações - pronto para produção Easypanel
+   
+   - **Status de Produção:**
+     - ✅ APROVADO ARCHITECT (Oct 30, 2025) - sem problemas de segurança
+     - ✅ Isolamento multi-tenant preservado
+     - ✅ Validações pós-backfill implementadas
+     - ✅ Idempotência validada (pula em desenvolvimento)
+     - 🟢 PRODUCTION READY para Easypanel
+   
+   - **Procedimento de Deploy Easypanel:**
+     1. Fazer backup completo do banco antes da migração
+     2. Migração executará automaticamente no primeiro startup
+     3. Verificar logs para validações pós-backfill
+     4. Se órfãos detectados: revisar dados manualmente antes de re-executar
+     5. Migração é idempotente: pode executar múltiplas vezes sem problemas
+   
    - **IMPORTANTE:** Ao criar novos registros nesses modelos, sempre definir admin_id=current_user.id
 
 2. ✅ **Módulo de Custos - Dashboard TCO Completo** (Tarefas 1-4)
