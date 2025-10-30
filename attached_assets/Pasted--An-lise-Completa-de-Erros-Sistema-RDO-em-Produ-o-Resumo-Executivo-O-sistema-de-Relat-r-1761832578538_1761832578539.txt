@@ -1,0 +1,725 @@
+# Análise Completa de Erros - Sistema RDO em Produção
+
+## Resumo Executivo
+
+O sistema de Relatórios Diários de Obra (RDO) está enfrentando **múltiplos erros críticos em produção** que impedem o funcionamento normal da aplicação. Foram identificados **três tipos principais de problemas**:
+
+1. **Coluna `admin_id` inexistente** em tabelas críticas
+2. **Erro de cálculo de métricas do RDO** com coluna `admin_id` 
+3. **Erro de transação SQL abortada** ao consultar serviços e subatividades
+4. **Interface quebrada** com mensagem "Erro ao carregar RDO"
+
+---
+
+## 1. Erro: Coluna `rdo_mao_obra.admin_id` não existe
+
+### 1.1 Descrição do Erro
+
+**Erro identificado nas imagens 1:**
+```
+psycopg2.errors.UndefinedColumn: column rdo_mao_obra.admin_id does not exist
+LINE 2: FROM (SELECT rdo_mao_obra.id AS rdo_mao_obra_id, rdo_mao_obr...
+```
+
+**SQL completo gerado:**
+```sql
+SELECT count(*) AS count_1
+FROM (
+    SELECT rdo_mao_obra.id AS rdo_mao_obra_id, 
+           rdo_mao_obra.admin_id AS rdo_mao_obra_admin_id,  -- COLUNA NÃO EXISTE
+           rdo_mao_obra.rdo_id AS rdo_mao_obra_rdo_id, 
+           rdo_mao_obra.funcionario_id AS rdo_mao_obra_funcionario_id, 
+           rdo_mao_obra.funcao_exercida AS rdo_mao_obra_funcao_exercida, 
+           rdo_mao_obra.horas_trabalhadas AS rdo_mao_obra_horas_trabalhadas
+    FROM rdo_mao_obra
+    WHERE rdo_mao_obra.rdo_id = %(rdo_id_1)s
+) AS anon_1
+```
+
+**Parâmetros:**
+- `rdo_id_1`: 120, 119, 118
+
+### 1.2 Contexto do Erro
+
+Este erro ocorre ao tentar calcular métricas do RDO, especificamente ao contar registros de mão de obra. O SQLAlchemy está tentando selecionar a coluna `admin_id` que não existe na tabela `rdo_mao_obra`.
+
+### 1.3 Impacto
+
+- ❌ **Cálculo de métricas do RDO quebrado**
+- ❌ **Impossível visualizar estatísticas de mão de obra**
+- ❌ **Dashboards e relatórios não funcionam**
+- ❌ **Afeta múltiplos RDOs** (IDs: 118, 119, 120)
+
+---
+
+## 2. Erro: Transação SQL Abortada em `rdo_servico_subatividade`
+
+### 2.1 Descrição do Erro
+
+**Erro identificado na imagem 2:**
+```
+psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, 
+commands ignored until end of transaction block
+```
+
+**SQL que causou o erro inicial:**
+```sql
+SELECT count(*) AS count_1
+FROM (
+    SELECT rdo_servico_subatividade.id AS rdo_servico_subatividade_id, 
+           rdo_servico_subatividade.rdo_id AS rdo_servico_subatividade_rdo_id, 
+           rdo_servico_subatividade.servico_id AS rdo_servico_subatividade_servico_id, 
+           rdo_servico_subatividade.nome_subatividade AS rdo_servico_subatividade_nome_subatividade, 
+           rdo_servico_subatividade.descricao_subatividade AS rdo_servico_subatividade_descricao_subatividade, 
+           rdo_servico_subatividade.percentual_conclusao AS rdo_servico_subatividade_percentual_conclusao, 
+           rdo_servico_subatividade.percentual_anterior AS rdo_servico_subatividade_percentual_anterior, 
+           rdo_servico_subatividade.incremento_dia AS rdo_servico_subatividade_incremento_dia, 
+           rdo_servico_subatividade.observacoes_tecnicas AS rdo_servico_subatividade_observacoes_tecnicas, 
+           rdo_servico_subatividade.ordem_execucao AS rdo_servico_subatividade_ordem_execucao, 
+           rdo_servico_subatividade.ativo AS rdo_servico_subatividade_ativo, 
+           rdo_servico_subatividade.admin_id AS rdo_servico_subatividade_admin_id, 
+           rdo_servico_subatividade.created_at AS rdo_servico_subatividade_created_at, 
+           rdo_servico_subatividade.updated_at AS rdo_servico_subatividade_updated_at
+    FROM rdo_servico_subatividade
+    WHERE rdo_servico_subatividade.rdo_id = %(rdo_id_1)s
+) AS anon_1
+```
+
+**Parâmetros:**
+- `rdo_id_1`: 112, 110, 106
+
+### 2.2 Contexto do Erro
+
+Este é um **erro em cascata**. Um erro anterior (provavelmente relacionado a `admin_id`) causou o abort da transação PostgreSQL. Todas as queries subsequentes na mesma transação falham com este erro até que a transação seja finalizada (COMMIT ou ROLLBACK).
+
+### 2.3 Análise da Tabela `rdo_servico_subatividade`
+
+**Verificação no JSON fornecido:**
+
+Analisando o arquivo `rdo_servico_subatividade(4).json`, **a coluna `admin_id` EXISTE** nos dados:
+
+```json
+{
+  "id": 964,
+  "rdo_id": 90,
+  "servico_id": 33,
+  "nome_subatividade": "1. Detalhamento do projeto",
+  "admin_id": 2,  // ✅ COLUNA EXISTE
+  "created_at": "2025-10-10 12:57:27.228746",
+  "updated_at": "2025-10-10 12:57:27.22875"
+}
+```
+
+**Conclusão:** A tabela `rdo_servico_subatividade` possui a coluna `admin_id` no banco de dados. O erro não é causado por essa tabela, mas por um erro anterior na transação.
+
+### 2.4 Impacto
+
+- ❌ **Consultas de serviços e subatividades falham**
+- ❌ **Efeito cascata** - todas as queries na transação falham
+- ❌ **Impossível visualizar progresso de serviços**
+- ❌ **Afeta RDOs** (IDs: 106, 110, 112)
+
+---
+
+## 3. Erro na Interface: "Erro ao carregar RDO"
+
+### 3.1 Descrição do Erro
+
+**Erro identificado na imagem 3:**
+
+A interface do sistema mostra uma mensagem de erro em vermelho:
+
+```
+Erro ao carregar RDO.
+```
+
+Esta mensagem aparece na página de **Relatórios Diários de Obra**, impedindo o usuário de visualizar ou editar RDOs.
+
+### 3.2 Contexto
+
+A página mostra:
+- ✅ Filtros funcionando (Obra, Status, Funcionário, Período, Ordenação)
+- ✅ Lista de RDOs carregada (268.25 - Madrid Open Mall, 192.25 - GVC Mauricio)
+- ✅ Cards de RDO exibindo informações básicas
+- ❌ **Erro ao tentar carregar detalhes do RDO**
+
+### 3.3 Causa Provável
+
+O erro na interface é consequência dos erros de banco de dados identificados anteriormente. Quando o usuário tenta:
+- Visualizar detalhes de um RDO
+- Editar um RDO
+- Calcular métricas do RDO
+
+O backend falha devido aos erros de SQL, e a mensagem genérica "Erro ao carregar RDO" é exibida.
+
+### 3.4 Impacto
+
+- ❌ **Usuários não conseguem visualizar RDOs**
+- ❌ **Impossível editar RDOs existentes**
+- ❌ **Experiência do usuário comprometida**
+- ❌ **Perda de produtividade da equipe**
+
+---
+
+## 4. Tabela Consolidada de Problemas
+
+| Tabela | Coluna `admin_id` no Modelo | Coluna `admin_id` no DB | Status | Severidade |
+|--------|----------------------------|------------------------|--------|------------|
+| `rdo` | ✅ Sim | ✅ Sim | ✅ OK | - |
+| `rdo_servico_subatividade` | ✅ Sim | ✅ Sim | ✅ OK | - |
+| `rdo_mao_obra` | ✅ Sim | ❌ **Não** | ❌ **ERRO** | 🔴 **CRÍTICO** |
+| `funcao` | ✅ Sim | ❌ **Não** | ❌ **ERRO** | 🔴 **CRÍTICO** |
+| `registro_alimentacao` | ✅ Sim | ❌ **Não** | ❌ **ERRO** | 🔴 **CRÍTICO** |
+
+---
+
+## 5. Análise de Causa Raiz
+
+### 5.1 Padrão Identificado
+
+Existe um **padrão claro** de inconsistência:
+
+1. **Algumas tabelas têm `admin_id`** no banco de dados (rdo, rdo_servico_subatividade)
+2. **Outras tabelas NÃO têm `admin_id`** no banco de dados (rdo_mao_obra, funcao, registro_alimentacao)
+3. **Todos os modelos SQLAlchemy têm `admin_id`** definido
+
+### 5.2 Hipótese Principal
+
+**Migration parcialmente executada:**
+
+Provavelmente foi criada uma migration para adicionar a coluna `admin_id` em todas as tabelas do sistema, mas:
+
+1. ✅ A migration foi executada com sucesso em **algumas tabelas** (rdo, rdo_servico_subatividade)
+2. ❌ A migration **falhou ou foi interrompida** antes de completar todas as tabelas
+3. ❌ O código foi deployado assumindo que todas as tabelas teriam a coluna
+4. ❌ Não houve validação de schema antes do deploy em produção
+
+### 5.3 Evidências
+
+1. **Consistência nos dados:** Todas as tabelas que têm `admin_id` possuem o valor `2` consistentemente
+2. **Timestamps similares:** As tabelas foram criadas/atualizadas em períodos próximos
+3. **Padrão de nomenclatura:** Todas usam `admin_id` (mesmo nome de coluna)
+
+---
+
+## 6. Soluções Detalhadas
+
+### Solução 1: Adicionar coluna `admin_id` nas tabelas faltantes (RECOMENDADO)
+
+#### Passo 1: Criar Migration
+
+```python
+# migrations/versions/xxxx_add_admin_id_missing_tables.py
+
+"""Add admin_id to rdo_mao_obra, funcao, and registro_alimentacao
+
+Revision ID: xxxx
+Revises: yyyy
+Create Date: 2025-10-30
+"""
+
+from alembic import op
+import sqlalchemy as sa
+
+# revision identifiers, used by Alembic.
+revision = 'xxxx'
+down_revision = 'yyyy'
+branch_labels = None
+depends_on = None
+
+def upgrade():
+    # Adicionar admin_id na tabela rdo_mao_obra
+    op.add_column('rdo_mao_obra', 
+        sa.Column('admin_id', sa.Integer(), nullable=True)
+    )
+    op.create_foreign_key(
+        'fk_rdo_mao_obra_admin_id', 
+        'rdo_mao_obra', 
+        'admin',  # ou 'usuario' - verificar nome da tabela
+        ['admin_id'], 
+        ['id'],
+        ondelete='SET NULL'
+    )
+    
+    # Adicionar admin_id na tabela funcao
+    op.add_column('funcao', 
+        sa.Column('admin_id', sa.Integer(), nullable=True)
+    )
+    op.create_foreign_key(
+        'fk_funcao_admin_id', 
+        'funcao', 
+        'admin',
+        ['admin_id'], 
+        ['id'],
+        ondelete='SET NULL'
+    )
+    
+    # Adicionar admin_id na tabela registro_alimentacao
+    op.add_column('registro_alimentacao', 
+        sa.Column('admin_id', sa.Integer(), nullable=True)
+    )
+    op.create_foreign_key(
+        'fk_registro_alimentacao_admin_id', 
+        'registro_alimentacao', 
+        'admin',
+        ['admin_id'], 
+        ['id'],
+        ondelete='SET NULL'
+    )
+
+def downgrade():
+    # Remover foreign keys
+    op.drop_constraint('fk_registro_alimentacao_admin_id', 'registro_alimentacao', type_='foreignkey')
+    op.drop_column('registro_alimentacao', 'admin_id')
+    
+    op.drop_constraint('fk_funcao_admin_id', 'funcao', type_='foreignkey')
+    op.drop_column('funcao', 'admin_id')
+    
+    op.drop_constraint('fk_rdo_mao_obra_admin_id', 'rdo_mao_obra', type_='foreignkey')
+    op.drop_column('rdo_mao_obra', 'admin_id')
+```
+
+#### Passo 2: Executar Migration
+
+```bash
+# Em ambiente de staging primeiro
+flask db upgrade
+
+# Verificar se funcionou
+psql -d nome_do_banco -c "\d rdo_mao_obra"
+psql -d nome_do_banco -c "\d funcao"
+psql -d nome_do_banco -c "\d registro_alimentacao"
+```
+
+#### Passo 3: Atualizar Registros Existentes
+
+```sql
+-- Definir admin_id padrão para registros existentes
+-- Usar o mesmo valor que as outras tabelas (admin_id = 2)
+
+UPDATE rdo_mao_obra 
+SET admin_id = 2 
+WHERE admin_id IS NULL;
+
+UPDATE funcao 
+SET admin_id = 2 
+WHERE admin_id IS NULL;
+
+UPDATE registro_alimentacao 
+SET admin_id = 2 
+WHERE admin_id IS NULL;
+```
+
+#### Passo 4: Tornar Coluna NOT NULL (Opcional)
+
+Se a coluna for obrigatória no modelo de negócio:
+
+```sql
+-- Após garantir que todos os registros têm admin_id
+ALTER TABLE rdo_mao_obra 
+ALTER COLUMN admin_id SET NOT NULL;
+
+ALTER TABLE funcao 
+ALTER COLUMN admin_id SET NOT NULL;
+
+ALTER TABLE registro_alimentacao 
+ALTER COLUMN admin_id SET NOT NULL;
+```
+
+---
+
+### Solução 2: Remover `admin_id` dos Modelos SQLAlchemy
+
+Se a coluna `admin_id` não for necessária para o negócio, remova dos modelos:
+
+#### Arquivo: `models.py`
+
+```python
+# ANTES
+class RdoMaoObra(db.Model):
+    __tablename__ = 'rdo_mao_obra'
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('admin.id'))  # REMOVER
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    funcao_exercida = db.Column(db.String(100))
+    horas_trabalhadas = db.Column(db.Numeric(5, 2))
+
+# DEPOIS
+class RdoMaoObra(db.Model):
+    __tablename__ = 'rdo_mao_obra'
+    id = db.Column(db.Integer, primary_key=True)
+    # admin_id removido
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    funcao_exercida = db.Column(db.String(100))
+    horas_trabalhadas = db.Column(db.Numeric(5, 2))
+```
+
+Repetir para `Funcao` e `RegistroAlimentacao`.
+
+**⚠️ Atenção:** Esta solução requer também remover `admin_id` das tabelas que já possuem a coluna (`rdo`, `rdo_servico_subatividade`) para manter consistência.
+
+---
+
+## 7. Correção do Erro de Transação Abortada
+
+### 7.1 Problema
+
+O erro `InFailedSqlTransaction` ocorre quando:
+1. Uma query falha dentro de uma transação
+2. O código tenta executar outra query na mesma transação
+3. PostgreSQL rejeita todas as queries até ROLLBACK
+
+### 7.2 Solução: Tratamento de Erros
+
+```python
+# ANTES (código problemático)
+def calcular_metricas_rdo(rdo_id):
+    try:
+        # Query 1 - pode falhar
+        mao_obra = db.session.query(RdoMaoObra).filter_by(rdo_id=rdo_id).all()
+        
+        # Query 2 - falha se Query 1 falhou
+        servicos = db.session.query(RdoServicoSubatividade).filter_by(rdo_id=rdo_id).all()
+        
+        return calcular(mao_obra, servicos)
+    except Exception as e:
+        # Erro não é tratado corretamente
+        logger.error(f"Erro: {e}")
+        return None
+
+# DEPOIS (código corrigido)
+def calcular_metricas_rdo(rdo_id):
+    try:
+        # Query 1
+        mao_obra = db.session.query(RdoMaoObra).filter_by(rdo_id=rdo_id).all()
+        
+        # Query 2
+        servicos = db.session.query(RdoServicoSubatividade).filter_by(rdo_id=rdo_id).all()
+        
+        return calcular(mao_obra, servicos)
+    except Exception as e:
+        # IMPORTANTE: Fazer rollback da transação
+        db.session.rollback()
+        logger.error(f"Erro ao calcular métricas do RDO {rdo_id}: {e}")
+        raise  # Re-lançar exceção para tratamento superior
+```
+
+### 7.3 Melhoria: Usar Context Manager
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def safe_transaction():
+    """Context manager para garantir rollback em caso de erro"""
+    try:
+        yield db.session
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+# Uso
+def calcular_metricas_rdo(rdo_id):
+    with safe_transaction():
+        mao_obra = db.session.query(RdoMaoObra).filter_by(rdo_id=rdo_id).all()
+        servicos = db.session.query(RdoServicoSubatividade).filter_by(rdo_id=rdo_id).all()
+        return calcular(mao_obra, servicos)
+```
+
+---
+
+## 8. Plano de Ação Imediato
+
+### 8.1 Hotfix Urgente (Próximas 2 horas)
+
+1. ✅ **Criar backup do banco de dados**
+   ```bash
+   pg_dump -U usuario -d nome_banco > backup_pre_fix_$(date +%Y%m%d_%H%M%S).sql
+   ```
+
+2. ✅ **Aplicar migration em staging**
+   ```bash
+   # Ambiente de staging
+   flask db upgrade
+   ```
+
+3. ✅ **Testar funcionalidades afetadas**
+   - [ ] Visualizar RDO
+   - [ ] Editar RDO
+   - [ ] Calcular métricas de mão de obra
+   - [ ] Visualizar registros de alimentação
+   - [ ] Visualizar funções de funcionários
+
+4. ✅ **Atualizar registros existentes**
+   ```sql
+   UPDATE rdo_mao_obra SET admin_id = 2 WHERE admin_id IS NULL;
+   UPDATE funcao SET admin_id = 2 WHERE admin_id IS NULL;
+   UPDATE registro_alimentacao SET admin_id = 2 WHERE admin_id IS NULL;
+   ```
+
+5. ✅ **Deploy em produção com janela de manutenção**
+   - Comunicar usuários
+   - Aplicar migration
+   - Atualizar registros
+   - Verificar logs
+   - Testar funcionalidades críticas
+
+### 8.2 Ações Preventivas (Próxima semana)
+
+1. ✅ **Implementar validação de schema**
+   ```python
+   # check_schema.py
+   def validate_schema():
+       """Valida se modelos estão sincronizados com banco"""
+       # Ver script completo na seção 9
+   ```
+
+2. ✅ **Adicionar testes de integração**
+   ```python
+   def test_rdo_mao_obra_columns():
+       """Testa se todas as colunas do modelo existem no banco"""
+       assert hasattr(RdoMaoObra, 'admin_id')
+       # Verificar se coluna existe no banco
+   ```
+
+3. ✅ **Melhorar tratamento de erros**
+   - Adicionar rollback automático
+   - Logs estruturados
+   - Alertas em tempo real
+
+4. ✅ **Documentar processo de migration**
+   - Checklist de deploy
+   - Procedimentos de rollback
+   - Testes obrigatórios
+
+---
+
+## 9. Script de Verificação de Schema
+
+```python
+#!/usr/bin/env python3
+"""
+Script para verificar inconsistências entre modelos SQLAlchemy e banco de dados
+Executar antes de cada deploy em produção
+"""
+
+from sqlalchemy import inspect
+from app import db, app
+import sys
+
+def check_model_vs_database():
+    """Verifica se todas as colunas dos modelos existem no banco"""
+    
+    inspector = inspect(db.engine)
+    inconsistencies = []
+    errors = []
+    
+    print("🔍 Verificando consistência entre modelos e banco de dados...\n")
+    
+    for table_name in db.metadata.tables.keys():
+        try:
+            # Colunas no modelo
+            model_columns = set(db.metadata.tables[table_name].columns.keys())
+            
+            # Colunas no banco
+            db_columns = set([col['name'] for col in inspector.get_columns(table_name)])
+            
+            # Colunas no modelo mas não no banco
+            missing_in_db = model_columns - db_columns
+            
+            # Colunas no banco mas não no modelo
+            missing_in_model = db_columns - model_columns
+            
+            if missing_in_db or missing_in_model:
+                inconsistencies.append({
+                    'table': table_name,
+                    'missing_in_db': list(missing_in_db),
+                    'missing_in_model': list(missing_in_model)
+                })
+        except Exception as e:
+            errors.append({
+                'table': table_name,
+                'error': str(e)
+            })
+    
+    # Relatório
+    if errors:
+        print("❌ Erros ao verificar tabelas:")
+        for error in errors:
+            print(f"  Tabela: {error['table']}")
+            print(f"  Erro: {error['error']}\n")
+    
+    if inconsistencies:
+        print("❌ Inconsistências encontradas:\n")
+        for issue in inconsistencies:
+            print(f"📋 Tabela: {issue['table']}")
+            if issue['missing_in_db']:
+                print(f"  ⚠️  Colunas no MODELO mas NÃO no BANCO: {', '.join(issue['missing_in_db'])}")
+            if issue['missing_in_model']:
+                print(f"  ⚠️  Colunas no BANCO mas NÃO no MODELO: {', '.join(issue['missing_in_model'])}")
+            print()
+        
+        print(f"\n🔴 Total de tabelas com problemas: {len(inconsistencies)}")
+        return False
+    else:
+        print("✅ Todos os modelos estão sincronizados com o banco de dados!")
+        return True
+
+if __name__ == '__main__':
+    with app.app_context():
+        success = check_model_vs_database()
+        sys.exit(0 if success else 1)
+```
+
+**Uso:**
+```bash
+# Executar antes de cada deploy
+python check_schema.py
+
+# Se retornar código 1, NÃO fazer deploy
+# Se retornar código 0, OK para deploy
+```
+
+---
+
+## 10. Melhorias de Mensagens de Erro
+
+### 10.1 Problema Atual
+
+A mensagem genérica "Erro ao carregar RDO" não ajuda o usuário nem o desenvolvedor a entender o problema.
+
+### 10.2 Solução: Mensagens Específicas
+
+```python
+# views.py
+
+@app.route('/rdo/<int:rdo_id>')
+def visualizar_rdo(rdo_id):
+    try:
+        rdo = RDO.query.get_or_404(rdo_id)
+        
+        # Carregar mão de obra
+        try:
+            mao_obra = RdoMaoObra.query.filter_by(rdo_id=rdo_id).all()
+        except Exception as e:
+            logger.error(f"Erro ao carregar mão de obra do RDO {rdo_id}: {e}")
+            flash("Erro ao carregar dados de mão de obra. Contate o suporte.", "error")
+            mao_obra = []
+        
+        # Carregar serviços
+        try:
+            servicos = RdoServicoSubatividade.query.filter_by(rdo_id=rdo_id).all()
+        except Exception as e:
+            logger.error(f"Erro ao carregar serviços do RDO {rdo_id}: {e}")
+            flash("Erro ao carregar serviços. Contate o suporte.", "error")
+            servicos = []
+        
+        return render_template('rdo_detalhes.html', 
+                             rdo=rdo, 
+                             mao_obra=mao_obra,
+                             servicos=servicos)
+    
+    except Exception as e:
+        logger.error(f"Erro crítico ao visualizar RDO {rdo_id}: {e}", exc_info=True)
+        db.session.rollback()
+        flash("Erro ao carregar RDO. Por favor, tente novamente.", "error")
+        return redirect(url_for('lista_rdos'))
+```
+
+### 10.3 Logs Estruturados
+
+```python
+import logging
+import json
+
+class StructuredLogger:
+    def __init__(self, logger):
+        self.logger = logger
+    
+    def log_db_error(self, operation, table, error, context=None):
+        """Log estruturado para erros de banco de dados"""
+        log_data = {
+            'type': 'database_error',
+            'operation': operation,
+            'table': table,
+            'error': str(error),
+            'error_type': type(error).__name__,
+            'context': context or {}
+        }
+        self.logger.error(json.dumps(log_data))
+
+# Uso
+structured_logger = StructuredLogger(logging.getLogger(__name__))
+
+try:
+    mao_obra = RdoMaoObra.query.filter_by(rdo_id=rdo_id).all()
+except Exception as e:
+    structured_logger.log_db_error(
+        operation='query',
+        table='rdo_mao_obra',
+        error=e,
+        context={'rdo_id': rdo_id}
+    )
+```
+
+---
+
+## 11. Checklist de Deploy
+
+### Antes do Deploy
+
+- [ ] Backup do banco de dados criado
+- [ ] Migration testada em ambiente de desenvolvimento
+- [ ] Migration testada em ambiente de staging
+- [ ] Script de verificação de schema executado
+- [ ] Testes de integração passando
+- [ ] Plano de rollback documentado
+- [ ] Janela de manutenção comunicada aos usuários
+
+### Durante o Deploy
+
+- [ ] Colocar aplicação em modo manutenção
+- [ ] Executar migration: `flask db upgrade`
+- [ ] Atualizar registros existentes (scripts SQL)
+- [ ] Verificar logs de erro
+- [ ] Testar funcionalidades críticas manualmente
+
+### Após o Deploy
+
+- [ ] Remover modo manutenção
+- [ ] Monitorar logs por 1 hora
+- [ ] Verificar métricas de erro
+- [ ] Confirmar com usuários que sistema está funcionando
+- [ ] Documentar lições aprendidas
+
+### Em Caso de Problema
+
+- [ ] Colocar aplicação em modo manutenção
+- [ ] Executar rollback: `flask db downgrade`
+- [ ] Restaurar backup se necessário
+- [ ] Investigar causa raiz
+- [ ] Comunicar usuários
+
+---
+
+## 12. Conclusão
+
+O sistema RDO está enfrentando **erros críticos em produção** causados por **inconsistências entre modelos SQLAlchemy e o schema do banco de dados PostgreSQL**. Especificamente, três tabelas não possuem a coluna `admin_id` que está definida nos modelos:
+
+1. **`rdo_mao_obra`** - Impede cálculo de métricas de mão de obra
+2. **`funcao`** - Impede visualização de funções de funcionários  
+3. **`registro_alimentacao`** - Impede visualização de registros de alimentação
+
+A **solução recomendada** é adicionar a coluna `admin_id` nas três tabelas via migration, garantindo consistência com as demais tabelas do sistema (`rdo` e `rdo_servico_subatividade` já possuem a coluna).
+
+Adicionalmente, é fundamental implementar:
+- ✅ Validação automática de schema antes de deploys
+- ✅ Tratamento adequado de erros de transação SQL
+- ✅ Mensagens de erro mais específicas para usuários
+- ✅ Logs estruturados para facilitar debugging
+- ✅ Processo de deploy com checklist e validações
+
+Com essas correções e melhorias, o sistema voltará a funcionar normalmente e estará mais resiliente a problemas futuros.
