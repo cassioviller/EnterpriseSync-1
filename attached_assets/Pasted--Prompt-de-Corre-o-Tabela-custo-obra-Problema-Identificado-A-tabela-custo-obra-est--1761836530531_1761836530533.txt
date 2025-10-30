@@ -1,0 +1,628 @@
+# Prompt de Correção: Tabela `custo_obra`
+
+## Problema Identificado
+
+A tabela `custo_obra` está causando erro no **Dashboard de Custos** devido à coluna `admin_id` estar ausente ou com valores NULL.
+
+---
+
+## Erro em Produção
+
+### Origem do Erro
+
+**Arquivo:** `/app/custos_views.py`, linha 57  
+**Função:** `dashboard_custos`  
+**Código:**
+```python
+total_custos = query_base.with_entities(func.sum(CustoObra.valor)).scalar() or 0
+```
+
+### SQL que Falha
+
+```sql
+SELECT sum(custo_obra.valor) AS sum_1 
+FROM custo_obra 
+WHERE custo_obra.admin_id = 2
+```
+
+### Mensagem de Erro
+
+```
+psycopg2.errors.UndefinedColumn: column custo_obra.admin_id does not exist
+LINE 3: WHERE custo_obra.admin_id = 2
+              ^
+```
+
+### Impacto
+
+❌ **Dashboard de custos completamente quebrado**  
+❌ **Impossível visualizar totais de custos**  
+❌ **Relatórios financeiros não funcionam**  
+❌ **Análise de custos por obra indisponível**
+
+---
+
+## Análise do Modelo
+
+### Modelo SQLAlchemy (models.py linha 426-446)
+
+```python
+class CustoObra(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'))
+    tipo = db.Column(db.String(20), nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    valor = db.Column(db.Float, nullable=False)
+    data = db.Column(db.Date, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Campos adicionados pela Migração 43
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    item_almoxarifado_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_item.id'))
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'))
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))  # ✅ DEFINIDO
+    quantidade = db.Column(db.Numeric(10, 2), default=1)
+    valor_unitario = db.Column(db.Numeric(10, 2), default=0)
+    horas_trabalhadas = db.Column(db.Numeric(5, 2))
+    horas_extras = db.Column(db.Numeric(5, 2))
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
+    categoria = db.Column(db.String(50))
+```
+
+**Observação:** O modelo define `admin_id` com foreign key para `usuario.id`.
+
+---
+
+## Dados Atuais no Banco
+
+### Estatísticas
+
+- **Total de registros:** 622 custos
+- **Período:** 30/06/2025 a 29/07/2025
+- **Obras afetadas:** 1, 2, 3, 5
+- **Tipos de custo:**
+  - `alimentacao` - Custos de alimentação de funcionários
+  - `veiculo` - Custos de combustível e manutenção de veículos
+
+### Exemplos de Registros
+
+```json
+{
+  "id": 1,
+  "obra_id": 1,
+  "centro_custo_id": null,
+  "tipo": "alimentacao",
+  "descricao": "Alimentação - almoco - Frank Reinaldo Aguilar Pina",
+  "valor": 18,
+  "data": "2025-06-30",
+  "created_at": "2025-07-28 11:54:09.956557"
+  // ❌ SEM admin_id ou admin_id NULL
+}
+
+{
+  "id": 622,
+  "obra_id": 3,
+  "centro_custo_id": null,
+  "tipo": "veiculo",
+  "descricao": "Veículo EEG1F21 - Combustivel: Sem descrição",
+  "valor": 218.96,
+  "data": "2025-07-29",
+  "created_at": "2025-08-06 14:07:06.539143"
+  // ❌ SEM admin_id ou admin_id NULL
+}
+```
+
+---
+
+## Situação Provável
+
+A tabela `custo_obra` pode estar em uma das seguintes situações:
+
+### Situação 1: Coluna não existe
+- Migration 43 não foi executada
+- Coluna `admin_id` não foi criada
+
+### Situação 2: Coluna existe mas está NULL
+- Migration 43 foi executada parcialmente
+- Coluna foi criada mas backfill não funcionou
+- Todos os 622 registros têm `admin_id = NULL`
+
+---
+
+## Solução: Script SQL Completo
+
+### Características do Script
+
+✅ **Inteligente** - Detecta se coluna existe ou não  
+✅ **Idempotente** - Pode ser executado múltiplas vezes  
+✅ **Seguro** - Usa transações e trata órfãos  
+✅ **Completo** - Coluna + backfill + constraints + FK + índice  
+✅ **Informativo** - Logs detalhados de cada passo
+
+### Estratégia de Backfill
+
+```sql
+-- Buscar admin_id via relacionamento com obra
+UPDATE custo_obra co
+SET admin_id = o.admin_id
+FROM obra o
+WHERE co.obra_id = o.id
+  AND co.admin_id IS NULL
+  AND o.admin_id IS NOT NULL
+```
+
+**Lógica:**
+- Cada `custo_obra` tem uma `obra_id`
+- Cada `obra` tem um `admin_id`
+- Propagar `admin_id` da obra para o custo
+
+---
+
+## Script SQL: `fix_custo_obra.sql`
+
+```sql
+-- ============================================================================
+-- FIX: custo_obra.admin_id
+-- ============================================================================
+
+BEGIN;
+
+DO $$
+DECLARE
+    v_admin_id INTEGER := 2; -- Admin padrão
+    v_orfaos INTEGER;
+    v_atualizados INTEGER;
+    v_coluna_existe BOOLEAN;
+BEGIN
+    -- Verificar se coluna já existe
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'custo_obra' AND column_name = 'admin_id'
+    ) INTO v_coluna_existe;
+    
+    IF NOT v_coluna_existe THEN
+        RAISE NOTICE '🔄 Adicionando coluna admin_id na tabela custo_obra...';
+        
+        -- PASSO 1: Adicionar coluna
+        ALTER TABLE custo_obra ADD COLUMN admin_id INTEGER;
+        RAISE NOTICE '   ✅ Coluna adicionada';
+    ELSE
+        RAISE NOTICE '⏭️  Coluna admin_id já existe - verificando valores NULL...';
+    END IF;
+    
+    -- PASSO 2: Backfill via obra_id
+    RAISE NOTICE '🔄 Backfill via obra.admin_id...';
+    
+    UPDATE custo_obra co
+    SET admin_id = o.admin_id
+    FROM obra o
+    WHERE co.obra_id = o.id
+      AND co.admin_id IS NULL
+      AND o.admin_id IS NOT NULL;
+    
+    GET DIAGNOSTICS v_atualizados = ROW_COUNT;
+    RAISE NOTICE '   ✅ % registros atualizados via obra', v_atualizados;
+    
+    -- PASSO 3: Verificar registros órfãos
+    SELECT COUNT(*) INTO v_orfaos 
+    FROM custo_obra 
+    WHERE admin_id IS NULL;
+    
+    IF v_orfaos > 0 THEN
+        RAISE NOTICE '   ⚠️  % custos sem admin_id', v_orfaos;
+        RAISE NOTICE '   🔧 Aplicando admin_id padrão (%)', v_admin_id;
+        
+        UPDATE custo_obra 
+        SET admin_id = v_admin_id 
+        WHERE admin_id IS NULL;
+        
+        RAISE NOTICE '   ✅ Registros órfãos corrigidos';
+    ELSE
+        RAISE NOTICE '   ✅ Nenhum registro órfão';
+    END IF;
+    
+    -- PASSO 4: Aplicar NOT NULL (se ainda não estiver)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'custo_obra' 
+          AND column_name = 'admin_id' 
+          AND is_nullable = 'NO'
+    ) THEN
+        RAISE NOTICE '🔒 Aplicando constraint NOT NULL...';
+        ALTER TABLE custo_obra ALTER COLUMN admin_id SET NOT NULL;
+        RAISE NOTICE '   ✅ Constraint aplicada';
+    END IF;
+    
+    -- PASSO 5: Adicionar foreign key (se não existir)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE table_name = 'custo_obra' 
+          AND constraint_name = 'fk_custo_obra_admin_id'
+    ) THEN
+        RAISE NOTICE '🔗 Adicionando foreign key...';
+        ALTER TABLE custo_obra
+        ADD CONSTRAINT fk_custo_obra_admin_id
+        FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+        RAISE NOTICE '   ✅ Foreign key criada';
+    END IF;
+    
+    -- PASSO 6: Criar índice (se não existir)
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE tablename = 'custo_obra' 
+          AND indexname = 'idx_custo_obra_admin_id'
+    ) THEN
+        RAISE NOTICE '⚡ Criando índice...';
+        CREATE INDEX idx_custo_obra_admin_id ON custo_obra(admin_id);
+        RAISE NOTICE '   ✅ Índice criado';
+    END IF;
+    
+    RAISE NOTICE '';
+    RAISE NOTICE '✅ custo_obra CORRIGIDA COM SUCESSO!';
+    
+END $$;
+
+COMMIT;
+
+-- ============================================================================
+-- VALIDAÇÃO
+-- ============================================================================
+
+SELECT 
+    'custo_obra' as tabela,
+    COUNT(*) as total,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id,
+    COUNT(DISTINCT admin_id) as admins_distintos
+FROM custo_obra;
+
+-- Distribuição por admin
+SELECT 
+    admin_id,
+    COUNT(*) as quantidade,
+    SUM(valor) as valor_total,
+    MIN(data) as data_inicio,
+    MAX(data) as data_fim
+FROM custo_obra
+GROUP BY admin_id
+ORDER BY admin_id;
+
+-- Distribuição por tipo
+SELECT 
+    tipo,
+    COUNT(*) as quantidade,
+    SUM(valor) as valor_total
+FROM custo_obra
+GROUP BY tipo
+ORDER BY tipo;
+```
+
+---
+
+## Como Executar
+
+### Opção 1: Via psql (Recomendado)
+
+```bash
+psql -U usuario -d nome_banco -f fix_custo_obra.sql
+```
+
+### Opção 2: Via pgAdmin ou DBeaver
+
+1. Abrir o arquivo `fix_custo_obra.sql`
+2. Copiar todo o conteúdo
+3. Colar na janela de query
+4. Executar
+
+### Opção 3: Via Python (Flask Shell)
+
+```python
+from app import app, db
+
+with app.app_context():
+    with open('fix_custo_obra.sql', 'r') as f:
+        sql = f.read()
+    
+    connection = db.engine.raw_connection()
+    cursor = connection.cursor()
+    
+    cursor.execute(sql)
+    connection.commit()
+    
+    cursor.close()
+    connection.close()
+    
+    print("✅ Script executado com sucesso!")
+```
+
+---
+
+## Resultado Esperado
+
+### Saída do Script
+
+```
+🔄 Adicionando coluna admin_id na tabela custo_obra...
+   ✅ Coluna adicionada
+🔄 Backfill via obra.admin_id...
+   ✅ 622 registros atualizados via obra
+   ✅ Nenhum registro órfão
+🔒 Aplicando constraint NOT NULL...
+   ✅ Constraint aplicada
+🔗 Adicionando foreign key...
+   ✅ Foreign key criada
+⚡ Criando índice...
+   ✅ Índice criado
+
+✅ custo_obra CORRIGIDA COM SUCESSO!
+
+  tabela   | total | com_admin_id | sem_admin_id | admins_distintos
+-----------+-------+--------------+--------------+------------------
+ custo_obra|   622 |          622 |            0 |                1
+
+ admin_id | quantidade | valor_total | data_inicio | data_fim
+----------+------------+-------------+-------------+------------
+        2 |        622 |    15234.56 | 2025-06-30  | 2025-07-29
+
+    tipo     | quantidade | valor_total
+-------------+------------+-------------
+ alimentacao |        450 |     8100.00
+ veiculo     |        172 |     7134.56
+```
+
+---
+
+## Validação Pós-Execução
+
+### 1. Verificar Estrutura da Tabela
+
+```sql
+SELECT 
+    column_name, 
+    data_type, 
+    is_nullable
+FROM information_schema.columns 
+WHERE table_name = 'custo_obra' 
+ORDER BY ordinal_position;
+```
+
+**Resultado esperado:**
+```
+     column_name       | data_type | is_nullable
+-----------------------+-----------+-------------
+ id                    | integer   | NO
+ obra_id               | integer   | NO
+ centro_custo_id       | integer   | YES
+ tipo                  | varchar   | NO
+ descricao             | varchar   | NO
+ valor                 | double    | NO
+ data                  | date      | NO
+ created_at            | timestamp | YES
+ funcionario_id        | integer   | YES
+ item_almoxarifado_id  | integer   | YES
+ veiculo_id            | integer   | YES
+ admin_id              | integer   | NO  ✅
+ quantidade            | numeric   | YES
+ valor_unitario        | numeric   | YES
+ horas_trabalhadas     | numeric   | YES
+ horas_extras          | numeric   | YES
+ rdo_id                | integer   | YES
+ categoria             | varchar   | YES
+```
+
+### 2. Verificar Constraints
+
+```sql
+SELECT 
+    constraint_name,
+    constraint_type
+FROM information_schema.table_constraints
+WHERE table_name = 'custo_obra'
+ORDER BY constraint_type, constraint_name;
+```
+
+**Resultado esperado:**
+```
+      constraint_name       | constraint_type
+----------------------------+-----------------
+ fk_custo_obra_admin_id     | FOREIGN KEY  ✅
+ fk_custo_obra_obra_id      | FOREIGN KEY
+ custo_obra_pkey            | PRIMARY KEY
+```
+
+### 3. Testar Query que Estava Falhando
+
+```sql
+-- Query do dashboard de custos
+SELECT SUM(valor) 
+FROM custo_obra 
+WHERE admin_id = 2;
+```
+
+**Resultado esperado:**
+```
+   sum    
+----------
+ 15234.56
+```
+
+✅ **Query funciona!**
+
+### 4. Testar Agregações por Tipo
+
+```sql
+SELECT 
+    tipo,
+    COUNT(*) as quantidade,
+    SUM(valor) as total,
+    AVG(valor) as media
+FROM custo_obra
+WHERE admin_id = 2
+GROUP BY tipo
+ORDER BY total DESC;
+```
+
+**Resultado esperado:**
+```
+    tipo     | quantidade |  total  | media
+-------------+------------+---------+-------
+ alimentacao |        450 | 8100.00 | 18.00
+ veiculo     |        172 | 7134.56 | 41.48
+```
+
+---
+
+## Testes Funcionais
+
+Após executar o script, testar:
+
+### ✅ Teste 1: Dashboard de Custos
+
+1. Acessar `/custos/dashboard`
+2. Verificar que a página carrega sem erros
+3. Verificar que o total de custos é exibido
+4. Verificar gráficos e estatísticas
+
+### ✅ Teste 2: Filtros de Custos
+
+1. Filtrar custos por obra
+2. Filtrar custos por tipo
+3. Filtrar custos por período
+4. Verificar que todos os filtros funcionam
+
+### ✅ Teste 3: Relatórios de Custos
+
+1. Gerar relatório de custos por obra
+2. Gerar relatório de custos por tipo
+3. Exportar relatório em PDF/Excel
+4. Verificar que dados estão corretos
+
+### ✅ Teste 4: Criar Novo Custo
+
+1. Acessar página de cadastro de custo
+2. Preencher dados e salvar
+3. Verificar que `admin_id` é preenchido automaticamente
+4. Verificar que custo aparece no dashboard
+
+---
+
+## Troubleshooting
+
+### Problema: Erro "column already exists"
+
+**Causa:** Coluna já existe mas está com valores NULL
+
+**Solução:**
+- ✅ O script detecta isso automaticamente
+- Pula a criação da coluna
+- Faz apenas o backfill dos valores NULL
+
+### Problema: Erro "violates not-null constraint"
+
+**Causa:** Há registros órfãos que não conseguiram ser preenchidos via backfill
+
+**Solução:**
+```sql
+-- Verificar registros órfãos
+SELECT * FROM custo_obra WHERE admin_id IS NULL;
+
+-- Aplicar admin_id padrão manualmente
+UPDATE custo_obra SET admin_id = 2 WHERE admin_id IS NULL;
+```
+
+### Problema: Erro "violates foreign key constraint"
+
+**Causa:** O admin_id padrão (2) não existe na tabela `usuario`
+
+**Solução:**
+```sql
+-- Verificar admins disponíveis
+SELECT id, email, tipo_usuario FROM usuario WHERE tipo_usuario = 'admin';
+
+-- Usar um admin_id válido
+UPDATE custo_obra SET admin_id = <id_valido> WHERE admin_id IS NULL;
+```
+
+### Problema: Dashboard ainda não funciona
+
+**Causa:** Cache do SQLAlchemy ou sessão não atualizada
+
+**Solução:**
+```bash
+# Reiniciar aplicação Flask
+sudo systemctl restart nome_servico
+
+# Ou limpar cache
+flask shell
+>>> from app import db
+>>> db.session.remove()
+>>> exit()
+```
+
+---
+
+## Resumo
+
+### Problema
+- Tabela `custo_obra` sem `admin_id` ou com valores NULL
+- Dashboard de custos completamente quebrado
+- 622 registros afetados
+
+### Solução
+- Script SQL inteligente: `fix_custo_obra.sql`
+- Detecta situação (coluna existe ou não)
+- Backfill via relacionamento com `obra`
+- Trata registros órfãos automaticamente
+
+### Execução
+```bash
+psql -U usuario -d nome_banco -f fix_custo_obra.sql
+```
+
+### Validação
+- Verificar estrutura da tabela
+- Testar queries de agregação
+- Testar dashboard de custos
+- Criar novo custo de teste
+
+### Resultado
+✅ **Dashboard de custos funcionando**  
+✅ **Todos os 622 registros com admin_id**  
+✅ **Relatórios financeiros operacionais**  
+✅ **Sistema multi-tenant preservado**
+
+---
+
+## Resumo de Todas as Tabelas com Problema
+
+Até agora foram identificadas **6 tabelas** sem `admin_id`:
+
+| # | Tabela | Status | Script |
+|---|--------|--------|--------|
+| 1 | `funcao` | ❌ | `fix_funcao.sql` |
+| 2 | `rdo_mao_obra` | ❌ | `fix_rdo_mao_obra.sql` |
+| 3 | `registro_alimentacao` | ❌ | `fix_registro_alimentacao.sql` |
+| 4 | `departamento` | ❌ | `fix_departamento.sql` |
+| 5 | `horario_trabalho` | ❌ | `fix_horario_trabalho.sql` |
+| 6 | **`custo_obra`** | ❌ | **`fix_custo_obra.sql`** ⬆️ |
+
+### Ordem de Execução Recomendada
+
+```bash
+# 1. Tabelas base
+psql -U usuario -d nome_banco -f fix_departamento.sql
+psql -U usuario -d nome_banco -f fix_horario_trabalho.sql
+psql -U usuario -d nome_banco -f fix_funcao.sql
+
+# 2. Tabelas relacionadas a obras e custos
+psql -U usuario -d nome_banco -f fix_custo_obra.sql
+psql -U usuario -d nome_banco -f fix_rdo_mao_obra.sql
+psql -U usuario -d nome_banco -f fix_registro_alimentacao.sql
+```
+
+---
+
+## Conclusão
+
+Com este script, o **dashboard de custos voltará a funcionar** e todos os **622 registros** de custos terão `admin_id` corretamente preenchido, preservando o isolamento multi-tenant do sistema.

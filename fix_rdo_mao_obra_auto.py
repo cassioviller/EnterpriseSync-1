@@ -331,6 +331,66 @@ def fix_departamento_auto(db_engine):
         logger.error(f"❌ Erro ao corrigir departamento: {e}")
         return False
 
+def fix_custo_obra_auto(db_engine):
+    """Adiciona admin_id em custo_obra se não existir"""
+    try:
+        with db_engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_name = 'custo_obra' 
+                  AND column_name = 'admin_id'
+            """))
+            
+            if result.scalar() > 0:
+                logger.info("✅ custo_obra.admin_id já existe - skip")
+                return True
+            
+            logger.warning("⚠️  custo_obra.admin_id NÃO EXISTE - corrigindo...")
+            
+            connection.execute(text("""
+                BEGIN;
+                
+                ALTER TABLE custo_obra ADD COLUMN admin_id INTEGER;
+                
+                -- Backfill usando obra.admin_id
+                UPDATE custo_obra co
+                SET admin_id = o.admin_id
+                FROM obra o
+                WHERE co.obra_id = o.id
+                  AND co.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL;
+                
+                -- Usar admin_id mais comum para NULLs restantes
+                UPDATE custo_obra
+                SET admin_id = (
+                    SELECT admin_id 
+                    FROM obra 
+                    WHERE admin_id IS NOT NULL 
+                    GROUP BY admin_id 
+                    ORDER BY COUNT(*) DESC 
+                    LIMIT 1
+                )
+                WHERE admin_id IS NULL;
+                
+                ALTER TABLE custo_obra 
+                ADD CONSTRAINT fk_custo_obra_admin_id
+                FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+                
+                CREATE INDEX IF NOT EXISTS idx_custo_obra_admin_id 
+                ON custo_obra(admin_id);
+                
+                COMMIT;
+            """))
+            
+            connection.commit()
+            logger.info("✅ custo_obra.admin_id adicionado (automático)")
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir custo_obra: {e}")
+        return False
+
 def auto_fix_migration_48():
     """
     Correção automática da Migration 48
@@ -344,12 +404,13 @@ def auto_fix_migration_48():
     
     results = []
     
-    # Corrigir as 5 tabelas críticas
+    # Corrigir as 6 tabelas críticas
     results.append(("rdo_mao_obra", fix_rdo_mao_obra_auto(db.engine)))
     results.append(("funcao", fix_funcao_auto(db.engine)))
     results.append(("registro_alimentacao", fix_registro_alimentacao_auto(db.engine)))
     results.append(("horario_trabalho", fix_horario_trabalho_auto(db.engine)))
     results.append(("departamento", fix_departamento_auto(db.engine)))
+    results.append(("custo_obra", fix_custo_obra_auto(db.engine)))
     
     # Resumo
     success_count = sum(1 for _, success in results if success)

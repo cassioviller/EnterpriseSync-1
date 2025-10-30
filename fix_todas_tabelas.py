@@ -13,14 +13,14 @@ def main():
     """Executa todas as correções"""
     
     logger.info("=" * 80)
-    logger.info("🚀 CORREÇÃO COMPLETA: admin_id em 5 tabelas")
+    logger.info("🚀 CORREÇÃO COMPLETA: admin_id em 6 tabelas")
     logger.info("=" * 80)
     print()
     
     resultados = []
     
     # 1. Funcao
-    logger.info("📋 1/5: Corrigindo funcao...")
+    logger.info("📋 1/6: Corrigindo funcao...")
     try:
         from fix_funcao_admin_id import fix_funcao_admin_id
         success = fix_funcao_admin_id()
@@ -31,7 +31,7 @@ def main():
     print()
     
     # 2. rdo_mao_obra
-    logger.info("📋 2/5: Corrigindo rdo_mao_obra...")
+    logger.info("📋 2/6: Corrigindo rdo_mao_obra...")
     try:
         from fix_rdo_mao_obra_admin_id import fix_rdo_mao_obra_admin_id
         success = fix_rdo_mao_obra_admin_id()
@@ -42,7 +42,7 @@ def main():
     print()
     
     # 3. registro_alimentacao
-    logger.info("📋 3/5: Corrigindo registro_alimentacao...")
+    logger.info("📋 3/6: Corrigindo registro_alimentacao...")
     try:
         from fix_registro_alimentacao_admin_id import fix_registro_alimentacao_admin_id
         success = fix_registro_alimentacao_admin_id()
@@ -53,7 +53,7 @@ def main():
     print()
     
     # 4. horario_trabalho
-    logger.info("📋 4/5: Corrigindo horario_trabalho...")
+    logger.info("📋 4/6: Corrigindo horario_trabalho...")
     try:
         from fix_horario_trabalho_admin_id import fix_horario_trabalho_admin_id
         success = fix_horario_trabalho_admin_id()
@@ -64,7 +64,7 @@ def main():
     print()
     
     # 5. departamento
-    logger.info("📋 5/5: Corrigindo departamento...")
+    logger.info("📋 5/6: Corrigindo departamento...")
     try:
         from fix_departamento_admin_id import fix_departamento_admin_id
         success = fix_departamento_admin_id()
@@ -72,6 +72,17 @@ def main():
     except Exception as e:
         logger.error(f"❌ Erro em departamento: {e}")
         resultados.append(("departamento", False))
+    print()
+    
+    # 6. custo_obra
+    logger.info("📋 6/6: Corrigindo custo_obra...")
+    try:
+        from fix_custo_obra_admin_id import fix_custo_obra_admin_id
+        success = fix_custo_obra_admin_id()
+        resultados.append(("custo_obra", success))
+    except Exception as e:
+        logger.error(f"❌ Erro em custo_obra: {e}")
+        resultados.append(("custo_obra", False))
     print()
     
     # Resumo
