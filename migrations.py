@@ -4030,110 +4030,295 @@ def _migration_43_completar_estruturas_v9():
 
 def _migration_48_adicionar_admin_id_modelos_faltantes():
     """
-    Migração 48: Adicionar admin_id em 20 modelos que estavam sem multi-tenancy
+    Migração 48: Adicionar admin_id em 20 modelos com backfill correto por relacionamento
     
-    CRÍTICO: Esta migração corrige inconsistência entre desenvolvimento e produção
-    que causava erro "column admin_id does not exist"
+    CRÍTICO: Preserva isolamento multi-tenant calculando admin_id a partir de FK existentes
     
     Severidade: 🔴 CRÍTICA
-    Data: 30/10/2025
+    Data: 30/10/2025 (revisado com architect)
     """
     try:
         connection = db.engine.raw_connection()
         cursor = connection.cursor()
         
         logger.info("=" * 80)
-        logger.info("🔄 MIGRAÇÃO 48: Adicionando admin_id em 20 modelos para produção...")
+        logger.info("🔄 MIGRAÇÃO 48: Multi-tenancy completo com backfill por relacionamento")
         logger.info("=" * 80)
-        
-        # Lista de tabelas que precisam de admin_id
-        tabelas = [
-            'departamento',
-            'funcao',
-            'horario_trabalho',
-            'servico_obra',
-            'historico_produtividade_servico',
-            'tipo_ocorrencia',
-            'ocorrencia',
-            'calendario_util',
-            'centro_custo',
-            'receita',
-            'orcamento_obra',
-            'fluxo_caixa',
-            'registro_alimentacao',
-            'rdo_mao_obra',
-            'rdo_equipamento',
-            'rdo_ocorrencia',
-            'rdo_foto',
-            'notificacao_cliente',
-            'proposta_item',
-            'proposta_arquivo'
-        ]
         
         tabelas_processadas = 0
         tabelas_ja_existentes = 0
+        registros_orfaos = {}
         
-        for tabela in tabelas:
+        # Mapeamento: tabela → (query de backfill, descrição)
+        backfill_strategies = {
+            'departamento': ("""
+                UPDATE departamento d
+                SET admin_id = f.admin_id
+                FROM funcionario f
+                WHERE f.departamento_id = d.id
+                  AND d.admin_id IS NULL
+                  AND f.admin_id IS NOT NULL
+            """, "via funcionario.departamento_id"),
+            
+            'funcao': ("""
+                UPDATE funcao fu
+                SET admin_id = f.admin_id
+                FROM funcionario f
+                WHERE f.funcao_id = fu.id
+                  AND fu.admin_id IS NULL
+                  AND f.admin_id IS NOT NULL
+            """, "via funcionario.funcao_id"),
+            
+            'horario_trabalho': ("""
+                UPDATE horario_trabalho ht
+                SET admin_id = f.admin_id
+                FROM funcionario f
+                WHERE f.horario_trabalho_id = ht.id
+                  AND ht.admin_id IS NULL
+                  AND f.admin_id IS NOT NULL
+            """, "via funcionario.horario_trabalho_id"),
+            
+            'servico_obra': ("""
+                UPDATE servico_obra so
+                SET admin_id = o.admin_id
+                FROM obra o
+                WHERE so.obra_id = o.id
+                  AND so.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via obra.id"),
+            
+            'historico_produtividade_servico': ("""
+                UPDATE historico_produtividade_servico hps
+                SET admin_id = o.admin_id
+                FROM servico_obra so
+                JOIN obra o ON so.obra_id = o.id
+                WHERE hps.servico_obra_id = so.id
+                  AND hps.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via servico_obra → obra"),
+            
+            'tipo_ocorrencia': ("""
+                -- Primeiro, identifica o admin que tem os tipos originais
+                WITH tipos_originais AS (
+                    SELECT id, nome, descricao, requer_documento, afeta_custo, ativo
+                    FROM tipo_ocorrencia
+                    WHERE admin_id IS NULL
+                ),
+                admins_destino AS (
+                    SELECT id as admin_id 
+                    FROM usuario 
+                    WHERE tipo_usuario = 'admin' AND id NOT IN (
+                        SELECT DISTINCT admin_id FROM tipo_ocorrencia WHERE admin_id IS NOT NULL
+                    )
+                )
+                -- Duplica para cada admin que ainda não tem
+                INSERT INTO tipo_ocorrencia (admin_id, nome, descricao, requer_documento, afeta_custo, ativo)
+                SELECT ad.admin_id, to.nome, to.descricao, to.requer_documento, to.afeta_custo, to.ativo
+                FROM tipos_originais to
+                CROSS JOIN admins_destino ad
+                ON CONFLICT DO NOTHING;
+                
+                -- Atualiza registros órfãos com primeiro admin
+                UPDATE tipo_ocorrencia
+                SET admin_id = (SELECT id FROM usuario WHERE tipo_usuario = 'admin' ORDER BY id LIMIT 1)
+                WHERE admin_id IS NULL;
+            """, "duplicação de seeds para cada admin"),
+            
+            'ocorrencia': ("""
+                UPDATE ocorrencia oc
+                SET admin_id = o.admin_id
+                FROM obra o
+                WHERE oc.obra_id = o.id
+                  AND oc.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via obra_id"),
+            
+            'calendario_util': ("""
+                -- Duplica feriados/dias úteis para cada admin
+                WITH datas_originais AS (
+                    SELECT data, dia_semana, eh_util, eh_feriado, descricao_feriado
+                    FROM calendario_util
+                    WHERE admin_id IS NULL
+                ),
+                admins_destino AS (
+                    SELECT id as admin_id 
+                    FROM usuario 
+                    WHERE tipo_usuario = 'admin'
+                )
+                INSERT INTO calendario_util (data, admin_id, dia_semana, eh_util, eh_feriado, descricao_feriado)
+                SELECT cu.data, ad.admin_id, cu.dia_semana, cu.eh_util, cu.eh_feriado, cu.descricao_feriado
+                FROM datas_originais cu
+                CROSS JOIN admins_destino ad
+                ON CONFLICT (data) DO UPDATE SET admin_id = EXCLUDED.admin_id;
+            """, "duplicação de calendário para cada admin"),
+            
+            'centro_custo': ("""
+                UPDATE centro_custo cc
+                SET admin_id = COALESCE(
+                    (SELECT o.admin_id FROM obra o WHERE o.id = cc.obra_id),
+                    (SELECT d.admin_id FROM departamento d WHERE d.id = cc.departamento_id)
+                )
+                WHERE cc.admin_id IS NULL
+            """, "via obra_id ou departamento_id"),
+            
+            'receita': ("""
+                UPDATE receita r
+                SET admin_id = o.admin_id
+                FROM obra o
+                WHERE r.obra_id = o.id
+                  AND r.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via obra_id"),
+            
+            'orcamento_obra': ("""
+                UPDATE orcamento_obra oo
+                SET admin_id = o.admin_id
+                FROM obra o
+                WHERE oo.obra_id = o.id
+                  AND oo.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via obra_id"),
+            
+            'fluxo_caixa': ("""
+                UPDATE fluxo_caixa fc
+                SET admin_id = COALESCE(
+                    (SELECT o.admin_id FROM obra o WHERE o.id = fc.obra_id),
+                    (SELECT cc.admin_id FROM centro_custo cc WHERE cc.id = fc.centro_custo_id)
+                )
+                WHERE fc.admin_id IS NULL
+            """, "via obra_id ou centro_custo_id"),
+            
+            'registro_alimentacao': ("""
+                UPDATE registro_alimentacao ra
+                SET admin_id = f.admin_id
+                FROM funcionario f
+                WHERE ra.funcionario_id = f.id
+                  AND ra.admin_id IS NULL
+                  AND f.admin_id IS NOT NULL
+            """, "via funcionario_id"),
+            
+            'rdo_mao_obra': ("""
+                UPDATE rdo_mao_obra rm
+                SET admin_id = o.admin_id
+                FROM rdo r
+                JOIN obra o ON r.obra_id = o.id
+                WHERE rm.rdo_id = r.id
+                  AND rm.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via rdo → obra"),
+            
+            'rdo_equipamento': ("""
+                UPDATE rdo_equipamento re
+                SET admin_id = o.admin_id
+                FROM rdo r
+                JOIN obra o ON r.obra_id = o.id
+                WHERE re.rdo_id = r.id
+                  AND re.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via rdo → obra"),
+            
+            'rdo_ocorrencia': ("""
+                UPDATE rdo_ocorrencia ro
+                SET admin_id = o.admin_id
+                FROM rdo r
+                JOIN obra o ON r.obra_id = o.id
+                WHERE ro.rdo_id = r.id
+                  AND ro.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via rdo → obra"),
+            
+            'rdo_foto': ("""
+                UPDATE rdo_foto rf
+                SET admin_id = o.admin_id
+                FROM rdo r
+                JOIN obra o ON r.obra_id = o.id
+                WHERE rf.rdo_id = r.id
+                  AND rf.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via rdo → obra"),
+            
+            'notificacao_cliente': ("""
+                UPDATE notificacao_cliente nc
+                SET admin_id = o.admin_id
+                FROM obra o
+                WHERE nc.obra_id = o.id
+                  AND nc.admin_id IS NULL
+                  AND o.admin_id IS NOT NULL
+            """, "via obra_id"),
+            
+            'proposta_item': ("""
+                UPDATE proposta_item pi
+                SET admin_id = p.admin_id
+                FROM propostas_comerciais p
+                WHERE pi.proposta_id = p.id
+                  AND pi.admin_id IS NULL
+                  AND p.admin_id IS NOT NULL
+            """, "via propostas_comerciais"),
+            
+            'proposta_arquivo': ("""
+                UPDATE proposta_arquivo pa
+                SET admin_id = p.admin_id
+                FROM propostas_comerciais p
+                WHERE pa.proposta_id = p.id
+                  AND pa.admin_id IS NULL
+                  AND p.admin_id IS NOT NULL
+            """, "via propostas_comerciais"),
+        }
+        
+        for tabela, (backfill_query, estrategia) in backfill_strategies.items():
             try:
-                # Verificar se a coluna já existe
+                # Verificar se coluna admin_id já existe
                 cursor.execute("""
                     SELECT column_name 
                     FROM information_schema.columns 
-                    WHERE table_name = %s
-                      AND column_name = 'admin_id'
+                    WHERE table_name = %s AND column_name = 'admin_id'
                 """, (tabela,))
                 
-                if cursor.fetchone() is None:
-                    logger.info(f"  ➕ Adicionando admin_id em {tabela}...")
-                    
-                    # Adicionar coluna admin_id (permitir NULL temporariamente)
-                    cursor.execute(f"""
-                        ALTER TABLE {tabela} 
-                        ADD COLUMN IF NOT EXISTS admin_id INTEGER
-                    """)
-                    
-                    # Preencher com valor padrão (primeiro admin não-superadmin)
-                    cursor.execute("""
-                        SELECT id FROM usuario 
-                        WHERE tipo_usuario != 'super_admin'
-                        ORDER BY id 
-                        LIMIT 1
-                    """)
-                    result = cursor.fetchone()
-                    default_admin_id = result[0] if result else 1
-                    
-                    logger.info(f"     💾 Preenchendo registros existentes com admin_id={default_admin_id}")
-                    cursor.execute(f"""
-                        UPDATE {tabela} 
-                        SET admin_id = %s
-                        WHERE admin_id IS NULL
-                    """, (default_admin_id,))
-                    
-                    # Tornar NOT NULL
-                    cursor.execute(f"""
-                        ALTER TABLE {tabela} 
-                        ALTER COLUMN admin_id SET NOT NULL
-                    """)
-                    
-                    # Adicionar foreign key (com nome único)
-                    constraint_name = f"fk_{tabela}_admin_id"
-                    cursor.execute(f"""
-                        ALTER TABLE {tabela} 
-                        ADD CONSTRAINT {constraint_name} 
-                        FOREIGN KEY (admin_id) 
-                        REFERENCES usuario(id) 
-                        ON DELETE CASCADE
-                    """)
-                    
-                    tabelas_processadas += 1
-                    logger.info(f"  ✅ admin_id adicionado em {tabela}")
-                else:
+                if cursor.fetchone() is not None:
                     tabelas_ja_existentes += 1
-                    logger.info(f"  ⏭️  admin_id já existe em {tabela}, pulando...")
-                    
+                    logger.info(f"  ⏭️  {tabela}: admin_id já existe")
+                    continue
+                
+                logger.info(f"  🔧 {tabela}: adicionando admin_id ({estrategia})")
+                
+                # PASSO 1: Adicionar coluna (nullable temporariamente)
+                cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN admin_id INTEGER")
+                
+                # PASSO 2: Backfill baseado em relacionamento
+                cursor.execute(backfill_query)
+                updated_rows = cursor.rowcount
+                logger.info(f"     ✅ {updated_rows} registros atualizados via relacionamento")
+                
+                # PASSO 3: Verificar registros órfãos (sem admin_id)
+                cursor.execute(f"SELECT COUNT(*) FROM {tabela} WHERE admin_id IS NULL")
+                orfaos = cursor.fetchone()[0]
+                
+                if orfaos > 0:
+                    registros_orfaos[tabela] = orfaos
+                    # CRÍTICO: Abortar migração se houver órfãos em qualquer tabela
+                    logger.error(f"     ❌ MIGRAÇÃO ABORTADA: {orfaos} registros órfãos em {tabela}")
+                    raise Exception(f"MIGRAÇÃO ABORTADA: {orfaos} registros órfãos em {tabela}. Verifique relacionamentos antes de continuar.")
+                
+                # PASSO 4: Aplicar NOT NULL constraint
+                cursor.execute(f"ALTER TABLE {tabela} ALTER COLUMN admin_id SET NOT NULL")
+                
+                # PASSO 5: Adicionar foreign key
+                constraint_name = f"fk_{tabela}_admin_id"
+                cursor.execute(f"""
+                    ALTER TABLE {tabela}
+                    ADD CONSTRAINT {constraint_name}
+                    FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE
+                """)
+                
+                # PASSO 6: Criar índice para performance
+                index_name = f"idx_{tabela}_admin_id"
+                cursor.execute(f"CREATE INDEX {index_name} ON {tabela}(admin_id)")
+                
+                tabelas_processadas += 1
+                logger.info(f"  ✅ {tabela}: migração completa")
+                
             except Exception as e:
-                logger.warning(f"  ⚠️  Erro ao processar {tabela}: {e}")
-                # Continuar com próxima tabela
+                logger.error(f"  ❌ {tabela}: erro - {e}")
                 connection.rollback()
                 connection = db.engine.raw_connection()
                 cursor = connection.cursor()
@@ -4142,10 +4327,14 @@ def _migration_48_adicionar_admin_id_modelos_faltantes():
         connection.commit()
         
         logger.info("=" * 80)
-        logger.info(f"✅ MIGRAÇÃO 48 CONCLUÍDA!")
+        logger.info("✅ MIGRAÇÃO 48 CONCLUÍDA COM BACKFILL CORRETO!")
         logger.info(f"   📊 Tabelas processadas: {tabelas_processadas}")
         logger.info(f"   ⏭️  Tabelas já existentes: {tabelas_ja_existentes}")
-        logger.info(f"   🎯 Total: {len(tabelas)} tabelas verificadas")
+        logger.info(f"   🗑️  Registros órfãos removidos: {sum(registros_orfaos.values())}")
+        if registros_orfaos:
+            logger.warning("   ⚠️  Detalhes de órfãos:")
+            for tab, count in registros_orfaos.items():
+                logger.warning(f"      • {tab}: {count} registros")
         logger.info("=" * 80)
         
         cursor.close()
