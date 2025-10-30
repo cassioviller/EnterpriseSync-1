@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+
+{% block title %}Diagnóstico de Banco de Dados - SIGE{% endblock %}
+
+{% block extra_css %}
+<style>
+    .diagnostic-card {
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        margin-bottom: 24px;
+    }
+    
+    .diagnostic-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .status-badge-success {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .status-badge-danger {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .code-block {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border-radius: 8px;
+        padding: 20px;
+        font-family: 'Roboto Mono', 'Courier New', monospace;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        overflow-x: auto;
+        position: relative;
+        margin-bottom: 20px;
+    }
+    
+    .code-block pre {
+        margin: 0;
+        color: #d4d4d4;
+    }
+    
+    .copy-button {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+        z-index: 10;
+    }
+    
+    .copy-button:hover {
+        background: #0056b3;
+        transform: scale(1.05);
+    }
+    
+    .copy-button.copied {
+        background: #28a745;
+    }
+    
+    .table-structure {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 0.9rem;
+    }
+    
+    .table-structure th {
+        background: #f8f9fa;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .table-structure tbody tr:hover {
+        background: #f1f3f5;
+    }
+    
+    .migration-progress {
+        margin-top: 20px;
+    }
+    
+    .migration-progress .progress {
+        height: 30px;
+        border-radius: 15px;
+        background: #e9ecef;
+    }
+    
+    .migration-progress .progress-bar {
+        background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+        font-weight: 600;
+        line-height: 30px;
+    }
+    
+    .table-status-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .table-status-item {
+        padding: 12px;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.2s;
+    }
+    
+    .table-status-item:hover {
+        background: #f8f9fa;
+    }
+    
+    .table-status-item:last-child {
+        border-bottom: none;
+    }
+    
+    .section-header {
+        border-left: 4px solid #007bff;
+        padding-left: 16px;
+        margin-bottom: 20px;
+    }
+    
+    .section-header h3 {
+        margin: 0;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    
+    .section-header p {
+        margin: 4px 0 0 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .error-log {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 16px;
+        margin-bottom: 16px;
+        border-radius: 6px;
+    }
+    
+    .error-log-header {
+        font-weight: 600;
+        color: #856404;
+        margin-bottom: 8px;
+    }
+    
+    .check-icon {
+        font-size: 1.5rem;
+    }
+    
+    .icon-ok {
+        color: #28a745;
+    }
+    
+    .icon-missing {
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 mb-0">🔍 Diagnóstico de Banco de Dados</h1>
+                    <p class="text-muted mt-2">Sistema automático de detecção e análise de erros de banco de dados</p>
+                </div>
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">
+                    <i data-feather="arrow-left"></i> Voltar ao Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status da Migração 48 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card diagnostic-card">
+                <div class="card-body">
+                    <div class="section-header">
+                        <h3>📊 Status da Migração 48</h3>
+                        <p>Verificação de admin_id em 20 tabelas essenciais</p>
+                    </div>
+
+                    {% if migration_status %}
+                    <div class="migration-progress">
+                        {% set total_tables = migration_status.tabelas_ok|length + migration_status.tabelas_faltando|length %}
+                        {% set percent = (migration_status.tabelas_ok|length / total_tables * 100) if total_tables > 0 else 0 %}
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="font-weight-bold">Progresso:</span>
+                            <span class="badge badge-{% if migration_status.completa %}success{% else %}warning{% endif %}">
+                                {{ migration_status.tabelas_ok|length }} / {{ total_tables }} tabelas
+                            </span>
+                        </div>
+                        
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: {{ percent }}%"
+                                 aria-valuenow="{{ percent }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                {{ "%.1f"|format(percent) }}%
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <!-- Tabelas OK -->
+                        <div class="col-md-6">
+                            <h5 class="text-success mb-3">
+                                <i data-feather="check-circle"></i> 
+                                Tabelas OK ({{ migration_status.tabelas_ok|length }})
+                            </h5>
+                            <div class="table-status-list">
+                                {% for table in migration_status.tabelas_ok %}
+                                <div class="table-status-item">
+                                    <span class="font-weight-medium">{{ table }}</span>
+                                    <span class="check-icon icon-ok">✅</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Tabelas Faltando -->
+                        <div class="col-md-6">
+                            <h5 class="text-danger mb-3">
+                                <i data-feather="alert-circle"></i> 
+                                Tabelas Faltando ({{ migration_status.tabelas_faltando|length }})
+                            </h5>
+                            <div class="table-status-list">
+                                {% for table in migration_status.tabelas_faltando %}
+                                <div class="table-status-item">
+                                    <span class="font-weight-medium">{{ table }}</span>
+                                    <span class="check-icon icon-missing">❌</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if not migration_status.completa %}
+                    <div class="alert alert-warning mt-4" role="alert">
+                        <strong>⚠️ Ação Recomendada:</strong> Execute a migração 48 para adicionar admin_id às tabelas faltantes.
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verificar Estrutura de Tabela -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card diagnostic-card">
+                <div class="card-body">
+                    <div class="section-header">
+                        <h3>🔎 Verificar Estrutura de Tabela</h3>
+                        <p>Consulte a estrutura completa de qualquer tabela do banco</p>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('main.check_table_structure') }}" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group mb-0">
+                                    <label for="table_name">Nome da Tabela:</label>
+                                    <select class="form-control" id="table_name" name="table_name" required>
+                                        <option value="">Selecione uma tabela...</option>
+                                        {% for table in all_tables %}
+                                        <option value="{{ table }}" {% if table == table_to_check %}selected{% endif %}>
+                                            {{ table }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label>&nbsp;</label>
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i data-feather="search"></i> Verificar Estrutura
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    {% if table_to_check and table_structure %}
+                    <hr class="my-4">
+                    
+                    <h5 class="mb-3">Tabela: <code>{{ table_to_check }}</code></h5>
+                    
+                    {% if table_health %}
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-0">{{ table_health.columns }}</div>
+                                <small class="text-muted">Colunas</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-0">{{ table_health.row_count if table_health.row_count is not none else 'N/A' }}</div>
+                                <small class="text-muted">Registros</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-0">
+                                    {% if table_health.has_admin_id %}
+                                    <span class="text-success">✅</span>
+                                    {% else %}
+                                    <span class="text-danger">❌</span>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">admin_id</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-0">{{ table_health.primary_keys|length }}</div>
+                                <small class="text-muted">Primary Keys</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover table-structure">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Coluna</th>
+                                    <th>Tipo</th>
+                                    <th>Nullable</th>
+                                    <th>Default</th>
+                                    <th>Primary Key</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for col in table_structure %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ col.nome }}</strong>
+                                        {% if col.nome == 'admin_id' %}
+                                        <span class="badge badge-success ml-2">Multi-tenant</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><code>{{ col.tipo }}</code></td>
+                                    <td>
+                                        {% if col.nullable %}
+                                        <span class="text-success">✓</span>
+                                        {% else %}
+                                        <span class="text-danger">NOT NULL</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if col.default %}
+                                        <code>{{ col.default }}</code>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if col.primary_key %}
+                                        <span class="badge badge-primary">PK</span>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Código copiável -->
+                    <div class="code-block">
+                        <button class="copy-button" onclick="copyToClipboard('table-structure-code')">
+                            <i data-feather="copy"></i> Copiar
+                        </button>
+                        <pre id="table-structure-code">📊 ESTRUTURA DA TABELA: {{ table_to_check }}
+================================================================================
+{% for col in table_structure %}
+{{ "%-30s %-20s %s%s"|format(
+    col.nome,
+    col.tipo,
+    "NOT NULL" if not col.nullable else "",
+    ", PRIMARY KEY" if col.primary_key else ""
+) }}
+{% endfor %}
+================================================================================
+Total de colunas: {{ table_structure|length }}
+{% if table_health %}Row count: {{ table_health.row_count if table_health.row_count is not none else 'N/A' }}
+Admin_id presente: {{ '✅' if table_health.has_admin_id else '❌' }}{% endif %}</pre>
+                    </div>
+                    {% elif table_to_check and not table_structure %}
+                    <div class="alert alert-danger">
+                        <strong>❌ Erro:</strong> Tabela <code>{{ table_to_check }}</code> não encontrada no banco de dados.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Últimos Erros Capturados -->
+    {% if recent_errors %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card diagnostic-card">
+                <div class="card-body">
+                    <div class="section-header">
+                        <h3>🚨 Últimos Erros Capturados</h3>
+                        <p>Diagnósticos automáticos dos últimos erros de banco de dados</p>
+                    </div>
+
+                    {% for error in recent_errors %}
+                    <div class="code-block">
+                        <button class="copy-button" onclick="copyToClipboard('error-{{ loop.index }}')">
+                            <i data-feather="copy"></i> Copiar
+                        </button>
+                        <pre id="error-{{ loop.index }}">{{ error }}</pre>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+// Ativar ícones Feather
+if (typeof feather !== 'undefined') {
+    feather.replace();
+}
+
+// Função para copiar texto para clipboard
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    const text = element.innerText;
+    
+    // Criar textarea temporária
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = 0;
+    document.body.appendChild(textarea);
+    
+    // Selecionar e copiar
+    textarea.select();
+    textarea.setSelectionRange(0, 99999); // Para mobile
+    
+    try {
+        document.execCommand('copy');
+        
+        // Feedback visual
+        const button = element.previousElementSibling;
+        const originalHTML = button.innerHTML;
+        button.classList.add('copied');
+        button.innerHTML = '<i data-feather="check"></i> Copiado!';
+        feather.replace();
+        
+        setTimeout(() => {
+            button.classList.remove('copied');
+            button.innerHTML = originalHTML;
+            feather.replace();
+        }, 2000);
+    } catch (err) {
+        console.error('Erro ao copiar:', err);
+        alert('Erro ao copiar. Use Ctrl+C manualmente.');
+    }
+    
+    // Remover textarea temporária
+    document.body.removeChild(textarea);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,110 @@
+ERRO: (psycopg2.errors.UndefinedColumn) column funcao.admin_id does not exist
+LINE 1: ...icao, funcao.salario_base AS funcao_salario_base, funcao.adm...
+                                                             ^
+
+[SQL: SELECT funcao.id AS funcao_id, funcao.nome AS funcao_nome, funcao.descricao AS funcao_descricao, funcao.salario_base AS funcao_salario_base, funcao.admin_id AS funcao_admin_id, funcao.created_at AS funcao_created_at 
+FROM funcao 
+WHERE funcao.id = %(pk_1)s]
+[parameters: {&#39;pk_1&#39;: 1}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 951, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column funcao.admin_id does not exist
+LINE 1: ...icao, funcao.salario_base AS funcao_salario_base, funcao.adm...
+                                                             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/views.py&#34;, line 1665, in funcionarios
+    return render_template(&#39;funcionarios.html&#39;,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/templating.py&#34;, line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/templating.py&#34;, line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 1295, in render
+    self.environment.handle_exception()
+  File &#34;/usr/local/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File &#34;/app/templates/funcionarios.html&#34;, line 1, in top-level template code
+    {% extends &#34;base_completo.html&#34; %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/templates/base_completo.html&#34;, line 872, in top-level template code
+    {% block content %}{% endblock %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/templates/funcionarios.html&#34;, line 479, in block &#39;content&#39;
+    data-funcao=&#34;{{ kpi.funcionario.funcao_ref.nome.lower() if kpi.funcionario.funcao_ref else &#39;&#39; }}&#34;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 490, in getattr
+    return getattr(obj, attribute)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py&#34;, line 569, in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py&#34;, line 1096, in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/attributes.py&#34;, line 1131, in _fire_loader_callables
+    return self.callable_(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/strategies.py&#34;, line 978, in _load_for_state
+    return self._emit_lazyload(
+           ^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/strategies.py&#34;, line 1079, in _emit_lazyload
+    return loading.load_on_pk_identity(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/loading.py&#34;, line 695, in load_on_pk_identity
+    session.execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/context.py&#34;, line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1419, in execute
+    return meth(
+           ^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py&#34;, line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 951, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column funcao.admin_id does not exist
+LINE 1: ...icao, funcao.salario_base AS funcao_salario_base, funcao.adm...
+                                                             ^
+
+[SQL: SELECT funcao.id AS funcao_id, funcao.nome AS funcao_nome, funcao.descricao AS funcao_descricao, funcao.salario_base AS funcao_salario_base, funcao.admin_id AS funcao_admin_id, funcao.created_at AS funcao_created_at 
+FROM funcao 
+WHERE funcao.id = %(pk_1)s]
+[parameters: {&#39;pk_1&#39;: 1}]
+(Background on this error at: https://sqlalche.me/e/20/f405)

@@ -10046,3 +10046,69 @@ def api_finalizar_uso(uso_id):
         print(f"❌ [API_FINALIZAR_USO] Erro: {str(e)}")
         return jsonify({'success': False, 'error': 'Erro interno'}), 500
 
+
+# ===== DIAGNÓSTICO DE BANCO DE DADOS =====
+@main_bp.route('/admin/database-diagnostics')
+@super_admin_required
+def database_diagnostics():
+    """
+    Painel de diagnóstico de banco de dados - apenas para super_admin
+    Mostra status da migração 48 e permite verificar estrutura de tabelas
+    """
+    try:
+        from utils.database_diagnostics import DatabaseDiagnostics
+        
+        diagnostics = DatabaseDiagnostics()
+        
+        # Verificar status da migração 48
+        migration_status = diagnostics.check_migration_48_status()
+        
+        # Buscar últimos erros do log
+        recent_errors = diagnostics.read_recent_diagnostics(max_entries=10)
+        
+        # Listar todas as tabelas do banco
+        all_tables = diagnostics.get_all_tables()
+        
+        # Tabela específica para verificar (se fornecida)
+        table_to_check = request.args.get('table')
+        table_structure = None
+        table_health = None
+        
+        if table_to_check:
+            from utils.database_diagnostics import get_table_structure
+            table_structure = get_table_structure(table_to_check)
+            table_health = diagnostics.check_table_health(table_to_check)
+        
+        return render_template('admin/database_diagnostics.html',
+                             migration_status=migration_status,
+                             recent_errors=recent_errors,
+                             all_tables=all_tables,
+                             table_to_check=table_to_check,
+                             table_structure=table_structure,
+                             table_health=table_health)
+    
+    except Exception as e:
+        logger.error(f"Erro no painel de diagnóstico: {e}")
+        flash(f'Erro ao carregar diagnóstico: {str(e)}', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+
+@main_bp.route('/admin/database-diagnostics/check-table', methods=['POST'])
+@super_admin_required
+def check_table_structure():
+    """API para verificar estrutura de uma tabela específica"""
+    try:
+        table_name = request.form.get('table_name', '').strip()
+        
+        if not table_name:
+            flash('Nome da tabela é obrigatório', 'warning')
+            return redirect(url_for('main.database_diagnostics'))
+        
+        # Redirecionar para a mesma página com parâmetro de query
+        return redirect(url_for('main.database_diagnostics', table=table_name))
+    
+    except Exception as e:
+        logger.error(f"Erro ao verificar tabela: {e}")
+        flash(f'Erro ao verificar tabela: {str(e)}', 'danger')
+        return redirect(url_for('main.database_diagnostics'))
+
