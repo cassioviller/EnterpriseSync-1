@@ -4027,3 +4027,138 @@ def _migration_43_completar_estruturas_v9():
                 connection.close()
             except:
                 pass
+
+def _migration_48_adicionar_admin_id_modelos_faltantes():
+    """
+    Migração 48: Adicionar admin_id em 20 modelos que estavam sem multi-tenancy
+    
+    CRÍTICO: Esta migração corrige inconsistência entre desenvolvimento e produção
+    que causava erro "column admin_id does not exist"
+    
+    Severidade: 🔴 CRÍTICA
+    Data: 30/10/2025
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("🔄 MIGRAÇÃO 48: Adicionando admin_id em 20 modelos para produção...")
+        logger.info("=" * 80)
+        
+        # Lista de tabelas que precisam de admin_id
+        tabelas = [
+            'departamento',
+            'funcao',
+            'horario_trabalho',
+            'servico_obra',
+            'historico_produtividade_servico',
+            'tipo_ocorrencia',
+            'ocorrencia',
+            'calendario_util',
+            'centro_custo',
+            'receita',
+            'orcamento_obra',
+            'fluxo_caixa',
+            'registro_alimentacao',
+            'rdo_mao_obra',
+            'rdo_equipamento',
+            'rdo_ocorrencia',
+            'rdo_foto',
+            'notificacao_cliente',
+            'proposta_item',
+            'proposta_arquivo'
+        ]
+        
+        tabelas_processadas = 0
+        tabelas_ja_existentes = 0
+        
+        for tabela in tabelas:
+            try:
+                # Verificar se a coluna já existe
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = %s
+                      AND column_name = 'admin_id'
+                """, (tabela,))
+                
+                if cursor.fetchone() is None:
+                    logger.info(f"  ➕ Adicionando admin_id em {tabela}...")
+                    
+                    # Adicionar coluna admin_id (permitir NULL temporariamente)
+                    cursor.execute(f"""
+                        ALTER TABLE {tabela} 
+                        ADD COLUMN IF NOT EXISTS admin_id INTEGER
+                    """)
+                    
+                    # Preencher com valor padrão (primeiro admin não-superadmin)
+                    cursor.execute("""
+                        SELECT id FROM usuario 
+                        WHERE tipo_usuario != 'super_admin'
+                        ORDER BY id 
+                        LIMIT 1
+                    """)
+                    result = cursor.fetchone()
+                    default_admin_id = result[0] if result else 1
+                    
+                    logger.info(f"     💾 Preenchendo registros existentes com admin_id={default_admin_id}")
+                    cursor.execute(f"""
+                        UPDATE {tabela} 
+                        SET admin_id = %s
+                        WHERE admin_id IS NULL
+                    """, (default_admin_id,))
+                    
+                    # Tornar NOT NULL
+                    cursor.execute(f"""
+                        ALTER TABLE {tabela} 
+                        ALTER COLUMN admin_id SET NOT NULL
+                    """)
+                    
+                    # Adicionar foreign key (com nome único)
+                    constraint_name = f"fk_{tabela}_admin_id"
+                    cursor.execute(f"""
+                        ALTER TABLE {tabela} 
+                        ADD CONSTRAINT {constraint_name} 
+                        FOREIGN KEY (admin_id) 
+                        REFERENCES usuario(id) 
+                        ON DELETE CASCADE
+                    """)
+                    
+                    tabelas_processadas += 1
+                    logger.info(f"  ✅ admin_id adicionado em {tabela}")
+                else:
+                    tabelas_ja_existentes += 1
+                    logger.info(f"  ⏭️  admin_id já existe em {tabela}, pulando...")
+                    
+            except Exception as e:
+                logger.warning(f"  ⚠️  Erro ao processar {tabela}: {e}")
+                # Continuar com próxima tabela
+                connection.rollback()
+                connection = db.engine.raw_connection()
+                cursor = connection.cursor()
+                continue
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info(f"✅ MIGRAÇÃO 48 CONCLUÍDA!")
+        logger.info(f"   📊 Tabelas processadas: {tabelas_processadas}")
+        logger.info(f"   ⏭️  Tabelas já existentes: {tabelas_ja_existentes}")
+        logger.info(f"   🎯 Total: {len(tabelas)} tabelas verificadas")
+        logger.info("=" * 80)
+        
+        cursor.close()
+        connection.close()
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro crítico na migração 48: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        raise
