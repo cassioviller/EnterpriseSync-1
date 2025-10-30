@@ -1628,6 +1628,7 @@ def funcionarios():
     
     except Exception as e:
         import traceback
+        db.session.rollback()  # CRÍTICO: Fechar transação abortada
         print(f"ERRO CRÍTICO KPIs: {str(e)}")
         print(f"TRACEBACK DETALHADO: {traceback.format_exc()}")
         # Em caso de erro, criar dados básicos para não quebrar a página
@@ -1648,14 +1649,27 @@ def funcionarios():
     # Debug final antes do template
     print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários, {len(funcionarios_kpis)} KPIs")
     
+    # Buscar dados para o formulário (com proteção contra transação abortada)
+    try:
+        departamentos = Departamento.query.filter_by(admin_id=admin_id).all()
+        funcoes = Funcao.query.filter_by(admin_id=admin_id).all()
+        horarios = HorarioTrabalho.query.filter_by(admin_id=admin_id).all()
+    except Exception as e:
+        db.session.rollback()  # Fechar transação se houver erro
+        print(f"ERRO ao buscar dados do formulário: {str(e)}")
+        departamentos = []
+        funcoes = []
+        horarios = []
+        flash('Erro ao carregar dados do formulário. Tente novamente.', 'warning')
+    
     return render_template('funcionarios.html', 
                          funcionarios_kpis=funcionarios_kpis,
                          funcionarios=funcionarios,
                          kpis_geral=kpis_geral,
                          obras_ativas=obras_ativas,
-                         departamentos=Departamento.query.filter_by(admin_id=admin_id).all(),
-                         funcoes=Funcao.query.all(),
-                         horarios=HorarioTrabalho.query.filter_by(admin_id=admin_id).all(),
+                         departamentos=departamentos,
+                         funcoes=funcoes,
+                         horarios=horarios,
                          data_inicio=data_inicio,
                          data_fim=data_fim)
 
