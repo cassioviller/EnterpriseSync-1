@@ -44,7 +44,7 @@ class Departamento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.Text)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     funcionarios = db.relationship('Funcionario', backref='departamento_ref', lazy=True)
@@ -54,7 +54,7 @@ class Funcao(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.Text)
     salario_base = db.Column(db.Float, default=0.0)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     funcionarios = db.relationship('Funcionario', backref='funcao_ref', lazy=True)
@@ -69,7 +69,7 @@ class HorarioTrabalho(db.Model):
     dias_semana = db.Column(db.String(20), nullable=False)  # Ex: "1,2,3,4,5" (Segunda=1, Domingo=7)
     horas_diarias = db.Column(db.Float, default=8.0)  # Horas trabalhadas por dia
     valor_hora = db.Column(db.Float, default=12.0)  # Valor por hora
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def __repr__(self):
