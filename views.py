@@ -7422,6 +7422,12 @@ def rdo_novo_unificado():
 @capture_db_errors
 def funcionario_rdo_consolidado():
     """Lista RDOs consolidada - página original que estava funcionando"""
+    # Limpar qualquer transação pendente/abortada antes de começar
+    try:
+        db.session.rollback()
+    except:
+        pass
+    
     try:
         # Usar sistema de detecção dinâmica para obter admin_id correto
         admin_id_correto = get_admin_id_dinamico()
