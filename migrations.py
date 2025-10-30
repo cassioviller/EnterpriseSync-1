@@ -4121,7 +4121,7 @@ def _migration_48_adicionar_admin_id_modelos_faltantes():
             'centro_custo', 'receita', 'orcamento_obra',
             'fluxo_caixa', 'registro_alimentacao',
             'rdo_mao_obra', 'rdo_equipamento', 'rdo_ocorrencia', 'rdo_foto',
-            'notificacao_cliente', 'proposta_item', 'proposta_arquivo'
+            'notificacao_cliente', 'proposta_itens', 'proposta_arquivos'
         ]
         
         processadas = 0
