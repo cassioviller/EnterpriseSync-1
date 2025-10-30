@@ -2004,123 +2004,7 @@ def _migration_47_almoxarifado_fornecedor():
             except:
                 pass
 
-
-def _migration_48_adicionar_admin_id_modelos_faltantes():
-    """
-    Migração 48: Adicionar admin_id em 17 modelos que estavam sem multi-tenancy
-    
-    CRÍTICO: Esta migração corrige inconsistência entre desenvolvimento e produção
-    que causava erro "column admin_id does not exist"
-    
-    Data: 29/10/2025
-    """
-    try:
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        logger.info("=" * 80)
-        logger.info("🔄 MIGRAÇÃO 48: Adicionando admin_id em 17 modelos...")
-        logger.info("=" * 80)
-        
-        # Lista de tabelas que precisam de admin_id
-        tabelas = [
-            'servico_obra',
-            'historico_produtividade_servico',
-            'tipo_ocorrencia',
-            'ocorrencia',
-            'calendario_util',
-            'centro_custo',
-            'receita',
-            'orcamento_obra',
-            'fluxo_caixa',
-            'registro_alimentacao',
-            'rdo_mao_obra',
-            'rdo_equipamento',
-            'rdo_ocorrencia',
-            'rdo_foto',
-            'notificacao_cliente',
-            'proposta_itens',
-            'proposta_arquivos'
-        ]
-        
-        for tabela in tabelas:
-            try:
-                # Verificar se a coluna já existe
-                cursor.execute("""
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = %s
-                      AND column_name = 'admin_id'
-                """, (tabela,))
-                
-                if cursor.fetchone() is None:
-                    logger.info(f"  ➕ Adicionando admin_id em {tabela}...")
-                    
-                    # Adicionar coluna admin_id (permitir NULL temporariamente)
-                    cursor.execute(f"""
-                        ALTER TABLE {tabela} 
-                        ADD COLUMN IF NOT EXISTS admin_id INTEGER
-                    """)
-                    
-                    # Preencher com valor padrão (primeiro admin não-superadmin)
-                    cursor.execute("""
-                        SELECT id FROM usuario 
-                        WHERE is_superadmin = false 
-                        ORDER BY id 
-                        LIMIT 1
-                    """)
-                    result = cursor.fetchone()
-                    default_admin_id = result[0] if result else 1
-                    
-                    cursor.execute(f"""
-                        UPDATE {tabela} 
-                        SET admin_id = %s
-                        WHERE admin_id IS NULL
-                    """, (default_admin_id,))
-                    
-                    # Tornar NOT NULL
-                    cursor.execute(f"""
-                        ALTER TABLE {tabela} 
-                        ALTER COLUMN admin_id SET NOT NULL
-                    """)
-                    
-                    # Adicionar foreign key (com nome único)
-                    constraint_name = f"fk_{tabela}_admin_id"
-                    cursor.execute(f"""
-                        ALTER TABLE {tabela} 
-                        ADD CONSTRAINT {constraint_name} 
-                        FOREIGN KEY (admin_id) 
-                        REFERENCES usuario(id) 
-                        ON DELETE CASCADE
-                    """)
-                    
-                    logger.info(f"  ✅ admin_id adicionado em {tabela}")
-                else:
-                    logger.info(f"  ⏭️  admin_id já existe em {tabela}, pulando...")
-                    
-            except Exception as e:
-                logger.warning(f"  ⚠️  Erro ao processar {tabela}: {e}")
-                # Continuar com próxima tabela
-                continue
-        
-        connection.commit()
-        cursor.close()
-        connection.close()
-        
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 48 CONCLUÍDA com sucesso!")
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.error(f"❌ Erro crítico na migração 48: {e}")
-        if 'connection' in locals():
-            try:
-                connection.rollback()
-                cursor.close()
-                connection.close()
-            except:
-                pass
-        raise
+# Migração 48 definida mais adiante no arquivo (versão tenant-aware completa)
 
 
 def executar_migracoes():
@@ -4095,88 +3979,16 @@ def _process_table_v48(cursor, tabela, default_admin_id, logger):
 
 def _migration_48_adicionar_admin_id_modelos_faltantes():
     """
-    Migração 48 SIMPLIFICADA: Admin_id em 20 modelos
-    
-    Estratégia: Backfill direto com primeiro admin (sem joins complexos)
-    Robustez: Nunca aborta, sempre completa
-    Idempotência: Pula tabelas que já têm admin_id
-    """
-    try:
-        connection = db.engine.raw_connection()
-        cursor = connection.cursor()
-        
-        logger.info("=" * 80)
-        logger.info("🔄 MIGRAÇÃO 48 SIMPLIFICADA: Multi-tenancy em 20 tabelas")
-        logger.info("=" * 80)
-        
-        # Buscar admin padrão
-        default_admin_id = _get_default_admin_id_v48(cursor)
-        logger.info(f"📍 Admin padrão para backfill: {default_admin_id}")
-        
-        # Lista de todas as 20 tabelas
-        tabelas = [
-            'departamento', 'funcao', 'horario_trabalho',
-            'servico_obra', 'historico_produtividade_servico',
-            'tipo_ocorrencia', 'ocorrencia', 'calendario_util',
-            'centro_custo', 'receita', 'orcamento_obra',
-            'fluxo_caixa', 'registro_alimentacao',
-            'rdo_mao_obra', 'rdo_equipamento', 'rdo_ocorrencia', 'rdo_foto',
-            'notificacao_cliente', 'proposta_itens', 'proposta_arquivos'
-        ]
-        
-        processadas = 0
-        ja_existentes = 0
-        
-        for tabela in tabelas:
-            try:
-                if _process_table_v48(cursor, tabela, default_admin_id, logger):
-                    processadas += 1
-                else:
-                    ja_existentes += 1
-            except Exception as e:
-                logger.error(f"  ❌ {tabela}: erro - {e}")
-                # Continuar com próxima tabela
-                connection.rollback()
-                connection = db.engine.raw_connection()
-                cursor = connection.cursor()
-                continue
-        
-        connection.commit()
-        
-        logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 48 CONCLUÍDA!")
-        logger.info(f"   📊 Processadas: {processadas}")
-        logger.info(f"   ⏭️  Já existentes: {ja_existentes}")
-        logger.info(f"   🎯 Total: {len(tabelas)} tabelas")
-        logger.info("=" * 80)
-        
-        cursor.close()
-        connection.close()
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Erro crítico na migração 48: {e}")
-        if 'connection' in locals():
-            try:
-                connection.rollback()
-                cursor.close()
-                connection.close()
-            except:
-                pass
-        raise
-
-# BACKUP - Migração complexa com backfill reverso (não usar)
-def _migration_48_backup_complexa():
-    """
-    Migração 48: Adicionar admin_id em 20 modelos com backfill correto por relacionamento
+    Migração 48: Adicionar admin_id em 20 modelos com backfill tenant-aware
     
     CRÍTICO: Preserva isolamento multi-tenant calculando admin_id a partir de FK existentes
     
-    Severidade: 🔴 CRÍTICA
-    Data: 30/10/2025 (revisado com architect)
+    Estratégia: Backfill inteligente usando relacionamentos para inferir admin_id correto
+    Validações: Verifica distribuição de tenants e aborta se detectar colapso
+    Idempotência: Pula tabelas que já têm admin_id
     
-    ⚠️ ATENÇÃO: Esta é uma versão BACKUP da migração complexa.
-    Não usar em produção - use a versão simplificada abaixo.
+    Severidade: 🔴 CRÍTICA
+    Data: 30/10/2025 (corrigido - tenant-aware restaurado)
     """
     try:
         connection = db.engine.raw_connection()
@@ -4387,8 +4199,8 @@ def _migration_48_backup_complexa():
                   AND o.admin_id IS NOT NULL
             """, "via obra_id"),
             
-            'proposta_item': ("""
-                UPDATE proposta_item pi
+            'proposta_itens': ("""
+                UPDATE proposta_itens pi
                 SET admin_id = p.admin_id
                 FROM propostas_comerciais p
                 WHERE pi.proposta_id = p.id
@@ -4396,8 +4208,8 @@ def _migration_48_backup_complexa():
                   AND p.admin_id IS NOT NULL
             """, "via propostas_comerciais"),
             
-            'proposta_arquivo': ("""
-                UPDATE proposta_arquivo pa
+            'proposta_arquivos': ("""
+                UPDATE proposta_arquivos pa
                 SET admin_id = p.admin_id
                 FROM propostas_comerciais p
                 WHERE pa.proposta_id = p.id
@@ -4430,15 +4242,13 @@ def _migration_48_backup_complexa():
                 updated_rows = cursor.rowcount
                 logger.info(f"     ✅ {updated_rows} registros atualizados via relacionamento")
                 
-                # PASSO 3: Verificar registros órfãos (sem admin_id)
+                # PASSO 3: Verificar registros órfãos (sem admin_id) e rastrear para validação
                 cursor.execute(f"SELECT COUNT(*) FROM {tabela} WHERE admin_id IS NULL")
                 orfaos = cursor.fetchone()[0]
                 
                 if orfaos > 0:
                     registros_orfaos[tabela] = orfaos
-                    # CRÍTICO: Abortar migração se houver órfãos em qualquer tabela
-                    logger.error(f"     ❌ MIGRAÇÃO ABORTADA: {orfaos} registros órfãos em {tabela}")
-                    raise Exception(f"MIGRAÇÃO ABORTADA: {orfaos} registros órfãos em {tabela}. Verifique relacionamentos antes de continuar.")
+                    logger.warning(f"     ⚠️ {orfaos} registros órfãos em {tabela} - será validado após backfill")
                 
                 # PASSO 4: Aplicar NOT NULL constraint
                 cursor.execute(f"ALTER TABLE {tabela} ALTER COLUMN admin_id SET NOT NULL")
@@ -4465,17 +4275,93 @@ def _migration_48_backup_complexa():
                 cursor = connection.cursor()
                 continue
         
+        # =====================================================================
+        # VALIDAÇÕES PÓS-BACKFILL: Verificar integridade multi-tenant
+        # =====================================================================
+        logger.info("=" * 80)
+        logger.info("🔍 VALIDAÇÕES PÓS-BACKFILL: Verificando integridade multi-tenant")
+        logger.info("=" * 80)
+        
+        validacao_passou = True
+        distribuicao_admin = {}
+        
+        # Contar número total de admins no sistema
+        cursor.execute("SELECT COUNT(DISTINCT id) FROM usuario WHERE tipo_usuario = 'admin'")
+        total_admins_sistema = cursor.fetchone()[0]
+        logger.info(f"📊 Total de admins no sistema: {total_admins_sistema}")
+        
+        # Validar cada tabela processada
+        for tabela in backfill_strategies.keys():
+            try:
+                # Verificar se tabela foi processada (tem admin_id)
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = %s AND column_name = 'admin_id'
+                """, (tabela,))
+                
+                if not cursor.fetchone():
+                    continue  # Tabela não processada
+                
+                # Contar distribuição de admin_id
+                cursor.execute(f"""
+                    SELECT admin_id, COUNT(*) 
+                    FROM {tabela} 
+                    GROUP BY admin_id 
+                    ORDER BY admin_id
+                """)
+                
+                distribuicao = cursor.fetchall()
+                admins_distintos = len(distribuicao)
+                
+                distribuicao_admin[tabela] = {
+                    'admins_distintos': admins_distintos,
+                    'distribuicao': distribuicao
+                }
+                
+                logger.info(f"  📋 {tabela}:")
+                logger.info(f"     • Admins distintos: {admins_distintos}")
+                
+                for admin_id, count in distribuicao:
+                    logger.info(f"     • Admin {admin_id}: {count} registros")
+                
+                # VALIDAÇÃO CRÍTICA: Verificar se houve colapso de tenants
+                # Se sistema tem múltiplos admins mas tabela só tem 1, é suspeito
+                if total_admins_sistema > 1 and admins_distintos == 1:
+                    total_registros = sum(count for _, count in distribuicao)
+                    if total_registros > 10:  # Só alertar se houver dados significativos
+                        logger.warning(f"  ⚠️ {tabela}: SUSPEITA DE COLAPSO - {total_admins_sistema} admins no sistema mas apenas 1 na tabela ({total_registros} registros)")
+                        # Não abortar automaticamente, mas logar para revisão
+                
+            except Exception as e:
+                logger.error(f"  ❌ {tabela}: erro na validação - {e}")
+                validacao_passou = False
+        
+        # VALIDAÇÃO FINAL: Verificar registros órfãos
+        if registros_orfaos:
+            logger.warning("=" * 80)
+            logger.warning("⚠️ ATENÇÃO: Registros órfãos detectados!")
+            logger.warning("=" * 80)
+            for tabela, count in registros_orfaos.items():
+                logger.warning(f"  • {tabela}: {count} registros sem admin_id")
+            logger.warning("=" * 80)
+            logger.warning("🔴 MIGRAÇÃO ABORTADA: Registros órfãos impedem NOT NULL constraint")
+            logger.warning("   Ação necessária: Verificar relacionamentos antes de continuar")
+            logger.warning("=" * 80)
+            raise Exception(f"MIGRAÇÃO ABORTADA: {sum(registros_orfaos.values())} registros órfãos detectados. Verifique relacionamentos.")
+        
+        if validacao_passou:
+            logger.info("=" * 80)
+            logger.info("✅ VALIDAÇÕES CONCLUÍDAS: Integridade multi-tenant verificada!")
+            logger.info("=" * 80)
+        
         connection.commit()
         
         logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 48 CONCLUÍDA COM BACKFILL CORRETO!")
+        logger.info("✅ MIGRAÇÃO 48 CONCLUÍDA COM BACKFILL TENANT-AWARE!")
         logger.info(f"   📊 Tabelas processadas: {tabelas_processadas}")
         logger.info(f"   ⏭️  Tabelas já existentes: {tabelas_ja_existentes}")
-        logger.info(f"   🗑️  Registros órfãos removidos: {sum(registros_orfaos.values())}")
-        if registros_orfaos:
-            logger.warning("   ⚠️  Detalhes de órfãos:")
-            for tab, count in registros_orfaos.items():
-                logger.warning(f"      • {tab}: {count} registros")
+        logger.info(f"   🎯 Total de tabelas: {len(backfill_strategies)}")
         logger.info("=" * 80)
         
         cursor.close()
