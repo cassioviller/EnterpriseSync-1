@@ -1,0 +1,695 @@
+# Prompt para Correção de Erros de `admin_id` em Produção
+
+## Contexto do Problema
+
+O sistema **EnterpriseSync (SIGE)** está apresentando **erros críticos em produção** devido a inconsistências entre os modelos SQLAlchemy e o schema do banco de dados PostgreSQL. Especificamente, a **Migration 48** foi criada para adicionar a coluna `admin_id` em múltiplas tabelas para suporte multi-tenant, mas **não foi executada completamente** no ambiente de produção.
+
+---
+
+## Erros Identificados em Produção
+
+### 1. Coluna `rdo_mao_obra.admin_id` não existe
+```
+psycopg2.errors.UndefinedColumn: column rdo_mao_obra.admin_id does not exist
+```
+- **Impacto:** Impossível calcular métricas de mão de obra do RDO
+- **Afeta RDOs:** 118, 119, 120
+
+### 2. Coluna `funcao.admin_id` não existe
+```
+psycopg2.errors.UndefinedColumn: column funcao.admin_id does not exist
+```
+- **Impacto:** Página de funcionários quebrada, impossível visualizar funções
+- **Origem:** Template `funcionarios.html` linha 479
+
+### 3. Coluna `registro_alimentacao.admin_id` não existe
+```
+psycopg2.errors.UndefinedColumn: column registro_alimentacao.admin_id does not exist
+```
+- **Impacto:** Detalhes da obra quebrados, impossível visualizar registros de alimentação
+- **Origem:** View `detalhes_obra` linha 3051
+
+### 4. Transação SQL abortada
+```
+psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, 
+commands ignored until end of transaction block
+```
+- **Causa:** Erro anterior na transação não foi tratado com ROLLBACK
+- **Efeito cascata:** Todas as queries subsequentes na transação falham
+
+### 5. Interface quebrada
+- **Mensagem:** "Erro ao carregar RDO"
+- **Causa:** Consequência dos erros de banco de dados
+- **Impacto:** Usuários não conseguem visualizar ou editar RDOs
+
+---
+
+## Análise do Código
+
+### Modelos SQLAlchemy (models.py)
+
+**Todas as 3 tabelas TÊM `admin_id` definido nos modelos:**
+
+```python
+# Linha 663-667
+class RDOMaoObra(db.Model):
+    __tablename__ = 'rdo_mao_obra'
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # ✅ DEFINIDO
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    funcao_exercida = db.Column(db.String(100), nullable=False)
+    horas_trabalhadas = db.Column(db.Float, nullable=False)
+
+# Linha 52-57
+class Funcao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    salario_base = db.Column(db.Float, default=0.0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # ✅ DEFINIDO
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Linha 560-562
+class RegistroAlimentacao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # ✅ DEFINIDO
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+```
+
+### Migration 48 (migrations.py)
+
+**A Migration 48 INCLUI as 3 tabelas com estratégias de backfill:**
+
+```python
+# Linha 4016-4023 - funcao
+'funcao': ("""
+    UPDATE funcao fu
+    SET admin_id = f.admin_id
+    FROM funcionario f
+    WHERE f.funcao_id = fu.id
+      AND fu.admin_id IS NULL
+      AND f.admin_id IS NOT NULL
+""", "via funcionario.funcao_id"),
+
+# Linha 4144-4151 - registro_alimentacao
+'registro_alimentacao': ("""
+    UPDATE registro_alimentacao ra
+    SET admin_id = f.admin_id
+    FROM funcionario f
+    WHERE ra.funcionario_id = f.id
+      AND ra.admin_id IS NULL
+      AND f.admin_id IS NOT NULL
+""", "via funcionario_id"),
+
+# Linha 4153-4161 - rdo_mao_obra
+'rdo_mao_obra': ("""
+    UPDATE rdo_mao_obra rm
+    SET admin_id = o.admin_id
+    FROM rdo r
+    JOIN obra o ON r.obra_id = o.id
+    WHERE rm.rdo_id = r.id
+      AND rm.admin_id IS NULL
+      AND o.admin_id IS NOT NULL
+""", "via rdo → obra"),
+```
+
+**Processo da Migration 48 (linhas 4237-4266):**
+
+1. Adiciona coluna `admin_id INTEGER` (nullable)
+2. Executa backfill baseado em relacionamentos FK
+3. Verifica registros órfãos
+4. Aplica constraint `NOT NULL`
+5. Adiciona foreign key `REFERENCES usuario(id) ON DELETE CASCADE`
+6. Cria índice para performance
+
+---
+
+## Causa Raiz
+
+A **Migration 48 foi criada mas NÃO foi executada** no banco de dados de produção. Possíveis causas:
+
+1. **Migration não foi chamada:** O sistema de migrations não executou a migration 48
+2. **Erro durante execução:** A migration começou mas falhou no meio (registros órfãos?)
+3. **Deploy incompleto:** Código foi atualizado mas migrations não foram aplicadas
+4. **Ambiente desincronizado:** Migration executada em dev/staging mas não em produção
+
+---
+
+## Solução Recomendada
+
+### Opção 1: Executar Migration 48 Manualmente (RECOMENDADO)
+
+Esta é a solução correta pois a migration já existe e está bem estruturada.
+
+#### Passo 1: Verificar se Migration 48 foi executada
+
+```python
+# Script: check_migration_48.py
+from app import app, db
+from sqlalchemy import text
+
+with app.app_context():
+    connection = db.engine.raw_connection()
+    cursor = connection.cursor()
+    
+    # Verificar histórico de migrations
+    cursor.execute("""
+        SELECT migration_number, migration_name, executed_at, status 
+        FROM migration_history 
+        WHERE migration_number = 48
+    """)
+    
+    result = cursor.fetchone()
+    
+    if result:
+        print(f"✅ Migration 48 encontrada no histórico:")
+        print(f"   Número: {result[0]}")
+        print(f"   Nome: {result[1]}")
+        print(f"   Executada em: {result[2]}")
+        print(f"   Status: {result[3]}")
+    else:
+        print("❌ Migration 48 NÃO encontrada no histórico")
+    
+    # Verificar se colunas existem
+    tabelas = ['rdo_mao_obra', 'funcao', 'registro_alimentacao']
+    
+    for tabela in tabelas:
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s AND column_name = 'admin_id'
+        """, (tabela,))
+        
+        if cursor.fetchone():
+            print(f"✅ {tabela}: coluna admin_id EXISTE")
+        else:
+            print(f"❌ {tabela}: coluna admin_id NÃO EXISTE")
+    
+    cursor.close()
+    connection.close()
+```
+
+#### Passo 2: Forçar Execução da Migration 48
+
+```python
+# Script: force_migration_48.py
+from app import app, db
+from migrations import _migration_48_adicionar_admin_id_modelos_faltantes
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+with app.app_context():
+    try:
+        logger.info("🔄 Forçando execução da Migration 48...")
+        
+        # Executar migration
+        _migration_48_adicionar_admin_id_modelos_faltantes()
+        
+        logger.info("✅ Migration 48 executada com sucesso!")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao executar Migration 48: {e}")
+        raise
+```
+
+#### Passo 3: Validar Resultado
+
+```python
+# Script: validate_migration_48.py
+from app import app, db
+from sqlalchemy import text
+
+with app.app_context():
+    connection = db.engine.raw_connection()
+    cursor = connection.cursor()
+    
+    tabelas = ['rdo_mao_obra', 'funcao', 'registro_alimentacao']
+    
+    print("=" * 80)
+    print("🔍 VALIDAÇÃO PÓS-MIGRATION 48")
+    print("=" * 80)
+    
+    for tabela in tabelas:
+        print(f"\n📋 Tabela: {tabela}")
+        
+        # 1. Verificar se coluna existe
+        cursor.execute("""
+            SELECT column_name, data_type, is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = %s AND column_name = 'admin_id'
+        """, (tabela,))
+        
+        col_info = cursor.fetchone()
+        
+        if col_info:
+            print(f"  ✅ Coluna admin_id existe")
+            print(f"     Tipo: {col_info[1]}")
+            print(f"     Nullable: {col_info[2]}")
+        else:
+            print(f"  ❌ Coluna admin_id NÃO existe")
+            continue
+        
+        # 2. Verificar foreign key
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = %s 
+              AND constraint_type = 'FOREIGN KEY'
+              AND constraint_name LIKE '%admin_id%'
+        """, (tabela,))
+        
+        fk = cursor.fetchone()
+        if fk:
+            print(f"  ✅ Foreign key: {fk[0]}")
+        else:
+            print(f"  ⚠️  Foreign key não encontrada")
+        
+        # 3. Verificar índice
+        cursor.execute("""
+            SELECT indexname 
+            FROM pg_indexes 
+            WHERE tablename = %s 
+              AND indexname LIKE '%admin_id%'
+        """, (tabela,))
+        
+        idx = cursor.fetchone()
+        if idx:
+            print(f"  ✅ Índice: {idx[0]}")
+        else:
+            print(f"  ⚠️  Índice não encontrado")
+        
+        # 4. Verificar distribuição de dados
+        cursor.execute(f"""
+            SELECT admin_id, COUNT(*) 
+            FROM {tabela} 
+            GROUP BY admin_id 
+            ORDER BY admin_id
+        """)
+        
+        distribuicao = cursor.fetchall()
+        print(f"  📊 Distribuição de admin_id:")
+        for admin_id, count in distribuicao:
+            print(f"     Admin {admin_id}: {count} registros")
+        
+        # 5. Verificar registros NULL
+        cursor.execute(f"SELECT COUNT(*) FROM {tabela} WHERE admin_id IS NULL")
+        nulls = cursor.fetchone()[0]
+        
+        if nulls > 0:
+            print(f"  ❌ {nulls} registros com admin_id NULL")
+        else:
+            print(f"  ✅ Nenhum registro com admin_id NULL")
+    
+    print("\n" + "=" * 80)
+    print("✅ VALIDAÇÃO CONCLUÍDA")
+    print("=" * 80)
+    
+    cursor.close()
+    connection.close()
+```
+
+---
+
+### Opção 2: SQL Manual Direto (Fallback)
+
+Se a Migration 48 não puder ser executada via Python, use SQL direto:
+
+```sql
+-- Script: fix_admin_id_production.sql
+
+BEGIN;
+
+-- ============================================================================
+-- 1. TABELA: funcao
+-- ============================================================================
+
+-- Verificar se coluna já existe
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'funcao' AND column_name = 'admin_id'
+    ) THEN
+        -- Adicionar coluna
+        ALTER TABLE funcao ADD COLUMN admin_id INTEGER;
+        
+        -- Backfill baseado em funcionario.funcao_id
+        UPDATE funcao fu
+        SET admin_id = f.admin_id
+        FROM funcionario f
+        WHERE f.funcao_id = fu.id
+          AND fu.admin_id IS NULL
+          AND f.admin_id IS NOT NULL;
+        
+        -- Aplicar NOT NULL
+        ALTER TABLE funcao ALTER COLUMN admin_id SET NOT NULL;
+        
+        -- Adicionar foreign key
+        ALTER TABLE funcao
+        ADD CONSTRAINT fk_funcao_admin_id
+        FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+        
+        -- Criar índice
+        CREATE INDEX idx_funcao_admin_id ON funcao(admin_id);
+        
+        RAISE NOTICE '✅ funcao.admin_id criada com sucesso';
+    ELSE
+        RAISE NOTICE '⏭️  funcao.admin_id já existe';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- 2. TABELA: registro_alimentacao
+-- ============================================================================
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'registro_alimentacao' AND column_name = 'admin_id'
+    ) THEN
+        -- Adicionar coluna
+        ALTER TABLE registro_alimentacao ADD COLUMN admin_id INTEGER;
+        
+        -- Backfill baseado em funcionario_id
+        UPDATE registro_alimentacao ra
+        SET admin_id = f.admin_id
+        FROM funcionario f
+        WHERE ra.funcionario_id = f.id
+          AND ra.admin_id IS NULL
+          AND f.admin_id IS NOT NULL;
+        
+        -- Aplicar NOT NULL
+        ALTER TABLE registro_alimentacao ALTER COLUMN admin_id SET NOT NULL;
+        
+        -- Adicionar foreign key
+        ALTER TABLE registro_alimentacao
+        ADD CONSTRAINT fk_registro_alimentacao_admin_id
+        FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+        
+        -- Criar índice
+        CREATE INDEX idx_registro_alimentacao_admin_id ON registro_alimentacao(admin_id);
+        
+        RAISE NOTICE '✅ registro_alimentacao.admin_id criada com sucesso';
+    ELSE
+        RAISE NOTICE '⏭️  registro_alimentacao.admin_id já existe';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- 3. TABELA: rdo_mao_obra
+-- ============================================================================
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'rdo_mao_obra' AND column_name = 'admin_id'
+    ) THEN
+        -- Adicionar coluna
+        ALTER TABLE rdo_mao_obra ADD COLUMN admin_id INTEGER;
+        
+        -- Backfill baseado em rdo → obra
+        UPDATE rdo_mao_obra rm
+        SET admin_id = o.admin_id
+        FROM rdo r
+        JOIN obra o ON r.obra_id = o.id
+        WHERE rm.rdo_id = r.id
+          AND rm.admin_id IS NULL
+          AND o.admin_id IS NOT NULL;
+        
+        -- Aplicar NOT NULL
+        ALTER TABLE rdo_mao_obra ALTER COLUMN admin_id SET NOT NULL;
+        
+        -- Adicionar foreign key
+        ALTER TABLE rdo_mao_obra
+        ADD CONSTRAINT fk_rdo_mao_obra_admin_id
+        FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+        
+        -- Criar índice
+        CREATE INDEX idx_rdo_mao_obra_admin_id ON rdo_mao_obra(admin_id);
+        
+        RAISE NOTICE '✅ rdo_mao_obra.admin_id criada com sucesso';
+    ELSE
+        RAISE NOTICE '⏭️  rdo_mao_obra.admin_id já existe';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- 4. REGISTRAR NO HISTÓRICO DE MIGRATIONS
+-- ============================================================================
+
+INSERT INTO migration_history 
+    (migration_number, migration_name, executed_at, status)
+VALUES 
+    (48, 'Adicionar admin_id em funcao, registro_alimentacao, rdo_mao_obra', NOW(), 'success')
+ON CONFLICT (migration_number) DO NOTHING;
+
+COMMIT;
+
+-- ============================================================================
+-- 5. VALIDAÇÃO
+-- ============================================================================
+
+SELECT 
+    'funcao' as tabela,
+    COUNT(*) as total_registros,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id
+FROM funcao
+
+UNION ALL
+
+SELECT 
+    'registro_alimentacao' as tabela,
+    COUNT(*) as total_registros,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id
+FROM registro_alimentacao
+
+UNION ALL
+
+SELECT 
+    'rdo_mao_obra' as tabela,
+    COUNT(*) as total_registros,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id
+FROM rdo_mao_obra;
+```
+
+**Executar:**
+```bash
+psql -U usuario -d nome_banco -f fix_admin_id_production.sql
+```
+
+---
+
+## Correção do Tratamento de Erros de Transação
+
+Para evitar o erro `InFailedSqlTransaction`, adicionar tratamento adequado:
+
+```python
+# views.py - Exemplo de correção
+
+from functools import wraps
+from flask import flash, redirect, url_for
+import logging
+
+logger = logging.getLogger(__name__)
+
+def safe_db_operation(f):
+    """Decorator para garantir rollback em caso de erro"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Erro em {f.__name__}: {e}", exc_info=True)
+            flash("Erro ao processar operação. Por favor, tente novamente.", "error")
+            return redirect(url_for('main.index'))
+    return decorated_function
+
+@app.route('/rdo/<int:rdo_id>')
+@safe_db_operation
+def visualizar_rdo(rdo_id):
+    rdo = RDO.query.get_or_404(rdo_id)
+    mao_obra = RdoMaoObra.query.filter_by(rdo_id=rdo_id).all()
+    servicos = RdoServicoSubatividade.query.filter_by(rdo_id=rdo_id).all()
+    
+    return render_template('rdo_detalhes.html', 
+                         rdo=rdo, 
+                         mao_obra=mao_obra,
+                         servicos=servicos)
+```
+
+---
+
+## Plano de Ação - Checklist
+
+### Pré-Deploy
+
+- [ ] Criar backup completo do banco de dados
+- [ ] Verificar se Migration 48 está no histórico
+- [ ] Verificar se colunas admin_id existem nas 3 tabelas
+- [ ] Testar scripts em ambiente de staging
+- [ ] Comunicar janela de manutenção aos usuários
+
+### Deploy
+
+- [ ] Colocar aplicação em modo manutenção
+- [ ] Executar Migration 48 (Python ou SQL)
+- [ ] Validar resultado (colunas, FKs, índices, dados)
+- [ ] Verificar logs de erro
+- [ ] Testar funcionalidades críticas:
+  - [ ] Visualizar RDO
+  - [ ] Calcular métricas de mão de obra
+  - [ ] Visualizar funcionários e funções
+  - [ ] Visualizar registros de alimentação
+  - [ ] Editar RDO
+
+### Pós-Deploy
+
+- [ ] Remover modo manutenção
+- [ ] Monitorar logs por 1 hora
+- [ ] Verificar métricas de erro
+- [ ] Confirmar com usuários que sistema está funcionando
+- [ ] Documentar lições aprendidas
+
+### Em Caso de Problema
+
+- [ ] Colocar aplicação em modo manutenção
+- [ ] Restaurar backup
+- [ ] Investigar causa raiz
+- [ ] Ajustar solução
+- [ ] Comunicar usuários
+
+---
+
+## Melhorias Preventivas
+
+### 1. Validação Automática de Schema
+
+```python
+# pre_deploy_check.py
+from app import app, db
+from models import db as models_db
+from sqlalchemy import inspect
+import sys
+
+def validate_schema():
+    """Valida se modelos estão sincronizados com banco"""
+    with app.app_context():
+        inspector = inspect(db.engine)
+        errors = []
+        
+        for table_name in db.metadata.tables.keys():
+            model_columns = set(db.metadata.tables[table_name].columns.keys())
+            
+            try:
+                db_columns = set([col['name'] for col in inspector.get_columns(table_name)])
+            except:
+                errors.append(f"Tabela {table_name} não existe no banco")
+                continue
+            
+            missing_in_db = model_columns - db_columns
+            
+            if missing_in_db:
+                errors.append(f"Tabela {table_name}: colunas no modelo mas não no DB: {missing_in_db}")
+        
+        if errors:
+            print("❌ ERROS DE SCHEMA DETECTADOS:")
+            for error in errors:
+                print(f"  - {error}")
+            return False
+        else:
+            print("✅ Schema validado com sucesso")
+            return True
+
+if __name__ == '__main__':
+    success = validate_schema()
+    sys.exit(0 if success else 1)
+```
+
+### 2. CI/CD com Validação
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Validate Schema
+        run: |
+          python pre_deploy_check.py
+          
+      - name: Run Migrations
+        run: |
+          python -c "from migrations import run_all_migrations; run_all_migrations()"
+          
+      - name: Deploy
+        run: |
+          # Deploy steps
+```
+
+### 3. Monitoramento de Erros
+
+```python
+# error_monitoring.py
+import logging
+from logging.handlers import RotatingFileHandler
+import json
+
+class StructuredLogger:
+    def __init__(self, logger):
+        self.logger = logger
+    
+    def log_db_error(self, operation, table, error, context=None):
+        """Log estruturado para erros de banco de dados"""
+        log_data = {
+            'type': 'database_error',
+            'operation': operation,
+            'table': table,
+            'error': str(error),
+            'error_type': type(error).__name__,
+            'context': context or {}
+        }
+        self.logger.error(json.dumps(log_data))
+
+# Configurar logger
+handler = RotatingFileHandler('logs/database_errors.log', maxBytes=10000000, backupCount=5)
+handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+
+db_logger = logging.getLogger('database')
+db_logger.addHandler(handler)
+db_logger.setLevel(logging.ERROR)
+
+structured_logger = StructuredLogger(db_logger)
+```
+
+---
+
+## Conclusão
+
+O problema é causado pela **não execução da Migration 48** no banco de produção. A solução é:
+
+1. **Executar Migration 48** (via Python ou SQL direto)
+2. **Validar resultado** (colunas, FKs, índices, dados)
+3. **Melhorar tratamento de erros** (rollback automático)
+4. **Implementar validação de schema** no CI/CD
+5. **Monitorar logs** estruturados
+
+Com essas correções, o sistema voltará a funcionar normalmente e estará mais resiliente a problemas futuros.
