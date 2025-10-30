@@ -233,11 +233,11 @@ def fix_horario_trabalho_auto(db_engine):
                 
                 ALTER TABLE horario_trabalho ADD COLUMN admin_id INTEGER;
                 
-                -- Backfill usando funcionario.horario_id
+                -- Backfill usando funcionario.horario_trabalho_id
                 UPDATE horario_trabalho ht
                 SET admin_id = f.admin_id
                 FROM funcionario f
-                WHERE f.horario_id = ht.id
+                WHERE f.horario_trabalho_id = ht.id
                   AND ht.admin_id IS NULL
                   AND f.admin_id IS NOT NULL;
                 
