@@ -1,0 +1,379 @@
+# Análise de Problemas - RDO e Obra em Produção
+
+## 1. Problema Principal: Coluna `admin_id` não existe em múltiplas tabelas
+
+### 1.1 Erro na tabela `funcao`
+
+**Erro identificado:**
+```
+psycopg2.errors.UndefinedColumn: column funcao.admin_id does not exist
+```
+
+**SQL gerado pelo SQLAlchemy:**
+```sql
+SELECT funcao.id AS funcao_id, 
+       funcao.nome AS funcao_nome, 
+       funcao.descricao AS funcao_descricao, 
+       funcao.salario_base AS funcao_salario_base, 
+       funcao.admin_id AS funcao_admin_id,  -- COLUNA NÃO EXISTE
+       funcao.created_at AS funcao_created_at 
+FROM funcao 
+WHERE funcao.id = %(pk_1)s
+```
+
+**Origem do erro:**
+- Arquivo: `/app/views.py`, linha 1665
+- Template: `/app/templates/funcionarios.html`, linha 479
+- Contexto: Lazy loading do relacionamento `funcao_ref` em `kpi.funcionario.funcao_ref.nome`
+
+**Causa raiz:**
+O modelo SQLAlchemy da tabela `Funcao` está definido com a coluna `admin_id`, mas essa coluna não existe fisicamente no banco de dados PostgreSQL.
+
+---
+
+### 1.2 Erro na tabela `registro_alimentacao`
+
+**Erro identificado:**
+```
+psycopg2.errors.UndefinedColumn: column registro_alimentacao.admin_id does not exist
+```
+
+**SQL gerado pelo SQLAlchemy:**
+```sql
+SELECT registro_alimentacao.id AS registro_alimentacao_id, 
+       registro_alimentacao.admin_id AS registro_alimentacao_admin_id,  -- COLUNA NÃO EXISTE
+       registro_alimentacao.funcionario_id AS registro_alimentacao_funcionario_id, 
+       registro_alimentacao.obra_id AS registro_alimentacao_obra_id, 
+       registro_alimentacao.restaurante_id AS registro_alimentacao_restaurante_id, 
+       registro_alimentacao.data AS registro_alimentacao_data, 
+       registro_alimentacao.tipo AS registro_alimentacao_tipo, 
+       registro_alimentacao.valor AS registro_alimentacao_valor, 
+       registro_alimentacao.observacoes AS registro_alimentacao_observacoes, 
+       registro_alimentacao.created_at AS registro_alimentacao_created_at 
+FROM registro_alimentacao 
+WHERE registro_alimentacao.obra_id = %(obra_id_1)s 
+  AND registro_alimentacao.data >= %(data_1)s 
+  AND registro_alimentacao.data <= %(data_2)s 
+ORDER BY registro_alimentacao.data DESC
+```
+
+**Origem do erro:**
+- Arquivo: `/app/views.py`, linha 3051
+- Contexto: Consulta de registros de alimentação filtrados por obra e período
+
+**Causa raiz:**
+O modelo SQLAlchemy da tabela `RegistroAlimentacao` está definido com a coluna `admin_id`, mas essa coluna não existe fisicamente no banco de dados PostgreSQL.
+
+---
+
+## 2. Análise dos dados JSON
+
+### 2.1 Tabela `rdo`
+
+Analisando o arquivo `rdo(2).json`, observa-se que **todos os registros possuem a coluna `admin_id`**:
+
+```json
+{
+  "id": 86,
+  "numero_rdo": "RDO-2-2025-035",
+  "data_relatorio": "2025-10-06",
+  "obra_id": 19,
+  "criado_por_id": 3,
+  "admin_id": 2,  // COLUNA EXISTE
+  ...
+}
+```
+
+**Conclusão:** A tabela `rdo` possui a coluna `admin_id` no banco de dados e está funcionando corretamente.
+
+---
+
+### 2.2 Tabela `rdo_servico_subatividade`
+
+Analisando o arquivo `rdo_servico_subatividade(2).json`, observa-se que **todos os registros possuem a coluna `admin_id`**:
+
+```json
+{
+  "id": 964,
+  "rdo_id": 90,
+  "servico_id": 33,
+  "nome_subatividade": "1. Detalhamento do projeto",
+  "admin_id": 2,  // COLUNA EXISTE
+  ...
+}
+```
+
+**Conclusão:** A tabela `rdo_servico_subatividade` possui a coluna `admin_id` no banco de dados e está funcionando corretamente.
+
+---
+
+## 3. Inconsistência entre Modelo e Banco de Dados
+
+### 3.1 Problema de Sincronização
+
+Existe uma **inconsistência crítica** entre os modelos SQLAlchemy e o esquema real do banco de dados:
+
+| Tabela | Coluna `admin_id` no Modelo | Coluna `admin_id` no DB | Status |
+|--------|----------------------------|------------------------|--------|
+| `rdo` | ✅ Sim | ✅ Sim | ✅ OK |
+| `rdo_servico_subatividade` | ✅ Sim | ✅ Sim | ✅ OK |
+| `funcao` | ✅ Sim | ❌ Não | ❌ ERRO |
+| `registro_alimentacao` | ✅ Sim | ❌ Não | ❌ ERRO |
+
+### 3.2 Possíveis Causas
+
+1. **Migração incompleta:** As migrations do Alembic/Flask-Migrate foram criadas mas não executadas no banco de produção
+2. **Rollback não sincronizado:** O código foi revertido mas o banco não foi
+3. **Deploy inconsistente:** O código foi atualizado mas as migrations não foram aplicadas
+4. **Ambientes diferentes:** O modelo foi desenvolvido em um ambiente mas não migrado para produção
+
+---
+
+## 4. Impacto dos Erros
+
+### 4.1 Funcionalidades Afetadas
+
+**Erro em `funcao`:**
+- ❌ Página de funcionários (`/funcionarios`) quebrada
+- ❌ Impossível visualizar dados de função dos funcionários
+- ❌ KPIs de funcionários não carregam
+
+**Erro em `registro_alimentacao`:**
+- ❌ Detalhes da obra (`/detalhes_obra`) quebrados
+- ❌ Impossível visualizar registros de alimentação
+- ❌ Relatórios de custos com alimentação não funcionam
+
+### 4.2 Severidade
+
+🔴 **CRÍTICO** - Funcionalidades essenciais do sistema estão completamente quebradas em produção.
+
+---
+
+## 5. Soluções Propostas
+
+### Solução 1: Adicionar colunas no banco de dados (RECOMENDADO)
+
+Se a coluna `admin_id` é necessária para o modelo de negócio:
+
+**Passo 1:** Criar migration para adicionar as colunas
+
+```python
+# migrations/versions/xxxx_add_admin_id_to_funcao_and_registro_alimentacao.py
+
+from alembic import op
+import sqlalchemy as sa
+
+def upgrade():
+    # Adicionar coluna admin_id na tabela funcao
+    op.add_column('funcao', 
+        sa.Column('admin_id', sa.Integer(), nullable=True)
+    )
+    
+    # Adicionar foreign key se necessário
+    op.create_foreign_key(
+        'fk_funcao_admin_id', 
+        'funcao', 
+        'admin',  # ou nome da tabela de administradores
+        ['admin_id'], 
+        ['id']
+    )
+    
+    # Adicionar coluna admin_id na tabela registro_alimentacao
+    op.add_column('registro_alimentacao', 
+        sa.Column('admin_id', sa.Integer(), nullable=True)
+    )
+    
+    # Adicionar foreign key se necessário
+    op.create_foreign_key(
+        'fk_registro_alimentacao_admin_id', 
+        'registro_alimentacao', 
+        'admin',  # ou nome da tabela de administradores
+        ['admin_id'], 
+        ['id']
+    )
+
+def downgrade():
+    op.drop_constraint('fk_registro_alimentacao_admin_id', 'registro_alimentacao', type_='foreignkey')
+    op.drop_column('registro_alimentacao', 'admin_id')
+    
+    op.drop_constraint('fk_funcao_admin_id', 'funcao', type_='foreignkey')
+    op.drop_column('funcao', 'admin_id')
+```
+
+**Passo 2:** Executar a migration
+
+```bash
+flask db upgrade
+```
+
+**Passo 3:** Atualizar registros existentes (se necessário)
+
+```sql
+-- Definir um admin_id padrão para registros existentes
+UPDATE funcao SET admin_id = 2 WHERE admin_id IS NULL;
+UPDATE registro_alimentacao SET admin_id = 2 WHERE admin_id IS NULL;
+```
+
+---
+
+### Solução 2: Remover coluna dos modelos SQLAlchemy
+
+Se a coluna `admin_id` não é necessária:
+
+**Arquivo: `models.py` (ou arquivo de modelos)**
+
+```python
+# ANTES
+class Funcao(db.Model):
+    __tablename__ = 'funcao'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100))
+    descricao = db.Column(db.Text)
+    salario_base = db.Column(db.Numeric(10, 2))
+    admin_id = db.Column(db.Integer, db.ForeignKey('admin.id'))  # REMOVER
+    created_at = db.Column(db.DateTime)
+
+# DEPOIS
+class Funcao(db.Model):
+    __tablename__ = 'funcao'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100))
+    descricao = db.Column(db.Text)
+    salario_base = db.Column(db.Numeric(10, 2))
+    # admin_id removido
+    created_at = db.Column(db.DateTime)
+```
+
+```python
+# ANTES
+class RegistroAlimentacao(db.Model):
+    __tablename__ = 'registro_alimentacao'
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('admin.id'))  # REMOVER
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    # ... outros campos
+
+# DEPOIS
+class RegistroAlimentacao(db.Model):
+    __tablename__ = 'registro_alimentacao'
+    id = db.Column(db.Integer, primary_key=True)
+    # admin_id removido
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
+    # ... outros campos
+```
+
+---
+
+## 6. Recomendações de Boas Práticas
+
+### 6.1 Gestão de Migrations
+
+1. **Sempre usar migrations:** Nunca alterar modelos sem criar uma migration correspondente
+2. **Testar migrations:** Executar `upgrade` e `downgrade` em ambiente de desenvolvimento
+3. **Versionamento:** Manter migrations no controle de versão (Git)
+4. **Documentação:** Documentar mudanças complexas nas migrations
+
+### 6.2 Deploy Seguro
+
+1. **Checklist de deploy:**
+   - [ ] Código atualizado
+   - [ ] Migrations executadas
+   - [ ] Testes de integração passando
+   - [ ] Backup do banco antes de migrations
+
+2. **Ambientes sincronizados:**
+   - Desenvolvimento
+   - Staging/Homologação
+   - Produção
+
+### 6.3 Monitoramento
+
+1. **Logs estruturados:** Capturar erros de banco de dados
+2. **Alertas:** Notificar quando queries falham
+3. **Health checks:** Verificar integridade do schema periodicamente
+
+---
+
+## 7. Próximos Passos
+
+### Ação Imediata (Hotfix)
+
+1. ✅ Identificar qual solução aplicar (adicionar coluna ou remover do modelo)
+2. ✅ Aplicar correção em ambiente de staging
+3. ✅ Testar funcionalidades afetadas
+4. ✅ Deploy em produção com janela de manutenção
+
+### Ação Preventiva
+
+1. ✅ Implementar CI/CD com validação de schema
+2. ✅ Criar testes de integração que validem modelos vs. banco
+3. ✅ Documentar processo de migration
+4. ✅ Revisar todas as tabelas para identificar outras inconsistências
+
+---
+
+## 8. Script de Verificação
+
+Para identificar outras possíveis inconsistências:
+
+```python
+# check_schema_consistency.py
+
+from sqlalchemy import inspect
+from app import db, app
+
+def check_model_vs_database():
+    """Verifica se todas as colunas dos modelos existem no banco"""
+    
+    inspector = inspect(db.engine)
+    inconsistencies = []
+    
+    for table_name in db.metadata.tables.keys():
+        # Colunas no modelo
+        model_columns = set(db.metadata.tables[table_name].columns.keys())
+        
+        # Colunas no banco
+        db_columns = set([col['name'] for col in inspector.get_columns(table_name)])
+        
+        # Colunas no modelo mas não no banco
+        missing_in_db = model_columns - db_columns
+        
+        # Colunas no banco mas não no modelo
+        missing_in_model = db_columns - model_columns
+        
+        if missing_in_db or missing_in_model:
+            inconsistencies.append({
+                'table': table_name,
+                'missing_in_db': list(missing_in_db),
+                'missing_in_model': list(missing_in_model)
+            })
+    
+    return inconsistencies
+
+if __name__ == '__main__':
+    with app.app_context():
+        issues = check_model_vs_database()
+        
+        if issues:
+            print("❌ Inconsistências encontradas:")
+            for issue in issues:
+                print(f"\nTabela: {issue['table']}")
+                if issue['missing_in_db']:
+                    print(f"  Colunas no modelo mas não no DB: {issue['missing_in_db']}")
+                if issue['missing_in_model']:
+                    print(f"  Colunas no DB mas não no modelo: {issue['missing_in_model']}")
+        else:
+            print("✅ Todos os modelos estão sincronizados com o banco de dados")
+```
+
+---
+
+## Conclusão
+
+Os erros em produção são causados por **inconsistência entre os modelos SQLAlchemy e o schema do banco de dados**. As tabelas `funcao` e `registro_alimentacao` têm a coluna `admin_id` definida nos modelos, mas essa coluna não existe fisicamente no PostgreSQL.
+
+A solução recomendada é **adicionar as colunas faltantes via migration**, garantindo que o banco de dados reflita o modelo de negócio atual. Alternativamente, se a coluna não é necessária, deve ser removida dos modelos.
+
+É fundamental estabelecer processos de CI/CD e validação de schema para prevenir esse tipo de problema no futuro.
