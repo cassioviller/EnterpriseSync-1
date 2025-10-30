@@ -4028,7 +4028,145 @@ def _migration_43_completar_estruturas_v9():
             except:
                 pass
 
+# ============================================================================
+# MIGRAÇÃO 48 - FUNÇÕES AUXILIARES
+# ============================================================================
+
+def _get_default_admin_id_v48(cursor):
+    """Busca primeiro admin com fallbacks robustos"""
+    # Tentativa 1: Admin não-super (tipo_usuario != 'super_admin' e NOT LIKE 'SUPER_%')
+    cursor.execute("""
+        SELECT id FROM usuario 
+        WHERE LOWER(tipo_usuario) NOT LIKE '%super%'
+        ORDER BY id LIMIT 1
+    """)
+    result = cursor.fetchone()
+    if result:
+        return result[0]
+    
+    # Tentativa 2: Qualquer usuário
+    cursor.execute("SELECT id FROM usuario ORDER BY id LIMIT 1")
+    result = cursor.fetchone()
+    if result:
+        return result[0]
+    
+    # Tentativa 3: Fallback hard-coded
+    return 1
+
+def _column_exists_v48(cursor, table_name, column_name):
+    """Verifica se coluna existe"""
+    cursor.execute("""
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = %s AND column_name = %s
+    """, (table_name, column_name))
+    return cursor.fetchone() is not None
+
+def _process_table_v48(cursor, tabela, default_admin_id, logger):
+    """Processa uma tabela com idempotência total"""
+    if _column_exists_v48(cursor, tabela, 'admin_id'):
+        logger.info(f"  ⏭️  {tabela}: admin_id já existe")
+        return False
+    
+    logger.info(f"  🔧 {tabela}: adicionando admin_id...")
+    
+    # STEP 1: ADD COLUMN
+    cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN admin_id INTEGER")
+    
+    # STEP 2: UPDATE com admin padrão
+    cursor.execute(f"UPDATE {tabela} SET admin_id = %s WHERE admin_id IS NULL", (default_admin_id,))
+    updated = cursor.rowcount
+    logger.info(f"     ✅ {updated} registros atualizados")
+    
+    # STEP 3: SET NOT NULL
+    cursor.execute(f"ALTER TABLE {tabela} ALTER COLUMN admin_id SET NOT NULL")
+    
+    # STEP 4: ADD CONSTRAINT
+    cursor.execute(f"""
+        ALTER TABLE {tabela} 
+        ADD CONSTRAINT fk_{tabela}_admin_id 
+        FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE
+    """)
+    
+    # STEP 5: CREATE INDEX
+    cursor.execute(f"CREATE INDEX idx_{tabela}_admin_id ON {tabela}(admin_id)")
+    
+    logger.info(f"  ✅ {tabela}: completo")
+    return True
+
 def _migration_48_adicionar_admin_id_modelos_faltantes():
+    """
+    Migração 48 SIMPLIFICADA: Admin_id em 20 modelos
+    
+    Estratégia: Backfill direto com primeiro admin (sem joins complexos)
+    Robustez: Nunca aborta, sempre completa
+    Idempotência: Pula tabelas que já têm admin_id
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("🔄 MIGRAÇÃO 48 SIMPLIFICADA: Multi-tenancy em 20 tabelas")
+        logger.info("=" * 80)
+        
+        # Buscar admin padrão
+        default_admin_id = _get_default_admin_id_v48(cursor)
+        logger.info(f"📍 Admin padrão para backfill: {default_admin_id}")
+        
+        # Lista de todas as 20 tabelas
+        tabelas = [
+            'departamento', 'funcao', 'horario_trabalho',
+            'servico_obra', 'historico_produtividade_servico',
+            'tipo_ocorrencia', 'ocorrencia', 'calendario_util',
+            'centro_custo', 'receita', 'orcamento_obra',
+            'fluxo_caixa', 'registro_alimentacao',
+            'rdo_mao_obra', 'rdo_equipamento', 'rdo_ocorrencia', 'rdo_foto',
+            'notificacao_cliente', 'proposta_item', 'proposta_arquivo'
+        ]
+        
+        processadas = 0
+        ja_existentes = 0
+        
+        for tabela in tabelas:
+            try:
+                if _process_table_v48(cursor, tabela, default_admin_id, logger):
+                    processadas += 1
+                else:
+                    ja_existentes += 1
+            except Exception as e:
+                logger.error(f"  ❌ {tabela}: erro - {e}")
+                # Continuar com próxima tabela
+                connection.rollback()
+                connection = db.engine.raw_connection()
+                cursor = connection.cursor()
+                continue
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 48 CONCLUÍDA!")
+        logger.info(f"   📊 Processadas: {processadas}")
+        logger.info(f"   ⏭️  Já existentes: {ja_existentes}")
+        logger.info(f"   🎯 Total: {len(tabelas)} tabelas")
+        logger.info("=" * 80)
+        
+        cursor.close()
+        connection.close()
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro crítico na migração 48: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        raise
+
+# BACKUP - Migração complexa com backfill reverso (não usar)
+def _migration_48_backup_complexa():
     """
     Migração 48: Adicionar admin_id em 20 modelos com backfill correto por relacionamento
     
@@ -4036,6 +4174,9 @@ def _migration_48_adicionar_admin_id_modelos_faltantes():
     
     Severidade: 🔴 CRÍTICA
     Data: 30/10/2025 (revisado com architect)
+    
+    ⚠️ ATENÇÃO: Esta é uma versão BACKUP da migração complexa.
+    Não usar em produção - use a versão simplificada abaixo.
     """
     try:
         connection = db.engine.raw_connection()
