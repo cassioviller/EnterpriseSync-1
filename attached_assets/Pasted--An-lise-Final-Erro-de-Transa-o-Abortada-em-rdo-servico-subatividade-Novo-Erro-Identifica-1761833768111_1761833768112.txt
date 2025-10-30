@@ -1,0 +1,435 @@
+# Análise Final: Erro de Transação Abortada em `rdo_servico_subatividade`
+
+## Novo Erro Identificado
+
+### Erro na Imagem Fornecida
+
+```
+ERRO cálculo RDO 104: (psycopg2.errors.InFailedSqlTransaction) 
+current transaction is aborted, commands ignored until end of transaction block
+
+[SQL: SELECT count(*) AS count_1
+FROM (SELECT rdo_servico_subatividade.id AS rdo_servico_subatividade_id, 
+             rdo_servico_subatividade.rdo_id AS rdo_servico_subatividade_rdo_id, 
+             rdo_servico_subatividade.servico_id AS rdo_servico_subatividade_servico_id, 
+             rdo_servico_subatividade.nome_subatividade AS rdo_servico_subatividade_nome_subatividade, 
+             rdo_servico_subatividade.descricao_subatividade AS rdo_servico_subatividade_descricao_subatividade, 
+             rdo_servico_subatividade.percentual_conclusao AS rdo_servico_subatividade_percentual_conclusao, 
+             rdo_servico_subatividade.percentual_anterior AS rdo_servico_subatividade_percentual_anterior, 
+             rdo_servico_subatividade.incremento_dia AS rdo_servico_subatividade_incremento_dia, 
+             rdo_servico_subatividade.observacoes_tecnicas AS rdo_servico_subatividade_observacoes_tecnicas, 
+             rdo_servico_subatividade.ordem_execucao AS rdo_servico_subatividade_ordem_execucao, 
+             rdo_servico_subatividade.ativo AS rdo_servico_subatividade_ativo, 
+             rdo_servico_subatividade.admin_id AS rdo_servico_subatividade_admin_id, 
+             rdo_servico_subatividade.created_at AS rdo_servico_subatividade_created_at, 
+             rdo_servico_subatividade.updated_at AS rdo_servico_subatividade_updated_at
+      FROM rdo_servico_subatividade
+      WHERE rdo_servico_subatividade.rdo_id = %(rdo_id_1)s) AS anon_1]
+
+[parameters: {'rdo_id_1': 104}]
+```
+
+---
+
+## Análise Detalhada
+
+### 1. Confirmação: Tabela `rdo_servico_subatividade` TEM `admin_id`
+
+**Evidência do JSON fornecido:**
+
+Todos os registros no arquivo `rdo_servico_subatividade(5).json` possuem a coluna `admin_id`:
+
+```json
+{
+  "id": 964,
+  "rdo_id": 90,
+  "servico_id": 33,
+  "nome_subatividade": "1. Detalhamento do projeto",
+  "admin_id": 2,  // ✅ COLUNA EXISTE
+  "created_at": "2025-10-10 12:57:27.228746",
+  "updated_at": "2025-10-10 12:57:27.22875"
+}
+```
+
+**Confirmação no modelo SQLAlchemy (models.py linha 926):**
+
+```python
+class RDOServicoSubatividade(db.Model):
+    __tablename__ = 'rdo_servico_subatividade'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    nome_subatividade = db.Column(db.String(255), nullable=False)
+    descricao_subatividade = db.Column(db.Text)
+    percentual_conclusao = db.Column(db.Float, default=0.0)
+    percentual_anterior = db.Column(db.Float, default=0.0)
+    incremento_dia = db.Column(db.Float, default=0.0)
+    observacoes_tecnicas = db.Column(db.Text)
+    ordem_execucao = db.Column(db.Integer)
+    ativo = db.Column(db.Boolean, default=True)
+    admin_id = db.Column(db.Integer, nullable=False)  # ✅ DEFINIDO
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+```
+
+**Conclusão:** A tabela `rdo_servico_subatividade` **NÃO é o problema**. A coluna `admin_id` existe tanto no modelo quanto no banco de dados.
+
+---
+
+### 2. O Verdadeiro Problema: Transação Abortada
+
+O erro `InFailedSqlTransaction` indica que:
+
+1. **Uma query anterior na mesma transação falhou**
+2. **PostgreSQL abortou a transação**
+3. **Todas as queries subsequentes são rejeitadas** até que a transação seja finalizada (COMMIT ou ROLLBACK)
+
+**Sequência do erro:**
+
+```
+1. Query A executa → ERRO (ex: rdo_mao_obra.admin_id não existe)
+2. PostgreSQL aborta a transação
+3. Query B tenta executar (count em rdo_servico_subatividade)
+4. PostgreSQL rejeita: "current transaction is aborted"
+```
+
+---
+
+### 3. Origem do Erro: Código de Cálculo do RDO
+
+**Arquivo: `crud_rdo_completo.py` (linhas 65-69)**
+
+```python
+# Contadores
+total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()  # ← ESTA QUERY FALHA
+total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()  # ← PODE TER FALHADO ANTES
+
+# FÓRMULA SIMPLES PROGRESSO
+subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+```
+
+**Cenário provável:**
+
+1. Código tenta contar `RDOMaoObra` (linha 66)
+2. **ERRO:** `rdo_mao_obra.admin_id` não existe
+3. Transação é abortada
+4. Código tenta contar `RDOServicoSubatividade` (linha 65)
+5. **ERRO:** Transação já abortada, query rejeitada
+
+---
+
+### 4. Por Que o Modelo SQLAlchemy Inclui `admin_id`?
+
+**Linha 926 do models.py:**
+
+```python
+admin_id = db.Column(db.Integer, nullable=False)
+```
+
+**Observação importante:** A coluna `admin_id` está definida **SEM foreign key**:
+
+```python
+# CORRETO (com FK)
+admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+# ATUAL (sem FK) - linha 926
+admin_id = db.Column(db.Integer, nullable=False)
+```
+
+Isso sugere que a coluna foi adicionada manualmente ou via migration, mas a foreign key pode não ter sido criada.
+
+---
+
+## Problema Real: `rdo_mao_obra.admin_id` Não Existe
+
+Baseado na análise anterior e nos novos dados, o problema **NÃO é** `rdo_servico_subatividade`, mas sim:
+
+### Tabela `rdo_mao_obra` NÃO tem `admin_id` no banco de produção
+
+**Evidência:**
+
+1. ✅ Modelo define `admin_id` (linha 667 do models.py)
+2. ❌ Coluna não existe no banco de dados
+3. ❌ Query falha ao tentar acessar `rdo_mao_obra.admin_id`
+4. ❌ Transação é abortada
+5. ❌ Queries subsequentes (mesmo em tabelas corretas) falham
+
+---
+
+## Solução Definitiva
+
+### 1. Confirmar Tabelas com Problema
+
+Execute este script para identificar exatamente quais tabelas não têm `admin_id`:
+
+```python
+# check_admin_id_all_tables.py
+from app import app, db
+from sqlalchemy import text
+
+with app.app_context():
+    connection = db.engine.raw_connection()
+    cursor = connection.cursor()
+    
+    # Tabelas que DEVEM ter admin_id segundo os modelos
+    tabelas_esperadas = [
+        'rdo',
+        'rdo_mao_obra',
+        'rdo_servico_subatividade',
+        'rdo_equipamento',
+        'rdo_ocorrencia',
+        'rdo_foto',
+        'funcao',
+        'registro_alimentacao',
+        'obra',
+        'funcionario',
+        'servico',
+    ]
+    
+    print("=" * 80)
+    print("🔍 VERIFICAÇÃO DE COLUNA admin_id")
+    print("=" * 80)
+    
+    tabelas_ok = []
+    tabelas_problema = []
+    
+    for tabela in tabelas_esperadas:
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s AND column_name = 'admin_id'
+        """, (tabela,))
+        
+        if cursor.fetchone():
+            tabelas_ok.append(tabela)
+            print(f"✅ {tabela}: admin_id EXISTE")
+        else:
+            tabelas_problema.append(tabela)
+            print(f"❌ {tabela}: admin_id NÃO EXISTE")
+    
+    print("\n" + "=" * 80)
+    print(f"📊 RESUMO:")
+    print(f"   ✅ Tabelas OK: {len(tabelas_ok)}")
+    print(f"   ❌ Tabelas com problema: {len(tabelas_problema)}")
+    
+    if tabelas_problema:
+        print(f"\n🔴 TABELAS QUE PRECISAM DE CORREÇÃO:")
+        for tabela in tabelas_problema:
+            print(f"   - {tabela}")
+    
+    print("=" * 80)
+    
+    cursor.close()
+    connection.close()
+```
+
+### 2. Executar Migration 48
+
+Se o script acima confirmar que `rdo_mao_obra`, `funcao` e `registro_alimentacao` não têm `admin_id`, execute:
+
+```python
+# force_migration_48.py
+from app import app, db
+from migrations import _migration_48_adicionar_admin_id_modelos_faltantes
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+with app.app_context():
+    try:
+        logger.info("🔄 Executando Migration 48...")
+        
+        # Executar migration
+        result = _migration_48_adicionar_admin_id_modelos_faltantes()
+        
+        if result:
+            logger.info("✅ Migration 48 executada com sucesso!")
+        else:
+            logger.error("❌ Migration 48 falhou")
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao executar Migration 48: {e}", exc_info=True)
+        raise
+```
+
+### 3. Corrigir Tratamento de Erros no Código
+
+**Arquivo: `crud_rdo_completo.py`**
+
+**ANTES (linhas 63-75):**
+
+```python
+# Processar dados dos RDOs
+rdos_processados = []
+for rdo, obra in rdos_paginated.items:
+    # Contadores
+    total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
+    total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
+    
+    # FÓRMULA SIMPLES PROGRESSO
+    subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+    if subatividades:
+        soma_perc = sum(s.percentual_conclusao for s in subatividades)
+        total_sub = len(subatividades)
+        progresso_medio = round(soma_perc / total_sub, 1)
+        print(f"🎯 CRUD PROGRESSO RDO {rdo.id}: {soma_perc}÷{total_sub} = {progresso_medio}%")
+    else:
+        progresso_medio = 0.0
+```
+
+**DEPOIS (com tratamento de erro):**
+
+```python
+# Processar dados dos RDOs
+rdos_processados = []
+for rdo, obra in rdos_paginated.items:
+    try:
+        # Contadores
+        total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
+        total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
+        
+        # FÓRMULA SIMPLES PROGRESSO
+        subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+        if subatividades:
+            soma_perc = sum(s.percentual_conclusao for s in subatividades)
+            total_sub = len(subatividades)
+            progresso_medio = round(soma_perc / total_sub, 1)
+            print(f"🎯 CRUD PROGRESSO RDO {rdo.id}: {soma_perc}÷{total_sub} = {progresso_medio}%")
+        else:
+            progresso_medio = 0.0
+    
+    except Exception as e:
+        # ROLLBACK da transação para evitar InFailedSqlTransaction
+        db.session.rollback()
+        
+        # Log do erro
+        logger.error(f"❌ Erro ao processar RDO {rdo.id}: {e}", exc_info=True)
+        
+        # Valores padrão para continuar renderização
+        total_subatividades = 0
+        total_funcionarios = 0
+        progresso_medio = 0.0
+```
+
+### 4. Adicionar Decorator de Segurança
+
+```python
+# crud_rdo_completo.py - adicionar no início do arquivo
+
+from functools import wraps
+import logging
+
+logger = logging.getLogger(__name__)
+
+def safe_db_query(default_value=None):
+    """Decorator para queries de banco com rollback automático"""
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Erro em {f.__name__}: {e}", exc_info=True)
+                return default_value
+        return wrapped
+    return decorator
+
+# Uso:
+@rdo_crud_bp.route('/')
+@login_required
+@safe_db_query(default_value=[])
+def listar_rdos():
+    # ... código normal ...
+```
+
+---
+
+## Resumo da Solução
+
+### Problema Identificado
+
+1. ✅ **`rdo_servico_subatividade` está OK** - tem `admin_id` no banco
+2. ❌ **`rdo_mao_obra` NÃO tem `admin_id`** no banco de produção
+3. ❌ **`funcao` NÃO tem `admin_id`** no banco de produção
+4. ❌ **`registro_alimentacao` NÃO tem `admin_id`** no banco de produção
+
+### Sequência de Erro
+
+```
+1. Código tenta contar RDOMaoObra
+2. ERRO: rdo_mao_obra.admin_id não existe
+3. PostgreSQL aborta transação
+4. Código tenta contar RDOServicoSubatividade
+5. ERRO: Transação abortada (mesmo que a tabela esteja OK)
+```
+
+### Ações Necessárias
+
+1. ✅ Executar script de verificação (`check_admin_id_all_tables.py`)
+2. ✅ Executar Migration 48 (`force_migration_48.py`)
+3. ✅ Adicionar tratamento de erro com rollback no código
+4. ✅ Validar resultado
+
+### Código de Correção Imediata
+
+Se não puder executar Migration 48, use SQL direto:
+
+```sql
+-- Apenas para rdo_mao_obra (se confirmado que não tem admin_id)
+
+BEGIN;
+
+-- Verificar se coluna existe
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'rdo_mao_obra' AND column_name = 'admin_id'
+    ) THEN
+        -- Adicionar coluna
+        ALTER TABLE rdo_mao_obra ADD COLUMN admin_id INTEGER;
+        
+        -- Backfill via rdo → obra
+        UPDATE rdo_mao_obra rm
+        SET admin_id = o.admin_id
+        FROM rdo r
+        JOIN obra o ON r.obra_id = o.id
+        WHERE rm.rdo_id = r.id
+          AND rm.admin_id IS NULL
+          AND o.admin_id IS NOT NULL;
+        
+        -- Aplicar NOT NULL
+        ALTER TABLE rdo_mao_obra ALTER COLUMN admin_id SET NOT NULL;
+        
+        -- Adicionar foreign key
+        ALTER TABLE rdo_mao_obra
+        ADD CONSTRAINT fk_rdo_mao_obra_admin_id
+        FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+        
+        -- Criar índice
+        CREATE INDEX idx_rdo_mao_obra_admin_id ON rdo_mao_obra(admin_id);
+        
+        RAISE NOTICE '✅ rdo_mao_obra.admin_id criada com sucesso';
+    ELSE
+        RAISE NOTICE '⏭️  rdo_mao_obra.admin_id já existe';
+    END IF;
+END $$;
+
+COMMIT;
+```
+
+---
+
+## Conclusão
+
+O erro **NÃO é causado por `rdo_servico_subatividade`**, que está funcionando corretamente. O problema real é:
+
+1. **Tabela `rdo_mao_obra` não tem `admin_id`** no banco de produção
+2. **Query falha** ao tentar acessar essa coluna
+3. **Transação é abortada** pelo PostgreSQL
+4. **Queries subsequentes falham** mesmo em tabelas corretas (efeito cascata)
+
+A solução é **executar a Migration 48** que adiciona `admin_id` nas tabelas faltantes, ou aplicar o SQL manual fornecido acima.
