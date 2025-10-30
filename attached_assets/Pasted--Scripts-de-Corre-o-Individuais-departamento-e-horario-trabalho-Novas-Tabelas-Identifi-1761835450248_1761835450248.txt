@@ -1,0 +1,532 @@
+# Scripts de Correção Individuais - `departamento` e `horario_trabalho`
+
+## Novas Tabelas Identificadas com Problema
+
+Além das 3 tabelas anteriores (`funcao`, `rdo_mao_obra`, `registro_alimentacao`), foram identificadas **mais 2 tabelas** sem a coluna `admin_id`:
+
+| Tabela | Erro | Origem | Impacto |
+|--------|------|--------|---------|
+| **`departamento`** | `column departamento.admin_id does not exist` | `configuracoes_views.py` linha 158 | ❌ Página de configurações quebrada |
+| **`horario_trabalho`** | `column horario_trabalho.admin_id does not exist` | `configuracoes_views.py` linha 348 | ❌ Página de horários quebrada |
+
+---
+
+## Script 1: Corrigir Tabela `departamento`
+
+### Análise
+
+**Dados atuais no banco:**
+```json
+{"id":1,"nome":"Serralheiro","descricao":"","created_at":"2025-07-24 11:46:54.130476"}
+{"id":2,"nome":"Ajudante Geral","descricao":"","created_at":"2025-07-24 12:08:09.777735"}
+```
+❌ **Sem coluna `admin_id`**
+
+**Estratégia de backfill (Migration 48):**
+```sql
+UPDATE departamento d
+SET admin_id = f.admin_id
+FROM funcionario f
+WHERE f.departamento_id = d.id
+  AND d.admin_id IS NULL
+  AND f.admin_id IS NOT NULL
+```
+✅ Busca `admin_id` via relacionamento com `funcionario`
+
+---
+
+### Script SQL
+
+```sql
+-- fix_departamento.sql
+-- Adiciona coluna admin_id na tabela departamento
+
+BEGIN;
+
+DO $$
+DECLARE
+    v_admin_id INTEGER := 2; -- Admin padrão para registros órfãos
+    v_orfaos INTEGER;
+    v_atualizados INTEGER;
+BEGIN
+    -- Verificar se coluna já existe
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'departamento' AND column_name = 'admin_id'
+    ) THEN
+        RAISE NOTICE '⏭️  departamento.admin_id já existe - nada a fazer';
+        RETURN;
+    END IF;
+    
+    RAISE NOTICE '🔄 Iniciando correção da tabela departamento...';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 1: Adicionar coluna (nullable temporariamente)
+    -- ========================================================================
+    RAISE NOTICE '📝 PASSO 1: Adicionando coluna admin_id...';
+    ALTER TABLE departamento ADD COLUMN admin_id INTEGER;
+    RAISE NOTICE '   ✅ Coluna adicionada';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 2: Backfill via relacionamento com funcionario
+    -- ========================================================================
+    RAISE NOTICE '🔄 PASSO 2: Backfill via funcionario.departamento_id...';
+    
+    UPDATE departamento d
+    SET admin_id = f.admin_id
+    FROM funcionario f
+    WHERE f.departamento_id = d.id
+      AND d.admin_id IS NULL
+      AND f.admin_id IS NOT NULL;
+    
+    GET DIAGNOSTICS v_atualizados = ROW_COUNT;
+    RAISE NOTICE '   ✅ % departamentos atualizados via relacionamento', v_atualizados;
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 3: Verificar e tratar registros órfãos
+    -- ========================================================================
+    RAISE NOTICE '🔍 PASSO 3: Verificando registros órfãos...';
+    
+    SELECT COUNT(*) INTO v_orfaos 
+    FROM departamento 
+    WHERE admin_id IS NULL;
+    
+    IF v_orfaos > 0 THEN
+        RAISE NOTICE '   ⚠️  % departamentos sem admin_id', v_orfaos;
+        RAISE NOTICE '   🔧 Aplicando admin_id padrão (%)', v_admin_id;
+        
+        UPDATE departamento 
+        SET admin_id = v_admin_id 
+        WHERE admin_id IS NULL;
+        
+        RAISE NOTICE '   ✅ Registros órfãos corrigidos';
+    ELSE
+        RAISE NOTICE '   ✅ Nenhum registro órfão';
+    END IF;
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 4: Aplicar constraint NOT NULL
+    -- ========================================================================
+    RAISE NOTICE '🔒 PASSO 4: Aplicando constraint NOT NULL...';
+    ALTER TABLE departamento ALTER COLUMN admin_id SET NOT NULL;
+    RAISE NOTICE '   ✅ Constraint aplicada';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 5: Adicionar foreign key
+    -- ========================================================================
+    RAISE NOTICE '🔗 PASSO 5: Adicionando foreign key...';
+    ALTER TABLE departamento
+    ADD CONSTRAINT fk_departamento_admin_id
+    FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+    RAISE NOTICE '   ✅ Foreign key criada: fk_departamento_admin_id';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 6: Criar índice para performance
+    -- ========================================================================
+    RAISE NOTICE '⚡ PASSO 6: Criando índice...';
+    CREATE INDEX idx_departamento_admin_id ON departamento(admin_id);
+    RAISE NOTICE '   ✅ Índice criado: idx_departamento_admin_id';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- RESUMO FINAL
+    -- ========================================================================
+    RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+    RAISE NOTICE '✅ TABELA departamento CORRIGIDA COM SUCESSO!';
+    RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+    RAISE NOTICE '📊 Estatísticas:';
+    RAISE NOTICE '   • Registros via relacionamento: %', v_atualizados;
+    RAISE NOTICE '   • Registros órfãos corrigidos: %', v_orfaos;
+    RAISE NOTICE '   • Admin padrão usado: %', v_admin_id;
+    RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+    
+END $$;
+
+COMMIT;
+
+-- ============================================================================
+-- VALIDAÇÃO
+-- ============================================================================
+
+SELECT 
+    '📋 VALIDAÇÃO: departamento' as info,
+    COUNT(*) as total_registros,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id,
+    COUNT(DISTINCT admin_id) as admins_distintos
+FROM departamento;
+
+-- Mostrar distribuição por admin
+SELECT 
+    admin_id,
+    COUNT(*) as quantidade,
+    STRING_AGG(nome, ', ') as departamentos
+FROM departamento
+GROUP BY admin_id
+ORDER BY admin_id;
+```
+
+**Executar:**
+```bash
+psql -U usuario -d nome_banco -f fix_departamento.sql
+```
+
+---
+
+## Script 2: Corrigir Tabela `horario_trabalho`
+
+### Análise
+
+**Dados atuais no banco:**
+```json
+{"id":1,"nome":"Seg a Sex ","entrada":"07:12:00","saida_almoco":"12:00:00","retorno_almoco":"13:00:00","saida":"17:00:00","dias_semana":"1,2,3,4,5","horas_diarias":8.8,"valor_hora":12,"created_at":"2025-07-24 11:50:29.715057"}
+{"id":2,"nome":"Estagiario","entrada":"07:12:00","saida_almoco":"12:11:00","retorno_almoco":"12:11:00","saida":"12:12:00","dias_semana":"1,2,3,4,5","horas_diarias":5,"valor_hora":12,"created_at":"2025-07-24 12:09:47.818042"}
+```
+❌ **Sem coluna `admin_id`**
+
+**Estratégia de backfill (Migration 48):**
+```sql
+UPDATE horario_trabalho ht
+SET admin_id = f.admin_id
+FROM funcionario f
+WHERE f.horario_trabalho_id = ht.id
+  AND ht.admin_id IS NULL
+  AND f.admin_id IS NOT NULL
+```
+✅ Busca `admin_id` via relacionamento com `funcionario`
+
+---
+
+### Script SQL
+
+```sql
+-- fix_horario_trabalho.sql
+-- Adiciona coluna admin_id na tabela horario_trabalho
+
+BEGIN;
+
+DO $$
+DECLARE
+    v_admin_id INTEGER := 2; -- Admin padrão para registros órfãos
+    v_orfaos INTEGER;
+    v_atualizados INTEGER;
+BEGIN
+    -- Verificar se coluna já existe
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'horario_trabalho' AND column_name = 'admin_id'
+    ) THEN
+        RAISE NOTICE '⏭️  horario_trabalho.admin_id já existe - nada a fazer';
+        RETURN;
+    END IF;
+    
+    RAISE NOTICE '🔄 Iniciando correção da tabela horario_trabalho...';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 1: Adicionar coluna (nullable temporariamente)
+    -- ========================================================================
+    RAISE NOTICE '📝 PASSO 1: Adicionando coluna admin_id...';
+    ALTER TABLE horario_trabalho ADD COLUMN admin_id INTEGER;
+    RAISE NOTICE '   ✅ Coluna adicionada';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 2: Backfill via relacionamento com funcionario
+    -- ========================================================================
+    RAISE NOTICE '🔄 PASSO 2: Backfill via funcionario.horario_trabalho_id...';
+    
+    UPDATE horario_trabalho ht
+    SET admin_id = f.admin_id
+    FROM funcionario f
+    WHERE f.horario_trabalho_id = ht.id
+      AND ht.admin_id IS NULL
+      AND f.admin_id IS NOT NULL;
+    
+    GET DIAGNOSTICS v_atualizados = ROW_COUNT;
+    RAISE NOTICE '   ✅ % horários atualizados via relacionamento', v_atualizados;
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 3: Verificar e tratar registros órfãos
+    -- ========================================================================
+    RAISE NOTICE '🔍 PASSO 3: Verificando registros órfãos...';
+    
+    SELECT COUNT(*) INTO v_orfaos 
+    FROM horario_trabalho 
+    WHERE admin_id IS NULL;
+    
+    IF v_orfaos > 0 THEN
+        RAISE NOTICE '   ⚠️  % horários sem admin_id', v_orfaos;
+        RAISE NOTICE '   🔧 Aplicando admin_id padrão (%)', v_admin_id;
+        
+        UPDATE horario_trabalho 
+        SET admin_id = v_admin_id 
+        WHERE admin_id IS NULL;
+        
+        RAISE NOTICE '   ✅ Registros órfãos corrigidos';
+    ELSE
+        RAISE NOTICE '   ✅ Nenhum registro órfão';
+    END IF;
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 4: Aplicar constraint NOT NULL
+    -- ========================================================================
+    RAISE NOTICE '🔒 PASSO 4: Aplicando constraint NOT NULL...';
+    ALTER TABLE horario_trabalho ALTER COLUMN admin_id SET NOT NULL;
+    RAISE NOTICE '   ✅ Constraint aplicada';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 5: Adicionar foreign key
+    -- ========================================================================
+    RAISE NOTICE '🔗 PASSO 5: Adicionando foreign key...';
+    ALTER TABLE horario_trabalho
+    ADD CONSTRAINT fk_horario_trabalho_admin_id
+    FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+    RAISE NOTICE '   ✅ Foreign key criada: fk_horario_trabalho_admin_id';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- PASSO 6: Criar índice para performance
+    -- ========================================================================
+    RAISE NOTICE '⚡ PASSO 6: Criando índice...';
+    CREATE INDEX idx_horario_trabalho_admin_id ON horario_trabalho(admin_id);
+    RAISE NOTICE '   ✅ Índice criado: idx_horario_trabalho_admin_id';
+    RAISE NOTICE '';
+    
+    -- ========================================================================
+    -- RESUMO FINAL
+    -- ========================================================================
+    RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+    RAISE NOTICE '✅ TABELA horario_trabalho CORRIGIDA COM SUCESSO!';
+    RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+    RAISE NOTICE '📊 Estatísticas:';
+    RAISE NOTICE '   • Registros via relacionamento: %', v_atualizados;
+    RAISE NOTICE '   • Registros órfãos corrigidos: %', v_orfaos;
+    RAISE NOTICE '   • Admin padrão usado: %', v_admin_id;
+    RAISE NOTICE '═══════════════════════════════════════════════════════════════';
+    
+END $$;
+
+COMMIT;
+
+-- ============================================================================
+-- VALIDAÇÃO
+-- ============================================================================
+
+SELECT 
+    '📋 VALIDAÇÃO: horario_trabalho' as info,
+    COUNT(*) as total_registros,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id,
+    COUNT(DISTINCT admin_id) as admins_distintos
+FROM horario_trabalho;
+
+-- Mostrar distribuição por admin
+SELECT 
+    admin_id,
+    COUNT(*) as quantidade,
+    STRING_AGG(nome, ', ') as horarios
+FROM horario_trabalho
+GROUP BY admin_id
+ORDER BY admin_id;
+```
+
+**Executar:**
+```bash
+psql -U usuario -d nome_banco -f fix_horario_trabalho.sql
+```
+
+---
+
+## Resumo das Tabelas com Problema
+
+### Total: 5 Tabelas
+
+| # | Tabela | Status | Script |
+|---|--------|--------|--------|
+| 1 | `funcao` | ❌ Sem `admin_id` | `fix_funcao.sql` (documento anterior) |
+| 2 | `rdo_mao_obra` | ❌ Sem `admin_id` | `fix_rdo_mao_obra.sql` (documento anterior) |
+| 3 | `registro_alimentacao` | ❌ Sem `admin_id` | `fix_registro_alimentacao.sql` (documento anterior) |
+| 4 | **`departamento`** | ❌ Sem `admin_id` | **`fix_departamento.sql`** ⬆️ |
+| 5 | **`horario_trabalho`** | ❌ Sem `admin_id` | **`fix_horario_trabalho.sql`** ⬆️ |
+
+---
+
+## Ordem de Execução Recomendada
+
+Execute os scripts nesta ordem para evitar problemas de dependência:
+
+```bash
+# 1. Tabelas base (sem dependências complexas)
+psql -U usuario -d nome_banco -f fix_departamento.sql
+psql -U usuario -d nome_banco -f fix_horario_trabalho.sql
+psql -U usuario -d nome_banco -f fix_funcao.sql
+
+# 2. Tabelas relacionadas a RDO
+psql -U usuario -d nome_banco -f fix_rdo_mao_obra.sql
+psql -U usuario -d nome_banco -f fix_registro_alimentacao.sql
+```
+
+---
+
+## Script de Validação Geral
+
+Após executar todos os scripts, valide com:
+
+```sql
+-- validate_all_fixes.sql
+
+SELECT 
+    'departamento' as tabela,
+    COUNT(*) as total,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id,
+    CASE 
+        WHEN COUNT(*) - COUNT(admin_id) = 0 THEN '✅ OK'
+        ELSE '❌ ERRO'
+    END as status
+FROM departamento
+
+UNION ALL
+
+SELECT 
+    'horario_trabalho' as tabela,
+    COUNT(*) as total,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id,
+    CASE 
+        WHEN COUNT(*) - COUNT(admin_id) = 0 THEN '✅ OK'
+        ELSE '❌ ERRO'
+    END as status
+FROM horario_trabalho
+
+UNION ALL
+
+SELECT 
+    'funcao' as tabela,
+    COUNT(*) as total,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id,
+    CASE 
+        WHEN COUNT(*) - COUNT(admin_id) = 0 THEN '✅ OK'
+        ELSE '❌ ERRO'
+    END as status
+FROM funcao
+
+UNION ALL
+
+SELECT 
+    'rdo_mao_obra' as tabela,
+    COUNT(*) as total,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id,
+    CASE 
+        WHEN COUNT(*) - COUNT(admin_id) = 0 THEN '✅ OK'
+        ELSE '❌ ERRO'
+    END as status
+FROM rdo_mao_obra
+
+UNION ALL
+
+SELECT 
+    'registro_alimentacao' as tabela,
+    COUNT(*) as total,
+    COUNT(admin_id) as com_admin_id,
+    COUNT(*) - COUNT(admin_id) as sem_admin_id,
+    CASE 
+        WHEN COUNT(*) - COUNT(admin_id) = 0 THEN '✅ OK'
+        ELSE '❌ ERRO'
+    END as status
+FROM registro_alimentacao
+
+ORDER BY tabela;
+```
+
+**Executar:**
+```bash
+psql -U usuario -d nome_banco -f validate_all_fixes.sql
+```
+
+**Resultado esperado:**
+```
+      tabela          | total | com_admin_id | sem_admin_id | status
+----------------------+-------+--------------+--------------+--------
+ departamento         |     9 |            9 |            0 | ✅ OK
+ funcao               |    15 |           15 |            0 | ✅ OK
+ horario_trabalho     |     2 |            2 |            0 | ✅ OK
+ rdo_mao_obra         |   234 |          234 |            0 | ✅ OK
+ registro_alimentacao |    89 |           89 |            0 | ✅ OK
+```
+
+---
+
+## Características dos Scripts
+
+### ✅ Idempotentes
+- Podem ser executados múltiplas vezes
+- Verificam se coluna já existe antes de adicionar
+
+### ✅ Seguros
+- Usam transações (BEGIN/COMMIT)
+- Tratam registros órfãos automaticamente
+- Aplicam admin_id padrão (2) quando necessário
+
+### ✅ Informativos
+- Logs detalhados de cada passo
+- Estatísticas ao final
+- Queries de validação incluídas
+
+### ✅ Completos
+- Adicionam coluna
+- Fazem backfill via relacionamentos
+- Aplicam constraints NOT NULL
+- Criam foreign keys
+- Criam índices para performance
+
+---
+
+## Checklist de Execução
+
+### Antes de Executar
+- [ ] Criar backup completo do banco de dados
+- [ ] Testar scripts em ambiente de staging
+- [ ] Comunicar janela de manutenção
+- [ ] Colocar aplicação em modo manutenção
+
+### Durante Execução
+- [ ] Executar `fix_departamento.sql`
+- [ ] Executar `fix_horario_trabalho.sql`
+- [ ] Executar scripts das outras 3 tabelas
+- [ ] Executar `validate_all_fixes.sql`
+- [ ] Verificar que todas as tabelas mostram "✅ OK"
+
+### Após Execução
+- [ ] Remover modo manutenção
+- [ ] Testar página de configurações
+- [ ] Testar página de horários
+- [ ] Testar página de funcionários
+- [ ] Testar RDOs
+- [ ] Monitorar logs por 1 hora
+
+---
+
+## Conclusão
+
+Com esses 2 scripts adicionais, você tem correções individuais para **todas as 5 tabelas** identificadas com problema:
+
+1. ✅ `fix_departamento.sql` - Corrige tabela `departamento`
+2. ✅ `fix_horario_trabalho.sql` - Corrige tabela `horario_trabalho`
+3. ✅ `fix_funcao.sql` - Corrige tabela `funcao` (documento anterior)
+4. ✅ `fix_rdo_mao_obra.sql` - Corrige tabela `rdo_mao_obra` (documento anterior)
+5. ✅ `fix_registro_alimentacao.sql` - Corrige tabela `registro_alimentacao` (documento anterior)
+
+Todos os scripts seguem o mesmo padrão, são seguros, idempotentes e incluem validação.

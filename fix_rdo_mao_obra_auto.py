@@ -271,6 +271,66 @@ def fix_horario_trabalho_auto(db_engine):
         logger.error(f"❌ Erro ao corrigir horario_trabalho: {e}")
         return False
 
+def fix_departamento_auto(db_engine):
+    """Adiciona admin_id em departamento se não existir"""
+    try:
+        with db_engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_name = 'departamento' 
+                  AND column_name = 'admin_id'
+            """))
+            
+            if result.scalar() > 0:
+                logger.info("✅ departamento.admin_id já existe - skip")
+                return True
+            
+            logger.warning("⚠️  departamento.admin_id NÃO EXISTE - corrigindo...")
+            
+            connection.execute(text("""
+                BEGIN;
+                
+                ALTER TABLE departamento ADD COLUMN admin_id INTEGER;
+                
+                -- Backfill usando funcionario.departamento_id
+                UPDATE departamento d
+                SET admin_id = f.admin_id
+                FROM funcionario f
+                WHERE f.departamento_id = d.id
+                  AND d.admin_id IS NULL
+                  AND f.admin_id IS NOT NULL;
+                
+                -- Usar admin_id mais comum para NULLs restantes
+                UPDATE departamento
+                SET admin_id = (
+                    SELECT admin_id 
+                    FROM funcionario 
+                    WHERE admin_id IS NOT NULL 
+                    GROUP BY admin_id 
+                    ORDER BY COUNT(*) DESC 
+                    LIMIT 1
+                )
+                WHERE admin_id IS NULL;
+                
+                ALTER TABLE departamento 
+                ADD CONSTRAINT fk_departamento_admin_id
+                FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+                
+                CREATE INDEX IF NOT EXISTS idx_departamento_admin_id 
+                ON departamento(admin_id);
+                
+                COMMIT;
+            """))
+            
+            connection.commit()
+            logger.info("✅ departamento.admin_id adicionado (automático)")
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir departamento: {e}")
+        return False
+
 def auto_fix_migration_48():
     """
     Correção automática da Migration 48
@@ -284,11 +344,12 @@ def auto_fix_migration_48():
     
     results = []
     
-    # Corrigir as 4 tabelas críticas
+    # Corrigir as 5 tabelas críticas
     results.append(("rdo_mao_obra", fix_rdo_mao_obra_auto(db.engine)))
     results.append(("funcao", fix_funcao_auto(db.engine)))
     results.append(("registro_alimentacao", fix_registro_alimentacao_auto(db.engine)))
     results.append(("horario_trabalho", fix_horario_trabalho_auto(db.engine)))
+    results.append(("departamento", fix_departamento_auto(db.engine)))
     
     # Resumo
     success_count = sum(1 for _, success in results if success)
