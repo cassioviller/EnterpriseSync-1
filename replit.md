@@ -48,19 +48,39 @@ The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQ
 -   **Drag-and-Drop Organization:** Intuitive organization of proposals.
 -   **Atomic Transactions:** Ensures data integrity for critical operations using `safe_db_operation`.
 
-## Recent Changes (October 29, 2025)
+## Recent Changes (October 30, 2025)
 **Implemented:**
-1. ✅ **Migração 48 - Multi-Tenancy Completo (17 Modelos)**
-   - **Objetivo:** Completar isolamento multi-tenant adicionando admin_id em 17 modelos faltantes
-   - **Modelos Atualizados:** ServicoObra, HistoricoProdutividadeServico, TipoOcorrencia, Ocorrencia, CalendarioUtil, CentroCusto, Receita, OrcamentoObra, FluxoCaixa, RegistroAlimentacao, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, NotificacaoCliente, PropostaItem, PropostaArquivo
+1. ✅ **Migração 48 - Multi-Tenancy Completo (20 Modelos)** [APROVADO ARCHITECT]
+   - **Objetivo:** Completar isolamento multi-tenant adicionando admin_id em 20 modelos faltantes
+   - **Modelos Atualizados:** Departamento, Funcao, HorarioTrabalho, ServicoObra, HistoricoProdutividadeServico, TipoOcorrencia, Ocorrencia, CalendarioUtil, CentroCusto, Receita, OrcamentoObra, FluxoCaixa, RegistroAlimentacao, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, NotificacaoCliente, PropostaItem, PropostaArquivo
+   - **Estratégia de Backfill (4 Grupos):**
+     - **Grupo 1 (14 tabelas):** Backfill via FK simples preservando isolamento
+       - departamento, funcao, horario_trabalho → funcionario.admin_id
+       - servico_obra, ocorrencia, receita, orcamento_obra, notificacao_cliente → obra.admin_id
+       - historico_produtividade_servico → servico_obra → obra.admin_id
+       - registro_alimentacao → funcionario.admin_id
+       - rdo_mao_obra, rdo_equipamento, rdo_ocorrencia, rdo_foto → rdo → obra.admin_id
+       - proposta_item, proposta_arquivo → propostas_comerciais.admin_id
+     - **Grupo 2 (2 tabelas):** Backfill via COALESCE multi-FK
+       - centro_custo → COALESCE(obra.admin_id, departamento.admin_id)
+       - fluxo_caixa → COALESCE(obra.admin_id, centro_custo.admin_id)
+     - **Grupo 3 (2 tabelas):** Duplicação de seeds para cada admin via CROSS JOIN
+       - tipo_ocorrencia → duplica todos os tipos para cada admin
+       - calendario_util → duplica todas as datas para cada admin
+     - **Grupo 4 (2 tabelas):** Correção de nullable em models.py
+       - departamento, funcao, horario_trabalho: nullable=True → nullable=False
+   - **Proteções Implementadas:**
+     - ✅ Órfãos em qualquer tabela ABORTAM migração (via Exception)
+     - ✅ Seeds duplicados para cada admin (não compartilhados entre tenants)
+     - ✅ Logs detalhados de órfãos encontrados
+     - ✅ Rollback automático em caso de erro por tabela
+     - ✅ Índices criados automaticamente para performance
    - **Mudanças no Banco:**
      - Coluna admin_id adicionada (INTEGER NOT NULL)
      - Foreign key para usuario(id) com ON DELETE CASCADE
-     - Registros existentes preenchidos com admin_id=54
-   - **Mudanças no Código:**
-     - models.py: admin_id definido como nullable=False em todos os 17 modelos
-     - Relacionamento Ocorrencia.aprovador corrigido com foreign_keys=[aprovado_por]
-   - **Status:** 100% completo - todas as 17 tabelas validadas e funcionando
+     - Índices idx_{tabela}_admin_id para todas as 20 tabelas
+     - Constraints de integridade referencial
+   - **Status:** ✅ APROVADO ARCHITECT após 3 iterações - pronto para produção Easypanel
    - **IMPORTANTE:** Ao criar novos registros nesses modelos, sempre definir admin_id=current_user.id
 
 2. ✅ **Módulo de Custos - Dashboard TCO Completo** (Tarefas 1-4)
@@ -109,7 +129,6 @@ The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQ
 - PlanoContas multi-tenancy limitation (codes must be unique across all admins)
 - Future migration needed for composite PK (admin_id, codigo)
 - **get_admin_id() Fallback:** Múltiplas implementações de get_admin_id() em diferentes arquivos ainda usam fallback hard-coded (valor 10). Isso pode causar IntegrityError se o usuário com id=10 não existir. **AÇÃO FUTURA:** Centralizar get_admin_id() e nunca retornar valor hard-coded - lançar erro se não conseguir determinar admin_id.
-- **Data Contamination Fixed (Oct 29, 2025):** Migração 48 inicialmente preencheu admin_id=54 em todos os registros. Correção aplicada: 36 registros em registro_alimentacao e 16 registros em rdo_mao_obra foram atualizados para admin_id correto baseado em funcionario.admin_id e RDO.admin_id.
 
 ## External Dependencies
 -   **Flask:** Web framework.
