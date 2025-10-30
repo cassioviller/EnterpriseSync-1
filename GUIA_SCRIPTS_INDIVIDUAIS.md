@@ -2,14 +2,15 @@
 
 ## Scripts Criados
 
-Criei **4 scripts Python independentes** para corrigir o problema de `admin_id`:
+Criei **5 scripts Python independentes** para corrigir o problema de `admin_id`:
 
 | Script | Tabela | Uso |
 |--------|--------|-----|
 | `fix_funcao_admin_id.py` | funcao | Executa sozinho |
 | `fix_rdo_mao_obra_admin_id.py` | rdo_mao_obra | Executa sozinho |
 | `fix_registro_alimentacao_admin_id.py` | registro_alimentacao | Executa sozinho |
-| `fix_todas_tabelas.py` | TODAS | Executa os 3 acima |
+| `fix_horario_trabalho_admin_id.py` | horario_trabalho | Executa sozinho |
+| `fix_todas_tabelas.py` | TODAS | Executa os 4 acima |
 
 ---
 
@@ -24,26 +25,32 @@ python3 fix_todas_tabelas.py
 
 **Output esperado:**
 ```
-🚀 CORREÇÃO COMPLETA: admin_id em 3 tabelas
+🚀 CORREÇÃO COMPLETA: admin_id em 4 tabelas
 ================================================================================
 
-📋 1/3: Corrigindo funcao...
+📋 1/4: Corrigindo funcao...
 ⚠️  funcao.admin_id NÃO EXISTE - corrigindo...
 ✅ funcao.admin_id adicionado com sucesso
    Total de registros: 9
    Com admin_id: 9
 
-📋 2/3: Corrigindo rdo_mao_obra...
+📋 2/4: Corrigindo rdo_mao_obra...
 ⚠️  rdo_mao_obra.admin_id NÃO EXISTE - corrigindo...
 ✅ rdo_mao_obra.admin_id adicionado com sucesso
    Total de registros: 150
    Com admin_id: 150
 
-📋 3/3: Corrigindo registro_alimentacao...
+📋 3/4: Corrigindo registro_alimentacao...
 ⚠️  registro_alimentacao.admin_id NÃO EXISTE - corrigindo...
 ✅ registro_alimentacao.admin_id adicionado com sucesso
    Total de registros: 36
    Com admin_id: 36
+
+📋 4/4: Corrigindo horario_trabalho...
+⚠️  horario_trabalho.admin_id NÃO EXISTE - corrigindo...
+✅ horario_trabalho.admin_id adicionado com sucesso
+   Total de registros: 2
+   Com admin_id: 2
 
 ================================================================================
 📊 RESUMO DA CORREÇÃO
@@ -51,8 +58,9 @@ python3 fix_todas_tabelas.py
 ✅ funcao
 ✅ rdo_mao_obra
 ✅ registro_alimentacao
+✅ horario_trabalho
 --------------------------------------------------------------------------------
-Total: 3/3 tabelas corrigidas
+Total: 4/4 tabelas corrigidas
 ✅ TODAS as tabelas corrigidas com sucesso!
 
 🔄 Próximo passo: Reiniciar aplicação
@@ -78,6 +86,11 @@ python3 fix_rdo_mao_obra_admin_id.py
 ### Apenas registro_alimentacao:
 ```bash
 python3 fix_registro_alimentacao_admin_id.py
+```
+
+### Apenas horario_trabalho:
+```bash
+python3 fix_horario_trabalho_admin_id.py
 ```
 
 ---
@@ -133,6 +146,7 @@ sleep 30
 ❌ column funcao.admin_id does not exist
 ❌ column rdo_mao_obra.admin_id does not exist
 ❌ column registro_alimentacao.admin_id does not exist
+❌ column horario_trabalho.admin_id does not exist
 ❌ RDOs: 0.0% progresso
 ```
 
@@ -154,6 +168,7 @@ sleep 30
 | **Só funcao** | `python3 fix_funcao_admin_id.py` |
 | **Só rdo_mao_obra** | `python3 fix_rdo_mao_obra_admin_id.py` |
 | **Só registro_alimentacao** | `python3 fix_registro_alimentacao_admin_id.py` |
+| **Só horario_trabalho** | `python3 fix_horario_trabalho_admin_id.py` |
 | **Verificar status** | `python3 check_migration_48.py` |
 | **Validar resultado** | `python3 validate_migration_48.py` |
 

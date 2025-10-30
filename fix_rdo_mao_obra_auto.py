@@ -211,6 +211,66 @@ def fix_registro_alimentacao_auto(db_engine):
         logger.error(f"❌ Erro ao corrigir registro_alimentacao: {e}")
         return False
 
+def fix_horario_trabalho_auto(db_engine):
+    """Adiciona admin_id em horario_trabalho se não existir"""
+    try:
+        with db_engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_name = 'horario_trabalho' 
+                  AND column_name = 'admin_id'
+            """))
+            
+            if result.scalar() > 0:
+                logger.info("✅ horario_trabalho.admin_id já existe - skip")
+                return True
+            
+            logger.warning("⚠️  horario_trabalho.admin_id NÃO EXISTE - corrigindo...")
+            
+            connection.execute(text("""
+                BEGIN;
+                
+                ALTER TABLE horario_trabalho ADD COLUMN admin_id INTEGER;
+                
+                -- Backfill usando funcionario.horario_id
+                UPDATE horario_trabalho ht
+                SET admin_id = f.admin_id
+                FROM funcionario f
+                WHERE f.horario_id = ht.id
+                  AND ht.admin_id IS NULL
+                  AND f.admin_id IS NOT NULL;
+                
+                -- Usar admin_id mais comum para NULLs restantes
+                UPDATE horario_trabalho
+                SET admin_id = (
+                    SELECT admin_id 
+                    FROM funcionario 
+                    WHERE admin_id IS NOT NULL 
+                    GROUP BY admin_id 
+                    ORDER BY COUNT(*) DESC 
+                    LIMIT 1
+                )
+                WHERE admin_id IS NULL;
+                
+                ALTER TABLE horario_trabalho 
+                ADD CONSTRAINT fk_horario_trabalho_admin_id
+                FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+                
+                CREATE INDEX IF NOT EXISTS idx_horario_trabalho_admin_id 
+                ON horario_trabalho(admin_id);
+                
+                COMMIT;
+            """))
+            
+            connection.commit()
+            logger.info("✅ horario_trabalho.admin_id adicionado (automático)")
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir horario_trabalho: {e}")
+        return False
+
 def auto_fix_migration_48():
     """
     Correção automática da Migration 48
@@ -224,21 +284,23 @@ def auto_fix_migration_48():
     
     results = []
     
-    # Corrigir as 3 tabelas críticas
+    # Corrigir as 4 tabelas críticas
     results.append(("rdo_mao_obra", fix_rdo_mao_obra_auto(db.engine)))
     results.append(("funcao", fix_funcao_auto(db.engine)))
     results.append(("registro_alimentacao", fix_registro_alimentacao_auto(db.engine)))
+    results.append(("horario_trabalho", fix_horario_trabalho_auto(db.engine)))
     
     # Resumo
     success_count = sum(1 for _, success in results if success)
+    total = len(results)
     
     logger.info("=" * 80)
-    logger.info(f"📊 AUTO-FIX CONCLUÍDO: {success_count}/3 tabelas OK")
+    logger.info(f"📊 AUTO-FIX CONCLUÍDO: {success_count}/{total} tabelas OK")
     logger.info("=" * 80)
     
-    if success_count == 3:
+    if success_count == total:
         logger.info("✅ Todas as tabelas corrigidas com sucesso")
     else:
         logger.warning("⚠️  Algumas tabelas não foram corrigidas - verificar logs")
     
-    return success_count == 3
+    return success_count == total

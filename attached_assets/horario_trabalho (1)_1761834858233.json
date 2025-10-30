@@ -1,0 +1,4 @@
+[
+{"id":1,"nome":"Seg a Sex ","entrada":"07:12:00","saida_almoco":"12:00:00","retorno_almoco":"13:00:00","saida":"17:00:00","dias_semana":"1,2,3,4,5","horas_diarias":8.8,"valor_hora":12,"created_at":"2025-07-24 11:50:29.715057"},
+{"id":2,"nome":"Estagiario","entrada":"07:12:00","saida_almoco":"12:11:00","retorno_almoco":"12:11:00","saida":"12:12:00","dias_semana":"1,2,3,4,5","horas_diarias":5,"valor_hora":12,"created_at":"2025-07-24 12:09:47.818042"}
+]

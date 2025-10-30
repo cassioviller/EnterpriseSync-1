@@ -9,10 +9,11 @@ Implementei uma **correção 100% automática** que executa no startup da aplica
 ## 📦 Arquivos Criados
 
 ### 1. `fix_rdo_mao_obra_auto.py` ✅
-**Correção automática das 3 tabelas:**
+**Correção automática das 4 tabelas:**
 - `rdo_mao_obra.admin_id`
 - `funcao.admin_id`
 - `registro_alimentacao.admin_id`
+- `horario_trabalho.admin_id`
 
 **Funciona assim:**
 1. Verifica se coluna `admin_id` existe
@@ -58,8 +59,9 @@ Implementei uma **correção 100% automática** que executa no startup da aplica
 ✅ rdo_mao_obra.admin_id adicionado com sucesso (automático)
 ✅ funcao.admin_id já existe - skip
 ✅ registro_alimentacao.admin_id já existe - skip
+✅ horario_trabalho.admin_id já existe - skip
 
-📊 AUTO-FIX CONCLUÍDO: 3/3 tabelas OK
+📊 AUTO-FIX CONCLUÍDO: 4/4 tabelas OK
 ✅ Todas as tabelas corrigidas com sucesso
 ```
 
