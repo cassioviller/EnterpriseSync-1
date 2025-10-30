@@ -88,6 +88,16 @@ The system is built on a Flask backend, utilizing SQLAlchemy ORM and a PostgreSQ
    - Evento emitido após commit do lançamento (alimentacao_views.py linhas 202-213)
    - CRUD completo já existente: restaurantes e lançamentos com validações multi-tenant
 
+5. ✅ **Módulo Financeiro - Correções Críticas** (October 30, 2025)
+   - **Bug Fix:** Template `contas_pagar.html` linha 243 referenciava `datetime` sem passar no contexto → Corrigido passando `datetime=datetime` em todos os renders
+   - **Bug Fix:** Endpoint `criar_conta_pagar` passava `fornecedor_nome` direto para ContaPagar, mas modelo requer `fornecedor_id` → Implementado busca/criação automática de Fornecedor
+   - **Bug Fix:** Tabela `fornecedor` tem coluna `nome` NOT NULL não mapeada no modelo Python → Corrigido usando SQL direto para preencher todos os campos obrigatórios
+   - **Funcionalidades Validadas via E2E:**
+     - ✅ Criar conta a pagar com fornecedor auto-criado (busca por CNPJ, cria se não existir)
+     - ✅ Baixar parcialmente conta a pagar (status PENDENTE → PARCIAL)
+     - ✅ KPIs em tempo real na listagem de contas
+   - **Status:** Contas a Pagar 100% funcional e testado
+
 **Previous Changes (October 28, 2025):**
 1. ✅ Late deduction in payroll (`services/folha_service.py`)
 2. ✅ Chart of Accounts initialized (14 accounts)

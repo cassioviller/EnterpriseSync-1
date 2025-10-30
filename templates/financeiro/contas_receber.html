@@ -226,7 +226,7 @@
                 <h5 class="modal-title">Baixar Recebimento</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" action="{{ url_for('financeiro.baixar_conta_receber') }}">
+            <form method="post" id="formBaixaRecebimento">
                 <input type="hidden" name="conta_id" id="baixa_conta_id">
                 <div class="modal-body">
                     <p><strong>Conta:</strong> <span id="baixa_descricao"></span></p>
@@ -279,6 +279,8 @@ function abrirModalBaixa(contaId, descricao, saldo) {
     document.getElementById('baixa_saldo').textContent = saldo.toFixed(2);
     document.getElementById('baixa_valor').value = saldo.toFixed(2);
     document.getElementById('baixa_valor').max = saldo.toFixed(2);
+    // Atualizar action do formulário com conta_id
+    document.getElementById('formBaixaRecebimento').action = `/financeiro/contas-receber/${contaId}/receber`;
     new bootstrap.Modal(document.getElementById('modalBaixaRecebimento')).show();
 }
 

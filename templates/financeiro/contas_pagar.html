@@ -226,7 +226,7 @@
                 <h5 class="modal-title">Baixar Pagamento</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post" action="{{ url_for('financeiro.baixar_conta_pagar') }}">
+            <form method="post" id="formBaixaPagamento">
                 <input type="hidden" name="conta_id" id="baixa_conta_id">
                 <div class="modal-body">
                     <p><strong>Conta:</strong> <span id="baixa_descricao"></span></p>
@@ -279,6 +279,8 @@ function abrirModalBaixa(contaId, descricao, saldo) {
     document.getElementById('baixa_saldo').textContent = saldo.toFixed(2);
     document.getElementById('baixa_valor').value = saldo.toFixed(2);
     document.getElementById('baixa_valor').max = saldo.toFixed(2);
+    // Atualizar action do formulário com conta_id
+    document.getElementById('formBaixaPagamento').action = `/financeiro/contas-pagar/${contaId}/pagar`;
     new bootstrap.Modal(document.getElementById('modalBaixaPagamento')).show();
 }
 

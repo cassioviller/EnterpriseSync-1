@@ -110,7 +110,8 @@ def listar_contas_pagar():
         bancos=bancos,
         resumo=resumo,
         status_selecionado=status,
-        obra_selecionada=obra_id
+        obra_selecionada=obra_id,
+        datetime=datetime
     )
 
 
@@ -122,7 +123,7 @@ def criar_conta_pagar():
         admin_id = get_admin_id()
         
         fornecedor_nome = request.form.get('fornecedor_nome')
-        fornecedor_cpf_cnpj = request.form.get('fornecedor_cpf_cnpj') or None
+        fornecedor_cpf_cnpj = request.form.get('fornecedor_cpf_cnpj') or 'SEM_CNPJ'
         obra_id_input = request.form.get('obra_id', type=int) or None
         descricao = request.form.get('descricao')
         valor = Decimal(request.form.get('valor'))
@@ -142,11 +143,39 @@ def criar_conta_pagar():
             else:
                 logger.warning(f"⚠️ Tentativa de vincular obra {obra_id_input} de outro tenant pelo admin {admin_id}")
         
-        # Criar conta com obra_id validado
+        # Buscar ou criar fornecedor
+        fornecedor = Fornecedor.query.filter_by(
+            admin_id=admin_id,
+            cnpj=fornecedor_cpf_cnpj
+        ).first()
+        
+        if not fornecedor:
+            # Criar fornecedor com todos os campos obrigatórios
+            fornecedor = db.session.execute(
+                db.text("""
+                    INSERT INTO fornecedor (nome, cnpj, razao_social, nome_fantasia, admin_id, ativo, created_at)
+                    VALUES (:nome, :cnpj, :razao_social, :nome_fantasia, :admin_id, true, NOW())
+                    RETURNING id
+                """),
+                {
+                    'nome': fornecedor_nome,
+                    'cnpj': fornecedor_cpf_cnpj,
+                    'razao_social': fornecedor_nome,
+                    'nome_fantasia': fornecedor_nome,
+                    'admin_id': admin_id
+                }
+            ).fetchone()
+            
+            fornecedor_id = fornecedor[0]
+            db.session.flush()
+            logger.info(f"✅ Fornecedor criado: {fornecedor_nome} (ID: {fornecedor_id})")
+        else:
+            fornecedor_id = fornecedor.id
+        
+        # Criar conta com fornecedor_id
         conta = ContaPagar(
             admin_id=admin_id,
-            fornecedor_nome=fornecedor_nome,
-            fornecedor_cpf_cnpj=fornecedor_cpf_cnpj,
+            fornecedor_id=fornecedor_id,
             obra_id=obra_id,
             numero_documento=numero_documento,
             descricao=descricao,
@@ -328,7 +357,8 @@ def listar_contas_receber():
         bancos=bancos,
         resumo=resumo,
         status_selecionado=status,
-        obra_selecionada=obra_id
+        obra_selecionada=obra_id,
+        datetime=datetime
     )
 
 
