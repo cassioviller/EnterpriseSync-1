@@ -261,13 +261,13 @@ with app.app_context():
         logger.error(f"❌ Erro ao executar migrações: {e}")
         logger.warning("⚠️ Aplicação continuará mesmo com erro nas migrações")
     
-    # 🔧 AUTO-FIX MIGRATION 48 - Correção automática de admin_id
-    # Executa SEMPRE no startup para garantir que tabelas críticas tenham admin_id
+    # 🔧 AUTO-FIX UNIVERSAL - Correção automática de admin_id em TODAS as tabelas
+    # Executa SEMPRE no startup para garantir que TODAS as tabelas tenham admin_id
     try:
-        from fix_rdo_mao_obra_auto import auto_fix_migration_48
-        auto_fix_migration_48()
+        from fix_all_admin_id_universal import auto_fix_all_admin_id
+        auto_fix_all_admin_id()
     except Exception as e:
-        logger.error(f"❌ Erro no auto-fix Migration 48: {e}")
+        logger.error(f"❌ Erro no auto-fix universal: {e}")
     
     # 🗑️ SISTEMA DE LIMPEZA DE VEÍCULOS - CRITICAL INTEGRATION
     # Executa limpeza de tabelas obsoletas de veículos quando RUN_CLEANUP_VEICULOS=1
