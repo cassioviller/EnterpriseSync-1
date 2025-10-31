@@ -223,7 +223,8 @@ def salvar_edicao_rdo(rdo_id):
                         rdo_id=rdo_id,
                         funcionario_id=func_id,
                         funcao_exercida=funcao_exercida,
-                        horas_trabalhadas=horas_trabalhadas
+                        horas_trabalhadas=horas_trabalhadas,
+                        admin_id=admin_id
                     )
                     db.session.add(rdo_funcionario)
                     funcionarios_salvos += 1

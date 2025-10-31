@@ -6419,6 +6419,7 @@ def criar_rdo():
                         mao_obra.funcionario_id = int(funcionario_id)
                         mao_obra.funcao_exercida = mo_data.get('funcao', '').strip()
                         mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
+                        mao_obra.admin_id = admin_id
                         db.session.add(mao_obra)
                         print(f"DEBUG: Mão de obra {i+1} adicionada: Funcionário {funcionario_id} - {mao_obra.horas_trabalhadas}h")
                         
@@ -7016,6 +7017,15 @@ def duplicar_rdo(id):
             nova_mao.funcionario_id = mao_original.funcionario_id
             nova_mao.horas_trabalhadas = mao_original.horas_trabalhadas
             nova_mao.observacoes = mao_original.observacoes
+            # Detectar admin_id correto dinamicamente
+            if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                nova_mao.admin_id = current_user.admin_id
+            elif hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
+                nova_mao.admin_id = current_user.id
+            else:
+                # Buscar funcionário para obter admin_id
+                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
+                nova_mao.admin_id = funcionario.admin_id if funcionario else 10
             
             db.session.add(nova_mao)
         
@@ -8147,6 +8157,7 @@ def rdo_salvar_unificado():
                             mao_obra.funcionario_id = int(funcionario_id)
                             mao_obra.funcao_exercida = funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Geral'
                             mao_obra.horas_trabalhadas = horas
+                            mao_obra.admin_id = admin_id_correto
                             db.session.add(mao_obra)
                             
                             print(f"DEBUG: Funcionário {nome_funcionario}: {horas}h")
@@ -8168,6 +8179,7 @@ def rdo_salvar_unificado():
                         mao_obra.funcionario_id = int(funcionario_id)
                         mao_obra.funcao_exercida = mo_data.get('funcao', '').strip()
                         mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
+                        mao_obra.admin_id = admin_id_correto
                         db.session.add(mao_obra)
                         print(f"DEBUG: Funcionário JSON ID {funcionario_id}: {mo_data.get('horas', 8)}h")
             except (json.JSONDecodeError, ValueError) as e:
