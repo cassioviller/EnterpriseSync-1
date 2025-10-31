@@ -5351,6 +5351,114 @@ def api_ponto_lancamento_multiplo():
         traceback.print_exc()
         return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
 
+# ===== API PARA BUSCAR FUNCIONÁRIO INDIVIDUAL =====
+@main_bp.route('/api/funcionario/<int:funcionario_id>', methods=['GET'])
+@login_required
+def get_funcionario(funcionario_id):
+    """API para buscar dados de um funcionário específico"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 404
+        
+        return jsonify({
+            'success': True,
+            'funcionario': {
+                'id': funcionario.id,
+                'nome': funcionario.nome,
+                'cpf': funcionario.cpf,
+                'rg': funcionario.rg or '',
+                'data_nascimento': funcionario.data_nascimento.strftime('%Y-%m-%d') if funcionario.data_nascimento else '',
+                'email': funcionario.email or '',
+                'telefone': funcionario.telefone or '',
+                'endereco': funcionario.endereco or '',
+                'data_admissao': funcionario.data_admissao.strftime('%Y-%m-%d') if funcionario.data_admissao else '',
+                'salario': float(funcionario.salario) if funcionario.salario else 0,
+                'departamento_id': funcionario.departamento_id or 0,
+                'funcao_id': funcionario.funcao_id or 0,
+                'horario_trabalho_id': funcionario.horario_trabalho_id or 0,
+                'ativo': funcionario.ativo,
+                'foto': funcionario.foto or ''
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar funcionário: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# ===== ROTA PARA EDITAR FUNCIONÁRIO =====
+@main_bp.route('/funcionarios/<int:funcionario_id>/editar', methods=['POST'])
+@login_required
+def editar_funcionario(funcionario_id):
+    """Editar dados de um funcionário"""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            flash('❌ Funcionário não encontrado', 'error')
+            return redirect(url_for('main.funcionarios'))
+        
+        # Atualizar dados
+        funcionario.nome = request.form.get('nome', '').strip()
+        funcionario.cpf = request.form.get('cpf', '').strip()
+        funcionario.rg = request.form.get('rg', '').strip()
+        
+        if request.form.get('data_nascimento'):
+            funcionario.data_nascimento = datetime.strptime(request.form['data_nascimento'], '%Y-%m-%d').date()
+        
+        funcionario.email = request.form.get('email', '').strip()
+        funcionario.telefone = request.form.get('telefone', '').strip()
+        funcionario.endereco = request.form.get('endereco', '').strip()
+        
+        if request.form.get('data_admissao'):
+            funcionario.data_admissao = datetime.strptime(request.form['data_admissao'], '%Y-%m-%d').date()
+        
+        if request.form.get('salario'):
+            funcionario.salario = float(request.form['salario'])
+        
+        # Atualizar IDs de relacionamentos
+        funcionario.departamento_id = int(request.form['departamento_id']) if request.form.get('departamento_id') and request.form['departamento_id'] != '0' else None
+        funcionario.funcao_id = int(request.form['funcao_id']) if request.form.get('funcao_id') and request.form['funcao_id'] != '0' else None
+        funcionario.horario_trabalho_id = int(request.form['horario_trabalho_id']) if request.form.get('horario_trabalho_id') and request.form['horario_trabalho_id'] != '0' else None
+        
+        funcionario.ativo = 'ativo' in request.form
+        
+        # Processar foto se enviada
+        if 'foto' in request.files and request.files['foto'].filename:
+            from werkzeug.utils import secure_filename
+            import os
+            
+            foto = request.files['foto']
+            filename = secure_filename(f"{funcionario.codigo}_{foto.filename}")
+            foto_path = os.path.join('static/fotos_funcionarios', filename)
+            
+            # Criar diretório se não existir
+            os.makedirs(os.path.dirname(foto_path), exist_ok=True)
+            foto.save(foto_path)
+            funcionario.foto = filename
+        
+        db.session.commit()
+        
+        flash(f'✅ Funcionário {funcionario.nome} atualizado com sucesso!', 'success')
+        return redirect(url_for('main.funcionarios'))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao editar funcionário: {str(e)}")
+        flash(f'❌ Erro ao editar funcionário: {str(e)}', 'error')
+        return redirect(url_for('main.funcionarios'))
+
 @main_bp.route('/api/funcionario/<int:funcionario_id>/toggle-ativo', methods=['POST'])
 @login_required
 def toggle_funcionario_ativo(funcionario_id):

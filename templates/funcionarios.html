@@ -999,8 +999,60 @@ function isValidCPF(cpf) {
     return true;
 }
 
-function editarFuncionario(id) {
-    alert('Funcionalidade de edição será implementada em breve');
+async function editarFuncionario(id) {
+    try {
+        // Buscar dados do funcionário via API
+        const response = await fetch(`/api/funcionario/${id}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+            alert(`Erro ao carregar funcionário: ${data.message}`);
+            return;
+        }
+        
+        const func = data.funcionario;
+        
+        // Popular formulário
+        document.getElementById('nome').value = func.nome || '';
+        document.getElementById('cpf').value = func.cpf || '';
+        document.getElementById('rg').value = func.rg || '';
+        document.getElementById('data_nascimento').value = func.data_nascimento || '';
+        document.getElementById('email').value = func.email || '';
+        document.getElementById('telefone').value = func.telefone || '';
+        document.getElementById('endereco').value = func.endereco || '';
+        document.getElementById('data_admissao').value = func.data_admissao || '';
+        document.getElementById('salario').value = func.salario || '';
+        
+        // Popular dropdowns
+        document.getElementById('departamento_id').value = func.departamento_id || '0';
+        document.getElementById('funcao_id').value = func.funcao_id || '0';
+        document.getElementById('horario_trabalho_id').value = func.horario_trabalho_id || '0';
+        
+        // Checkbox ativo
+        document.getElementById('ativo').checked = func.ativo;
+        
+        // Mostrar preview da foto se existir
+        const fotoPreview = document.getElementById('foto-preview');
+        const fotoImg = document.getElementById('foto-img');
+        if (func.foto) {
+            fotoImg.src = `/static/fotos_funcionarios/${func.foto}`;
+            fotoPreview.style.display = 'block';
+        } else {
+            fotoPreview.style.display = 'none';
+        }
+        
+        // Configurar formulário para editar
+        document.getElementById('modalTitle').textContent = 'Editar Funcionário';
+        document.getElementById('funcionarioForm').action = `/funcionarios/${id}/editar`;
+        
+        // Abrir modal
+        const modal = new bootstrap.Modal(document.getElementById('funcionarioModal'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Erro ao editar funcionário:', error);
+        alert('Erro ao carregar dados do funcionário');
+    }
 }
 
 function verDetalhesFuncionario(id) {
