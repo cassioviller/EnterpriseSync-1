@@ -1199,7 +1199,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="#" enctype="multipart/form-data">
+            <form method="POST" action="{{ url_for('main.editar_funcionario', funcionario_id=funcionario.id) }}" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6">
