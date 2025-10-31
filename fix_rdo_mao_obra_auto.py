@@ -391,6 +391,156 @@ def fix_custo_obra_auto(db_engine):
         logger.error(f"❌ Erro ao corrigir custo_obra: {e}")
         return False
 
+def fix_rdo_equipamento_auto(db_engine):
+    """Adiciona admin_id em rdo_equipamento se não existir"""
+    try:
+        with db_engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_name = 'rdo_equipamento' 
+                  AND column_name = 'admin_id'
+            """))
+            
+            if result.scalar() > 0:
+                logger.info("✅ rdo_equipamento.admin_id já existe - skip")
+                return True
+            
+            logger.warning("⚠️  rdo_equipamento.admin_id NÃO EXISTE - corrigindo...")
+            
+            connection.execute(text("""
+                BEGIN;
+                
+                ALTER TABLE rdo_equipamento ADD COLUMN admin_id INTEGER;
+                
+                -- Backfill via RDO -> Obra
+                UPDATE rdo_equipamento re
+                SET admin_id = o.admin_id
+                FROM rdo r
+                JOIN obra o ON r.obra_id = o.id
+                WHERE re.rdo_id = r.id
+                  AND re.admin_id IS NULL;
+                
+                ALTER TABLE rdo_equipamento ALTER COLUMN admin_id SET NOT NULL;
+                
+                ALTER TABLE rdo_equipamento
+                ADD CONSTRAINT fk_rdo_equipamento_admin_id
+                FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+                
+                CREATE INDEX IF NOT EXISTS idx_rdo_equipamento_admin_id 
+                ON rdo_equipamento(admin_id);
+                
+                COMMIT;
+            """))
+            
+            connection.commit()
+            logger.info("✅ rdo_equipamento.admin_id adicionado (automático)")
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir rdo_equipamento: {e}")
+        return False
+
+def fix_rdo_ocorrencia_auto(db_engine):
+    """Adiciona admin_id em rdo_ocorrencia se não existir"""
+    try:
+        with db_engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_name = 'rdo_ocorrencia' 
+                  AND column_name = 'admin_id'
+            """))
+            
+            if result.scalar() > 0:
+                logger.info("✅ rdo_ocorrencia.admin_id já existe - skip")
+                return True
+            
+            logger.warning("⚠️  rdo_ocorrencia.admin_id NÃO EXISTE - corrigindo...")
+            
+            connection.execute(text("""
+                BEGIN;
+                
+                ALTER TABLE rdo_ocorrencia ADD COLUMN admin_id INTEGER;
+                
+                -- Backfill via RDO -> Obra
+                UPDATE rdo_ocorrencia ro
+                SET admin_id = o.admin_id
+                FROM rdo r
+                JOIN obra o ON r.obra_id = o.id
+                WHERE ro.rdo_id = r.id
+                  AND ro.admin_id IS NULL;
+                
+                ALTER TABLE rdo_ocorrencia ALTER COLUMN admin_id SET NOT NULL;
+                
+                ALTER TABLE rdo_ocorrencia
+                ADD CONSTRAINT fk_rdo_ocorrencia_admin_id
+                FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+                
+                CREATE INDEX IF NOT EXISTS idx_rdo_ocorrencia_admin_id 
+                ON rdo_ocorrencia(admin_id);
+                
+                COMMIT;
+            """))
+            
+            connection.commit()
+            logger.info("✅ rdo_ocorrencia.admin_id adicionado (automático)")
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir rdo_ocorrencia: {e}")
+        return False
+
+def fix_rdo_servico_subatividade_auto(db_engine):
+    """Adiciona admin_id em rdo_servico_subatividade se não existir"""
+    try:
+        with db_engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_name = 'rdo_servico_subatividade' 
+                  AND column_name = 'admin_id'
+            """))
+            
+            if result.scalar() > 0:
+                logger.info("✅ rdo_servico_subatividade.admin_id já existe - skip")
+                return True
+            
+            logger.warning("⚠️  rdo_servico_subatividade.admin_id NÃO EXISTE - corrigindo...")
+            
+            connection.execute(text("""
+                BEGIN;
+                
+                ALTER TABLE rdo_servico_subatividade ADD COLUMN admin_id INTEGER;
+                
+                -- Backfill via RDO -> Obra
+                UPDATE rdo_servico_subatividade rss
+                SET admin_id = o.admin_id
+                FROM rdo r
+                JOIN obra o ON r.obra_id = o.id
+                WHERE rss.rdo_id = r.id
+                  AND rss.admin_id IS NULL;
+                
+                ALTER TABLE rdo_servico_subatividade ALTER COLUMN admin_id SET NOT NULL;
+                
+                ALTER TABLE rdo_servico_subatividade
+                ADD CONSTRAINT fk_rdo_servico_subatividade_admin_id
+                FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+                
+                CREATE INDEX IF NOT EXISTS idx_rdo_servico_subatividade_admin_id 
+                ON rdo_servico_subatividade(admin_id);
+                
+                COMMIT;
+            """))
+            
+            connection.commit()
+            logger.info("✅ rdo_servico_subatividade.admin_id adicionado (automático)")
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir rdo_servico_subatividade: {e}")
+        return False
+
 def auto_fix_migration_48():
     """
     Correção automática da Migration 48
@@ -404,13 +554,16 @@ def auto_fix_migration_48():
     
     results = []
     
-    # Corrigir as 6 tabelas críticas
+    # Corrigir as 9 tabelas críticas (6 originais + 3 RDO)
     results.append(("rdo_mao_obra", fix_rdo_mao_obra_auto(db.engine)))
     results.append(("funcao", fix_funcao_auto(db.engine)))
     results.append(("registro_alimentacao", fix_registro_alimentacao_auto(db.engine)))
     results.append(("horario_trabalho", fix_horario_trabalho_auto(db.engine)))
     results.append(("departamento", fix_departamento_auto(db.engine)))
     results.append(("custo_obra", fix_custo_obra_auto(db.engine)))
+    results.append(("rdo_equipamento", fix_rdo_equipamento_auto(db.engine)))
+    results.append(("rdo_ocorrencia", fix_rdo_ocorrencia_auto(db.engine)))
+    results.append(("rdo_servico_subatividade", fix_rdo_servico_subatividade_auto(db.engine)))
     
     # Resumo
     success_count = sum(1 for _, success in results if success)
