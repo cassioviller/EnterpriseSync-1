@@ -10,7 +10,7 @@
 
 ### **Status Final:**
 - ✅ **76 de 76 tabelas** com admin_id (100%)
-- ✅ **11 tabelas** no sistema de auto-fix
+- ✅ **12 tabelas** no sistema de auto-fix
 - ✅ **Sistema 100% multi-tenant seguro**
 
 ---
@@ -149,7 +149,7 @@ Todas as tabelas de dados de negócio têm admin_id:
 
 ---
 
-## 🔧 **SISTEMA DE AUTO-FIX: 11 Tabelas**
+## 🔧 **SISTEMA DE AUTO-FIX: 12 Tabelas**
 
 O sistema de auto-fix garante que as colunas admin_id existam em produção mesmo se a Migration 48 não foi executada:
 
@@ -166,6 +166,7 @@ O sistema de auto-fix garante que as colunas admin_id existam em produção mesm
 9. ✅ **rdo_servico_subatividade** - Backfill via RDO → Obra
 10. ✅ **rdo_foto** - Backfill via RDO → Obra
 11. ✅ **allocation_employee** - Backfill via Allocation
+12. ✅ **notificacao_cliente** - Backfill via Obra
 
 ### **Estratégias de Backfill:**
 
@@ -227,8 +228,9 @@ INFO:fix_rdo_mao_obra_auto:✅ rdo_ocorrencia.admin_id já existe - skip
 INFO:fix_rdo_mao_obra_auto:✅ rdo_servico_subatividade.admin_id já existe - skip
 INFO:fix_rdo_mao_obra_auto:✅ rdo_foto.admin_id já existe - skip
 INFO:fix_rdo_mao_obra_auto:✅ allocation_employee.admin_id já existe - skip
+INFO:fix_rdo_mao_obra_auto:✅ notificacao_cliente.admin_id já existe - skip
 INFO:fix_rdo_mao_obra_auto:================================================================================
-INFO:fix_rdo_mao_obra_auto:📊 AUTO-FIX CONCLUÍDO: 11/11 tabelas OK
+INFO:fix_rdo_mao_obra_auto:📊 AUTO-FIX CONCLUÍDO: 12/12 tabelas OK
 INFO:fix_rdo_mao_obra_auto:================================================================================
 INFO:fix_rdo_mao_obra_auto:✅ Todas as tabelas corrigidas com sucesso
 ```
