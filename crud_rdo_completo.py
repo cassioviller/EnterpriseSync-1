@@ -3,7 +3,7 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre
+from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre, NotificacaoCliente, RDOFoto
 from datetime import datetime, date
 import json
 
@@ -476,7 +476,9 @@ def excluir_rdo(rdo_id):
         
         numero_rdo = rdo.numero_rdo
         
-        # Excluir dados relacionados
+        # Excluir TODOS os dados relacionados (incluindo notificacoes e fotos!)
+        NotificacaoCliente.query.filter_by(rdo_id=rdo.id).delete()
+        RDOFoto.query.filter_by(rdo_id=rdo.id).delete()
         RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
         RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
         RDOEquipamento.query.filter_by(rdo_id=rdo.id).delete()

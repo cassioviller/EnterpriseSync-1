@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
@@ -6212,7 +6212,10 @@ def excluir_rdo(rdo_id):
             flash('RDO não encontrado.', 'error')
             return redirect(url_for('main.rdos'))
         
-        # Excluir dependências em ordem
+        # Excluir TODAS as dependências em ordem (incluindo notificacoes!)
+        db.session.query(NotificacaoCliente).filter(NotificacaoCliente.rdo_id == rdo_id).delete()
+        db.session.query(RDOFoto).filter(RDOFoto.rdo_id == rdo_id).delete()
+        db.session.query(RDOEquipamento).filter(RDOEquipamento.rdo_id == rdo_id).delete()
         db.session.query(RDOMaoObra).filter(RDOMaoObra.rdo_id == rdo_id).delete()
         db.session.query(RDOServicoSubatividade).filter(RDOServicoSubatividade.rdo_id == rdo_id).delete()
         db.session.query(RDOOcorrencia).filter(RDOOcorrencia.rdo_id == rdo_id).delete()
