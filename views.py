@@ -9308,13 +9308,14 @@ def salvar_rdo_flexivel():
                                 logger.warning(f"⚠️ Erro ao buscar função do funcionário {funcionario.nome}: {e}")
                             
                             # 🔍 VERIFICAÇÃO SCHEMA RDOMaoObra
-                            logger.info(f"🔍 Criando RDOMaoObra - rdo_id: {rdo.id}, funcionario_id: {funcionario_id_sel}")
+                            logger.info(f"🔍 Criando RDOMaoObra - rdo_id: {rdo.id}, funcionario_id: {funcionario_id_sel}, admin_id: {admin_id}")
                             try:
                                 mao_obra = RDOMaoObra(
                                     rdo_id=rdo.id,
                                     funcionario_id=funcionario_id_sel,
                                     horas_trabalhadas=8.8,  # Padrão
-                                    funcao_exercida=funcao_exercida
+                                    funcao_exercida=funcao_exercida,
+                                    admin_id=admin_id
                                 )
                                 
                                 # Teste de schema antes de adicionar
@@ -9347,6 +9348,7 @@ def salvar_rdo_flexivel():
             # ✅ LOG DETALHADO PARA DEBUG PRODUÇÃO
             import traceback
             logger.error(f"❌ Stack trace completo: {traceback.format_exc()}")
+            error_message = str(e)
             success = False
         
         if success:
@@ -9354,7 +9356,21 @@ def salvar_rdo_flexivel():
             logger.info(f"✅ RDO {numero_rdo} salvo com {len(subactivities)} subatividades no serviço {target_service_id}")
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         else:
-            flash('Erro interno ao salvar RDO. Verifique os logs para detalhes.', 'error')
+            # ✅ MENSAGEM DE ERRO DETALHADA
+            if 'admin_id' in error_message and 'null' in error_message.lower():
+                flash('Erro: Campo admin_id obrigatório não foi preenchido. Entre em contato com o suporte.', 'error')
+            elif 'foreign key' in error_message.lower():
+                flash('Erro: Referência inválida a obra ou funcionário. Verifique os dados.', 'error')
+            elif 'unique constraint' in error_message.lower():
+                flash('Erro: Este RDO já existe. Use um número diferente.', 'error')
+            elif 'not-null constraint' in error_message.lower():
+                # Extrair nome da coluna do erro
+                import re
+                match = re.search(r'column "(\w+)"', error_message)
+                campo = match.group(1) if match else 'desconhecido'
+                flash(f'Erro: O campo "{campo}" é obrigatório e não foi preenchido.', 'error')
+            else:
+                flash(f'Erro ao salvar RDO: {error_message[:200]}', 'error')
             logger.error("❌ FALHA NO SALVAMENTO - Redirecionando para formulário")
             return redirect(url_for('main.funcionario_rdo_novo'))
         

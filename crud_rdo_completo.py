@@ -434,7 +434,24 @@ def salvar_rdo():
     except Exception as e:
         db.session.rollback()
         print(f"ERRO SALVAR RDO: {str(e)}")
-        flash(f'Erro ao salvar RDO: {str(e)}', 'error')
+        error_message = str(e)
+        
+        # ✅ MENSAGEM DE ERRO DETALHADA
+        if 'admin_id' in error_message and 'null' in error_message.lower():
+            flash('Erro: Campo admin_id obrigatório não foi preenchido. Entre em contato com o suporte.', 'error')
+        elif 'foreign key' in error_message.lower():
+            flash('Erro: Referência inválida a obra ou funcionário. Verifique os dados selecionados.', 'error')
+        elif 'unique constraint' in error_message.lower():
+            flash('Erro: Este RDO já existe. Use um número diferente ou edite o RDO existente.', 'error')
+        elif 'not-null constraint' in error_message.lower():
+            # Extrair nome da coluna do erro
+            import re
+            match = re.search(r'column "(\w+)"', error_message)
+            campo = match.group(1) if match else 'desconhecido'
+            flash(f'Erro: O campo "{campo}" é obrigatório e não foi preenchido. Verifique os dados do formulário.', 'error')
+        else:
+            flash(f'Erro ao salvar RDO: {error_message[:200]}', 'error')
+        
         return redirect(url_for('rdo_crud.listar_rdos'))
 
 @rdo_crud_bp.route('/excluir/<int:rdo_id>', methods=['POST'])
