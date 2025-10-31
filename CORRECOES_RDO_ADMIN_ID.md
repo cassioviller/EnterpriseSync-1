@@ -124,7 +124,7 @@ grep -n "RDOMaoObra(" views.py crud_rdo_completo.py rdo_editar_sistema.py
 
 ## 🔄 **Sistema Auto-Fix (Deploy Automático)**
 
-O sistema continua com auto-fix para garantir que as colunas existam:
+O sistema agora cobre **11 tabelas** com auto-fix para garantir que as colunas existam:
 
 ```
 ✅ rdo_mao_obra.admin_id já existe - skip
@@ -133,7 +133,12 @@ O sistema continua com auto-fix para garantir que as colunas existam:
 ✅ horario_trabalho.admin_id já existe - skip
 ✅ departamento.admin_id já existe - skip
 ✅ custo_obra.admin_id já existe - skip
-📊 AUTO-FIX CONCLUÍDO: 6/6 tabelas OK
+✅ rdo_equipamento.admin_id já existe - skip
+✅ rdo_ocorrencia.admin_id já existe - skip
+✅ rdo_servico_subatividade.admin_id já existe - skip
+✅ rdo_foto.admin_id já existe - skip
+✅ allocation_employee.admin_id já existe - skip
+📊 AUTO-FIX CONCLUÍDO: 11/11 tabelas OK
 ```
 
 ---

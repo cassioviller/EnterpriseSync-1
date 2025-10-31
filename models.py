@@ -2858,6 +2858,7 @@ class AllocationEmployee(db.Model):
     __tablename__ = 'allocation_employee'
     
     id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     allocation_id = db.Column(db.Integer, db.ForeignKey('allocation.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     turno_inicio = db.Column(db.Time, default=time(8, 0))

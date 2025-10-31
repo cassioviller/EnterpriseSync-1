@@ -541,6 +541,105 @@ def fix_rdo_servico_subatividade_auto(db_engine):
         logger.error(f"❌ Erro ao corrigir rdo_servico_subatividade: {e}")
         return False
 
+def fix_rdo_foto_auto(db_engine):
+    """Adiciona admin_id em rdo_foto se não existir"""
+    try:
+        with db_engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_name = 'rdo_foto' 
+                  AND column_name = 'admin_id'
+            """))
+            
+            if result.scalar() > 0:
+                logger.info("✅ rdo_foto.admin_id já existe - skip")
+                return True
+            
+            logger.warning("⚠️  rdo_foto.admin_id NÃO EXISTE - corrigindo...")
+            
+            connection.execute(text("""
+                BEGIN;
+                
+                ALTER TABLE rdo_foto ADD COLUMN admin_id INTEGER;
+                
+                -- Backfill via RDO -> Obra
+                UPDATE rdo_foto rf
+                SET admin_id = o.admin_id
+                FROM rdo r
+                JOIN obra o ON r.obra_id = o.id
+                WHERE rf.rdo_id = r.id
+                  AND rf.admin_id IS NULL;
+                
+                ALTER TABLE rdo_foto ALTER COLUMN admin_id SET NOT NULL;
+                
+                ALTER TABLE rdo_foto
+                ADD CONSTRAINT fk_rdo_foto_admin_id
+                FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+                
+                CREATE INDEX IF NOT EXISTS idx_rdo_foto_admin_id 
+                ON rdo_foto(admin_id);
+                
+                COMMIT;
+            """))
+            
+            connection.commit()
+            logger.info("✅ rdo_foto.admin_id adicionado (automático)")
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir rdo_foto: {e}")
+        return False
+
+def fix_allocation_employee_auto(db_engine):
+    """Adiciona admin_id em allocation_employee se não existir"""
+    try:
+        with db_engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_name = 'allocation_employee' 
+                  AND column_name = 'admin_id'
+            """))
+            
+            if result.scalar() > 0:
+                logger.info("✅ allocation_employee.admin_id já existe - skip")
+                return True
+            
+            logger.warning("⚠️  allocation_employee.admin_id NÃO EXISTE - corrigindo...")
+            
+            connection.execute(text("""
+                BEGIN;
+                
+                ALTER TABLE allocation_employee ADD COLUMN admin_id INTEGER;
+                
+                -- Backfill via allocation
+                UPDATE allocation_employee ae
+                SET admin_id = a.admin_id
+                FROM allocation a
+                WHERE ae.allocation_id = a.id
+                  AND ae.admin_id IS NULL;
+                
+                ALTER TABLE allocation_employee ALTER COLUMN admin_id SET NOT NULL;
+                
+                ALTER TABLE allocation_employee
+                ADD CONSTRAINT fk_allocation_employee_admin_id
+                FOREIGN KEY (admin_id) REFERENCES usuario(id) ON DELETE CASCADE;
+                
+                CREATE INDEX IF NOT EXISTS idx_allocation_employee_admin_id 
+                ON allocation_employee(admin_id);
+                
+                COMMIT;
+            """))
+            
+            connection.commit()
+            logger.info("✅ allocation_employee.admin_id adicionado (automático)")
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao corrigir allocation_employee: {e}")
+        return False
+
 def auto_fix_migration_48():
     """
     Correção automática da Migration 48
@@ -554,7 +653,7 @@ def auto_fix_migration_48():
     
     results = []
     
-    # Corrigir as 9 tabelas críticas (6 originais + 3 RDO)
+    # Corrigir as 11 tabelas críticas (6 originais + 4 RDO + 1 equipe)
     results.append(("rdo_mao_obra", fix_rdo_mao_obra_auto(db.engine)))
     results.append(("funcao", fix_funcao_auto(db.engine)))
     results.append(("registro_alimentacao", fix_registro_alimentacao_auto(db.engine)))
@@ -564,6 +663,8 @@ def auto_fix_migration_48():
     results.append(("rdo_equipamento", fix_rdo_equipamento_auto(db.engine)))
     results.append(("rdo_ocorrencia", fix_rdo_ocorrencia_auto(db.engine)))
     results.append(("rdo_servico_subatividade", fix_rdo_servico_subatividade_auto(db.engine)))
+    results.append(("rdo_foto", fix_rdo_foto_auto(db.engine)))
+    results.append(("allocation_employee", fix_allocation_employee_auto(db.engine)))
     
     # Resumo
     success_count = sum(1 for _, success in results if success)
