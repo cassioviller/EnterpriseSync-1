@@ -16,6 +16,8 @@ SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management syst
 - Testes dedicados estruturados para validação contínua dos módulos consolidados
 - Links RDO devem apontar para rota moderna `/funcionario/rdo/consolidado` com funcionalidades completas
 - Ambiente de produção com 80 tabelas deve ser preservado durante migrações
+- Operações destrutivas (exclusão) devem usar POST via formulários JavaScript
+- Evitar auto-fill de campos que possam interferir em filtros de busca
 
 ## System Architecture
 The system employs a Flask backend, SQLAlchemy ORM, and a PostgreSQL database. Jinja2 is used for server-side templating and Bootstrap for responsive frontend styling. Docker facilitates deployment. A unified `base_completo.html` template ensures UI/UX consistency.
