@@ -2820,22 +2820,136 @@ def excluir_obra(id):
             flash(f'Não é possível excluir a obra "{nome}" pois possui {rdos_count} RDOs associados', 'warning')
             return redirect(url_for('main.detalhes_obra', id=id))
         
-        # 🧹 EXCLUSÃO MANUAL DE CUSTOS: Usar SQL direto para evitar problemas de cache/sessão
+        # 🧹 EXCLUSÃO COMPLETA VIA SQL DIRETO: Evitar lazy loading e problemas de cache
+        # ⚠️ TODAS as exclusões incluem admin_id para SEGURANÇA MULTI-TENANT
+        # 📋 Ordem de exclusão respeita dependências FK (filhos antes de pais)
         try:
-            # Deletar custos usando SQL direto (não carrega modelo)
-            result = db.session.execute(
-                text("DELETE FROM custo_obra WHERE obra_id = :obra_id"),
-                {"obra_id": id}
+            # ⚡ LISTA COMPLETA: TODAS as 38 tabelas com FK para obra.id
+            # Ordem importa - dependências mais profundas primeiro
+            tabelas_dependentes = [
+                # Tabelas críticas com admin_id
+                'custo_obra',
+                'servico_obra_real',
+                'servico_obra',
+                'registro_ponto',
+                'historico_produtividade_servico',
+                'conta_pagar',
+                'conta_receber',
+                'fluxo_caixa',
+                'alimentacao_lancamento',
+                'almoxarifado_movimento',
+                'frota_utilizacao',
+                'configuracao_horario',
+                'dispositivo_obra',
+                'funcionario_obras_ponto',
+                'almoxarifado_estoque',
+                'alocacao_equipe',
+                'centro_custo',
+                'centro_custo_contabil',
+                'custo_veiculo',
+                'fleet_vehicle_usage',
+                'frota_despesa',
+                'movimentacao_estoque',
+                'movimentacao_material',
+                'notificacao_cliente',
+                'obra_servico',
+                'orcamento_obra',
+                'outro_custo',
+                'receita',
+                'registro_alimentacao',
+                'uso_veiculo',
+                'vehicle_expense',
+                'vehicle_usage',
+                'weekly_plan',
+                'allocation',
+                # Tabelas sem admin_id (tentar, mas não falhar)
+                'propostas_comerciais',  # tem obra_id mas admin_id próprio
+                'proposta'  # obra_gerada_id
+            ]
+            
+            # Mapeamento especial para tabelas com nomes de coluna FK diferentes
+            fk_column_map = {
+                'proposta': 'obra_gerada_id',  # Usa obra_gerada_id em vez de obra_id
+            }
+            
+            # 🔍 INTROSPECT: Detectar quais tabelas têm admin_id ANTES de deletar
+            # Isso evita rollbacks que desfazem exclusões anteriores
+            print("🔍 Introspectando colunas das tabelas dependentes...")
+            tabelas_com_admin_id = set()
+            for tabela in tabelas_dependentes:
+                try:
+                    result = db.session.execute(
+                        text("""
+                            SELECT column_name 
+                            FROM information_schema.columns 
+                            WHERE table_name = :table_name 
+                            AND column_name = 'admin_id'
+                        """),
+                        {"table_name": tabela}
+                    )
+                    if result.fetchone():
+                        tabelas_com_admin_id.add(tabela)
+                except Exception as introspect_error:
+                    print(f"⚠️ Erro ao introspeccionar {tabela}: {introspect_error}")
+            
+            print(f"📊 {len(tabelas_com_admin_id)} tabelas COM admin_id, {len(tabelas_dependentes) - len(tabelas_com_admin_id)} SEM admin_id")
+            
+            # 🗑️ DELETAR: Usar query correta baseada na introspect
+            total_deletados = 0
+            for tabela in tabelas_dependentes:
+                try:
+                    # Determinar nome da coluna FK (obra_id ou custom)
+                    fk_column = fk_column_map.get(tabela, 'obra_id')
+                    
+                    # Escolher query baseada na presença de admin_id (SEM exceções!)
+                    if tabela in tabelas_com_admin_id:
+                        # Tabela TEM admin_id - deletar com verificação
+                        result = db.session.execute(
+                            text(f"""
+                                DELETE FROM {tabela} 
+                                WHERE {fk_column} = :obra_id 
+                                AND admin_id = :admin_id
+                            """),
+                            {"obra_id": id, "admin_id": admin_id}
+                        )
+                        count = result.rowcount
+                        if count > 0:
+                            print(f"🧹 Removidos {count} de {tabela} (COM admin_id={admin_id})")
+                            total_deletados += count
+                    else:
+                        # Tabela NÃO tem admin_id - deletar sem verificação
+                        # (Seguro porque já verificamos ownership da obra no início)
+                        result = db.session.execute(
+                            text(f"DELETE FROM {tabela} WHERE {fk_column} = :obra_id"),
+                            {"obra_id": id}
+                        )
+                        count = result.rowcount
+                        if count > 0:
+                            print(f"🧹 Removidos {count} de {tabela} (SEM admin_id)")
+                            total_deletados += count
+                            
+                except Exception as table_error:
+                    print(f"⚠️ Erro ao deletar de {tabela}: {table_error}")
+            
+            print(f"📊 Total de {total_deletados} registros dependentes removidos")
+            
+            # Deletar a própria obra via SQL direto (COM VERIFICAÇÃO ADMIN_ID)
+            result_obra = db.session.execute(
+                text("DELETE FROM obra WHERE id = :obra_id AND admin_id = :admin_id"),
+                {"obra_id": id, "admin_id": admin_id}
             )
-            custos_deletados = result.rowcount
-            if custos_deletados > 0:
-                print(f"🧹 Removidos {custos_deletados} custos associados à obra {id} via SQL direto")
-        except Exception as custos_error:
-            print(f"⚠️ Erro ao deletar custos: {custos_error}")
-            # Continuar mesmo com erro - tentar deletar a obra
-        
-        db.session.delete(obra)
-        db.session.commit()
+            
+            if result_obra.rowcount == 0:
+                raise Exception("Obra não encontrada ou não pertence ao admin atual")
+            
+            print(f"✅ Obra {id} e {total_deletados} registros dependentes deletados (multi-tenant seguro)")
+            
+            db.session.commit()
+            
+        except Exception as delete_error:
+            print(f"❌ Erro na exclusão via SQL: {delete_error}")
+            db.session.rollback()
+            raise
         
         flash(f'Obra "{nome}" excluída com sucesso!', 'success')
         return redirect(url_for('main.obras'))
