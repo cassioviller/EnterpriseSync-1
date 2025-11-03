@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
@@ -1825,6 +1825,11 @@ def funcionario_perfil(id):
     # Calcular valor total dos itens em posse
     valor_total_itens = sum((item.valor_unitario or 0) * (item.quantidade or 1) for item in itens_almoxarifado)
     
+    # Buscar opções para dropdowns do modal de edição
+    departamentos = Departamento.query.filter_by(admin_id=admin_id).all()
+    funcoes = Funcao.query.filter_by(admin_id=admin_id).all()
+    horarios = HorarioTrabalho.query.filter_by(admin_id=admin_id).all()
+    
     return render_template('funcionario_perfil.html', 
                          funcionario=funcionario,
                          kpis=kpis,
@@ -1836,7 +1841,10 @@ def funcionario_perfil(id):
                          graficos=graficos,
                          obras=obras,
                          itens_almoxarifado=itens_almoxarifado,
-                         valor_total_itens=valor_total_itens)
+                         valor_total_itens=valor_total_itens,
+                         departamentos=departamentos,
+                         funcoes=funcoes,
+                         horarios=horarios)
 
 # Rota para exportar PDF do funcionário - COM CIRCUIT BREAKER
 @main_bp.route('/funcionario_perfil/<int:id>/pdf')

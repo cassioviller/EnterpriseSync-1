@@ -1205,13 +1205,13 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="nome" class="form-label">Nome *</label>
-                                <input type="text" class="form-control" name="nome" value="{{ funcionario.nome }}" required>
+                                <input type="text" class="form-control" id="nome" name="nome" value="{{ funcionario.nome }}" required>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="cpf" class="form-label">CPF *</label>
-                                <input type="text" class="form-control" name="cpf" value="{{ funcionario.cpf }}" required>
+                                <input type="text" class="form-control" id="cpf" name="cpf" value="{{ funcionario.cpf }}" required>
                             </div>
                         </div>
                     </div>
@@ -1220,13 +1220,13 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="rg" class="form-label">RG</label>
-                                <input type="text" class="form-control" name="rg" value="{{ funcionario.rg or '' }}">
+                                <input type="text" class="form-control" id="rg" name="rg" value="{{ funcionario.rg or '' }}">
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="data_nascimento" class="form-label">Data de Nascimento</label>
-                                <input type="date" class="form-control" name="data_nascimento" 
+                                <input type="date" class="form-control" id="data_nascimento" name="data_nascimento" 
                                        value="{{ funcionario.data_nascimento.strftime('%Y-%m-%d') if funcionario.data_nascimento else '' }}">
                             </div>
                         </div>
@@ -1236,13 +1236,13 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="telefone" class="form-label">Telefone</label>
-                                <input type="text" class="form-control" name="telefone" value="{{ funcionario.telefone or '' }}">
+                                <input type="text" class="form-control" id="telefone" name="telefone" value="{{ funcionario.telefone or '' }}">
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="email" class="form-label">Email</label>
-                                <input type="email" class="form-control" name="email" value="{{ funcionario.email or '' }}">
+                                <input type="email" class="form-control" id="email" name="email" value="{{ funcionario.email or '' }}">
                             </div>
                         </div>
                     </div>
@@ -1251,14 +1251,14 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="data_admissao" class="form-label">Data de Admissão *</label>
-                                <input type="date" class="form-control" name="data_admissao" 
+                                <input type="date" class="form-control" id="data_admissao" name="data_admissao" 
                                        value="{{ funcionario.data_admissao.strftime('%Y-%m-%d') }}" required>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="salario" class="form-label">Salário</label>
-                                <input type="number" class="form-control" name="salario" step="0.01" min="0" 
+                                <input type="number" class="form-control" id="salario" name="salario" step="0.01" min="0" 
                                        value="{{ funcionario.salario }}">
                             </div>
                         </div>
@@ -1268,7 +1268,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="departamento_id" class="form-label">Departamento</label>
-                                <select class="form-select" name="departamento_id">
+                                <select class="form-select" id="departamento_id" name="departamento_id">
                                     <option value="">Selecione...</option>
                                     {% for dept in departamentos %}
                                     <option value="{{ dept.id }}" {{ 'selected' if funcionario.departamento_id == dept.id else '' }}>
@@ -1281,7 +1281,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="funcao_id" class="form-label">Função</label>
-                                <select class="form-select" name="funcao_id">
+                                <select class="form-select" id="funcao_id" name="funcao_id">
                                     <option value="">Selecione...</option>
                                     {% for func in funcoes %}
                                     <option value="{{ func.id }}" {{ 'selected' if funcionario.funcao_id == func.id else '' }}>
@@ -1297,7 +1297,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="horario_trabalho_id" class="form-label">Horário de Trabalho</label>
-                                <select class="form-select" name="horario_trabalho_id">
+                                <select class="form-select" id="horario_trabalho_id" name="horario_trabalho_id">
                                     <option value="">Selecione...</option>
                                     {% for horario in horarios %}
                                     <option value="{{ horario.id }}" {{ 'selected' if funcionario.horario_trabalho_id == horario.id else '' }}>
@@ -1310,7 +1310,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="foto" class="form-label">Foto</label>
-                                <input type="file" class="form-control" name="foto" accept="image/*">
+                                <input type="file" class="form-control" id="foto" name="foto" accept="image/*">
                                 <small class="text-muted">Deixe em branco para manter a foto atual</small>
                             </div>
                         </div>
@@ -1318,11 +1318,11 @@
                     
                     <div class="mb-3">
                         <label for="endereco" class="form-label">Endereço</label>
-                        <textarea class="form-control" name="endereco" rows="2">{{ funcionario.endereco or '' }}</textarea>
+                        <textarea class="form-control" id="endereco" name="endereco" rows="2">{{ funcionario.endereco or '' }}</textarea>
                     </div>
                     
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="ativo" value="1" 
+                        <input class="form-check-input" type="checkbox" id="ativo" name="ativo" value="1" 
                                {{ 'checked' if funcionario.ativo else '' }}>
                         <label class="form-check-label" for="ativo">
                             Funcionário Ativo
