@@ -2894,41 +2894,50 @@ def excluir_obra(id):
             
             print(f"📊 {len(tabelas_com_admin_id)} tabelas COM admin_id, {len(tabelas_dependentes) - len(tabelas_com_admin_id)} SEM admin_id")
             
-            # 🗑️ DELETAR: Usar query correta baseada na introspect
+            # 🗑️ DELETAR: Usar conexão RAW com autocommit para isolar cada DELETE
+            # Isso evita que erros em uma tabela corrompam a sessão principal
             total_deletados = 0
+            
+            # Obter conexão raw do engine (bypass SQLAlchemy session)
+            engine = db.engine
+            
             for tabela in tabelas_dependentes:
                 try:
                     # Determinar nome da coluna FK (obra_id ou custom)
                     fk_column = fk_column_map.get(tabela, 'obra_id')
                     
-                    # Escolher query baseada na presença de admin_id (SEM exceções!)
-                    if tabela in tabelas_com_admin_id:
-                        # Tabela TEM admin_id - deletar com verificação
-                        result = db.session.execute(
-                            text(f"""
-                                DELETE FROM {tabela} 
-                                WHERE {fk_column} = :obra_id 
-                                AND admin_id = :admin_id
-                            """),
-                            {"obra_id": id, "admin_id": admin_id}
-                        )
-                        count = result.rowcount
-                        if count > 0:
-                            print(f"🧹 Removidos {count} de {tabela} (COM admin_id={admin_id})")
-                            total_deletados += count
-                    else:
-                        # Tabela NÃO tem admin_id - deletar sem verificação
-                        # (Seguro porque já verificamos ownership da obra no início)
-                        result = db.session.execute(
-                            text(f"DELETE FROM {tabela} WHERE {fk_column} = :obra_id"),
-                            {"obra_id": id}
-                        )
-                        count = result.rowcount
-                        if count > 0:
-                            print(f"🧹 Removidos {count} de {tabela} (SEM admin_id)")
-                            total_deletados += count
-                            
+                    # Executar DELETE em conexão isolada com AUTOCOMMIT
+                    # CRITICAL: execution_options() retorna NOVA conexão configurada
+                    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                        # Escolher query baseada na presença de admin_id
+                        if tabela in tabelas_com_admin_id:
+                            # Tabela TEM admin_id - deletar com verificação
+                            result = conn.execute(
+                                text(f"""
+                                    DELETE FROM {tabela} 
+                                    WHERE {fk_column} = :obra_id 
+                                    AND admin_id = :admin_id
+                                """),
+                                {"obra_id": id, "admin_id": admin_id}
+                            )
+                            count = result.rowcount
+                            if count > 0:
+                                print(f"🧹 Removidos {count} de {tabela} (COM admin_id={admin_id})")
+                                total_deletados += count
+                        else:
+                            # Tabela NÃO tem admin_id - deletar sem verificação
+                            # (Seguro porque já verificamos ownership da obra no início)
+                            result = conn.execute(
+                                text(f"DELETE FROM {tabela} WHERE {fk_column} = :obra_id"),
+                                {"obra_id": id}
+                            )
+                            count = result.rowcount
+                            if count > 0:
+                                print(f"🧹 Removidos {count} de {tabela} (SEM admin_id)")
+                                total_deletados += count
+                    
                 except Exception as table_error:
+                    # Erro é isolado - não afeta outras tabelas nem a sessão principal
                     print(f"⚠️ Erro ao deletar de {tabela}: {table_error}")
             
             print(f"📊 Total de {total_deletados} registros dependentes removidos")
