@@ -1558,11 +1558,38 @@ function aplicarFiltros() {
     window.location.href = url.toString();
 }
 
-// Inicializar página sem sobrescrever valores dos campos de data
+// Mapa de funções com salários base
+const funcoesSalarios = {
+    {% for func in funcoes %}
+    {{ func.id }}: {{ func.salario_base or 0 }}{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+
+// Auto-preencher salário ao selecionar função
 document.addEventListener('DOMContentLoaded', function() {
     // Os valores dos campos já são definidos pelo backend via Jinja2
     // Não fazer nada aqui para preservar os valores corretos
     console.log('Página de perfil carregada com filtros preservados');
+    
+    // Event listener para auto-preencher salário
+    const funcaoSelect = document.getElementById('funcao_id');
+    const salarioInput = document.getElementById('salario');
+    
+    if (funcaoSelect && salarioInput) {
+        funcaoSelect.addEventListener('change', function() {
+            const funcaoId = parseInt(this.value);
+            
+            // Verifica se a função existe no mapa (permite salário zero)
+            if (funcaoId && funcoesSalarios.hasOwnProperty(funcaoId)) {
+                const salarioBase = funcoesSalarios[funcaoId];
+                salarioInput.value = salarioBase.toFixed(2);
+                console.log(`Salário auto-preenchido: R$ ${salarioBase.toFixed(2)}`);
+            } else if (!funcaoId) {
+                // Limpa o campo se nenhuma função foi selecionada
+                salarioInput.value = '';
+            }
+        });
+    }
 });
 
 // Função para submeter formulário de ponto (criação ou edição)
