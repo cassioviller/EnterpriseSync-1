@@ -2800,6 +2800,13 @@ def excluir_obra(id):
         flash('Operação de exclusão deve ser feita via POST', 'warning')
         return redirect(url_for('main.obras'))
     try:
+        # 🔄 ROLLBACK PREVENTIVO: Limpar qualquer sessão corrompida
+        try:
+            db.session.rollback()
+            print("🔄 ROLLBACK preventivo na exclusão executado")
+        except Exception as rollback_error:
+            print(f"⚠️ Falha no rollback preventivo: {rollback_error}")
+        
         # 🔒 SEGURANÇA MULTI-TENANT: Obter admin_id do usuário atual
         admin_id = get_tenant_admin_id()
         
@@ -2812,6 +2819,20 @@ def excluir_obra(id):
         if rdos_count > 0:
             flash(f'Não é possível excluir a obra "{nome}" pois possui {rdos_count} RDOs associados', 'warning')
             return redirect(url_for('main.detalhes_obra', id=id))
+        
+        # 🧹 EXCLUSÃO MANUAL DE CUSTOS: Usar SQL direto para evitar problemas de cache/sessão
+        try:
+            # Deletar custos usando SQL direto (não carrega modelo)
+            result = db.session.execute(
+                text("DELETE FROM custo_obra WHERE obra_id = :obra_id"),
+                {"obra_id": id}
+            )
+            custos_deletados = result.rowcount
+            if custos_deletados > 0:
+                print(f"🧹 Removidos {custos_deletados} custos associados à obra {id} via SQL direto")
+        except Exception as custos_error:
+            print(f"⚠️ Erro ao deletar custos: {custos_error}")
+            # Continuar mesmo com erro - tentar deletar a obra
         
         db.session.delete(obra)
         db.session.commit()
