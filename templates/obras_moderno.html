@@ -804,18 +804,19 @@ document.addEventListener('DOMContentLoaded', function() {
         card.style.animationDelay = `${index * 0.1}s`;
     });
     
-    // Auto-completar data de início com hoje
-    const dataInicioInput = document.querySelector('input[name="data_inicio"]');
-    if (dataInicioInput && !dataInicioInput.value) {
-        const hoje = new Date().toISOString().split('T')[0];
-        dataInicioInput.value = hoje;
-    }
+    // REMOVIDO: Auto-preenchimento de data que interferia no filtro
+    // O filtro deve permitir buscar sem data especificada
 });
 
-// Função para excluir obra
+// Função para excluir obra - CORRIGIDO para usar POST
 function excluirObra(id) {
     if (confirm('Tem certeza que deseja excluir esta obra? Esta ação não pode ser desfeita.')) {
-        window.location.href = `/obras/excluir/${id}`;
+        // Criar formulário para enviar POST
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/obras/excluir/${id}`;
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 

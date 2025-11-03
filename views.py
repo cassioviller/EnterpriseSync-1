@@ -2800,7 +2800,11 @@ def excluir_obra(id):
         flash('Operação de exclusão deve ser feita via POST', 'warning')
         return redirect(url_for('main.obras'))
     try:
-        obra = Obra.query.get_or_404(id)
+        # 🔒 SEGURANÇA MULTI-TENANT: Obter admin_id do usuário atual
+        admin_id = get_tenant_admin_id()
+        
+        # Buscar obra com verificação de admin_id
+        obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         nome = obra.nome
         
         # Verificar se há RDOs associados
