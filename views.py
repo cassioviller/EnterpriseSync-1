@@ -2215,11 +2215,11 @@ def nova_obra():
             db.session.flush()  # Para obter o ID da obra
             
             # ✅ CORREÇÃO CRÍTICA: Processar serviços selecionados usando função refatorada
+            # SEMPRE chamar processar_servicos_obra(), mesmo com lista vazia (igual à edição)
             servicos_selecionados = request.form.getlist('servicos_obra')
             print(f"🔧 NOVA OBRA: Processando {len(servicos_selecionados)} serviços selecionados")
-            if servicos_selecionados:
-                servicos_processados = processar_servicos_obra(nova_obra.id, servicos_selecionados)
-                print(f"✅ {servicos_processados} serviços processados para nova obra {nova_obra.id}")
+            servicos_processados = processar_servicos_obra(nova_obra.id, servicos_selecionados)
+            print(f"✅ {servicos_processados} serviços processados para nova obra {nova_obra.id}")
             
             db.session.commit()
             
