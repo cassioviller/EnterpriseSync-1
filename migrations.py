@@ -2006,6 +2006,58 @@ def _migration_47_almoxarifado_fornecedor():
 
 # Migração 48 definida mais adiante no arquivo (versão tenant-aware completa)
 
+def _migration_49_vehicle_alertas():
+    """
+    Migração 49: Adicionar campos de alertas/vencimentos em frota_veiculo
+    Adiciona: data_vencimento_ipva, data_vencimento_seguro
+    """
+    logger.info("=" * 80)
+    logger.info("🚗 MIGRAÇÃO 49: Campos de Alertas - Veículos")
+    logger.info("=" * 80)
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar e adicionar colunas se não existirem
+        colunas_adicionar = {
+            'data_vencimento_ipva': 'DATE',
+            'data_vencimento_seguro': 'DATE'
+        }
+        
+        for coluna, tipo_sql in colunas_adicionar.items():
+            # Verificar se coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'frota_veiculo' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' em frota_veiculo...")
+                cursor.execute(f"ALTER TABLE frota_veiculo ADD COLUMN {coluna} {tipo_sql}")
+                logger.info(f"✅ Coluna '{coluna}' adicionada com sucesso!")
+            else:
+                logger.info(f"✅ Coluna '{coluna}' já existe - skip")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 49 CONCLUÍDA: Campos de alertas adicionados!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 49: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
 
 def executar_migracoes():
     """
@@ -2048,6 +2100,7 @@ def executar_migracoes():
             (46, "Adicionar descricao a centro_custo_contabil", _migration_46_adicionar_descricao_centro_custo),
             (47, "Adicionar fornecedor_id ao almoxarifado_movimento", _migration_47_almoxarifado_fornecedor),
             (48, "Adicionar admin_id em 17 modelos faltantes", _migration_48_adicionar_admin_id_modelos_faltantes),
+            (49, "Campos de alertas veículos (IPVA/Seguro)", _migration_49_vehicle_alertas),
         ]
         
         # Executar cada migração com rastreamento
