@@ -200,34 +200,54 @@ def detalhes(id):
         
         # Buscar funcionários para exibir nomes nos passageiros
         funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id).all()
+        print(f"🔍 [FROTA_DETALHES] {len(funcionarios)} funcionários encontrados")
         
-        # Buscar usos recentes (últimos 20)
-        usos = FrotaUtilizacao.query.filter_by(
-            veiculo_id=id,
-            admin_id=tenant_admin_id
-        ).order_by(FrotaUtilizacao.data_uso.desc()).limit(20).all()
+        # Buscar usos recentes (últimos 20) com tratamento de erro
+        try:
+            print(f"🔍 [FROTA_DETALHES] Buscando usos do veículo...")
+            usos = FrotaUtilizacao.query.filter_by(
+                veiculo_id=id,
+                admin_id=tenant_admin_id
+            ).order_by(FrotaUtilizacao.data_uso.desc()).limit(20).all()
+            print(f"✅ [FROTA_DETALHES] {len(usos)} usos encontrados")
+        except Exception as e_usos:
+            print(f"⚠️ [FROTA_DETALHES] Erro ao buscar usos: {str(e_usos)}")
+            usos = []
         
-        # Estatísticas de uso
-        stats_uso = {
-            'total': FrotaUtilizacao.query.filter_by(veiculo_id=id, admin_id=tenant_admin_id).count(),
-            'km_total': db.session.query(db.func.sum(FrotaUtilizacao.km_percorrido)).filter_by(
-                veiculo_id=id, admin_id=tenant_admin_id
-            ).scalar() or 0
-        }
+        # Estatísticas de uso com tratamento de erro
+        try:
+            stats_uso = {
+                'total': FrotaUtilizacao.query.filter_by(veiculo_id=id, admin_id=tenant_admin_id).count(),
+                'km_total': db.session.query(db.func.sum(FrotaUtilizacao.km_percorrido)).filter_by(
+                    veiculo_id=id, admin_id=tenant_admin_id
+                ).scalar() or 0
+            }
+        except Exception as e_stats:
+            print(f"⚠️ [FROTA_DETALHES] Erro ao calcular stats de uso: {str(e_stats)}")
+            stats_uso = {'total': 0, 'km_total': 0}
         
-        # Buscar custos recentes
-        custos = FrotaDespesa.query.filter_by(
-            veiculo_id=id,
-            admin_id=tenant_admin_id
-        ).order_by(FrotaDespesa.data_custo.desc()).limit(20).all()
+        # Buscar custos recentes com tratamento de erro
+        try:
+            custos = FrotaDespesa.query.filter_by(
+                veiculo_id=id,
+                admin_id=tenant_admin_id
+            ).order_by(FrotaDespesa.data_custo.desc()).limit(20).all()
+            print(f"✅ [FROTA_DETALHES] {len(custos)} custos encontrados")
+        except Exception as e_custos:
+            print(f"⚠️ [FROTA_DETALHES] Erro ao buscar custos: {str(e_custos)}")
+            custos = []
         
-        # Estatísticas de custos
-        stats_custos = {
-            'total': FrotaDespesa.query.filter_by(veiculo_id=id, admin_id=tenant_admin_id).count(),
-            'valor_total': db.session.query(db.func.sum(FrotaDespesa.valor)).filter_by(
-                veiculo_id=id, admin_id=tenant_admin_id
-            ).scalar() or 0
-        }
+        # Estatísticas de custos com tratamento de erro
+        try:
+            stats_custos = {
+                'total': FrotaDespesa.query.filter_by(veiculo_id=id, admin_id=tenant_admin_id).count(),
+                'valor_total': db.session.query(db.func.sum(FrotaDespesa.valor)).filter_by(
+                    veiculo_id=id, admin_id=tenant_admin_id
+                ).scalar() or 0
+            }
+        except Exception as e_stats_custos:
+            print(f"⚠️ [FROTA_DETALHES] Erro ao calcular stats de custos: {str(e_stats_custos)}")
+            stats_custos = {'total': 0, 'valor_total': 0}
         
         return render_template('veiculos_detalhes.html',
                              veiculo=veiculo,
