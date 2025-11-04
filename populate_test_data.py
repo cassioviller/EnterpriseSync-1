@@ -487,12 +487,13 @@ def criar_usos_veiculos(veiculos, obras):
         for veiculo in veiculos:
             km_percorrido = random.randint(50, 200)
             uso = UsoVeiculo(
-                data=data_uso,
+                data_uso=data_uso,
                 veiculo_id=veiculo.id,
                 obra_id=random.choice(obras).id,
                 km_inicial=km_inicial,
                 km_final=km_inicial + km_percorrido,
-                objetivo=f"Transporte de materiais - {data_uso}",
+                km_percorrido=km_percorrido,
+                observacoes=f"Transporte de materiais",
                 admin_id=ADMIN_ID
             )
             db.session.add(uso)
@@ -517,11 +518,11 @@ def criar_custos_veiculos(veiculos):
         for veiculo in veiculos:
             if random.random() > 0.7:  # 30% de chance por dia
                 custo = CustoVeiculo(
-                    data=data_custo,
+                    data_custo=data_custo,
                     veiculo_id=veiculo.id,
                     tipo_custo=random.choice(tipos),
                     valor=Decimal(random.uniform(100.0, 500.0)),
-                    descricao=f"Custo de {random.choice(tipos)} - {data_custo}",
+                    descricao=f"Custo de {random.choice(tipos)}",
                     admin_id=ADMIN_ID
                 )
                 db.session.add(custo)
@@ -555,17 +556,15 @@ def main():
             restaurantes = criar_restaurantes()
             veiculos = criar_veiculos()
             
-            # 3. Criar dados transacionais (desabilitado por hora)
+            # 3. Criar dados transacionais
             # rdos = criar_rdos(obras, funcionarios)
             # registros_alimentacao = criar_registros_alimentacao(restaurantes, obras, funcionarios)
             # custos_obra = criar_custos_obra(obras)
-            # usos_veiculos = criar_usos_veiculos(veiculos, obras)
-            # custos_veiculos = criar_custos_veiculos(veiculos)
+            usos_veiculos = criar_usos_veiculos(veiculos, obras)
+            custos_veiculos = criar_custos_veiculos(veiculos)
             rdos = []
             registros_alimentacao = []
             custos_obra = []
-            usos_veiculos = []
-            custos_veiculos = []
             
             # 4. Commit final
             db.session.commit()

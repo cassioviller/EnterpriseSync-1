@@ -1,0 +1,341 @@
+# Prompt: Correção de Erros no Módulo de Frota
+
+## Problema Identificado
+
+O módulo de **Frota** do aplicativo EnterpriseSync está apresentando erros críticos que impedem a exibição de dados. A análise dos logs revelou que as tabelas `uso_veiculo` e `custo_veiculo` possuem a coluna `admin_id` definida nos modelos SQLAlchemy, mas **essa coluna não existe fisicamente no banco de dados PostgreSQL**.
+
+### Erros Específicos
+
+#### 1. **Erro em `uso_veiculo`**
+
+```
+psycopg2.errors.UndefinedFunction: operator does not exist: character varying = integer
+LINE 3: ...o_veiculo.veiculo_id = 4 AND uso_veiculo.admin_id = 2 ORDER ...
+```
+
+**Origem:**
+- Arquivo: `frota_views.py`, linha 211
+- Query: `.order_by(FrotaUtilizacao.data_uso.desc()).limit(20).all()`
+
+**Causa:**
+- SQLAlchemy tenta filtrar por `admin_id`, mas a coluna não existe
+- Erro de tipo secundário indica problema de schema
+
+#### 2. **Erro em `custo_veiculo`**
+
+```
+psycopg2.errors.UndefinedFunction: operator does not exist: character varying = integer
+LINE 3: ...custo_veiculo.veiculo_id = 4 AND custo_veiculo.admin_id = 2 ORDER ...
+```
+
+**Origem:**
+- Arquivo: `frota_views.py`, linha 211
+- Query similar para custos
+
+**Causa:**
+- Mesmo problema: coluna `admin_id` não existe
+
+#### 3. **Transações Abortadas (Efeito Cascata)**
+
+```
+psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
+```
+
+**Causa:**
+- Após o primeiro erro, a transação PostgreSQL é abortada
+- Todas as queries subsequentes falham até um ROLLBACK
+
+### Impacto
+
+❌ **Módulo de Frota completamente quebrado:**
+- Listagem de veículos não carrega dados de uso
+- Listagem de veículos não carrega dados de custos
+- Dashboard do veículo mostra "Nenhum uso registrado" (mesmo com dados no banco)
+- Dashboard do veículo mostra "Custos (0)"
+- KPIs de frota zerados ou incorretos
+
+---
+
+## Análise Técnica
+
+### Modelos SQLAlchemy Corretos
+
+Os modelos em `models.py` estão corretos e possuem `admin_id` definido:
+
+**`UsoVeiculo` (linha 3334):**
+```python
+admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+```
+
+**`CustoVeiculo` (linha 3420):**
+```python
+admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+```
+
+### Banco de Dados Desatualizado
+
+As tabelas no banco de dados **não possuem** a coluna `admin_id`:
+
+```sql
+-- Estado atual (ERRADO)
+SELECT column_name FROM information_schema.columns 
+WHERE table_name = 'uso_veiculo';
+-- Resultado: id, veiculo_id, funcionario_id, obra_id, data_uso, ...
+-- ❌ Falta: admin_id
+
+SELECT column_name FROM information_schema.columns 
+WHERE table_name = 'custo_veiculo';
+-- Resultado: id, veiculo_id, data_custo, tipo_custo, valor, ...
+-- ❌ Falta: admin_id
+```
+
+### Causa Raiz
+
+A **Migration 48** (que adiciona `admin_id` em várias tabelas) provavelmente:
+1. **Não foi executada** no banco de produção, OU
+2. **Não incluiu** as tabelas `uso_veiculo` e `custo_veiculo`
+
+---
+
+## Solução
+
+### Script SQL de Correção
+
+O script `fix_frota_admin_id.sql` foi criado para corrigir o problema. Ele:
+
+✅ **Adiciona a coluna `admin_id`** nas duas tabelas  
+✅ **Faz backfill** via relacionamento com `veiculo` (propaga `admin_id` do veículo)  
+✅ **Trata registros órfãos** (atribui `admin_id = 2` como padrão)  
+✅ **Adiciona constraint NOT NULL**  
+✅ **Cria foreign keys** para `usuario`  
+✅ **Cria índices** para performance  
+✅ **Valida** o resultado final  
+✅ **É idempotente** (pode ser executado múltiplas vezes)
+
+### Estratégia de Backfill
+
+A estratégia de backfill é baseada no relacionamento hierárquico:
+
+```
+veiculo (tem admin_id)
+  ↓
+uso_veiculo (herda admin_id do veiculo)
+custo_veiculo (herda admin_id do veiculo)
+```
+
+**SQL de backfill:**
+```sql
+-- Para uso_veiculo
+UPDATE uso_veiculo uv
+SET admin_id = v.admin_id
+FROM veiculo v
+WHERE uv.veiculo_id = v.id
+  AND uv.admin_id IS NULL
+  AND v.admin_id IS NOT NULL;
+
+-- Para custo_veiculo
+UPDATE custo_veiculo cv
+SET admin_id = v.admin_id
+FROM veiculo v
+WHERE cv.veiculo_id = v.id
+  AND cv.admin_id IS NULL
+  AND v.admin_id IS NOT NULL;
+```
+
+---
+
+## Como Executar
+
+### Pré-requisitos
+
+1. **Backup do banco de dados:**
+   ```bash
+   pg_dump -U usuario -d nome_banco > backup_antes_fix_frota.sql
+   ```
+
+2. **Acesso ao PostgreSQL:**
+   ```bash
+   psql -U usuario -d nome_banco
+   ```
+
+### Execução
+
+```bash
+psql -U usuario -d nome_banco -f fix_frota_admin_id.sql
+```
+
+### Saída Esperada
+
+```
+🔧 Corrigindo tabela uso_veiculo...
+  → Adicionando coluna admin_id...
+  → Fazendo backfill via veiculo...
+  ✅ 150 registros atualizados via veiculo
+  ✅ Nenhum registro órfão
+  → Adicionando constraint NOT NULL...
+  ✅ Constraint NOT NULL adicionada
+  → Criando foreign key para usuario...
+  ✅ Foreign key criada
+  → Criando índice idx_uso_veiculo_data_admin...
+  ✅ Índice criado
+✅ uso_veiculo CORRIGIDA COM SUCESSO!
+
+🔧 Corrigindo tabela custo_veiculo...
+  → Adicionando coluna admin_id...
+  → Fazendo backfill via veiculo...
+  ✅ 80 registros atualizados via veiculo
+  ✅ Nenhum registro órfão
+  → Adicionando constraint NOT NULL...
+  ✅ Constraint NOT NULL adicionada
+  → Criando foreign key para usuario...
+  ✅ Foreign key criada
+  → Criando índice idx_custo_veiculo_data_admin...
+  ✅ Índice criado
+  → Criando índice idx_custo_veiculo_tipo...
+  ✅ Índice criado
+✅ custo_veiculo CORRIGIDA COM SUCESSO!
+
+📊 VALIDAÇÃO FINAL:
+
+uso_veiculo:
+  Total de registros: 150
+  Com admin_id: 150
+  Sem admin_id: 0
+  Admins distintos: 1
+
+custo_veiculo:
+  Total de registros: 80
+  Com admin_id: 80
+  Sem admin_id: 0
+  Admins distintos: 1
+
+📝 Registrado no histórico de migrations
+
+========================================
+✅ CORREÇÃO CONCLUÍDA COM SUCESSO!
+========================================
+
+Próximos passos:
+1. Reiniciar a aplicação Flask
+2. Testar o módulo de Frota
+3. Verificar se os dados aparecem corretamente
+```
+
+---
+
+## Validação Pós-Correção
+
+### 1. Verificar Schema
+
+```sql
+-- Verificar se admin_id existe
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name IN ('uso_veiculo', 'custo_veiculo')
+  AND column_name = 'admin_id';
+
+-- Resultado esperado:
+-- column_name | data_type | is_nullable
+-- ------------+-----------+-------------
+-- admin_id    | integer   | NO
+-- admin_id    | integer   | NO
+```
+
+### 2. Verificar Dados
+
+```sql
+-- Verificar distribuição de admin_id
+SELECT 
+    'uso_veiculo' AS tabela,
+    admin_id,
+    COUNT(*) AS quantidade
+FROM uso_veiculo
+GROUP BY admin_id
+
+UNION ALL
+
+SELECT 
+    'custo_veiculo' AS tabela,
+    admin_id,
+    COUNT(*) AS quantidade
+FROM custo_veiculo
+GROUP BY admin_id
+ORDER BY tabela, admin_id;
+```
+
+### 3. Testar Interface
+
+1. **Acessar `/frota`**
+   - ✅ Lista de veículos deve carregar
+   - ✅ Cada veículo deve mostrar quantidade de usos e custos
+
+2. **Clicar em "Dashboard" em um veículo**
+   - ✅ KPIs devem mostrar valores corretos (KM Rodado, Custo/KM, etc.)
+   - ✅ Gráficos de custos e uso devem ter dados
+   - ✅ Histórico de usos deve listar registros
+   - ✅ Histórico de custos deve listar registros
+
+3. **Verificar logs do Flask**
+   - ✅ Nenhum erro `UndefinedFunction` ou `InFailedSqlTransaction`
+
+---
+
+## Troubleshooting
+
+### Erro: "column admin_id already exists"
+
+**Causa:** A coluna já foi adicionada anteriormente.
+
+**Solução:** O script é idempotente e irá pular a criação da coluna. Continue a execução.
+
+### Erro: "foreign key constraint violation"
+
+**Causa:** Existem registros com `admin_id` que não existe na tabela `usuario`.
+
+**Solução:**
+```sql
+-- Identificar registros problemáticos
+SELECT DISTINCT admin_id
+FROM uso_veiculo
+WHERE admin_id NOT IN (SELECT id FROM usuario);
+
+-- Corrigir manualmente
+UPDATE uso_veiculo
+SET admin_id = 2
+WHERE admin_id NOT IN (SELECT id FROM usuario);
+```
+
+### Dados ainda não aparecem após correção
+
+**Causa:** Aplicação Flask não foi reiniciada.
+
+**Solução:**
+```bash
+# Reiniciar aplicação
+sudo systemctl restart nome_do_servico_flask
+# OU
+pkill -f "python.*app.py" && python3 app.py
+```
+
+---
+
+## Resumo
+
+| Item | Status |
+|------|--------|
+| **Problema** | Coluna `admin_id` não existe em `uso_veiculo` e `custo_veiculo` |
+| **Causa** | Migration não executada ou incompleta |
+| **Solução** | Script SQL `fix_frota_admin_id.sql` |
+| **Backfill** | Via relacionamento com `veiculo` |
+| **Órfãos** | Atribuídos a `admin_id = 2` |
+| **Idempotente** | ✅ Sim |
+| **Validação** | ✅ Incluída no script |
+
+---
+
+## Arquivos Fornecidos
+
+1. **`fix_frota_admin_id.sql`** - Script SQL completo de correção
+2. **`prompt_fix_frota.md`** - Este documento (análise e instruções)
+
+Execute o script SQL e o módulo de Frota voltará a funcionar normalmente! 🚗
