@@ -38,10 +38,12 @@ The system employs a Flask backend, SQLAlchemy ORM, and a PostgreSQL database. J
     -   **Costs Management (Custos):** CRUD for construction costs with multi-tenant security, real-time statistics, and a dashboard with KPIs.
     -   **Accounting (Contabilidade):** Double-entry bookkeeping, automatic journal entries from payroll, a chart of accounts, trial balance, and DRE with competency selection.
     -   **Fleet Management System:** Manages vehicles, expenses, and provides TCO dashboards with critical alert notifications.
-    -   **Food Management System:** Manages restaurant and food entries, integrates with the financial module to generate accounts payable.
+    -   **Food Management System:** Manages restaurant and food entries, integrates with the financial module to generate accounts payable. Utilizes abordagem híbrida para suportar dois modelos (RegistroAlimentacao legado e AlimentacaoLancamento novo) com agregação automática de dados de ambas as fontes em dashboards, KPIs e gráficos.
     -   **Warehouse Management (Almoxarifado):** Manages materials, tools, and PPE with traceability.
     -   **Shared Device Time Clock System (Ponto Eletrônico):** Mobile-first time clock with GPS tracking.
 -   **Automated Database Error Diagnostics:** Includes a `DatabaseDiagnostics` system (`utils/database_diagnostics.py`) to analyze SQLAlchemy errors, report missing columns, and generate diagnostic reports. This system is integrated into views with `@capture_db_errors` decorators to provide user-friendly error messages and fallback mechanisms, particularly crucial for ensuring system functionality even when core migrations (like Migration 48) are pending in production. This diagnostic system includes a dedicated admin panel and pre/post-migration scripts for robust deployment.
+-   **Híbrido Data Model Support:** Sistema de alimentação utiliza lógica híbrida para ler dados de dois modelos simultaneamente (RegistroAlimentacao legado com campo `valor` e AlimentacaoLancamento novo com campo `valor_total`), permitindo coexistência de dados históricos e novos lançamentos. Implementado em `alimentacao_views.py` com agregação em Python de queries separadas, mantendo filtros multi-tenant e preservando formato compatível com templates existentes.
+-   **Transaction Isolation for Deletions:** Operações de exclusão críticas (ex: obras com 38 dependências) utilizam conexões RAW com `isolation_level="AUTOCOMMIT"` para prevenir erros "InFailedSqlTransaction" ao executar múltiplos DELETEs consecutivos. Schema é introspectado via `information_schema.columns` para determinar quais tabelas dependentes possuem `admin_id` antes de aplicar filtros multi-tenant.
 
 ## External Dependencies
 -   **Flask:** Web framework.
