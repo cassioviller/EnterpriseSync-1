@@ -2059,6 +2059,59 @@ def _migration_49_vehicle_alertas():
             except:
                 pass
 
+def _migration_50_uso_veiculo_passageiros():
+    """
+    Migração 50: Adicionar campos de passageiros em uso_veiculo
+    Adiciona: passageiros_frente, passageiros_tras (TEXT)
+    """
+    logger.info("=" * 80)
+    logger.info("🚗 MIGRAÇÃO 50: Campos de Passageiros - Uso de Veículo")
+    logger.info("=" * 80)
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar e adicionar colunas se não existirem
+        colunas_adicionar = {
+            'passageiros_frente': 'TEXT',
+            'passageiros_tras': 'TEXT'
+        }
+        
+        for coluna, tipo_sql in colunas_adicionar.items():
+            # Verificar se coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'uso_veiculo' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' em uso_veiculo...")
+                cursor.execute(f"ALTER TABLE uso_veiculo ADD COLUMN {coluna} {tipo_sql}")
+                logger.info(f"✅ Coluna '{coluna}' adicionada com sucesso!")
+            else:
+                logger.info(f"✅ Coluna '{coluna}' já existe - skip")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 50 CONCLUÍDA: Campos de passageiros adicionados!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 50: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2101,6 +2154,7 @@ def executar_migracoes():
             (47, "Adicionar fornecedor_id ao almoxarifado_movimento", _migration_47_almoxarifado_fornecedor),
             (48, "Adicionar admin_id em 17 modelos faltantes", _migration_48_adicionar_admin_id_modelos_faltantes),
             (49, "Campos de alertas veículos (IPVA/Seguro)", _migration_49_vehicle_alertas),
+            (50, "Campos de passageiros em uso_veiculo", _migration_50_uso_veiculo_passageiros),
         ]
         
         # Executar cada migração com rastreamento
