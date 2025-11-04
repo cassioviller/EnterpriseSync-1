@@ -406,11 +406,12 @@ def dashboard():
         else:
             variacao_percentual = 100.0 if custos_mes_atual > 0 else 0.0
         
-        # Gráfico 1: Top 5 Funcionários (mais refeições) - CORRIGIDO para RegistroAlimentacao
-        top_funcionarios = db.session.query(
-            Funcionario.nome,
+        # 🔄 HÍBRIDO: Gráfico 1 - Top 5 Funcionários (mais refeições)
+        # Contar de modelo ANTIGO (1 funcionário por registro)
+        top_func_antigo = db.session.query(
             Funcionario.id,
-            func.count(RegistroAlimentacao.id).label('total_refeicoes')
+            Funcionario.nome,
+            func.count(RegistroAlimentacao.id).label('total')
         ).join(
             RegistroAlimentacao,
             Funcionario.id == RegistroAlimentacao.funcionario_id
@@ -418,63 +419,164 @@ def dashboard():
             RegistroAlimentacao.admin_id == admin_id,
             Funcionario.admin_id == admin_id
         )
-        
         if data_inicio:
-            top_funcionarios = top_funcionarios.filter(RegistroAlimentacao.data >= data_inicio)
+            top_func_antigo = top_func_antigo.filter(RegistroAlimentacao.data >= data_inicio)
         if data_fim:
-            top_funcionarios = top_funcionarios.filter(RegistroAlimentacao.data <= data_fim)
+            top_func_antigo = top_func_antigo.filter(RegistroAlimentacao.data <= data_fim)
         if filtro_restaurante_id:
-            top_funcionarios = top_funcionarios.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
+            top_func_antigo = top_func_antigo.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            top_funcionarios = top_funcionarios.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
+            top_func_antigo = top_func_antigo.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
+        top_func_antigo = top_func_antigo.group_by(Funcionario.id, Funcionario.nome).all()
         
-        top_funcionarios = top_funcionarios.group_by(
-            Funcionario.id, Funcionario.nome
-        ).order_by(func.count(RegistroAlimentacao.id).desc()).limit(5).all()
+        # Contar de modelo NOVO (many-to-many via association table)
+        from models import alimentacao_lancamento_funcionarios
+        top_func_novo = db.session.query(
+            Funcionario.id,
+            Funcionario.nome,
+            func.count(alimentacao_lancamento_funcionarios.c.lancamento_id).label('total')
+        ).join(
+            alimentacao_lancamento_funcionarios,
+            Funcionario.id == alimentacao_lancamento_funcionarios.c.funcionario_id
+        ).join(
+            AlimentacaoLancamento,
+            AlimentacaoLancamento.id == alimentacao_lancamento_funcionarios.c.lancamento_id
+        ).filter(
+            AlimentacaoLancamento.admin_id == admin_id,
+            Funcionario.admin_id == admin_id
+        )
+        if data_inicio:
+            top_func_novo = top_func_novo.filter(AlimentacaoLancamento.data >= data_inicio)
+        if data_fim:
+            top_func_novo = top_func_novo.filter(AlimentacaoLancamento.data <= data_fim)
+        if filtro_restaurante_id:
+            top_func_novo = top_func_novo.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            top_func_novo = top_func_novo.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        top_func_novo = top_func_novo.group_by(Funcionario.id, Funcionario.nome).all()
         
-        # Gráfico 2: Top 5 Obras (mais gastos) - CORRIGIDO para usar 'valor'
-        top_obras = db.session.query(
-            Obra.nome,
+        # Combinar e somar
+        func_dict = {}
+        for func_id, func_nome, total in top_func_antigo:
+            func_dict[func_id] = {'nome': func_nome, 'total_refeicoes': int(total)}
+        for func_id, func_nome, total in top_func_novo:
+            if func_id in func_dict:
+                func_dict[func_id]['total_refeicoes'] += int(total)
+            else:
+                func_dict[func_id] = {'nome': func_nome, 'total_refeicoes': int(total)}
+        
+        # Ordenar e pegar top 5
+        top_funcionarios = sorted(
+            [(nome_data['nome'], fid, nome_data['total_refeicoes']) 
+             for fid, nome_data in func_dict.items()],
+            key=lambda x: x[2],
+            reverse=True
+        )[:5]
+        
+        # 🔄 HÍBRIDO: Gráfico 2 - Top 5 Obras (mais gastos)
+        # Somar de modelo ANTIGO
+        top_obras_antigo = db.session.query(
             Obra.id,
-            func.sum(RegistroAlimentacao.valor).label('total_gastos')
+            Obra.nome,
+            func.sum(RegistroAlimentacao.valor).label('total')
         ).join(RegistroAlimentacao).filter(
             RegistroAlimentacao.admin_id == admin_id,
             Obra.admin_id == admin_id
         )
-        
         if data_inicio:
-            top_obras = top_obras.filter(RegistroAlimentacao.data >= data_inicio)
+            top_obras_antigo = top_obras_antigo.filter(RegistroAlimentacao.data >= data_inicio)
         if data_fim:
-            top_obras = top_obras.filter(RegistroAlimentacao.data <= data_fim)
+            top_obras_antigo = top_obras_antigo.filter(RegistroAlimentacao.data <= data_fim)
         if filtro_restaurante_id:
-            top_obras = top_obras.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
+            top_obras_antigo = top_obras_antigo.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            top_obras = top_obras.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
+            top_obras_antigo = top_obras_antigo.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
+        top_obras_antigo = top_obras_antigo.group_by(Obra.id, Obra.nome).all()
         
-        top_obras = top_obras.group_by(Obra.id, Obra.nome).order_by(
-            func.sum(RegistroAlimentacao.valor).desc()
-        ).limit(5).all()
+        # Somar de modelo NOVO
+        top_obras_novo = db.session.query(
+            Obra.id,
+            Obra.nome,
+            func.sum(AlimentacaoLancamento.valor_total).label('total')
+        ).join(AlimentacaoLancamento).filter(
+            AlimentacaoLancamento.admin_id == admin_id,
+            Obra.admin_id == admin_id
+        )
+        if data_inicio:
+            top_obras_novo = top_obras_novo.filter(AlimentacaoLancamento.data >= data_inicio)
+        if data_fim:
+            top_obras_novo = top_obras_novo.filter(AlimentacaoLancamento.data <= data_fim)
+        if filtro_restaurante_id:
+            top_obras_novo = top_obras_novo.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            top_obras_novo = top_obras_novo.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        top_obras_novo = top_obras_novo.group_by(Obra.id, Obra.nome).all()
         
-        # Gráfico 3: Evolução Mensal - CORRIGIDO para usar 'valor'
-        evolucao_mensal = db.session.query(
+        # Combinar e somar
+        obra_dict = {}
+        for obra_id, obra_nome, total in top_obras_antigo:
+            obra_dict[obra_id] = {'nome': obra_nome, 'total_gastos': float(total or 0)}
+        for obra_id, obra_nome, total in top_obras_novo:
+            if obra_id in obra_dict:
+                obra_dict[obra_id]['total_gastos'] += float(total or 0)
+            else:
+                obra_dict[obra_id] = {'nome': obra_nome, 'total_gastos': float(total or 0)}
+        
+        # Ordenar e pegar top 5
+        top_obras = sorted(
+            [(nome_data['nome'], oid, nome_data['total_gastos']) 
+             for oid, nome_data in obra_dict.items()],
+            key=lambda x: x[2],
+            reverse=True
+        )[:5]
+        
+        # 🔄 HÍBRIDO: Gráfico 3 - Evolução Mensal
+        # Agrupar modelo ANTIGO
+        evolucao_antigo = db.session.query(
             func.to_char(RegistroAlimentacao.data, 'YYYY-MM').label('mes'),
             func.sum(RegistroAlimentacao.valor).label('total')
-        ).filter(
-            RegistroAlimentacao.admin_id == admin_id
-        )
-        
+        ).filter(RegistroAlimentacao.admin_id == admin_id)
         if data_inicio:
-            evolucao_mensal = evolucao_mensal.filter(RegistroAlimentacao.data >= data_inicio)
+            evolucao_antigo = evolucao_antigo.filter(RegistroAlimentacao.data >= data_inicio)
         if data_fim:
-            evolucao_mensal = evolucao_mensal.filter(RegistroAlimentacao.data <= data_fim)
+            evolucao_antigo = evolucao_antigo.filter(RegistroAlimentacao.data <= data_fim)
         if filtro_restaurante_id:
-            evolucao_mensal = evolucao_mensal.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
+            evolucao_antigo = evolucao_antigo.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            evolucao_mensal = evolucao_mensal.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
+            evolucao_antigo = evolucao_antigo.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
+        evolucao_antigo = evolucao_antigo.group_by(func.to_char(RegistroAlimentacao.data, 'YYYY-MM')).all()
         
-        evolucao_mensal = evolucao_mensal.group_by(
-            func.to_char(RegistroAlimentacao.data, 'YYYY-MM')
-        ).order_by(func.to_char(RegistroAlimentacao.data, 'YYYY-MM').desc()).limit(6).all()
+        # Agrupar modelo NOVO
+        evolucao_novo = db.session.query(
+            func.to_char(AlimentacaoLancamento.data, 'YYYY-MM').label('mes'),
+            func.sum(AlimentacaoLancamento.valor_total).label('total')
+        ).filter(AlimentacaoLancamento.admin_id == admin_id)
+        if data_inicio:
+            evolucao_novo = evolucao_novo.filter(AlimentacaoLancamento.data >= data_inicio)
+        if data_fim:
+            evolucao_novo = evolucao_novo.filter(AlimentacaoLancamento.data <= data_fim)
+        if filtro_restaurante_id:
+            evolucao_novo = evolucao_novo.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            evolucao_novo = evolucao_novo.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+        evolucao_novo = evolucao_novo.group_by(func.to_char(AlimentacaoLancamento.data, 'YYYY-MM')).all()
+        
+        # Combinar por mês
+        mes_dict = {}
+        for mes, total in evolucao_antigo:
+            mes_dict[mes] = float(total or 0)
+        for mes, total in evolucao_novo:
+            if mes in mes_dict:
+                mes_dict[mes] += float(total or 0)
+            else:
+                mes_dict[mes] = float(total or 0)
+        
+        # Ordenar e pegar últimos 6 meses
+        evolucao_mensal = sorted(
+            [(mes, total) for mes, total in mes_dict.items()],
+            key=lambda x: x[0],
+            reverse=True
+        )[:6]
         
         # Buscar restaurantes e obras para os filtros
         restaurantes_disponiveis = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
