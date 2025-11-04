@@ -1,0 +1,680 @@
+#!/usr/bin/env python3
+"""
+Script de População de Dados de Teste - EnterpriseSync
+======================================================
+
+Este script popula o banco de dados com dados de teste realistas
+para validação completa do sistema via interface.
+
+Uso:
+    python3 populate_test_data.py
+
+Requisitos:
+    - Aplicação Flask configurada
+    - Banco de dados acessível
+    - Migrations executadas (incluindo admin_id em todas as tabelas)
+"""
+
+import sys
+import os
+from datetime import datetime, timedelta, date
+from decimal import Decimal
+import random
+
+# Adicionar diretório da aplicação ao path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from app import app, db
+from models import (
+    Usuario, Obra, Funcionario, Departamento, Funcao, HorarioTrabalho,
+    RDO, RDOMaoObra, RDOServicoSubatividade, RegistroAlimentacao,
+    CustoObra, FrotaVeiculo, FrotaUsoVeiculo, FrotaCustoVeiculo,
+    ServicoObra, Servico, Subatividade, CentroCusto
+)
+
+# ============================================================================
+# CONFIGURAÇÕES
+# ============================================================================
+
+ADMIN_ID = 2  # ID do admin que será usado para todos os registros
+VERBOSE = True  # Mostrar logs detalhados
+
+# Cores para output
+class Colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+
+def log(message, color=Colors.OKBLUE):
+    """Log colorido"""
+    if VERBOSE:
+        print(f"{color}{message}{Colors.ENDC}")
+
+def success(message):
+    """Log de sucesso"""
+    log(f"✅ {message}", Colors.OKGREEN)
+
+def error(message):
+    """Log de erro"""
+    log(f"❌ {message}", Colors.FAIL)
+
+def warning(message):
+    """Log de aviso"""
+    log(f"⚠️  {message}", Colors.WARNING)
+
+def info(message):
+    """Log de informação"""
+    log(f"ℹ️  {message}", Colors.OKCYAN)
+
+# ============================================================================
+# FUNÇÕES DE LIMPEZA
+# ============================================================================
+
+def limpar_dados_teste():
+    """Remove dados de teste anteriores"""
+    log("\n" + "="*80, Colors.HEADER)
+    log("LIMPEZA DE DADOS DE TESTE ANTERIORES", Colors.HEADER)
+    log("="*80, Colors.HEADER)
+    
+    try:
+        # Ordem de exclusão respeitando foreign keys
+        tabelas = [
+            ('FrotaCustoVeiculo', FrotaCustoVeiculo),
+            ('FrotaUsoVeiculo', FrotaUsoVeiculo),
+            ('FrotaVeiculo', FrotaVeiculo),
+            ('CustoObra', CustoObra),
+            ('RegistroAlimentacao', RegistroAlimentacao),
+            ('RDOServicoSubatividade', RDOServicoSubatividade),
+            ('RDOMaoObra', RDOMaoObra),
+            ('RDO', RDO),
+            ('ServicoObra', ServicoObra),
+            ('Subatividade', Subatividade),
+            ('Servico', Servico),
+            ('Funcionario', Funcionario),
+            ('HorarioTrabalho', HorarioTrabalho),
+            ('Funcao', Funcao),
+            ('Departamento', Departamento),
+            ('CentroCusto', CentroCusto),
+            ('Obra', Obra),
+        ]
+        
+        for nome, modelo in tabelas:
+            count = modelo.query.filter_by(admin_id=ADMIN_ID).count()
+            if count > 0:
+                modelo.query.filter_by(admin_id=ADMIN_ID).delete()
+                info(f"Removidos {count} registros de {nome}")
+        
+        db.session.commit()
+        success("Limpeza concluída com sucesso!")
+        
+    except Exception as e:
+        db.session.rollback()
+        error(f"Erro na limpeza: {str(e)}")
+        raise
+
+# ============================================================================
+# FUNÇÕES DE POPULAÇÃO
+# ============================================================================
+
+def criar_departamentos():
+    """Cria departamentos de teste"""
+    log("\n📁 Criando Departamentos...", Colors.HEADER)
+    
+    departamentos_data = [
+        {"nome": "Engenharia", "descricao": "Equipe de engenharia e projetos"},
+        {"nome": "Obras", "descricao": "Equipe de execução de obras"},
+        {"nome": "Administrativo", "descricao": "Equipe administrativa"},
+        {"nome": "Manutenção", "descricao": "Equipe de manutenção"},
+    ]
+    
+    departamentos = []
+    for data in departamentos_data:
+        dept = Departamento(
+            nome=data["nome"],
+            descricao=data["descricao"],
+            admin_id=ADMIN_ID
+        )
+        db.session.add(dept)
+        departamentos.append(dept)
+        info(f"Departamento: {data['nome']}")
+    
+    db.session.flush()
+    success(f"{len(departamentos)} departamentos criados")
+    return departamentos
+
+def criar_funcoes():
+    """Cria funções de teste"""
+    log("\n👷 Criando Funções...", Colors.HEADER)
+    
+    funcoes_data = [
+        {"nome": "Engenheiro Civil", "descricao": "Responsável técnico"},
+        {"nome": "Mestre de Obras", "descricao": "Supervisão de obras"},
+        {"nome": "Pedreiro", "descricao": "Execução de alvenaria"},
+        {"nome": "Servente", "descricao": "Serviços gerais"},
+        {"nome": "Eletricista", "descricao": "Instalações elétricas"},
+        {"nome": "Encanador", "descricao": "Instalações hidráulicas"},
+    ]
+    
+    funcoes = []
+    for data in funcoes_data:
+        funcao = Funcao(
+            nome=data["nome"],
+            descricao=data["descricao"],
+            admin_id=ADMIN_ID
+        )
+        db.session.add(funcao)
+        funcoes.append(funcao)
+        info(f"Função: {data['nome']}")
+    
+    db.session.flush()
+    success(f"{len(funcoes)} funções criadas")
+    return funcoes
+
+def criar_horarios_trabalho():
+    """Cria horários de trabalho de teste"""
+    log("\n⏰ Criando Horários de Trabalho...", Colors.HEADER)
+    
+    horarios_data = [
+        {
+            "nome": "Comercial - 8h",
+            "entrada": "08:00:00",
+            "saida_almoco": "12:00:00",
+            "retorno_almoco": "13:00:00",
+            "saida": "17:00:00",
+            "dias_semana": "1,2,3,4,5",
+            "horas_diarias": 8.0,
+            "valor_hora": 25.00
+        },
+        {
+            "nome": "Obra - 9h",
+            "entrada": "07:00:00",
+            "saida_almoco": "12:00:00",
+            "retorno_almoco": "13:00:00",
+            "saida": "17:00:00",
+            "dias_semana": "1,2,3,4,5,6",
+            "horas_diarias": 9.0,
+            "valor_hora": 20.00
+        },
+    ]
+    
+    horarios = []
+    for data in horarios_data:
+        horario = HorarioTrabalho(
+            nome=data["nome"],
+            entrada=data["entrada"],
+            saida_almoco=data["saida_almoco"],
+            retorno_almoco=data["retorno_almoco"],
+            saida=data["saida"],
+            dias_semana=data["dias_semana"],
+            horas_diarias=data["horas_diarias"],
+            valor_hora=data["valor_hora"],
+            admin_id=ADMIN_ID
+        )
+        db.session.add(horario)
+        horarios.append(horario)
+        info(f"Horário: {data['nome']}")
+    
+    db.session.flush()
+    success(f"{len(horarios)} horários criados")
+    return horarios
+
+def criar_obras():
+    """Cria obras de teste"""
+    log("\n🏗️  Criando Obras...", Colors.HEADER)
+    
+    obras_data = [
+        {
+            "nome": "Edifício Residencial Sunset",
+            "endereco": "Rua das Flores, 123 - Centro",
+            "cidade": "São Paulo",
+            "estado": "SP",
+            "valor_contrato": 1500000.00,
+            "data_inicio": date.today() - timedelta(days=60),
+            "data_previsao_termino": date.today() + timedelta(days=120),
+            "ativo": True
+        },
+        {
+            "nome": "Reforma Comercial Plaza Shopping",
+            "endereco": "Av. Paulista, 1000",
+            "cidade": "São Paulo",
+            "estado": "SP",
+            "valor_contrato": 800000.00,
+            "data_inicio": date.today() - timedelta(days=30),
+            "data_previsao_termino": date.today() + timedelta(days=90),
+            "ativo": True
+        },
+        {
+            "nome": "Construção Galpão Industrial",
+            "endereco": "Rod. Anhanguera, Km 45",
+            "cidade": "Jundiaí",
+            "estado": "SP",
+            "valor_contrato": 2000000.00,
+            "data_inicio": date.today() - timedelta(days=90),
+            "data_previsao_termino": date.today() + timedelta(days=60),
+            "ativo": True
+        },
+    ]
+    
+    obras = []
+    for data in obras_data:
+        obra = Obra(
+            nome=data["nome"],
+            endereco=data["endereco"],
+            cidade=data["cidade"],
+            estado=data["estado"],
+            valor_contrato=data["valor_contrato"],
+            data_inicio=data["data_inicio"],
+            data_previsao_termino=data["data_previsao_termino"],
+            ativo=data["ativo"],
+            admin_id=ADMIN_ID
+        )
+        db.session.add(obra)
+        obras.append(obra)
+        info(f"Obra: {data['nome']}")
+    
+    db.session.flush()
+    success(f"{len(obras)} obras criadas")
+    return obras
+
+def criar_funcionarios(departamentos, funcoes, horarios):
+    """Cria funcionários de teste"""
+    log("\n👥 Criando Funcionários...", Colors.HEADER)
+    
+    nomes = [
+        "João Silva Santos",
+        "Maria Oliveira Costa",
+        "Pedro Henrique Souza",
+        "Ana Paula Ferreira",
+        "Carlos Eduardo Lima",
+        "Juliana Rodrigues Alves",
+        "Fernando Martins Pereira",
+        "Beatriz Santos Oliveira",
+        "Rafael Costa Mendes",
+        "Camila Almeida Rocha"
+    ]
+    
+    funcionarios = []
+    for i, nome in enumerate(nomes):
+        func = Funcionario(
+            nome=nome,
+            cpf=f"{random.randint(10000000000, 99999999999)}",
+            rg=f"{random.randint(100000000, 999999999)}",
+            data_nascimento=date(1990, 1, 1) + timedelta(days=random.randint(0, 10000)),
+            telefone=f"(11) 9{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
+            email=f"{nome.lower().replace(' ', '.')}@teste.com",
+            endereco=f"Rua Teste, {random.randint(1, 999)}",
+            cidade="São Paulo",
+            estado="SP",
+            cep=f"{random.randint(10000, 99999)}-{random.randint(100, 999)}",
+            data_admissao=date.today() - timedelta(days=random.randint(30, 365)),
+            departamento_id=random.choice(departamentos).id,
+            funcao_id=random.choice(funcoes).id,
+            horario_trabalho_id=random.choice(horarios).id,
+            salario=Decimal(random.randint(2000, 8000)),
+            ativo=True,
+            admin_id=ADMIN_ID
+        )
+        db.session.add(func)
+        funcionarios.append(func)
+        info(f"Funcionário: {nome}")
+    
+    db.session.flush()
+    success(f"{len(funcionarios)} funcionários criados")
+    return funcionarios
+
+def criar_servicos_e_subatividades():
+    """Cria serviços e subatividades de teste"""
+    log("\n🔧 Criando Serviços e Subatividades...", Colors.HEADER)
+    
+    servicos_data = [
+        {
+            "nome": "Fundação",
+            "subatividades": ["Escavação", "Armação", "Concretagem", "Impermeabilização"]
+        },
+        {
+            "nome": "Estrutura",
+            "subatividades": ["Formas", "Armação", "Concretagem", "Desforma"]
+        },
+        {
+            "nome": "Alvenaria",
+            "subatividades": ["Elevação", "Vergas e Contravergas", "Encunhamento"]
+        },
+        {
+            "nome": "Revestimento",
+            "subatividades": ["Chapisco", "Emboço", "Reboco", "Pintura"]
+        },
+    ]
+    
+    servicos = []
+    subatividades = []
+    
+    for serv_data in servicos_data:
+        servico = Servico(
+            nome=serv_data["nome"],
+            descricao=f"Serviço de {serv_data['nome']}",
+            admin_id=ADMIN_ID
+        )
+        db.session.add(servico)
+        db.session.flush()
+        servicos.append(servico)
+        info(f"Serviço: {serv_data['nome']}")
+        
+        for sub_nome in serv_data["subatividades"]:
+            subatividade = Subatividade(
+                nome=sub_nome,
+                descricao=f"{sub_nome} de {serv_data['nome']}",
+                servico_id=servico.id,
+                admin_id=ADMIN_ID
+            )
+            db.session.add(subatividade)
+            subatividades.append(subatividade)
+            info(f"  → Subatividade: {sub_nome}")
+    
+    db.session.flush()
+    success(f"{len(servicos)} serviços e {len(subatividades)} subatividades criados")
+    return servicos, subatividades
+
+def vincular_servicos_obras(obras, servicos):
+    """Vincula serviços às obras"""
+    log("\n🔗 Vinculando Serviços às Obras...", Colors.HEADER)
+    
+    servicos_obra = []
+    for obra in obras:
+        for servico in servicos:
+            so = ServicoObra(
+                obra_id=obra.id,
+                servico_id=servico.id,
+                admin_id=ADMIN_ID
+            )
+            db.session.add(so)
+            servicos_obra.append(so)
+    
+    db.session.flush()
+    success(f"{len(servicos_obra)} vínculos serviço-obra criados")
+    return servicos_obra
+
+def criar_rdos(obras, funcionarios, servicos, subatividades):
+    """Cria RDOs de teste"""
+    log("\n📋 Criando RDOs...", Colors.HEADER)
+    
+    rdos = []
+    rdos_mao_obra = []
+    rdos_servicos = []
+    
+    # Criar RDOs para os últimos 30 dias
+    for i in range(30):
+        data_rdo = date.today() - timedelta(days=i)
+        
+        for obra in obras[:2]:  # Apenas 2 primeiras obras
+            rdo = RDO(
+                obra_id=obra.id,
+                data=data_rdo,
+                funcionario_id=random.choice(funcionarios).id,
+                rdo_id=f"RDO-{obra.id}-{data_rdo.strftime('%Y%m%d')}",
+                horas_trabalhadas=Decimal(random.randint(8, 10)),
+                funcao_exercida=f"Função {random.randint(1, 3)}",
+                admin_id=ADMIN_ID
+            )
+            db.session.add(rdo)
+            db.session.flush()
+            rdos.append(rdo)
+            
+            # Adicionar mão de obra
+            for _ in range(random.randint(3, 6)):
+                mo = RDOMaoObra(
+                    rdo_id=rdo.id,
+                    funcionario_id=random.choice(funcionarios).id,
+                    admin_id=ADMIN_ID
+                )
+                db.session.add(mo)
+                rdos_mao_obra.append(mo)
+            
+            # Adicionar serviços
+            for servico in random.sample(servicos, k=random.randint(1, 3)):
+                subs = [s for s in subatividades if s.servico_id == servico.id]
+                if subs:
+                    rs = RDOServicoSubatividade(
+                        rdo_id=rdo.id,
+                        servico_id=servico.id,
+                        subatividade_id=random.choice(subs).id,
+                        percentual_concluido=Decimal(random.randint(5, 20)),
+                        admin_id=ADMIN_ID
+                    )
+                    db.session.add(rs)
+                    rdos_servicos.append(rs)
+    
+    db.session.flush()
+    success(f"{len(rdos)} RDOs criados")
+    success(f"{len(rdos_mao_obra)} registros de mão de obra criados")
+    success(f"{len(rdos_servicos)} registros de serviços criados")
+    return rdos
+
+def criar_registros_alimentacao(obras, funcionarios):
+    """Cria registros de alimentação de teste"""
+    log("\n🍽️  Criando Registros de Alimentação...", Colors.HEADER)
+    
+    registros = []
+    
+    # Últimos 30 dias
+    for i in range(30):
+        data_reg = date.today() - timedelta(days=i)
+        
+        for obra in obras[:2]:
+            for _ in range(random.randint(3, 8)):
+                reg = RegistroAlimentacao(
+                    obra_id=obra.id,
+                    funcionario_id=random.choice(funcionarios).id,
+                    data=data_reg,
+                    tipo_refeicao=random.choice(['cafe', 'almoco', 'jantar']),
+                    valor=Decimal(random.choice([15.00, 18.00, 20.00, 25.00])),
+                    admin_id=ADMIN_ID
+                )
+                db.session.add(reg)
+                registros.append(reg)
+    
+    db.session.flush()
+    success(f"{len(registros)} registros de alimentação criados")
+    return registros
+
+def criar_custos_obra(obras):
+    """Cria custos de obra de teste"""
+    log("\n💰 Criando Custos de Obra...", Colors.HEADER)
+    
+    custos = []
+    
+    # Últimos 30 dias
+    for i in range(30):
+        data_custo = date.today() - timedelta(days=i)
+        
+        for obra in obras:
+            # Custos de alimentação
+            for _ in range(random.randint(2, 5)):
+                custo = CustoObra(
+                    obra_id=obra.id,
+                    tipo='alimentacao',
+                    descricao=f"Alimentação - {random.choice(['almoco', 'cafe', 'jantar'])}",
+                    valor=Decimal(random.randint(15, 30)),
+                    data=data_custo,
+                    admin_id=ADMIN_ID
+                )
+                db.session.add(custo)
+                custos.append(custo)
+            
+            # Custos de material
+            if random.random() > 0.7:
+                custo = CustoObra(
+                    obra_id=obra.id,
+                    tipo='material',
+                    descricao=random.choice(['Cimento', 'Areia', 'Brita', 'Tijolo']),
+                    valor=Decimal(random.randint(500, 3000)),
+                    data=data_custo,
+                    admin_id=ADMIN_ID
+                )
+                db.session.add(custo)
+                custos.append(custo)
+    
+    db.session.flush()
+    success(f"{len(custos)} custos de obra criados")
+    return custos
+
+def criar_veiculos():
+    """Cria veículos de teste"""
+    log("\n🚗 Criando Veículos...", Colors.HEADER)
+    
+    veiculos_data = [
+        {"placa": "ABC1234", "modelo": "Fiat Strada", "ano": 2020, "tipo": "Caminhonete"},
+        {"placa": "DEF5678", "modelo": "VW Saveiro", "ano": 2019, "tipo": "Caminhonete"},
+        {"placa": "GHI9012", "modelo": "Ford Cargo", "ano": 2018, "tipo": "Caminhão"},
+    ]
+    
+    veiculos = []
+    for data in veiculos_data:
+        veiculo = FrotaVeiculo(
+            placa=data["placa"],
+            modelo=data["modelo"],
+            ano=data["ano"],
+            tipo=data["tipo"],
+            km_atual=Decimal(random.randint(50000, 150000)),
+            ativo=True,
+            admin_id=ADMIN_ID
+        )
+        db.session.add(veiculo)
+        veiculos.append(veiculo)
+        info(f"Veículo: {data['placa']} - {data['modelo']}")
+    
+    db.session.flush()
+    success(f"{len(veiculos)} veículos criados")
+    return veiculos
+
+def criar_usos_veiculos(veiculos, obras, funcionarios):
+    """Cria usos de veículos de teste"""
+    log("\n🛣️  Criando Usos de Veículos...", Colors.HEADER)
+    
+    usos = []
+    
+    for i in range(60):  # Últimos 60 dias
+        data_uso = date.today() - timedelta(days=i)
+        
+        for veiculo in veiculos:
+            if random.random() > 0.5:  # 50% de chance de uso por dia
+                uso = FrotaUsoVeiculo(
+                    veiculo_id=veiculo.id,
+                    obra_id=random.choice(obras).id,
+                    funcionario_id=random.choice(funcionarios).id,
+                    data=data_uso,
+                    km_inicial=veiculo.km_atual,
+                    km_final=veiculo.km_atual + Decimal(random.randint(50, 200)),
+                    descricao="Transporte de materiais",
+                    admin_id=ADMIN_ID
+                )
+                db.session.add(uso)
+                usos.append(uso)
+                
+                # Atualizar km do veículo
+                veiculo.km_atual = uso.km_final
+    
+    db.session.flush()
+    success(f"{len(usos)} usos de veículos criados")
+    return usos
+
+def criar_custos_veiculos(veiculos):
+    """Cria custos de veículos de teste"""
+    log("\n⛽ Criando Custos de Veículos...", Colors.HEADER)
+    
+    custos = []
+    
+    for i in range(30):  # Últimos 30 dias
+        data_custo = date.today() - timedelta(days=i)
+        
+        for veiculo in veiculos:
+            if random.random() > 0.6:  # 40% de chance de custo por dia
+                custo = FrotaCustoVeiculo(
+                    veiculo_id=veiculo.id,
+                    tipo=random.choice(['combustivel', 'manutencao']),
+                    descricao=random.choice(['Abastecimento', 'Troca de óleo', 'Revisão']),
+                    valor=Decimal(random.randint(100, 500)),
+                    data=data_custo,
+                    admin_id=ADMIN_ID
+                )
+                db.session.add(custo)
+                custos.append(custo)
+    
+    db.session.flush()
+    success(f"{len(custos)} custos de veículos criados")
+    return custos
+
+# ============================================================================
+# FUNÇÃO PRINCIPAL
+# ============================================================================
+
+def main():
+    """Função principal de população de dados"""
+    log("\n" + "="*80, Colors.HEADER)
+    log("POPULAÇÃO DE DADOS DE TESTE - ENTERPRISESYNC", Colors.HEADER)
+    log("="*80, Colors.HEADER)
+    
+    with app.app_context():
+        try:
+            # Verificar se admin existe
+            admin = Usuario.query.get(ADMIN_ID)
+            if not admin:
+                error(f"Admin com ID {ADMIN_ID} não encontrado!")
+                error("Execute as migrations primeiro ou ajuste ADMIN_ID no script")
+                return False
+            
+            info(f"Admin encontrado: {admin.email}")
+            
+            # Limpeza
+            limpar_dados_teste()
+            
+            # População
+            departamentos = criar_departamentos()
+            funcoes = criar_funcoes()
+            horarios = criar_horarios_trabalho()
+            obras = criar_obras()
+            funcionarios = criar_funcionarios(departamentos, funcoes, horarios)
+            servicos, subatividades = criar_servicos_e_subatividades()
+            vincular_servicos_obras(obras, servicos)
+            criar_rdos(obras, funcionarios, servicos, subatividades)
+            criar_registros_alimentacao(obras, funcionarios)
+            criar_custos_obra(obras)
+            veiculos = criar_veiculos()
+            criar_usos_veiculos(veiculos, obras, funcionarios)
+            criar_custos_veiculos(veiculos)
+            
+            # Commit final
+            db.session.commit()
+            
+            # Resumo
+            log("\n" + "="*80, Colors.HEADER)
+            log("RESUMO DA POPULAÇÃO", Colors.HEADER)
+            log("="*80, Colors.HEADER)
+            success(f"✅ {len(departamentos)} Departamentos")
+            success(f"✅ {len(funcoes)} Funções")
+            success(f"✅ {len(horarios)} Horários de Trabalho")
+            success(f"✅ {len(obras)} Obras")
+            success(f"✅ {len(funcionarios)} Funcionários")
+            success(f"✅ {len(servicos)} Serviços")
+            success(f"✅ {len(subatividades)} Subatividades")
+            success(f"✅ {len(veiculos)} Veículos")
+            log("="*80, Colors.HEADER)
+            success("POPULAÇÃO CONCLUÍDA COM SUCESSO!")
+            log("="*80, Colors.HEADER)
+            
+            return True
+            
+        except Exception as e:
+            db.session.rollback()
+            error(f"Erro durante população: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+if __name__ == "__main__":
+    success_status = main()
+    sys.exit(0 if success_status else 1)

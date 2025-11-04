@@ -1,0 +1,214 @@
+# Prompt: Teste End-to-End do Aplicativo EnterpriseSync
+
+## Objetivo
+
+Realizar um teste completo (end-to-end) do aplicativo **EnterpriseSync** para garantir que todos os módulos principais estão funcionando corretamente após as correções no banco de dados. O teste envolve duas fases:
+
+1.  **População de Dados:** Executar um script Python para popular o banco de dados com um conjunto de dados de teste realista.
+2.  **Validação via Interface:** Seguir um roteiro de testes para verificar se os dados populados são exibidos corretamente nos dashboards e KPIs da aplicação.
+3.  **Relatório Final:** Gerar um relatório consolidado com os resultados dos testes.
+
+---
+
+## Fase 1: População de Dados
+
+### Pré-requisitos
+
+1.  **Ambiente Configurado:** A aplicação Flask deve estar rodando e acessível.
+2.  **Banco de Dados Acessível:** O banco de dados PostgreSQL deve estar online e as credenciais de acesso configuradas na aplicação.
+3.  **Migrations Executadas:** Todas as migrations, incluindo as que adicionam a coluna `admin_id` em todas as tabelas, devem ter sido executadas com sucesso.
+4.  **Admin Existente:** Um usuário com `id = 2` e perfil de administrador deve existir na tabela `usuario`.
+
+### Script de População
+
+O script `populate_test_data.py` foi criado para automatizar a inserção de dados de teste. Ele é **idempotente**, ou seja, pode ser executado múltiplas vezes sem duplicar dados, pois ele primeiro limpa os dados de teste anteriores associados ao `admin_id = 2`.
+
+**Arquivo:** `populate_test_data.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Script de População de Dados de Teste - EnterpriseSync
+======================================================
+
+Este script popula o banco de dados com dados de teste realistas
+para validação completa do sistema via interface.
+
+Uso:
+    python3 populate_test_data.py
+
+Requisitos:
+    - Aplicação Flask configurada
+    - Banco de dados acessível
+    - Migrations executadas (incluindo admin_id em todas as tabelas)
+"""
+
+import sys
+import os
+from datetime import datetime, timedelta, date
+from decimal import Decimal
+import random
+
+# Adicionar diretório da aplicação ao path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from app import app, db
+from models import (
+    Usuario, Obra, Funcionario, Departamento, Funcao, HorarioTrabalho,
+    RDO, RDOMaoObra, RDOServicoSubatividade, RegistroAlimentacao,
+    CustoObra, FrotaVeiculo, FrotaUsoVeiculo, FrotaCustoVeiculo,
+    ServicoObra, Servico, Subatividade, CentroCusto
+)
+
+# ... (restante do código do script)
+```
+
+### Dados a Serem Criados
+
+O script irá criar:
+
+-   **4** Departamentos (Engenharia, Obras, etc.)
+-   **6** Funções (Engenheiro, Mestre de Obras, etc.)
+-   **2** Horários de Trabalho
+-   **3** Obras Ativas
+-   **10** Funcionários Ativos
+-   **4** Serviços com Subatividades
+-   **RDOs** para os últimos 30 dias em 2 obras
+-   **Registros de Alimentação** para os últimos 30 dias
+-   **Custos de Obra** (alimentação e material) para os últimos 30 dias
+-   **3** Veículos na Frota
+-   **Usos de Veículos** para os últimos 60 dias
+-   **Custos de Veículos** (combustível e manutenção) para os últimos 30 dias
+
+### Como Executar
+
+1.  **Acesse o servidor** onde a aplicação está rodando.
+2.  **Navegue até o diretório** da aplicação EnterpriseSync.
+3.  **Execute o script** com o seguinte comando:
+
+    ```bash
+    python3 populate_test_data.py
+    ```
+
+4.  **Verifique a saída:** O script exibirá logs detalhados de cada etapa. Ao final, uma mensagem de sucesso deve ser exibida.
+
+    ```
+    ================================================================================
+    RESUMO DA POPULAÇÃO
+    ================================================================================
+    ✅ 4 Departamentos
+    ✅ 6 Funções
+    ✅ 2 Horários de Trabalho
+    ✅ 3 Obras
+    ✅ 10 Funcionários
+    ✅ 4 Serviços
+    ✅ 13 Subatividades
+    ✅ 3 Veículos
+    ================================================================================
+    ✅ POPULAÇÃO CONCLUÍDA COM SUCESSO!
+    ================================================================================
+    ```
+
+---
+
+## Fase 2: Validação via Interface
+
+Após a execução bem-sucedida do script de população, acesse a aplicação web e siga o roteiro de testes abaixo para validar se os dados estão sendo exibidos corretamente.
+
+**Faça login como o usuário administrador (`admin_id = 2`).**
+
+### Roteiro de Testes
+
+O roteiro de testes está detalhado no arquivo `test_plan.md`.
+
+```markdown
+# Roteiro de Testes End-to-End - EnterpriseSync
+
+## 1. Dashboard Principal (`/dashboard`)
+
+| KPI | Valor Esperado | Verificação |
+|---|---|---|
+| **Obras Ativas** | 3 | Contar cards de obras ativas |
+| **Funcionários Ativos** | 10 | Contar funcionários na lista |
+| **Veículos na Frota** | 3 | Contar veículos na lista |
+| **Custo Total (Últimos 30 dias)** | > 0 | Verificar se valor é positivo e consistente com custos criados |
+| **Progresso Médio das Obras** | > 0% | Verificar se barra de progresso não está zerada |
+| **RDOs (Últimos 30 dias)** | > 0 | Verificar se gráfico de RDOs tem dados |
+
+## 2. Módulo de Obras (`/obras`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Listagem de Obras** | Acessar `/obras` | 3 obras devem ser listadas |
+| **Detalhes da Obra** | Clicar em "Visualizar" na obra "Edifício Residencial Sunset" | - Progresso geral > 0%<br>- Custos (Alimentação, Material) > 0<br>- Gráficos de custos e progresso com dados<br>- Lista de RDOs com registros |
+
+## 3. Módulo de Funcionários (`/funcionarios`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Listagem de Funcionários** | Acessar `/funcionarios` | 10 funcionários devem ser listados |
+| **Perfil do Funcionário** | Clicar em "Ver Perfil" no funcionário "João Silva Santos" | - KPIs (Horas Trabalhadas, RDOs, Custos) > 0<br>- Gráficos de produtividade com dados<br>- Histórico de RDOs e custos com registros |
+
+## 4. Módulo de Custos (`/custos/dashboard`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Dashboard de Custos** | Acessar `/custos/dashboard` | - Custo total > 0<br>- Gráfico de custos por obra com dados<br>- Gráfico de custos por tipo (Alimentação, Material) com dados |
+
+## 5. Módulo de Frota (`/frota`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Listagem de Veículos** | Acessar `/frota` | 3 veículos devem ser listados |
+| **Dashboard do Veículo** | Clicar em "Dashboard" no veículo "ABC1234" | - KPIs (KM Rodado, Custo/KM, Consumo) > 0<br>- Gráficos de custos e uso com dados |
+
+## 6. Módulo de RDOs (`/rdos`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Listagem de RDOs** | Acessar `/rdos` | RDOs dos últimos 30 dias devem ser listados |
+| **Visualizar RDO** | Clicar em "Visualizar" em um RDO | - Detalhes do RDO<br>- Lista de mão de obra<br>- Lista de serviços com percentuais |
+
+```
+
+---
+
+## Fase 3: Relatório Final
+
+Após concluir o roteiro de testes, preencha o seguinte checklist para gerar um relatório final sobre a saúde do sistema.
+
+### Checklist de Resultados
+
+| Módulo | Status (✅ OK / ❌ ERRO) | Observações |
+|---|---|---|
+| **Dashboard Principal** | | KPIs principais estão corretos? |
+| **Módulo de Obras** | | Listagem, detalhes e filtros funcionam? |
+| **Módulo de Funcionários** | | Listagem, perfis e filtros funcionam? |
+| **Módulo de Custos** | | Dashboard e filtros funcionam? |
+| **Módulo de Frota** | | Listagem, dashboards e filtros funcionam? |
+| **Módulo de RDOs** | | Listagem, detalhes e filtros funcionam? |
+
+### Análise de Erros
+
+-   **Erros no Console do Navegador:**
+    -   Houve algum erro (vermelho) no console do desenvolvedor (F12)? Se sim, liste-os aqui.
+
+-   **Erros no Log do Servidor:**
+    -   Houve algum erro no log do Flask durante os testes? Se sim, liste-os aqui.
+
+### Conclusão Geral
+
+-   [ ] **Sistema Aprovado:** Todos os testes passaram sem erros críticos.
+-   [ ] **Sistema Aprovado com Ressalvas:** Testes passaram, mas foram encontrados erros menores ou avisos.
+-   [ ] **Sistema Reprovado:** Foram encontrados erros críticos que impedem o funcionamento de módulos principais.
+
+**Resumo Final:**
+
+(Escreva um breve parágrafo resumindo os resultados dos testes e a conclusão geral sobre o estado da aplicação.)
+
+---
+
+## Próximos Passos
+
+-   Se todos os testes passarem, o sistema pode ser considerado estável e pronto para produção.
+-   Se forem encontrados erros, eles devem ser documentados e reportados para correção.

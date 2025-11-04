@@ -103,38 +103,30 @@ def restaurante_detalhes(restaurante_id):
         admin_id=admin_id
     ).all()
     
-    # Combinar ambos em formato unificado para template
+    # Adapter: Normaliza modelo ANTIGO para formato do template
+    class LancamentoAdapter:
+        """Adapter para normalizar RegistroAlimentacao para o formato esperado pelo template"""
+        def __init__(self, registro):
+            self.data = registro.data
+            self.obra = registro.obra_ref  # Objeto ORM (ou None)
+            self.valor_total = float(registro.valor)
+            self.funcionarios = [registro.funcionario_ref] if registro.funcionario_ref else []
+            self.valor_por_funcionario = float(registro.valor) if registro.funcionario_ref else 0
+            self.descricao = registro.tipo or '-'
+            self._origem = 'antigo'
+    
+    # Combinar ambos em lista unificada
     lancamentos = []
     
-    # Adicionar registros antigos
+    # Adicionar registros antigos (via adapter)
     for reg in registros_antigos:
-        lancamentos.append({
-            'id': reg.id,
-            'data': reg.data,
-            'valor': float(reg.valor),
-            'tipo': reg.tipo,
-            'funcionario': reg.funcionario_ref.nome if reg.funcionario_ref else 'N/A',
-            'obra': reg.obra_ref.nome if reg.obra_ref else 'N/A',
-            'observacoes': reg.observacoes or '',
-            'origem': 'antigo'
-        })
+        lancamentos.append(LancamentoAdapter(reg))
     
-    # Adicionar lançamentos novos
-    for lanc in lancamentos_novos:
-        funcionarios_nomes = ', '.join([f.nome for f in lanc.funcionarios]) if lanc.funcionarios else 'N/A'
-        lancamentos.append({
-            'id': lanc.id,
-            'data': lanc.data,
-            'valor': float(lanc.valor_total),
-            'tipo': lanc.descricao or 'lançamento',
-            'funcionario': funcionarios_nomes,
-            'obra': lanc.obra.nome if lanc.obra else 'N/A',
-            'observacoes': lanc.descricao or '',
-            'origem': 'novo'
-        })
+    # Adicionar lançamentos novos (já no formato correto)
+    lancamentos.extend(lancamentos_novos)
     
     # Ordenar por data (mais recente primeiro)
-    lancamentos.sort(key=lambda x: x['data'], reverse=True)
+    lancamentos.sort(key=lambda x: x.data, reverse=True)
     
     # Calcular estatísticas (soma de ambas as tabelas)
     total_gasto = sum(reg.valor for reg in registros_antigos) + sum(lanc.valor_total for lanc in lancamentos_novos)

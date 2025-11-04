@@ -1,0 +1,66 @@
+# Roteiro de Testes End-to-End - EnterpriseSync
+
+## 1. Dashboard Principal (`/dashboard`)
+
+| KPI | Valor Esperado | Verificação |
+|---|---|---|
+| **Obras Ativas** | 3 | Contar cards de obras ativas |
+| **Funcionários Ativos** | 10 | Contar funcionários na lista |
+| **Veículos na Frota** | 3 | Contar veículos na lista |
+| **Custo Total (Últimos 30 dias)** | > 0 | Verificar se valor é positivo e consistente com custos criados |
+| **Progresso Médio das Obras** | > 0% | Verificar se barra de progresso não está zerada |
+| **RDOs (Últimos 30 dias)** | > 0 | Verificar se gráfico de RDOs tem dados |
+
+## 2. Módulo de Obras (`/obras`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Listagem de Obras** | Acessar `/obras` | 3 obras devem ser listadas |
+| **Detalhes da Obra** | Clicar em "Visualizar" na obra "Edifício Residencial Sunset" | - Progresso geral > 0%<br>- Custos (Alimentação, Material) > 0<br>- Gráficos de custos e progresso com dados<br>- Lista de RDOs com registros |
+| **Filtros** | Filtrar por "Ativa" | 3 obras devem ser exibidas |
+| **Busca** | Buscar por "Sunset" | 1 obra deve ser exibida |
+
+## 3. Módulo de Funcionários (`/funcionarios`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Listagem de Funcionários** | Acessar `/funcionarios` | 10 funcionários devem ser listados |
+| **Perfil do Funcionário** | Clicar em "Ver Perfil" no funcionário "João Silva Santos" | - KPIs (Horas Trabalhadas, RDOs, Custos) > 0<br>- Gráficos de produtividade com dados<br>- Histórico de RDOs e custos com registros |
+| **Filtros** | Filtrar por departamento "Engenharia" | Pelo menos 1 funcionário deve ser exibido |
+| **Busca** | Buscar por "Maria Oliveira" | 1 funcionário deve ser exibido |
+
+## 4. Módulo de Custos (`/custos/dashboard`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Dashboard de Custos** | Acessar `/custos/dashboard` | - Custo total > 0<br>- Gráfico de custos por obra com dados<br>- Gráfico de custos por tipo (Alimentação, Material) com dados<br>- Lista de últimos custos com registros |
+| **Filtros** | Filtrar por obra "Reforma Comercial Plaza Shopping" | Gráficos e lista atualizados com dados da obra selecionada |
+
+## 5. Módulo de Frota (`/frota`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Listagem de Veículos** | Acessar `/frota` | 3 veículos devem ser listados |
+| **Dashboard do Veículo** | Clicar em "Dashboard" no veículo "ABC1234" | - KPIs (KM Rodado, Custo/KM, Consumo) > 0<br>- Gráficos de custos e uso com dados<br>- Histórico de usos e custos com registros |
+| **Filtros** | Filtrar por tipo "Caminhonete" | 2 veículos devem ser exibidos |
+
+## 6. Módulo de RDOs (`/rdos`)
+
+| Teste | Ação | Resultado Esperado |
+|---|---|---|
+| **Listagem de RDOs** | Acessar `/rdos` | RDOs dos últimos 30 dias devem ser listados |
+| **Visualizar RDO** | Clicar em "Visualizar" em um RDO | - Detalhes do RDO (obra, data, funcionário)<br>- Lista de mão de obra com funcionários<br>- Lista de serviços com percentuais concluídos |
+| **Filtros** | Filtrar por obra "Edifício Residencial Sunset" | Apenas RDOs da obra selecionada devem ser exibidos |
+
+## 7. Relatório Final
+
+- [ ] **Dashboard Principal:** Todos os KPIs corretos?
+- [ ] **Módulo de Obras:** Detalhes e filtros funcionam?
+- [ ] **Módulo de Funcionários:** Perfis e filtros funcionam?
+- [ ] **Módulo de Custos:** Dashboard e filtros funcionam?
+- [ ] **Módulo de Frota:** Dashboards e filtros funcionam?
+- [ ] **Módulo de RDOs:** Detalhes e filtros funcionam?
+- [ ] **Erros no Console:** Houve algum erro no console do navegador?
+- [ ] **Erros no Log do Servidor:** Houve algum erro no log do Flask?
+
+**Observações:**
