@@ -2059,27 +2059,43 @@ def _migration_49_vehicle_alertas():
             except:
                 pass
 
-def _migration_50_uso_veiculo_passageiros():
+def _migration_50_uso_veiculo_schema_completo():
     """
-    Migração 50: Adicionar campos de passageiros em uso_veiculo
-    Adiciona: passageiros_frente, passageiros_tras (TEXT)
+    Migração 50: Garantir schema COMPLETO da tabela uso_veiculo
+    Sincroniza TODAS as colunas do modelo com o banco de dados
     """
     logger.info("=" * 80)
-    logger.info("🚗 MIGRAÇÃO 50: Campos de Passageiros - Uso de Veículo")
+    logger.info("🚗 MIGRAÇÃO 50: Schema Completo - Tabela uso_veiculo")
     logger.info("=" * 80)
     
     try:
         connection = db.engine.raw_connection()
         cursor = connection.cursor()
         
-        # Verificar e adicionar colunas se não existirem
-        colunas_adicionar = {
+        # Schema completo da tabela uso_veiculo conforme modelo Python
+        schema_completo = {
+            'veiculo_id': 'INTEGER',
+            'funcionario_id': 'INTEGER',
+            'obra_id': 'INTEGER',
+            'data_uso': 'DATE NOT NULL',
+            'hora_saida': 'TIME',
+            'hora_retorno': 'TIME',
+            'km_inicial': 'INTEGER',
+            'km_final': 'INTEGER',
+            'km_percorrido': 'INTEGER',
             'passageiros_frente': 'TEXT',
-            'passageiros_tras': 'TEXT'
+            'passageiros_tras': 'TEXT',
+            'responsavel_veiculo': 'VARCHAR(100)',
+            'observacoes': 'TEXT',
+            'admin_id': 'INTEGER NOT NULL',
+            'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
         }
         
-        for coluna, tipo_sql in colunas_adicionar.items():
-            # Verificar se coluna já existe
+        colunas_adicionadas = 0
+        
+        for coluna, tipo_sql in schema_completo.items():
+            # Verificar se coluna existe
             cursor.execute("""
                 SELECT column_name 
                 FROM information_schema.columns 
@@ -2089,21 +2105,104 @@ def _migration_50_uso_veiculo_passageiros():
             
             if not cursor.fetchone():
                 logger.info(f"🔧 Adicionando coluna '{coluna}' em uso_veiculo...")
-                cursor.execute(f"ALTER TABLE uso_veiculo ADD COLUMN {coluna} {tipo_sql}")
-                logger.info(f"✅ Coluna '{coluna}' adicionada com sucesso!")
+                # Remover NOT NULL e DEFAULT da definição para ALTER TABLE
+                tipo_limpo = tipo_sql.replace(' NOT NULL', '').replace(' DEFAULT CURRENT_TIMESTAMP', '')
+                cursor.execute(f"ALTER TABLE uso_veiculo ADD COLUMN {coluna} {tipo_limpo}")
+                logger.info(f"✅ Coluna '{coluna}' adicionada!")
+                colunas_adicionadas += 1
             else:
-                logger.info(f"✅ Coluna '{coluna}' já existe - skip")
+                logger.debug(f"✅ Coluna '{coluna}' já existe")
+        
+        # Garantir foreign keys e índices
+        logger.info("🔍 Verificando foreign keys...")
+        
+        # FK veiculo_id
+        cursor.execute("""
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE table_name = 'uso_veiculo' 
+            AND constraint_type = 'FOREIGN KEY'
+            AND constraint_name = 'uso_veiculo_veiculo_id_fkey'
+        """)
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE uso_veiculo 
+                    ADD CONSTRAINT uso_veiculo_veiculo_id_fkey 
+                    FOREIGN KEY (veiculo_id) REFERENCES veiculo(id)
+                """)
+                logger.info("✅ FK veiculo_id criada")
+            except Exception as e:
+                logger.warning(f"⚠️ FK veiculo_id já existe ou erro: {e}")
+        
+        # FK funcionario_id
+        cursor.execute("""
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE table_name = 'uso_veiculo' 
+            AND constraint_type = 'FOREIGN KEY'
+            AND constraint_name = 'uso_veiculo_funcionario_id_fkey'
+        """)
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE uso_veiculo 
+                    ADD CONSTRAINT uso_veiculo_funcionario_id_fkey 
+                    FOREIGN KEY (funcionario_id) REFERENCES funcionario(id)
+                """)
+                logger.info("✅ FK funcionario_id criada")
+            except Exception as e:
+                logger.warning(f"⚠️ FK funcionario_id já existe ou erro: {e}")
+        
+        # FK obra_id
+        cursor.execute("""
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE table_name = 'uso_veiculo' 
+            AND constraint_type = 'FOREIGN KEY'
+            AND constraint_name = 'uso_veiculo_obra_id_fkey'
+        """)
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE uso_veiculo 
+                    ADD CONSTRAINT uso_veiculo_obra_id_fkey 
+                    FOREIGN KEY (obra_id) REFERENCES obra(id)
+                """)
+                logger.info("✅ FK obra_id criada")
+            except Exception as e:
+                logger.warning(f"⚠️ FK obra_id já existe ou erro: {e}")
+        
+        # FK admin_id
+        cursor.execute("""
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE table_name = 'uso_veiculo' 
+            AND constraint_type = 'FOREIGN KEY'
+            AND constraint_name = 'uso_veiculo_admin_id_fkey'
+        """)
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE uso_veiculo 
+                    ADD CONSTRAINT uso_veiculo_admin_id_fkey 
+                    FOREIGN KEY (admin_id) REFERENCES usuario(id)
+                """)
+                logger.info("✅ FK admin_id criada")
+            except Exception as e:
+                logger.warning(f"⚠️ FK admin_id já existe ou erro: {e}")
         
         connection.commit()
         cursor.close()
         connection.close()
         
         logger.info("=" * 80)
-        logger.info("✅ MIGRAÇÃO 50 CONCLUÍDA: Campos de passageiros adicionados!")
+        if colunas_adicionadas > 0:
+            logger.info(f"✅ MIGRAÇÃO 50 CONCLUÍDA: {colunas_adicionadas} colunas adicionadas!")
+        else:
+            logger.info("✅ MIGRAÇÃO 50 CONCLUÍDA: Schema já estava completo!")
         logger.info("=" * 80)
         
     except Exception as e:
         logger.error(f"❌ Erro na Migração 50: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         if 'connection' in locals():
             try:
                 connection.rollback()
@@ -2154,7 +2253,7 @@ def executar_migracoes():
             (47, "Adicionar fornecedor_id ao almoxarifado_movimento", _migration_47_almoxarifado_fornecedor),
             (48, "Adicionar admin_id em 17 modelos faltantes", _migration_48_adicionar_admin_id_modelos_faltantes),
             (49, "Campos de alertas veículos (IPVA/Seguro)", _migration_49_vehicle_alertas),
-            (50, "Campos de passageiros em uso_veiculo", _migration_50_uso_veiculo_passageiros),
+            (50, "Schema completo tabela uso_veiculo", _migration_50_uso_veiculo_schema_completo),
         ]
         
         # Executar cada migração com rastreamento
