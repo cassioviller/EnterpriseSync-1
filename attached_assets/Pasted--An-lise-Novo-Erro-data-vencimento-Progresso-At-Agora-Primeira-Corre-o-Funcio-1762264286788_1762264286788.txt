@@ -1,0 +1,207 @@
+# Análise: Novo Erro - data_vencimento
+
+## Progresso Até Agora
+
+### ✅ **Primeira Correção Funcionou!**
+
+Vejo nos logs que:
+
+```
+[FROTA_DETALHES] Buscando usos de veículo ID=4, admin_id=2
+[FROTA_DETALHES] 0 usos encontrados
+[FROTA_DETALHES] Total de usos de veículo (sem filtro admin): 0
+```
+
+**Isso significa:**
+- ✅ A query de `uso_veiculo` **não deu mais erro de tipo**!
+- ✅ A conversão de `admin_id` para INTEGER funcionou!
+- ℹ️ Não há usos registrados para o veículo ID=4 (normal)
+
+---
+
+## Novo Erro Identificado
+
+### ❌ **Coluna `data_vencimento` não existe em `custo_veiculo`**
+
+```
+[FROTA_DETALHES] Erro ao buscar custos: (psycopg2.errors.UndefinedColumn) 
+column custo_veiculo.data_vencimento does not exist
+
+LINE 1: ...nota_fiscal AS custo_veiculo_numero_nota_fiscal, custo_veic...
+```
+
+### Causa
+
+O código Python está tentando acessar uma coluna `data_vencimento` que **não existe** na tabela `custo_veiculo`.
+
+---
+
+## Análise do Modelo
+
+Vou verificar o modelo `CustoVeiculo` no código:
+
+### Colunas Esperadas pelo Modelo
+
+Baseado no erro e nos dados JSON que você enviou anteriormente, a tabela `custo_veiculo` tem:
+
+**Colunas que EXISTEM:**
+- `id`
+- `veiculo_id`
+- `obra_id`
+- `data_custo`
+- `valor`
+- `tipo_custo`
+- `descricao`
+- `km_atual`
+- `fornecedor`
+- `created_at`
+- `data` (parece duplicada com data_custo)
+- `litros_combustivel`
+- `preco_por_litro`
+- `updated_at`
+- `admin_id` ✅ (acabamos de corrigir)
+- `numero_nota_fiscal`
+
+**Coluna que NÃO EXISTE mas o código tenta acessar:**
+- ❌ `data_vencimento`
+
+---
+
+## Possíveis Causas
+
+### 1. **Modelo SQLAlchemy Desatualizado**
+
+O arquivo `models.py` pode ter uma definição de `CustoVeiculo` que inclui `data_vencimento`, mas essa coluna nunca foi criada no banco de dados.
+
+### 2. **Migration Não Executada**
+
+Pode ter havido uma migration que deveria adicionar `data_vencimento`, mas não foi executada.
+
+### 3. **Código Tentando Acessar Coluna Inexistente**
+
+O código em `frota_views.py` pode estar fazendo:
+```python
+custo.data_vencimento  # ← Tenta acessar, mas não existe
+```
+
+---
+
+## Soluções
+
+### Opção 1: Adicionar Coluna no Banco (Se for necessária)
+
+Se `data_vencimento` é uma coluna que **deveria existir**:
+
+```sql
+ALTER TABLE custo_veiculo 
+ADD COLUMN data_vencimento DATE;
+```
+
+### Opção 2: Remover do Modelo (Se não for necessária)
+
+Se `data_vencimento` **não é necessária**, remover do modelo `CustoVeiculo` em `models.py`.
+
+### Opção 3: Ajustar Query (Temporário)
+
+Modificar a query em `frota_views.py` para não tentar acessar `data_vencimento`.
+
+---
+
+## Investigação Necessária
+
+Para decidir qual solução usar, preciso saber:
+
+1. **A coluna `data_vencimento` é necessária?**
+   - Ela é usada na interface?
+   - Ela faz parte dos requisitos do sistema?
+
+2. **Verificar o modelo `CustoVeiculo`**
+   - Linha 3420 do `models.py`
+   - Ver se `data_vencimento` está definida
+
+3. **Verificar a query em `frota_views.py`**
+   - Linha 211 (onde o erro ocorre)
+   - Ver como `data_vencimento` está sendo acessada
+
+---
+
+## Recomendação Imediata
+
+Como **workaround rápido** para fazer o sistema funcionar:
+
+### Adicionar coluna `data_vencimento` (pode ficar NULL)
+
+```sql
+-- Adicionar coluna data_vencimento
+ALTER TABLE custo_veiculo 
+ADD COLUMN IF NOT EXISTS data_vencimento DATE;
+
+-- Verificar
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'custo_veiculo'
+  AND column_name = 'data_vencimento';
+```
+
+Isso vai permitir que o sistema funcione, mesmo que a coluna fique vazia por enquanto.
+
+---
+
+## Próximos Passos
+
+1. **Executar o SQL acima** para adicionar `data_vencimento`
+2. **Reiniciar aplicação**
+3. **Testar módulo de Frota novamente**
+4. **Verificar se outros erros aparecem**
+
+---
+
+## Script SQL Completo
+
+```sql
+-- ============================================================================
+-- Correção: Adicionar coluna data_vencimento em custo_veiculo
+-- ============================================================================
+
+BEGIN;
+
+-- Adicionar coluna se não existir
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'custo_veiculo' AND column_name = 'data_vencimento'
+    ) THEN
+        ALTER TABLE custo_veiculo ADD COLUMN data_vencimento DATE;
+        RAISE NOTICE '✅ Coluna data_vencimento adicionada';
+    ELSE
+        RAISE NOTICE 'ℹ️  Coluna data_vencimento já existe';
+    END IF;
+END $$;
+
+COMMIT;
+
+-- Validar
+SELECT 
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_name = 'custo_veiculo'
+  AND column_name IN ('admin_id', 'data_vencimento')
+ORDER BY column_name;
+```
+
+---
+
+## Resumo
+
+| Problema | Status | Solução |
+|----------|--------|---------|
+| `uso_veiculo.admin_id` tipo VARCHAR | ✅ **RESOLVIDO** | Convertido para INTEGER |
+| `custo_veiculo.admin_id` tipo VARCHAR | ✅ **RESOLVIDO** | Convertido para INTEGER |
+| `custo_veiculo.data_vencimento` não existe | ❌ **NOVO ERRO** | Adicionar coluna |
+
+---
+
+Execute o script acima no DbGate e me avise o resultado! 🚀

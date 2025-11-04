@@ -2211,6 +2211,150 @@ def _migration_50_uso_veiculo_schema_completo():
             except:
                 pass
 
+def _migration_51_custo_veiculo_schema_completo():
+    """
+    Migração 51: Garantir schema COMPLETO da tabela custo_veiculo
+    Sincroniza TODAS as colunas do modelo com o banco de dados
+    Especialmente campos de pagamento e vencimento
+    """
+    logger.info("=" * 80)
+    logger.info("💰 MIGRAÇÃO 51: Schema Completo - Tabela custo_veiculo")
+    logger.info("=" * 80)
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Schema completo da tabela custo_veiculo conforme modelo Python
+        schema_completo = {
+            'veiculo_id': 'INTEGER',
+            'data_custo': 'DATE NOT NULL',
+            'tipo_custo': 'VARCHAR(30) NOT NULL',
+            'valor': 'NUMERIC(10, 2) NOT NULL',
+            'descricao': 'VARCHAR(200) NOT NULL',
+            'fornecedor': 'VARCHAR(100)',
+            'numero_nota_fiscal': 'VARCHAR(20)',
+            'data_vencimento': 'DATE',
+            'status_pagamento': 'VARCHAR(20) DEFAULT \'Pendente\'',
+            'forma_pagamento': 'VARCHAR(30)',
+            'km_veiculo': 'INTEGER',
+            'observacoes': 'TEXT',
+            'admin_id': 'INTEGER NOT NULL'
+        }
+        
+        colunas_adicionadas = 0
+        
+        for coluna, tipo_sql in schema_completo.items():
+            # Verificar se coluna existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'custo_veiculo' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' em custo_veiculo...")
+                # Remover NOT NULL e DEFAULT da definição para ALTER TABLE
+                tipo_limpo = tipo_sql.replace(' NOT NULL', '').replace(' DEFAULT \'Pendente\'', '')
+                cursor.execute(f"ALTER TABLE custo_veiculo ADD COLUMN {coluna} {tipo_limpo}")
+                
+                # Aplicar DEFAULT separadamente se existir
+                if 'DEFAULT' in tipo_sql:
+                    if 'Pendente' in tipo_sql:
+                        cursor.execute(f"ALTER TABLE custo_veiculo ALTER COLUMN {coluna} SET DEFAULT 'Pendente'")
+                
+                logger.info(f"✅ Coluna '{coluna}' adicionada!")
+                colunas_adicionadas += 1
+            else:
+                logger.debug(f"✅ Coluna '{coluna}' já existe")
+        
+        # Garantir foreign key para veiculo_id
+        logger.info("🔍 Verificando foreign keys...")
+        
+        # FK veiculo_id
+        cursor.execute("""
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE table_name = 'custo_veiculo' 
+            AND constraint_type = 'FOREIGN KEY'
+            AND constraint_name = 'custo_veiculo_veiculo_id_fkey'
+        """)
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE custo_veiculo 
+                    ADD CONSTRAINT custo_veiculo_veiculo_id_fkey 
+                    FOREIGN KEY (veiculo_id) REFERENCES veiculo(id)
+                """)
+                logger.info("✅ FK veiculo_id criada")
+            except Exception as e:
+                logger.warning(f"⚠️ FK veiculo_id já existe ou erro: {e}")
+        
+        # FK admin_id
+        cursor.execute("""
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE table_name = 'custo_veiculo' 
+            AND constraint_type = 'FOREIGN KEY'
+            AND constraint_name = 'custo_veiculo_admin_id_fkey'
+        """)
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE custo_veiculo 
+                    ADD CONSTRAINT custo_veiculo_admin_id_fkey 
+                    FOREIGN KEY (admin_id) REFERENCES usuario(id)
+                """)
+                logger.info("✅ FK admin_id criada")
+            except Exception as e:
+                logger.warning(f"⚠️ FK admin_id já existe ou erro: {e}")
+        
+        # Criar índices úteis
+        logger.info("🔍 Verificando índices...")
+        
+        # Índice para data_vencimento (útil para alertas)
+        try:
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_custo_veiculo_data_vencimento 
+                ON custo_veiculo(data_vencimento) 
+                WHERE data_vencimento IS NOT NULL
+            """)
+            logger.info("✅ Índice data_vencimento criado")
+        except Exception as e:
+            logger.warning(f"⚠️ Índice data_vencimento já existe ou erro: {e}")
+        
+        # Índice para status_pagamento
+        try:
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_custo_veiculo_status_pagamento 
+                ON custo_veiculo(status_pagamento)
+            """)
+            logger.info("✅ Índice status_pagamento criado")
+        except Exception as e:
+            logger.warning(f"⚠️ Índice status_pagamento já existe ou erro: {e}")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        if colunas_adicionadas > 0:
+            logger.info(f"✅ MIGRAÇÃO 51 CONCLUÍDA: {colunas_adicionadas} colunas adicionadas!")
+        else:
+            logger.info("✅ MIGRAÇÃO 51 CONCLUÍDA: Schema já estava completo!")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 51: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2254,6 +2398,7 @@ def executar_migracoes():
             (48, "Adicionar admin_id em 17 modelos faltantes", _migration_48_adicionar_admin_id_modelos_faltantes),
             (49, "Campos de alertas veículos (IPVA/Seguro)", _migration_49_vehicle_alertas),
             (50, "Schema completo tabela uso_veiculo", _migration_50_uso_veiculo_schema_completo),
+            (51, "Schema completo tabela custo_veiculo", _migration_51_custo_veiculo_schema_completo),
         ]
         
         # Executar cada migração com rastreamento
