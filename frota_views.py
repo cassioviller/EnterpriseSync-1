@@ -204,14 +204,29 @@ def detalhes(id):
         
         # Buscar usos recentes (últimos 20) com tratamento de erro
         try:
-            print(f"🔍 [FROTA_DETALHES] Buscando usos do veículo...")
+            print(f"🔍 [FROTA_DETALHES] Buscando usos do veículo ID={id}, admin_id={tenant_admin_id}")
             usos = FrotaUtilizacao.query.filter_by(
                 veiculo_id=id,
                 admin_id=tenant_admin_id
             ).order_by(FrotaUtilizacao.data_uso.desc()).limit(20).all()
             print(f"✅ [FROTA_DETALHES] {len(usos)} usos encontrados")
+            
+            # Debug: mostrar os primeiros usos
+            if usos:
+                for uso in usos[:3]:
+                    print(f"   📋 Uso: ID={uso.id}, Data={uso.data_uso}, Veiculo={uso.veiculo_id}, Admin={uso.admin_id}")
+            else:
+                # Verificar se existem usos SEM filtro de admin_id
+                total_usos_veiculo = FrotaUtilizacao.query.filter_by(veiculo_id=id).count()
+                print(f"⚠️ [FROTA_DETALHES] Total de usos do veículo (sem filtro admin): {total_usos_veiculo}")
+                if total_usos_veiculo > 0:
+                    # Verificar admin_id dos usos existentes
+                    uso_sample = FrotaUtilizacao.query.filter_by(veiculo_id=id).first()
+                    print(f"⚠️ [FROTA_DETALHES] Uso existente tem admin_id={uso_sample.admin_id}, esperado={tenant_admin_id}")
         except Exception as e_usos:
             print(f"⚠️ [FROTA_DETALHES] Erro ao buscar usos: {str(e_usos)}")
+            import traceback
+            print(traceback.format_exc())
             usos = []
         
         # Estatísticas de uso com tratamento de erro
