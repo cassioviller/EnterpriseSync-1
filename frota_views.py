@@ -457,6 +457,12 @@ def novo_uso(veiculo_id):
                 novo_uso.km_percorrido = novo_uso.km_final - novo_uso.km_inicial
             
             db.session.add(novo_uso)
+            
+            # 🚗 ATUALIZAR KM ATUAL DO VEÍCULO
+            if novo_uso.km_final:
+                veiculo.km_atual = novo_uso.km_final
+                print(f"✅ [FROTA_NOVO_USO] KM Atual do veículo atualizado: {veiculo.km_atual} km")
+            
             db.session.commit()
             
             # 🔗 INTEGRAÇÃO AUTOMÁTICA - Emitir evento de veículo usado
@@ -659,6 +665,18 @@ def editar_uso(uso_id):
             uso.responsavel_veiculo = dados.get('responsavel_veiculo')
             uso.observacoes = dados.get('observacoes')
             
+            # 🚗 ATUALIZAR KM ATUAL DO VEÍCULO (se editou km_final)
+            if dados.get('km_final'):
+                # Verificar se esse uso é o mais recente
+                ultimo_uso = FrotaUtilizacao.query.filter_by(
+                    veiculo_id=veiculo.id,
+                    admin_id=tenant_admin_id
+                ).order_by(FrotaUtilizacao.data_uso.desc(), FrotaUtilizacao.id.desc()).first()
+                
+                if ultimo_uso and ultimo_uso.id == uso.id and ultimo_uso.km_final:
+                    veiculo.km_atual = ultimo_uso.km_final
+                    print(f"✅ [FROTA_EDITAR_USO] KM Atual do veículo atualizado: {veiculo.km_atual} km")
+            
             db.session.commit()
             
             flash('Uso do veículo atualizado com sucesso!', 'success')
@@ -704,7 +722,27 @@ def deletar_uso(uso_id):
         
         veiculo_id = uso.veiculo_id
         
+        # Buscar veículo antes de deletar
+        veiculo = FrotaVeiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
+        
         db.session.delete(uso)
+        db.session.flush()
+        
+        # 🚗 ATUALIZAR KM ATUAL DO VEÍCULO após deleção
+        if veiculo:
+            # Buscar o último uso restante (após a deleção)
+            ultimo_uso = FrotaUtilizacao.query.filter_by(
+                veiculo_id=veiculo_id,
+                admin_id=tenant_admin_id
+            ).order_by(FrotaUtilizacao.data_uso.desc(), FrotaUtilizacao.id.desc()).first()
+            
+            if ultimo_uso and ultimo_uso.km_final:
+                veiculo.km_atual = ultimo_uso.km_final
+                print(f"✅ [FROTA_DELETAR_USO] KM Atual atualizado para último uso: {veiculo.km_atual} km")
+            else:
+                # Se não houver mais usos, manter o km_atual do veículo
+                print(f"ℹ️ [FROTA_DELETAR_USO] Nenhum uso restante, km_atual mantido")
+        
         db.session.commit()
         
         flash('Uso do veículo deletado com sucesso!', 'success')
