@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
-from models import db, Restaurante, AlimentacaoLancamento, Funcionario, Obra
+from models import db, Restaurante, AlimentacaoLancamento, RegistroAlimentacao, Funcionario, Obra
 from datetime import datetime
 from sqlalchemy import func
 from decimal import Decimal
@@ -90,15 +90,55 @@ def restaurante_detalhes(restaurante_id):
     # Buscar restaurante com validação multi-tenant
     restaurante = Restaurante.query.filter_by(id=restaurante_id, admin_id=admin_id).first_or_404()
     
-    # Buscar lançamentos desse restaurante (funcionários carregados via lazy='selectin')
-    lancamentos = AlimentacaoLancamento.query.filter_by(
+    # 🔄 HÍBRIDO: Buscar de AMBAS as tabelas (antigo e novo)
+    # Modelo ANTIGO: RegistroAlimentacao (dados históricos)
+    registros_antigos = RegistroAlimentacao.query.filter_by(
         restaurante_id=restaurante_id, 
         admin_id=admin_id
-    ).order_by(AlimentacaoLancamento.data.desc()).all()
+    ).all()
     
-    # Calcular estatísticas
-    total_gasto = sum(l.valor_total for l in lancamentos) if lancamentos else 0
-    total_lancamentos = len(lancamentos)
+    # Modelo NOVO: AlimentacaoLancamento (lançamentos novos)
+    lancamentos_novos = AlimentacaoLancamento.query.filter_by(
+        restaurante_id=restaurante_id, 
+        admin_id=admin_id
+    ).all()
+    
+    # Combinar ambos em formato unificado para template
+    lancamentos = []
+    
+    # Adicionar registros antigos
+    for reg in registros_antigos:
+        lancamentos.append({
+            'id': reg.id,
+            'data': reg.data,
+            'valor': float(reg.valor),
+            'tipo': reg.tipo,
+            'funcionario': reg.funcionario_ref.nome if reg.funcionario_ref else 'N/A',
+            'obra': reg.obra_ref.nome if reg.obra_ref else 'N/A',
+            'observacoes': reg.observacoes or '',
+            'origem': 'antigo'
+        })
+    
+    # Adicionar lançamentos novos
+    for lanc in lancamentos_novos:
+        funcionarios_nomes = ', '.join([f.nome for f in lanc.funcionarios]) if lanc.funcionarios else 'N/A'
+        lancamentos.append({
+            'id': lanc.id,
+            'data': lanc.data,
+            'valor': float(lanc.valor_total),
+            'tipo': lanc.descricao or 'lançamento',
+            'funcionario': funcionarios_nomes,
+            'obra': lanc.obra.nome if lanc.obra else 'N/A',
+            'observacoes': lanc.descricao or '',
+            'origem': 'novo'
+        })
+    
+    # Ordenar por data (mais recente primeiro)
+    lancamentos.sort(key=lambda x: x['data'], reverse=True)
+    
+    # Calcular estatísticas (soma de ambas as tabelas)
+    total_gasto = sum(reg.valor for reg in registros_antigos) + sum(lanc.valor_total for lanc in lancamentos_novos)
+    total_lancamentos = len(registros_antigos) + len(lancamentos_novos)
     
     return render_template('alimentacao/restaurante_detalhes.html', 
                          restaurante=restaurante,
@@ -254,37 +294,56 @@ def dashboard():
         data_inicio = datetime.strptime(filtro_data_inicio, '%Y-%m-%d').date() if filtro_data_inicio else None
         data_fim = datetime.strptime(filtro_data_fim, '%Y-%m-%d').date() if filtro_data_fim else None
         
-        # Query base para lançamentos
-        query_base = AlimentacaoLancamento.query.filter_by(admin_id=admin_id)
-        
-        # Aplicar filtros
+        # 🔄 HÍBRIDO: Contar de AMBAS as tabelas
+        # Query base para modelo ANTIGO
+        query_antigo = RegistroAlimentacao.query.filter_by(admin_id=admin_id)
         if data_inicio:
-            query_base = query_base.filter(AlimentacaoLancamento.data >= data_inicio)
+            query_antigo = query_antigo.filter(RegistroAlimentacao.data >= data_inicio)
         if data_fim:
-            query_base = query_base.filter(AlimentacaoLancamento.data <= data_fim)
+            query_antigo = query_antigo.filter(RegistroAlimentacao.data <= data_fim)
         if filtro_restaurante_id:
-            query_base = query_base.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+            query_antigo = query_antigo.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            query_base = query_base.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+            query_antigo = query_antigo.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
         
-        # KPI 1: Total de Refeições (contagem de lançamentos)
-        total_refeicoes = query_base.count()
+        # Query base para modelo NOVO
+        query_novo = AlimentacaoLancamento.query.filter_by(admin_id=admin_id)
+        if data_inicio:
+            query_novo = query_novo.filter(AlimentacaoLancamento.data >= data_inicio)
+        if data_fim:
+            query_novo = query_novo.filter(AlimentacaoLancamento.data <= data_fim)
+        if filtro_restaurante_id:
+            query_novo = query_novo.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+        if filtro_obra_id:
+            query_novo = query_novo.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
         
-        # KPI 2: Custo Total
-        custo_total = db.session.query(
+        # KPI 1: Total de Refeições (soma de ambas as tabelas)
+        total_refeicoes = query_antigo.count() + query_novo.count()
+        
+        # KPI 2: Custo Total (soma de ambas as tabelas)
+        custo_antigo = db.session.query(
+            func.coalesce(func.sum(RegistroAlimentacao.valor), Decimal('0'))
+        ).filter(RegistroAlimentacao.admin_id == admin_id)
+        
+        custo_novo = db.session.query(
             func.coalesce(func.sum(AlimentacaoLancamento.valor_total), Decimal('0'))
         ).filter(AlimentacaoLancamento.admin_id == admin_id)
         
+        # Aplicar mesmos filtros
         if data_inicio:
-            custo_total = custo_total.filter(AlimentacaoLancamento.data >= data_inicio)
+            custo_antigo = custo_antigo.filter(RegistroAlimentacao.data >= data_inicio)
+            custo_novo = custo_novo.filter(AlimentacaoLancamento.data >= data_inicio)
         if data_fim:
-            custo_total = custo_total.filter(AlimentacaoLancamento.data <= data_fim)
+            custo_antigo = custo_antigo.filter(RegistroAlimentacao.data <= data_fim)
+            custo_novo = custo_novo.filter(AlimentacaoLancamento.data <= data_fim)
         if filtro_restaurante_id:
-            custo_total = custo_total.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+            custo_antigo = custo_antigo.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
+            custo_novo = custo_novo.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            custo_total = custo_total.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+            custo_antigo = custo_antigo.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
+            custo_novo = custo_novo.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
         
-        custo_total = float(custo_total.scalar() or 0)
+        custo_total = float(custo_antigo.scalar() or 0) + float(custo_novo.scalar() or 0)
         
         # KPI 3: Custo Médio por Refeição
         custo_medio_refeicao = round(custo_total / total_refeicoes, 2) if total_refeicoes > 0 else 0
@@ -295,22 +354,37 @@ def dashboard():
         inicio_mes_anterior = (inicio_mes_atual - relativedelta(months=1))
         fim_mes_anterior = inicio_mes_atual - relativedelta(days=1)
         
-        # Custos do mês atual
-        custos_mes_atual = db.session.query(
+        # 🔄 HÍBRIDO: Custos do mês atual (ambas as tabelas)
+        custos_mes_atual_antigo = db.session.query(
+            func.coalesce(func.sum(RegistroAlimentacao.valor), Decimal('0'))
+        ).filter(
+            RegistroAlimentacao.admin_id == admin_id,
+            RegistroAlimentacao.data >= inicio_mes_atual
+        )
+        custos_mes_atual_novo = db.session.query(
             func.coalesce(func.sum(AlimentacaoLancamento.valor_total), Decimal('0'))
         ).filter(
             AlimentacaoLancamento.admin_id == admin_id,
             AlimentacaoLancamento.data >= inicio_mes_atual
         )
         if filtro_restaurante_id:
-            custos_mes_atual = custos_mes_atual.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+            custos_mes_atual_antigo = custos_mes_atual_antigo.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
+            custos_mes_atual_novo = custos_mes_atual_novo.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            custos_mes_atual = custos_mes_atual.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+            custos_mes_atual_antigo = custos_mes_atual_antigo.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
+            custos_mes_atual_novo = custos_mes_atual_novo.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
         
-        custos_mes_atual = float(custos_mes_atual.scalar() or 0)
+        custos_mes_atual = float(custos_mes_atual_antigo.scalar() or 0) + float(custos_mes_atual_novo.scalar() or 0)
         
-        # Custos do mês anterior
-        custos_mes_anterior = db.session.query(
+        # 🔄 HÍBRIDO: Custos do mês anterior (ambas as tabelas)
+        custos_mes_anterior_antigo = db.session.query(
+            func.coalesce(func.sum(RegistroAlimentacao.valor), Decimal('0'))
+        ).filter(
+            RegistroAlimentacao.admin_id == admin_id,
+            RegistroAlimentacao.data >= inicio_mes_anterior,
+            RegistroAlimentacao.data <= fim_mes_anterior
+        )
+        custos_mes_anterior_novo = db.session.query(
             func.coalesce(func.sum(AlimentacaoLancamento.valor_total), Decimal('0'))
         ).filter(
             AlimentacaoLancamento.admin_id == admin_id,
@@ -318,11 +392,13 @@ def dashboard():
             AlimentacaoLancamento.data <= fim_mes_anterior
         )
         if filtro_restaurante_id:
-            custos_mes_anterior = custos_mes_anterior.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+            custos_mes_anterior_antigo = custos_mes_anterior_antigo.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
+            custos_mes_anterior_novo = custos_mes_anterior_novo.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            custos_mes_anterior = custos_mes_anterior.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+            custos_mes_anterior_antigo = custos_mes_anterior_antigo.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
+            custos_mes_anterior_novo = custos_mes_anterior_novo.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
         
-        custos_mes_anterior = float(custos_mes_anterior.scalar() or 0)
+        custos_mes_anterior = float(custos_mes_anterior_antigo.scalar() or 0) + float(custos_mes_anterior_novo.scalar() or 0)
         
         # Calcular variação percentual
         if custos_mes_anterior > 0:
@@ -330,81 +406,75 @@ def dashboard():
         else:
             variacao_percentual = 100.0 if custos_mes_atual > 0 else 0.0
         
-        # Gráfico 1: Top 5 Funcionários (mais refeições)
-        # Usar a tabela de associação para contar
-        from models import alimentacao_funcionarios_assoc
-        
+        # Gráfico 1: Top 5 Funcionários (mais refeições) - CORRIGIDO para RegistroAlimentacao
         top_funcionarios = db.session.query(
             Funcionario.nome,
             Funcionario.id,
-            func.count(alimentacao_funcionarios_assoc.c.lancamento_id).label('total_refeicoes')
+            func.count(RegistroAlimentacao.id).label('total_refeicoes')
         ).join(
-            alimentacao_funcionarios_assoc,
-            Funcionario.id == alimentacao_funcionarios_assoc.c.funcionario_id
-        ).join(
-            AlimentacaoLancamento,
-            AlimentacaoLancamento.id == alimentacao_funcionarios_assoc.c.lancamento_id
+            RegistroAlimentacao,
+            Funcionario.id == RegistroAlimentacao.funcionario_id
         ).filter(
-            AlimentacaoLancamento.admin_id == admin_id,
+            RegistroAlimentacao.admin_id == admin_id,
             Funcionario.admin_id == admin_id
         )
         
         if data_inicio:
-            top_funcionarios = top_funcionarios.filter(AlimentacaoLancamento.data >= data_inicio)
+            top_funcionarios = top_funcionarios.filter(RegistroAlimentacao.data >= data_inicio)
         if data_fim:
-            top_funcionarios = top_funcionarios.filter(AlimentacaoLancamento.data <= data_fim)
+            top_funcionarios = top_funcionarios.filter(RegistroAlimentacao.data <= data_fim)
         if filtro_restaurante_id:
-            top_funcionarios = top_funcionarios.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+            top_funcionarios = top_funcionarios.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            top_funcionarios = top_funcionarios.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+            top_funcionarios = top_funcionarios.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
         
         top_funcionarios = top_funcionarios.group_by(
             Funcionario.id, Funcionario.nome
-        ).order_by(func.count(alimentacao_funcionarios_assoc.c.lancamento_id).desc()).limit(5).all()
+        ).order_by(func.count(RegistroAlimentacao.id).desc()).limit(5).all()
         
-        # Gráfico 2: Top 5 Obras (mais gastos)
+        # Gráfico 2: Top 5 Obras (mais gastos) - CORRIGIDO para usar 'valor'
         top_obras = db.session.query(
             Obra.nome,
             Obra.id,
-            func.sum(AlimentacaoLancamento.valor_total).label('total_gastos')
-        ).join(AlimentacaoLancamento).filter(
-            AlimentacaoLancamento.admin_id == admin_id,
+            func.sum(RegistroAlimentacao.valor).label('total_gastos')
+        ).join(RegistroAlimentacao).filter(
+            RegistroAlimentacao.admin_id == admin_id,
             Obra.admin_id == admin_id
         )
         
         if data_inicio:
-            top_obras = top_obras.filter(AlimentacaoLancamento.data >= data_inicio)
+            top_obras = top_obras.filter(RegistroAlimentacao.data >= data_inicio)
         if data_fim:
-            top_obras = top_obras.filter(AlimentacaoLancamento.data <= data_fim)
+            top_obras = top_obras.filter(RegistroAlimentacao.data <= data_fim)
         if filtro_restaurante_id:
-            top_obras = top_obras.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+            top_obras = top_obras.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            top_obras = top_obras.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+            top_obras = top_obras.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
         
         top_obras = top_obras.group_by(Obra.id, Obra.nome).order_by(
-            func.sum(AlimentacaoLancamento.valor_total).desc()
+            func.sum(RegistroAlimentacao.valor).desc()
         ).limit(5).all()
         
-        # Gráfico 3: Evolução Mensal
+        # Gráfico 3: Evolução Mensal - CORRIGIDO para usar 'valor'
         evolucao_mensal = db.session.query(
-            func.to_char(AlimentacaoLancamento.data, 'YYYY-MM').label('mes'),
-            func.sum(AlimentacaoLancamento.valor_total).label('total')
+            func.to_char(RegistroAlimentacao.data, 'YYYY-MM').label('mes'),
+            func.sum(RegistroAlimentacao.valor).label('total')
         ).filter(
-            AlimentacaoLancamento.admin_id == admin_id
+            RegistroAlimentacao.admin_id == admin_id
         )
         
         if data_inicio:
-            evolucao_mensal = evolucao_mensal.filter(AlimentacaoLancamento.data >= data_inicio)
+            evolucao_mensal = evolucao_mensal.filter(RegistroAlimentacao.data >= data_inicio)
         if data_fim:
-            evolucao_mensal = evolucao_mensal.filter(AlimentacaoLancamento.data <= data_fim)
+            evolucao_mensal = evolucao_mensal.filter(RegistroAlimentacao.data <= data_fim)
         if filtro_restaurante_id:
-            evolucao_mensal = evolucao_mensal.filter(AlimentacaoLancamento.restaurante_id == filtro_restaurante_id)
+            evolucao_mensal = evolucao_mensal.filter(RegistroAlimentacao.restaurante_id == filtro_restaurante_id)
         if filtro_obra_id:
-            evolucao_mensal = evolucao_mensal.filter(AlimentacaoLancamento.obra_id == filtro_obra_id)
+            evolucao_mensal = evolucao_mensal.filter(RegistroAlimentacao.obra_id == filtro_obra_id)
         
         evolucao_mensal = evolucao_mensal.group_by(
-            func.to_char(AlimentacaoLancamento.data, 'YYYY-MM')
-        ).order_by(func.to_char(AlimentacaoLancamento.data, 'YYYY-MM').desc()).limit(6).all()
+            func.to_char(RegistroAlimentacao.data, 'YYYY-MM')
+        ).order_by(func.to_char(RegistroAlimentacao.data, 'YYYY-MM').desc()).limit(6).all()
         
         # Buscar restaurantes e obras para os filtros
         restaurantes_disponiveis = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()

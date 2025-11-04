@@ -1,0 +1,8 @@
+[
+{"id":1,"nome":"Sabor da Casa","endereco":"","telefone":"","email":null,"ativo":true,"created_at":"2025-07-25 18:56:18.054139","responsavel":"","preco_almoco":"18.00","preco_jantar":"0.00","preco_lanche":"0.00","admin_id":2,"razao_social":null,"cnpj":null,"pix":null,"nome_conta":null},
+{"id":2,"nome":"Vinhedo","endereco":"","telefone":"","email":null,"ativo":true,"created_at":"2025-08-04 11:00:13.157618","responsavel":"","preco_almoco":"27.00","preco_jantar":"27.00","preco_lanche":"15.00","admin_id":2,"razao_social":null,"cnpj":null,"pix":null,"nome_conta":null},
+{"id":3,"nome":"Pomar","endereco":"","telefone":"","email":null,"ativo":true,"created_at":"2025-08-05 11:30:36.850709","responsavel":"","preco_almoco":"18.00","preco_jantar":"0.00","preco_lanche":"0.00","admin_id":2,"razao_social":null,"cnpj":null,"pix":null,"nome_conta":null},
+{"id":4,"nome":"Ilha Bela","endereco":"","telefone":"","email":null,"ativo":true,"created_at":"2025-08-05 11:39:20.968847","responsavel":"","preco_almoco":"30.00","preco_jantar":"30.00","preco_lanche":"15.00","admin_id":2,"razao_social":null,"cnpj":null,"pix":null,"nome_conta":null},
+{"id":5,"nome":"Pavinu","endereco":"","telefone":"","email":null,"ativo":true,"created_at":"2025-08-05 11:53:53.039829","responsavel":"","preco_almoco":"22.00","preco_jantar":"0.00","preco_lanche":"0.00","admin_id":2,"razao_social":null,"cnpj":null,"pix":null,"nome_conta":null},
+{"id":6,"nome":"Guarapuava","endereco":"","telefone":"","email":null,"ativo":true,"created_at":"2025-08-05 12:00:41.624512","responsavel":"","preco_almoco":"0.00","preco_jantar":"0.00","preco_lanche":"0.00","admin_id":2,"razao_social":null,"cnpj":null,"pix":null,"nome_conta":null}
+]
