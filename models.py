@@ -3339,7 +3339,6 @@ class UsoVeiculo(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    veiculo = db.relationship('Veiculo', foreign_keys=[veiculo_id], backref='usos')
     funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id], backref='usos_veiculo')
     obra = db.relationship('Obra', backref='usos_veiculo')
     admin = db.relationship('Usuario', backref='usos_veiculo_administrados')
