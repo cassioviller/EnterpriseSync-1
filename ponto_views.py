@@ -598,8 +598,14 @@ def download_modelo():
             flash('Nenhum funcionário ativo encontrado para gerar o modelo.', 'warning')
             return redirect(url_for('ponto.pagina_importar'))
         
-        # Gerar planilha
-        excel_buffer = PontoExcelService.gerar_planilha_modelo(funcionarios)
+        # Buscar obras ativas
+        obras = Obra.query.filter_by(
+            admin_id=admin_id,
+            ativa=True
+        ).order_by(Obra.nome).all()
+        
+        # Gerar planilha com obras
+        excel_buffer = PontoExcelService.gerar_planilha_modelo(funcionarios, obras)
         
         # Criar response
         response = make_response(excel_buffer.getvalue())

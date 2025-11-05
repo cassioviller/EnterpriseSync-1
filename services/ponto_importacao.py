@@ -34,7 +34,7 @@ class PontoExcelService:
     }
     
     @staticmethod
-    def gerar_planilha_modelo(funcionarios: List, mes_referencia: date = None) -> BytesIO:
+    def gerar_planilha_modelo(funcionarios: List, obras: List = None, mes_referencia: date = None) -> BytesIO:
         """
         Gera planilha Excel modelo com uma aba por funcionário ativo
         
@@ -69,7 +69,7 @@ class PontoExcelService:
         # Criar aba de Legenda primeiro
         ws_legenda = wb.active
         ws_legenda.title = "📖 LEGENDA"
-        PontoExcelService._criar_aba_legenda(ws_legenda)
+        PontoExcelService._criar_aba_legenda(ws_legenda, obras or [])
         
         # Estilos
         header_fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
@@ -95,7 +95,7 @@ class PontoExcelService:
             # Cabeçalho informativo
             ws['A1'] = f"REGISTRO DE PONTO - {func.nome.upper()}"
             ws['A1'].font = Font(bold=True, size=14)
-            ws.merge_cells('A1:F1')
+            ws.merge_cells('A1:G1')
             
             ws['A2'] = f"Código: {func.codigo}"
             ws['B2'] = f"CPF: {func.cpf}"
@@ -104,8 +104,8 @@ class PontoExcelService:
             # Linha em branco
             current_row = 4
             
-            # Cabeçalho da tabela (ADICIONADA coluna "Tipo")
-            headers = ['Data', 'Tipo', 'Entrada', 'Saída', 'Início Almoço', 'Fim Almoço']
+            # Cabeçalho da tabela (ADICIONADAS colunas "Tipo" e "Obra ID")
+            headers = ['Data', 'Tipo', 'Obra ID', 'Entrada', 'Saída', 'Início Almoço', 'Fim Almoço']
             for col, header in enumerate(headers, start=1):
                 cell = ws.cell(row=current_row, column=col, value=header)
                 cell.fill = header_fill
@@ -115,10 +115,19 @@ class PontoExcelService:
             
             # Criar lista de tipos para dropdown
             tipos_lista = ','.join(PontoExcelService.TIPOS_REGISTRO.keys())
-            dv = DataValidation(type="list", formula1=f'"{tipos_lista}"', allow_blank=True)
-            dv.error = 'Selecione um tipo válido da lista'
-            dv.errorTitle = 'Tipo Inválido'
-            ws.add_data_validation(dv)
+            dv_tipos = DataValidation(type="list", formula1=f'"{tipos_lista}"', allow_blank=True)
+            dv_tipos.error = 'Selecione um tipo válido da lista'
+            dv_tipos.errorTitle = 'Tipo Inválido'
+            ws.add_data_validation(dv_tipos)
+            
+            # Criar lista de obras para dropdown
+            dv_obras = None
+            if obras:
+                obras_ids = ','.join(str(obra.id) for obra in obras)
+                dv_obras = DataValidation(type="list", formula1=f'"{obras_ids}"', allow_blank=True)
+                dv_obras.error = 'Selecione um ID de obra válido da aba LEGENDA'
+                dv_obras.errorTitle = 'Obra Inválida'
+                ws.add_data_validation(dv_obras)
             
             # Linha inicial dos dados
             data_start_row = current_row + 1
@@ -128,19 +137,26 @@ class PontoExcelService:
             for dia in range(1, ultimo_dia + 1):
                 data_dia = date(ano, mes, dia)
                 
-                # Data
+                # Data (coluna A)
                 cell = ws.cell(row=current_row, column=1, value=data_dia.strftime('%d/%m/%Y'))
                 cell.border = border
                 cell.alignment = Alignment(horizontal='center')
                 
-                # Tipo (com dropdown)
+                # Tipo (coluna B com dropdown)
                 cell = ws.cell(row=current_row, column=2, value='TRAB')
                 cell.border = border
                 cell.alignment = Alignment(horizontal='center')
-                dv.add(cell)  # Adicionar validação de dados
+                dv_tipos.add(cell)  # Adicionar validação de dados
                 
-                # Horários vazios (usuário preencherá)
-                for col in range(3, 7):
+                # Obra ID (coluna C com dropdown)
+                cell = ws.cell(row=current_row, column=3, value='')
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center')
+                if dv_obras:
+                    dv_obras.add(cell)  # Adicionar validação de dados
+                
+                # Horários vazios (colunas D, E, F, G)
+                for col in range(4, 8):
                     cell = ws.cell(row=current_row, column=col, value='')
                     cell.border = border
                     cell.alignment = Alignment(horizontal='center')
@@ -165,7 +181,7 @@ class PontoExcelService:
             instrucoes = [
                 "• Preencha os horários no formato HH:MM (exemplo: 08:00)",
                 "• Selecione o TIPO do dia na coluna B (use o dropdown)",
-                "• Para copiar tipos, veja a aba 📖 LEGENDA",
+                "• Preencha o OBRA ID na coluna C (veja IDs na aba 📖 LEGENDA)",
                 "• Deixe horários em branco para dias de falta/folga",
                 "• Os KPIs serão calculados automaticamente",
                 "• Não altere as datas ou fórmulas",
@@ -180,8 +196,9 @@ class PontoExcelService:
             ws.column_dimensions['B'].width = 12
             ws.column_dimensions['C'].width = 12
             ws.column_dimensions['D'].width = 12
-            ws.column_dimensions['E'].width = 15
+            ws.column_dimensions['E'].width = 12
             ws.column_dimensions['F'].width = 15
+            ws.column_dimensions['G'].width = 15
         
         # Salvar em BytesIO
         buffer = BytesIO()
@@ -191,14 +208,14 @@ class PontoExcelService:
         return buffer
     
     @staticmethod
-    def _criar_aba_legenda(ws):
-        """Cria aba de legenda com dicionário de códigos"""
+    def _criar_aba_legenda(ws, obras):
+        """Cria aba de legenda com dicionário de códigos e lista de obras"""
         # Título
-        ws['A1'] = "📖 DICIONÁRIO DE CÓDIGOS - TIPOS DE PONTO"
+        ws['A1'] = "📖 DICIONÁRIO - TIPOS DE PONTO E OBRAS"
         ws['A1'].font = Font(bold=True, size=16, color="1565C0")
         ws.merge_cells('A1:C1')
         
-        ws['A3'] = "Use esta legenda para preencher a coluna 'Tipo' nas abas de cada funcionário"
+        ws['A3'] = "Use esta legenda para preencher as colunas 'Tipo' e 'Obra ID' nas abas de cada funcionário"
         ws['A3'].font = Font(italic=True, size=11)
         ws.merge_cells('A3:C3')
         
@@ -272,10 +289,55 @@ class PontoExcelService:
             ws.merge_cells(f'A{row}:C{row}')
             row += 1
         
+        # SEÇÃO DE OBRAS
+        row += 3
+        ws[f'A{row}'] = "🏗️ OBRAS DISPONÍVEIS"
+        ws[f'A{row}'].font = Font(bold=True, size=14, color="2E7D32")
+        ws.merge_cells(f'A{row}:C{row}')
+        
+        row += 1
+        ws[f'A{row}'] = "Use os IDs abaixo para preencher a coluna 'Obra ID' nas abas de funcionários"
+        ws[f'A{row}'].font = Font(italic=True, size=11)
+        ws.merge_cells(f'A{row}:C{row}')
+        
+        row += 2
+        # Cabeçalho da tabela de obras
+        headers_obras = ['ID', 'NOME DA OBRA', 'CLIENTE']
+        for col, header in enumerate(headers_obras, start=1):
+            cell = ws.cell(row=row, column=col, value=header)
+            cell.fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
+            cell.font = Font(bold=True, color="FFFFFF", size=11)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = border
+        
+        row += 1
+        # Dados das obras
+        if obras:
+            for obra in obras:
+                ws.cell(row=row, column=1, value=obra.id).border = border
+                ws.cell(row=row, column=1).alignment = Alignment(horizontal='center')
+                ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="2E7D32")
+                
+                ws.cell(row=row, column=2, value=obra.nome).border = border
+                ws.cell(row=row, column=3, value=obra.cliente or 'N/A').border = border
+                row += 1
+        else:
+            ws.cell(row=row, column=1, value="Nenhuma obra cadastrada").border = border
+            ws.merge_cells(f'A{row}:C{row}')
+            ws.cell(row=row, column=1).alignment = Alignment(horizontal='center')
+            ws.cell(row=row, column=1).font = Font(italic=True, color="999999")
+            row += 1
+        
+        # Instruções sobre Obra ID
+        row += 2
+        ws[f'A{row}'] = "💡 DICA: Copie o ID da obra e cole na coluna 'Obra ID' do funcionário"
+        ws[f'A{row}'].font = Font(bold=True, size=11, color="FF6F00")
+        ws.merge_cells(f'A{row}:C{row}')
+        
         # Ajustar larguras
         ws.column_dimensions['A'].width = 15
-        ws.column_dimensions['B'].width = 25
-        ws.column_dimensions['C'].width = 50
+        ws.column_dimensions['B'].width = 35
+        ws.column_dimensions['C'].width = 35
     
     @staticmethod
     def _criar_secao_kpis(ws, start_row, data_start_row, data_end_row, kpi_fill, header_font, border):
@@ -436,11 +498,20 @@ class PontoExcelService:
                     else:
                         tipo_registro = 'TRAB'  # Default
                     
-                    # Ler horários (AJUSTADO para colunas C, D, E, F)
-                    entrada = PontoExcelService._parse_time(ws.cell(row=row, column=3).value)
-                    saida = PontoExcelService._parse_time(ws.cell(row=row, column=4).value)
-                    almoco_inicio = PontoExcelService._parse_time(ws.cell(row=row, column=5).value)
-                    almoco_fim = PontoExcelService._parse_time(ws.cell(row=row, column=6).value)
+                    # Ler obra_id (coluna C)
+                    obra_id_cell = ws.cell(row=row, column=3).value
+                    obra_id = None
+                    if obra_id_cell:
+                        try:
+                            obra_id = int(obra_id_cell)
+                        except (ValueError, TypeError):
+                            logger.warning(f"Aba '{sheet_name}', linha {row}: ID de obra inválido '{obra_id_cell}', ignorando")
+                    
+                    # Ler horários (AJUSTADO para colunas D, E, F, G)
+                    entrada = PontoExcelService._parse_time(ws.cell(row=row, column=4).value)
+                    saida = PontoExcelService._parse_time(ws.cell(row=row, column=5).value)
+                    almoco_inicio = PontoExcelService._parse_time(ws.cell(row=row, column=6).value)
+                    almoco_fim = PontoExcelService._parse_time(ws.cell(row=row, column=7).value)
                     
                     # Para tipos de folga/falta, não requer horários
                     tipos_sem_horario = ['FALTA', 'FALTA_J', 'SAB_FOLGA', 'DOM_FOLGA', 
@@ -453,6 +524,7 @@ class PontoExcelService:
                             'funcionario_id': funcionario_id,
                             'data': data_ponto,
                             'tipo_registro': tipo_registro,
+                            'obra_id': obra_id,
                             'admin_id': admin_id
                         })
                         continue
@@ -484,6 +556,7 @@ class PontoExcelService:
                         'hora_saida': saida,
                         'hora_almoco_saida': almoco_inicio,
                         'hora_almoco_retorno': almoco_fim,
+                        'obra_id': obra_id,
                         'admin_id': admin_id,
                         'tipo_registro': tipo_registro
                     })
