@@ -43,7 +43,7 @@ def lista():
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
-        print(f"🔍 [FROTA_LISTA] tenant_admin_id = {tenant_admin_id}")
+        # DEBUG: print(f"🔍 [FROTA_LISTA] tenant_admin_id = {tenant_admin_id}")
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
             return redirect(url_for('auth.login'))
@@ -64,20 +64,20 @@ def lista():
         
         # Buscar veículos da frota diretamente
         query = FrotaVeiculo.query.filter_by(admin_id=tenant_admin_id)
-        print(f"🔍 [FROTA_LISTA] Query inicial: admin_id={tenant_admin_id}")
+        # DEBUG: print(f"🔍 [FROTA_LISTA] Query inicial: admin_id={tenant_admin_id}")
         
         # Aplicar filtros
         if filtros.get('status'):
             if filtros['status'] == 'ativo':
                 query = query.filter_by(ativo=True)
-                print(f"🔍 [FROTA_LISTA] Filtro aplicado: ativo=True")
+                # DEBUG: print(f"🔍 [FROTA_LISTA] Filtro aplicado: ativo=True")
             elif filtros['status'] == 'inativo':
                 query = query.filter_by(ativo=False)
-                print(f"🔍 [FROTA_LISTA] Filtro aplicado: ativo=False")
+                # DEBUG: print(f"🔍 [FROTA_LISTA] Filtro aplicado: ativo=False")
         else:
             # ✅ CORREÇÃO: Por padrão, mostrar apenas veículos ativos
             query = query.filter_by(ativo=True)
-            print(f"🔍 [FROTA_LISTA] Filtro padrão aplicado: ativo=True")
+            # DEBUG: print(f"🔍 [FROTA_LISTA] Filtro padrão aplicado: ativo=True")
         
         if filtros.get('tipo'):
             query = query.filter_by(tipo=filtros['tipo'])
@@ -135,7 +135,7 @@ def novo():
         
         # POST - Processar cadastro
         dados = request.form.to_dict()
-        print(f"🔍 [FROTA_NOVO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"🔍 [FROTA_NOVO] Dados recebidos: {dados.keys()}")
         
         # Validações básicas
         campos_obrigatorios = ['placa', 'marca', 'modelo', 'ano', 'tipo']
@@ -200,11 +200,11 @@ def detalhes(id):
         
         # Buscar funcionários para exibir nomes nos passageiros
         funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id).all()
-        print(f"🔍 [FROTA_DETALHES] {len(funcionarios)} funcionários encontrados")
+        # DEBUG: print(f"🔍 [FROTA_DETALHES] {len(funcionarios)} funcionários encontrados")
         
         # Buscar usos recentes (últimos 20) com tratamento de erro
         try:
-            print(f"🔍 [FROTA_DETALHES] Buscando usos do veículo ID={id}, admin_id={tenant_admin_id}")
+            # DEBUG: print(f"🔍 [FROTA_DETALHES] Buscando usos do veículo ID={id}, admin_id={tenant_admin_id}")
             usos = FrotaUtilizacao.query.filter_by(
                 veiculo_id=id,
                 admin_id=tenant_admin_id
@@ -303,7 +303,7 @@ def editar(id):
         
         # POST - Processar edição
         dados = request.form.to_dict()
-        print(f"🔍 [FROTA_EDITAR] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"🔍 [FROTA_EDITAR] Dados recebidos: {dados.keys()}")
         
         try:
             # Atualizar campos
@@ -420,9 +420,9 @@ def novo_uso(veiculo_id):
         dados = request.form.to_dict()
         dados['veiculo_id'] = veiculo_id  # Garantir que o ID está nos dados
         
-        print(f"🔍 [FROTA_NOVO_USO] Dados recebidos: {dados.keys()}")
-        print(f"🔍 [FROTA_NOVO_USO] Passageiros Frente: '{dados.get('passageiros_frente')}'")
-        print(f"🔍 [FROTA_NOVO_USO] Passageiros Trás: '{dados.get('passageiros_tras')}'")
+        # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Passageiros Frente: '{dados.get('passageiros_frente')}'")
+        # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Passageiros Trás: '{dados.get('passageiros_tras')}'")
         
         # Validações básicas
         campos_obrigatorios = ['data_uso', 'hora_saida', 'km_inicial']
@@ -474,15 +474,15 @@ def novo_uso(veiculo_id):
                 print(f"✅ [FROTA_NOVO_USO] KM Atual do veículo atualizado: {veiculo.km_atual} km")
             
             # 🔍 DEBUG: Verificar campos de passageiros antes do commit
-            print(f"🔍 [FROTA_NOVO_USO] Antes do commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
-            print(f"🔍 [FROTA_NOVO_USO] Antes do commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
+            # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Antes do commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
+            # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Antes do commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
             
             db.session.commit()
             
             # 🔍 DEBUG: Verificar campos de passageiros após o commit
             db.session.refresh(novo_uso)
-            print(f"🔍 [FROTA_NOVO_USO] Após o commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
-            print(f"🔍 [FROTA_NOVO_USO] Após o commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
+            # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Após o commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
+            # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Após o commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
             
             # 🔗 INTEGRAÇÃO AUTOMÁTICA - Emitir evento de veículo usado
             try:
@@ -556,7 +556,7 @@ def novo_custo(veiculo_id):
         dados = request.form.to_dict()
         dados['veiculo_id'] = veiculo_id
         
-        print(f"🔍 [FROTA_NOVO_CUSTO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"🔍 [FROTA_NOVO_CUSTO] Dados recebidos: {dados.keys()}")
         
         # Validações básicas
         campos_obrigatorios = ['data_custo', 'tipo', 'valor']
@@ -656,7 +656,7 @@ def editar_uso(uso_id):
         
         # POST - Processar edição
         dados = request.form.to_dict()
-        print(f"🔍 [FROTA_EDITAR_USO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"🔍 [FROTA_EDITAR_USO] Dados recebidos: {dados.keys()}")
         
         try:
             # Atualizar campos
@@ -745,6 +745,8 @@ def deletar_uso(uso_id):
         veiculo = FrotaVeiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
         
         # 🗑️ DELETAR REGISTROS DA TABELA LEGADA passageiro_veiculo (CASCADE)
+        # TODO: Promover para ORM-level cascade relationship quando refatorar modelos
+        # Architect recomendou substituir raw SQL por configuração cascade="all, delete-orphan"
         try:
             db.session.execute(
                 db.text("DELETE FROM passageiro_veiculo WHERE uso_veiculo_id = :uso_id"),
@@ -821,7 +823,7 @@ def editar_custo(custo_id):
         
         # POST - Processar edição
         dados = request.form.to_dict()
-        print(f"🔍 [FROTA_EDITAR_CUSTO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"🔍 [FROTA_EDITAR_CUSTO] Dados recebidos: {dados.keys()}")
         
         try:
             # Atualizar campos

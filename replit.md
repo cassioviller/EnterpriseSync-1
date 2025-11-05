@@ -41,7 +41,7 @@ The system employs a Flask backend, SQLAlchemy ORM, and a PostgreSQL database. J
     -   **Payroll (Folha de Pagamento):** Automated calculations including CLT-compliant overtime differentiation (50% and 100% rates) and late deduction processing. Integrates with accounting.
     -   **Costs Management (Custos):** CRUD for construction costs with multi-tenant security, real-time statistics, and a dashboard with KPIs.
     -   **Accounting (Contabilidade):** Double-entry bookkeeping, automatic journal entries from payroll, a chart of accounts, trial balance, and DRE with competency selection.
-    -   **Fleet Management System:** Manages vehicles, expenses, and provides TCO dashboards with critical alert notifications.
+    -   **Fleet Management System:** Manages vehicles, expenses, and provides TCO dashboards with critical alert notifications. Sistema de passageiros simplificado usando `<select multiple>` nativo para seleção robusta e compatível com automação. Deleção em cascata de registros legados (`passageiro_veiculo`) implementada via raw SQL antes da exclusão do uso (TODO: migrar para ORM-level cascade quando refatorar modelos). Atualização automática de `km_atual` ao criar, editar ou deletar usos.
     -   **Food Management System:** Manages restaurant and food entries, integrates with the financial module to generate accounts payable. Utilizes abordagem híbrida para suportar dois modelos (RegistroAlimentacao legado e AlimentacaoLancamento novo) com agregação automática de dados de ambas as fontes em dashboards, KPIs e gráficos.
     -   **Warehouse Management (Almoxarifado):** Manages materials, tools, and PPE with traceability.
     -   **Shared Device Time Clock System (Ponto Eletrônico):** Mobile-first time clock with GPS tracking.
