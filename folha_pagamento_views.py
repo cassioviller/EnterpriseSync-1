@@ -884,13 +884,27 @@ def holerite_pdf(folha_id):
     
     funcionario = folha.funcionario
     
-    # Dados da empresa (pode vir de configurações)
-    empresa = {
-        'nome': 'EMPRESA EXEMPLO LTDA',
-        'cnpj': '00.000.000/0001-00',
-        'endereco': 'Rua Exemplo, 123 - Centro',
-        'cidade': 'São Paulo - SP'
-    }
+    # Buscar dados da empresa na configuração
+    from models import ConfiguracaoEmpresa
+    config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=current_user.id).first()
+    
+    if config_empresa:
+        empresa = {
+            'nome': config_empresa.nome_empresa or 'EMPRESA',
+            'cnpj': config_empresa.cnpj or '',
+            'endereco': config_empresa.endereco or '',
+            'telefone': config_empresa.telefone or '',
+            'email': config_empresa.email or ''
+        }
+    else:
+        # Fallback se não houver configuração
+        empresa = {
+            'nome': 'EMPRESA',
+            'cnpj': '',
+            'endereco': '',
+            'telefone': '',
+            'email': ''
+        }
     
     try:
         # Tentar usar reportlab (disponível)
@@ -924,9 +938,14 @@ def holerite_pdf(folha_id):
         
         # Cabeçalho da empresa
         story.append(Paragraph(f"<b>{empresa['nome']}</b>", style_title))
-        story.append(Paragraph(f"CNPJ: {empresa['cnpj']}", styles['Normal']))
-        story.append(Paragraph(f"{empresa['endereco']}", styles['Normal']))
-        story.append(Paragraph(f"{empresa['cidade']}", styles['Normal']))
+        if empresa['cnpj']:
+            story.append(Paragraph(f"CNPJ: {empresa['cnpj']}", styles['Normal']))
+        if empresa['endereco']:
+            story.append(Paragraph(f"{empresa['endereco']}", styles['Normal']))
+        if empresa['telefone']:
+            story.append(Paragraph(f"Tel: {empresa['telefone']}", styles['Normal']))
+        if empresa['email']:
+            story.append(Paragraph(f"Email: {empresa['email']}", styles['Normal']))
         story.append(Spacer(1, 0.5*cm))
         
         # Título do holerite
