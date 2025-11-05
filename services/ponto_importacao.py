@@ -33,6 +33,22 @@ class PontoExcelService:
         
         # Criar workbook
         wb = Workbook()
+        
+        # Se não houver funcionários, criar uma planilha de aviso
+        if not funcionarios:
+            ws = wb.active
+            ws.title = "Aviso"
+            ws['A1'] = "⚠️ ATENÇÃO"
+            ws['A1'].font = Font(bold=True, size=16, color="FF0000")
+            ws['A3'] = "Não há funcionários ativos cadastrados no sistema."
+            ws['A4'] = "Por favor, cadastre funcionários antes de gerar a planilha de importação."
+            ws.column_dimensions['A'].width = 60
+            
+            buffer = BytesIO()
+            wb.save(buffer)
+            buffer.seek(0)
+            return buffer
+        
         wb.remove(wb.active)  # Remover sheet padrão
         
         # Estilos
