@@ -601,7 +601,7 @@ def download_modelo():
         # Buscar obras ativas
         obras = Obra.query.filter_by(
             admin_id=admin_id,
-            ativa=True
+            ativo=True
         ).order_by(Obra.nome).all()
         
         # Gerar planilha com obras

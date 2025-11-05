@@ -403,9 +403,23 @@ class PontoExcelService:
         ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
         row += 1
         
+        # KPI 7: Total de Horas Extras (dias)
+        ws.cell(row=row, column=1, value="Total Horas Extras (dias)").border = border
+        ws.cell(row=row, column=2, value=f'=COUNTIF(B{data_start_row}:B{data_end_row},"SAB_TRAB")+COUNTIF(B{data_start_row}:B{data_end_row},"DOM_TRAB")+COUNTIF(B{data_start_row}:B{data_end_row},"FER_TRAB")').border = border
+        ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
+        ws.cell(row=row, column=2).font = Font(color="FF6F00", bold=True)
+        row += 1
+        
+        # KPI 8: Atrasos (entradas após 08:01)
+        ws.cell(row=row, column=1, value="Atrasos (entrada > 08:00)").border = border
+        ws.cell(row=row, column=2, value=f'=COUNTIF(D{data_start_row}:D{data_end_row},">08:00")').border = border
+        ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
+        ws.cell(row=row, column=2).font = Font(color="FF0000", bold=True)
+        row += 1
+        
         # Nota explicativa
         row += 2
-        ws[f'A{row}'] = "💡 Os valores acima são calculados automaticamente conforme você preenche a coluna 'Tipo'"
+        ws[f'A{row}'] = "💡 Os valores acima são calculados automaticamente conforme você preenche os dados"
         ws[f'A{row}'].font = Font(italic=True, size=10, color="666666")
         ws.merge_cells(f'A{row}:D{row}')
         
