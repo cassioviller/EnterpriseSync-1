@@ -857,49 +857,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 <div class="form-grid form-grid-2">
                     <div class="form-group">
-                        <label for="busca_passageiros_frente">Passageiros da Frente</label>
-                        <div class="passageiro-selector">
-                            <input type="text" 
-                                   id="busca_passageiros_frente" 
-                                   class="modern-input passageiro-busca" 
-                                   placeholder="🔍 Buscar funcionário para frente..." 
-                                   autocomplete="off">
-                            <div id="dropdown_passageiros_frente" class="passageiro-dropdown" style="display: none;">
-                                {% for funcionario in funcionarios %}
-                                <div class="passageiro-item" data-id="{{ funcionario.id }}" data-nome="{{ funcionario.nome }}" data-funcao="{{ funcionario.funcao or 'Sem função' }}">
-                                    <span class="passageiro-nome">{{ funcionario.nome }}</span>
-                                    <small class="passageiro-funcao">{{ funcionario.funcao or 'Sem função' }}</small>
-                                </div>
-                                {% endfor %}
-                            </div>
-                            <div id="passageiros_frente_selecionados" class="passageiros-selecionados">
-                                <!-- Funcionários selecionados aparecerão aqui -->
-                            </div>
-                        </div>
-                        <input type="hidden" id="passageiros_frente_ids" name="passageiros_frente" value="">
+                        <label for="passageiros_frente">Passageiros da Frente</label>
+                        <select multiple 
+                                id="passageiros_frente" 
+                                name="passageiros_frente" 
+                                class="modern-select" 
+                                style="min-height: 120px; padding: 0.5rem;">
+                            {% for funcionario in funcionarios %}
+                            <option value="{{ funcionario.id }}">{{ funcionario.nome }} {% if funcionario.funcao %}({{ funcionario.funcao }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="input-help">Segure Ctrl/Cmd para selecionar múltiplos passageiros</div>
                     </div>
                     
                     <div class="form-group">
-                        <label for="busca_passageiros_tras">Passageiros de Trás</label>
-                        <div class="passageiro-selector">
-                            <input type="text" 
-                                   id="busca_passageiros_tras" 
-                                   class="modern-input passageiro-busca" 
-                                   placeholder="🔍 Buscar funcionário para trás..." 
-                                   autocomplete="off">
-                            <div id="dropdown_passageiros_tras" class="passageiro-dropdown" style="display: none;">
-                                {% for funcionario in funcionarios %}
-                                <div class="passageiro-item" data-id="{{ funcionario.id }}" data-nome="{{ funcionario.nome }}" data-funcao="{{ funcionario.funcao or 'Sem função' }}">
-                                    <span class="passageiro-nome">{{ funcionario.nome }}</span>
-                                    <small class="passageiro-funcao">{{ funcionario.funcao or 'Sem função' }}</small>
-                                </div>
-                                {% endfor %}
-                            </div>
-                            <div id="passageiros_tras_selecionados" class="passageiros-selecionados">
-                                <!-- Funcionários selecionados aparecerão aqui -->
-                            </div>
-                        </div>
-                        <input type="hidden" id="passageiros_tras_ids" name="passageiros_tras" value="">
+                        <label for="passageiros_tras">Passageiros de Trás</label>
+                        <select multiple 
+                                id="passageiros_tras" 
+                                name="passageiros_tras" 
+                                class="modern-select" 
+                                style="min-height: 120px; padding: 0.5rem;">
+                            {% for funcionario in funcionarios %}
+                            <option value="{{ funcionario.id }}">{{ funcionario.nome }} {% if funcionario.funcao %}({{ funcionario.funcao }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="input-help">Segure Ctrl/Cmd para selecionar múltiplos passageiros</div>
                     </div>
                 </div>
                 
@@ -1099,7 +1081,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function atualizarCampoHidden(tipo) {
         const hiddenInput = document.getElementById(`passageiros_${tipo}_ids`);
-        hiddenInput.value = passageirosSelecionados[tipo].join(',');
+        const valor = passageirosSelecionados[tipo].join(',');
+        hiddenInput.value = valor;
+        
+        // 🔥 FORCE attribute update para garantir que Playwright/testes vejam o valor
+        hiddenInput.setAttribute('value', valor);
+        
+        console.log(`✅ [HIDDEN_UPDATE] Atualizado passageiros_${tipo}_ids:`, valor);
     }
     
     // Calcular resumo dos passageiros automaticamente
@@ -1131,6 +1119,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Validação do formulário
     const form = document.getElementById('formUsoVeiculo');
     form.addEventListener('submit', function(e) {
+        // 🔥 CRITICAL: Atualizar campos hidden ANTES de validar/submeter
+        console.log('🔍 [SUBMIT] Atualizando campos hidden antes do submit...');
+        atualizarCampoHidden('frente');
+        atualizarCampoHidden('tras');
+        console.log('✅ [SUBMIT] Passageiros Frente:', document.getElementById('passageiros_frente_ids').value);
+        console.log('✅ [SUBMIT] Passageiros Trás:', document.getElementById('passageiros_tras_ids').value);
+        
         const dataUso = document.getElementById('data_uso').value;
         const horaSaida = document.getElementById('hora_saida').value;
         const motoristaId = document.getElementById('funcionario_id').value;

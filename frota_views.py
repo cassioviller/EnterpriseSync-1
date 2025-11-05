@@ -421,6 +421,8 @@ def novo_uso(veiculo_id):
         dados['veiculo_id'] = veiculo_id  # Garantir que o ID está nos dados
         
         print(f"🔍 [FROTA_NOVO_USO] Dados recebidos: {dados.keys()}")
+        print(f"🔍 [FROTA_NOVO_USO] Passageiros Frente: '{dados.get('passageiros_frente')}'")
+        print(f"🔍 [FROTA_NOVO_USO] Passageiros Trás: '{dados.get('passageiros_tras')}'")
         
         # Validações básicas
         campos_obrigatorios = ['data_uso', 'hora_saida', 'km_inicial']
@@ -435,6 +437,19 @@ def novo_uso(veiculo_id):
                                      obras=obras)
         
         try:
+            # 🔥 RECEBER PASSAGEIROS DE SELECT MULTIPLE (retorna lista de IDs)
+            passageiros_frente_list = request.form.getlist('passageiros_frente')
+            passageiros_tras_list = request.form.getlist('passageiros_tras')
+            
+            # Converter lista de IDs para string CSV
+            passageiros_frente_csv = ','.join(passageiros_frente_list) if passageiros_frente_list else ''
+            passageiros_tras_csv = ','.join(passageiros_tras_list) if passageiros_tras_list else ''
+            
+            print(f"🔍 [FROTA_NOVO_USO] Passageiros Frente LIST: {passageiros_frente_list}")
+            print(f"🔍 [FROTA_NOVO_USO] Passageiros Trás LIST: {passageiros_tras_list}")
+            print(f"🔍 [FROTA_NOVO_USO] Passageiros Frente CSV: '{passageiros_frente_csv}'")
+            print(f"🔍 [FROTA_NOVO_USO] Passageiros Trás CSV: '{passageiros_tras_csv}'")
+            
             # Criar novo uso da frota
             novo_uso = FrotaUtilizacao(
                 veiculo_id=veiculo_id,
@@ -445,8 +460,8 @@ def novo_uso(veiculo_id):
                 hora_retorno=datetime.strptime(dados['hora_retorno'], '%H:%M').time() if dados.get('hora_retorno') else None,
                 km_inicial=int(dados['km_inicial']) if dados.get('km_inicial') else None,
                 km_final=int(dados['km_final']) if dados.get('km_final') else None,
-                passageiros_frente=dados.get('passageiros_frente'),
-                passageiros_tras=dados.get('passageiros_tras'),
+                passageiros_frente=passageiros_frente_csv,
+                passageiros_tras=passageiros_tras_csv,
                 responsavel_veiculo=dados.get('responsavel_veiculo'),
                 observacoes=dados.get('observacoes'),
                 admin_id=tenant_admin_id
@@ -463,7 +478,16 @@ def novo_uso(veiculo_id):
                 veiculo.km_atual = novo_uso.km_final
                 print(f"✅ [FROTA_NOVO_USO] KM Atual do veículo atualizado: {veiculo.km_atual} km")
             
+            # 🔍 DEBUG: Verificar campos de passageiros antes do commit
+            print(f"🔍 [FROTA_NOVO_USO] Antes do commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
+            print(f"🔍 [FROTA_NOVO_USO] Antes do commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
+            
             db.session.commit()
+            
+            # 🔍 DEBUG: Verificar campos de passageiros após o commit
+            db.session.refresh(novo_uso)
+            print(f"🔍 [FROTA_NOVO_USO] Após o commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
+            print(f"🔍 [FROTA_NOVO_USO] Após o commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
             
             # 🔗 INTEGRAÇÃO AUTOMÁTICA - Emitir evento de veículo usado
             try:
@@ -724,6 +748,16 @@ def deletar_uso(uso_id):
         
         # Buscar veículo antes de deletar
         veiculo = FrotaVeiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
+        
+        # 🗑️ DELETAR REGISTROS DA TABELA LEGADA passageiro_veiculo (CASCADE)
+        try:
+            db.session.execute(
+                db.text("DELETE FROM passageiro_veiculo WHERE uso_veiculo_id = :uso_id"),
+                {"uso_id": uso_id}
+            )
+            print(f"✅ [FROTA_DELETAR_USO] Registros de passageiro_veiculo deletados")
+        except Exception as e:
+            print(f"⚠️ [FROTA_DELETAR_USO] Erro ao deletar passageiros (tabela pode não existir): {e}")
         
         db.session.delete(uso)
         db.session.flush()
