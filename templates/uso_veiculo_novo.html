@@ -857,31 +857,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 <div class="form-grid form-grid-2">
                     <div class="form-group">
-                        <label for="passageiros_frente">Passageiros da Frente</label>
-                        <select multiple 
-                                id="passageiros_frente" 
-                                name="passageiros_frente" 
-                                class="modern-select" 
-                                style="min-height: 120px; padding: 0.5rem;">
-                            {% for funcionario in funcionarios %}
-                            <option value="{{ funcionario.id }}">{{ funcionario.nome }} {% if funcionario.funcao %}({{ funcionario.funcao }}){% endif %}</option>
-                            {% endfor %}
-                        </select>
-                        <div class="input-help">Segure Ctrl/Cmd para selecionar múltiplos passageiros</div>
+                        <label for="passageiros_frente_display">Passageiros da Frente</label>
+                        <div class="passageiro-selector-compact" onclick="abrirModalPassageiros('frente')" style="cursor: pointer;">
+                            <input type="text" 
+                                   id="passageiros_frente_display" 
+                                   class="modern-input" 
+                                   value="0 selecionados"
+                                   readonly
+                                   style="cursor: pointer; background: #f8f9fa;">
+                            <i class="fas fa-users" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #6c757d; pointer-events: none;"></i>
+                        </div>
+                        <div class="input-help">Clique para selecionar passageiros</div>
                     </div>
                     
                     <div class="form-group">
-                        <label for="passageiros_tras">Passageiros de Trás</label>
-                        <select multiple 
-                                id="passageiros_tras" 
-                                name="passageiros_tras" 
-                                class="modern-select" 
-                                style="min-height: 120px; padding: 0.5rem;">
-                            {% for funcionario in funcionarios %}
-                            <option value="{{ funcionario.id }}">{{ funcionario.nome }} {% if funcionario.funcao %}({{ funcionario.funcao }}){% endif %}</option>
-                            {% endfor %}
-                        </select>
-                        <div class="input-help">Segure Ctrl/Cmd para selecionar múltiplos passageiros</div>
+                        <label for="passageiros_tras_display">Passageiros de Trás</label>
+                        <div class="passageiro-selector-compact" onclick="abrirModalPassageiros('tras')" style="cursor: pointer;">
+                            <input type="text" 
+                                   id="passageiros_tras_display" 
+                                   class="modern-input" 
+                                   value="0 selecionados"
+                                   readonly
+                                   style="cursor: pointer; background: #f8f9fa;">
+                            <i class="fas fa-users" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #6c757d; pointer-events: none;"></i>
+                        </div>
+                        <div class="input-help">Clique para selecionar passageiros</div>
                     </div>
                 </div>
                 
@@ -910,6 +910,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
 
+            <!-- Campos Hidden para armazenar IDs dos passageiros -->
+            <input type="hidden" id="passageiros_frente_hidden" name="passageiros_frente" value="">
+            <input type="hidden" id="passageiros_tras_hidden" name="passageiros_tras" value="">
+
             <!-- Botões de Ação -->
             <div class="form-actions">
                 <a href="{{ url_for('frota.lista') }}" class="btn-action btn-secondary-custom">
@@ -924,6 +928,357 @@ document.addEventListener('DOMContentLoaded', function() {
         </form>
     </div>
 </div>
+
+<!-- Modal Seleção de Passageiros -->
+<div id="modalPassageiros" class="modal-passageiros" style="display: none;">
+    <div class="modal-passageiros-overlay" onclick="fecharModalPassageiros()"></div>
+    <div class="modal-passageiros-content">
+        <div class="modal-passageiros-header">
+            <h3 id="modalTitulo">Selecionar Passageiros</h3>
+            <button type="button" class="modal-close" onclick="fecharModalPassageiros()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-passageiros-body">
+            <div id="listaPassageiros" class="lista-passageiros">
+                <!-- Lista de funcionários será preenchida dinamicamente -->
+            </div>
+        </div>
+        <div class="modal-passageiros-footer">
+            <button type="button" class="btn-modal btn-secondary" onclick="fecharModalPassageiros()">
+                Cancelar
+            </button>
+            <button type="button" class="btn-modal btn-primary" onclick="confirmarSelecaoPassageiros()">
+                Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Modal Passageiros */
+.modal-passageiros {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.modal-passageiros-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.modal-passageiros-content {
+    position: relative;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-passageiros-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-passageiros-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #212529;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background: #f8f9fa;
+    color: #212529;
+}
+
+.modal-passageiros-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.lista-passageiros {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.passageiro-item-checkbox {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+}
+
+.passageiro-item-checkbox:hover {
+    border-color: #0d6efd;
+    background: #f8f9fa;
+}
+
+.passageiro-item-checkbox.selected {
+    border-color: #0d6efd;
+    background: #e7f1ff;
+}
+
+.passageiro-item-checkbox input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 1rem;
+    cursor: pointer;
+    accent-color: #0d6efd;
+}
+
+.passageiro-item-info {
+    flex: 1;
+}
+
+.passageiro-item-nome {
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 0.25rem;
+}
+
+.passageiro-item-funcao {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.modal-passageiros-footer {
+    padding: 1.5rem;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.btn-modal {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.btn-modal.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-modal.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.btn-modal.btn-primary {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+}
+
+.btn-modal.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.passageiro-selector-compact {
+    position: relative;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .modal-passageiros-content {
+        max-width: 100%;
+        max-height: 90vh;
+        margin: 0;
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .passageiro-item-checkbox {
+        padding: 0.875rem;
+    }
+}
+</style>
+
+<script>
+// Dados dos funcionários disponíveis
+const funcionariosDisponiveis = [
+    {% for funcionario in funcionarios %}
+    {
+        id: {{ funcionario.id }},
+        nome: "{{ funcionario.nome }}",
+        funcao: "{{ funcionario.funcao or 'Sem função' }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+// Estado da seleção
+let tipoAtual = null; // 'frente' ou 'tras'
+const passageirosSelecionados = {
+    frente: [],
+    tras: []
+};
+
+// Abrir modal
+function abrirModalPassageiros(tipo) {
+    tipoAtual = tipo;
+    const modal = document.getElementById('modalPassageiros');
+    const titulo = document.getElementById('modalTitulo');
+    const lista = document.getElementById('listaPassageiros');
+    
+    // Atualizar título
+    titulo.textContent = tipo === 'frente' ? 'Passageiros da Frente' : 'Passageiros de Trás';
+    
+    // Limpar e preencher lista
+    lista.innerHTML = '';
+    funcionariosDisponiveis.forEach(func => {
+        const isSelected = passageirosSelecionados[tipo].includes(func.id);
+        const item = document.createElement('div');
+        item.className = 'passageiro-item-checkbox' + (isSelected ? ' selected' : '');
+        item.onclick = () => togglePassageiro(func.id);
+        
+        item.innerHTML = `
+            <input type="checkbox" 
+                   id="pass_${tipo}_${func.id}" 
+                   ${isSelected ? 'checked' : ''}
+                   onclick="event.stopPropagation(); togglePassageiro(${func.id})">
+            <div class="passageiro-item-info">
+                <div class="passageiro-item-nome">${func.nome}</div>
+                <div class="passageiro-item-funcao">${func.funcao}</div>
+            </div>
+        `;
+        
+        lista.appendChild(item);
+    });
+    
+    // Mostrar modal
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+// Fechar modal
+function fecharModalPassageiros() {
+    const modal = document.getElementById('modalPassageiros');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    tipoAtual = null;
+}
+
+// Toggle seleção
+function togglePassageiro(funcId) {
+    if (!tipoAtual) return;
+    
+    const index = passageirosSelecionados[tipoAtual].indexOf(funcId);
+    if (index > -1) {
+        passageirosSelecionados[tipoAtual].splice(index, 1);
+    } else {
+        passageirosSelecionados[tipoAtual].push(funcId);
+    }
+    
+    // Atualizar visual do checkbox e item
+    const checkbox = document.getElementById(`pass_${tipoAtual}_${funcId}`);
+    const item = checkbox.closest('.passageiro-item-checkbox');
+    
+    if (passageirosSelecionados[tipoAtual].includes(funcId)) {
+        checkbox.checked = true;
+        item.classList.add('selected');
+    } else {
+        checkbox.checked = false;
+        item.classList.remove('selected');
+    }
+}
+
+// Confirmar seleção
+function confirmarSelecaoPassageiros() {
+    if (!tipoAtual) return;
+    
+    // Atualizar campo de display
+    const count = passageirosSelecionados[tipoAtual].length;
+    const displayInput = document.getElementById(`passageiros_${tipoAtual}_display`);
+    displayInput.value = `${count} selecionado${count !== 1 ? 's' : ''}`;
+    
+    // Atualizar campo hidden (lista de IDs separados por vírgula)
+    const hiddenInput = document.getElementById(`passageiros_${tipoAtual}_hidden`);
+    hiddenInput.value = passageirosSelecionados[tipoAtual].join(',');
+    
+    // Fechar modal
+    fecharModalPassageiros();
+    
+    // Atualizar resumo
+    atualizarResumoPassageiros();
+}
+
+// Atualizar resumo
+function atualizarResumoPassageiros() {
+    const totalFrente = passageirosSelecionados.frente.length;
+    const totalTras = passageirosSelecionados.tras.length;
+    const totalPassageiros = totalFrente + totalTras;
+    const totalPessoas = totalPassageiros + 1; // +1 para o motorista
+    
+    document.getElementById('total_pessoas').textContent = 
+        `Total: ${totalPessoas} pessoa${totalPessoas !== 1 ? 's' : ''} (${totalPassageiros} passageiro${totalPassageiros !== 1 ? 's' : ''} + motorista)`;
+    document.getElementById('distribuicao').textContent = 
+        `Frente: ${totalFrente + 1} (motorista + ${totalFrente}) | Trás: ${totalTras}`;
+}
+
+// Fechar modal ao clicar ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && tipoAtual) {
+        fecharModalPassageiros();
+    }
+});
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -956,208 +1311,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const hoje = new Date().toISOString().split('T')[0];
         dataUsoInput.value = hoje;
     }
-    
-    // Sistema de seleção de passageiros moderno
-    const passageirosSelecionados = {
-        frente: [],
-        tras: []
-    };
-    
-    // Inicializar sistema para passageiros da frente
-    initPassageiroSelector('frente');
-    // Inicializar sistema para passageiros de trás
-    initPassageiroSelector('tras');
-    
-    function initPassageiroSelector(tipo) {
-        const buscaInput = document.getElementById(`busca_passageiros_${tipo}`);
-        const dropdown = document.getElementById(`dropdown_passageiros_${tipo}`);
-        const passageirosSelecionadosDiv = document.getElementById(`passageiros_${tipo}_selecionados`);
-        const hiddenInput = document.getElementById(`passageiros_${tipo}_ids`);
-        
-        // Mostrar dropdown ao focar no campo
-        buscaInput.addEventListener('focus', () => {
-            dropdown.style.display = 'block';
-            filtrarPassageiros(tipo, '');
-        });
-        
-        // Filtrar passageiros conforme digitação
-        buscaInput.addEventListener('input', (e) => {
-            filtrarPassageiros(tipo, e.target.value);
-        });
-        
-        // Esconder dropdown ao clicar fora
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest(`#busca_passageiros_${tipo}`) && !e.target.closest(`#dropdown_passageiros_${tipo}`)) {
-                dropdown.style.display = 'none';
-                buscaInput.value = ''; // Limpar busca
-            }
-        });
-        
-        // Adicionar event listeners aos items de passageiros
-        dropdown.querySelectorAll('.passageiro-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const id = item.dataset.id;
-                const nome = item.dataset.nome;
-                const funcao = item.dataset.funcao;
-                
-                adicionarPassageiro(tipo, id, nome, funcao);
-                buscaInput.value = ''; // Limpar busca
-                dropdown.style.display = 'none';
-            });
-        });
-    }
-    
-    function filtrarPassageiros(tipo, termo) {
-        const dropdown = document.getElementById(`dropdown_passageiros_${tipo}`);
-        const items = dropdown.querySelectorAll('.passageiro-item');
-        
-        termo = termo.toLowerCase();
-        
-        items.forEach(item => {
-            const nome = item.dataset.nome.toLowerCase();
-            const funcao = item.dataset.funcao.toLowerCase();
-            const id = item.dataset.id;
-            
-            // Esconder se já foi selecionado
-            const jaFoiSelecionado = passageirosSelecionados[tipo].includes(id);
-            
-            if (jaFoiSelecionado) {
-                item.style.display = 'none';
-                return;
-            }
-            
-            // Filtrar por termo de busca
-            if (nome.includes(termo) || funcao.includes(termo)) {
-                item.style.display = 'flex';
-            } else {
-                item.style.display = 'none';
-            }
-        });
-    }
-    
-    function adicionarPassageiro(tipo, id, nome, funcao) {
-        // Evitar duplicatas
-        if (passageirosSelecionados[tipo].includes(id)) return;
-        
-        // Adicionar à lista
-        passageirosSelecionados[tipo].push(id);
-        
-        // Criar chip visual
-        const passageirosSelecionadosDiv = document.getElementById(`passageiros_${tipo}_selecionados`);
-        const chip = document.createElement('div');
-        chip.className = 'passageiro-chip';
-        chip.dataset.id = id;
-        chip.innerHTML = `
-            <span>${nome} <small>(${funcao})</small></span>
-            <span class="passageiro-chip-remover" onclick="removerPassageiro('${tipo}', '${id}')">&times;</span>
-        `;
-        
-        passageirosSelecionadosDiv.appendChild(chip);
-        
-        // Atualizar campo hidden
-        atualizarCampoHidden(tipo);
-        
-        // Atualizar resumo
-        calcularResumoPassageiros();
-    }
-    
-    function removerPassageiro(tipo, id) {
-        // Remover da lista
-        passageirosSelecionados[tipo] = passageirosSelecionados[tipo].filter(pId => pId !== id);
-        
-        // Remover chip visual
-        const chip = document.querySelector(`#passageiros_${tipo}_selecionados .passageiro-chip[data-id="${id}"]`);
-        if (chip) chip.remove();
-        
-        // Atualizar campo hidden
-        atualizarCampoHidden(tipo);
-        
-        // Atualizar resumo
-        calcularResumoPassageiros();
-    }
-    
-    // Tornar função global para o onclick
-    window.removerPassageiro = removerPassageiro;
-    
-    function atualizarCampoHidden(tipo) {
-        const hiddenInput = document.getElementById(`passageiros_${tipo}_ids`);
-        const valor = passageirosSelecionados[tipo].join(',');
-        hiddenInput.value = valor;
-        
-        // 🔥 FORCE attribute update para garantir que Playwright/testes vejam o valor
-        hiddenInput.setAttribute('value', valor);
-        
-        console.log(`✅ [HIDDEN_UPDATE] Atualizado passageiros_${tipo}_ids:`, valor);
-    }
-    
-    // Calcular resumo dos passageiros automaticamente
-    const motoristaSelect = document.getElementById('funcionario_id');
-    const totalPessoasDiv = document.getElementById('total_pessoas');
-    const distribuicaoDiv = document.getElementById('distribuicao');
-    
-    function calcularResumoPassageiros() {
-        const temMotorista = motoristaSelect.value ? 1 : 0;
-        const totalFrente = passageirosSelecionados.frente.length + temMotorista;
-        const totalTras = passageirosSelecionados.tras.length;
-        const totalPessoas = totalFrente + totalTras;
-        
-        if (totalPessoas > 0) {
-            totalPessoasDiv.textContent = `Total: ${totalPessoas} pessoa${totalPessoas > 1 ? 's' : ''} ${temMotorista ? '(incluindo motorista)' : ''}`;
-            distribuicaoDiv.textContent = `Frente: ${totalFrente} | Trás: ${totalTras}`;
-        } else {
-            totalPessoasDiv.textContent = 'Total: 0 pessoas';
-            distribuicaoDiv.textContent = 'Selecione o motorista e passageiros';
-        }
-    }
-    
-    // Adicionar listener para atualizar resumo quando motorista mudar
-    motoristaSelect.addEventListener('change', calcularResumoPassageiros);
-    
-    // Calcular resumo inicial
-    calcularResumoPassageiros();
-    
-    // Validação do formulário
-    const form = document.getElementById('formUsoVeiculo');
-    form.addEventListener('submit', function(e) {
-        // 🔥 CRITICAL: Atualizar campos hidden ANTES de validar/submeter
-        console.log('🔍 [SUBMIT] Atualizando campos hidden antes do submit...');
-        atualizarCampoHidden('frente');
-        atualizarCampoHidden('tras');
-        console.log('✅ [SUBMIT] Passageiros Frente:', document.getElementById('passageiros_frente_ids').value);
-        console.log('✅ [SUBMIT] Passageiros Trás:', document.getElementById('passageiros_tras_ids').value);
-        
-        const dataUso = document.getElementById('data_uso').value;
-        const horaSaida = document.getElementById('hora_saida').value;
-        const motoristaId = document.getElementById('funcionario_id').value;
-        const kmInicial = document.getElementById('km_inicial').value;
-        
-        if (!dataUso || !horaSaida || !motoristaId || !kmInicial) {
-            e.preventDefault();
-            alert('Por favor, preencha todos os campos obrigatórios.');
-            return false;
-        }
-        
-        // Validar KM
-        const kmInicialVal = parseFloat(kmInicial);
-        const kmFinalVal = parseFloat(kmFinalInput.value);
-        
-        if (kmFinalVal && kmFinalVal <= kmInicialVal) {
-            e.preventDefault();
-            alert('O KM final deve ser maior que o KM inicial.');
-            return false;
-        }
-        
-        // Validar data (não pode ser futura)
-        const dataUsoDate = new Date(dataUso);
-        const hoje = new Date();
-        hoje.setHours(23, 59, 59, 999); // Fim do dia
-        
-        if (dataUsoDate > hoje) {
-            e.preventDefault();
-            alert('A data de uso não pode ser futura.');
-            return false;
-        }
-    });
 });
 </script>
 {% endblock %}
