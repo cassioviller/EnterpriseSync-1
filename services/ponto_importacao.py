@@ -115,9 +115,16 @@ class PontoExcelService:
             ws['F3'] = f"(Usado para calcular atrasos e horas extras)"
             ws['F3'].font = Font(italic=True, size=9, color="666666")
             
-            # Armazenar horários em células ocultas para fórmulas
-            ws['Z1'] = horario_entrada_padrao
-            ws['Z2'] = horario_saida_padrao
+            # Armazenar horários em células ocultas para fórmulas (como valores de tempo, não strings)
+            # Converter strings HH:MM para valores de tempo do Excel
+            from datetime import datetime as dt
+            entrada_time = dt.strptime(horario_entrada_padrao, '%H:%M').time()
+            saida_time = dt.strptime(horario_saida_padrao, '%H:%M').time()
+            
+            ws['Z1'] = entrada_time
+            ws['Z1'].number_format = 'HH:MM'
+            ws['Z2'] = saida_time
+            ws['Z2'].number_format = 'HH:MM'
             
             # Linha em branco
             current_row = 5
