@@ -380,12 +380,11 @@ class PontoExcelService:
         # Processar cada aba (uma por funcionário)
         for sheet_name in wb.sheetnames:
             try:
-                ws = wb[sheet_name]
+                # Pular abas especiais (Legenda, Aviso, etc)
+                if sheet_name in ["📖 LEGENDA", "Aviso"] or ' - ' not in sheet_name:
+                    continue  # Não é aba de funcionário, pular silenciosamente
                 
-                # Extrair código do funcionário do nome da aba (formato: "CÓDIGO - Nome")
-                if ' - ' not in sheet_name:
-                    erros.append(f"Aba '{sheet_name}': formato inválido (esperado 'CÓDIGO - Nome')")
-                    continue
+                ws = wb[sheet_name]
                 
                 codigo_func = sheet_name.split(' - ')[0].strip()
                 
