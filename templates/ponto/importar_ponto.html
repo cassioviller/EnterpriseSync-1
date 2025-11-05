@@ -1,0 +1,293 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Importar Pontos - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Cabeçalho -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-1">
+                                <i class="fas fa-file-excel text-success me-2"></i>
+                                Importar Pontos via Excel
+                            </h2>
+                            <p class="text-muted mb-0">
+                                Importe registros de ponto de múltiplos funcionários de uma única vez
+                            </p>
+                        </div>
+                        <a href="{{ url_for('ponto.index') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>
+                            Voltar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instruções e Download do Modelo -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">
+                        <i class="fas fa-info-circle text-info me-2"></i>
+                        Como Importar
+                    </h5>
+                    
+                    <div class="steps">
+                        <div class="step mb-3">
+                            <div class="d-flex align-items-start">
+                                <div class="step-number bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                     style="width: 32px; height: 32px; flex-shrink: 0;">
+                                    <strong>1</strong>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Baixe a planilha modelo</h6>
+                                    <p class="text-muted mb-0">
+                                        Clique no botão abaixo para baixar a planilha com todos os seus funcionários ativos. 
+                                        Cada funcionário terá uma aba própria com os dias do mês.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="step mb-3">
+                            <div class="d-flex align-items-start">
+                                <div class="step-number bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                     style="width: 32px; height: 32px; flex-shrink: 0;">
+                                    <strong>2</strong>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Preencha os horários</h6>
+                                    <p class="text-muted mb-0">
+                                        Preencha os horários no formato <strong>HH:MM</strong> (exemplo: 08:00). 
+                                        Deixe em branco os campos de dias não trabalhados.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="step mb-3">
+                            <div class="d-flex align-items-start">
+                                <div class="step-number bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                     style="width: 32px; height: 32px; flex-shrink: 0;">
+                                    <strong>3</strong>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Envie a planilha preenchida</h6>
+                                    <p class="text-muted mb-0">
+                                        Use o formulário ao lado para fazer upload da planilha. 
+                                        O sistema validará e importará automaticamente.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning mt-3" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Importante:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Não altere as datas ou o formato da planilha</li>
+                            <li>Não exclua, adicione ou renomeie as abas</li>
+                            <li>Registros duplicados serão atualizados automaticamente</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card de Ação -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm bg-success bg-gradient text-white h-100">
+                <div class="card-body d-flex flex-column">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-download fa-3x mb-3"></i>
+                        <h5 class="card-title">Baixar Planilha Modelo</h5>
+                        <p class="mb-0 opacity-75">
+                            Planilha com todos os funcionários ativos
+                        </p>
+                    </div>
+                    
+                    <div class="mt-auto">
+                        <a href="{{ url_for('ponto.download_modelo') }}" 
+                           class="btn btn-light btn-lg w-100">
+                            <i class="fas fa-file-excel me-2"></i>
+                            Baixar Modelo
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload de Arquivo -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">
+                        <i class="fas fa-upload text-primary me-2"></i>
+                        Enviar Planilha Preenchida
+                    </h5>
+
+                    <form action="{{ url_for('ponto.processar_importacao') }}" 
+                          method="POST" 
+                          enctype="multipart/form-data"
+                          id="formUpload">
+                        
+                        <!-- Área de Drop -->
+                        <div class="upload-area border border-2 border-dashed rounded p-5 text-center mb-3" 
+                             id="uploadArea"
+                             style="cursor: pointer; transition: all 0.3s;">
+                            <input type="file" 
+                                   name="arquivo" 
+                                   id="inputArquivo" 
+                                   accept=".xlsx,.xls"
+                                   class="d-none"
+                                   required>
+                            
+                            <div id="uploadPlaceholder">
+                                <i class="fas fa-cloud-upload-alt fa-4x text-muted mb-3"></i>
+                                <h5>Arraste o arquivo aqui ou clique para selecionar</h5>
+                                <p class="text-muted mb-0">Formatos aceitos: .xlsx, .xls</p>
+                            </div>
+                            
+                            <div id="uploadInfo" class="d-none">
+                                <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
+                                <h5 id="nomeArquivo" class="text-success"></h5>
+                                <p class="text-muted mb-0">Clique em "Importar" para processar</p>
+                            </div>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" 
+                                    class="btn btn-outline-secondary" 
+                                    id="btnLimpar"
+                                    style="display: none;">
+                                <i class="fas fa-times me-2"></i>
+                                Limpar
+                            </button>
+                            <button type="submit" 
+                                    class="btn btn-primary btn-lg"
+                                    id="btnImportar"
+                                    disabled>
+                                <i class="fas fa-file-import me-2"></i>
+                                Importar Pontos
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.upload-area {
+    background-color: #f8f9fa;
+}
+
+.upload-area:hover {
+    background-color: #e9ecef;
+    border-color: #28a745 !important;
+}
+
+.upload-area.dragover {
+    background-color: #d4edda;
+    border-color: #28a745 !important;
+}
+
+.step-number {
+    font-size: 14px;
+}
+</style>
+
+<script>
+// Elementos
+const uploadArea = document.getElementById('uploadArea');
+const inputArquivo = document.getElementById('inputArquivo');
+const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+const uploadInfo = document.getElementById('uploadInfo');
+const nomeArquivo = document.getElementById('nomeArquivo');
+const btnImportar = document.getElementById('btnImportar');
+const btnLimpar = document.getElementById('btnLimpar');
+const formUpload = document.getElementById('formUpload');
+
+// Click na área para abrir seletor
+uploadArea.addEventListener('click', () => {
+    inputArquivo.click();
+});
+
+// Seleção de arquivo
+inputArquivo.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        mostrarArquivo(e.target.files[0]);
+    }
+});
+
+// Drag and Drop
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    
+    if (e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        
+        // Validar extensão
+        if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+            inputArquivo.files = e.dataTransfer.files;
+            mostrarArquivo(file);
+        } else {
+            alert('Por favor, selecione um arquivo Excel (.xlsx ou .xls)');
+        }
+    }
+});
+
+// Mostrar informações do arquivo
+function mostrarArquivo(file) {
+    nomeArquivo.textContent = file.name;
+    uploadPlaceholder.classList.add('d-none');
+    uploadInfo.classList.remove('d-none');
+    btnImportar.disabled = false;
+    btnLimpar.style.display = 'inline-block';
+}
+
+// Limpar seleção
+btnLimpar.addEventListener('click', () => {
+    inputArquivo.value = '';
+    uploadPlaceholder.classList.remove('d-none');
+    uploadInfo.classList.add('d-none');
+    btnImportar.disabled = true;
+    btnLimpar.style.display = 'none';
+});
+
+// Validação antes do submit
+formUpload.addEventListener('submit', (e) => {
+    if (!inputArquivo.files.length) {
+        e.preventDefault();
+        alert('Por favor, selecione um arquivo Excel para importar.');
+        return false;
+    }
+    
+    // Mostrar loading
+    btnImportar.disabled = true;
+    btnImportar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importando...';
+});
+</script>
+{% endblock %}

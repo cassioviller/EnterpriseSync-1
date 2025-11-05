@@ -563,3 +563,164 @@ def listar_configuracoes():
         logger.error(f"Erro ao listar configurações: {e}")
         flash(f'Erro: {str(e)}', 'error')
         return redirect(url_for('main.dashboard'))
+
+
+# ================================
+# IMPORTAÇÃO DE PONTOS VIA EXCEL
+# ================================
+
+@ponto_bp.route('/importar')
+@login_required
+@admin_required
+def pagina_importar():
+    """Página de importação de pontos via Excel"""
+    return render_template('ponto/importar_ponto.html')
+
+
+@ponto_bp.route('/importar/download-modelo')
+@login_required
+@admin_required
+def download_modelo():
+    """Gera e faz download da planilha modelo Excel"""
+    from services.ponto_importacao import PontoExcelService
+    from flask import make_response
+    
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        # Buscar funcionários ativos
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Funcionario.codigo).all()
+        
+        if not funcionarios:
+            flash('Nenhum funcionário ativo encontrado para gerar o modelo.', 'warning')
+            return redirect(url_for('ponto.pagina_importar'))
+        
+        # Gerar planilha
+        excel_buffer = PontoExcelService.gerar_planilha_modelo(funcionarios)
+        
+        # Criar response
+        response = make_response(excel_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        response.headers['Content-Disposition'] = f'attachment; filename=modelo_ponto_{date.today().strftime("%Y%m")}.xlsx'
+        
+        logger.info(f"Admin {admin_id} baixou modelo de importação com {len(funcionarios)} funcionários")
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Erro ao gerar planilha modelo: {e}", exc_info=True)
+        flash(f'Erro ao gerar planilha modelo: {str(e)}', 'error')
+        return redirect(url_for('ponto.pagina_importar'))
+
+
+@ponto_bp.route('/importar/processar', methods=['POST'])
+@login_required
+@admin_required
+def processar_importacao():
+    """Processa upload e importação da planilha Excel"""
+    from services.ponto_importacao import PontoExcelService
+    from werkzeug.utils import secure_filename
+    from io import BytesIO
+    
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        # Verificar se arquivo foi enviado
+        if 'arquivo' not in request.files:
+            flash('Nenhum arquivo foi enviado.', 'error')
+            return redirect(url_for('ponto.pagina_importar'))
+        
+        file = request.files['arquivo']
+        
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado.', 'error')
+            return redirect(url_for('ponto.pagina_importar'))
+        
+        # Validar extensão
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            flash('Formato de arquivo inválido. Envie um arquivo Excel (.xlsx ou .xls).', 'error')
+            return redirect(url_for('ponto.pagina_importar'))
+        
+        # Ler arquivo
+        excel_file = BytesIO(file.read())
+        
+        # Criar mapa de funcionários ativos (código -> id)
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).all()
+        
+        funcionarios_map = {func.codigo: func.id for func in funcionarios}
+        
+        # Validar e preparar dados
+        registros_validos, erros = PontoExcelService.validar_e_importar(
+            excel_file,
+            funcionarios_map,
+            admin_id
+        )
+        
+        # Importar registros válidos
+        total_importados = 0
+        total_duplicados = 0
+        total_atualizados = 0
+        
+        for registro in registros_validos:
+            # Verificar se já existe registro para este funcionário nesta data
+            registro_existente = RegistroPonto.query.filter_by(
+                funcionario_id=registro['funcionario_id'],
+                data=registro['data'],
+                admin_id=admin_id
+            ).first()
+            
+            if registro_existente:
+                # Atualizar registro existente
+                registro_existente.hora_entrada = registro['hora_entrada']
+                registro_existente.hora_saida = registro['hora_saida']
+                registro_existente.hora_almoco_saida = registro['hora_almoco_saida']
+                registro_existente.hora_almoco_retorno = registro['hora_almoco_retorno']
+                total_atualizados += 1
+            else:
+                # Criar novo registro
+                novo_registro = RegistroPonto(**registro)
+                db.session.add(novo_registro)
+                total_importados += 1
+        
+        # Commit
+        db.session.commit()
+        
+        # Mensagem de resultado
+        mensagens = []
+        if total_importados > 0:
+            mensagens.append(f"{total_importados} novos registros importados")
+        if total_atualizados > 0:
+            mensagens.append(f"{total_atualizados} registros atualizados")
+        if erros:
+            mensagens.append(f"{len(erros)} erros encontrados")
+        
+        if total_importados > 0 or total_atualizados > 0:
+            flash(f"✅ Importação concluída: {', '.join(mensagens)}", 'success')
+        
+        if erros:
+            # Limitar erros exibidos para não sobrecarregar a interface
+            erros_exibir = erros[:10]
+            for erro in erros_exibir:
+                flash(f"⚠️ {erro}", 'warning')
+            
+            if len(erros) > 10:
+                flash(f"... e mais {len(erros) - 10} erros.", 'warning')
+        
+        logger.info(
+            f"Admin {admin_id} importou pontos: "
+            f"{total_importados} novos, {total_atualizados} atualizados, {len(erros)} erros"
+        )
+        
+        return redirect(url_for('ponto.pagina_importar'))
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao processar importação: {e}", exc_info=True)
+        flash(f'Erro ao processar importação: {str(e)}', 'error')
+        return redirect(url_for('ponto.pagina_importar'))
