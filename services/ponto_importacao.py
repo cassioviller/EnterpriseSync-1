@@ -95,23 +95,46 @@ class PontoExcelService:
             # Cabeçalho informativo
             ws['A1'] = f"REGISTRO DE PONTO - {func.nome.upper()}"
             ws['A1'].font = Font(bold=True, size=14)
-            ws.merge_cells('A1:G1')
+            ws.merge_cells('A1:I1')
             
             ws['A2'] = f"Código: {func.codigo}"
             ws['B2'] = f"CPF: {func.cpf}"
             ws['D2'] = f"Cargo: {func.funcao_ref.nome if func.funcao_ref else 'N/A'}"
             
-            # Linha em branco
-            current_row = 4
+            # Horário padrão do funcionário (para cálculos)
+            horario_entrada_padrao = "08:00"
+            horario_saida_padrao = "17:00"
+            if func.horario_trabalho:
+                horario_entrada_padrao = func.horario_trabalho.entrada.strftime('%H:%M')
+                horario_saida_padrao = func.horario_trabalho.saida.strftime('%H:%M')
             
-            # Cabeçalho da tabela (ADICIONADAS colunas "Tipo" e "Obra ID")
-            headers = ['Data', 'Tipo', 'Obra ID', 'Entrada', 'Saída', 'Início Almoço', 'Fim Almoço']
+            ws['A3'] = f"⏰ Horário Padrão:"
+            ws['A3'].font = Font(bold=True, size=11, color="1565C0")
+            ws['B3'] = f"Entrada: {horario_entrada_padrao}"
+            ws['D3'] = f"Saída: {horario_saida_padrao}"
+            ws['F3'] = f"(Usado para calcular atrasos e horas extras)"
+            ws['F3'].font = Font(italic=True, size=9, color="666666")
+            
+            # Armazenar horários em células ocultas para fórmulas
+            ws['Z1'] = horario_entrada_padrao
+            ws['Z2'] = horario_saida_padrao
+            
+            # Linha em branco
+            current_row = 5
+            
+            # Cabeçalho da tabela (ADICIONADAS colunas "Tipo", "Obra ID", "Min. Atraso" e "Min. HE")
+            headers = ['Data', 'Tipo', 'Obra ID', 'Entrada', 'Saída', 'Início Almoço', 'Fim Almoço', 'Min. Atraso', 'Min. HE']
             for col, header in enumerate(headers, start=1):
                 cell = ws.cell(row=current_row, column=col, value=header)
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 cell.border = border
+                
+                # Destaque especial para colunas calculadas
+                if header in ['Min. Atraso', 'Min. HE']:
+                    cell.fill = PatternFill(start_color="FF6F00", end_color="FF6F00", fill_type="solid")
+                    cell.font = Font(bold=True, color="FFFFFF", size=10)
             
             # Criar lista de tipos para dropdown
             tipos_lista = ','.join(PontoExcelService.TIPOS_REGISTRO.keys())
@@ -161,6 +184,24 @@ class PontoExcelService:
                     cell.border = border
                     cell.alignment = Alignment(horizontal='center')
                 
+                # Coluna H: Minutos de Atraso (calculado automaticamente)
+                # Fórmula: SE entrada > entrada_padrão, calcular diferença em minutos, senão 0
+                formula_atraso = f'=IF(AND(D{current_row}<>"",D{current_row}>$Z$1),(D{current_row}-$Z$1)*1440,0)'
+                cell = ws.cell(row=current_row, column=8, value=formula_atraso)
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center')
+                cell.fill = PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid")
+                cell.font = Font(color="FF6F00", bold=True)
+                
+                # Coluna I: Minutos de Horas Extras (calculado automaticamente)
+                # Fórmula: SE saída > saída_padrão, calcular diferença em minutos, senão 0
+                formula_he = f'=IF(AND(E{current_row}<>"",E{current_row}>$Z$2),(E{current_row}-$Z$2)*1440,0)'
+                cell = ws.cell(row=current_row, column=9, value=formula_he)
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center')
+                cell.fill = PatternFill(start_color="E3F2FD", end_color="E3F2FD", fill_type="solid")
+                cell.font = Font(color="1565C0", bold=True)
+                
                 current_row += 1
             
             data_end_row = current_row - 1
@@ -199,6 +240,11 @@ class PontoExcelService:
             ws.column_dimensions['E'].width = 12
             ws.column_dimensions['F'].width = 15
             ws.column_dimensions['G'].width = 15
+            ws.column_dimensions['H'].width = 15
+            ws.column_dimensions['I'].width = 15
+            
+            # Ocultar coluna Z (horários padrão)
+            ws.column_dimensions['Z'].hidden = True
         
         # Salvar em BytesIO
         buffer = BytesIO()
@@ -403,18 +449,32 @@ class PontoExcelService:
         ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
         row += 1
         
-        # KPI 7: Total de Horas Extras (dias)
-        ws.cell(row=row, column=1, value="Total Horas Extras (dias)").border = border
-        ws.cell(row=row, column=2, value=f'=COUNTIF(B{data_start_row}:B{data_end_row},"SAB_TRAB")+COUNTIF(B{data_start_row}:B{data_end_row},"DOM_TRAB")+COUNTIF(B{data_start_row}:B{data_end_row},"FER_TRAB")').border = border
+        # KPI 7: Total Minutos de Atraso
+        ws.cell(row=row, column=1, value="Total Minutos de Atraso").border = border
+        ws.cell(row=row, column=2, value=f'=SUM(H{data_start_row}:H{data_end_row})').border = border
+        ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
+        ws.cell(row=row, column=2).font = Font(color="FF0000", bold=True)
+        row += 1
+        
+        # KPI 8: Total Minutos de Horas Extras
+        ws.cell(row=row, column=1, value="Total Minutos de Horas Extras").border = border
+        ws.cell(row=row, column=2, value=f'=SUM(I{data_start_row}:I{data_end_row})').border = border
         ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
         ws.cell(row=row, column=2).font = Font(color="FF6F00", bold=True)
         row += 1
         
-        # KPI 8: Atrasos (entradas após 08:01)
-        ws.cell(row=row, column=1, value="Atrasos (entrada > 08:00)").border = border
-        ws.cell(row=row, column=2, value=f'=COUNTIF(D{data_start_row}:D{data_end_row},">08:00")').border = border
+        # KPI 9: Total Horas Extras (em formato HH:MM)
+        ws.cell(row=row, column=1, value="Horas Extras (HH:MM)").border = border
+        ws.cell(row=row, column=2, value=f'=TEXT(SUM(I{data_start_row}:I{data_end_row})/1440,"[HH]:MM")').border = border
         ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
-        ws.cell(row=row, column=2).font = Font(color="FF0000", bold=True)
+        ws.cell(row=row, column=2).font = Font(color="0066CC", bold=True)
+        row += 1
+        
+        # KPI 10: Total Atrasos (em formato HH:MM)
+        ws.cell(row=row, column=1, value="Atrasos (HH:MM)").border = border
+        ws.cell(row=row, column=2, value=f'=TEXT(SUM(H{data_start_row}:H{data_end_row})/1440,"[HH]:MM")').border = border
+        ws.cell(row=row, column=2).alignment = Alignment(horizontal='center')
+        ws.cell(row=row, column=2).font = Font(color="CC0000", bold=True)
         row += 1
         
         # Nota explicativa
