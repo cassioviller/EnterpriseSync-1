@@ -445,11 +445,6 @@ def novo_uso(veiculo_id):
             passageiros_frente_csv = ','.join(passageiros_frente_list) if passageiros_frente_list else ''
             passageiros_tras_csv = ','.join(passageiros_tras_list) if passageiros_tras_list else ''
             
-            print(f"🔍 [FROTA_NOVO_USO] Passageiros Frente LIST: {passageiros_frente_list}")
-            print(f"🔍 [FROTA_NOVO_USO] Passageiros Trás LIST: {passageiros_tras_list}")
-            print(f"🔍 [FROTA_NOVO_USO] Passageiros Frente CSV: '{passageiros_frente_csv}'")
-            print(f"🔍 [FROTA_NOVO_USO] Passageiros Trás CSV: '{passageiros_tras_csv}'")
-            
             # Criar novo uso da frota
             novo_uso = FrotaUtilizacao(
                 veiculo_id=veiculo_id,
