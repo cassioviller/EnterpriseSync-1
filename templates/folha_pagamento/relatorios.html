@@ -193,7 +193,7 @@ function mostrarFuncionarios(mes, ano) {
     const modal = new bootstrap.Modal(document.getElementById('modalFuncionarios'));
     modal.show();
     
-    fetch(`/api/funcionarios/folha/${ano}/${mes}`)
+    fetch(`/folha/api/funcionarios/folha/${ano}/${mes}`)
         .then(response => response.json())
         .then(data => {
             if (data.success && data.funcionarios.length > 0) {
