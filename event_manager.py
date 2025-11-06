@@ -759,23 +759,25 @@ def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
     Cria lançamento contábil automaticamente quando a folha é processada.
     
     Lançamento:
-    D - 5.1.01.001 - Despesas com Pessoal (Total Proventos)
-    C - 2.1.03.001 - Salários a Pagar (Salário Líquido)
-    C - 2.1.03.002 - INSS a Recolher (INSS Descontado)
-    C - 2.1.03.003 - IRRF a Recolher (IRRF Descontado)
-    C - 2.1.03.004 - FGTS a Recolher (FGTS)
+    D - 5.1.01.001 - Salários (Total Proventos + FGTS)
+    C - 2.1.02.001 - Salários a Pagar (Salário Líquido)
+    C - 2.1.02.002 - INSS a Recolher (INSS Descontado)
+    C - 2.1.03.001 - IRRF a Recolher (IRRF Descontado)
+    C - 2.1.02.003 - FGTS a Recolher (FGTS)
     """
     try:
         from models import (db, FolhaPagamento, LancamentoContabil, PartidaContabil, 
                            PlanoContas, Funcionario)
         from datetime import datetime
         
+        logger.info(f"🔔 HANDLER FOLHA_PROCESSADA CHAMADO! admin_id={admin_id}, data={data}")
+        
         folha_id = data.get('folha_id')
         if not folha_id:
             logger.warning("⚠️ folha_id não fornecido no evento folha_processada")
             return
         
-        logger.info(f"📊 Criando lançamento contábil para folha {folha_id}")
+        logger.info(f"📊 Criando lançamento contábil para folha {folha_id} | admin_id={admin_id}")
         
         # SEGURANÇA: Buscar folha com filtro de admin_id
         folha = FolhaPagamento.query.filter_by(id=folha_id, admin_id=admin_id).first()
