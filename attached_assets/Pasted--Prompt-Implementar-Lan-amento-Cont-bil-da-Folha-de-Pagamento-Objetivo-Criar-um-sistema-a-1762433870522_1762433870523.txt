@@ -1,0 +1,175 @@
+# Prompt: Implementar Lançamento Contábil da Folha de Pagamento
+
+## Objetivo
+
+Criar um sistema automatizado que, ao processar a folha de pagamento de um funcionário, gere o lançamento contábil correspondente no balancete, registrando as despesas com pessoal e as obrigações a pagar (salários e impostos).
+
+## Análise do Sistema
+
+O sistema já possui uma arquitetura baseada em eventos que facilita essa integração:
+
+1.  **Módulo de Folha (`folha_pagamento_views.py`):** Após calcular e salvar uma `FolhaPagamento`, o sistema emite um evento `folha_processada`.
+2.  **Gerenciador de Eventos (`event_manager.py`):** Este módulo escuta o evento `folha_processada` e aciona um *handler* específico.
+3.  **Handler Contábil (`criar_lancamento_folha_pagamento`):** Esta função, já existente no `event_manager.py`, é responsável por receber os dados da folha e criar o `LancamentoContabil` com as `PartidaContabil` (débitos e créditos) corretas.
+
+## Lançamento Contábil Padrão (Partidas Dobradas)
+
+O lançamento contábil para a folha de pagamento deve seguir o método das partidas dobradas, onde a soma dos débitos é igual à soma dos créditos.
+
+### Contas Envolvidas
+
+| Código | Nome da Conta | Tipo | Natureza |
+| :--- | :--- | :--- | :--- |
+| **5.1.01.001** | Despesas com Pessoal | Despesa | Devedora |
+| **2.1.03.001** | Salários a Pagar | Passivo | Credora |
+| **2.1.03.002** | INSS a Recolher | Passivo | Credora |
+| **2.1.03.003** | IRRF a Recolher | Passivo | Credora |
+| **2.1.03.004** | FGTS a Recolher | Passivo | Credora |
+
+### Estrutura do Lançamento
+
+| Tipo | Conta | Valor | Origem no Holerite |
+| :--- | :--- | :--- | :--- |
+| **Débito (D)** | Despesas com Pessoal | `total_proventos` + `fgts` | Custo total da empresa |
+| **Crédito (C)** | Salários a Pagar | `salario_liquido` | Valor a ser pago ao funcionário |
+| **Crédito (C)** | INSS a Recolher | `inss` | Desconto do funcionário |
+| **Crédito (C)** | IRRF a Recolher | `irrf` | Desconto do funcionário |
+| **Crédito (C)** | FGTS a Recolher | `fgts` | Encargo da empresa |
+
+**Observação Crucial:** O FGTS é um encargo da empresa, não um desconto do salário. Portanto, ele entra como **despesa** para a empresa (no débito) e como uma **obrigação a pagar** (no crédito).
+
+## Implementação Técnica (Passo a Passo)
+
+### 1. Disparar o Evento
+
+No final do processamento da folha de cada funcionário em `folha_pagamento_views.py`, após o `db.session.flush()`, garantir que o evento seja emitido:
+
+```python
+# /folha_pagamento_views.py - dentro de processar_folha_mes()
+
+# ... (cria o objeto 'folha')
+db.session.add(folha)
+db.session.flush()  # Garante que folha.id seja gerado
+
+# Emitir evento para contabilidade
+EventManager.emit('folha_processada', {
+    'folha_id': folha.id
+}, admin_id=current_user.id)
+```
+
+### 2. Criar o Handler do Evento
+
+No arquivo `event_manager.py`, criar a função que irá lidar com o evento.
+
+```python
+# /event_manager.py
+
+from models import db, FolhaPagamento, LancamentoContabil, PartidaContabil, PlanoContas
+
+@event_handler('folha_processada')
+def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
+    """Cria lançamento contábil para a folha de pagamento."""
+    
+    folha_id = data.get('folha_id')
+    if not folha_id:
+        return
+
+    # Iniciar transação segura
+    try:
+        # 1. Buscar dados necessários
+        folha = FolhaPagamento.query.filter_by(id=folha_id, admin_id=admin_id).one()
+        funcionario = folha.funcionario
+
+        # 2. Verificar se o lançamento já existe para evitar duplicidade
+        lancamento_existente = LancamentoContabil.query.filter_by(
+            origem='FOLHA_PAGAMENTO',
+            origem_id=folha.id,
+            admin_id=admin_id
+        ).first()
+        if lancamento_existente:
+            return # Lançamento já existe
+
+        # 3. Criar o cabeçalho do Lançamento Contábil
+        valor_total_debito = (folha.total_proventos or 0) + (folha.fgts or 0)
+        
+        lancamento = LancamentoContabil(
+            admin_id=admin_id,
+            data_lancamento=folha.mes_referencia,
+            historico=f"Folha de Pagamento - {funcionario.nome} - {folha.mes_referencia.strftime('%m/%Y')}",
+            valor_total=valor_total_debito,
+            origem='FOLHA_PAGAMENTO',
+            origem_id=folha.id
+        )
+        db.session.add(lancamento)
+        db.session.flush() # Gera o ID do lançamento
+
+        # 4. Criar as Partidas (Débitos e Créditos)
+        partidas = []
+
+        # DÉBITO
+        partidas.append(PartidaContabil(
+            lancamento_id=lancamento.id,
+            conta_codigo='5.1.01.001', # Despesas com Pessoal
+            tipo_partida='DEBITO',
+            valor=valor_total_debito,
+            admin_id=admin_id
+        ))
+
+        # CRÉDITOS
+        partidas.append(PartidaContabil(
+            lancamento_id=lancamento.id,
+            conta_codigo='2.1.03.001', # Salários a Pagar
+            tipo_partida='CREDITO',
+            valor=folha.salario_liquido or 0,
+            admin_id=admin_id
+        ))
+
+        if (folha.inss or 0) > 0:
+            partidas.append(PartidaContabil(
+                lancamento_id=lancamento.id,
+                conta_codigo='2.1.03.002', # INSS a Recolher
+                tipo_partida='CREDITO',
+                valor=folha.inss,
+                admin_id=admin_id
+            ))
+
+        if (folha.irrf or 0) > 0:
+            partidas.append(PartidaContabil(
+                lancamento_id=lancamento.id,
+                conta_codigo='2.1.03.003', # IRRF a Recolher
+                tipo_partida='CREDITO',
+                valor=folha.irrf,
+                admin_id=admin_id
+            ))
+
+        if (folha.fgts or 0) > 0:
+            partidas.append(PartidaContabil(
+                lancamento_id=lancamento.id,
+                conta_codigo='2.1.03.004', # FGTS a Recolher
+                tipo_partida='CREDITO',
+                valor=folha.fgts,
+                admin_id=admin_id
+            ))
+
+        db.session.add_all(partidas)
+        db.session.commit()
+
+    except Exception as e:
+        db.session.rollback()
+        # Logar o erro
+```
+
+### 3. Validação e Testes
+
+1.  **Processar uma folha de pagamento** para um funcionário através da interface.
+2.  **Verificar na tabela `lancamento_contabil`** se um novo lançamento foi criado com `origem = 'FOLHA_PAGAMENTO'`.
+3.  **Verificar na tabela `partida_contabil`** se as partidas de débito e crédito foram criadas corretamente para o lançamento acima.
+4.  **Conferir os valores:** A soma dos créditos deve ser igual ao valor do débito.
+5.  **Gerar um balancete** e verificar se os saldos das contas de despesa e passivo foram atualizados corretamente.
+
+## Melhorias e Boas Práticas
+
+-   **Idempotência:** A lógica deve verificar se um lançamento para aquela folha específica já existe, para evitar duplicidade em caso de reprocessamento.
+-   **Transações Atômicas:** Todo o processo de criação do lançamento e suas partidas deve estar dentro de um bloco `try/except` com `db.session.commit()` no final e `db.session.rollback()` no erro, garantindo a integridade dos dados.
+-   **Configuração de Contas:** Em vez de usar códigos fixos (`'5.1.01.001'`), o ideal é ter uma tela de parametrização contábil onde o usuário associa as contas do `PlanoContas` a eventos do sistema (ex: `CONTA_DESPESA_SALARIO`, `CONTA_INSS_PAGAR`).
+-   **Logs Detalhados:** Adicionar logs para cada etapa do processo, facilitando a depuração em caso de falhas.

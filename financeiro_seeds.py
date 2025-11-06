@@ -42,6 +42,12 @@ PLANO_CONTAS_CONSTRUCAO = [
     {"codigo": "2.1.02.002", "nome": "INSS a Recolher", "tipo_conta": "PASSIVO", "natureza": "CREDORA", "nivel": 4, "conta_pai_codigo": "2.1.02", "aceita_lancamento": True},
     {"codigo": "2.1.02.003", "nome": "FGTS a Recolher", "tipo_conta": "PASSIVO", "natureza": "CREDORA", "nivel": 4, "conta_pai_codigo": "2.1.02", "aceita_lancamento": True},
     
+    # 2.1.03 IMPOSTOS E TAXAS
+    {"codigo": "2.1.03", "nome": "IMPOSTOS E TAXAS", "tipo_conta": "PASSIVO", "natureza": "CREDORA", "nivel": 3, "conta_pai_codigo": "2.1", "aceita_lancamento": False},
+    {"codigo": "2.1.03.001", "nome": "IRRF a Recolher", "tipo_conta": "PASSIVO", "natureza": "CREDORA", "nivel": 4, "conta_pai_codigo": "2.1.03", "aceita_lancamento": True},
+    {"codigo": "2.1.03.002", "nome": "ISS a Recolher", "tipo_conta": "PASSIVO", "natureza": "CREDORA", "nivel": 4, "conta_pai_codigo": "2.1.03", "aceita_lancamento": True},
+    {"codigo": "2.1.03.003", "nome": "PIS/COFINS a Recolher", "tipo_conta": "PASSIVO", "natureza": "CREDORA", "nivel": 4, "conta_pai_codigo": "2.1.03", "aceita_lancamento": True},
+    
     # 3. PATRIMÔNIO LÍQUIDO
     {"codigo": "3", "nome": "PATRIMÔNIO LÍQUIDO", "tipo_conta": "PATRIMONIO", "natureza": "CREDORA", "nivel": 1, "conta_pai_codigo": None, "aceita_lancamento": False},
     {"codigo": "3.1", "nome": "CAPITAL SOCIAL", "tipo_conta": "PATRIMONIO", "natureza": "CREDORA", "nivel": 2, "conta_pai_codigo": "3", "aceita_lancamento": False},

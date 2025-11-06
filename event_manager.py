@@ -798,25 +798,25 @@ def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
         
         conta_salarios_pagar = PlanoContas.query.filter_by(
             admin_id=admin_id,
-            codigo='2.1.03.001',
+            codigo='2.1.02.001',
             ativo=True
         ).first()
         
         conta_inss_recolher = PlanoContas.query.filter_by(
             admin_id=admin_id,
-            codigo='2.1.03.002',
+            codigo='2.1.02.002',
             ativo=True
         ).first()
         
         conta_irrf_recolher = PlanoContas.query.filter_by(
             admin_id=admin_id,
-            codigo='2.1.03.003',
+            codigo='2.1.03.001',
             ativo=True
         ).first()
         
         conta_fgts_recolher = PlanoContas.query.filter_by(
             admin_id=admin_id,
-            codigo='2.1.03.004',
+            codigo='2.1.02.003',
             ativo=True
         ).first()
         
