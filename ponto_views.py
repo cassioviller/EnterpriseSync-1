@@ -574,19 +574,55 @@ def listar_configuracoes():
 @admin_required
 def pagina_importar():
     """Página de importação de pontos via Excel"""
-    return render_template('ponto/importar_ponto.html')
+    from datetime import datetime
+    return render_template('ponto/importar_ponto.html', now=datetime.now())
 
 
 @ponto_bp.route('/importar/download-modelo')
 @login_required
 @admin_required
 def download_modelo():
-    """Gera e faz download da planilha modelo Excel"""
+    """Gera e faz download da planilha modelo Excel com competência selecionada"""
     from services.ponto_importacao import PontoExcelService
     from flask import make_response
+    from datetime import datetime
     
     try:
         admin_id = get_tenant_admin_id()
+        
+        # Parsear competência dos parâmetros (formato: YYYY-MM)
+        competencia_str = request.args.get('competencia', '')
+        mes_referencia = None
+        
+        if competencia_str:
+            try:
+                # Validar formato YYYY-MM
+                ano, mes = competencia_str.split('-')
+                ano = int(ano)
+                mes = int(mes)
+                
+                # Validar valores
+                if mes < 1 or mes > 12:
+                    raise ValueError("Mês inválido")
+                
+                # Não permitir meses futuros
+                hoje = date.today()
+                if ano > hoje.year or (ano == hoje.year and mes > hoje.month):
+                    flash('Não é possível gerar modelo para meses futuros.', 'warning')
+                    ano, mes = hoje.year, hoje.month
+                
+                mes_referencia = date(ano, mes, 1)
+                logger.info(f"Competência selecionada: {mes_referencia.strftime('%m/%Y')}")
+                
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Competência inválida '{competencia_str}': {e}")
+                mes_referencia = None
+        
+        # Se não especificado ou inválido, usar mês atual
+        if mes_referencia is None:
+            hoje = date.today()
+            mes_referencia = date(hoje.year, hoje.month, 1)
+            logger.info(f"Usando competência padrão (mês atual): {mes_referencia.strftime('%m/%Y')}")
         
         # Buscar funcionários ativos
         funcionarios = Funcionario.query.filter_by(
@@ -604,15 +640,16 @@ def download_modelo():
             ativo=True
         ).order_by(Obra.nome).all()
         
-        # Gerar planilha com obras
-        excel_buffer = PontoExcelService.gerar_planilha_modelo(funcionarios, obras)
+        # Gerar planilha com obras e competência selecionada
+        excel_buffer = PontoExcelService.gerar_planilha_modelo(funcionarios, obras, mes_referencia)
         
-        # Criar response
+        # Criar response com nome do arquivo incluindo a competência
+        filename = f'modelo_ponto_{mes_referencia.strftime("%Y%m")}.xlsx'
         response = make_response(excel_buffer.getvalue())
         response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        response.headers['Content-Disposition'] = f'attachment; filename=modelo_ponto_{date.today().strftime("%Y%m")}.xlsx'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
         
-        logger.info(f"Admin {admin_id} baixou modelo de importação com {len(funcionarios)} funcionários")
+        logger.info(f"Admin {admin_id} baixou modelo de importação para {mes_referencia.strftime('%m/%Y')} com {len(funcionarios)} funcionários")
         
         return response
         

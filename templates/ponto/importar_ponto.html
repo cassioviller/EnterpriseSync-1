@@ -115,11 +115,28 @@
                     </div>
                     
                     <div class="mt-auto">
-                        <a href="{{ url_for('ponto.download_modelo') }}" 
-                           class="btn btn-light btn-lg w-100">
-                            <i class="fas fa-file-excel me-2"></i>
-                            Baixar Modelo
-                        </a>
+                        <form method="GET" action="{{ url_for('ponto.download_modelo') }}" class="mb-3">
+                            <label for="competencia" class="form-label small">
+                                <i class="fas fa-calendar-alt me-1"></i>
+                                Competência (Mês/Ano)
+                            </label>
+                            <input type="month" 
+                                   id="competencia" 
+                                   name="competencia"
+                                   class="form-control form-control-lg mb-3"
+                                   value="{{ '%04d-%02d' | format(competencia_ano or now.year, competencia_mes or now.month) }}"
+                                   max="{{ '%04d-%02d' | format(now.year, now.month) }}">
+                            
+                            <button type="submit" class="btn btn-light btn-lg w-100">
+                                <i class="fas fa-file-excel me-2"></i>
+                                Baixar Modelo
+                            </button>
+                        </form>
+                        
+                        <p class="small mb-0 opacity-75 text-center">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Selecione o mês para gerar a planilha
+                        </p>
                     </div>
                 </div>
             </div>
