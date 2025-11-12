@@ -6749,6 +6749,32 @@ def criar_rdo():
         else:
             print("DEBUG: Nenhuma ocorrência para processar")
         
+        # Processar fotos (v9.0)
+        fotos_files = request.files.getlist('fotos[]')
+        print(f"DEBUG: {len(fotos_files)} foto(s) recebida(s) para processar")
+        
+        if fotos_files and fotos_files[0].filename != '':
+            try:
+                from services.rdo_foto_service import processar_upload_foto
+                
+                fotos_processadas = 0
+                for foto_file in fotos_files:
+                    if foto_file and foto_file.filename != '':
+                        resultado = processar_upload_foto(foto_file, rdo.id, admin_id)
+                        if resultado['success']:
+                            fotos_processadas += 1
+                            print(f"DEBUG: Foto processada: {resultado['foto'].arquivo_original}")
+                        else:
+                            print(f"AVISO: Erro ao processar foto {foto_file.filename}: {resultado['erro']}")
+                
+                if fotos_processadas > 0:
+                    print(f"✅ {fotos_processadas} foto(s) processada(s) com sucesso")
+                    flash(f'{fotos_processadas} foto(s) anexada(s) ao RDO', 'success')
+                        
+            except Exception as e:
+                print(f"ERRO ao processar fotos: {str(e)}")
+                flash(f'RDO criado, mas houve erro ao processar fotos: {str(e)}', 'warning')
+        
         db.session.commit()
         
         flash(f'RDO {numero_rdo} criado com sucesso!', 'success')
@@ -9574,6 +9600,30 @@ def salvar_rdo_flexivel():
                 except Exception as e:
                     logger.error(f"❌ Erro ao processar funcionário {funcionario_id_str}: {e}")
                     continue
+            
+            # 📸 PROCESSAR FOTOS (v9.0)
+            fotos_files = request.files.getlist('fotos[]')
+            logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) para processar")
+            
+            if fotos_files and fotos_files[0].filename != '':
+                try:
+                    from services.rdo_foto_service import processar_upload_foto
+                    
+                    fotos_processadas = 0
+                    for foto_file in fotos_files:
+                        if foto_file and foto_file.filename != '':
+                            resultado = processar_upload_foto(foto_file, rdo.id, admin_id)
+                            if resultado['success']:
+                                fotos_processadas += 1
+                                logger.info(f"📸 Foto processada: {resultado['foto'].arquivo_original}")
+                            else:
+                                logger.warning(f"⚠️ Erro ao processar foto {foto_file.filename}: {resultado['erro']}")
+                    
+                    if fotos_processadas > 0:
+                        logger.info(f"✅ {fotos_processadas} foto(s) processada(s) com sucesso")
+                            
+                except Exception as e:
+                    logger.error(f"❌ ERRO ao processar fotos: {str(e)}")
             
             # 🚀 COMMIT DA TRANSAÇÃO FINAL
             logger.info(f"🚀 EXECUTANDO COMMIT FINAL...")

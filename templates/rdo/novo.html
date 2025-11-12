@@ -241,7 +241,7 @@
                 </h3>
             </div>
             <div class="rdo-card-body">
-                <form method="POST" action="/salvar-rdo-flexivel" id="formNovoRDO">
+                <form method="POST" action="/salvar-rdo-flexivel" id="formNovoRDO" enctype="multipart/form-data">
                     <!-- Campos ocultos para garantir dados da sessão -->
                     <input type="hidden" name="funcionario_id" value="{{ session.funcionario_id }}">
                     <input type="hidden" name="admin_id_form" value="{{ session.admin_id }}">
@@ -402,6 +402,41 @@
                         <small>Use o campo de busca acima ou clique em "Ver Todos" para selecionar funcionários</small>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- ===== SEÇÃO DE FOTOS DO RDO v9.0 ===== -->
+        <div class="rdo-card slide-in">
+            <div class="rdo-card-header">
+                <h3>
+                    <i class="fas fa-camera"></i>
+                    Fotos do RDO
+                </h3>
+            </div>
+            <div class="rdo-card-body">
+                <div class="card border-primary">
+                    <div class="card-body text-center" style="cursor: pointer; border: 3px dashed #ccc; border-radius: 10px; padding: 30px; transition: all 0.3s;">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                        <p class="mb-2">Selecione fotos para anexar ao RDO</p>
+                        <p class="text-muted small">JPG, PNG, GIF, WEBP - Máximo 5MB por foto</p>
+                        <input type="file" id="fileInputNovo" name="fotos[]" multiple 
+                               accept="image/*" capture="camera" 
+                               form="formNovoRDO"
+                               onchange="previewFotosNovo(event)">
+                        <button type="button" class="btn btn-primary mt-2" 
+                                onclick="document.getElementById('fileInputNovo').click()">
+                            <i class="fas fa-folder-open"></i> Selecionar Fotos
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Preview antes do upload -->
+                <div id="previewContainerNovo" class="row mt-3"></div>
+                
+                <p class="text-muted small mt-2">
+                    <i class="fas fa-info-circle"></i> 
+                    As fotos serão enviadas junto com o RDO quando você clicar em "Finalizar RDO"
+                </p>
             </div>
         </div>
 
@@ -942,6 +977,41 @@ function limparTodosFuncionarios() {
         
         console.log('Todos os funcionários foram removidos');
     }
+}
+
+// === SISTEMA DE FOTOS ===
+function previewFotosNovo(event) {
+    const files = event.target.files;
+    const container = document.getElementById('previewContainerNovo');
+    container.innerHTML = '';
+    
+    if (files.length === 0) return;
+    
+    Array.from(files).forEach((file, index) => {
+        if (!file.type.startsWith('image/')) {
+            alert(`${file.name} não é uma imagem válida`);
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const col = document.createElement('div');
+            col.className = 'col-6 col-md-3 mb-3';
+            col.innerHTML = `
+                <div class="card h-100">
+                    <img src="${e.target.result}" class="card-img-top" style="height: 150px; object-fit: cover;">
+                    <div class="card-body p-2">
+                        <small class="text-muted d-block text-truncate">${file.name}</small>
+                        <small class="text-muted">${(file.size / 1024).toFixed(0)} KB</small>
+                    </div>
+                </div>
+            `;
+            container.appendChild(col);
+        };
+        reader.readAsDataURL(file);
+    });
+    
+    console.log(`${files.length} foto(s) selecionada(s) para upload`);
 }
 
 // === INICIALIZAÇÃO ===
