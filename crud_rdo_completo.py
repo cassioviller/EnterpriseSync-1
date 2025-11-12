@@ -147,51 +147,8 @@ def novo_rdo():
 @rdo_crud_bp.route('/editar/<int:rdo_id>')
 @login_required
 def editar_rdo(rdo_id):
-    """Formulário para editar RDO existente"""
-    try:
-        admin_id = get_admin_id()
-        
-        # Buscar RDO com verificação de permissão
-        rdo = RDO.query.join(Obra).filter(
-            RDO.id == rdo_id,
-            Obra.admin_id == admin_id
-        ).first()
-        
-        if not rdo:
-            flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-            return redirect(url_for('rdo_crud.listar_rdos'))
-        
-        if rdo.status != 'Rascunho':
-            flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
-            return redirect(url_for('rdo_crud.visualizar_rdo', rdo_id=rdo_id))
-        
-        # Dados necessários para o formulário
-        obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
-        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-        subatividades = SubatividadeMestre.query.order_by(SubatividadeMestre.servico_id, SubatividadeMestre.nome).all()
-        
-        # Carregar dados do RDO
-        rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo_id).all()
-        rdo_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo_id).all()
-        rdo_equipamentos = RDOEquipamento.query.filter_by(rdo_id=rdo_id).all()
-        rdo_ocorrencias = RDOOcorrencia.query.filter_by(rdo_id=rdo_id).all()
-        
-        return render_template('rdo_form.html',
-                             obras=obras,
-                             funcionarios=funcionarios,
-                             subatividades=subatividades,
-                             obra_selecionada=rdo.obra,
-                             rdo=rdo,
-                             rdo_subatividades=rdo_subatividades,
-                             rdo_funcionarios=rdo_funcionarios,
-                             rdo_equipamentos=rdo_equipamentos,
-                             rdo_ocorrencias=rdo_ocorrencias,
-                             acao='Editar')
-        
-    except Exception as e:
-        print(f"ERRO EDITAR RDO: {str(e)}")
-        flash('Erro ao carregar formulário de edição.', 'error')
-        return redirect(url_for('rdo_crud.listar_rdos'))
+    """Redirecionar para o blueprint oficial de edição de RDO"""
+    return redirect(url_for('rdo_editar.editar_rdo_form', rdo_id=rdo_id))
 
 @rdo_crud_bp.route('/visualizar/<int:rdo_id>')
 @login_required

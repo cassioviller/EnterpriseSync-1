@@ -4,6 +4,7 @@ Funcionalidade completa para editar RDOs existentes com todas as subatividades
 """
 
 from flask import Blueprint, request, render_template, redirect, url_for, flash, jsonify
+from flask_login import login_required, current_user
 from datetime import datetime
 import logging
 
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 rdo_editar_bp = Blueprint('rdo_editar', __name__, url_prefix='/rdo/editar')
 
 @rdo_editar_bp.route('/<int:rdo_id>', methods=['GET'])
+@login_required
 def editar_rdo_form(rdo_id):
     """
     Exibir formulário de edição para RDO específico
@@ -24,8 +26,6 @@ def editar_rdo_form(rdo_id):
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
-            # bypass_auth removido - usar current_user diretamente
-            from flask_login import current_user
             def get_admin_id_from_user():
                 return getattr(current_user, 'admin_id', current_user.id)
         from app import db
@@ -38,6 +38,11 @@ def editar_rdo_form(rdo_id):
         rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
         if not rdo:
             flash('RDO não encontrado', 'error')
+            return redirect(url_for('main.funcionario_rdo_consolidado'))
+        
+        # VALIDAÇÃO: Apenas RDOs em rascunho podem ser editados
+        if rdo.status != 'Rascunho':
+            flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         
         # Buscar todas as obras do admin
@@ -80,6 +85,7 @@ def editar_rdo_form(rdo_id):
         return redirect(url_for('main.funcionario_rdo_consolidado'))
 
 @rdo_editar_bp.route('/<int:rdo_id>', methods=['POST'])
+@login_required
 def salvar_edicao_rdo(rdo_id):
     """
     Salvar alterações no RDO editado
@@ -89,8 +95,6 @@ def salvar_edicao_rdo(rdo_id):
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
-            # bypass_auth removido - usar current_user diretamente
-            from flask_login import current_user
             def get_admin_id_from_user():
                 return getattr(current_user, 'admin_id', current_user.id)
         from app import db
@@ -103,6 +107,11 @@ def salvar_edicao_rdo(rdo_id):
         rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
         if not rdo:
             flash('RDO não encontrado', 'error')
+            return redirect(url_for('main.funcionario_rdo_consolidado'))
+        
+        # VALIDAÇÃO: Apenas RDOs em rascunho podem ser editados
+        if rdo.status != 'Rascunho':
+            flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         
         # Capturar dados do formulário
@@ -271,6 +280,7 @@ def salvar_edicao_rdo(rdo_id):
 
 # API para buscar funcionários ativos
 @rdo_editar_bp.route('/api/funcionarios-ativos')
+@login_required
 def api_funcionarios_ativos():
     """
     API para buscar funcionários ativos do admin atual

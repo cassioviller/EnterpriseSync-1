@@ -8620,31 +8620,8 @@ def funcionario_visualizar_rdo(id):
 @main_bp.route('/funcionario/rdo/<int:id>/editar', methods=['GET', 'POST'])
 @funcionario_required
 def funcionario_editar_rdo(id):
-    """Funcionário editar RDO específico"""
-    try:
-        # Buscar RDO com verificação de acesso multitenant
-        rdo = RDO.query.join(Obra).filter(
-            RDO.id == id,
-            Obra.admin_id == current_user.admin_id
-        ).first_or_404()
-        
-        # Só pode editar RDOs em rascunho
-        if rdo.status != 'Rascunho':
-            flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
-            return redirect(url_for('main.funcionario_visualizar_rdo', id=id))
-        
-        # Buscar funcionários para mão de obra
-        funcionarios = Funcionario.query.filter_by(
-            admin_id=current_user.admin_id, 
-            ativo=True
-        ).order_by(Funcionario.nome).all()
-        
-        return render_template('funcionario/editar_rdo.html', rdo=rdo, funcionarios=funcionarios)
-        
-    except Exception as e:
-        print(f"ERRO FUNCIONÁRIO EDITAR RDO: {str(e)}")
-        flash('RDO não encontrado.', 'error')
-        return redirect('/rdo')
+    """Redirecionar para o blueprint oficial de edição de RDO"""
+    return redirect(url_for('rdo_editar.editar_rdo_form', rdo_id=id))
 
 @main_bp.route('/funcionario/obras')
 @funcionario_required
