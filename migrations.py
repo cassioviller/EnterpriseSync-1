@@ -2355,6 +2355,119 @@ def _migration_51_custo_veiculo_schema_completo():
             except:
                 pass
 
+def _migration_52_rdo_foto_campos_otimizacao():
+    """
+    Migração 52: Adicionar campos de otimização ao RDOFoto
+    - Campos para arquivos otimizados (WebP, thumbnails)
+    - Metadados de imagem (tamanho, ordem)
+    - Migra dados antigos para novos campos
+    """
+    logger.info("=" * 80)
+    logger.info("📸 MIGRAÇÃO 52: Campos de Otimização - RDOFoto")
+    logger.info("=" * 80)
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar e adicionar novos campos
+        campos_novos = {
+            'descricao': 'TEXT',
+            'arquivo_original': 'VARCHAR(500)',
+            'arquivo_otimizado': 'VARCHAR(500)',
+            'thumbnail': 'VARCHAR(500)',
+            'nome_original': 'VARCHAR(255)',
+            'tamanho_bytes': 'BIGINT',
+            'ordem': 'INTEGER DEFAULT 0'
+        }
+        
+        colunas_adicionadas = 0
+        
+        for coluna, tipo_sql in campos_novos.items():
+            # Verificar se coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'rdo_foto' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' em rdo_foto...")
+                # Remover DEFAULT da definição para ALTER TABLE
+                tipo_limpo = tipo_sql.replace(' DEFAULT 0', '')
+                cursor.execute(f"ALTER TABLE rdo_foto ADD COLUMN {coluna} {tipo_limpo}")
+                
+                # Aplicar DEFAULT separadamente se existir
+                if 'DEFAULT' in tipo_sql:
+                    cursor.execute(f"ALTER TABLE rdo_foto ALTER COLUMN {coluna} SET DEFAULT 0")
+                
+                logger.info(f"✅ Coluna '{coluna}' adicionada!")
+                colunas_adicionadas += 1
+            else:
+                logger.debug(f"✅ Coluna '{coluna}' já existe - skip")
+        
+        # Migrar dados antigos (legenda → descricao, caminho_arquivo → arquivo_original)
+        logger.info("🔄 Migrando dados antigos...")
+        cursor.execute("""
+            UPDATE rdo_foto 
+            SET descricao = legenda,
+                arquivo_original = caminho_arquivo,
+                nome_original = nome_arquivo
+            WHERE descricao IS NULL AND legenda IS NOT NULL
+        """)
+        registros_migrados = cursor.rowcount
+        logger.info(f"✅ {registros_migrados} registros migrados de campos legados")
+        
+        # Criar índices para performance
+        logger.info("🔍 Criando índices...")
+        
+        # Índice em admin_id (se não existir)
+        cursor.execute("""
+            SELECT indexname FROM pg_indexes 
+            WHERE tablename = 'rdo_foto' 
+            AND indexname = 'idx_rdo_foto_admin_id'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("CREATE INDEX idx_rdo_foto_admin_id ON rdo_foto(admin_id)")
+            logger.info("✅ Índice idx_rdo_foto_admin_id criado")
+        else:
+            logger.debug("✅ Índice idx_rdo_foto_admin_id já existe")
+        
+        # Índice em rdo_id (se não existir)
+        cursor.execute("""
+            SELECT indexname FROM pg_indexes 
+            WHERE tablename = 'rdo_foto' 
+            AND indexname = 'idx_rdo_foto_rdo_id'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("CREATE INDEX idx_rdo_foto_rdo_id ON rdo_foto(rdo_id)")
+            logger.info("✅ Índice idx_rdo_foto_rdo_id criado")
+        else:
+            logger.debug("✅ Índice idx_rdo_foto_rdo_id já existe")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 52 CONCLUÍDA!")
+        logger.info(f"   📊 Colunas adicionadas: {colunas_adicionadas}")
+        logger.info(f"   🔄 Registros migrados: {registros_migrados}")
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 52: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2399,6 +2512,7 @@ def executar_migracoes():
             (49, "Campos de alertas veículos (IPVA/Seguro)", _migration_49_vehicle_alertas),
             (50, "Schema completo tabela uso_veiculo", _migration_50_uso_veiculo_schema_completo),
             (51, "Schema completo tabela custo_veiculo", _migration_51_custo_veiculo_schema_completo),
+            (52, "RDO Foto - otimização de campos", _migration_52_rdo_foto_campos_otimizacao),
         ]
         
         # Executar cada migração com rastreamento

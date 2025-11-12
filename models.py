@@ -615,7 +615,7 @@ class RDO(db.Model):
     equipamentos = db.relationship('RDOEquipamento', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
     # Removido: atividades obsoletas - agora usamos servico_subatividades
     ocorrencias_rdo = db.relationship('RDOOcorrencia', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
-    fotos = db.relationship('RDOFoto', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
+    # fotos - definido em RDOFoto com backref (linha ~743)
     
     def __repr__(self):
         return f'<RDO {self.numero_rdo}>'
@@ -720,12 +720,27 @@ class RDOFoto(db.Model):
     __tablename__ = 'rdo_foto'
     
     id = db.Column(db.Integer, primary_key=True)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
-    nome_arquivo = db.Column(db.String(255), nullable=False)
-    caminho_arquivo = db.Column(db.String(500), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False, index=True)
+    
+    # Campos legados (mantidos por compatibilidade)
+    nome_arquivo = db.Column(db.String(255))
+    caminho_arquivo = db.Column(db.String(500))
     legenda = db.Column(db.Text)
+    
+    # Novos campos (v9.0)
+    descricao = db.Column(db.Text)
+    arquivo_original = db.Column(db.String(500))
+    arquivo_otimizado = db.Column(db.String(500))
+    thumbnail = db.Column(db.String(500))
+    nome_original = db.Column(db.String(255))
+    tamanho_bytes = db.Column(db.BigInteger)
+    ordem = db.Column(db.Integer, default=0)
+    
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamento com RDO
+    rdo = db.relationship('RDO', backref=db.backref('fotos', lazy='dynamic', order_by='RDOFoto.ordem'))
 
 
 # ===== MÓDULO ALIMENTAÇÃO - Gestão de Refeições =====

@@ -1,0 +1,228 @@
+# Prompt: Implementar Sistema de Fotos Otimizado para RDOs
+
+## Objetivo
+
+Implementar um sistema completo e performático para upload, armazenamento e visualização de fotos com descrições nos Relatórios Diários de Obra (RDOs), aproveitando a estrutura existente e adicionando otimizações cruciais.
+
+## Análise e Decisões Arquiteturais
+
+-   **Modelo de Dados:** O modelo `RDOFoto` já existe, mas será **aprimorado** para incluir caminhos de arquivos otimizados e metadados importantes.
+-   **Armazenamento:** Utilizaremos o **filesystem local** do servidor, que é a solução mais rápida e compatível com o ambiente atual do Easypanel. A estrutura de pastas garantirá o isolamento multi-tenant.
+-   **Performance:** A chave para a performance é o **processamento no lado do servidor**. As imagens serão otimizadas *antes* de serem salvas, garantindo que a interface (web e mobile) sempre lide com arquivos pequenos e rápidos.
+
+## Plano de Implementação Detalhado
+
+### 1. Aprimorar o Modelo de Dados (`models.py`)
+
+Vamos evoluir o modelo `RDOFoto` para ser mais robusto.
+
+**Antes:**
+```python
+class RDOFoto(db.Model):
+    __tablename__ = 'rdo_foto'
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    nome_arquivo = db.Column(db.String(255), nullable=False)
+    caminho_arquivo = db.Column(db.String(500), nullable=False)
+    legenda = db.Column(db.Text)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+**Depois (Prompt de Modificação):**
+```python
+# /models.py
+
+class RDOFoto(db.Model):
+    __tablename__ = 'rdo_foto'
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False, index=True)
+    
+    # ✅ Aprimoramento: Descrição/Legenda
+    descricao = db.Column(db.Text) 
+    
+    # ✅ Aprimoramento: Caminhos de arquivos
+    arquivo_original = db.Column(db.String(500), nullable=False)
+    arquivo_otimizado = db.Column(db.String(500), nullable=False) # WebP
+    thumbnail = db.Column(db.String(500), nullable=False)       # WebP thumbnail
+    
+    # ✅ Aprimoramento: Metadados
+    nome_original = db.Column(db.String(255), nullable=False)
+    tamanho_bytes = db.Column(db.BigInteger) # Para controle de uso
+    ordem = db.Column(db.Integer, default=0) # Para reordenação
+    
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relacionamento
+    rdo = db.relationship('RDO', backref=db.backref('fotos', lazy='dynamic', order_by='RDOFoto.ordem'))
+
+    # Remover campos legados (se a migration for segura)
+    # nome_arquivo, caminho_arquivo, legenda
+```
+
+### 2. Criar a Lógica de Upload e Otimização (`rdo_views.py`)
+
+Esta é a parte central. Criaremos uma nova rota para lidar com o upload.
+
+```python
+# /rdo_views.py
+
+from flask import request, jsonify
+from werkzeug.utils import secure_filename
+from PIL import Image
+import os
+
+# ... (outros imports)
+
+UPLOAD_FOLDER = '/app/uploads' # Usar caminho absoluto no container
+
+def otimizar_imagem(caminho_original, caminho_saida, formato='WEBP', qualidade=70, max_size=(1920, 1920)):
+    """Otimiza uma imagem, redimensiona e converte para WebP."""
+    with Image.open(caminho_original) as img:
+        img.thumbnail(max_size)
+        img.save(caminho_saida, format=formato, quality=qualidade)
+
+@rdo_bp.route('/<int:rdo_id>/fotos/upload', methods=['POST'])
+@admin_required
+def upload_foto_rdo(rdo_id):
+    rdo = RDO.query.filter_by(id=rdo_id, admin_id=current_user.id).first_or_404()
+    
+    if 'fotos' not in request.files:
+        return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+
+    files = request.files.getlist('fotos')
+    fotos_criadas = []
+
+    for file in files:
+        if file.filename == '':
+            continue
+
+        # 1. Estrutura de Pastas Segura
+        tenant_path = os.path.join(UPLOAD_FOLDER, str(current_user.id))
+        rdo_path = os.path.join(tenant_path, 'rdos', str(rdo_id))
+        os.makedirs(rdo_path, exist_ok=True)
+
+        # 2. Salvar Arquivo Original
+        nome_seguro = secure_filename(file.filename)
+        caminho_original = os.path.join(rdo_path, nome_seguro)
+        file.save(caminho_original)
+
+        # 3. Otimizar e Gerar Thumbnails
+        base_nome, _ = os.path.splitext(nome_seguro)
+        caminho_otimizado = os.path.join(rdo_path, f"{base_nome}.webp")
+        caminho_thumbnail = os.path.join(rdo_path, f"{base_nome}_thumb.webp")
+
+        otimizar_imagem(caminho_original, caminho_otimizado)
+        otimizar_imagem(caminho_original, caminho_thumbnail, max_size=(200, 200))
+
+        # 4. Salvar no Banco de Dados
+        nova_foto = RDOFoto(
+            admin_id=current_user.id,
+            rdo_id=rdo.id,
+            descricao=request.form.get('descricao', ''),
+            arquivo_original=caminho_original,
+            arquivo_otimizado=caminho_otimizado,
+            thumbnail=caminho_thumbnail,
+            nome_original=file.filename,
+            tamanho_bytes=os.path.getsize(caminho_original)
+        )
+        db.session.add(nova_foto)
+        fotos_criadas.append(nova_foto.id)
+
+    db.session.commit()
+    return jsonify({'success': True, 'foto_ids': fotos_criadas}), 201
+```
+
+### 3. Desenvolver a Interface (`templates/rdo/detalhes.html`)
+
+Adicionar uma seção para fotos na página de detalhes do RDO.
+
+```html
+<!-- templates/rdo/detalhes.html -->
+
+<!-- ... (outros detalhes do RDO) ... -->
+
+<div class="card mt-4">
+    <div class="card-header">
+        <h3>Fotos do RDO</h3>
+    </div>
+    <div class="card-body">
+        <!-- Formulário de Upload -->
+        <form action="{{ url_for('rdo.upload_foto_rdo', rdo_id=rdo.id) }}" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="fotos" class="form-label">Adicionar Fotos (múltiplas permitidas)</label>
+                <input class="form-control" type="file" id="fotos" name="fotos" multiple>
+            </div>
+            <div class="mb-3">
+                <label for="descricao" class="form-label">Descrição para as fotos</label>
+                <textarea class="form-control" id="descricao" name="descricao" rows="2"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Enviar Fotos</button>
+        </form>
+
+        <hr>
+
+        <!-- Galeria de Fotos -->
+        <div class="row">
+            {% for foto in rdo.fotos %}
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <a href="{{ url_for('static', filename=foto.arquivo_otimizado.replace('/app/static/', '')) }}" data-lightbox="rdo-fotos" data-title="{{ foto.descricao }}">
+                            <img src="{{ url_for('static', filename=foto.thumbnail.replace('/app/static/', '')) }}" class="card-img-top" alt="{{ foto.descricao }}" loading="lazy">
+                        </a>
+                        <div class="card-body">
+                            <p class="card-text">{{ foto.descricao or 'Sem descrição' }}</p>
+                            <!-- Adicionar botões para editar/excluir -->
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <p>Nenhuma foto adicionada a este RDO.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Incluir JS e CSS do Lightbox2 para galeria -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/css/lightbox.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/js/lightbox.min.js"></script>
+```
+
+### 4. Criar a Migration do Banco de Dados
+
+Após modificar o `models.py`, é necessário gerar e aplicar uma migration.
+
+```bash
+# No terminal do servidor
+flask db migrate -m "Aprimora modelo RDOFoto com otimização e metadados"
+flask db upgrade
+```
+
+## Teste e Validação
+
+1.  **Teste de Upload:**
+    -   Acesse um RDO, envie uma ou mais fotos (JPG, PNG).
+    -   Verifique se os arquivos são criados na pasta `/app/uploads/<admin_id>/rdos/<rdo_id>/`.
+    -   Confirme que as versões `.webp` e `_thumb.webp` foram geradas.
+2.  **Teste de Visualização:**
+    -   A galeria de fotos deve aparecer na página do RDO.
+    -   As imagens devem carregar via *lazy loading*.
+    -   Clicar em uma imagem deve abrir a versão otimizada em um lightbox.
+3.  **Teste de Performance:**
+    -   Use as ferramentas de desenvolvedor do navegador (aba "Network") para verificar o tamanho das imagens carregadas na galeria (devem ser os thumbnails pequenos).
+4.  **Teste de Segurança:**
+    -   Tente acessar a URL de uma foto de outro *tenant* (outro `admin_id`). O acesso deve ser negado.
+
+## Resumo da Implementação
+
+| Tarefa | Status | Detalhes |
+| :--- | :--- | :--- |
+| **Modelo de Dados** | ✅ Planejado | Aprimorar `RDOFoto` com novos campos. |
+| **Armazenamento** | ✅ Planejado | Filesystem local com estrutura `/<admin_id>/rdos/<rdo_id>/`. |
+| **Otimização** | ✅ Planejado | Função `otimizar_imagem` com Pillow para WebP. |
+| **Backend (Rota)** | ✅ Planejado | Rota `/<rdo_id>/fotos/upload` para processar uploads. |
+| **Frontend (UI)** | ✅ Planejado | Formulário de upload e galeria com lightbox. |
+| **Migration** | ✅ Planejado | Gerar e aplicar migration para o novo modelo. |
+
+Este plano cria uma solução completa, segura e performática para a gestão de fotos nos RDOs.

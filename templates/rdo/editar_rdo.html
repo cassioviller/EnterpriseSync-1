@@ -417,6 +417,73 @@
     </div>
 </div>
 
+<!-- ===== SEÇÃO DE FOTOS DO RDO v9.0 ===== -->
+<div class="container-fluid mt-4">
+    <div class="rdo-card">
+        <div class="rdo-card-header">
+            <h3 class="mb-0">
+                <i class="fas fa-camera"></i>
+                Fotos do RDO
+            </h3>
+        </div>
+        <div class="rdo-card-body">
+            <!-- Área de Upload -->
+            <div class="mb-4">
+                <div class="card border-primary">
+                    <div class="card-body text-center" id="dropZone" style="cursor: pointer; border: 3px dashed #ccc; border-radius: 10px; padding: 30px; transition: all 0.3s;">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                        <p class="mb-2">Arraste fotos aqui ou clique para selecionar</p>
+                        <p class="text-muted small">JPG, PNG, GIF, WEBP - Máximo 5MB por foto</p>
+                        <input type="file" id="fileInput" name="fotos[]" multiple 
+                               accept="image/*" capture="camera" style="display:none">
+                        <button type="button" class="btn btn-primary mt-2" 
+                                onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-folder-open"></i> Selecionar Fotos
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Preview antes do upload -->
+                <div id="previewContainer" class="row mt-3"></div>
+                
+                <!-- Botão de Upload -->
+                <button type="button" id="btnUpload" class="btn btn-success mt-3" 
+                        style="display:none" onclick="uploadFotos()">
+                    <i class="fas fa-upload"></i> Enviar Fotos
+                    <span id="uploadCount"></span>
+                </button>
+                
+                <!-- Barra de Progresso -->
+                <div class="progress mt-3" id="uploadProgress" style="display:none; height: 25px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%">0%</div>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <!-- Galeria de Fotos -->
+            <h5 class="mb-3"><i class="fas fa-images"></i> Fotos Anexadas</h5>
+            <div id="galeriaFotos" class="row">
+                <div class="col-12 text-center text-muted py-4">
+                    <i class="fas fa-spinner fa-spin"></i> Carregando fotos...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para visualizar foto ampliada -->
+<div id="modalFoto" class="modal fade" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+                <img id="modalFotoImg" src="" class="img-fluid w-100" alt="Foto do RDO">
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // JavaScript para funcionalidades da edição de RDO
 const obraIdAtual = {{ rdo.obra_id }};
@@ -715,11 +782,256 @@ function renderizarErroFuncionarios() {
     `;
 }
 
+// ===== SISTEMA DE FOTOS RDO v9.0 =====
+
+let arquivosSelecionados = [];
+
+// Drag and Drop
+const dropZone = document.getElementById('dropZone');
+
+if (dropZone) {
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#007bff';
+        dropZone.style.backgroundColor = '#f0f8ff';
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.style.borderColor = '#ccc';
+        dropZone.style.backgroundColor = '';
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#ccc';
+        dropZone.style.backgroundColor = '';
+        
+        const files = Array.from(e.dataTransfer.files);
+        adicionarArquivos(files);
+    });
+
+    dropZone.addEventListener('click', () => {
+        document.getElementById('fileInput').click();
+    });
+}
+
+// Seleção via input
+document.getElementById('fileInput')?.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    adicionarArquivos(files);
+});
+
+function adicionarArquivos(files) {
+    const previewContainer = document.getElementById('previewContainer');
+    
+    files.forEach(file => {
+        // Validar tipo
+        if (!file.type.startsWith('image/')) {
+            alert(`${file.name} não é uma imagem válida`);
+            return;
+        }
+        
+        // Validar tamanho
+        if (file.size > 5 * 1024 * 1024) {
+            alert(`${file.name} é muito grande (máx 5MB)`);
+            return;
+        }
+        
+        arquivosSelecionados.push(file);
+        
+        // Criar preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const div = document.createElement('div');
+            div.className = 'col-md-3 col-6 mb-3';
+            div.innerHTML = `
+                <div class="card h-100">
+                    <img src="${e.target.result}" class="card-img-top" 
+                         style="height:150px; object-fit:cover" alt="${file.name}">
+                    <div class="card-body p-2">
+                        <small class="text-truncate d-block">${file.name}</small>
+                        <small class="text-muted">${(file.size / 1024).toFixed(0)} KB</small>
+                    </div>
+                </div>
+            `;
+            previewContainer.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+    });
+    
+    // Mostrar botão de upload
+    if (arquivosSelecionados.length > 0) {
+        document.getElementById('btnUpload').style.display = 'block';
+        document.getElementById('uploadCount').textContent = 
+            `(${arquivosSelecionados.length} foto${arquivosSelecionados.length > 1 ? 's' : ''})`;
+    }
+}
+
+async function uploadFotos() {
+    const formData = new FormData();
+    
+    // Adicionar arquivos
+    arquivosSelecionados.forEach(file => {
+        formData.append('fotos[]', file);
+    });
+    
+    // Mostrar progresso
+    const progressBar = document.getElementById('uploadProgress');
+    const progressBarInner = progressBar.querySelector('.progress-bar');
+    progressBar.style.display = 'block';
+    progressBarInner.style.width = '30%';
+    progressBarInner.textContent = '30%';
+    
+    try {
+        const response = await fetch(`/rdo/${rdoId}/fotos/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Sucesso
+            progressBarInner.style.width = '100%';
+            progressBarInner.textContent = '100%';
+            
+            // Limpar preview
+            arquivosSelecionados = [];
+            document.getElementById('previewContainer').innerHTML = '';
+            document.getElementById('btnUpload').style.display = 'none';
+            document.getElementById('fileInput').value = '';
+            
+            // Recarregar galeria
+            setTimeout(() => {
+                progressBar.style.display = 'none';
+                progressBarInner.style.width = '0%';
+                progressBarInner.textContent = '0%';
+                carregarGaleria();
+            }, 500);
+            
+            let mensagem = `${data.total} foto(s) enviada(s) com sucesso!`;
+            if (data.erros && data.erros.length > 0) {
+                mensagem += `\n\nAvisos:\n${data.erros.join('\n')}`;
+            }
+            alert(mensagem);
+        } else {
+            throw new Error(data.error || 'Erro no upload');
+        }
+    } catch (error) {
+        alert('Erro ao enviar fotos: ' + error.message);
+        progressBar.style.display = 'none';
+    }
+}
+
+async function carregarGaleria() {
+    try {
+        const response = await fetch(`/rdo/${rdoId}/fotos`);
+        const data = await response.json();
+        
+        const galeria = document.getElementById('galeriaFotos');
+        
+        if (!data.fotos || data.fotos.length === 0) {
+            galeria.innerHTML = `
+                <div class="col-12 text-center text-muted py-4">
+                    <i class="fas fa-images fa-3x mb-3"></i>
+                    <p>Nenhuma foto anexada ainda</p>
+                </div>
+            `;
+            return;
+        }
+        
+        galeria.innerHTML = data.fotos.map(foto => `
+            <div class="col-md-4 col-sm-6 mb-3">
+                <div class="card h-100">
+                    <img src="${foto.url_thumbnail}" 
+                         onclick="abrirModalFoto('${foto.url_otimizado}')"
+                         loading="lazy"
+                         class="card-img-top"
+                         style="height:200px; object-fit:cover; cursor:pointer;"
+                         alt="${foto.descricao || 'Foto do RDO'}">
+                    
+                    <div class="card-body p-2">
+                        <input type="text" class="form-control form-control-sm mb-2" 
+                               placeholder="Descrição da foto..."
+                               value="${foto.descricao || ''}"
+                               onchange="salvarDescricao(${foto.id}, this.value)">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                ${(foto.tamanho_bytes / 1024).toFixed(0)} KB
+                            </small>
+                            <button class="btn btn-sm btn-danger" 
+                                    onclick="deletarFoto(${foto.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Erro ao carregar galeria:', error);
+        document.getElementById('galeriaFotos').innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Erro ao carregar fotos: ${error.message}
+                </div>
+            </div>
+        `;
+    }
+}
+
+function abrirModalFoto(url) {
+    const modalFoto = new bootstrap.Modal(document.getElementById('modalFoto'));
+    document.getElementById('modalFotoImg').src = url;
+    modalFoto.show();
+}
+
+async function salvarDescricao(fotoId, descricao) {
+    try {
+        const response = await fetch(`/rdo/foto/${fotoId}/editar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ descricao })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erro ao salvar descrição');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar descrição:', error);
+        alert('Erro ao salvar descrição');
+    }
+}
+
+async function deletarFoto(fotoId) {
+    if (!confirm('Deseja realmente excluir esta foto?')) return;
+    
+    try {
+        const response = await fetch(`/rdo/foto/${fotoId}/deletar`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            carregarGaleria();
+        } else {
+            const data = await response.json();
+            alert('Erro ao deletar foto: ' + (data.error || 'Erro desconhecido'));
+        }
+    } catch (error) {
+        alert('Erro ao deletar foto: ' + error.message);
+    }
+}
+
 // Carregar serviços e funcionários automaticamente ao carregar a página
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Página de edição carregada - iniciando carregamento');
     carregarServicosParaEdicao();
     carregarFuncionariosParaEdicao();
+    carregarGaleria(); // Carregar fotos também
 });
 </script>
 {% endblock %}

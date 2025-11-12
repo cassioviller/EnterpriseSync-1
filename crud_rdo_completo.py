@@ -12,15 +12,24 @@ rdo_crud_bp = Blueprint('rdo_crud', __name__, url_prefix='/rdo')
 
 def get_admin_id():
     """Obter admin_id correto baseado no usuário atual"""
+    from models import TipoUsuario
+    
+    # Para usuários ADMIN, usar o próprio ID
+    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
+        return current_user.id
+    
+    # Para outros usuários, usar admin_id
     if hasattr(current_user, 'admin_id') and current_user.admin_id:
         return current_user.admin_id
-    elif hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.name == 'FUNCIONARIO':
-        # Para funcionários, buscar o admin_id através do email
+    
+    # Para funcionários legados, buscar através do email
+    if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.name == 'FUNCIONARIO':
         email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
         funcionario = Funcionario.query.filter_by(email=email_busca).first()
         if funcionario:
             return funcionario.admin_id
-    return 10  # Fallback padrão
+    
+    return None
 
 @rdo_crud_bp.route('/')
 @login_required
@@ -534,3 +543,249 @@ def api_funcionarios():
     except Exception as e:
         print(f"ERRO API FUNCIONÁRIOS: {str(e)}")
         return jsonify({'erro': str(e)}), 500
+
+
+# ===== SISTEMA DE FOTOS RDO v9.0 =====
+
+@rdo_crud_bp.route('/<int:rdo_id>/fotos/upload', methods=['POST'])
+@login_required
+def upload_foto_rdo(rdo_id):
+    """
+    Upload de múltiplas fotos para um RDO
+    Compressão automática para WebP + thumbnails
+    """
+    try:
+        from services.rdo_foto_service import salvar_foto_rdo, MAX_FOTOS_POR_RDO
+        from models import RDOFoto
+        
+        # 1. Validação multi-tenant
+        admin_id = get_admin_id()
+        rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
+        
+        if not rdo:
+            return jsonify({'error': 'RDO não encontrado'}), 404
+        
+        # 2. Verificar limite de fotos
+        fotos_existentes = RDOFoto.query.filter_by(rdo_id=rdo_id).count()
+        if fotos_existentes >= MAX_FOTOS_POR_RDO:
+            return jsonify({'error': f'Limite de {MAX_FOTOS_POR_RDO} fotos atingido'}), 400
+        
+        # 3. Coletar arquivos
+        if 'fotos[]' not in request.files:
+            return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+        
+        files = request.files.getlist('fotos[]')
+        fotos_criadas = []
+        erros = []
+        
+        # 4. Processar cada arquivo
+        for file in files:
+            # Verificar limite
+            if fotos_existentes + len(fotos_criadas) >= MAX_FOTOS_POR_RDO:
+                break
+            
+            try:
+                # Salvar e otimizar
+                resultado = salvar_foto_rdo(file, admin_id, rdo_id)
+                
+                # Criar registro no banco
+                nova_foto = RDOFoto(
+                    admin_id=admin_id,
+                    rdo_id=rdo_id,
+                    descricao='',
+                    arquivo_original=resultado['arquivo_original'],
+                    arquivo_otimizado=resultado['arquivo_otimizado'],
+                    thumbnail=resultado['thumbnail'],
+                    nome_original=resultado['nome_original'],
+                    tamanho_bytes=resultado['tamanho_bytes'],
+                    ordem=fotos_existentes + len(fotos_criadas)
+                )
+                
+                db.session.add(nova_foto)
+                db.session.flush()  # Garantir que foto tem ID antes de adicionar à lista
+                
+                fotos_criadas.append({
+                    'id': nova_foto.id,
+                    'nome': nova_foto.nome_original,
+                    'descricao': nova_foto.descricao or '',
+                    'tamanho_bytes': nova_foto.tamanho_bytes,
+                    'url_thumbnail': url_for('rdo_crud.servir_foto', foto_id=nova_foto.id, tipo='thumbnail'),
+                    'url_otimizado': url_for('rdo_crud.servir_foto', foto_id=nova_foto.id, tipo='otimizado')
+                })
+                
+            except ValueError as ve:
+                erros.append(f"{file.filename}: {str(ve)}")
+                continue
+            except Exception as e:
+                print(f"ERRO ao processar foto {file.filename}: {e}")
+                erros.append(f"{file.filename}: Erro no processamento")
+                continue
+        
+        # 5. Salvar tudo (transação atômica)
+        if fotos_criadas:
+            db.session.commit()
+        
+        resultado_response = {
+            'success': True,
+            'fotos': fotos_criadas,
+            'total': len(fotos_criadas)
+        }
+        
+        if erros:
+            resultado_response['erros'] = erros
+        
+        return jsonify(resultado_response), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO NO UPLOAD DE FOTOS: {str(e)}")
+        return jsonify({'error': f'Erro no servidor: {str(e)}'}), 500
+
+
+@rdo_crud_bp.route('/foto/<int:foto_id>/<tipo>', methods=['GET'])
+@login_required
+def servir_foto(foto_id, tipo):
+    """
+    Serve arquivo de foto de forma segura
+    Valida multi-tenant antes de servir
+    Tipos: 'thumbnail', 'otimizado', 'original'
+    """
+    try:
+        from flask import send_file
+        from models import RDOFoto
+        
+        # 1. Validação multi-tenant
+        admin_id = get_admin_id()
+        foto = RDOFoto.query.filter_by(id=foto_id, admin_id=admin_id).first()
+        
+        if not foto:
+            return "Foto não encontrada", 404
+        
+        # 2. Selecionar arquivo baseado no tipo
+        if tipo == 'thumbnail':
+            caminho = foto.thumbnail
+        elif tipo == 'otimizado':
+            caminho = foto.arquivo_otimizado
+        elif tipo == 'original':
+            caminho = foto.arquivo_original
+        else:
+            return "Tipo inválido", 400
+        
+        if not caminho:
+            return "Arquivo não disponível", 404
+        
+        # 3. Montar caminho completo
+        caminho_completo = os.path.join(os.getcwd(), 'static', caminho)
+        
+        if not os.path.exists(caminho_completo):
+            return "Arquivo não encontrado no servidor", 404
+        
+        # 4. Servir arquivo com cache
+        response = send_file(caminho_completo, mimetype='image/webp')
+        response.headers['Cache-Control'] = 'public, max-age=604800'  # 7 dias
+        return response
+        
+    except Exception as e:
+        print(f"ERRO AO SERVIR FOTO: {str(e)}")
+        return "Erro interno", 500
+
+
+@rdo_crud_bp.route('/<int:rdo_id>/fotos', methods=['GET'])
+@login_required
+def listar_fotos_rdo(rdo_id):
+    """
+    Lista todas as fotos de um RDO com URLs
+    """
+    try:
+        from models import RDOFoto
+        
+        admin_id = get_admin_id()
+        rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
+        
+        if not rdo:
+            return jsonify({'error': 'RDO não encontrado'}), 404
+        
+        fotos = RDOFoto.query.filter_by(rdo_id=rdo_id, admin_id=admin_id)\
+                             .order_by(RDOFoto.ordem).all()
+        
+        return jsonify({
+            'fotos': [{
+                'id': f.id,
+                'descricao': f.descricao or '',
+                'nome_original': f.nome_original,
+                'tamanho_bytes': f.tamanho_bytes,
+                'ordem': f.ordem,
+                'url_thumbnail': url_for('rdo_crud.servir_foto', foto_id=f.id, tipo='thumbnail'),
+                'url_otimizado': url_for('rdo_crud.servir_foto', foto_id=f.id, tipo='otimizado'),
+                'url_original': url_for('rdo_crud.servir_foto', foto_id=f.id, tipo='original')
+            } for f in fotos]
+        })
+        
+    except Exception as e:
+        print(f"ERRO AO LISTAR FOTOS: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@rdo_crud_bp.route('/foto/<int:foto_id>/editar', methods=['POST'])
+@login_required
+def editar_descricao_foto(foto_id):
+    """
+    Edita descrição de uma foto
+    """
+    try:
+        from models import RDOFoto
+        
+        admin_id = get_admin_id()
+        foto = RDOFoto.query.filter_by(id=foto_id, admin_id=admin_id).first()
+        
+        if not foto:
+            return jsonify({'error': 'Foto não encontrada'}), 404
+        
+        data = request.get_json()
+        foto.descricao = data.get('descricao', '')
+        
+        db.session.commit()
+        
+        return jsonify({'success': True}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO AO EDITAR DESCRIÇÃO: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@rdo_crud_bp.route('/foto/<int:foto_id>/deletar', methods=['POST'])
+@login_required
+def deletar_foto(foto_id):
+    """
+    Deleta foto do banco E do filesystem
+    """
+    try:
+        from models import RDOFoto
+        
+        admin_id = get_admin_id()
+        foto = RDOFoto.query.filter_by(id=foto_id, admin_id=admin_id).first()
+        
+        if not foto:
+            return jsonify({'error': 'Foto não encontrada'}), 404
+        
+        # Deletar arquivos físicos
+        for caminho_rel in [foto.arquivo_original, foto.arquivo_otimizado, foto.thumbnail]:
+            if caminho_rel:
+                caminho_completo = os.path.join(os.getcwd(), 'static', caminho_rel)
+                if os.path.exists(caminho_completo):
+                    try:
+                        os.remove(caminho_completo)
+                    except Exception as e:
+                        print(f"Aviso: Não foi possível deletar {caminho_completo}: {e}")
+        
+        # Deletar do banco
+        db.session.delete(foto)
+        db.session.commit()
+        
+        return jsonify({'success': True}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO AO DELETAR FOTO: {str(e)}")
+        return jsonify({'error': str(e)}), 500

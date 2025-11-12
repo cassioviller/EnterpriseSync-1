@@ -22,12 +22,16 @@ def editar_rdo_form(rdo_id):
     Exibir formulário de edição para RDO específico
     """
     try:
-        from models import RDO, Obra, RDOServicoSubatividade, SubatividadeMestre, Funcionario
+        from models import RDO, Obra, RDOServicoSubatividade, SubatividadeMestre, Funcionario, TipoUsuario
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
             def get_admin_id_from_user():
-                return getattr(current_user, 'admin_id', current_user.id)
+                if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                    return current_user.id
+                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                    return current_user.admin_id
+                return None
         from app import db
         
         # Obter admin_id do usuário atual
@@ -91,12 +95,16 @@ def salvar_edicao_rdo(rdo_id):
     Salvar alterações no RDO editado
     """
     try:
-        from models import RDO, RDOServicoSubatividade, SubatividadeMestre
+        from models import RDO, RDOServicoSubatividade, SubatividadeMestre, TipoUsuario
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
             def get_admin_id_from_user():
-                return getattr(current_user, 'admin_id', current_user.id)
+                if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                    return current_user.id
+                elif hasattr(current_user, 'admin_id') and current_user.admin_id:
+                    return current_user.admin_id
+                return None
         from app import db
         
         # Obter admin_id do usuário atual
