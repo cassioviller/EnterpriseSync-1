@@ -602,7 +602,7 @@ console.log('Initializing RDO view with light theme...');
 .foto-modal-content {
     background: #000 !important;
     border: none !important;
-    max-height: calc(100vh - 3.5rem) !important;
+    height: calc(100vh - 3.5rem) !important;
     display: flex !important;
     flex-direction: column !important;
 }
@@ -611,40 +611,58 @@ console.log('Initializing RDO view with light theme...');
     background: #000 !important;
     border-bottom: 1px solid #333 !important;
     flex-shrink: 0 !important;
+    padding: 1rem 1.5rem !important;
 }
 
 .foto-modal-body {
     background: #000 !important;
-    padding: 2rem !important;
+    padding: 0 1rem !important;
     display: flex !important;
-    flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
     flex: 1 !important;
-    overflow: auto !important;
+    overflow: hidden !important;
+}
+
+.foto-modal-figure {
+    height: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 .foto-modal-img {
-    max-width: 95% !important;
-    max-height: calc(100vh - 200px) !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
     width: auto !important;
     height: auto !important;
     border-radius: 8px !important;
     object-fit: contain !important;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
-    flex-shrink: 1 !important;
+}
+
+.foto-modal-footer {
+    background: #000 !important;
+    border-top: 1px solid #333 !important;
+    flex-shrink: 0 !important;
+    padding: 1rem 1.5rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.5rem !important;
 }
 
 .foto-modal-caption {
     color: #f8f9fa !important;
-    text-align: center !important;
-    flex-shrink: 0 !important;
+    margin: 0 !important;
+    font-size: 0.95rem !important;
 }
 
 .foto-modal-date {
     color: #adb5bd !important;
-    text-align: center !important;
-    flex-shrink: 0 !important;
+    margin: 0 !important;
+    font-size: 0.85rem !important;
 }
 
 /* Responsividade para mobile */
@@ -656,26 +674,17 @@ console.log('Initializing RDO view with light theme...');
     }
     
     .foto-modal-content {
-        max-height: 100vh !important;
+        height: 100vh !important;
     }
     
     .foto-modal-body {
-        padding: 1rem !important;
-    }
-    
-    .foto-modal-img {
-        max-width: 100% !important;
-        max-height: calc(100vh - 150px) !important;
+        padding: 0.5rem !important;
     }
 }
 
 @media (max-width: 360px) {
     .foto-modal-body {
-        padding: 0.5rem !important;
-    }
-    
-    .foto-modal-img {
-        max-height: calc(100vh - 120px) !important;
+        padding: 0.25rem !important;
     }
 }
 </style>
@@ -928,20 +937,26 @@ console.log('Initializing RDO view with light theme...');
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                             </div>
                             <div class="modal-body foto-modal-body">
-                                <img src="{{ url_for('static', filename=foto.arquivo_otimizado or foto.arquivo_original or foto.caminho_arquivo) }}" 
-                                     alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
-                                     class="foto-modal-img">
+                                <figure class="foto-modal-figure">
+                                    <img src="{{ url_for('static', filename=foto.arquivo_otimizado or foto.arquivo_original or foto.caminho_arquivo) }}" 
+                                         alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
+                                         class="foto-modal-img">
+                                </figure>
+                            </div>
+                            {% if (foto.descricao or foto.legenda) or foto.uploaded_at %}
+                            <div class="modal-footer foto-modal-footer">
                                 {% if foto.descricao or foto.legenda %}
-                                <p class="mt-3 foto-modal-caption">
+                                <p class="foto-modal-caption">
                                     <i class="fas fa-comment-dots"></i>
                                     {{ foto.descricao or foto.legenda }}
                                 </p>
                                 {% endif %}
-                                <p class="small mt-2 foto-modal-date">
+                                <p class="foto-modal-date">
                                     <i class="fas fa-calendar"></i>
                                     Enviada em {{ foto.uploaded_at.strftime('%d/%m/%Y às %H:%M') if foto.uploaded_at else 'Data não disponível' }}
                                 </p>
                             </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
