@@ -6798,7 +6798,8 @@ def visualizar_rdo(id):
         # Buscar RDO diretamente sem verificação de acesso
         rdo = RDO.query.options(
             db.joinedload(RDO.obra),
-            db.joinedload(RDO.criado_por)
+            db.joinedload(RDO.criado_por),
+            db.joinedload(RDO.fotos)
         ).filter(RDO.id == id).first()
         
         if not rdo:

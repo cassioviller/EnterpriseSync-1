@@ -800,17 +800,18 @@ console.log('Initializing RDO view with light theme...');
     </div>
     {% endif %}
 
-    <!-- Seção Fotos do RDO (v9.0) -->
-    {% set fotos_rdo = rdo.fotos.all() %}
-    {% if fotos_rdo %}
+    <!-- Seção Fotos do RDO (v9.0) - SEMPRE VISÍVEL -->
+    {% set fotos_rdo = rdo.fotos %}
     <div class="info-section">
         <div class="info-card">
             <div class="info-header">
                 <div class="info-header-icon">
                     <i class="fas fa-camera"></i>
                 </div>
-                <h3>Fotos do RDO ({{ fotos_rdo|length }} foto{{ 's' if fotos_rdo|length != 1 else '' }})</h3>
+                <h3>Fotos do RDO {% if fotos_rdo %}({{ fotos_rdo|length }} foto{{ 's' if fotos_rdo|length != 1 else '' }}){% endif %}</h3>
             </div>
+            
+            {% if fotos_rdo %}
             <div class="fotos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; padding: 1.5rem;">
                 {% for foto in fotos_rdo %}
                 <div class="foto-card" style="border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.3s; cursor: pointer;"
@@ -857,8 +858,25 @@ console.log('Initializing RDO view with light theme...');
                 </div>
                 {% endfor %}
             </div>
+            {% else %}
+            <!-- Empty State: Nenhuma foto -->
+            <div style="padding: 3rem 1.5rem; text-align: center;">
+                <div style="font-size: 4rem; color: var(--gray-300); margin-bottom: 1rem;">
+                    <i class="fas fa-camera"></i>
+                </div>
+                <p style="color: var(--gray-500); font-size: 1rem; margin-bottom: 0.5rem;">
+                    Nenhuma foto anexada a este RDO
+                </p>
+                <p style="color: var(--gray-400); font-size: 0.875rem;">
+                    {% if rdo.status == 'Rascunho' %}
+                        As fotos podem ser adicionadas durante a edição do RDO
+                    {% else %}
+                        Este RDO foi finalizado sem fotos anexadas
+                    {% endif %}
+                </p>
+            </div>
+            {% endif %}
         </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}

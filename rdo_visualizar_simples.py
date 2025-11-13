@@ -15,7 +15,8 @@ def visualizar_rdo_simples(id):
         # Buscar RDO
         rdo = RDO.query.options(
             joinedload(RDO.obra),
-            joinedload(RDO.criado_por)
+            joinedload(RDO.criado_por),
+            joinedload(RDO.fotos)
         ).filter(RDO.id == id).first()
         
         if not rdo:

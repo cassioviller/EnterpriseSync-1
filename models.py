@@ -740,7 +740,7 @@ class RDOFoto(db.Model):
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamento com RDO
-    rdo = db.relationship('RDO', backref=db.backref('fotos', lazy='dynamic', order_by='RDOFoto.ordem'))
+    rdo = db.relationship('RDO', backref=db.backref('fotos', lazy='selectin', order_by='RDOFoto.ordem'))
 
 
 # ===== MÓDULO ALIMENTAÇÃO - Gestão de Refeições =====
