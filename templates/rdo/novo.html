@@ -415,18 +415,36 @@
             </div>
             <div class="rdo-card-body">
                 <div class="card border-primary">
-                    <div class="card-body text-center" style="cursor: pointer; border: 3px dashed #ccc; border-radius: 10px; padding: 30px; transition: all 0.3s;">
+                    <div class="card-body text-center" style="border: 3px dashed #ccc; border-radius: 10px; padding: 30px;">
                         <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
                         <p class="mb-2">Selecione fotos para anexar ao RDO</p>
                         <p class="text-muted small">JPG, PNG, GIF, WEBP - Máximo 5MB por foto</p>
-                        <input type="file" id="fileInputNovo" name="fotos[]" multiple 
+                        
+                        <!-- Input para Câmera -->
+                        <input type="file" id="fileInputNovoCam" name="fotos[]" multiple 
+                               accept="image/*" capture="camera"
+                               form="formNovoRDO"
+                               onchange="previewFotosNovo(event)"
+                               style="display:none">
+                        
+                        <!-- Input para Galeria -->
+                        <input type="file" id="fileInputNovoGal" name="fotos[]" multiple 
                                accept="image/*"
                                form="formNovoRDO"
-                               onchange="previewFotosNovo(event)">
-                        <button type="button" class="btn btn-primary mt-2" 
-                                onclick="document.getElementById('fileInputNovo').click()">
-                            <i class="fas fa-folder-open"></i> Selecionar Fotos
-                        </button>
+                               onchange="previewFotosNovo(event)"
+                               style="display:none">
+                        
+                        <!-- Botões -->
+                        <div class="d-flex gap-2 justify-content-center mt-3">
+                            <button type="button" class="btn btn-success" 
+                                    onclick="document.getElementById('fileInputNovoCam').click()">
+                                <i class="fas fa-camera"></i> Câmera
+                            </button>
+                            <button type="button" class="btn btn-primary" 
+                                    onclick="document.getElementById('fileInputNovoGal').click()">
+                                <i class="fas fa-images"></i> Galeria
+                            </button>
+                        </div>
                     </div>
                 </div>
                 

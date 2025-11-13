@@ -434,12 +434,26 @@
                         <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
                         <p class="mb-2">Arraste fotos aqui ou clique para selecionar</p>
                         <p class="text-muted small">JPG, PNG, GIF, WEBP - Máximo 5MB por foto</p>
-                        <input type="file" id="fileInput" name="fotos[]" multiple 
+                        
+                        <!-- Input para Câmera -->
+                        <input type="file" id="fileInputCam" name="fotos[]" multiple 
+                               accept="image/*" capture="camera" style="display:none">
+                        
+                        <!-- Input para Galeria -->
+                        <input type="file" id="fileInputGal" name="fotos[]" multiple 
                                accept="image/*" style="display:none">
-                        <button type="button" class="btn btn-primary mt-2" 
-                                onclick="document.getElementById('fileInput').click()">
-                            <i class="fas fa-folder-open"></i> Selecionar Fotos
-                        </button>
+                        
+                        <!-- Botões -->
+                        <div class="d-flex gap-2 justify-content-center mt-3">
+                            <button type="button" class="btn btn-success" 
+                                    onclick="document.getElementById('fileInputCam').click()">
+                                <i class="fas fa-camera"></i> Câmera
+                            </button>
+                            <button type="button" class="btn btn-primary" 
+                                    onclick="document.getElementById('fileInputGal').click()">
+                                <i class="fas fa-images"></i> Galeria
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -786,6 +800,22 @@ function renderizarErroFuncionarios() {
 
 let arquivosSelecionados = [];
 
+// Helper para registrar listeners nos inputs de arquivo
+function registrarListenersInputs(inputIds, callback) {
+    inputIds.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                callback(files);
+            });
+        }
+    });
+}
+
+// Registrar listeners para ambos os inputs (câmera e galeria)
+registrarListenersInputs(['fileInputCam', 'fileInputGal'], adicionarArquivos);
+
 // Drag and Drop
 const dropZone = document.getElementById('dropZone');
 
@@ -810,16 +840,17 @@ if (dropZone) {
         adicionarArquivos(files);
     });
 
-    dropZone.addEventListener('click', () => {
-        document.getElementById('fileInput').click();
+    // Click no dropZone sempre abre galeria (comportamento previsível)
+    dropZone.addEventListener('click', (e) => {
+        // Evitar abrir seletor ao clicar nos botões
+        if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+            const inputGal = document.getElementById('fileInputGal');
+            if (inputGal) {
+                inputGal.click();
+            }
+        }
     });
 }
-
-// Seleção via input
-document.getElementById('fileInput')?.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    adicionarArquivos(files);
-});
 
 function adicionarArquivos(files) {
     const previewContainer = document.getElementById('previewContainer');
@@ -895,11 +926,16 @@ async function uploadFotos() {
             progressBarInner.style.width = '100%';
             progressBarInner.textContent = '100%';
             
-            // Limpar preview
+            // Limpar preview e resetar ambos inputs
             arquivosSelecionados = [];
             document.getElementById('previewContainer').innerHTML = '';
             document.getElementById('btnUpload').style.display = 'none';
-            document.getElementById('fileInput').value = '';
+            
+            // Resetar ambos os inputs
+            const inputCam = document.getElementById('fileInputCam');
+            const inputGal = document.getElementById('fileInputGal');
+            if (inputCam) inputCam.value = '';
+            if (inputGal) inputGal.value = '';
             
             // Recarregar galeria
             setTimeout(() => {
