@@ -9801,103 +9801,99 @@ def api_rdo_ultima_dados(obra_id):
         print(f"📊 [RDO-API] {len(servicos_obra_atuais)} serviços ativos na obra")
         
         # ═══════════════════════════════════════════════════════
-        # ETAPA 3: Processar serviços do último RDO
+        # ETAPA 3: Pré-processar histórico do último RDO
         # ═══════════════════════════════════════════════════════
-        servicos_finais = {}
-        servicos_no_ultimo_rdo = set()
+        historico_percentuais = {}
         
         if ultimo_rdo:
             print(f"📄 [RDO-API] Último RDO: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio})")
             
-            subatividades = RDOServicoSubatividade.query.filter_by(
+            subatividades_antigas = RDOServicoSubatividade.query.filter_by(
                 rdo_id=ultimo_rdo.id
             ).all()
             
-            for sub in subatividades:
+            for sub in subatividades_antigas:
                 sid = sub.servico_id
-                servicos_no_ultimo_rdo.add(sid)
+                nome_normalizado = sub.nome_subatividade.strip().casefold() if sub.nome_subatividade else ''
                 
-                if sid not in servicos_finais:
-                    servico = Servico.query.get(sid)
-                    if servico:
-                        servicos_finais[sid] = {
-                            'id': servico.id,
-                            'nome': servico.nome,
-                            'categoria': getattr(servico, 'categoria', 'Geral'),
-                            'descricao': servico.descricao or '',
-                            'subatividades': [],
-                            'eh_novo': False
-                        }
+                if sid not in historico_percentuais:
+                    historico_percentuais[sid] = {}
                 
-                if sid in servicos_finais:
-                    # Buscar ID da subatividade mestre
-                    sub_mestre_id = sub.id
-                    try:
-                        sub_mestre = SubatividadeMestre.query.filter_by(
-                            nome=sub.nome_subatividade,
-                            servico_id=sid,
-                            admin_id=admin_id
-                        ).first()
-                        if sub_mestre:
-                            sub_mestre_id = sub_mestre.id
-                    except:
-                        pass
-                    
-                    servicos_finais[sid]['subatividades'].append({
-                        'id': sub_mestre_id,
-                        'nome': sub.nome_subatividade,
-                        'percentual': float(sub.percentual_conclusao or 0),
-                        'observacoes': sub.observacoes_tecnicas or ''
-                    })
+                historico_percentuais[sid][nome_normalizado] = {
+                    'percentual': float(sub.percentual_conclusao or 0),
+                    'observacoes': sub.observacoes_tecnicas or ''
+                }
+                
+            print(f"📊 [RDO-API] Histórico: {len(historico_percentuais)} serviços com dados antigos")
         
         # ═══════════════════════════════════════════════════════
-        # ETAPA 4: ADICIONAR NOVOS SERVIÇOS (CORE FIX) 🎯
+        # ETAPA 4: Processar TODOS serviços com subatividades ATUAIS
         # ═══════════════════════════════════════════════════════
-        novos_count = 0
+        servicos_finais = {}
         
         for servico_obra_real, servico in servicos_obra_atuais:
             sid = servico.id
             
-            # 🆕 SERVIÇO NOVO: não estava no último RDO
-            if sid not in servicos_no_ultimo_rdo:
-                print(f"🆕 [RDO-API] NOVO → {servico.nome} (ID:{sid})")
-                
-                # Buscar subatividades
-                subs_mestre = SubatividadeMestre.query.filter_by(
-                    servico_id=sid,
-                    admin_id=admin_id,
-                    ativo=True
-                ).order_by(SubatividadeMestre.ordem_padrao).all()
-                
-                subatividades_novas = []
-                for sm in subs_mestre:
-                    subatividades_novas.append({
+            # Buscar subatividades ATUAIS da tabela mestre
+            subs_mestre_atuais = SubatividadeMestre.query.filter_by(
+                servico_id=sid,
+                admin_id=admin_id,
+                ativo=True
+            ).order_by(SubatividadeMestre.ordem_padrao).all()
+            
+            subatividades_lista = []
+            tem_historico = sid in historico_percentuais
+            
+            if subs_mestre_atuais:
+                for sm in subs_mestre_atuais:
+                    nome_normalizado = sm.nome.strip().casefold() if sm.nome else ''
+                    
+                    # Tentar mapear com histórico por nome
+                    percentual = 0.0
+                    observacoes = ''
+                    
+                    if tem_historico and nome_normalizado in historico_percentuais[sid]:
+                        dados_hist = historico_percentuais[sid][nome_normalizado]
+                        percentual = dados_hist['percentual']
+                        observacoes = dados_hist['observacoes']
+                        print(f"✅ [RDO-API] Mapeado: {servico.nome} → {sm.nome} = {percentual}%")
+                    else:
+                        print(f"🆕 [RDO-API] Novo/Sem histórico: {servico.nome} → {sm.nome} = 0%")
+                    
+                    subatividades_lista.append({
                         'id': sm.id,
                         'nome': sm.nome,
-                        'percentual': 0.0,  # SEMPRE 0%
-                        'observacoes': ''
+                        'percentual': percentual,
+                        'observacoes': observacoes
                     })
+            else:
+                # Fallback: se serviço não tem subatividades, criar uma padrão
+                qtd_info = f"{servico_obra_real.quantidade_planejada or 1} {servico.unidade_simbolo or servico.unidade_medida or 'un'}"
+                percentual = 0.0
+                observacoes = f'Qtd planejada: {qtd_info}'
                 
-                # Fallback: criar subatividade padrão
-                if not subatividades_novas:
-                    qtd_info = f"{servico_obra_real.quantidade_planejada or 1} {servico.unidade_simbolo or servico.unidade_medida or 'un'}"
-                    subatividades_novas.append({
-                        'id': f'new_{sid}',
-                        'nome': servico.nome,
-                        'percentual': 0.0,
-                        'observacoes': f'Qtd planejada: {qtd_info}'
-                    })
+                # Tentar mapear percentual do histórico se houver
+                if tem_historico:
+                    nome_normalizado = servico.nome.strip().casefold()
+                    if nome_normalizado in historico_percentuais[sid]:
+                        percentual = historico_percentuais[sid][nome_normalizado]['percentual']
+                        observacoes = historico_percentuais[sid][nome_normalizado]['observacoes'] or observacoes
                 
-                servicos_finais[sid] = {
-                    'id': servico.id,
+                subatividades_lista.append({
+                    'id': f'new_{sid}',
                     'nome': servico.nome,
-                    'categoria': getattr(servico, 'categoria', 'Geral'),
-                    'descricao': servico.descricao or '',
-                    'subatividades': subatividades_novas,
-                    'eh_novo': True
-                }
-                
-                novos_count += 1
+                    'percentual': percentual,
+                    'observacoes': observacoes
+                })
+            
+            servicos_finais[sid] = {
+                'id': servico.id,
+                'nome': servico.nome,
+                'categoria': getattr(servico, 'categoria', 'Geral'),
+                'descricao': servico.descricao or '',
+                'subatividades': subatividades_lista,
+                'eh_novo': not tem_historico
+            }
         
         # ═══════════════════════════════════════════════════════
         # ETAPA 5: Ordenar subatividades e serviços
@@ -9934,9 +9930,12 @@ def api_rdo_ultima_dados(obra_id):
         # ═══════════════════════════════════════════════════════
         # LOGS FINAIS
         # ═══════════════════════════════════════════════════════
+        servicos_com_historico = sum(1 for s in servicos_finais.values() if not s['eh_novo'])
+        servicos_novos = sum(1 for s in servicos_finais.values() if s['eh_novo'])
+        
         print(f"✅ [RDO-API] Resultado:")
-        print(f"   → Último RDO: {len(servicos_no_ultimo_rdo)} serviços")
-        print(f"   → Novos: {novos_count} serviços")
+        print(f"   → Com histórico: {servicos_com_historico} serviços")
+        print(f"   → Novos/Sem histórico: {servicos_novos} serviços")
         print(f"   → Total: {len(servicos_lista)} serviços")
         
         # ═══════════════════════════════════════════════════════
@@ -9959,7 +9958,7 @@ def api_rdo_ultima_dados(obra_id):
         return jsonify({
             'success': True,
             'tem_rdo_anterior': True,
-            'novos_servicos': novos_count,
+            'novos_servicos': servicos_novos,
             'total_servicos': len(servicos_lista),
             'ultima_rdo': {
                 'numero_rdo': ultimo_rdo.numero_rdo or f'RDO-{ultimo_rdo.id}',
