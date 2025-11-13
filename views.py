@@ -9649,6 +9649,10 @@ def salvar_rdo_flexivel():
                             nova_foto = RDOFoto(
                                 admin_id=admin_id,
                                 rdo_id=rdo.id,
+                                # Campos legados obrigatórios (NOT NULL no banco)
+                                nome_arquivo=resultado['nome_original'],
+                                caminho_arquivo=resultado['arquivo_original'],
+                                # Novos campos (v9.0)
                                 descricao='',
                                 arquivo_original=resultado['arquivo_original'],
                                 arquivo_otimizado=resultado['arquivo_otimizado'],
