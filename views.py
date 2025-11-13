@@ -9311,8 +9311,10 @@ def salvar_rdo_flexivel():
                     service_name = servico_obra.servico.nome
                     logger.info(f"🎯 SERVIÇO DA OBRA: {service_name} (ID: {target_service_id})")
                 else:
-                    flash('Não foi possível identificar o serviço para esta obra', 'error')
-                    return redirect(url_for('main.funcionario_rdo_novo'))
+                    # ✅ CORREÇÃO: Permitir RDO sem serviços (status Rascunho com fotos/funcionários)
+                    target_service_id = None
+                    service_name = "Sem serviço definido"
+                    logger.warning(f"⚠️ Obra sem serviços associados - RDO criado como rascunho")
             except Exception as e:
                 logger.error(f"❌ Erro ao buscar serviço da obra: {e}")
                 flash('Erro ao identificar serviço da obra', 'error')
@@ -9534,6 +9536,12 @@ def salvar_rdo_flexivel():
                 try:
                     # ✅ CORREÇÃO CRÍTICA: Usar original_service_id de cada subatividade
                     servico_id_correto = sub_data.get('original_service_id', target_service_id)
+                    
+                    # Pular se não há serviço definido
+                    if not servico_id_correto:
+                        logger.warning(f"  ⚠️ Subatividade {sub_data['nome']} pulada - sem serviço associado")
+                        continue
+                    
                     logger.info(f"  📋 [{i+1}/{len(subactivities)}] {sub_data['nome']} = {sub_data['percentual']}% (servico_id={servico_id_correto})")
                     
                     subatividade = RDOServicoSubatividade(
