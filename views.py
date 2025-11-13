@@ -9775,25 +9775,38 @@ def api_rdo_ultima_dados(obra_id):
                         }
                 
                 if sid in servicos_finais:
-                    # Buscar ID da subatividade mestre
-                    sub_mestre_id = sub.id
+                    # ✅ CORREÇÃO CRÍTICA: Buscar ID da subatividade mestre SEMPRE
+                    sub_mestre_id = None
                     try:
                         sub_mestre = SubatividadeMestre.query.filter_by(
                             nome=sub.nome_subatividade,
-                            servico_id=sid,
-                            admin_id=admin_id
+                            servico_id=sid
                         ).first()
+                        
                         if sub_mestre:
                             sub_mestre_id = sub_mestre.id
-                    except:
-                        pass
+                        else:
+                            # Fallback: buscar qualquer subatividade do serviço
+                            sub_mestre_fallback = SubatividadeMestre.query.filter_by(
+                                servico_id=sid,
+                                ativo=True
+                            ).first()
+                            if sub_mestre_fallback:
+                                sub_mestre_id = sub_mestre_fallback.id
+                                print(f"⚠️ [RDO-API] Subatividade '{sub.nome_subatividade}' não encontrada, usando fallback ID={sub_mestre_id}")
+                    except Exception as e:
+                        print(f"❌ [RDO-API] Erro ao buscar subatividade mestre: {e}")
                     
-                    servicos_finais[sid]['subatividades'].append({
-                        'id': sub_mestre_id,
-                        'nome': sub.nome_subatividade,
-                        'percentual': float(sub.percentual_conclusao or 0),
-                        'observacoes': sub.observacoes_tecnicas or ''
-                    })
+                    # Só adicionar se encontrou um ID válido
+                    if sub_mestre_id:
+                        servicos_finais[sid]['subatividades'].append({
+                            'id': sub_mestre_id,
+                            'nome': sub.nome_subatividade,
+                            'percentual': float(sub.percentual_conclusao or 0),
+                            'observacoes': sub.observacoes_tecnicas or ''
+                        })
+                    else:
+                        print(f"❌ [RDO-API] IGNORANDO subatividade '{sub.nome_subatividade}' - ID não encontrado")
         
         # ═══════════════════════════════════════════════════════
         # ETAPA 4: ADICIONAR NOVOS SERVIÇOS (CORE FIX) 🎯
