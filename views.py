@@ -9603,25 +9603,50 @@ def salvar_rdo_flexivel():
                     continue
             
             # 📸 PROCESSAR FOTOS (v9.0)
+            logger.info(f"🔍 DEBUG UPLOAD: Verificando request.files completo")
+            logger.info(f"🔍 request.files.keys(): {list(request.files.keys())}")
+            logger.info(f"🔍 request.files: {request.files}")
+            
             fotos_files = request.files.getlist('fotos[]')
             logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) para processar")
             
+            if fotos_files:
+                for idx, foto in enumerate(fotos_files):
+                    logger.info(f"  📝 Foto {idx+1}: filename='{foto.filename}', content_type='{foto.content_type}'")
+            
             if fotos_files and fotos_files[0].filename != '':
                 try:
-                    from services.rdo_foto_service import processar_upload_foto
+                    from services.rdo_foto_service import salvar_foto_rdo
                     
                     fotos_processadas = 0
                     for foto_file in fotos_files:
                         if foto_file and foto_file.filename != '':
-                            resultado = processar_upload_foto(foto_file, rdo.id, admin_id)
-                            if resultado['success']:
+                            try:
+                                # Salvar arquivo e obter caminhos
+                                resultado = salvar_foto_rdo(foto_file, admin_id, rdo.id)
+                                
+                                # Criar registro no banco de dados
+                                nova_foto = RDOFoto(
+                                    admin_id=admin_id,
+                                    rdo_id=rdo.id,
+                                    descricao='',
+                                    arquivo_original=resultado['arquivo_original'],
+                                    arquivo_otimizado=resultado['arquivo_otimizado'],
+                                    thumbnail=resultado['thumbnail'],
+                                    nome_original=resultado['nome_original'],
+                                    tamanho_bytes=resultado['tamanho_bytes'],
+                                    ordem=fotos_processadas
+                                )
+                                
+                                db.session.add(nova_foto)
                                 fotos_processadas += 1
-                                logger.info(f"📸 Foto processada: {resultado['foto'].arquivo_original}")
-                            else:
-                                logger.warning(f"⚠️ Erro ao processar foto {foto_file.filename}: {resultado['erro']}")
+                                logger.info(f"📸 Foto salva no banco: {nova_foto.arquivo_original}")
+                                
+                            except Exception as foto_erro:
+                                logger.warning(f"⚠️ Erro ao processar foto {foto_file.filename}: {foto_erro}")
                     
                     if fotos_processadas > 0:
-                        logger.info(f"✅ {fotos_processadas} foto(s) processada(s) com sucesso")
+                        logger.info(f"✅ {fotos_processadas} foto(s) processada(s) e salvas no banco com sucesso")
                             
                 except Exception as e:
                     logger.error(f"❌ ERRO ao processar fotos: {str(e)}")
