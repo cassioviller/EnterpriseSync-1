@@ -723,9 +723,9 @@ class RDOFoto(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False, index=True)
     
-    # Campos legados (mantidos por compatibilidade)
-    nome_arquivo = db.Column(db.String(255))
-    caminho_arquivo = db.Column(db.String(500))
+    # ✅ CORREÇÃO CRÍTICA: Campos legados são NOT NULL no banco de dados
+    nome_arquivo = db.Column(db.String(255), nullable=False)
+    caminho_arquivo = db.Column(db.String(500), nullable=False)
     legenda = db.Column(db.Text)
     
     # Novos campos (v9.0)
