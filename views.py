@@ -9625,16 +9625,19 @@ def salvar_rdo_flexivel():
                 for idx, foto in enumerate(fotos_files):
                     logger.info(f"  📝 Foto {idx+1}: filename='{foto.filename}', content_type='{foto.content_type}'")
             
-            if fotos_files and fotos_files[0].filename != '':
+            # 🔍 FILTRAR ARQUIVOS VAZIOS (bug fix: às vezes vem arquivo vazio no início)
+            fotos_validas = [f for f in fotos_files if f and f.filename and f.filename.strip() != '']
+            logger.info(f"✅ {len(fotos_validas)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_validas)} arquivos vazios)")
+            
+            if fotos_validas:
                 try:
                     from services.rdo_foto_service import salvar_foto_rdo
                     
-                    logger.info(f"🎯 [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_files)} foto(s)")
+                    logger.info(f"🎯 [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_validas)} foto(s)")
                     
-                    for idx, foto_file in enumerate(fotos_files):
-                        if foto_file and foto_file.filename != '':
-                            try:
-                                logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx+1}/{len(fotos_files)}: {foto_file.filename}")
+                    for idx, foto_file in enumerate(fotos_validas):
+                        try:
+                                logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx+1}/{len(fotos_validas)}: {foto_file.filename}")
                                 
                                 # Salvar arquivo e obter caminhos
                                 logger.info(f"   🔄 Chamando salvar_foto_rdo...")
