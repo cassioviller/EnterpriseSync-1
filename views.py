@@ -9602,37 +9602,89 @@ def salvar_rdo_flexivel():
                     logger.error(f"❌ Erro ao processar funcionário {funcionario_id_str}: {e}")
                     continue
             
-            # 📸 PROCESSAR FOTOS (v9.0)
-            fotos_files = request.files.getlist('fotos[]')
-            logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) para processar")
-            
-            if fotos_files and fotos_files[0].filename != '':
-                try:
-                    from services.rdo_foto_service import processar_upload_foto
+            # 📸 PROCESSAR FOTOS (v9.0) - CORREÇÃO COMPLETA
+            if 'fotos[]' in request.files:
+                fotos_files = request.files.getlist('fotos[]')
+                logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) para processar")
+                
+                # DEBUG: Mostrar todas as fotos recebidas
+                for i, foto in enumerate(fotos_files, 1):
+                    logger.info(f"  📝 Foto {i}: filename='{foto.filename}', content_type='{foto.content_type}'")
+                
+                # ✅ CORREÇÃO 1: FILTRAR ARQUIVOS VAZIOS (crítico!)
+                fotos_validas = [f for f in fotos_files if f and f.filename and f.filename.strip() != '']
+                logger.info(f"✅ {len(fotos_validas)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_validas)} arquivos vazios)")
+                
+                if fotos_validas:
+                    logger.info(f"🎯 [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_validas)} foto(s)")
                     
-                    fotos_processadas = 0
-                    for foto_file in fotos_files:
-                        if foto_file and foto_file.filename != '':
-                            resultado = processar_upload_foto(foto_file, rdo.id, admin_id)
-                            if resultado['success']:
-                                fotos_processadas += 1
-                                logger.info(f"📸 Foto processada: {resultado['foto'].arquivo_original}")
-                            else:
-                                logger.warning(f"⚠️ Erro ao processar foto {foto_file.filename}: {resultado['erro']}")
-                    
-                    if fotos_processadas > 0:
-                        logger.info(f"✅ {fotos_processadas} foto(s) processada(s) com sucesso")
+                    try:
+                        # ✅ CORREÇÃO 2: Usar salvar_foto_rdo (que existe)
+                        from services.rdo_foto_service import salvar_foto_rdo
+                        
+                        for idx, foto in enumerate(fotos_validas, 1):
+                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx}/{len(fotos_validas)}: {foto.filename}")
+                            logger.info(f"   🔄 Chamando salvar_foto_rdo...")
                             
-                except Exception as e:
-                    logger.error(f"❌ ERRO ao processar fotos: {str(e)}")
+                            # Chamar service layer para processar foto
+                            resultado = salvar_foto_rdo(foto, admin_id, rdo.id)
+                            logger.info(f"   ✅ salvar_foto_rdo retornou: {resultado}")
+                            
+                            # ✅ CORREÇÃO 3: Criar registro no banco com CAMPOS LEGADOS
+                            logger.info(f"   💾 Criando objeto RDOFoto no banco...")
+                            nova_foto = RDOFoto(
+                                admin_id=admin_id,
+                                rdo_id=rdo.id,
+                                # ✅ CAMPOS LEGADOS OBRIGATÓRIOS (NOT NULL no banco)
+                                nome_arquivo=resultado['nome_original'],
+                                caminho_arquivo=resultado['arquivo_original'],
+                                # Novos campos v9.0
+                                descricao='',
+                                arquivo_original=resultado['arquivo_original'],
+                                arquivo_otimizado=resultado['arquivo_otimizado'],
+                                thumbnail=resultado['thumbnail'],
+                                nome_original=resultado['nome_original'],
+                                tamanho_bytes=resultado['tamanho_bytes']
+                            )
+                            
+                            logger.info(f"   📝 Objeto criado: RDOFoto(id=None, admin_id={admin_id}, rdo_id={rdo.id})")
+                            logger.info(f"   📝 Campos legados: nome_arquivo={resultado['nome_original']}, caminho_arquivo={resultado['arquivo_original']}")
+                            logger.info(f"   📝 Campos novos: tamanho={resultado['tamanho_bytes']} bytes")
+                            
+                            logger.info(f"   🔄 Adicionando à sessão do SQLAlchemy...")
+                            db.session.add(nova_foto)
+                            logger.info(f"   ✅ Objeto adicionado à sessão (ainda não commitado)")
+                            
+                            logger.info(f"✅ [FOTO-UPLOAD] Foto {idx} processada: {resultado['arquivo_original']}")
+                        
+                        logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {len(fotos_validas)} foto(s) adicionadas à sessão")
+                        logger.info(f"   ⏳ Aguardando commit final...")
+                    except Exception as e:
+                        logger.error(f"❌ ERRO ao processar fotos: {str(e)}", exc_info=True)
+                        # Não fazer rollback aqui - deixar para o bloco except principal
             
             # 🚀 COMMIT DA TRANSAÇÃO FINAL
-            logger.info(f"🚀 EXECUTANDO COMMIT FINAL...")
+            logger.info(f"🚀 [COMMIT] EXECUTANDO COMMIT FINAL...")
+            logger.info(f"   📊 Estado da sessão antes do commit:")
+            logger.info(f"      - Novos objetos: {len(db.session.new)}")
+            logger.info(f"      - Objetos modificados: {len(db.session.dirty)}")
+            logger.info(f"      - Objetos deletados: {len(db.session.deleted)}")
+            
             db.session.commit()
+            logger.info(f"✅ [COMMIT] Commit executado com sucesso!")
             success = True
+            
+            # 🔍 VERIFICAÇÃO: Consultar banco para confirmar fotos salvas
+            logger.info(f"🔍 [VERIFICAÇÃO] Consultando banco para confirmar fotos salvas...")
+            fotos_salvas = RDOFoto.query.filter_by(rdo_id=rdo.id).all()
+            logger.info(f"   📊 {len(fotos_salvas)} foto(s) encontrada(s) no banco para RDO {rdo.id}")
+            for foto in fotos_salvas:
+                logger.info(f"   📸 Foto ID {foto.id}: {foto.nome_original} ({foto.tamanho_bytes} bytes)")
+            
             logger.info(f"✅ SUCESSO TOTAL! RDO {rdo.numero_rdo} salvo:")
             logger.info(f"  📋 {len(subactivities)} subatividades")
             logger.info(f"  👥 {len(funcionarios_selecionados)} funcionarios")
+            logger.info(f"  📸 {len(fotos_salvas)} fotos")
             logger.info(f"  🏗️ Obra ID: {obra_id}")
             logger.info(f"  🏢 Admin ID: {admin_id}")
             logger.info(f"  🔢 Número RDO: {numero_rdo} (VERIFICADO Único)")
