@@ -9637,48 +9637,48 @@ def salvar_rdo_flexivel():
                     
                     for idx, foto_file in enumerate(fotos_validas):
                         try:
-                                logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx+1}/{len(fotos_validas)}: {foto_file.filename}")
-                                
-                                # Salvar arquivo e obter caminhos
-                                logger.info(f"   🔄 Chamando salvar_foto_rdo...")
-                                resultado = salvar_foto_rdo(foto_file, admin_id, rdo.id)
-                                logger.info(f"   ✅ salvar_foto_rdo retornou: {resultado}")
-                                
-                                # Criar registro no banco de dados
-                                logger.info(f"   💾 Criando objeto RDOFoto no banco...")
-                                nova_foto = RDOFoto(
-                                    admin_id=admin_id,
-                                    rdo_id=rdo.id,
-                                    descricao='',
-                                    arquivo_original=resultado['arquivo_original'],
-                                    arquivo_otimizado=resultado['arquivo_otimizado'],
-                                    thumbnail=resultado['thumbnail'],
-                                    nome_original=resultado['nome_original'],
-                                    tamanho_bytes=resultado['tamanho_bytes'],
-                                    ordem=fotos_processadas
-                                )
-                                
-                                logger.info(f"   📝 Objeto criado: RDOFoto(id={nova_foto.id}, admin_id={nova_foto.admin_id}, rdo_id={nova_foto.rdo_id})")
-                                logger.info(f"   📝 Campos: arquivo_original={nova_foto.arquivo_original}")
-                                logger.info(f"   📝 Campos: nome_original={nova_foto.nome_original}, tamanho={nova_foto.tamanho_bytes}")
-                                
-                                logger.info(f"   🔄 Adicionando à sessão do SQLAlchemy...")
-                                db.session.add(nova_foto)
-                                logger.info(f"   ✅ Objeto adicionado à sessão (ainda não commitado)")
-                                
-                                fotos_processadas += 1
-                                logger.info(f"✅ [FOTO-UPLOAD] Foto {idx+1} processada: {nova_foto.arquivo_original}")
-                                
-                            except Exception as foto_erro:
-                                logger.error(f"❌ [FOTO-UPLOAD] ERRO ao processar foto {foto_file.filename}: {foto_erro}")
-                                logger.error(f"   📋 Traceback completo:", exc_info=True)
+                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx+1}/{len(fotos_validas)}: {foto_file.filename}")
+                            
+                            # Salvar arquivo e obter caminhos
+                            logger.info(f"   🔄 Chamando salvar_foto_rdo...")
+                            resultado = salvar_foto_rdo(foto_file, admin_id, rdo.id)
+                            logger.info(f"   ✅ salvar_foto_rdo retornou: {resultado}")
+                            
+                            # Criar registro no banco de dados
+                            logger.info(f"   💾 Criando objeto RDOFoto no banco...")
+                            nova_foto = RDOFoto(
+                                admin_id=admin_id,
+                                rdo_id=rdo.id,
+                                descricao='',
+                                arquivo_original=resultado['arquivo_original'],
+                                arquivo_otimizado=resultado['arquivo_otimizado'],
+                                thumbnail=resultado['thumbnail'],
+                                nome_original=resultado['nome_original'],
+                                tamanho_bytes=resultado['tamanho_bytes'],
+                                ordem=fotos_processadas
+                            )
+                            
+                            logger.info(f"   📝 Objeto criado: RDOFoto(id={nova_foto.id}, admin_id={nova_foto.admin_id}, rdo_id={nova_foto.rdo_id})")
+                            logger.info(f"   📝 Campos: arquivo_original={nova_foto.arquivo_original}")
+                            logger.info(f"   📝 Campos: nome_original={nova_foto.nome_original}, tamanho={nova_foto.tamanho_bytes}")
+                            
+                            logger.info(f"   🔄 Adicionando à sessão do SQLAlchemy...")
+                            db.session.add(nova_foto)
+                            logger.info(f"   ✅ Objeto adicionado à sessão (ainda não commitado)")
+                            
+                            fotos_processadas += 1
+                            logger.info(f"✅ [FOTO-UPLOAD] Foto {idx+1} processada: {nova_foto.arquivo_original}")
+                            
+                        except Exception as foto_erro:
+                            logger.error(f"❌ [FOTO-UPLOAD] ERRO ao processar foto {foto_file.filename}: {foto_erro}")
+                            logger.error(f"   📋 Traceback completo:", exc_info=True)
                     
                     if fotos_processadas > 0:
                         logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {fotos_processadas} foto(s) adicionadas à sessão")
                         logger.info(f"   ⏳ Aguardando commit final...")
                     else:
                         logger.warning(f"⚠️ [FOTO-UPLOAD] Nenhuma foto foi processada com sucesso")
-                            
+                
                 except Exception as e:
                     logger.error(f"❌ [FOTO-UPLOAD] ERRO GERAL ao processar fotos: {str(e)}")
                     logger.error(f"   📋 Traceback completo:", exc_info=True)
