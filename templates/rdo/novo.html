@@ -423,12 +423,14 @@
                         <!-- Input para Câmera -->
                         <input type="file" id="fileInputNovoCam" name="fotos[]" multiple 
                                accept="image/*" capture="camera"
+                               form="formNovoRDO"
                                onchange="previewFotosNovo(event)"
                                style="display:none">
                         
                         <!-- Input para Galeria -->
                         <input type="file" id="fileInputNovoGal" name="fotos[]" multiple 
                                accept="image/*"
+                               form="formNovoRDO"
                                onchange="previewFotosNovo(event)"
                                style="display:none">
                         
@@ -1029,37 +1031,6 @@ function previewFotosNovo(event) {
     
     console.log(`${files.length} foto(s) selecionada(s) para upload`);
 }
-
-// === HANDLER DE SUBMIT ===
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('formNovoRDO');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            console.log('📤 FORMULÁRIO SENDO ENVIADO');
-            
-            // Verificar inputs de fotos
-            const fotoCam = document.getElementById('fileInputNovoCam');
-            const fotoGal = document.getElementById('fileInputNovoGal');
-            
-            console.log(`📷 Câmera: ${fotoCam.files.length} arquivo(s)`);
-            console.log(`🖼️ Galeria: ${fotoGal.files.length} arquivo(s)`);
-            
-            // Listar arquivos
-            if (fotoCam.files.length > 0) {
-                Array.from(fotoCam.files).forEach((file, i) => {
-                    console.log(`  📸 Câmera ${i+1}: ${file.name} (${file.size} bytes)`);
-                });
-            }
-            if (fotoGal.files.length > 0) {
-                Array.from(fotoGal.files).forEach((file, i) => {
-                    console.log(`  🖼️ Galeria ${i+1}: ${file.name} (${file.size} bytes)`);
-                });
-            }
-            
-            // NÃO bloquear o envio - deixar o formulário ser enviado normalmente
-        });
-    }
-});
 
 // === INICIALIZAÇÃO ===
 document.addEventListener('DOMContentLoaded', function() {

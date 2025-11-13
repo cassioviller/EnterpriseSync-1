@@ -9311,10 +9311,8 @@ def salvar_rdo_flexivel():
                     service_name = servico_obra.servico.nome
                     logger.info(f"🎯 SERVIÇO DA OBRA: {service_name} (ID: {target_service_id})")
                 else:
-                    # ✅ CORREÇÃO: Permitir RDO sem serviços (status Rascunho com fotos/funcionários)
-                    target_service_id = None
-                    service_name = "Sem serviço definido"
-                    logger.warning(f"⚠️ Obra sem serviços associados - RDO criado como rascunho")
+                    flash('Não foi possível identificar o serviço para esta obra', 'error')
+                    return redirect(url_for('main.funcionario_rdo_novo'))
             except Exception as e:
                 logger.error(f"❌ Erro ao buscar serviço da obra: {e}")
                 flash('Erro ao identificar serviço da obra', 'error')
@@ -9536,12 +9534,6 @@ def salvar_rdo_flexivel():
                 try:
                     # ✅ CORREÇÃO CRÍTICA: Usar original_service_id de cada subatividade
                     servico_id_correto = sub_data.get('original_service_id', target_service_id)
-                    
-                    # Pular se não há serviço definido
-                    if not servico_id_correto:
-                        logger.warning(f"  ⚠️ Subatividade {sub_data['nome']} pulada - sem serviço associado")
-                        continue
-                    
                     logger.info(f"  📋 [{i+1}/{len(subactivities)}] {sub_data['nome']} = {sub_data['percentual']}% (servico_id={servico_id_correto})")
                     
                     subatividade = RDOServicoSubatividade(
@@ -9611,118 +9603,36 @@ def salvar_rdo_flexivel():
                     continue
             
             # 📸 PROCESSAR FOTOS (v9.0)
-            logger.info(f"🔍 DEBUG UPLOAD: Verificando request.files completo")
-            logger.info(f"🔍 request.files.keys(): {list(request.files.keys())}")
-            logger.info(f"🔍 request.files: {request.files}")
-            
             fotos_files = request.files.getlist('fotos[]')
             logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) para processar")
             
-            # Inicializar contador de fotos (usado depois do commit)
-            fotos_processadas = 0
-            
-            if fotos_files:
-                for idx, foto in enumerate(fotos_files):
-                    logger.info(f"  📝 Foto {idx+1}: filename='{foto.filename}', content_type='{foto.content_type}'")
-            
-            # 🔍 FILTRAR ARQUIVOS VAZIOS (bug fix: às vezes vem arquivo vazio no início)
-            fotos_validas = [f for f in fotos_files if f and f.filename and f.filename.strip() != '']
-            logger.info(f"✅ {len(fotos_validas)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_validas)} arquivos vazios)")
-            
-            if fotos_validas:
+            if fotos_files and fotos_files[0].filename != '':
                 try:
-                    from services.rdo_foto_service import salvar_foto_rdo
+                    from services.rdo_foto_service import processar_upload_foto
                     
-                    logger.info(f"🎯 [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_validas)} foto(s)")
-                    
-                    for idx, foto_file in enumerate(fotos_validas):
-                        try:
-                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx+1}/{len(fotos_validas)}: {foto_file.filename}")
-                            
-                            # Salvar arquivo e obter caminhos
-                            logger.info(f"   🔄 Chamando salvar_foto_rdo...")
-                            resultado = salvar_foto_rdo(foto_file, admin_id, rdo.id)
-                            logger.info(f"   ✅ salvar_foto_rdo retornou: {resultado}")
-                            
-                            # Criar registro no banco de dados
-                            logger.info(f"   💾 Criando objeto RDOFoto no banco...")
-                            nova_foto = RDOFoto(
-                                admin_id=admin_id,
-                                rdo_id=rdo.id,
-                                # Campos legados obrigatórios (NOT NULL no banco)
-                                nome_arquivo=resultado['nome_original'],
-                                caminho_arquivo=resultado['arquivo_original'],
-                                # Novos campos (v9.0)
-                                descricao='',
-                                arquivo_original=resultado['arquivo_original'],
-                                arquivo_otimizado=resultado['arquivo_otimizado'],
-                                thumbnail=resultado['thumbnail'],
-                                nome_original=resultado['nome_original'],
-                                tamanho_bytes=resultado['tamanho_bytes'],
-                                ordem=fotos_processadas
-                            )
-                            
-                            logger.info(f"   📝 Objeto criado: RDOFoto(id={nova_foto.id}, admin_id={nova_foto.admin_id}, rdo_id={nova_foto.rdo_id})")
-                            logger.info(f"   📝 Campos: arquivo_original={nova_foto.arquivo_original}")
-                            logger.info(f"   📝 Campos: nome_original={nova_foto.nome_original}, tamanho={nova_foto.tamanho_bytes}")
-                            
-                            logger.info(f"   🔄 Adicionando à sessão do SQLAlchemy...")
-                            db.session.add(nova_foto)
-                            logger.info(f"   ✅ Objeto adicionado à sessão (ainda não commitado)")
-                            
-                            fotos_processadas += 1
-                            logger.info(f"✅ [FOTO-UPLOAD] Foto {idx+1} processada: {nova_foto.arquivo_original}")
-                            
-                        except Exception as foto_erro:
-                            logger.error(f"❌ [FOTO-UPLOAD] ERRO ao processar foto {foto_file.filename}: {foto_erro}")
-                            logger.error(f"   📋 Traceback completo:", exc_info=True)
+                    fotos_processadas = 0
+                    for foto_file in fotos_files:
+                        if foto_file and foto_file.filename != '':
+                            resultado = processar_upload_foto(foto_file, rdo.id, admin_id)
+                            if resultado['success']:
+                                fotos_processadas += 1
+                                logger.info(f"📸 Foto processada: {resultado['foto'].arquivo_original}")
+                            else:
+                                logger.warning(f"⚠️ Erro ao processar foto {foto_file.filename}: {resultado['erro']}")
                     
                     if fotos_processadas > 0:
-                        logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {fotos_processadas} foto(s) adicionadas à sessão")
-                        logger.info(f"   ⏳ Aguardando commit final...")
-                    else:
-                        logger.warning(f"⚠️ [FOTO-UPLOAD] Nenhuma foto foi processada com sucesso")
-                
+                        logger.info(f"✅ {fotos_processadas} foto(s) processada(s) com sucesso")
+                            
                 except Exception as e:
-                    logger.error(f"❌ [FOTO-UPLOAD] ERRO GERAL ao processar fotos: {str(e)}")
-                    logger.error(f"   📋 Traceback completo:", exc_info=True)
+                    logger.error(f"❌ ERRO ao processar fotos: {str(e)}")
             
             # 🚀 COMMIT DA TRANSAÇÃO FINAL
-            logger.info(f"🚀 [COMMIT] EXECUTANDO COMMIT FINAL...")
-            logger.info(f"   📊 Estado da sessão antes do commit:")
-            logger.info(f"      - Novos objetos: {len(db.session.new)}")
-            logger.info(f"      - Objetos modificados: {len(db.session.dirty)}")
-            logger.info(f"      - Objetos deletados: {len(db.session.deleted)}")
-            
-            try:
-                db.session.commit()
-                logger.info(f"✅ [COMMIT] Commit executado com sucesso!")
-                
-                # 🔍 VERIFICAÇÃO PÓS-COMMIT: Confirmar que fotos foram salvas
-                logger.info(f"🔍 [VERIFICAÇÃO] Consultando banco para confirmar fotos salvas...")
-                fotos_salvas = RDOFoto.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
-                logger.info(f"   📊 {len(fotos_salvas)} foto(s) encontrada(s) no banco para RDO {rdo.id}")
-                
-                for foto in fotos_salvas:
-                    logger.info(f"   📸 Foto ID {foto.id}: {foto.nome_original} ({foto.tamanho_bytes} bytes)")
-                
-                if len(fotos_salvas) == 0 and fotos_processadas > 0:
-                    logger.error(f"❌ [VERIFICAÇÃO] ERRO CRÍTICO: {fotos_processadas} fotos processadas mas 0 encontradas no banco!")
-                elif len(fotos_salvas) != fotos_processadas:
-                    logger.warning(f"⚠️ [VERIFICAÇÃO] AVISO: {fotos_processadas} fotos processadas mas {len(fotos_salvas)} encontradas no banco")
-                else:
-                    logger.info(f"✅ [VERIFICAÇÃO] Fotos confirmadas no banco: {len(fotos_salvas)} == {fotos_processadas}")
-                    
-            except Exception as commit_error:
-                logger.error(f"❌ [COMMIT] ERRO ao executar commit: {commit_error}")
-                logger.error(f"   📋 Traceback completo:", exc_info=True)
-                raise
-            
+            logger.info(f"🚀 EXECUTANDO COMMIT FINAL...")
+            db.session.commit()
             success = True
             logger.info(f"✅ SUCESSO TOTAL! RDO {rdo.numero_rdo} salvo:")
             logger.info(f"  📋 {len(subactivities)} subatividades")
             logger.info(f"  👥 {len(funcionarios_selecionados)} funcionarios")
-            logger.info(f"  📸 {len(fotos_salvas) if 'fotos_salvas' in locals() else 0} fotos")
             logger.info(f"  🏗️ Obra ID: {obra_id}")
             logger.info(f"  🏢 Admin ID: {admin_id}")
             logger.info(f"  🔢 Número RDO: {numero_rdo} (VERIFICADO Único)")
@@ -9832,47 +9742,25 @@ def api_rdo_ultima_dados(obra_id):
                         }
                 
                 if sid in servicos_finais:
-                    # ✅ CORREÇÃO CRÍTICA: Buscar ID da subatividade mestre SEMPRE
-                    sub_mestre_id = None
+                    # Buscar ID da subatividade mestre
+                    sub_mestre_id = sub.id
                     try:
                         sub_mestre = SubatividadeMestre.query.filter_by(
                             nome=sub.nome_subatividade,
-                            servico_id=sid
+                            servico_id=sid,
+                            admin_id=admin_id
                         ).first()
-                        
                         if sub_mestre:
                             sub_mestre_id = sub_mestre.id
-                        else:
-                            # Fallback: buscar qualquer subatividade do serviço
-                            sub_mestre_fallback = SubatividadeMestre.query.filter_by(
-                                servico_id=sid,
-                                ativo=True
-                            ).first()
-                            if sub_mestre_fallback:
-                                sub_mestre_id = sub_mestre_fallback.id
-                                import logging
-                                logger = logging.getLogger(__name__)
-                                logger.warning(f"⚠️ [RDO-API-FALLBACK] Subatividade '{sub.nome_subatividade}' não encontrada para serviço {sid}, usando fallback ID={sub_mestre_id} (admin_id={admin_id})")
-                                print(f"⚠️ [RDO-API] Subatividade '{sub.nome_subatividade}' não encontrada, usando fallback ID={sub_mestre_id}")
-                    except Exception as e:
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.error(f"❌ [RDO-API-ERROR] Erro ao buscar subatividade mestre: {e}")
-                        print(f"❌ [RDO-API] Erro ao buscar subatividade mestre: {e}")
+                    except:
+                        pass
                     
-                    # Só adicionar se encontrou um ID válido
-                    if sub_mestre_id:
-                        servicos_finais[sid]['subatividades'].append({
-                            'id': sub_mestre_id,
-                            'nome': sub.nome_subatividade,
-                            'percentual': float(sub.percentual_conclusao or 0),
-                            'observacoes': sub.observacoes_tecnicas or ''
-                        })
-                    else:
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.warning(f"⚠️ [RDO-API-ORPHAN] Subatividade órfã '{sub.nome_subatividade}' ignorada (serviço {sid}, admin_id={admin_id}) - possível registro corrompido")
-                        print(f"❌ [RDO-API] IGNORANDO subatividade '{sub.nome_subatividade}' - ID não encontrado")
+                    servicos_finais[sid]['subatividades'].append({
+                        'id': sub_mestre_id,
+                        'nome': sub.nome_subatividade,
+                        'percentual': float(sub.percentual_conclusao or 0),
+                        'observacoes': sub.observacoes_tecnicas or ''
+                    })
         
         # ═══════════════════════════════════════════════════════
         # ETAPA 4: ADICIONAR NOVOS SERVIÇOS (CORE FIX) 🎯

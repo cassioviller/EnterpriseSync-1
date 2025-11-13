@@ -183,26 +183,16 @@ def salvar_foto_rdo(file, admin_id, rdo_id):
         ValueError: Se validação falhar
         Exception: Se erro no processamento
     """
-    logger.info(f"🚀 [FOTO-SERVICE] INICIANDO processamento de foto")
-    logger.info(f"   📋 Parâmetros: admin_id={admin_id}, rdo_id={rdo_id}, filename={file.filename}")
-    
     # 1. Validar
-    logger.info(f"🔍 [FOTO-SERVICE] Etapa 1/6: Validando imagem...")
     valido, erro = validar_imagem(file)
     if not valido:
-        logger.error(f"❌ [FOTO-SERVICE] Validação FALHOU: {erro}")
         raise ValueError(erro)
-    logger.info(f"✅ [FOTO-SERVICE] Imagem validada com sucesso")
     
     # 2. Criar diretórios (multi-tenant)
-    logger.info(f"📁 [FOTO-SERVICE] Etapa 2/6: Criando diretórios...")
     pasta_tenant = os.path.join(UPLOAD_BASE, str(admin_id), str(rdo_id))
-    logger.info(f"   📂 Pasta tenant: {pasta_tenant}")
     os.makedirs(pasta_tenant, exist_ok=True)
-    logger.info(f"✅ [FOTO-SERVICE] Diretórios criados")
     
     # 3. Gerar nomes seguros
-    logger.info(f"🔐 [FOTO-SERVICE] Etapa 3/6: Gerando nomes seguros...")
     nome_seguro = secure_filename(file.filename)
     base_nome, ext_original = os.path.splitext(nome_seguro)
     timestamp = int(datetime.now().timestamp())
@@ -212,32 +202,22 @@ def salvar_foto_rdo(file, admin_id, rdo_id):
     caminho_otimizado = os.path.join(pasta_tenant, f"{base_nome}_{timestamp}.webp")
     caminho_thumbnail = os.path.join(pasta_tenant, f"{base_nome}_{timestamp}_thumb.webp")
     
-    logger.info(f"   📝 Original: {os.path.basename(caminho_original)}")
-    logger.info(f"   📝 Otimizado: {os.path.basename(caminho_otimizado)}")
-    logger.info(f"   📝 Thumbnail: {os.path.basename(caminho_thumbnail)}")
-    
     # 4. Salvar original
-    logger.info(f"💾 [FOTO-SERVICE] Etapa 4/6: Salvando arquivo original...")
     file.save(caminho_original)
     tamanho = os.path.getsize(caminho_original)
-    logger.info(f"✅ [FOTO-SERVICE] Arquivo original salvo: {caminho_original} ({tamanho} bytes)")
+    logger.info(f"📁 Arquivo original salvo: {caminho_original} ({tamanho} bytes)")
     
     # 5. Gerar otimizado
-    logger.info(f"🎨 [FOTO-SERVICE] Etapa 5/6: Gerando versão otimizada WebP...")
     if not otimizar_para_webp(caminho_original, caminho_otimizado):
-        logger.error(f"❌ [FOTO-SERVICE] Falha ao otimizar - limpando arquivos...")
         # Tentar limpar arquivo original se falhou
         try:
             os.remove(caminho_original)
         except:
             pass
         raise Exception("Erro ao otimizar imagem")
-    logger.info(f"✅ [FOTO-SERVICE] Versão otimizada gerada")
     
     # 6. Gerar thumbnail
-    logger.info(f"🖼️ [FOTO-SERVICE] Etapa 6/6: Gerando thumbnail...")
     if not gerar_thumbnail(caminho_original, caminho_thumbnail):
-        logger.error(f"❌ [FOTO-SERVICE] Falha ao gerar thumbnail - limpando arquivos...")
         # Tentar limpar arquivos se falhou
         try:
             os.remove(caminho_original)
@@ -245,7 +225,6 @@ def salvar_foto_rdo(file, admin_id, rdo_id):
         except:
             pass
         raise Exception("Erro ao gerar thumbnail")
-    logger.info(f"✅ [FOTO-SERVICE] Thumbnail gerado")
     
     # Retornar caminhos relativos (para URL)
     base_relativo = f"uploads/rdo/{admin_id}/{rdo_id}"
@@ -258,6 +237,5 @@ def salvar_foto_rdo(file, admin_id, rdo_id):
         'tamanho_bytes': tamanho
     }
     
-    logger.info(f"✅ [FOTO-SERVICE] ✨ PROCESSAMENTO COMPLETO - {file.filename}")
-    logger.info(f"   📊 Resultado: {resultado}")
+    logger.info(f"✅ Foto processada com sucesso: {file.filename}")
     return resultado
