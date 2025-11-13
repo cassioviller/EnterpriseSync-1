@@ -9793,8 +9793,14 @@ def api_rdo_ultima_dados(obra_id):
                             ).first()
                             if sub_mestre_fallback:
                                 sub_mestre_id = sub_mestre_fallback.id
+                                import logging
+                                logger = logging.getLogger(__name__)
+                                logger.warning(f"⚠️ [RDO-API-FALLBACK] Subatividade '{sub.nome_subatividade}' não encontrada para serviço {sid}, usando fallback ID={sub_mestre_id} (admin_id={admin_id})")
                                 print(f"⚠️ [RDO-API] Subatividade '{sub.nome_subatividade}' não encontrada, usando fallback ID={sub_mestre_id}")
                     except Exception as e:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.error(f"❌ [RDO-API-ERROR] Erro ao buscar subatividade mestre: {e}")
                         print(f"❌ [RDO-API] Erro ao buscar subatividade mestre: {e}")
                     
                     # Só adicionar se encontrou um ID válido
@@ -9806,6 +9812,9 @@ def api_rdo_ultima_dados(obra_id):
                             'observacoes': sub.observacoes_tecnicas or ''
                         })
                     else:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"⚠️ [RDO-API-ORPHAN] Subatividade órfã '{sub.nome_subatividade}' ignorada (serviço {sid}, admin_id={admin_id}) - possível registro corrompido")
                         print(f"❌ [RDO-API] IGNORANDO subatividade '{sub.nome_subatividade}' - ID não encontrado")
         
         # ═══════════════════════════════════════════════════════
