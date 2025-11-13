@@ -6749,30 +6749,66 @@ def criar_rdo():
         else:
             print("DEBUG: Nenhuma ocorrência para processar")
         
-        # Processar fotos (v9.0)
+        # 📸 PROCESSAR FOTOS (v9.0) - Sistema Completo
         fotos_files = request.files.getlist('fotos[]')
-        print(f"DEBUG: {len(fotos_files)} foto(s) recebida(s) para processar")
+        logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) do formulário")
         
-        if fotos_files and fotos_files[0].filename != '':
+        # ✅ CORREÇÃO 1: Filtrar arquivos vazios ANTES do processamento
+        fotos_validas = [f for f in fotos_files if f and f.filename and f.filename.strip() != '']
+        logger.info(f"✅ {len(fotos_validas)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_validas)} vazios)")
+        
+        if fotos_validas:
             try:
-                from services.rdo_foto_service import processar_upload_foto
+                # ✅ CORREÇÃO 2: Usar salvar_foto_rdo (função correta que existe)
+                from services.rdo_foto_service import salvar_foto_rdo
                 
                 fotos_processadas = 0
-                for foto_file in fotos_files:
-                    if foto_file and foto_file.filename != '':
-                        resultado = processar_upload_foto(foto_file, rdo.id, admin_id)
-                        if resultado['success']:
-                            fotos_processadas += 1
-                            print(f"DEBUG: Foto processada: {resultado['foto'].arquivo_original}")
-                        else:
-                            print(f"AVISO: Erro ao processar foto {foto_file.filename}: {resultado['erro']}")
+                for idx, foto_file in enumerate(fotos_validas, 1):
+                    try:
+                        logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx}/{len(fotos_validas)}: {foto_file.filename}")
+                        
+                        # Chamar service layer
+                        resultado = salvar_foto_rdo(foto_file, admin_id, rdo.id)
+                        logger.info(f"   ✅ Service retornou: {resultado}")
+                        
+                        # ✅ CORREÇÃO 3: Criar RDOFoto com CAMPOS LEGADOS preenchidos
+                        nova_foto = RDOFoto(
+                            admin_id=admin_id,
+                            rdo_id=rdo.id,
+                            # ✅ CAMPOS LEGADOS OBRIGATÓRIOS (NOT NULL no banco)
+                            nome_arquivo=resultado['nome_original'],
+                            caminho_arquivo=resultado['arquivo_original'],
+                            # Novos campos v9.0
+                            descricao='',
+                            arquivo_original=resultado['arquivo_original'],
+                            arquivo_otimizado=resultado['arquivo_otimizado'],
+                            thumbnail=resultado['thumbnail'],
+                            nome_original=resultado['nome_original'],
+                            tamanho_bytes=resultado['tamanho_bytes']
+                        )
+                        
+                        db.session.add(nova_foto)
+                        fotos_processadas += 1
+                        logger.info(f"   ✅ Foto {idx} adicionada à sessão: {resultado['arquivo_original']}")
+                        
+                    except ValueError as e:
+                        # Erros de validação (tamanho, formato)
+                        logger.warning(f"   ⚠️ Validação falhou para {foto_file.filename}: {e}")
+                        flash(f'Foto {foto_file.filename}: {str(e)}', 'warning')
+                    except Exception as e:
+                        # Erros inesperados
+                        logger.error(f"   ❌ Erro ao processar {foto_file.filename}: {e}", exc_info=True)
+                        flash(f'Erro ao processar {foto_file.filename}', 'warning')
                 
                 if fotos_processadas > 0:
-                    print(f"✅ {fotos_processadas} foto(s) processada(s) com sucesso")
+                    logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {fotos_processadas} foto(s) adicionadas à sessão")
                     flash(f'{fotos_processadas} foto(s) anexada(s) ao RDO', 'success')
                         
+            except ImportError as e:
+                logger.error(f"ERRO: Service layer não encontrado: {e}")
+                flash(f'RDO criado, mas sistema de fotos não disponível', 'warning')
             except Exception as e:
-                print(f"ERRO ao processar fotos: {str(e)}")
+                logger.error(f"ERRO geral ao processar fotos: {str(e)}", exc_info=True)
                 flash(f'RDO criado, mas houve erro ao processar fotos: {str(e)}', 'warning')
         
         db.session.commit()

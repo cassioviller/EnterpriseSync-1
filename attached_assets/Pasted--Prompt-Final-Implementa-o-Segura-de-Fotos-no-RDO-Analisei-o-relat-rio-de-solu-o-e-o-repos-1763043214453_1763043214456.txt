@@ -1,0 +1,175 @@
+# 📸 Prompt Final: Implementação Segura de Fotos no RDO
+
+Analisei o relatório de solução e o repositório EnterpriseSync-1. O relatório está excelente, mas o repositório **não possui** as estruturas de segurança (CSRF, rota segura) e o service layer propostos. 
+
+Este prompt integra as **soluções prioritárias de segurança e UX** diretamente no código existente, garantindo que a implementação seja robusta e pronta para produção.
+
+## Diagnóstico de Compatibilidade
+
+| Funcionalidade | No Relatório | No Repositório | Ação Necessária |
+| :--- | :--- | :--- | :--- |
+| **`salvar_rdo_flexivel`** | ✅ Sim | ✅ Sim (em `views.py`) | Modificar função existente |
+| **`rdo_foto_service.py`** | ✅ Sim | ❌ **Não** | Criar novo arquivo |
+| **Proteção CSRF** | ✅ Sim | ❌ **Não** (desabilitado) | Habilitar e configurar |
+| **Rota Segura de Arquivos** | ✅ Sim | ❌ **Não** | Criar novo Blueprint |
+
+## Solução Integrada em 4 Passos
+
+### Passo 1: Habilitar e Configurar CSRF (app.py)
+
+**Problema:** O CSRF está explicitamente desabilitado no `app.py`, removendo uma camada essencial de segurança.
+
+**Solução:** Vamos reabilitá-lo e configurar para funcionar corretamente com AJAX.
+
+**Arquivo:** `app.py`
+
+```python
+# ANTES (linhas 6, 28, 142)
+# CSRFProtect removido...
+# app.config["WTF_CSRF_ENABLED"] = False
+# CSRFProtect estava sendo inicializado...
+
+# DEPOIS (substituir e adicionar)
+from flask_wtf.csrf import CSRFProtect
+
+# ... (após app = Flask(__name__))
+
+# Habilitar SECRET_KEY (essencial para CSRF)
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "uma-chave-secreta-de-fallback-muito-forte")
+
+# Inicializar proteção CSRF
+csrf = CSRFProtect(app)
+
+# Configurar para AJAX (opcional, mas recomendado)
+@app.after_request
+def inject_csrf_token(response):
+    response.headers.set(
+        'Access-Control-Expose-Headers',
+        'X-CSRFToken'
+    )
+    response.headers.set(
+        'X-CSRFToken',
+        generate_csrf()
+    )
+    return response
+```
+
+### Passo 2: Criar Rota Segura para Servir Arquivos (secure_files_bp.py)
+
+**Problema:** Servir arquivos de `/static/uploads` os torna públicos.
+
+**Solução:** Criar um novo Blueprint que verifica a permissão do usuário antes de entregar o arquivo.
+
+**Novo Arquivo:** `app/blueprints/secure_files_bp.py`
+
+```python
+from flask import Blueprint, send_from_directory, abort
+from flask_login import login_required, current_user
+from app.models import RDOFoto
+import os
+
+secure_files_bp = Blueprint('secure_files', __name__)
+
+@secure_files_bp.route('/rdo/foto/<int:foto_id>')
+@login_required
+def servir_foto_rdo(foto_id):
+    """ Rota segura para servir fotos de RDO """
+    foto = RDOFoto.query.get_or_404(foto_id)
+
+    # VERIFICAÇÃO MULTI-TENANT CRÍTICA
+    if foto.admin_id != current_user.admin_id:
+        abort(403) # Proibido
+
+    # Caminho absoluto para a pasta de uploads
+    base_path = os.path.abspath(os.path.join(os.getcwd(), 'static', 'uploads', 'rdo'))
+    
+    # Extrai o caminho relativo do objeto foto
+    relative_path = foto.arquivo_otimizado # ou foto.thumbnail
+    directory, filename = os.path.split(relative_path)
+
+    return send_from_directory(os.path.join(base_path, directory), filename)
+```
+
+**Registrar o Blueprint em `app.py`:**
+
+```python
+# Em app.py
+from app.blueprints.secure_files_bp import secure_files_bp
+app.register_blueprint(secure_files_bp, url_prefix='/secure-files')
+```
+
+### Passo 3: Criar o Service Layer (rdo_foto_service.py)
+
+**Problema:** A lógica de processamento de imagem não deve ficar na view.
+
+**Solução:** Criar o `rdo_foto_service.py` exatamente como descrito no relatório, mas na pasta `app/services/`.
+
+**Novo Arquivo:** `app/services/rdo_foto_service.py`
+
+```python
+# (Cole aqui o código completo do rdo_foto_service.py do relatório)
+#...
+```
+
+### Passo 4: Integrar Tudo na View (views.py)
+
+**Problema:** A função `salvar_rdo_flexivel` precisa ser atualizada para usar o service, preencher os campos legados e filtrar arquivos vazios.
+
+**Solução:** Refatorar a função para orquestrar as chamadas.
+
+**Arquivo:** `views.py` (função `salvar_rdo_flexivel`)
+
+```python
+# No topo de views.py
+from app.services.rdo_foto_service import salvar_foto_rdo
+
+# ... dentro da função salvar_rdo_flexivel
+
+# 📸 PROCESSAR FOTOS (se houver)
+if 'fotos[]' in request.files:
+    fotos_files = request.files.getlist('fotos[]')
+    
+    # ✅ FILTRAR ARQUIVOS VAZIOS
+    fotos_validas = [f for f in fotos_files if f and f.filename and f.filename.strip() != '']
+
+    if fotos_validas:
+        for foto_file in fotos_validas:
+            try:
+                # Chamar service layer
+                resultado = salvar_foto_rdo(foto_file, admin_id, rdo.id)
+
+                # Criar registro no banco
+                nova_foto = RDOFoto(
+                    admin_id=admin_id,
+                    rdo_id=rdo.id,
+                    # ✅ CAMPOS LEGADOS OBRIGATÓRIOS
+                    nome_arquivo=resultado['nome_original'],
+                    caminho_arquivo=resultado['arquivo_original'],
+                    # Novos campos
+                    descricao='',
+                    arquivo_original=resultado['arquivo_original'],
+                    arquivo_otimizado=resultado['arquivo_otimizado'],
+                    thumbnail=resultado['thumbnail'],
+                    nome_original=resultado['nome_original'],
+                    tamanho_bytes=resultado['tamanho_bytes']
+                )
+                db.session.add(nova_foto)
+
+            except ValueError as e: # Erros de validação do service
+                # Usar Toastr para erro amigável
+                flash(f'Erro no upload: {str(e)}', 'warning')
+                # Não interrompe o salvamento do RDO
+                continue
+
+# ... (resto da função com db.session.commit())
+```
+
+## Verificação Final
+
+-   **Sim, isso resolverá os problemas no repositório.**
+-   A reativação do CSRF protege contra ataques.
+-   A rota segura impede acesso não autorizado a fotos.
+-   O service layer organiza o código e centraliza a lógica de processamento.
+-   A view atualizada orquestra tudo corretamente, garantindo que os dados sejam salvos sem erros de constraint.
+
+Este prompt fornece uma solução completa e segura, pronta para ser implementada no repositório `EnterpriseSync-1`.
