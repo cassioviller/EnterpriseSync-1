@@ -9626,14 +9626,21 @@ def salvar_rdo_flexivel():
                 try:
                     from services.rdo_foto_service import salvar_foto_rdo
                     
+                    logger.info(f"🎯 [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_files)} foto(s)")
                     fotos_processadas = 0
-                    for foto_file in fotos_files:
+                    
+                    for idx, foto_file in enumerate(fotos_files):
                         if foto_file and foto_file.filename != '':
                             try:
+                                logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx+1}/{len(fotos_files)}: {foto_file.filename}")
+                                
                                 # Salvar arquivo e obter caminhos
+                                logger.info(f"   🔄 Chamando salvar_foto_rdo...")
                                 resultado = salvar_foto_rdo(foto_file, admin_id, rdo.id)
+                                logger.info(f"   ✅ salvar_foto_rdo retornou: {resultado}")
                                 
                                 # Criar registro no banco de dados
+                                logger.info(f"   💾 Criando objeto RDOFoto no banco...")
                                 nova_foto = RDOFoto(
                                     admin_id=admin_id,
                                     rdo_id=rdo.id,
@@ -9646,26 +9653,67 @@ def salvar_rdo_flexivel():
                                     ordem=fotos_processadas
                                 )
                                 
+                                logger.info(f"   📝 Objeto criado: RDOFoto(id={nova_foto.id}, admin_id={nova_foto.admin_id}, rdo_id={nova_foto.rdo_id})")
+                                logger.info(f"   📝 Campos: arquivo_original={nova_foto.arquivo_original}")
+                                logger.info(f"   📝 Campos: nome_original={nova_foto.nome_original}, tamanho={nova_foto.tamanho_bytes}")
+                                
+                                logger.info(f"   🔄 Adicionando à sessão do SQLAlchemy...")
                                 db.session.add(nova_foto)
+                                logger.info(f"   ✅ Objeto adicionado à sessão (ainda não commitado)")
+                                
                                 fotos_processadas += 1
-                                logger.info(f"📸 Foto salva no banco: {nova_foto.arquivo_original}")
+                                logger.info(f"✅ [FOTO-UPLOAD] Foto {idx+1} processada: {nova_foto.arquivo_original}")
                                 
                             except Exception as foto_erro:
-                                logger.warning(f"⚠️ Erro ao processar foto {foto_file.filename}: {foto_erro}")
+                                logger.error(f"❌ [FOTO-UPLOAD] ERRO ao processar foto {foto_file.filename}: {foto_erro}")
+                                logger.error(f"   📋 Traceback completo:", exc_info=True)
                     
                     if fotos_processadas > 0:
-                        logger.info(f"✅ {fotos_processadas} foto(s) processada(s) e salvas no banco com sucesso")
+                        logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {fotos_processadas} foto(s) adicionadas à sessão")
+                        logger.info(f"   ⏳ Aguardando commit final...")
+                    else:
+                        logger.warning(f"⚠️ [FOTO-UPLOAD] Nenhuma foto foi processada com sucesso")
                             
                 except Exception as e:
-                    logger.error(f"❌ ERRO ao processar fotos: {str(e)}")
+                    logger.error(f"❌ [FOTO-UPLOAD] ERRO GERAL ao processar fotos: {str(e)}")
+                    logger.error(f"   📋 Traceback completo:", exc_info=True)
             
             # 🚀 COMMIT DA TRANSAÇÃO FINAL
-            logger.info(f"🚀 EXECUTANDO COMMIT FINAL...")
-            db.session.commit()
+            logger.info(f"🚀 [COMMIT] EXECUTANDO COMMIT FINAL...")
+            logger.info(f"   📊 Estado da sessão antes do commit:")
+            logger.info(f"      - Novos objetos: {len(db.session.new)}")
+            logger.info(f"      - Objetos modificados: {len(db.session.dirty)}")
+            logger.info(f"      - Objetos deletados: {len(db.session.deleted)}")
+            
+            try:
+                db.session.commit()
+                logger.info(f"✅ [COMMIT] Commit executado com sucesso!")
+                
+                # 🔍 VERIFICAÇÃO PÓS-COMMIT: Confirmar que fotos foram salvas
+                logger.info(f"🔍 [VERIFICAÇÃO] Consultando banco para confirmar fotos salvas...")
+                fotos_salvas = RDOFoto.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
+                logger.info(f"   📊 {len(fotos_salvas)} foto(s) encontrada(s) no banco para RDO {rdo.id}")
+                
+                for foto in fotos_salvas:
+                    logger.info(f"   📸 Foto ID {foto.id}: {foto.nome_original} ({foto.tamanho_bytes} bytes)")
+                
+                if len(fotos_salvas) == 0 and fotos_processadas > 0:
+                    logger.error(f"❌ [VERIFICAÇÃO] ERRO CRÍTICO: {fotos_processadas} fotos processadas mas 0 encontradas no banco!")
+                elif len(fotos_salvas) != fotos_processadas:
+                    logger.warning(f"⚠️ [VERIFICAÇÃO] AVISO: {fotos_processadas} fotos processadas mas {len(fotos_salvas)} encontradas no banco")
+                else:
+                    logger.info(f"✅ [VERIFICAÇÃO] Fotos confirmadas no banco: {len(fotos_salvas)} == {fotos_processadas}")
+                    
+            except Exception as commit_error:
+                logger.error(f"❌ [COMMIT] ERRO ao executar commit: {commit_error}")
+                logger.error(f"   📋 Traceback completo:", exc_info=True)
+                raise
+            
             success = True
             logger.info(f"✅ SUCESSO TOTAL! RDO {rdo.numero_rdo} salvo:")
             logger.info(f"  📋 {len(subactivities)} subatividades")
             logger.info(f"  👥 {len(funcionarios_selecionados)} funcionarios")
+            logger.info(f"  📸 {len(fotos_salvas) if 'fotos_salvas' in locals() else 0} fotos")
             logger.info(f"  🏗️ Obra ID: {obra_id}")
             logger.info(f"  🏢 Admin ID: {admin_id}")
             logger.info(f"  🔢 Número RDO: {numero_rdo} (VERIFICADO Único)")
