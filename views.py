@@ -9618,6 +9618,9 @@ def salvar_rdo_flexivel():
             fotos_files = request.files.getlist('fotos[]')
             logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) para processar")
             
+            # Inicializar contador de fotos (usado depois do commit)
+            fotos_processadas = 0
+            
             if fotos_files:
                 for idx, foto in enumerate(fotos_files):
                     logger.info(f"  📝 Foto {idx+1}: filename='{foto.filename}', content_type='{foto.content_type}'")
@@ -9627,7 +9630,6 @@ def salvar_rdo_flexivel():
                     from services.rdo_foto_service import salvar_foto_rdo
                     
                     logger.info(f"🎯 [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_files)} foto(s)")
-                    fotos_processadas = 0
                     
                     for idx, foto_file in enumerate(fotos_files):
                         if foto_file and foto_file.filename != '':
