@@ -73,6 +73,15 @@ app.config['WTF_CSRF_ENABLED'] = False
 # Configurações v10.0 Digital Mastery
 app.config['DIGITAL_MASTERY_MODE'] = True
 app.config['OBSERVABILITY_ENABLED'] = True
+
+# ✅ CONFIGURAÇÃO STORAGE PERSISTENTE (v9.0.3)
+# Rota para servir uploads do volume persistente
+@app.route('/persistent-uploads/<path:filename>')
+def persistent_uploads(filename):
+    """Serve arquivos do storage persistente (produção)"""
+    from flask import send_from_directory
+    uploads_path = os.environ.get('UPLOADS_PATH', os.path.join(os.getcwd(), 'static', 'uploads'))
+    return send_from_directory(uploads_path, filename)
 app.config['RUN_MIGRATIONS_FLAG'] = os.environ.get('RUN_MIGRATIONS', '').lower() in ['1', 'true', 'yes']
 app.config['RDO_MASTERY_ENABLED'] = True
 

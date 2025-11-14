@@ -1,7 +1,7 @@
 """
 Service Layer para processamento de fotos de RDO
 Responsável por: validação, otimização, compressão e armazenamento
-SIGE v9.0 - Sistema de Fotos RDO
+SIGE v9.0 - Sistema de Fotos RDO com Storage Persistente
 """
 
 import os
@@ -12,8 +12,45 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Configurações
-UPLOAD_BASE = os.path.join(os.getcwd(), 'static', 'uploads', 'rdo')
+# ✅ CONFIGURAÇÃO STORAGE PERSISTENTE (v9.0.3 - PRODUÇÃO SAFE)
+# Prioridade:
+# 1. UPLOADS_PATH (variável de ambiente) → /persistent-storage/uploads (produção)
+# 2. Fallback → static/uploads (desenvolvimento)
+def get_upload_base():
+    """Retorna caminho base para uploads baseado no ambiente"""
+    # Tenta variável de ambiente primeiro (produção com volume persistente)
+    uploads_path = os.environ.get('UPLOADS_PATH')
+    
+    if uploads_path:
+        # Produção: usa volume persistente
+        base = os.path.join(uploads_path, 'rdo')
+        logger.info(f"📦 PRODUÇÃO: Usando storage persistente → {base}")
+        
+        # ✅ VALIDAÇÃO: Verifica se volume está montado e gravável
+        try:
+            os.makedirs(base, exist_ok=True)
+            # Testa escrita
+            test_file = os.path.join(base, '.write_test')
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+            logger.info(f"✅ Volume persistente GRAVÁVEL: {base}")
+        except Exception as e:
+            logger.error(f"❌ ERRO: Volume persistente NÃO gravável: {base}")
+            logger.error(f"   Erro: {e}")
+            logger.warning(f"⚠️ FALLBACK: Usando storage local temporário (fotos serão perdidas!)")
+            # Fallback para static/uploads se volume não estiver montado
+            base = os.path.join(os.getcwd(), 'static', 'uploads', 'rdo')
+            os.makedirs(base, exist_ok=True)
+    else:
+        # Desenvolvimento: usa static/uploads (será resetado, mas OK para dev)
+        base = os.path.join(os.getcwd(), 'static', 'uploads', 'rdo')
+        logger.info(f"💻 DESENVOLVIMENTO: Usando storage local → {base}")
+        os.makedirs(base, exist_ok=True)
+    
+    return base
+
+UPLOAD_BASE = get_upload_base()
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 MAX_FOTOS_POR_RDO = 20
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
