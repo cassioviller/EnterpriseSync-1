@@ -43,8 +43,10 @@ def listar_rdos():
         # Filtros
         obra_id = request.args.get('obra_id', type=int)
         status = request.args.get('status')
+        funcionario_id = request.args.get('funcionario_id', type=int)
         data_inicio = request.args.get('data_inicio')
         data_fim = request.args.get('data_fim')
+        order_by = request.args.get('order_by', 'data_desc')
         
         # Query base
         query = db.session.query(RDO, Obra).join(
@@ -56,13 +58,25 @@ def listar_rdos():
             query = query.filter(RDO.obra_id == obra_id)
         if status:
             query = query.filter(RDO.status == status)
+        if funcionario_id:
+            # Filtrar RDOs que têm esse funcionário na mão de obra
+            query = query.join(RDOMaoObra, RDO.id == RDOMaoObra.rdo_id).filter(
+                RDOMaoObra.funcionario_id == funcionario_id
+            )
         if data_inicio:
             query = query.filter(RDO.data_relatorio >= datetime.strptime(data_inicio, '%Y-%m-%d').date())
         if data_fim:
             query = query.filter(RDO.data_relatorio <= datetime.strptime(data_fim, '%Y-%m-%d').date())
         
-        # Ordenação
-        query = query.order_by(RDO.data_relatorio.desc())
+        # Ordenação dinâmica
+        if order_by == 'data_asc':
+            query = query.order_by(RDO.data_relatorio.asc())
+        elif order_by == 'obra':
+            query = query.order_by(Obra.nome.asc(), RDO.data_relatorio.desc())
+        elif order_by == 'status':
+            query = query.order_by(RDO.status.asc(), RDO.data_relatorio.desc())
+        else:  # data_desc (padrão)
+            query = query.order_by(RDO.data_relatorio.desc())
         
         # Paginação
         rdos_paginated = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -99,6 +113,7 @@ def listar_rdos():
         
         # Dados para filtros
         obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         
         return render_template('rdo_lista_unificada.html',
                              rdos=rdos_processados,
@@ -107,14 +122,14 @@ def listar_rdos():
                              page=page,
                              admin_id=admin_id,
                              obras=obras,
-                             funcionarios=[],
+                             funcionarios=funcionarios,
                              filters={
                                  'obra_id': obra_id,
                                  'status': status,
                                  'data_inicio': data_inicio,
                                  'data_fim': data_fim,
-                                 'funcionario_id': None,
-                                 'order_by': 'data_desc'
+                                 'funcionario_id': funcionario_id,
+                                 'order_by': order_by
                              })
         
     except Exception as e:
