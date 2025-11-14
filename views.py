@@ -6784,7 +6784,11 @@ def criar_rdo():
                             arquivo_otimizado=resultado['arquivo_otimizado'],
                             thumbnail=resultado['thumbnail'],
                             nome_original=resultado['nome_original'],
-                            tamanho_bytes=resultado['tamanho_bytes']
+                            tamanho_bytes=resultado['tamanho_bytes'],
+                            # 🔥 CAMPOS BASE64 (v9.0.4) - Persistência no banco de dados
+                            imagem_original_base64=resultado.get('imagem_original_base64'),
+                            imagem_otimizada_base64=resultado.get('imagem_otimizada_base64'),
+                            thumbnail_base64=resultado.get('thumbnail_base64')
                         )
                         
                         db.session.add(nova_foto)
@@ -9701,7 +9705,11 @@ def salvar_rdo_flexivel():
                                 arquivo_otimizado=resultado['arquivo_otimizado'],
                                 thumbnail=resultado['thumbnail'],
                                 nome_original=resultado['nome_original'],
-                                tamanho_bytes=resultado['tamanho_bytes']
+                                tamanho_bytes=resultado['tamanho_bytes'],
+                                # 🔥 CAMPOS BASE64 (v9.0.4) - Persistência no banco de dados
+                                imagem_original_base64=resultado.get('imagem_original_base64'),
+                                imagem_otimizada_base64=resultado.get('imagem_otimizada_base64'),
+                                thumbnail_base64=resultado.get('thumbnail_base64')
                             )
                             
                             db.session.add(nova_foto)

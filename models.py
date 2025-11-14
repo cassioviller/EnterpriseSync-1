@@ -737,6 +737,12 @@ class RDOFoto(db.Model):
     tamanho_bytes = db.Column(db.BigInteger)
     ordem = db.Column(db.Integer, default=0)
     
+    # 🔥 ARMAZENAMENTO PERSISTENTE (v9.0.4) - Fotos em Base64 no banco de dados
+    # Solução: Igual aos funcionários - fotos NUNCA são perdidas em deploy/restart
+    imagem_original_base64 = db.Column(db.Text)  # Backup completo da imagem original
+    imagem_otimizada_base64 = db.Column(db.Text)  # Versão otimizada (1200px) para visualização
+    thumbnail_base64 = db.Column(db.Text)  # Miniatura (300px) para listagem rápida
+    
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamento com RDO

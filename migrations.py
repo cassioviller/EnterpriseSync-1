@@ -2468,6 +2468,88 @@ def _migration_52_rdo_foto_campos_otimizacao():
             except:
                 pass
 
+def _migration_53_rdo_foto_base64():
+    """
+    Migração 53: Adicionar campos Base64 ao RDOFoto para persistência total
+    - imagem_original_base64: Backup completo da imagem original
+    - imagem_otimizada_base64: Versão otimizada (1200px) para visualização
+    - thumbnail_base64: Miniatura (300px) para listagem rápida
+    
+    Objetivo: Armazenar fotos no banco de dados (igual aos funcionários)
+    para nunca mais perder fotos em deploy/restart do container
+    """
+    logger.info("=" * 80)
+    logger.info("🔥 MIGRAÇÃO 53: Persistência Base64 - RDOFoto")
+    logger.info("=" * 80)
+    
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar e adicionar novos campos base64
+        campos_base64 = {
+            'imagem_original_base64': 'TEXT',
+            'imagem_otimizada_base64': 'TEXT',
+            'thumbnail_base64': 'TEXT'
+        }
+        
+        colunas_adicionadas = 0
+        
+        for coluna, tipo_sql in campos_base64.items():
+            # Verificar se coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'rdo_foto' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' em rdo_foto...")
+                cursor.execute(f"ALTER TABLE rdo_foto ADD COLUMN {coluna} {tipo_sql}")
+                logger.info(f"✅ Coluna '{coluna}' adicionada!")
+                colunas_adicionadas += 1
+            else:
+                logger.debug(f"✅ Coluna '{coluna}' já existe - skip")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 53 CONCLUÍDA!")
+        logger.info(f"   📊 Colunas base64 adicionadas: {colunas_adicionadas}")
+        logger.info("   💡 Próximas fotos serão armazenadas no banco de dados")
+        logger.info("   🎯 Fotos antigas em arquivo continuam acessíveis (fallback)")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 53: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        # ✅ GARANTIR LIMPEZA: Fechar cursor e connection mesmo se houver erro
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2513,6 +2595,7 @@ def executar_migracoes():
             (50, "Schema completo tabela uso_veiculo", _migration_50_uso_veiculo_schema_completo),
             (51, "Schema completo tabela custo_veiculo", _migration_51_custo_veiculo_schema_completo),
             (52, "RDO Foto - otimização de campos", _migration_52_rdo_foto_campos_otimizacao),
+            (53, "RDO Foto - persistência Base64", _migration_53_rdo_foto_base64),
         ]
         
         # Executar cada migração com rastreamento

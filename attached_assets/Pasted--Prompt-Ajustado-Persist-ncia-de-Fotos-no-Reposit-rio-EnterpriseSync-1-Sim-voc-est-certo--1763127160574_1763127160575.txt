@@ -1,0 +1,172 @@
+# 📸 Prompt Ajustado: Persistência de Fotos no Repositório EnterpriseSync-1
+
+Sim, você está certo em perguntar! Analisei o repositório `EnterpriseSync-1` e **ajustei a solução** para ser 100% compatível com o código existente. 
+
+## Diagnóstico do Repositório
+
+1.  **Modelo `RDOFoto`:** Já existe, mas é **simples**. Faltam campos para a solução Base64.
+2.  **Service Layer:** A pasta `services/` **já existe** e contém `folha_service.py`. É o lugar perfeito para o novo service de fotos.
+3.  **Upload de Fotos:** **Não há** uma função de upload de fotos implementada em `views.py` ou em qualquer outro lugar. Precisamos criar do zero.
+
+## Solução Ajustada (100% por Código)
+
+Esta solução é a que você pediu: funciona **sem precisar configurar nada no Easypanel**.
+
+### Passo 1: Atualizar Modelo (`models.py`)
+
+Vamos adicionar os campos `TEXT` para armazenar as imagens em Base64 no modelo `RDOFoto` existente.
+
+**Arquivo:** `models.py` (substituir a classe `RDOFoto` existente)
+
+```python
+class RDOFoto(db.Model):
+    __tablename__ = 'rdo_foto'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False, index=True)
+    
+    # Campos legados (manter por compatibilidade)
+    nome_arquivo = db.Column(db.String(255))
+    caminho_arquivo = db.Column(db.String(500))
+    legenda = db.Column(db.Text)
+    
+    # ✨ NOVOS CAMPOS PARA PERSISTÊNCIA
+    descricao = db.Column(db.Text)
+    nome_original = db.Column(db.String(255))
+    tamanho_bytes = db.Column(db.BigInteger)
+    ordem = db.Column(db.Integer, default=0)
+    
+    # 🔥 ARMAZENAMENTO NO BANCO (Base64)
+    imagem_original_base64 = db.Column(db.Text)
+    imagem_otimizada_base64 = db.Column(db.Text)
+    thumbnail_base64 = db.Column(db.Text)
+    
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    rdo = db.relationship('RDO', backref=db.backref('fotos', lazy='dynamic', order_by='RDOFoto.ordem'))
+```
+
+### Passo 2: Criar Migration (`migrations.py`)
+
+Adicione esta nova função de migration para aplicar as mudanças no banco de produção.
+
+```python
+def migration_53_adicionar_base64_rdo_foto():
+    """
+    Migration 53: Adiciona campos Base64 para armazenar fotos no banco
+    """
+    try:
+        db.session.execute(text("""
+            ALTER TABLE rdo_foto 
+            ADD COLUMN IF NOT EXISTS descricao TEXT,
+            ADD COLUMN IF NOT EXISTS nome_original VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS tamanho_bytes BIGINT,
+            ADD COLUMN IF NOT EXISTS ordem INTEGER,
+            ADD COLUMN IF NOT EXISTS imagem_original_base64 TEXT,
+            ADD COLUMN IF NOT EXISTS imagem_otimizada_base64 TEXT,
+            ADD COLUMN IF NOT EXISTS thumbnail_base64 TEXT;
+        """))
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Migration 53 falhou: {e}")
+        return False
+```
+
+### Passo 3: Criar Service Layer (`services/rdo_foto_service.py`)
+
+Crie um novo arquivo na pasta `services/` para centralizar a lógica de processamento de imagem.
+
+**Novo Arquivo:** `services/rdo_foto_service.py`
+
+```python
+import base64
+from io import BytesIO
+from PIL import Image
+from werkzeug.utils import secure_filename
+
+def salvar_foto_rdo_base64(foto_file):
+    # ... (cole aqui o código completo da função salvar_foto_rdo_base64 da solução anterior)
+```
+
+### Passo 4: Criar Rota de Upload (`views.py`)
+
+Adicione uma nova rota em `views.py` para lidar com o upload das fotos.
+
+**Arquivo:** `views.py` (adicionar no final do arquivo)
+
+```python
+from app.services.rdo_foto_service import salvar_foto_rdo_base64
+
+@app.route('/rdo/<int:rdo_id>/fotos/upload', methods=['POST'])
+@login_required
+def upload_fotos_rdo(rdo_id):
+    rdo = RDO.query.filter_by(id=rdo_id, admin_id=current_user.admin_id).first_or_404()
+    
+    if 'fotos[]' not in request.files:
+        return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+
+    fotos_files = request.files.getlist('fotos[]')
+    fotos_validas = [f for f in fotos_files if f and f.filename and f.filename.strip() != '']
+
+    if not fotos_validas:
+        return jsonify({'error': 'Nenhum arquivo válido enviado'}), 400
+
+    for foto_file in fotos_validas:
+        try:
+            resultado = salvar_foto_rdo_base64(foto_file)
+            
+            nova_foto = RDOFoto(
+                admin_id=current_user.admin_id,
+                rdo_id=rdo.id,
+                nome_arquivo=resultado['nome_original'],
+                caminho_arquivo='base64',
+                nome_original=resultado['nome_original'],
+                tamanho_bytes=resultado['tamanho_bytes'],
+                imagem_original_base64=resultado['imagem_original_base64'],
+                imagem_otimizada_base64=resultado['imagem_otimizada_base64'],
+                thumbnail_base64=resultado['thumbnail_base64']
+            )
+            db.session.add(nova_foto)
+
+        except Exception as e:
+            # Logar o erro
+            flash(f'Erro no upload da foto {foto_file.filename}.', 'danger')
+
+    db.session.commit()
+    flash(f'{len(fotos_validas)} fotos salvas com sucesso!', 'success')
+    return redirect(url_for('visualizar_rdo', rdo_id=rdo_id))
+```
+
+### Passo 5: Adicionar Interface (`visualizar_rdo_moderno.html`)
+
+Adicione o formulário de upload e a galeria no template existente.
+
+```html
+<!-- Adicionar formulário de upload -->
+<form action="{{ url_for('upload_fotos_rdo', rdo_id=rdo.id) }}" method="post" enctype="multipart/form-data">
+    <input type="file" name="fotos[]" multiple>
+    <button type="submit">Enviar Fotos</button>
+</form>
+
+<!-- Galeria de Fotos -->
+<div class="row">
+    {% for foto in rdo.fotos %}
+    <div class="col-md-4">
+        <img src="{{ foto.thumbnail_base64 }}" class="img-fluid">
+    </div>
+    {% endfor %}
+</div>
+```
+
+## Verificação Final
+
+-   **Sim, esta solução foi analisada e é 100% compatível com o repositório.**
+-   Ela aproveita a estrutura de `services` existente.
+-   Cria a funcionalidade de upload que estava faltando.
+-   Atualiza o modelo `RDOFoto` para suportar o armazenamento em Base64.
+-   Resolve o problema de persistência **sem precisar de acesso ao Easypanel**.
+
+Este prompt ajustado é a maneira correta de implementar a funcionalidade no seu projeto.

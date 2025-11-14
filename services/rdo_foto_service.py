@@ -1,10 +1,12 @@
 """
 Service Layer para processamento de fotos de RDO
 Responsável por: validação, otimização, compressão e armazenamento
-SIGE v9.0 - Sistema de Fotos RDO com Storage Persistente
+SIGE v9.0.4 - Sistema de Fotos RDO com Persistência Base64
 """
 
 import os
+import base64
+from io import BytesIO
 from PIL import Image
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -192,6 +194,109 @@ def gerar_thumbnail(caminho_origem, caminho_destino, size=THUMBNAIL_SIZE):
         return False
 
 
+def processar_imagem_base64(file):
+    """
+    Processa imagem e gera 3 versões em Base64 para armazenamento no banco
+    
+    Por quê Base64?
+    - ✅ Fotos NUNCA são perdidas em deploy/restart
+    - ✅ Backup automático com banco de dados
+    - ✅ Funciona em qualquer ambiente (sem configuração)
+    - ✅ Igual aos funcionários (padrão já testado)
+    
+    Args:
+        file: FileStorage object do Flask
+        
+    Returns:
+        dict: {
+            'imagem_original_base64': 'data:image/webp;base64,...',
+            'imagem_otimizada_base64': 'data:image/webp;base64,...',
+            'thumbnail_base64': 'data:image/webp;base64,...',
+            'tamanho_bytes': 123456,
+            'nome_original': 'foto.jpg'
+        }
+    """
+    try:
+        # Abrir imagem original
+        img_original = Image.open(file)
+        
+        # Converter para RGB se necessário (PNG com transparência)
+        if img_original.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img_original.size, (255, 255, 255))
+            if img_original.mode == 'RGBA':
+                background.paste(img_original, mask=img_original.split()[-1])
+            else:
+                background.paste(img_original)
+            img_original = background
+        
+        # =========================================================================
+        # 1. IMAGEM ORIGINAL (mantém dimensões originais, converte para WebP)
+        # =========================================================================
+        buffer_original = BytesIO()
+        img_original.save(buffer_original, format='WEBP', quality=85)
+        buffer_original.seek(0)
+        base64_original = base64.b64encode(buffer_original.read()).decode('utf-8')
+        imagem_original_base64 = f"data:image/webp;base64,{base64_original}"
+        
+        # =========================================================================
+        # 2. IMAGEM OTIMIZADA (1200px max para visualização)
+        # =========================================================================
+        img_otimizada = img_original.copy()
+        img_otimizada.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+        
+        buffer_otimizada = BytesIO()
+        img_otimizada.save(buffer_otimizada, format='WEBP', quality=70)
+        buffer_otimizada.seek(0)
+        base64_otimizada = base64.b64encode(buffer_otimizada.read()).decode('utf-8')
+        imagem_otimizada_base64 = f"data:image/webp;base64,{base64_otimizada}"
+        
+        # =========================================================================
+        # 3. THUMBNAIL (300px quadrado para listagem rápida)
+        # =========================================================================
+        img_thumb = img_original.copy()
+        
+        # Crop central para quadrado
+        width, height = img_thumb.size
+        side = min(width, height)
+        left = (width - side) / 2
+        top = (height - side) / 2
+        right = (width + side) / 2
+        bottom = (height + side) / 2
+        
+        img_thumb_cropped = img_thumb.crop((left, top, right, bottom))
+        img_thumb_cropped.thumbnail((300, 300), Image.Resampling.LANCZOS)
+        
+        buffer_thumb = BytesIO()
+        img_thumb_cropped.save(buffer_thumb, format='WEBP', quality=65)
+        buffer_thumb.seek(0)
+        base64_thumb = base64.b64encode(buffer_thumb.read()).decode('utf-8')
+        thumbnail_base64 = f"data:image/webp;base64,{base64_thumb}"
+        
+        # Calcular tamanho total (soma das 3 versões)
+        tamanho_total = len(base64_original) + len(base64_otimizada) + len(base64_thumb)
+        
+        # ✅ IMPORTANTE: Resetar cursor do arquivo para permitir reutilização
+        file.seek(0)
+        
+        logger.info(f"✅ Imagem processada em base64: {file.filename}")
+        logger.info(f"   📊 Original: {len(base64_original)} bytes")
+        logger.info(f"   📊 Otimizada: {len(base64_otimizada)} bytes")
+        logger.info(f"   📊 Thumbnail: {len(base64_thumb)} bytes")
+        logger.info(f"   📊 Total: {tamanho_total} bytes")
+        
+        return {
+            'imagem_original_base64': imagem_original_base64,
+            'imagem_otimizada_base64': imagem_otimizada_base64,
+            'thumbnail_base64': thumbnail_base64,
+            'tamanho_bytes': tamanho_total,
+            'nome_original': file.filename
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar imagem em base64: {e}")
+        raise Exception(f"Erro ao processar imagem: {str(e)}")
+
+
 def salvar_foto_rdo(file, admin_id, rdo_id):
     """
     Orquestra todo o fluxo de salvamento:
@@ -263,16 +368,28 @@ def salvar_foto_rdo(file, admin_id, rdo_id):
             pass
         raise Exception("Erro ao gerar thumbnail")
     
-    # Retornar caminhos relativos (para URL)
+    # 7. Processar versões Base64 (v9.0.4 - persistência no banco)
+    logger.info("🔄 Gerando versões Base64...")
+    file.seek(0)  # Resetar cursor para ler novamente
+    dados_base64 = processar_imagem_base64(file)
+    
+    # Retornar caminhos relativos (para URL) + base64
     base_relativo = f"uploads/rdo/{admin_id}/{rdo_id}"
     
     resultado = {
+        # Campos legados (arquivos físicos - compatibilidade)
         'arquivo_original': f"{base_relativo}/{os.path.basename(caminho_original)}",
         'arquivo_otimizado': f"{base_relativo}/{os.path.basename(caminho_otimizado)}",
         'thumbnail': f"{base_relativo}/{os.path.basename(caminho_thumbnail)}",
         'nome_original': file.filename,
-        'tamanho_bytes': tamanho
+        'tamanho_bytes': tamanho,
+        # Novos campos (base64 - persistência total)
+        'imagem_original_base64': dados_base64['imagem_original_base64'],
+        'imagem_otimizada_base64': dados_base64['imagem_otimizada_base64'],
+        'thumbnail_base64': dados_base64['thumbnail_base64']
     }
     
     logger.info(f"✅ Foto processada com sucesso: {file.filename}")
+    logger.info(f"   📁 Arquivos físicos salvos (backup)")
+    logger.info(f"   💾 Base64 gerados (persistência no banco)")
     return resultado
