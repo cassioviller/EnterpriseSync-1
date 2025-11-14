@@ -1005,14 +1005,16 @@ function previewFotosNovo(event) {
     
     if (files.length === 0) return;
     
-    let fotosValidasCount = 0;
+    console.log(`📊 Total de arquivos recebidos do navegador: ${files.length}`);
     
-    // Processar todos os arquivos usando ÍNDICE ORIGINAL (v9.0.2.2 - FIX DEFINITIVO)
-    // O navegador mantém os índices originais ao enviar o formulário, então precisamos usar os mesmos
+    // 🎯 ESTRATÉGIA DEFINITIVA (v9.0.2.3):
+    // Criar mapa de fotos válidas → índices originais
+    // Isso garante que legendas sigam os índices REAIS dos arquivos (incluindo vazios)
+    const fotosValidas = [];
+    
     Array.from(files).forEach((file, originalIndex) => {
-        // Filtrar arquivos vazios (não criar preview, mas manter índice)
         if (!file || !file.name || file.name.trim() === '' || file.size === 0) {
-            console.log(`Arquivo ${originalIndex} ignorado: vazio ou inválido`);
+            console.log(`❌ Arquivo ${originalIndex} IGNORADO: vazio (${file.size} bytes)`);
             return;
         }
         
@@ -1021,15 +1023,32 @@ function previewFotosNovo(event) {
             return;
         }
         
-        fotosValidasCount++;
-        
+        console.log(`✅ Arquivo ${originalIndex} VÁLIDO: ${file.name} (${file.size} bytes)`);
+        fotosValidas.push({ file, originalIndex });
+    });
+    
+    if (fotosValidas.length === 0) {
+        console.log('⚠️ Nenhuma foto válida selecionada');
+        return;
+    }
+    
+    console.log(`✅ ${fotosValidas.length} fotos válidas encontradas`);
+    console.log(`📌 Índices originais das fotos válidas: ${fotosValidas.map(f => f.originalIndex).join(', ')}`);
+    
+    // Criar previews usando os índices ORIGINAIS
+    fotosValidas.forEach(({ file, originalIndex }, visualIndex) => {
         const reader = new FileReader();
         reader.onload = function(e) {
             const col = document.createElement('div');
             col.className = 'col-6 col-md-3 mb-3';
             col.innerHTML = `
                 <div class="card h-100">
-                    <img src="${e.target.result}" class="card-img-top" style="height: 150px; object-fit: cover;">
+                    <div style="position: relative;">
+                        <img src="${e.target.result}" class="card-img-top" style="height: 150px; object-fit: cover;">
+                        <span style="position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
+                            #${visualIndex + 1}
+                        </span>
+                    </div>
                     <div class="card-body p-2">
                         <small class="text-muted d-block text-truncate">${file.name}</small>
                         <small class="text-muted">${(file.size / 1024).toFixed(0)} KB</small>
@@ -1038,7 +1057,8 @@ function previewFotosNovo(event) {
                                    name="legenda_foto_${originalIndex}"
                                    class="form-control form-control-sm foto-legenda-novo" 
                                    data-file-index="${originalIndex}"
-                                   placeholder="📝 Digite a legenda desta foto"
+                                   data-visual-index="${visualIndex}"
+                                   placeholder="📝 Legenda da foto #${visualIndex + 1}"
                                    form="formNovoRDO"
                                    style="font-size: 0.85rem; border-radius: 8px;">
                         </div>
@@ -1048,9 +1068,11 @@ function previewFotosNovo(event) {
             container.appendChild(col);
         };
         reader.readAsDataURL(file);
+        
+        console.log(`📝 Foto visual #${visualIndex + 1} → índice original ${originalIndex} → campo: legenda_foto_${originalIndex}`);
     });
     
-    console.log(`${fotosValidasCount} foto(s) válida(s) selecionada(s) para upload`);
+    console.log(`✅ ${fotosValidas.length} foto(s) válida(s) prontas para upload`);
 }
 
 // === INICIALIZAÇÃO ===
