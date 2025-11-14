@@ -1,0 +1,221 @@
+{# Partial reutilizável para lightbox de fotos de RDO #}
+{# Uso: {% include 'rdo/_rdo_lightbox.html' %} #}
+{# Requer variável: fotos_rdo (lista de objetos Foto) #}
+
+<style>
+/* ===== LIGHTBOX PERSONALIZADO (substitui Bootstrap modal) ===== */
+.foto-lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.95);
+    padding: 2rem;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 1rem;
+    overflow: auto;
+}
+
+.foto-lightbox.active {
+    display: flex !important;
+}
+
+.foto-lightbox-close {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    z-index: 10000;
+}
+
+.foto-lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
+.foto-lightbox-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    max-width: 90vw;
+    max-height: 90vh;
+    flex: 1;
+}
+
+.foto-lightbox-img {
+    max-width: 100%;
+    max-height: calc(90vh - 6rem);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+}
+
+.foto-lightbox-info {
+    text-align: center;
+    color: #f8f9fa;
+    max-width: 600px;
+}
+
+.foto-lightbox-caption {
+    font-size: 1rem;
+    margin: 0 0 0.5rem 0;
+}
+
+.foto-lightbox-date {
+    font-size: 0.875rem;
+    color: #adb5bd;
+    margin: 0;
+}
+
+/* Responsividade para mobile */
+@media (max-width: 768px) {
+    .foto-lightbox {
+        padding: 1rem;
+    }
+    
+    .foto-lightbox-img {
+        max-height: calc(90vh - 4rem);
+    }
+    
+    .foto-lightbox-close {
+        top: 1rem;
+        right: 1rem;
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 1.25rem;
+    }
+}
+
+/* Grid de fotos */
+.fotos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    padding: 1.5rem;
+}
+
+.foto-card {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+    cursor: pointer;
+}
+
+.foto-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.foto-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.foto-card-caption {
+    padding: 0.75rem;
+    background: white;
+    font-size: 0.875rem;
+    color: #495057;
+}
+</style>
+
+{% if fotos_rdo and fotos_rdo|length > 0 %}
+<div class="fotos-grid">
+    {% for foto in fotos_rdo %}
+    <div class="foto-card" onclick="openLightbox('fotoLightbox{{ foto.id }}')">
+        <img src="{{ url_for('static', filename=foto.thumbnail or foto.arquivo_otimizado or foto.caminho_arquivo) }}" 
+             alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}">
+        {% if foto.descricao or foto.legenda %}
+        <div class="foto-card-caption">
+            <i class="fas fa-comment-dots text-muted"></i>
+            {{ foto.descricao or foto.legenda }}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Lightbox Personalizado -->
+    <div class="foto-lightbox" id="fotoLightbox{{ foto.id }}" onclick="if(event.target === this) closeLightbox('fotoLightbox{{ foto.id }}')">
+        <button class="foto-lightbox-close" onclick="closeLightbox('fotoLightbox{{ foto.id }}')" aria-label="Fechar">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="foto-lightbox-content">
+            <img src="{{ url_for('static', filename=foto.arquivo_otimizado or foto.arquivo_original or foto.caminho_arquivo) }}" 
+                 alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
+                 class="foto-lightbox-img">
+            {% if (foto.descricao or foto.legenda) or foto.uploaded_at %}
+            <div class="foto-lightbox-info">
+                {% if foto.descricao or foto.legenda %}
+                <p class="foto-lightbox-caption">
+                    <i class="fas fa-comment-dots"></i>
+                    {{ foto.descricao or foto.legenda }}
+                </p>
+                {% endif %}
+                <p class="foto-lightbox-date">
+                    <i class="fas fa-calendar"></i>
+                    {{ foto.uploaded_at.strftime('%d/%m/%Y às %H:%M') if foto.uploaded_at else 'Data não disponível' }}
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<!-- Empty State: Nenhuma foto -->
+<div style="padding: 3rem 1.5rem; text-align: center;">
+    <div style="font-size: 4rem; color: #dee2e6; margin-bottom: 1rem;">
+        <i class="fas fa-camera"></i>
+    </div>
+    <p style="color: #6c757d; font-size: 1rem; margin-bottom: 0.5rem;">
+        Nenhuma foto anexada a este RDO
+    </p>
+</div>
+{% endif %}
+
+<script>
+// JavaScript para Lightbox Personalizado
+function openLightbox(lightboxId) {
+    const lightbox = document.getElementById(lightboxId);
+    if (lightbox) {
+        lightbox.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeLightbox(lightboxId) {
+    const lightbox = document.getElementById(lightboxId);
+    if (lightbox) {
+        lightbox.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
+// Fechar lightbox com tecla ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const activeLightbox = document.querySelector('.foto-lightbox.active');
+        if (activeLightbox) {
+            activeLightbox.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }
+});
+</script>
