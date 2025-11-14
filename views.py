@@ -9659,43 +9659,43 @@ def salvar_rdo_flexivel():
                         # ✅ CORREÇÃO 2: Usar salvar_foto_rdo (que existe)
                         from services.rdo_foto_service import salvar_foto_rdo
                         
-                        # 🎯 ESTRATÉGIA DEFINITIVA (v9.0.2.4 - FIX FINAL ABSOLUTO)
-                        # PROBLEMA: Navegador mobile adiciona arquivo vazio automaticamente ao enviar formulário
-                        # SOLUÇÃO: Usar contador sequencial para legendas (0, 1, 2...) ignorando índices originais
-                        # 
-                        # Fluxo correto:
-                        # 1. Frontend cria: legenda_foto_0, legenda_foto_1, legenda_foto_2 (sem vazio)
-                        # 2. Navegador envia: [vazio, foto1, foto2, foto3] (adiciona vazio no início!)
-                        # 3. Backend filtra vazio: [foto1, foto2, foto3]
-                        # 4. Backend usa contador: foto1→legenda_foto_0, foto2→legenda_foto_1, foto3→legenda_foto_2
+                        # 🎯 ESTRATÉGIA ROBUSTA COM FALLBACK (v9.0.2.5 - PRODUÇÃO SAFE)
+                        # Tenta contador sequencial primeiro (mobile com arquivo vazio)
+                        # Se não encontrar legenda, tenta índice original (desktop sem vazio)
+                        # Isso garante compatibilidade com TODOS os cenários
                         
-                        contador_legenda = 0  # Contador sequencial para sincronizar com frontend
+                        contador_legenda = 0  # Contador sequencial para mobile
                         
                         for original_idx, foto in fotos_com_indice:
-                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto #{contador_legenda} (índice original backend {original_idx}): {foto.filename}")
-                            logger.info(f"   🔄 Chamando salvar_foto_rdo...")
+                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto (contador={contador_legenda}, idx_original={original_idx}): {foto.filename}")
                             
                             # Chamar service layer para processar foto
                             resultado = salvar_foto_rdo(foto, admin_id, rdo.id)
-                            logger.info(f"   ✅ salvar_foto_rdo retornou: {resultado}")
+                            logger.info(f"   ✅ Foto processada: {resultado['arquivo_original']}")
                             
-                            # 📝 Pegar legenda usando CONTADOR SEQUENCIAL (sincroniza com frontend que não viu o arquivo vazio)
-                            campo_legenda = f"legenda_foto_{contador_legenda}"
-                            legenda = request.form.get(campo_legenda, '').strip()
+                            # 📝 FALLBACK INTELIGENTE: Tenta contador primeiro, depois índice original
+                            legenda = ''
+                            campo_contador = f"legenda_foto_{contador_legenda}"
+                            campo_original = f"legenda_foto_{original_idx}"
+                            
+                            # Tenta contador sequencial (mobile)
+                            legenda = request.form.get(campo_contador, '').strip()
                             if legenda:
-                                logger.info(f"   📝 Legenda recebida (campo {campo_legenda}): '{legenda}'")
+                                logger.info(f"   ✅ Legenda encontrada via contador ({campo_contador}): '{legenda}'")
                             else:
-                                logger.info(f"   ℹ️ Sem legenda para campo {campo_legenda}")
+                                # Fallback: tenta índice original (desktop)
+                                legenda = request.form.get(campo_original, '').strip()
+                                if legenda:
+                                    logger.info(f"   ✅ Legenda encontrada via índice original ({campo_original}): '{legenda}'")
+                                else:
+                                    logger.info(f"   ℹ️ Sem legenda (tentou {campo_contador} e {campo_original})")
                             
-                            # ✅ CORREÇÃO 3: Criar registro no banco com CAMPOS LEGADOS + LEGENDA
-                            logger.info(f"   💾 Criando objeto RDOFoto no banco...")
+                            # Criar registro no banco
                             nova_foto = RDOFoto(
                                 admin_id=admin_id,
                                 rdo_id=rdo.id,
-                                # ✅ CAMPOS LEGADOS OBRIGATÓRIOS (NOT NULL no banco)
                                 nome_arquivo=resultado['nome_original'],
                                 caminho_arquivo=resultado['arquivo_original'],
-                                # Novos campos v9.0 + Legenda v9.0.2
                                 descricao=legenda,
                                 arquivo_original=resultado['arquivo_original'],
                                 arquivo_otimizado=resultado['arquivo_otimizado'],
@@ -9704,17 +9704,9 @@ def salvar_rdo_flexivel():
                                 tamanho_bytes=resultado['tamanho_bytes']
                             )
                             
-                            logger.info(f"   📝 Objeto criado: RDOFoto(id=None, admin_id={admin_id}, rdo_id={rdo.id}, descricao='{legenda}')")
-                            logger.info(f"   📝 Campos legados: nome_arquivo={resultado['nome_original']}, caminho_arquivo={resultado['arquivo_original']}")
-                            logger.info(f"   📝 Campos novos: tamanho={resultado['tamanho_bytes']} bytes")
-                            
-                            logger.info(f"   🔄 Adicionando à sessão do SQLAlchemy...")
                             db.session.add(nova_foto)
-                            logger.info(f"   ✅ Objeto adicionado à sessão (ainda não commitado)")
+                            logger.info(f"✅ Foto salva com legenda: '{legenda[:50]}...' " if len(legenda) > 50 else f"✅ Foto salva com legenda: '{legenda}'")
                             
-                            logger.info(f"✅ [FOTO-UPLOAD] Foto #{contador_legenda} processada com legenda '{legenda}': {resultado['arquivo_original']}")
-                            
-                            # Incrementar contador para próxima foto
                             contador_legenda += 1
                         
                         logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {contador_legenda} foto(s) adicionadas à sessão")
