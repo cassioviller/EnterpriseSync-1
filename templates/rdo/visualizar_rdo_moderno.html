@@ -1041,32 +1041,6 @@ console.log('Initializing RDO view with light theme...');
                     </div>
                     {% endif %}
                 </div>
-
-                <!-- Lightbox Personalizado (substitui Bootstrap modal) -->
-                <div class="foto-lightbox" id="fotoLightbox{{ foto.id }}" onclick="if(event.target === this) closeLightbox('fotoLightbox{{ foto.id }}')">
-                    <button class="foto-lightbox-close" onclick="closeLightbox('fotoLightbox{{ foto.id }}')" aria-label="Fechar">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <div class="foto-lightbox-content">
-                        <img src="{{ url_for('static', filename=foto.arquivo_otimizado or foto.arquivo_original or foto.caminho_arquivo) }}" 
-                             alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
-                             class="foto-lightbox-img">
-                        {% if (foto.descricao or foto.legenda) or foto.uploaded_at %}
-                        <div class="foto-lightbox-info">
-                            {% if foto.descricao or foto.legenda %}
-                            <p class="foto-lightbox-caption">
-                                <i class="fas fa-comment-dots"></i>
-                                {{ foto.descricao or foto.legenda }}
-                            </p>
-                            {% endif %}
-                            <p class="foto-lightbox-date">
-                                <i class="fas fa-calendar"></i>
-                                {{ foto.uploaded_at.strftime('%d/%m/%Y às %H:%M') if foto.uploaded_at else 'Data não disponível' }}
-                            </p>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
                 {% endfor %}
             </div>
             {% else %}
@@ -1090,6 +1064,36 @@ console.log('Initializing RDO view with light theme...');
         </div>
     </div>
 </div>
+
+<!-- LIGHTBOXES FORA DE TODOS OS CONTAINERS (fullscreen garantido) -->
+{% if fotos_rdo %}
+{% for foto in fotos_rdo %}
+<div class="foto-lightbox" id="fotoLightbox{{ foto.id }}" onclick="if(event.target === this) closeLightbox('fotoLightbox{{ foto.id }}')">
+    <button class="foto-lightbox-close" onclick="closeLightbox('fotoLightbox{{ foto.id }}')" aria-label="Fechar">
+        <i class="fas fa-times"></i>
+    </button>
+    <div class="foto-lightbox-content">
+        <img src="{{ url_for('static', filename=foto.arquivo_otimizado or foto.arquivo_original or foto.caminho_arquivo) }}" 
+             alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
+             class="foto-lightbox-img">
+        {% if (foto.descricao or foto.legenda) or foto.uploaded_at %}
+        <div class="foto-lightbox-info">
+            {% if foto.descricao or foto.legenda %}
+            <p class="foto-lightbox-caption">
+                <i class="fas fa-comment-dots"></i>
+                {{ foto.descricao or foto.legenda }}
+            </p>
+            {% endif %}
+            <p class="foto-lightbox-date">
+                <i class="fas fa-calendar"></i>
+                {{ foto.uploaded_at.strftime('%d/%m/%Y às %H:%M') if foto.uploaded_at else 'Data não disponível' }}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% endif %}
 
 <script>
 // JavaScript para Lightbox Personalizado
