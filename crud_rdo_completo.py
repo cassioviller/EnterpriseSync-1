@@ -570,16 +570,26 @@ def upload_foto_rdo(rdo_id):
         if fotos_existentes >= MAX_FOTOS_POR_RDO:
             return jsonify({'error': f'Limite de {MAX_FOTOS_POR_RDO} fotos atingido'}), 400
         
-        # 3. Coletar arquivos
+        # 3. Coletar arquivos e legendas
         if 'fotos[]' not in request.files:
             return jsonify({'error': 'Nenhum arquivo enviado'}), 400
         
         files = request.files.getlist('fotos[]')
+        
+        # Receber legendas (opcional)
+        import json
+        legendas = []
+        if 'legendas' in request.form:
+            try:
+                legendas = json.loads(request.form['legendas'])
+            except:
+                legendas = []
+        
         fotos_criadas = []
         erros = []
         
         # 4. Processar cada arquivo
-        for file in files:
+        for index, file in enumerate(files):
             # Verificar limite
             if fotos_existentes + len(fotos_criadas) >= MAX_FOTOS_POR_RDO:
                 break
@@ -588,11 +598,16 @@ def upload_foto_rdo(rdo_id):
                 # Salvar e otimizar
                 resultado = salvar_foto_rdo(file, admin_id, rdo_id)
                 
+                # Pegar legenda correspondente (se existir)
+                legenda = ''
+                if index < len(legendas) and legendas[index]:
+                    legenda = legendas[index]
+                
                 # Criar registro no banco
                 nova_foto = RDOFoto(
                     admin_id=admin_id,
                     rdo_id=rdo_id,
-                    descricao='',
+                    descricao=legenda,
                     arquivo_original=resultado['arquivo_original'],
                     arquivo_otimizado=resultado['arquivo_otimizado'],
                     thumbnail=resultado['thumbnail'],
