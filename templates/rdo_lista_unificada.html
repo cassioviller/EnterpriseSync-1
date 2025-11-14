@@ -1,8 +1,6 @@
 {% extends "base_completo.html" %}
 
 {% block head %}
-<!-- Select2 CSS -->
-<link href="https://cdn.jsdelivr.net/npm/[email protected]/dist/css/select2.min.css" rel="stylesheet" />
 <script>
 // Garantir light theme para RDO
 console.log('Initializing RDO with light theme...');
@@ -1046,9 +1044,6 @@ console.log('Initializing RDO with light theme...');
     {% endif %}
 </div>
 
-<!-- Select2 JavaScript -->
-<script src="https://cdn.jsdelivr.net/npm/[email protected]/dist/js/select2.min.js"></script>
-
 <script>
 // Função para limpar filtros
 function limparFiltros() {
@@ -1059,10 +1054,6 @@ function limparFiltros() {
             input.value = '';
         } else if (input.tagName === 'SELECT') {
             input.selectedIndex = 0;
-            // Reset Select2 se estiver inicializado
-            if ($(input).data('select2')) {
-                $(input).val(null).trigger('change');
-            }
         }
     });
     form.submit();
@@ -1080,27 +1071,6 @@ function confirmarExclusao(rdoId) {
         form.submit();
     }
 }
-
-// Inicializar Select2 nos dropdowns de filtro
-$(document).ready(function() {
-    // Inicializar Select2 com tema Bootstrap
-    $('select[name="obra_id"], select[name="funcionario_id"]').select2({
-        theme: 'default',
-        width: '100%',
-        placeholder: function() {
-            return $(this).data('placeholder') || $(this).find('option:first').text();
-        },
-        allowClear: true,
-        language: {
-            noResults: function() {
-                return "Nenhum resultado encontrado";
-            },
-            searching: function() {
-                return "Buscando...";
-            }
-        }
-    });
-});
 
 // Animações suaves para carregamento
 document.addEventListener('DOMContentLoaded', function() {
