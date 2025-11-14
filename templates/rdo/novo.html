@@ -1005,11 +1005,22 @@ function previewFotosNovo(event) {
     
     if (files.length === 0) return;
     
-    Array.from(files).forEach((file, index) => {
+    let fotosValidasCount = 0;
+    
+    // Processar todos os arquivos mantendo índice original
+    Array.from(files).forEach((file, originalIndex) => {
+        // Filtrar arquivos vazios
+        if (!file || !file.name || file.name.trim() === '' || file.size === 0) {
+            console.log(`Arquivo ${originalIndex} ignorado: vazio ou inválido`);
+            return;
+        }
+        
         if (!file.type.startsWith('image/')) {
             alert(`${file.name} não é uma imagem válida`);
             return;
         }
+        
+        fotosValidasCount++;
         
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -1023,9 +1034,9 @@ function previewFotosNovo(event) {
                         <small class="text-muted">${(file.size / 1024).toFixed(0)} KB</small>
                         <div class="mt-2">
                             <input type="text" 
-                                   name="legenda_foto_${index}"
+                                   name="legenda_foto_${originalIndex}"
                                    class="form-control form-control-sm foto-legenda-novo" 
-                                   data-file-index="${index}"
+                                   data-file-index="${originalIndex}"
                                    placeholder="📝 Digite a legenda desta foto"
                                    form="formNovoRDO"
                                    style="font-size: 0.85rem; border-radius: 8px;">
@@ -1038,7 +1049,7 @@ function previewFotosNovo(event) {
         reader.readAsDataURL(file);
     });
     
-    console.log(`${files.length} foto(s) selecionada(s) para upload`);
+    console.log(`${fotosValidasCount} foto(s) válida(s) selecionada(s) para upload`);
 }
 
 // === INICIALIZAÇÃO ===
