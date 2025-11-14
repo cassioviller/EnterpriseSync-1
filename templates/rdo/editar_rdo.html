@@ -868,6 +868,7 @@ function adicionarArquivos(files) {
             return;
         }
         
+        const fileIndex = arquivosSelecionados.length;
         arquivosSelecionados.push(file);
         
         // Criar preview
@@ -882,6 +883,13 @@ function adicionarArquivos(files) {
                     <div class="card-body p-2">
                         <small class="text-truncate d-block">${file.name}</small>
                         <small class="text-muted">${(file.size / 1024).toFixed(0)} KB</small>
+                        <div class="mt-2">
+                            <input type="text" 
+                                   class="form-control form-control-sm foto-legenda-input" 
+                                   data-file-index="${fileIndex}"
+                                   placeholder="📝 Digite a legenda desta foto"
+                                   style="font-size: 0.85rem; border-radius: 8px;">
+                        </div>
                     </div>
                 </div>
             `;
@@ -901,10 +909,22 @@ function adicionarArquivos(files) {
 async function uploadFotos() {
     const formData = new FormData();
     
-    // Adicionar arquivos
-    arquivosSelecionados.forEach(file => {
+    // Coletar legendas dos inputs
+    const legendaInputs = document.querySelectorAll('.foto-legenda-input');
+    const legendas = [];
+    
+    // Adicionar arquivos e capturar legendas na mesma ordem
+    arquivosSelecionados.forEach((file, index) => {
         formData.append('fotos[]', file);
+        
+        // Encontrar legenda correspondente pelo data-file-index
+        const legendaInput = document.querySelector(`.foto-legenda-input[data-file-index="${index}"]`);
+        const legenda = legendaInput ? legendaInput.value.trim() : '';
+        legendas.push(legenda);
     });
+    
+    // Adicionar legendas ao FormData como JSON
+    formData.append('legendas', JSON.stringify(legendas));
     
     // Mostrar progresso
     const progressBar = document.getElementById('uploadProgress');
