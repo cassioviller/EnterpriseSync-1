@@ -9638,7 +9638,7 @@ def salvar_rdo_flexivel():
                     logger.error(f"❌ Erro ao processar funcionário {funcionario_id_str}: {e}")
                     continue
             
-            # 📸 PROCESSAR FOTOS (v9.0) - CORREÇÃO COMPLETA
+            # 📸 PROCESSAR FOTOS (v9.0) - CORREÇÃO COMPLETA + LEGENDAS v9.0.2
             if 'fotos[]' in request.files:
                 fotos_files = request.files.getlist('fotos[]')
                 logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) para processar")
@@ -9647,26 +9647,33 @@ def salvar_rdo_flexivel():
                 for i, foto in enumerate(fotos_files, 1):
                     logger.info(f"  📝 Foto {i}: filename='{foto.filename}', content_type='{foto.content_type}'")
                 
-                # ✅ CORREÇÃO 1: FILTRAR ARQUIVOS VAZIOS (crítico!)
-                fotos_validas = [f for f in fotos_files if f and f.filename and f.filename.strip() != '']
-                logger.info(f"✅ {len(fotos_validas)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_validas)} arquivos vazios)")
+                # ✅ CORREÇÃO 1: FILTRAR ARQUIVOS VAZIOS mantendo índice original (crítico!)
+                # Rastrear índice original para sincronização correta com legendas
+                fotos_com_indice = [(idx, f) for idx, f in enumerate(fotos_files) if f and f.filename and f.filename.strip() != '']
+                logger.info(f"✅ {len(fotos_com_indice)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_com_indice)} arquivos vazios)")
                 
-                if fotos_validas:
-                    logger.info(f"🎯 [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_validas)} foto(s)")
+                if fotos_com_indice:
+                    logger.info(f"🎯 [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_com_indice)} foto(s)")
                     
                     try:
                         # ✅ CORREÇÃO 2: Usar salvar_foto_rdo (que existe)
                         from services.rdo_foto_service import salvar_foto_rdo
                         
-                        for idx, foto in enumerate(fotos_validas, 1):
-                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx}/{len(fotos_validas)}: {foto.filename}")
+                        for original_idx, foto in fotos_com_indice:
+                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto (índice original {original_idx}): {foto.filename}")
                             logger.info(f"   🔄 Chamando salvar_foto_rdo...")
                             
                             # Chamar service layer para processar foto
                             resultado = salvar_foto_rdo(foto, admin_id, rdo.id)
                             logger.info(f"   ✅ salvar_foto_rdo retornou: {resultado}")
                             
-                            # ✅ CORREÇÃO 3: Criar registro no banco com CAMPOS LEGADOS
+                            # 📝 Pegar legenda correspondente usando índice ORIGINAL (v9.0.2 - FIX)
+                            campo_legenda = f"legenda_foto_{original_idx}"
+                            legenda = request.form.get(campo_legenda, '').strip()
+                            if legenda:
+                                logger.info(f"   📝 Legenda recebida para foto {original_idx}: '{legenda}'")
+                            
+                            # ✅ CORREÇÃO 3: Criar registro no banco com CAMPOS LEGADOS + LEGENDA
                             logger.info(f"   💾 Criando objeto RDOFoto no banco...")
                             nova_foto = RDOFoto(
                                 admin_id=admin_id,
@@ -9674,8 +9681,8 @@ def salvar_rdo_flexivel():
                                 # ✅ CAMPOS LEGADOS OBRIGATÓRIOS (NOT NULL no banco)
                                 nome_arquivo=resultado['nome_original'],
                                 caminho_arquivo=resultado['arquivo_original'],
-                                # Novos campos v9.0
-                                descricao='',
+                                # Novos campos v9.0 + Legenda v9.0.2
+                                descricao=legenda,
                                 arquivo_original=resultado['arquivo_original'],
                                 arquivo_otimizado=resultado['arquivo_otimizado'],
                                 thumbnail=resultado['thumbnail'],
