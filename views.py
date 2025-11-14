@@ -9659,21 +9659,21 @@ def salvar_rdo_flexivel():
                         # ✅ CORREÇÃO 2: Usar salvar_foto_rdo (que existe)
                         from services.rdo_foto_service import salvar_foto_rdo
                         
-                        # 🔢 CONTADOR SEQUENCIAL para legendas (v9.0.2.1 - FIX FINAL)
-                        # Frontend cria legendas sequenciais (0, 1, 2...) apenas para fotos VÁLIDAS
-                        # Backend usa contador em vez de índice original para sincronizar
-                        contador_foto_valida = 0
+                        # 🎯 USAR ÍNDICE ORIGINAL (v9.0.2.2 - FIX DEFINITIVO)
+                        # O navegador mantém os índices originais ao enviar o formulário (incluindo arquivos vazios)
+                        # Frontend cria legendas usando índices originais: legenda_foto_0, legenda_foto_1, etc
+                        # Backend deve buscar as legendas usando os mesmos índices originais
                         
                         for original_idx, foto in fotos_com_indice:
-                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto válida #{contador_foto_valida} (índice original {original_idx}): {foto.filename}")
+                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto (índice original {original_idx}): {foto.filename}")
                             logger.info(f"   🔄 Chamando salvar_foto_rdo...")
                             
                             # Chamar service layer para processar foto
                             resultado = salvar_foto_rdo(foto, admin_id, rdo.id)
                             logger.info(f"   ✅ salvar_foto_rdo retornou: {resultado}")
                             
-                            # 📝 Pegar legenda usando CONTADOR SEQUENCIAL (não índice original)
-                            campo_legenda = f"legenda_foto_{contador_foto_valida}"
+                            # 📝 Pegar legenda usando ÍNDICE ORIGINAL (sincroniza com frontend)
+                            campo_legenda = f"legenda_foto_{original_idx}"
                             legenda = request.form.get(campo_legenda, '').strip()
                             if legenda:
                                 logger.info(f"   📝 Legenda recebida (campo {campo_legenda}): '{legenda}'")
@@ -9705,12 +9705,9 @@ def salvar_rdo_flexivel():
                             db.session.add(nova_foto)
                             logger.info(f"   ✅ Objeto adicionado à sessão (ainda não commitado)")
                             
-                            logger.info(f"✅ [FOTO-UPLOAD] Foto válida #{contador_foto_valida} processada: {resultado['arquivo_original']}")
-                            
-                            # Incrementar contador para próxima foto válida
-                            contador_foto_valida += 1
+                            logger.info(f"✅ [FOTO-UPLOAD] Foto (índice {original_idx}) processada: {resultado['arquivo_original']}")
                         
-                        logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {contador_foto_valida} foto(s) adicionadas à sessão")
+                        logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {len(fotos_com_indice)} foto(s) adicionadas à sessão")
                         logger.info(f"   ⏳ Aguardando commit final...")
                     except Exception as e:
                         logger.error(f"❌ ERRO ao processar fotos: {str(e)}", exc_info=True)

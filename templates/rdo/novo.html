@@ -1005,13 +1005,12 @@ function previewFotosNovo(event) {
     
     if (files.length === 0) return;
     
-    // 🔢 CONTADOR SEQUENCIAL para fotos válidas (v9.0.2.1 - FIX FINAL)
-    // Legendas são numeradas sequencialmente (0, 1, 2...) apenas para fotos VÁLIDAS
-    let contadorFotoValida = 0;
+    let fotosValidasCount = 0;
     
-    // Processar todos os arquivos, mas criar inputs apenas para válidos
+    // Processar todos os arquivos usando ÍNDICE ORIGINAL (v9.0.2.2 - FIX DEFINITIVO)
+    // O navegador mantém os índices originais ao enviar o formulário, então precisamos usar os mesmos
     Array.from(files).forEach((file, originalIndex) => {
-        // Filtrar arquivos vazios
+        // Filtrar arquivos vazios (não criar preview, mas manter índice)
         if (!file || !file.name || file.name.trim() === '' || file.size === 0) {
             console.log(`Arquivo ${originalIndex} ignorado: vazio ou inválido`);
             return;
@@ -1021,6 +1020,8 @@ function previewFotosNovo(event) {
             alert(`${file.name} não é uma imagem válida`);
             return;
         }
+        
+        fotosValidasCount++;
         
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -1034,9 +1035,9 @@ function previewFotosNovo(event) {
                         <small class="text-muted">${(file.size / 1024).toFixed(0)} KB</small>
                         <div class="mt-2">
                             <input type="text" 
-                                   name="legenda_foto_${contadorFotoValida}"
+                                   name="legenda_foto_${originalIndex}"
                                    class="form-control form-control-sm foto-legenda-novo" 
-                                   data-file-index="${contadorFotoValida}"
+                                   data-file-index="${originalIndex}"
                                    placeholder="📝 Digite a legenda desta foto"
                                    form="formNovoRDO"
                                    style="font-size: 0.85rem; border-radius: 8px;">
@@ -1047,12 +1048,9 @@ function previewFotosNovo(event) {
             container.appendChild(col);
         };
         reader.readAsDataURL(file);
-        
-        // Incrementar contador APÓS criar o preview
-        contadorFotoValida++;
     });
     
-    console.log(`${contadorFotoValida} foto(s) válida(s) selecionada(s) para upload`);
+    console.log(`${fotosValidasCount} foto(s) válida(s) selecionada(s) para upload`);
 }
 
 // === INICIALIZAÇÃO ===
