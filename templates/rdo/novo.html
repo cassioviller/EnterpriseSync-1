@@ -1005,9 +1005,11 @@ function previewFotosNovo(event) {
     
     if (files.length === 0) return;
     
-    let fotosValidasCount = 0;
+    // 🔢 CONTADOR SEQUENCIAL para fotos válidas (v9.0.2.1 - FIX FINAL)
+    // Legendas são numeradas sequencialmente (0, 1, 2...) apenas para fotos VÁLIDAS
+    let contadorFotoValida = 0;
     
-    // Processar todos os arquivos mantendo índice original
+    // Processar todos os arquivos, mas criar inputs apenas para válidos
     Array.from(files).forEach((file, originalIndex) => {
         // Filtrar arquivos vazios
         if (!file || !file.name || file.name.trim() === '' || file.size === 0) {
@@ -1019,8 +1021,6 @@ function previewFotosNovo(event) {
             alert(`${file.name} não é uma imagem válida`);
             return;
         }
-        
-        fotosValidasCount++;
         
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -1034,9 +1034,9 @@ function previewFotosNovo(event) {
                         <small class="text-muted">${(file.size / 1024).toFixed(0)} KB</small>
                         <div class="mt-2">
                             <input type="text" 
-                                   name="legenda_foto_${originalIndex}"
+                                   name="legenda_foto_${contadorFotoValida}"
                                    class="form-control form-control-sm foto-legenda-novo" 
-                                   data-file-index="${originalIndex}"
+                                   data-file-index="${contadorFotoValida}"
                                    placeholder="📝 Digite a legenda desta foto"
                                    form="formNovoRDO"
                                    style="font-size: 0.85rem; border-radius: 8px;">
@@ -1047,9 +1047,12 @@ function previewFotosNovo(event) {
             container.appendChild(col);
         };
         reader.readAsDataURL(file);
+        
+        // Incrementar contador APÓS criar o preview
+        contadorFotoValida++;
     });
     
-    console.log(`${fotosValidasCount} foto(s) válida(s) selecionada(s) para upload`);
+    console.log(`${contadorFotoValida} foto(s) válida(s) selecionada(s) para upload`);
 }
 
 // === INICIALIZAÇÃO ===
