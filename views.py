@@ -9698,9 +9698,9 @@ def salvar_rdo_flexivel():
                             db.session.add(nova_foto)
                             logger.info(f"   ✅ Objeto adicionado à sessão (ainda não commitado)")
                             
-                            logger.info(f"✅ [FOTO-UPLOAD] Foto {idx} processada: {resultado['arquivo_original']}")
+                            logger.info(f"✅ [FOTO-UPLOAD] Foto {original_idx} processada: {resultado['arquivo_original']}")
                         
-                        logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {len(fotos_validas)} foto(s) adicionadas à sessão")
+                        logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {len(fotos_com_indice)} foto(s) adicionadas à sessão")
                         logger.info(f"   ⏳ Aguardando commit final...")
                     except Exception as e:
                         logger.error(f"❌ ERRO ao processar fotos: {str(e)}", exc_info=True)
