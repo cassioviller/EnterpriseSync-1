@@ -463,11 +463,21 @@ function carregarTemplateMultiplo() {
             console.log('Resposta bruta (texto):', text);
             
             try {
-                const data = JSON.parse(text);
-                console.log('Dados do template parseados:', data);
+                const response = JSON.parse(text);
+                console.log('Resposta completa parseada:', response);
+                
+                // Extrair template do objeto de resposta
+                if (!response.success || !response.template) {
+                    console.error('Resposta inválida:', response);
+                    alert('Erro: ' + (response.error || 'Dados do template inválidos'));
+                    return;
+                }
+                
+                const data = response.template;
+                console.log('Dados do template extraídos:', data);
                 
                 // Verificar se template já foi carregado
-                if (templatesCarregadosData.find(t => t.id == templateId)) {
+                if (templatesCarregadosData.find(t => t.id == data.id)) {
                     alert('Este template já foi carregado!');
                     return;
                 }
@@ -958,8 +968,18 @@ function carregarTemplateComValor(templateId) {
             console.log('Status da resposta:', response.status);
             return response.json();
         })
-        .then(data => {
-            console.log('Dados recebidos:', data);
+        .then(response => {
+            console.log('Resposta recebida:', response);
+            
+            // Extrair template do objeto de resposta
+            if (!response.success || !response.template) {
+                console.error('Resposta inválida:', response);
+                alert('Erro: ' + (response.error || 'Dados do template inválidos'));
+                return;
+            }
+            
+            const data = response.template;
+            console.log('Template extraído:', data);
             
             if (data && data.id) {
                 console.log('=== PREENCHENDO CAMPOS DO FORMULÁRIO ===');
