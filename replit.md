@@ -33,7 +33,7 @@ The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL. Jinja2
 -   **Core Modules:**
     -   **Proposal Management:** Reusable templates, automated calculations, PDF generation, and history tracking.
     -   **Employee Management:** Registration, automated time clocking, and overtime calculations.
-    -   **Construction Project Management (RDO):** Daily Work Reports, dynamic service progress, consolidated routing, and a comprehensive mobile-first photo upload system with automatic WebP optimization, thumbnail generation, custom full-screen lightbox, inline captioning, and **database-based base64 storage** for production-grade photo persistence (prevents photo loss on container restarts).
+    -   **Construction Project Management (RDO):** Daily Work Reports, dynamic service progress, consolidated routing, and a comprehensive mobile-first photo upload system with automatic WebP optimization, thumbnail generation, custom full-screen lightbox, inline captioning, and **database-based base64 storage** for production-grade photo persistence (prevents photo loss on container restarts). **Advanced filtering system** with obra, status, funcionário (via JOIN on RDOMaoObra), date range filters, and dynamic ordering (date desc/asc, obra alphabetical, status).
     -   **Payroll:** Automated CLT-compliant calculations, late deduction processing, and dynamic PDF holerite generation with automated accounting integration.
     -   **Costs Management:** CRUD for construction costs, real-time statistics, and KPI dashboards.
     -   **Accounting:** Double-entry bookkeeping, automated journal entries from payroll, chart of accounts, trial balance, and DRE.
