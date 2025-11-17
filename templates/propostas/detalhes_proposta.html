@@ -180,6 +180,12 @@
                     <h5 class="mb-0"><i class="fas fa-link me-2"></i>Portal do Cliente</h5>
                 </div>
                 <div class="card-body">
+                    {% if proposta.status == 'rascunho' %}
+                    <div class="alert alert-warning py-2 px-3 mb-3 small">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <strong>Atenção:</strong> Esta proposta está em rascunho. O cliente verá o conteúdo atual.
+                    </div>
+                    {% endif %}
                     <p class="small text-muted mb-2">Link para o cliente visualizar e aprovar a proposta:</p>
                     <div class="input-group">
                         <input type="text" class="form-control form-control-sm" 
