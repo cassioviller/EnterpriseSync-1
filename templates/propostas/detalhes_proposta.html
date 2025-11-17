@@ -191,7 +191,7 @@
                         <input type="text" class="form-control form-control-sm" 
                                value="{{ url_for('propostas.portal_cliente', token=proposta.token_cliente, _external=True) }}" 
                                id="linkPortalCliente" readonly>
-                        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="copiarLinkPortal()">
+                        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="copiarLinkPortal(this)">
                             <i class="fas fa-copy"></i> Copiar
                         </button>
                     </div>
@@ -258,7 +258,7 @@
 </style>
 
 <script>
-function copiarLinkPortal() {
+function copiarLinkPortal(btn) {
     const linkInput = document.getElementById('linkPortalCliente');
     if (linkInput) {
         linkInput.select();
@@ -266,7 +266,6 @@ function copiarLinkPortal() {
         
         navigator.clipboard.writeText(linkInput.value).then(() => {
             // Feedback visual
-            const btn = event.target.closest('button');
             const originalHTML = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
             btn.classList.add('btn-success');
