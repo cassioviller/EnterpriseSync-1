@@ -2,6 +2,16 @@
 SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management system for SMBs, designed to automate and streamline core operations. It covers commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations.
 
 ## Recent Changes (November 2025)
+**v9.1.0 - Proposal Items CRUD System (CRITICAL)**
+- **BREAKTHROUGH**: Implemented complete CRUD workflow for proposal items (PropostaItem)
+- Added item processing to POST `/criar` route: creates items + calculates valor_total automatically
+- Added item processing to POST `/editar/<id>` route: updates/creates/deletes items + recalculates total
+- Robust currency parser (`parse_currency()`): handles Brazilian formats ("2.500,50", "R$ 1.234,56")
+- Transactional integrity: Proposta + PropostaItem rows committed atomically
+- History tracking: "criada com X itens" / "editada - X itens processados"
+- **Validated end-to-end**: Created proposal FINAL-001 with 3 items → DB shows 3 proposta_itens rows + valor_total R$ 5.800,00 → Portal/PDF render correctly
+- **Impact**: Proposals can now have items! Previously only test data (TEST-PDF.25) had items via manual SQL
+
 **v9.0.3 - Total Calculation & Rendering Overhaul (Critical)**
 - Fixed total_geral calculation logic: now prioritizes manual valor_total over calculated sum
 - Updated all templates (portal and PDF) to use total_geral instead of proposta.valor_total

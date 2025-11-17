@@ -63,6 +63,43 @@ propostas_bp = Blueprint('propostas', __name__, url_prefix='/propostas')
 UPLOAD_FOLDER = 'static/uploads/propostas'
 ALLOWED_EXTENSIONS = {'pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xlsx', 'xls'}
 
+# ===== HELPER FUNCTIONS =====
+
+def parse_currency(value_str):
+    """
+    Converte string de moeda brasileira para float
+    Aceita formatos: "2.500,50", "2500,50", "2500.50", "2500", "R$ 1.234,56"
+    
+    Examples:
+        parse_currency("2.500,00") → 2500.00
+        parse_currency("2500,50") → 2500.50
+        parse_currency("2500.50") → 2500.50
+        parse_currency("R$ 1.234,56") → 1234.56
+    """
+    if not value_str:
+        return 0.0
+    
+    # Limpar string
+    value_str = str(value_str).strip().replace(' ', '').replace('R$', '')
+    
+    if not value_str:
+        return 0.0
+    
+    # Detectar formato: se tem vírgula E ponto, é formato BR (1.234,56)
+    if ',' in value_str and '.' in value_str:
+        # Formato BR: remover pontos (separador de milhares), trocar vírgula por ponto
+        value_str = value_str.replace('.', '').replace(',', '.')
+    elif ',' in value_str:
+        # Só tem vírgula: trocar por ponto (2500,50 → 2500.50)
+        value_str = value_str.replace(',', '.')
+    # Se só tem ponto, já está no formato correto (2500.50)
+    
+    try:
+        return float(value_str)
+    except ValueError:
+        print(f"ERRO parse_currency: não consegui converter '{value_str}'")
+        return 0.0
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -196,17 +233,20 @@ def nova():
 @login_required
 @admin_required
 def criar():
-    """Criar nova proposta com proteção idempotente"""
+    """Criar nova proposta COM processamento de itens"""
     try:
         admin_id = get_admin_id()
         
-        # Dados do formulário
+        # Dados básicos do formulário
         cliente_nome = request.form.get('cliente_nome', '').strip()
         cliente_email = request.form.get('cliente_email', '').strip()
+        cliente_telefone = request.form.get('cliente_telefone', '').strip()
+        cliente_documento = request.form.get('cliente_cpf_cnpj', request.form.get('cliente_documento', '')).strip()
+        cliente_endereco = request.form.get('cliente_endereco', '').strip()
+        
         # Aceitar 'assunto' ou 'titulo' (compatibilidade)
         titulo = request.form.get('assunto', request.form.get('titulo', '')).strip()
         descricao = request.form.get('objeto', request.form.get('descricao', '')).strip()
-        valor_total = request.form.get('valor_total', '0').replace(',', '.')
         
         # Validações básicas
         if not cliente_nome:
@@ -214,48 +254,129 @@ def criar():
             return redirect(url_for('propostas.nova'))
         
         if not titulo:
-            flash('Assunto da proposta é obrigatório', 'error')
-            return redirect(url_for('propostas.nova'))
-        
-        try:
-            valor_total = float(valor_total)
-        except ValueError:
-            flash('Valor total deve ser um número válido', 'error')
+            flash('Assunto/Título da proposta é obrigatório', 'error')
             return redirect(url_for('propostas.nova'))
         
         # Gerar número da proposta
-        ano_atual = datetime.now().year
-        last_numero = safe_db_operation(
-            lambda: Proposta.query.filter_by(admin_id=admin_id).count(),
-            0
-        )
-        numero_proposta = f"PROP-{ano_atual}-{(last_numero + 1):04d}"
+        numero_proposta_input = request.form.get('numero_proposta', '').strip()
+        if numero_proposta_input:
+            numero_proposta = numero_proposta_input
+        else:
+            ano_atual = datetime.now().year
+            last_numero = safe_db_operation(
+                lambda: Proposta.query.filter_by(admin_id=admin_id).count(),
+                0
+            )
+            numero_proposta = f"PROP-{ano_atual}-{(last_numero + 1):04d}"
         
-        # Criar proposta
-        proposta = Proposta(
-            numero=numero_proposta,
-            titulo=titulo,
-            descricao=descricao,
-            cliente_nome=cliente_nome,
-            cliente_email=cliente_email,
-            valor_total=valor_total,
-            status='rascunho',
-            admin_id=admin_id,
-            criado_por=current_user.id,
-            criado_em=datetime.now()
-        )
+        # ===== PROCESSAR ITENS DA PROPOSTA (mesma lógica do /editar) =====
+        item_descricoes = request.form.getlist('item_descricao')
+        item_quantidades = request.form.getlist('item_quantidade')
+        item_unidades = request.form.getlist('item_unidade')
+        item_precos = request.form.getlist('item_preco')
+        
+        # Calcular valor total baseado nos itens
+        valor_total_calculado = 0
+        itens_validos = []
+        
+        for i in range(len(item_descricoes)):
+            descricao_item = item_descricoes[i].strip()
+            if not descricao_item:
+                continue
+            
+            try:
+                # Usar parser robusto de moeda BR
+                quantidade = parse_currency(item_quantidades[i])
+                preco_unitario = parse_currency(item_precos[i])
+                unidade = item_unidades[i]
+                
+                itens_validos.append({
+                    'descricao': descricao_item,
+                    'quantidade': quantidade,
+                    'unidade': unidade,
+                    'preco_unitario': preco_unitario
+                })
+                
+                valor_total_calculado += quantidade * preco_unitario
+            except (ValueError, IndexError) as e:
+                print(f"ERRO ao processar item {i}: {e}")
+                continue
+        
+        print(f"DEBUG CRIAR: {len(itens_validos)} itens válidos, total: R$ {valor_total_calculado:,.2f}")
+        
+        # Criar proposta (usando apenas campos que existem no modelo)
+        proposta = Proposta()
+        proposta.numero = numero_proposta
+        proposta.titulo = titulo
+        proposta.descricao = descricao
+        proposta.cliente_nome = cliente_nome
+        proposta.cliente_email = cliente_email
+        proposta.cliente_telefone = cliente_telefone
+        proposta.cliente_endereco = cliente_endereco
+        proposta.valor_total = valor_total_calculado
+        proposta.status = 'rascunho'
+        proposta.admin_id = admin_id
+        proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
+        proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
+        
+        # Condições e observações
+        if request.form.get('condicoes_pagamento'):
+            proposta.condicoes_pagamento = request.form.get('condicoes_pagamento')
+        if request.form.get('garantias'):
+            proposta.garantias = request.form.get('garantias')
+        if request.form.get('consideracoes_gerais'):
+            proposta.consideracoes_gerais = request.form.get('consideracoes_gerais')
+        
+        # Processar itens inclusos/exclusos
+        itens_inclusos_raw = request.form.get('itens_inclusos', '')
+        if itens_inclusos_raw:
+            proposta.itens_inclusos = itens_inclusos_raw.replace(';', '\n').strip()
+        
+        itens_exclusos_raw = request.form.get('itens_exclusos', '')
+        if itens_exclusos_raw:
+            proposta.itens_exclusos = itens_exclusos_raw.replace(';', '\n').strip()
         
         db.session.add(proposta)
+        db.session.flush()  # Obter ID da proposta antes de criar itens
+        
+        # Criar itens da proposta
+        for idx, item_data in enumerate(itens_validos):
+            item = PropostaItem(
+                admin_id=admin_id,
+                proposta_id=proposta.id,
+                item_numero=idx + 1,
+                descricao=item_data['descricao'],
+                quantidade=item_data['quantidade'],
+                unidade=item_data['unidade'],
+                preco_unitario=item_data['preco_unitario'],
+                ordem=idx + 1
+            )
+            db.session.add(item)
+            print(f"  ✓ Item {idx+1} criado: {item_data['descricao'][:30]}...")
+        
+        # Registrar no histórico
+        historico = PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao='criada',
+            observacao=f'Proposta criada por {current_user.username} com {len(itens_validos)} itens',
+            admin_id=admin_id
+        )
+        db.session.add(historico)
+        
+        # Commit transacional único
         db.session.commit()
         
-        print(f"DEBUG PROPOSTA CRIADA: {numero_proposta} - R$ {valor_total}")
-        flash(f'Proposta {numero_proposta} criada com sucesso!', 'success')
+        print(f"DEBUG PROPOSTA CRIADA: {numero_proposta} com {len(itens_validos)} itens - R$ {valor_total_calculado:,.2f}")
+        flash(f'Proposta {numero_proposta} criada com sucesso! {len(itens_validos)} itens salvos.', 'success')
         
         return redirect(url_for('propostas.visualizar', id=proposta.id))
         
     except Exception as e:
         db.session.rollback()
         print(f"ERRO CRIAR PROPOSTA: {str(e)}")
+        import traceback
+        traceback.print_exc()
         flash(f'Erro ao criar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.nova'))
 
@@ -491,33 +612,103 @@ def editar(id):
 @login_required
 @admin_required
 def atualizar(id):
-    """Atualiza proposta existente"""
+    """Atualiza proposta existente COM processamento de itens"""
     try:
         admin_id = get_admin_id()
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         
-        # Atualizar campos (usar .numero, .titulo, .descricao - campos renomeados!)
+        # Atualizar campos básicos da proposta
         proposta.numero = request.form.get('numero')
         proposta.titulo = request.form.get('titulo')
         proposta.descricao = request.form.get('descricao')
         proposta.cliente_nome = request.form.get('cliente_nome')
         proposta.cliente_email = request.form.get('cliente_email')
+        proposta.cliente_telefone = request.form.get('cliente_telefone')
+        proposta.cliente_endereco = request.form.get('cliente_endereco')
+        proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
+        proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
+        proposta.condicoes_pagamento = request.form.get('condicoes_pagamento')
+        proposta.garantias = request.form.get('garantias')
         
-        # Parsing seguro de valor_total
-        valor_total_str = request.form.get('valor_total', '0').strip()
-        if valor_total_str:
-            proposta.valor_total = float(valor_total_str.replace(',', '.'))
-        else:
-            proposta.valor_total = 0.0
+        # Processar itens inclusos/exclusos
+        itens_inclusos_raw = request.form.get('itens_inclusos', '')
+        if itens_inclusos_raw:
+            proposta.itens_inclusos = itens_inclusos_raw.replace(';', '\n').strip()
+        
+        itens_exclusos_raw = request.form.get('itens_exclusos', '')
+        if itens_exclusos_raw:
+            proposta.itens_exclusos = itens_exclusos_raw.replace(';', '\n').strip()
+        
+        proposta.consideracoes_gerais = request.form.get('consideracoes_gerais', proposta.consideracoes_gerais)
+        
+        # ===== PROCESSAR ITENS DA PROPOSTA =====
+        # Coletar dados dos itens do formulário
+        item_ids = request.form.getlist('item_id')
+        item_descricoes = request.form.getlist('item_descricao')
+        item_quantidades = request.form.getlist('item_quantidade')
+        item_unidades = request.form.getlist('item_unidade')
+        item_precos = request.form.getlist('item_preco')
+        
+        print(f"DEBUG ATUALIZAR: Proposta {proposta.numero}")
+        print(f"DEBUG ITENS: {len(item_descricoes)} itens no formulário")
+        
+        # Deletar itens antigos que foram removidos
+        ids_formulario = [int(item_id) for item_id in item_ids if item_id]
+        PropostaItem.query.filter(
+            PropostaItem.proposta_id == proposta.id,
+            ~PropostaItem.id.in_(ids_formulario) if ids_formulario else True
+        ).delete(synchronize_session=False)
+        
+        # Atualizar/criar itens
+        valor_total_calculado = 0
+        for i in range(len(item_descricoes)):
+            descricao = item_descricoes[i].strip()
+            if not descricao:
+                continue
             
-        proposta.status = request.form.get('status', proposta.status)
+            # Usar parser robusto de moeda BR
+            quantidade = parse_currency(item_quantidades[i])
+            unidade = item_unidades[i]
+            preco_unitario = parse_currency(item_precos[i])
+            
+            # Verificar se é item existente ou novo
+            if i < len(item_ids) and item_ids[i]:
+                # Atualizar item existente
+                item = PropostaItem.query.get(int(item_ids[i]))
+                if item and item.proposta_id == proposta.id:
+                    item.descricao = descricao
+                    item.quantidade = quantidade
+                    item.unidade = unidade
+                    item.preco_unitario = preco_unitario
+                    item.item_numero = i + 1
+                    print(f"  ✓ Item {i+1} atualizado: {descricao[:30]}...")
+            else:
+                # Criar novo item
+                novo_item = PropostaItem(
+                    admin_id=admin_id,
+                    proposta_id=proposta.id,
+                    item_numero=i + 1,
+                    descricao=descricao,
+                    quantidade=quantidade,
+                    unidade=unidade,
+                    preco_unitario=preco_unitario,
+                    ordem=i + 1
+                )
+                db.session.add(novo_item)
+                print(f"  ✓ Item {i+1} criado: {descricao[:30]}...")
+            
+            valor_total_calculado += quantidade * preco_unitario
+        
+        # Atualizar valor_total da proposta
+        proposta.valor_total = valor_total_calculado
+        print(f"DEBUG: Valor total calculado: R$ {valor_total_calculado:,.2f}")
         
         # Registrar no histórico
         historico = PropostaHistorico(
             proposta_id=proposta.id,
             usuario_id=current_user.id,
             acao='editada',
-            observacao=f'Proposta editada por {current_user.username}',
+            observacao=f'Proposta editada por {current_user.username} - {len(item_descricoes)} itens processados',
             admin_id=admin_id
         )
         db.session.add(historico)
@@ -525,14 +716,16 @@ def atualizar(id):
         # Commit transacional único (tudo ou nada)
         db.session.commit()
         
-        print(f"DEBUG ATUALIZAR: Proposta {proposta.numero} atualizada com sucesso")
-        flash('Proposta atualizada com sucesso!', 'success')
+        print(f"DEBUG ATUALIZAR: Proposta {proposta.numero} atualizada com {len(item_descricoes)} itens")
+        flash(f'Proposta atualizada com sucesso! {len(item_descricoes)} itens salvos.', 'success')
         
         return redirect(url_for('propostas.visualizar', id=proposta.id))
         
     except Exception as e:
         db.session.rollback()
         print(f"ERRO ATUALIZAR PROPOSTA: {str(e)}")
+        import traceback
+        traceback.print_exc()
         flash(f'Erro ao atualizar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.editar', id=id))
 
