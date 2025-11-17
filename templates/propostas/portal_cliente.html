@@ -532,7 +532,7 @@
                             </tbody>
                             <tfoot class="table-info">
                                 <tr class="fw-bold">
-                                    <td colspan="5" class="text-end fs-6 py-2">SUBTOTAL {{ template_info.template_nome }}:</td>
+                                    <td colspan="5" class="text-end fs-6 py-2">SUBTOTAL:</td>
                                     <td class="text-end fs-6 py-2">R$ {{ "{:,.2f}".format(template_info.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                                 </tr>
                             </tfoot>
@@ -567,7 +567,7 @@
                         
                         <!-- Subtotal Mobile -->
                         <div class="mobile-total-card" style="background: #d1ecf1; border: 1px solid #bee5eb;">
-                            <div style="font-size: 0.95rem; font-weight: 600; margin-bottom: 4px;">SUBTOTAL {{ template_info.template_nome }}</div>
+                            <div style="font-size: 0.95rem; font-weight: 600; margin-bottom: 4px;">SUBTOTAL</div>
                             <div style="font-size: 1.4rem; font-weight: 700; color: #0c5460;">
                                 R$ {{ "{:,.2f}".format(template_info.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}
                             </div>

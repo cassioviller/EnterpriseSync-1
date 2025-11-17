@@ -449,11 +449,6 @@
                             </thead>
                             <tbody>
                                 {% for categoria_nome, itens_categoria in template_info.categorias %}
-                                    {% if categoria_nome and categoria_nome != 'Serviços' %}
-                                    <tr style="background-color: #e9ecef;">
-                                        <td colspan="6" style="font-weight: bold; padding: 8px;">{{ categoria_nome.upper() }}</td>
-                                    </tr>
-                                    {% endif %}
                                     {% for item in itens_categoria %}
                                     <tr>
                                         <td>{{ item.item_numero }}</td>
@@ -467,7 +462,7 @@
                                 {% endfor %}
                                 <!-- Subtotal do Template -->
                                 <tr style="background-color: #d1ecf1; font-weight: bold;">
-                                    <td colspan="5" style="text-align: right; padding: 10px;">SUBTOTAL {{ template_info.template_nome.upper() }}:</td>
+                                    <td colspan="5" style="text-align: right; padding: 10px;">SUBTOTAL:</td>
                                     <td style="text-align: right; padding: 10px;">R$ {{ "%.2f"|format(template_info.subtotal) }}</td>
                                 </tr>
                             </tbody>
