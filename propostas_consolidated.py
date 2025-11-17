@@ -668,6 +668,32 @@ def portal_cliente(token):
         None
     )
     
+    # Organizar itens por categoria (mesma lógica do PDF)
+    if hasattr(proposta, 'itens') and proposta.itens:
+        itens_organizados = []
+        categorias = {}
+        
+        for item in proposta.itens:
+            categoria = getattr(item, 'categoria_titulo', 'Serviços')
+            if categoria not in categorias:
+                categorias[categoria] = []
+            categorias[categoria].append(item)
+        
+        for categoria, itens_categoria in categorias.items():
+            itens_organizados.append((categoria, itens_categoria))
+        
+        proposta.itens_organizados = itens_organizados
+    else:
+        proposta.itens_organizados = []
+    
+    # Calcular total geral
+    total_geral = 0
+    if proposta.itens:
+        total_geral = sum(item.quantidade * item.preco_unitario for item in proposta.itens)
+    
+    if proposta.valor_total and proposta.valor_total > total_geral:
+        total_geral = proposta.valor_total
+    
     cores_empresa = {
         'primaria': config_empresa.cor_primaria if config_empresa and config_empresa.cor_primaria else '#007bff',
         'secundaria': config_empresa.cor_secundaria if config_empresa and config_empresa.cor_secundaria else '#6c757d',
@@ -677,7 +703,8 @@ def portal_cliente(token):
     return render_template('propostas/portal_cliente.html', 
                          proposta=proposta, 
                          config_empresa=config_empresa,
-                         empresa_cores=cores_empresa)
+                         empresa_cores=cores_empresa,
+                         total_geral=total_geral)
 
 @propostas_bp.route('/cliente/<token>/aprovar', methods=['POST'])
 def aprovar_proposta_cliente(token):

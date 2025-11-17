@@ -2,6 +2,12 @@
 SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management system for SMBs, designed to automate and streamline core operations. It covers commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations.
 
 ## Recent Changes (November 2025)
+**v9.0.2 - Proposal Items Rendering Fix (Critical)**
+- Fixed critical bug: Items table not rendering in client portal and PDF
+- Added item organization logic to `portal_cliente()` function (was missing)
+- Both portal and PDF now correctly display all proposal items with totals
+- Validated with 12-item proposal showing R$ 48.500,00 correctly
+
 **v9.0.1 - Proposal Portal Visibility & Copy Button Fix**
 - Fixed portal link visibility: Card now appears immediately upon proposal creation (even for drafts)
 - Added contextual warning banner for draft proposals to set client expectations
