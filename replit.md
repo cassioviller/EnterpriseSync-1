@@ -2,6 +2,13 @@
 SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management system for SMBs, designed to automate and streamline core operations. It covers commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations.
 
 ## Recent Changes (November 2025)
+**v9.0.3 - Total Calculation & Rendering Overhaul (Critical)**
+- Fixed total_geral calculation logic: now prioritizes manual valor_total over calculated sum
+- Updated all templates (portal and PDF) to use total_geral instead of proposta.valor_total
+- Fixed strftime None-type error in template listing with defensive rendering
+- Allows proposals to have manual totals (discounts/adjustments) different from item sums
+- Validated: Proposta with 12 items (R$ 120.700 calculated) correctly shows R$ 48.500 manual total
+
 **v9.0.2 - Proposal Items Rendering Fix (Critical)**
 - Fixed critical bug: Items table not rendering in client portal and PDF
 - Added item organization logic to `portal_cliente()` function (was missing)

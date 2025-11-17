@@ -103,7 +103,11 @@
 
                     <div class="d-flex justify-content-between align-items-center">
                         <small class="text-muted">
+                            {% if template.criado_em %}
                             Criado em {{ template.criado_em.strftime('%d/%m/%Y') }}
+                            {% else %}
+                            Criado recentemente
+                            {% endif %}
                         </small>
                         {% if template.publico %}
                         <i class="fas fa-globe text-info" title="Template público"></i>

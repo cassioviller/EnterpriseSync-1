@@ -380,12 +380,13 @@ def gerar_pdf(id):
             proposta.itens_organizados = []
             print("DEBUG PDF: Nenhum item encontrado na proposta")
         
-        total_geral = 0
-        if proposta.itens:
-            total_geral = sum(item.quantidade * item.preco_unitario for item in proposta.itens)
-        
-        if proposta.valor_total and proposta.valor_total > total_geral:
+        # Calcular total geral: priorizar valor_total da proposta (manual), senão calcular dos itens
+        if proposta.valor_total:
             total_geral = proposta.valor_total
+        elif proposta.itens:
+            total_geral = sum(item.quantidade * item.preco_unitario for item in proposta.itens)
+        else:
+            total_geral = 0
         
         print(f"DEBUG PDF: Total calculado dos itens: {total_geral}")
         print(f"DEBUG PDF: Valor total da proposta: {proposta.valor_total}")
@@ -686,13 +687,13 @@ def portal_cliente(token):
     else:
         proposta.itens_organizados = []
     
-    # Calcular total geral
-    total_geral = 0
-    if proposta.itens:
-        total_geral = sum(item.quantidade * item.preco_unitario for item in proposta.itens)
-    
-    if proposta.valor_total and proposta.valor_total > total_geral:
+    # Calcular total geral: priorizar valor_total da proposta (manual), senão calcular dos itens
+    if proposta.valor_total:
         total_geral = proposta.valor_total
+    elif proposta.itens:
+        total_geral = sum(item.quantidade * item.preco_unitario for item in proposta.itens)
+    else:
+        total_geral = 0
     
     cores_empresa = {
         'primaria': config_empresa.cor_primaria if config_empresa and config_empresa.cor_primaria else '#007bff',

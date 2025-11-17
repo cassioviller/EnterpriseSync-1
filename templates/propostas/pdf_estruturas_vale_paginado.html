@@ -461,7 +461,7 @@
                     {% endfor %}
                     
                     <div style="text-align: right; margin-top: 20px; font-weight: bold; font-size: 12pt;">
-                        VALOR TOTAL: R$ {{ "%.2f"|format(proposta.valor_total) }}
+                        VALOR TOTAL: R$ {{ "%.2f"|format(total_geral) }}
                     </div>
                 {% else %}
                     <!-- Formato tradicional simples -->
@@ -491,7 +491,7 @@
                             {% endfor %}
                             <tr class="total-row">
                                 <td colspan="5" style="text-align: right;"><strong>VALOR TOTAL</strong></td>
-                                <td style="text-align: right;"><strong>R$ {{ "%.2f"|format(proposta.valor_total) }}</strong></td>
+                                <td style="text-align: right;"><strong>R$ {{ "%.2f"|format(total_geral) }}</strong></td>
                             </tr>
                         </tbody>
                     </table>
