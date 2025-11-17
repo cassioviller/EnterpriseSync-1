@@ -2,6 +2,16 @@
 SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management system for SMBs, designed to automate and streamline core operations. It covers commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations.
 
 ## Recent Changes (November 2025)
+**v9.2.0 - Multi-Template Organization System (CRITICAL)**
+- **FEATURE**: Proposals with multiple templates now render as separate tables with individual subtotals
+- New `organizar_itens_por_template()` function groups items by `template_origem_nome` → then by `categoria_titulo`
+- Each template displays: Title (template name) → Items table → Subtotal
+- Total geral appears after all templates in highlighted section
+- Updated both portal do cliente and PDF templates to support multi-template rendering
+- Backward compatible: Single-template proposals continue to work normally
+- **Structure**: `templates_organizados = [{template_nome, categorias: [(cat, items)], subtotal}]`
+- **Impact**: Users can now combine multiple service types (e.g., "Escada Metálica" + "Portão Automático") in one proposal with clear organization
+
 **v9.1.0 - Proposal Items CRUD System (CRITICAL)**
 - **BREAKTHROUGH**: Implemented complete CRUD workflow for proposal items (PropostaItem)
 - Added item processing to POST `/criar` route: creates items + calculates valor_total automatically
