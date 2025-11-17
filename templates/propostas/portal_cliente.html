@@ -492,73 +492,101 @@
             </div>
         </div>
 
-        <!-- Tabela de Serviços -->
-        <div class="proposal-card">
-            <h4 class="section-title">Tabela de Serviços - {{ proposta.titulo }}</h4>
-            <div class="service-table">
-                <!-- Layout Desktop (Tabela) -->
-                <div class="table-responsive d-none d-md-block">
-                    <table class="table table-hover table-sm">
-                        <thead class="table-primary">
-                            <tr>
-                                <th style="width: 40px; text-align: center;">Item</th>
-                                <th style="min-width: 120px;">Descrição</th>
-                                <th style="width: 60px; text-align: center;">Qtd</th>
-                                <th style="width: 50px; text-align: center;">Un.</th>
-                                <th style="width: 80px; text-align: right;">Preço Unit.</th>
-                                <th style="width: 90px; text-align: right;">Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in proposta.itens %}
-                            <tr>
-                                <td class="text-center fw-bold">{{ item.item_numero }}</td>
-                                <td style="word-break: break-word;">{{ item.descricao }}</td>
-                                <td class="text-center">{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                                <td class="text-center">{{ item.unidade }}</td>
-                                <td class="text-end">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                                <td class="text-end fw-bold text-success">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        <tfoot class="table-success">
-                            <tr class="fw-bold">
-                                <td colspan="5" class="text-end fs-6 py-3">VALOR TOTAL:</td>
-                                <td class="text-end fs-5 py-3">R$ {{ "{:,.2f}".format(total_geral or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-
-                <!-- Layout Mobile (Cards) -->
-                <div class="d-block d-md-none">
-                    {% for item in proposta.itens %}
-                    <div class="mobile-service-item">
-                        <div class="mobile-service-header">
-                            <div class="mobile-service-title">
-                                {{ item.item_numero }}. {{ item.descricao }}
-                            </div>
-                            <div class="mobile-service-price">
-                                R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}
-                            </div>
-                        </div>
-                        <div class="mobile-service-details">
-                            <span>{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }} {{ item.unidade }}</span>
-                            <span>R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}/{{ item.unidade }}</span>
-                        </div>
+        <!-- Tabelas de Serviços por Template -->
+        {% if proposta.templates_organizados %}
+            {% for template_info in proposta.templates_organizados %}
+            <div class="proposal-card">
+                <h4 class="section-title">{{ template_info.template_nome }}</h4>
+                <div class="service-table">
+                    <!-- Layout Desktop (Tabela) -->
+                    <div class="table-responsive d-none d-md-block">
+                        <table class="table table-hover table-sm">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th style="width: 40px; text-align: center;">Item</th>
+                                    <th style="min-width: 120px;">Descrição</th>
+                                    <th style="width: 60px; text-align: center;">Qtd</th>
+                                    <th style="width: 50px; text-align: center;">Un.</th>
+                                    <th style="width: 80px; text-align: right;">Preço Unit.</th>
+                                    <th style="width: 90px; text-align: right;">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for categoria, itens_categoria in template_info.categorias %}
+                                    {% if categoria and categoria != 'Serviços' %}
+                                    <tr class="table-secondary">
+                                        <td colspan="6" class="fw-bold">{{ categoria }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for item in itens_categoria %}
+                                    <tr>
+                                        <td class="text-center fw-bold">{{ item.item_numero }}</td>
+                                        <td style="word-break: break-word;">{{ item.descricao }}</td>
+                                        <td class="text-center">{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                        <td class="text-center">{{ item.unidade }}</td>
+                                        <td class="text-end">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                        <td class="text-end fw-bold text-success">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-info">
+                                <tr class="fw-bold">
+                                    <td colspan="5" class="text-end fs-6 py-2">SUBTOTAL {{ template_info.template_nome }}:</td>
+                                    <td class="text-end fs-6 py-2">R$ {{ "{:,.2f}".format(template_info.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
-                    {% endfor %}
-                    
-                    <!-- Total Mobile -->
-                    <div class="mobile-total-card">
-                        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 4px;">VALOR TOTAL</div>
-                        <div style="font-size: 1.8rem; font-weight: 900;">
-                            R$ {{ "{:,.2f}".format(total_geral or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+
+                    <!-- Layout Mobile (Cards) -->
+                    <div class="d-block d-md-none">
+                        {% for categoria, itens_categoria in template_info.categorias %}
+                            {% if categoria and categoria != 'Serviços' %}
+                            <div class="mobile-category-header" style="background: #e9ecef; padding: 8px 12px; margin: 12px 0 8px 0; border-radius: 6px; font-weight: 600; color: #495057;">
+                                {{ categoria }}
+                            </div>
+                            {% endif %}
+                            {% for item in itens_categoria %}
+                            <div class="mobile-service-item">
+                                <div class="mobile-service-header">
+                                    <div class="mobile-service-title">
+                                        {{ item.item_numero }}. {{ item.descricao }}
+                                    </div>
+                                    <div class="mobile-service-price">
+                                        R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                    </div>
+                                </div>
+                                <div class="mobile-service-details">
+                                    <span>{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }} {{ item.unidade }}</span>
+                                    <span>R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}/{{ item.unidade }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% endfor %}
+                        
+                        <!-- Subtotal Mobile -->
+                        <div class="mobile-total-card" style="background: #d1ecf1; border: 1px solid #bee5eb;">
+                            <div style="font-size: 0.95rem; font-weight: 600; margin-bottom: 4px;">SUBTOTAL {{ template_info.template_nome }}</div>
+                            <div style="font-size: 1.4rem; font-weight: 700; color: #0c5460;">
+                                R$ {{ "{:,.2f}".format(template_info.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+            {% endfor %}
+            
+            <!-- Total Geral -->
+            <div class="proposal-card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white;">
+                <div class="text-center py-3">
+                    <h3 class="mb-2" style="font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Valor Total da Proposta</h3>
+                    <div style="font-size: 3rem; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+                        R$ {{ "{:,.2f}".format(total_geral or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
 
         <!-- Condições -->
         <div class="proposal-card">
