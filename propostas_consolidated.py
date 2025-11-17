@@ -65,6 +65,59 @@ ALLOWED_EXTENSIONS = {'pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg', 'gif', 'doc', '
 
 # ===== HELPER FUNCTIONS =====
 
+def organizar_itens_por_template(itens):
+    """
+    Organiza itens por template e categoria com subtotais
+    
+    Returns:
+        List[Dict]: Lista de templates organizados com categorias e subtotais
+        [
+            {
+                'template_nome': 'Nome do Template',
+                'categorias': [('Categoria 1', [item1, item2]), ('Categoria 2', [item3])],
+                'subtotal': Decimal('5000.00')
+            },
+            ...
+        ]
+    """
+    if not itens:
+        return []
+    
+    # Agrupar por template primeiro
+    templates = {}
+    for item in itens:
+        template_nome = getattr(item, 'template_origem_nome', None) or 'Serviços Gerais'
+        if template_nome not in templates:
+            templates[template_nome] = []
+        templates[template_nome].append(item)
+    
+    # Para cada template, organizar por categoria
+    templates_organizados = []
+    for template_nome, itens_template in templates.items():
+        categorias = {}
+        subtotal_template = Decimal('0.00')
+        
+        for item in itens_template:
+            categoria = getattr(item, 'categoria_titulo', 'Serviços')
+            if categoria not in categorias:
+                categorias[categoria] = []
+            categorias[categoria].append(item)
+            
+            # Calcular subtotal do item
+            item_total = Decimal(str(item.quantidade)) * Decimal(str(item.preco_unitario))
+            subtotal_template += item_total
+        
+        # Converter para lista de tuplas (categoria, itens)
+        categorias_lista = [(cat, itens_cat) for cat, itens_cat in categorias.items()]
+        
+        templates_organizados.append({
+            'template_nome': template_nome,
+            'categorias': categorias_lista,
+            'subtotal': subtotal_template
+        })
+    
+    return templates_organizados
+
 def parse_currency(value_str):
     """
     Converte string de moeda brasileira para float
@@ -482,23 +535,15 @@ def gerar_pdf(id):
         if hasattr(proposta, 'template_id') and proposta.template_id:
             template_proposta = PropostaTemplate.query.get(proposta.template_id)
         
+        # Organizar itens por template e categoria
         if hasattr(proposta, 'itens') and proposta.itens:
-            itens_organizados = []
-            categorias = {}
-            
-            for item in proposta.itens:
-                categoria = getattr(item, 'categoria_titulo', 'Serviços')
-                if categoria not in categorias:
-                    categorias[categoria] = []
-                categorias[categoria].append(item)
-            
-            for categoria, itens_categoria in categorias.items():
-                itens_organizados.append((categoria, itens_categoria))
-            
-            proposta.itens_organizados = itens_organizados
-            print(f"DEBUG PDF: {len(proposta.itens)} itens organizados em {len(itens_organizados)} categorias")
+            templates_organizados = organizar_itens_por_template(proposta.itens)
+            proposta.templates_organizados = templates_organizados
+            print(f"DEBUG PDF: {len(proposta.itens)} itens organizados em {len(templates_organizados)} templates")
+            for template_info in templates_organizados:
+                print(f"  - Template: {template_info['template_nome']}, Subtotal: R$ {template_info['subtotal']}")
         else:
-            proposta.itens_organizados = []
+            proposta.templates_organizados = []
             print("DEBUG PDF: Nenhum item encontrado na proposta")
         
         # Calcular total geral: priorizar valor_total da proposta (manual), senão calcular dos itens
@@ -862,23 +907,12 @@ def portal_cliente(token):
         None
     )
     
-    # Organizar itens por categoria (mesma lógica do PDF)
+    # Organizar itens por template e categoria
     if hasattr(proposta, 'itens') and proposta.itens:
-        itens_organizados = []
-        categorias = {}
-        
-        for item in proposta.itens:
-            categoria = getattr(item, 'categoria_titulo', 'Serviços')
-            if categoria not in categorias:
-                categorias[categoria] = []
-            categorias[categoria].append(item)
-        
-        for categoria, itens_categoria in categorias.items():
-            itens_organizados.append((categoria, itens_categoria))
-        
-        proposta.itens_organizados = itens_organizados
+        templates_organizados = organizar_itens_por_template(proposta.itens)
+        proposta.templates_organizados = templates_organizados
     else:
-        proposta.itens_organizados = []
+        proposta.templates_organizados = []
     
     # Calcular total geral: priorizar valor_total da proposta (manual), senão calcular dos itens
     if proposta.valor_total:
