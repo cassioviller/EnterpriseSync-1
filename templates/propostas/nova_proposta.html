@@ -544,6 +544,9 @@ function criarTabelaTemplate(template) {
                                value="${item.descricao}" 
                                onchange="atualizarItemTemplate(${template.id}, ${index}, 'descricao', this.value)"
                                placeholder="Descrição do serviço">
+                        <input type="hidden" name="item_template_nome" value="${template.nome || ''}">
+                        <input type="hidden" name="item_template_id" value="${template.id || ''}">
+                        <input type="hidden" name="item_categoria" value="${template.categoria || ''}">
                     </td>
                     <td class="text-center">
                         <input type="number" 
@@ -731,6 +734,9 @@ function adicionarItemTemplate(templateId) {
                        value="${novoItem.descricao}" 
                        onchange="atualizarItemTemplate(${templateId}, ${novoIndex}, 'descricao', this.value)"
                        placeholder="Descrição do serviço">
+                <input type="hidden" name="item_template_nome" value="${template.nome || ''}">
+                <input type="hidden" name="item_template_id" value="${template.id || ''}">
+                <input type="hidden" name="item_categoria" value="${template.categoria || ''}">
             </td>
             <td class="text-center">
                 <input type="number" 

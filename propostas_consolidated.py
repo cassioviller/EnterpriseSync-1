@@ -392,8 +392,26 @@ def criar():
         db.session.add(proposta)
         db.session.flush()  # Obter ID da proposta antes de criar itens
         
+        # Ler dados adicionais dos templates
+        templates_nomes = request.form.getlist('item_template_nome')
+        templates_ids = request.form.getlist('item_template_id')
+        categorias = request.form.getlist('item_categoria')
+        
         # Criar itens da proposta
         for idx, item_data in enumerate(itens_validos):
+            # Pegar dados do template se disponíveis
+            template_nome = templates_nomes[idx] if idx < len(templates_nomes) and templates_nomes[idx] else None
+            template_id = templates_ids[idx] if idx < len(templates_ids) and templates_ids[idx] else None
+            categoria = categorias[idx] if idx < len(categorias) and categorias[idx] else None
+            
+            # Converter template_id para int se não vazio
+            template_id_int = None
+            if template_id and template_id.strip():
+                try:
+                    template_id_int = int(template_id)
+                except ValueError:
+                    pass
+            
             item = PropostaItem(
                 admin_id=admin_id,
                 proposta_id=proposta.id,
@@ -402,7 +420,10 @@ def criar():
                 quantidade=item_data['quantidade'],
                 unidade=item_data['unidade'],
                 preco_unitario=item_data['preco_unitario'],
-                ordem=idx + 1
+                ordem=idx + 1,
+                template_origem_nome=template_nome,
+                template_origem_id=template_id_int,
+                categoria_titulo=categoria
             )
             db.session.add(item)
             print(f"  ✓ Item {idx+1} criado: {item_data['descricao'][:30]}...")
@@ -716,6 +737,23 @@ def atualizar(id):
             unidade = item_unidades[i]
             preco_unitario = parse_currency(item_precos[i])
             
+            # Pegar dados do template
+            templates_nomes = request.form.getlist('item_template_nome')
+            templates_ids = request.form.getlist('item_template_id')
+            categorias = request.form.getlist('item_categoria')
+            
+            template_nome = templates_nomes[i] if i < len(templates_nomes) and templates_nomes[i] else None
+            template_id = templates_ids[i] if i < len(templates_ids) and templates_ids[i] else None
+            categoria = categorias[i] if i < len(categorias) and categorias[i] else None
+            
+            # Converter template_id para int se não vazio
+            template_id_int = None
+            if template_id and template_id.strip():
+                try:
+                    template_id_int = int(template_id)
+                except ValueError:
+                    pass
+            
             # Verificar se é item existente ou novo
             if i < len(item_ids) and item_ids[i]:
                 # Atualizar item existente
@@ -726,6 +764,9 @@ def atualizar(id):
                     item.unidade = unidade
                     item.preco_unitario = preco_unitario
                     item.item_numero = i + 1
+                    item.template_origem_nome = template_nome
+                    item.template_origem_id = template_id_int
+                    item.categoria_titulo = categoria
                     print(f"  ✓ Item {i+1} atualizado: {descricao[:30]}...")
             else:
                 # Criar novo item
@@ -737,7 +778,10 @@ def atualizar(id):
                     quantidade=quantidade,
                     unidade=unidade,
                     preco_unitario=preco_unitario,
-                    ordem=i + 1
+                    ordem=i + 1,
+                    template_origem_nome=template_nome,
+                    template_origem_id=template_id_int,
+                    categoria_titulo=categoria
                 )
                 db.session.add(novo_item)
                 print(f"  ✓ Item {i+1} criado: {descricao[:30]}...")
