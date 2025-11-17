@@ -684,7 +684,7 @@
                     <h5 class="modal-title"><i class="fas fa-thumbs-up me-2"></i>Aprovar Proposta</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="{{ url_for('propostas.aprovar_proposta', token=proposta.token_cliente) }}">
+                <form method="POST" action="{{ url_for('propostas.aprovar_proposta_cliente', token=proposta.token_cliente) }}">
                     <div class="modal-body">
                         <p>Confirma a aprovação desta proposta?</p>
                         <div class="mb-3">
@@ -708,7 +708,7 @@
                     <h5 class="modal-title"><i class="fas fa-thumbs-down me-2"></i>Rejeitar Proposta</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="{{ url_for('propostas.rejeitar_proposta', token=proposta.token_cliente) }}">
+                <form method="POST" action="{{ url_for('propostas.rejeitar_proposta_cliente', token=proposta.token_cliente) }}">
                     <div class="modal-body">
                         <p>Tem certeza que deseja rejeitar esta proposta?</p>
                         <div class="mb-3">

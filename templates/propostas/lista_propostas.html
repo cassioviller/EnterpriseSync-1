@@ -55,7 +55,7 @@
                                         {{ proposta.status }}
                                     </span>
                                 </td>
-                                <td>{{ proposta.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>{{ proposta.criado_em.strftime('%d/%m/%Y %H:%M') if proposta.criado_em else '-' }}</td>
                                 <td>
                                     {% if proposta.data_envio %}
                                         {{ proposta.data_envio.strftime('%d/%m/%Y %H:%M') }}

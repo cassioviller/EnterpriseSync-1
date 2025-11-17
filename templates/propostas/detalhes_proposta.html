@@ -121,7 +121,7 @@
                             </div>
                             <div class="timeline-content">
                                 <h6 class="mb-1">{{ log.acao.title() }}</h6>
-                                <p class="mb-1">{{ log.criado_em.strftime('%d/%m/%Y %H:%M') }}</p>
+                                <p class="mb-1">{{ log.criado_em.strftime('%d/%m/%Y %H:%M') if log.criado_em else '-' }}</p>
                                 {% if log.observacoes %}
                                 <p class="mb-0 text-muted">{{ log.observacoes }}</p>
                                 {% endif %}
@@ -155,7 +155,9 @@
                     <hr>
                     
                     <p><strong>Valor:</strong><br>R$ {{ "%.2f"|format(proposta.valor_total) }}</p>
+                    {% if proposta.criado_em %}
                     <p><strong>Criada em:</strong><br>{{ proposta.criado_em.strftime('%d/%m/%Y %H:%M') }}</p>
+                    {% endif %}
                     
                     {% if proposta.data_envio %}
                     <p><strong>Enviada em:</strong><br>{{ proposta.data_envio.strftime('%d/%m/%Y %H:%M') }}</p>
