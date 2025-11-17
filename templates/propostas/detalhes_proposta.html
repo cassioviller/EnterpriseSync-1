@@ -171,6 +171,35 @@
                 </div>
             </div>
 
+            <!-- Portal do Cliente -->
+            {% if proposta.status != 'rascunho' and proposta.token_cliente %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-link me-2"></i>Portal do Cliente</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-2">Link para o cliente visualizar e aprovar a proposta:</p>
+                    <div class="input-group">
+                        <input type="text" class="form-control form-control-sm" 
+                               value="{{ url_for('propostas.portal_cliente', token=proposta.token_cliente, _external=True) }}" 
+                               id="linkPortalCliente" readonly>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" onclick="copiarLinkPortal()">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                    </div>
+                    {% if proposta.data_resposta_cliente %}
+                    <div class="mt-3">
+                        <p class="small text-muted mb-1">Resposta do cliente em:</p>
+                        <p class="small mb-1">{{ proposta.data_resposta_cliente.strftime('%d/%m/%Y às %H:%M') }}</p>
+                        {% if proposta.observacoes_cliente %}
+                        <p class="small">{{ proposta.observacoes_cliente }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Credenciais do Cliente -->
             {% if proposta.login_cliente %}
             <div class="card">
@@ -219,4 +248,31 @@
     padding-left: 15px;
 }
 </style>
+
+<script>
+function copiarLinkPortal() {
+    const linkInput = document.getElementById('linkPortalCliente');
+    if (linkInput) {
+        linkInput.select();
+        linkInput.setSelectionRange(0, 99999); // Para mobile
+        
+        navigator.clipboard.writeText(linkInput.value).then(() => {
+            // Feedback visual
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+            btn.classList.add('btn-success');
+            btn.classList.remove('btn-outline-secondary');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-secondary');
+            }, 2000);
+        }).catch(err => {
+            alert('Erro ao copiar link: ' + err);
+        });
+    }
+}
+</script>
 {% endblock %}

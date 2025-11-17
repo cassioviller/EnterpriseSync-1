@@ -299,15 +299,8 @@ def visualizar(id):
 @propostas_bp.route('/<int:id>/pdf')
 @login_required
 @admin_required
-@circuit_breaker(
-    name="proposta_pdf_generation",
-    failure_threshold=3,
-    recovery_timeout=120,
-    expected_exception=(Exception,),
-    fallback=lambda *args, **kwargs: redirect(url_for('propostas.visualizar', id=args[0] if args else 1))
-)
 def gerar_pdf(id):
-    """Gerar PDF da proposta com circuit breaker"""
+    """Gera PDF completo da proposta com template HTML paginado"""
     try:
         admin_id = get_admin_id()
         
@@ -315,53 +308,103 @@ def gerar_pdf(id):
             id=id, admin_id=admin_id
         ).first_or_404()
         
-        # Buscar configuração da empresa
-        config = safe_db_operation(
+        print(f"DEBUG PDF: Proposta {proposta.numero}")
+        print(f"DEBUG PDF: Cliente: {proposta.cliente_nome}")
+        print(f"DEBUG PDF: Valor total: {proposta.valor_total}")
+        print(f"DEBUG PDF: Número de itens: {len(proposta.itens) if proposta.itens else 0}")
+        
+        config_empresa = safe_db_operation(
             lambda: ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first(),
             None
         )
         
-        # Gerar PDF (implementação simplificada por ora)
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet
+        if hasattr(proposta, 'itens_inclusos') and proposta.itens_inclusos:
+            if isinstance(proposta.itens_inclusos, str):
+                try:
+                    itens_list = json.loads(proposta.itens_inclusos)
+                    if isinstance(itens_list, list):
+                        proposta.itens_inclusos = '\n'.join(itens_list)
+                except json.JSONDecodeError:
+                    pass
+            elif isinstance(proposta.itens_inclusos, list):
+                proposta.itens_inclusos = '\n'.join(proposta.itens_inclusos)
         
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        styles = getSampleStyleSheet()
-        story = []
+        if hasattr(proposta, 'itens_exclusos') and proposta.itens_exclusos:
+            if isinstance(proposta.itens_exclusos, str):
+                try:
+                    itens_list = json.loads(proposta.itens_exclusos)
+                    if isinstance(itens_list, list):
+                        proposta.itens_exclusos = '\n'.join(itens_list)
+                except json.JSONDecodeError:
+                    pass
+            elif isinstance(proposta.itens_exclusos, list):
+                proposta.itens_exclusos = '\n'.join(proposta.itens_exclusos)
         
-        # Cabeçalho
-        if config and config.nome_empresa:
-            story.append(Paragraph(config.nome_empresa, styles['Title']))
-            story.append(Spacer(1, 12))
+        if config_empresa:
+            print(f"DEBUG PDF: Config empresa: {config_empresa.nome_empresa}")
+            print(f"DEBUG PDF: Header PDF presente: {'SIM' if config_empresa.header_pdf_base64 else 'NÃO'}")
+            if config_empresa.header_pdf_base64:
+                print(f"DEBUG PDF: Tamanho header: {len(config_empresa.header_pdf_base64)} chars")
+        else:
+            print("DEBUG PDF: Nenhuma configuração encontrada")
         
-        # Dados da proposta
-        story.append(Paragraph(f"Proposta: {proposta.numero}", styles['Heading1']))
-        story.append(Paragraph(f"Cliente: {proposta.cliente_nome}", styles['Normal']))
-        story.append(Paragraph(f"Título: {proposta.titulo}", styles['Normal']))
-        story.append(Spacer(1, 12))
+        formato = request.args.get('formato', 'estruturas_vale')
         
-        if proposta.descricao:
-            story.append(Paragraph("Descrição:", styles['Heading2']))
-            story.append(Paragraph(proposta.descricao, styles['Normal']))
-            story.append(Spacer(1, 12))
+        if formato == 'estruturas_vale':
+            template_name = 'propostas/pdf_estruturas_vale_paginado.html'
+        else:
+            template_name = 'propostas/pdf.html'
         
-        story.append(Paragraph(f"Valor Total: R$ {proposta.valor_total:,.2f}", styles['Heading2']))
+        print(f"DEBUG PDF: Usando template: {template_name}")
         
-        doc.build(story)
-        buffer.seek(0)
+        template_proposta = None
+        if hasattr(proposta, 'template_id') and proposta.template_id:
+            template_proposta = PropostaTemplate.query.get(proposta.template_id)
         
-        print(f"DEBUG PDF: Proposta {proposta.numero} gerada com sucesso")
+        if hasattr(proposta, 'itens') and proposta.itens:
+            itens_organizados = []
+            categorias = {}
+            
+            for item in proposta.itens:
+                categoria = getattr(item, 'categoria_titulo', 'Serviços')
+                if categoria not in categorias:
+                    categorias[categoria] = []
+                categorias[categoria].append(item)
+            
+            for categoria, itens_categoria in categorias.items():
+                itens_organizados.append((categoria, itens_categoria))
+            
+            proposta.itens_organizados = itens_organizados
+            print(f"DEBUG PDF: {len(proposta.itens)} itens organizados em {len(itens_organizados)} categorias")
+        else:
+            proposta.itens_organizados = []
+            print("DEBUG PDF: Nenhum item encontrado na proposta")
         
-        response = make_response(buffer.getvalue())
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=proposta_{proposta.numero}.pdf'
+        total_geral = 0
+        if proposta.itens:
+            total_geral = sum(item.quantidade * item.preco_unitario for item in proposta.itens)
         
-        return response
+        if proposta.valor_total and proposta.valor_total > total_geral:
+            total_geral = proposta.valor_total
+        
+        print(f"DEBUG PDF: Total calculado dos itens: {total_geral}")
+        print(f"DEBUG PDF: Valor total da proposta: {proposta.valor_total}")
+        print(f"DEBUG PDF: Total geral final: {total_geral}")
+        
+        html_content = render_template(template_name, 
+                                     proposta=proposta, 
+                                     template=template_proposta,
+                                     config=config_empresa,
+                                     config_empresa=config_empresa,
+                                     total_geral=total_geral)
+        
+        print("DEBUG PDF: Template renderizado com sucesso")
+        return html_content
         
     except Exception as e:
-        print(f"ERRO GERAR PDF: {str(e)}")
+        print(f"ERRO PDF: {str(e)}")
+        import traceback
+        traceback.print_exc()
         flash(f'Erro ao gerar PDF: {str(e)}', 'error')
         return redirect(url_for('propostas.visualizar', id=id))
 
@@ -599,6 +642,82 @@ def rejeitar(id):
         print(f"ERRO REJEITAR PROPOSTA: {str(e)}")
         flash(f'Erro ao rejeitar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.visualizar', id=id))
+
+# ===== PORTAL DO CLIENTE (ACESSO PÚBLICO VIA TOKEN) =====
+
+@propostas_bp.route('/cliente/<token>')
+def portal_cliente(token):
+    """Portal para o cliente visualizar e aprovar proposta"""
+    proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
+    
+    admin_id = None
+    if proposta.criado_por:
+        from models import Usuario
+        usuario = Usuario.query.get(proposta.criado_por)
+        if usuario:
+            admin_id = usuario.admin_id or usuario.id
+    
+    if not admin_id and proposta.admin_id:
+        admin_id = proposta.admin_id
+    
+    if not admin_id:
+        admin_id = 10
+    
+    config_empresa = safe_db_operation(
+        lambda: ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first(),
+        None
+    )
+    
+    cores_empresa = {
+        'primaria': config_empresa.cor_primaria if config_empresa and config_empresa.cor_primaria else '#007bff',
+        'secundaria': config_empresa.cor_secundaria if config_empresa and config_empresa.cor_secundaria else '#6c757d',
+        'fundo_proposta': config_empresa.cor_fundo_proposta if config_empresa and config_empresa.cor_fundo_proposta else '#f8f9fa'
+    }
+    
+    return render_template('propostas/portal_cliente.html', 
+                         proposta=proposta, 
+                         config_empresa=config_empresa,
+                         empresa_cores=cores_empresa)
+
+@propostas_bp.route('/cliente/<token>/aprovar', methods=['POST'])
+def aprovar_proposta_cliente(token):
+    """Cliente aprova a proposta"""
+    proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
+    
+    try:
+        proposta.status = 'aprovada'
+        proposta.data_resposta_cliente = datetime.utcnow()
+        proposta.observacoes_cliente = request.form.get('observacoes', '')
+        
+        db.session.commit()
+        
+        flash('Proposta aprovada com sucesso!', 'success')
+        return render_template('propostas/aprovada.html', proposta=proposta)
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao aprovar proposta: {str(e)}', 'error')
+        return redirect(url_for('propostas.portal_cliente', token=token))
+
+@propostas_bp.route('/cliente/<token>/rejeitar', methods=['POST'])
+def rejeitar_proposta_cliente(token):
+    """Cliente rejeita a proposta"""
+    proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
+    
+    try:
+        proposta.status = 'rejeitada'
+        proposta.data_resposta_cliente = datetime.utcnow()
+        proposta.observacoes_cliente = request.form.get('observacoes', '')
+        
+        db.session.commit()
+        
+        flash('Sua resposta foi registrada.', 'info')
+        return render_template('propostas/rejeitada.html', proposta=proposta)
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao processar resposta: {str(e)}', 'error')
+        return redirect(url_for('propostas.portal_cliente', token=token))
 
 # ===== API DE CLIENTES =====
 
