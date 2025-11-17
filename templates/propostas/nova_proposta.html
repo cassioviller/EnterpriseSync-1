@@ -539,6 +539,7 @@ function criarTabelaTemplate(template) {
                 <tr>
                     <td>
                         <input type="text" 
+                               name="item_descricao"
                                class="form-control form-control-sm" 
                                value="${item.descricao}" 
                                onchange="atualizarItemTemplate(${template.id}, ${index}, 'descricao', this.value)"
@@ -546,6 +547,7 @@ function criarTabelaTemplate(template) {
                     </td>
                     <td class="text-center">
                         <input type="number" 
+                               name="item_quantidade"
                                class="form-control form-control-sm text-center template-quantidade" 
                                value="${item.quantidade}" 
                                min="0" 
@@ -556,7 +558,8 @@ function criarTabelaTemplate(template) {
                                style="width: 80px; margin: 0 auto;">
                     </td>
                     <td class="text-center">
-                        <select class="form-select form-select-sm" 
+                        <select name="item_unidade"
+                                class="form-select form-select-sm" 
                                 onchange="atualizarItemTemplate(${template.id}, ${index}, 'unidade', this.value)"
                                 style="width: 80px; margin: 0 auto;">
                             <option value="m²" ${item.unidade === 'm²' ? 'selected' : ''}>m²</option>
@@ -568,6 +571,7 @@ function criarTabelaTemplate(template) {
                     </td>
                     <td class="text-end">
                         <input type="number" 
+                               name="item_preco"
                                class="form-control form-control-sm text-end template-preco" 
                                value="${(item.preco_unitario || 0).toFixed(2)}" 
                                min="0" 
@@ -722,6 +726,7 @@ function adicionarItemTemplate(templateId) {
         novaLinha.innerHTML = `
             <td>
                 <input type="text" 
+                       name="item_descricao"
                        class="form-control form-control-sm" 
                        value="${novoItem.descricao}" 
                        onchange="atualizarItemTemplate(${templateId}, ${novoIndex}, 'descricao', this.value)"
@@ -729,6 +734,7 @@ function adicionarItemTemplate(templateId) {
             </td>
             <td class="text-center">
                 <input type="number" 
+                       name="item_quantidade"
                        class="form-control form-control-sm text-center template-quantidade" 
                        value="${novoItem.quantidade}" 
                        min="0" 
@@ -739,7 +745,8 @@ function adicionarItemTemplate(templateId) {
                        style="width: 80px; margin: 0 auto;">
             </td>
             <td class="text-center">
-                <select class="form-select form-select-sm" 
+                <select name="item_unidade"
+                        class="form-select form-select-sm" 
                         onchange="atualizarItemTemplate(${templateId}, ${novoIndex}, 'unidade', this.value)"
                         style="width: 80px; margin: 0 auto;">
                     <option value="m²" selected>m²</option>
@@ -751,6 +758,7 @@ function adicionarItemTemplate(templateId) {
             </td>
             <td class="text-end">
                 <input type="number" 
+                       name="item_preco"
                        class="form-control form-control-sm text-end template-preco" 
                        value="${novoItem.preco_unitario.toFixed(2)}" 
                        min="0" 
