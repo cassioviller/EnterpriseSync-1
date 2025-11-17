@@ -427,11 +427,15 @@
             <div class="section-title" style="margin-top: 15px; margin-left: 20px;">2.1 ESCOPO DE FORNECIMENTO:</div>
             
             {% if proposta.itens and proposta.itens|length > 0 %}
-                <!-- Se há múltiplas categorias organizadas -->
-                {% if proposta.itens_organizados %}
-                    {% for categoria_nome, itens_categoria in proposta.itens_organizados %}
-                        <div style="text-align: center; font-weight: bold; margin: 15px 0;">{{ (categoria_nome or 'ITENS').upper() }}</div>
+                <!-- Renderizar tabelas agrupadas por template -->
+                {% if proposta.templates_organizados %}
+                    {% for template_info in proposta.templates_organizados %}
+                        <!-- Título do Template -->
+                        <div style="text-align: center; font-weight: bold; margin: 20px 0 10px 0; font-size: 13pt; border-bottom: 2px solid #333; padding-bottom: 5px;">
+                            {{ template_info.template_nome.upper() }}
+                        </div>
                         
+                        <!-- Tabela de itens do template -->
                         <table class="items-table">
                             <thead>
                                 <tr>
@@ -444,27 +448,38 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% set subtotal_categoria = 0 %}
-                                {% for item in itens_categoria %}
-                                <tr>
-                                    <td>{{ item.item_numero }}</td>
-                                    <td>{{ item.descricao }}</td>
-                                    <td>{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
-                                    <td>{{ item.unidade }}</td>
-                                    <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
-                                    <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
-                                </tr>
-                                {% set subtotal_categoria = subtotal_categoria + item.subtotal %}
+                                {% for categoria_nome, itens_categoria in template_info.categorias %}
+                                    {% if categoria_nome and categoria_nome != 'Serviços' %}
+                                    <tr style="background-color: #e9ecef;">
+                                        <td colspan="6" style="font-weight: bold; padding: 8px;">{{ categoria_nome.upper() }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for item in itens_categoria %}
+                                    <tr>
+                                        <td>{{ item.item_numero }}</td>
+                                        <td>{{ item.descricao }}</td>
+                                        <td>{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
+                                        <td>{{ item.unidade }}</td>
+                                        <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
+                                        <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                                    </tr>
+                                    {% endfor %}
                                 {% endfor %}
+                                <!-- Subtotal do Template -->
+                                <tr style="background-color: #d1ecf1; font-weight: bold;">
+                                    <td colspan="5" style="text-align: right; padding: 10px;">SUBTOTAL {{ template_info.template_nome.upper() }}:</td>
+                                    <td style="text-align: right; padding: 10px;">R$ {{ "%.2f"|format(template_info.subtotal) }}</td>
+                                </tr>
                             </tbody>
                         </table>
                     {% endfor %}
                     
-                    <div style="text-align: right; margin-top: 20px; font-weight: bold; font-size: 12pt;">
-                        VALOR TOTAL: R$ {{ "%.2f"|format(total_geral) }}
+                    <!-- Total Geral -->
+                    <div style="text-align: right; margin-top: 25px; padding: 15px; background-color: #28a745; color: white; font-weight: bold; font-size: 14pt; border-radius: 5px;">
+                        VALOR TOTAL DA PROPOSTA: R$ {{ "%.2f"|format(total_geral) }}
                     </div>
                 {% else %}
-                    <!-- Formato tradicional simples -->
+                    <!-- Formato tradicional simples (fallback) -->
                     <div style="text-align: center; font-weight: bold; margin: 15px 0;">SERVIÇOS GERAIS</div>
                     
                     <table class="items-table">
