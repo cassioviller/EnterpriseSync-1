@@ -334,6 +334,16 @@
 .timeline-content {
     padding-left: 15px;
 }
+
+/* SweetAlert2 - Fundo transparente para ver a proposta */
+.swal2-container {
+    background-color: rgba(0, 0, 0, 0.4) !important;
+    backdrop-filter: blur(3px);
+}
+
+.swal2-popup {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3) !important;
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -350,7 +360,11 @@ function alterarStatus(novoStatus) {
         confirmButtonText: 'Confirmar',
         cancelButtonText: 'Cancelar',
         confirmButtonColor: '#28a745',
-        cancelButtonColor: '#6c757d'
+        cancelButtonColor: '#6c757d',
+        backdrop: 'rgba(0, 0, 0, 0.4)',
+        customClass: {
+            container: 'backdrop-blur'
+        }
     }).then((result) => {
         if (result.isConfirmed) {
             const motivo = document.getElementById('motivoStatus').value;
