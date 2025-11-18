@@ -2716,6 +2716,88 @@ def _migration_55_token_cliente_proposta():
             except:
                 pass
 
+def _migration_56_proposta_arquivo_base64():
+    """
+    Migração 56: Adicionar campos Base64 ao PropostaArquivo
+    - arquivo_base64: TEXT (para PDFs/DWG/DOC <5MB)
+    - imagem_original_base64: TEXT (imagem original completa)
+    - imagem_otimizada_base64: TEXT (imagem otimizada 1200px WebP)
+    - thumbnail_base64: TEXT (thumbnail 300px para preview)
+    
+    Solução: Arquivos persistem mesmo após deploys/restarts do container
+    """
+    logger.info("=" * 80)
+    logger.info("📎 MIGRAÇÃO 56: Campos Base64 em PropostaArquivo")
+    logger.info("=" * 80)
+    
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Campos Base64 para adicionar
+        campos_base64 = {
+            'arquivo_base64': 'TEXT',
+            'imagem_original_base64': 'TEXT',
+            'imagem_otimizada_base64': 'TEXT',
+            'thumbnail_base64': 'TEXT'
+        }
+        
+        colunas_adicionadas = 0
+        
+        for coluna, tipo_sql in campos_base64.items():
+            # Verificar se coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'proposta_arquivos' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' em proposta_arquivos...")
+                cursor.execute(f"ALTER TABLE proposta_arquivos ADD COLUMN {coluna} {tipo_sql}")
+                logger.info(f"✅ Coluna '{coluna}' adicionada!")
+                colunas_adicionadas += 1
+            else:
+                logger.debug(f"✅ Coluna '{coluna}' já existe - skip")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 56 CONCLUÍDA!")
+        logger.info(f"   📊 {colunas_adicionadas} colunas adicionadas para persistência")
+        logger.info("   🔥 Imagens: 3 versões Base64 (original, otimizada, thumbnail)")
+        logger.info("   📎 Outros arquivos: Base64 para arquivos <5MB")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 56: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2764,6 +2846,7 @@ def executar_migracoes():
             (53, "RDO Foto - persistência Base64", _migration_53_rdo_foto_base64),
             (54, "Tamanho logo portal do cliente", _migration_54_logo_tamanho_portal),
             (55, "Token cliente para portal público", _migration_55_token_cliente_proposta),
+            (56, "PropostaArquivo - persistência Base64", _migration_56_proposta_arquivo_base64),
         ]
         
         # Executar cada migração com rastreamento

@@ -2551,7 +2551,16 @@ class PropostaArquivo(db.Model):
     tipo_arquivo = db.Column(db.String(100))
     tamanho_bytes = db.Column(db.BigInteger)
     caminho_arquivo = db.Column(db.String(500), nullable=False)
-    categoria = db.Column(db.String(50))  # 'dwg', 'pdf', 'foto', 'documento', 'outros'
+    categoria = db.Column(db.String(50))  # 'dwg', 'pdf', 'imagem', 'documento', 'outros'
+    
+    # 🔥 ARMAZENAMENTO PERSISTENTE (v9.4.0) - Base64 no banco de dados
+    # Solução: Arquivos persistem mesmo após deploys/restarts do container
+    # - Imagens: 3 versões otimizadas (original, 1200px, 300px thumbnail)
+    # - Outros arquivos (<5MB): base64 direto
+    arquivo_base64 = db.Column(db.Text)  # Para PDFs/DWG/DOC pequenos (<5MB)
+    imagem_original_base64 = db.Column(db.Text)  # Imagem original completa
+    imagem_otimizada_base64 = db.Column(db.Text)  # Imagem otimizada 1200px WebP
+    thumbnail_base64 = db.Column(db.Text)  # Thumbnail 300px para preview
     
     enviado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
     enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
