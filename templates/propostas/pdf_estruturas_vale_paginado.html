@@ -453,17 +453,17 @@
                                     <tr>
                                         <td>{{ item.item_numero }}</td>
                                         <td>{{ item.descricao }}</td>
-                                        <td>{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
+                                        <td>{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                                         <td>{{ item.unidade }}</td>
-                                        <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
-                                        <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                                        <td>R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                        <td>R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                                     </tr>
                                     {% endfor %}
                                 {% endfor %}
                                 <!-- Subtotal do Template -->
                                 <tr style="background-color: #d1ecf1; font-weight: bold;">
                                     <td colspan="5" style="text-align: right; padding: 10px;">SUBTOTAL:</td>
-                                    <td style="text-align: right; padding: 10px;">R$ {{ "%.2f"|format(template_info.subtotal) }}</td>
+                                    <td style="text-align: right; padding: 10px;">R$ {{ "{:,.2f}".format(template_info.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -471,7 +471,7 @@
                     
                     <!-- Total Geral -->
                     <div style="text-align: right; margin-top: 25px; padding: 15px; background-color: #28a745; color: white; font-weight: bold; font-size: 14pt; border-radius: 5px;">
-                        VALOR TOTAL DA PROPOSTA: R$ {{ "%.2f"|format(total_geral) }}
+                        VALOR TOTAL DA PROPOSTA: R$ {{ "{:,.2f}".format(total_geral).replace(',', 'X').replace('.', ',').replace('X', '.') }}
                     </div>
                 {% else %}
                     <!-- Formato tradicional simples (fallback) -->
@@ -493,15 +493,15 @@
                             <tr>
                                 <td>{{ item.item_numero }}</td>
                                 <td>{{ item.descricao }}</td>
-                                <td>{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
+                                <td>{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                                 <td>{{ item.unidade }}</td>
-                                <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
-                                <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                                <td>R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                <td>R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                             </tr>
                             {% endfor %}
                             <tr class="total-row">
                                 <td colspan="5" style="text-align: right;"><strong>VALOR TOTAL</strong></td>
-                                <td style="text-align: right;"><strong>R$ {{ "%.2f"|format(total_geral) }}</strong></td>
+                                <td style="text-align: right;"><strong>R$ {{ "{:,.2f}".format(total_geral).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong></td>
                             </tr>
                         </tbody>
                     </table>
