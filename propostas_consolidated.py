@@ -18,6 +18,7 @@ import os
 import json
 import uuid
 import mimetypes
+import base64
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, desc, or_, and_, text
 from PIL import Image
@@ -1141,55 +1142,103 @@ def api_clientes():
 
 # ===== ROTAS DE ARQUIVOS =====
 
-def otimizar_imagem(caminho_arquivo, max_width=1920, qualidade=85):
-    """Otimiza imagens redimensionando e comprimindo
+def otimizar_imagem_base64(arquivo_bytes_ou_path):
+    """Otimiza imagens e retorna 3 versões em Base64 (PERSISTÊNCIA COMPLETA)
     
     Args:
-        caminho_arquivo: Caminho do arquivo de imagem original
-        max_width: Largura máxima em pixels
-        qualidade: Qualidade de compressão (1-100)
+        arquivo_bytes_ou_path: Bytes do arquivo ou caminho (str/Path)
     
     Returns:
-        Tupla (novo_caminho, tamanho_bytes) - caminho pode ser diferente se convertido para WebP
+        Dict com:
+            - original_base64: Imagem original completa em Base64 WebP
+            - otimizada_base64: Imagem otimizada 1200px em Base64 WebP
+            - thumbnail_base64: Thumbnail 300px em Base64 WebP
+            - tamanho_original: Tamanho em bytes da versão original
+            - tamanho_otimizada: Tamanho em bytes da versão otimizada
+            - tamanho_thumbnail: Tamanho em bytes do thumbnail
     """
     try:
-        with Image.open(caminho_arquivo) as img:
-            # Converter RGBA para RGB se necessário
-            if img.mode in ('RGBA', 'LA', 'P'):
-                background = Image.new('RGB', img.size, (255, 255, 255))
-                if img.mode == 'P':
-                    img = img.convert('RGBA')
-                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                img = background
-            
-            # Redimensionar se necessário
-            if img.width > max_width:
-                ratio = max_width / img.width
-                new_height = int(img.height * ratio)
-                img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
-            
-            # Salvar otimizado (converter para WebP se for imagem)
-            extensao = os.path.splitext(caminho_arquivo)[1].lower()
-            if extensao in ['.jpg', '.jpeg', '.png', '.gif']:
-                # Converter para WebP para melhor compressão
-                caminho_webp = os.path.splitext(caminho_arquivo)[0] + '.webp'
-                img.save(caminho_webp, 'WEBP', quality=qualidade, optimize=True)
-                
-                # Remover arquivo original
-                os.remove(caminho_arquivo)
-                
-                # Retornar caminho WebP e tamanho
-                return caminho_webp, os.path.getsize(caminho_webp)
-            else:
-                # Para outros formatos, apenas comprimir
-                img.save(caminho_arquivo, quality=qualidade, optimize=True)
-                return caminho_arquivo, os.path.getsize(caminho_arquivo)
+        # Abrir imagem (aceita bytes ou caminho)
+        if isinstance(arquivo_bytes_ou_path, (str, os.PathLike)):
+            img = Image.open(arquivo_bytes_ou_path)
+        else:
+            img = Image.open(BytesIO(arquivo_bytes_ou_path))
+        
+        # Converter RGBA para RGB se necessário (WebP não aceita RGBA)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+        
+        # 1️⃣ VERSÃO ORIGINAL COMPLETA (WebP otimizado)
+        buffer_original = BytesIO()
+        img.save(buffer_original, format='WEBP', quality=90, optimize=True)
+        buffer_original.seek(0)
+        base64_original = base64.b64encode(buffer_original.read()).decode('utf-8')
+        original_base64 = f"data:image/webp;base64,{base64_original}"
+        tamanho_original = len(base64_original)
+        
+        # 2️⃣ VERSÃO OTIMIZADA 1200px
+        img_otimizada = img.copy()
+        if img_otimizada.width > 1200:
+            ratio = 1200 / img_otimizada.width
+            new_height = int(img_otimizada.height * ratio)
+            img_otimizada = img_otimizada.resize((1200, new_height), Image.Resampling.LANCZOS)
+        
+        buffer_otimizada = BytesIO()
+        img_otimizada.save(buffer_otimizada, format='WEBP', quality=85, optimize=True)
+        buffer_otimizada.seek(0)
+        base64_otimizada = base64.b64encode(buffer_otimizada.read()).decode('utf-8')
+        otimizada_base64 = f"data:image/webp;base64,{base64_otimizada}"
+        tamanho_otimizada = len(base64_otimizada)
+        
+        # 3️⃣ THUMBNAIL 300px (crop centralizado)
+        img_thumb = img.copy()
+        # Calcular crop centralizado (quadrado)
+        width, height = img_thumb.size
+        if width > height:
+            left = (width - height) // 2
+            top = 0
+            right = left + height
+            bottom = height
+        else:
+            left = 0
+            top = (height - width) // 2
+            right = width
+            bottom = top + width
+        
+        img_thumb_cropped = img_thumb.crop((left, top, right, bottom))
+        img_thumb_cropped.thumbnail((300, 300), Image.Resampling.LANCZOS)
+        
+        buffer_thumb = BytesIO()
+        img_thumb_cropped.save(buffer_thumb, format='WEBP', quality=65, optimize=True)
+        buffer_thumb.seek(0)
+        base64_thumb = base64.b64encode(buffer_thumb.read()).decode('utf-8')
+        thumbnail_base64 = f"data:image/webp;base64,{base64_thumb}"
+        tamanho_thumbnail = len(base64_thumb)
+        
+        print(f"✅ Imagem processada em Base64:")
+        print(f"   📊 Original: {tamanho_original:,} bytes")
+        print(f"   📊 Otimizada (1200px): {tamanho_otimizada:,} bytes")
+        print(f"   📊 Thumbnail (300px): {tamanho_thumbnail:,} bytes")
+        print(f"   📊 Total: {(tamanho_original + tamanho_otimizada + tamanho_thumbnail):,} bytes")
+        
+        return {
+            'original_base64': original_base64,
+            'otimizada_base64': otimizada_base64,
+            'thumbnail_base64': thumbnail_base64,
+            'tamanho_original': tamanho_original,
+            'tamanho_otimizada': tamanho_otimizada,
+            'tamanho_thumbnail': tamanho_thumbnail
+        }
+        
     except Exception as e:
-        print(f"ERRO OTIMIZAR IMAGEM: {str(e)}")
+        print(f"ERRO otimizar_imagem_base64: {str(e)}")
         import traceback
         traceback.print_exc()
-        # Em caso de erro, retornar arquivo original
-        return caminho_arquivo, os.path.getsize(caminho_arquivo)
+        return None
 
 def get_file_category(filename):
     """Determina a categoria do arquivo baseado na extensão"""
@@ -1210,7 +1259,7 @@ def get_file_category(filename):
 @login_required
 @admin_required
 def upload_arquivo(id):
-    """Upload de múltiplos arquivos para uma proposta com otimização"""
+    """Upload de múltiplos arquivos para uma proposta - SISTEMA BASE64 PERSISTENTE"""
     try:
         admin_id = get_admin_id()
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
@@ -1231,55 +1280,77 @@ def upload_arquivo(id):
             if ext not in ALLOWED_EXTENSIONS:
                 continue
             
-            # Criar diretório se não existir
-            upload_path = os.path.join(UPLOAD_FOLDER, str(proposta.id))
-            os.makedirs(upload_path, exist_ok=True)
-            
-            # Gerar nome único
+            # Ler bytes do arquivo UMA VEZ
+            arquivo_bytes = arquivo.read()
             nome_original = secure_filename(filename)
-            nome_arquivo = f"{uuid.uuid4().hex}.{ext}"
-            caminho_completo = os.path.join(upload_path, nome_arquivo)
+            categoria = get_file_category(nome_original)
             
-            # Salvar arquivo
-            arquivo.save(caminho_completo)
-            
-            # Otimizar se for imagem
-            if ext in ['jpg', 'jpeg', 'png', 'gif']:
-                print(f"DEBUG UPLOAD: Otimizando imagem {nome_original}...")
-                caminho_completo, tamanho_bytes = otimizar_imagem(caminho_completo)
-                print(f"DEBUG UPLOAD: Imagem otimizada: {tamanho_bytes} bytes")
-                # Atualizar nome do arquivo se foi convertido para WebP
-                nome_arquivo = os.path.basename(caminho_completo)
-            else:
-                tamanho_bytes = os.path.getsize(caminho_completo)
-            
-            # Salvar no banco
+            # ===== PROCESSAMENTO CONFORME TIPO =====
             proposta_arquivo = PropostaArquivo()
             proposta_arquivo.admin_id = admin_id
             proposta_arquivo.proposta_id = proposta.id
-            proposta_arquivo.nome_arquivo = nome_arquivo
             proposta_arquivo.nome_original = nome_original
             proposta_arquivo.tipo_arquivo = mimetypes.guess_type(nome_original)[0]
-            proposta_arquivo.tamanho_bytes = tamanho_bytes
-            proposta_arquivo.caminho_arquivo = caminho_completo
-            proposta_arquivo.categoria = get_file_category(nome_original)
+            proposta_arquivo.categoria = categoria
             proposta_arquivo.enviado_por = current_user.id
+            
+            # 🖼️ IMAGENS: Processar 3 versões Base64
+            if ext in ['jpg', 'jpeg', 'png', 'gif']:
+                print(f"📸 Processando IMAGEM: {nome_original}...")
+                
+                resultado = otimizar_imagem_base64(arquivo_bytes)
+                if not resultado:
+                    print(f"⚠️ Erro ao processar imagem {nome_original}, pulando...")
+                    continue
+                
+                # Salvar 3 versões Base64 no banco
+                proposta_arquivo.imagem_original_base64 = resultado['original_base64']
+                proposta_arquivo.imagem_otimizada_base64 = resultado['otimizada_base64']
+                proposta_arquivo.thumbnail_base64 = resultado['thumbnail_base64']
+                
+                # Tamanho total (soma das 3 versões)
+                tamanho_total = resultado['tamanho_original'] + resultado['tamanho_otimizada'] + resultado['tamanho_thumbnail']
+                proposta_arquivo.tamanho_bytes = tamanho_total
+                
+                # Caminho vazio (não salva no disco)
+                proposta_arquivo.caminho_arquivo = f"base64://{nome_original}"
+                proposta_arquivo.nome_arquivo = f"{uuid.uuid4().hex}.webp"
+                
+                print(f"   ✅ Imagem salva em Base64:")
+                print(f"      Original: {resultado['tamanho_original']:,} bytes")
+                print(f"      Otimizada: {resultado['tamanho_otimizada']:,} bytes")
+                print(f"      Thumbnail: {resultado['tamanho_thumbnail']:,} bytes")
+                print(f"      TOTAL: {tamanho_total:,} bytes")
+            
+            # 📄 OUTROS ARQUIVOS (PDF, DWG, DOC): Base64 direto
+            else:
+                print(f"📄 Processando ARQUIVO: {nome_original}...")
+                
+                # Converter para Base64
+                arquivo_base64_str = base64.b64encode(arquivo_bytes).decode('utf-8')
+                proposta_arquivo.arquivo_base64 = f"data:{proposta_arquivo.tipo_arquivo or 'application/octet-stream'};base64,{arquivo_base64_str}"
+                
+                proposta_arquivo.tamanho_bytes = len(arquivo_base64_str)
+                proposta_arquivo.caminho_arquivo = f"base64://{nome_original}"
+                proposta_arquivo.nome_arquivo = f"{uuid.uuid4().hex}.{ext}"
+                
+                print(f"   ✅ Arquivo salvo em Base64: {len(arquivo_base64_str):,} bytes")
             
             db.session.add(proposta_arquivo)
             arquivos_salvos.append({
                 'id': proposta_arquivo.id,
                 'nome': nome_original,
-                'tamanho': tamanho_bytes,
-                'categoria': proposta_arquivo.categoria
+                'tamanho': proposta_arquivo.tamanho_bytes,
+                'categoria': categoria
             })
         
         db.session.commit()
         
-        print(f"DEBUG UPLOAD: {len(arquivos_salvos)} arquivos salvos para proposta {proposta.numero}")
+        print(f"✅ {len(arquivos_salvos)} arquivo(s) salvos em Base64 para proposta {proposta.numero}")
         
         return jsonify({
             'success': True,
-            'message': f'{len(arquivos_salvos)} arquivo(s) enviado(s) com sucesso!',
+            'message': f'{len(arquivos_salvos)} arquivo(s) enviado(s) com sucesso! (Base64 persistente)',
             'arquivos': arquivos_salvos
         })
         
@@ -1294,31 +1365,96 @@ def upload_arquivo(id):
 @login_required
 @admin_required
 def download_arquivo(arquivo_id):
-    """Download/visualização de arquivo anexado"""
+    """Download/visualização de arquivo anexado - SISTEMA BASE64 PERSISTENTE"""
     try:
         admin_id = get_admin_id()
         arquivo = PropostaArquivo.query.filter_by(id=arquivo_id, admin_id=admin_id).first_or_404()
         
-        if not os.path.exists(arquivo.caminho_arquivo):
-            flash('Arquivo não encontrado no servidor', 'error')
-            return redirect(url_for('propostas.index'))
+        # ===== PRIORIDADE 1: Servir a partir do Base64 (PERSISTENTE) =====
         
-        # Determinar mimetype correto baseado na extensão real do arquivo
-        extensao = os.path.splitext(arquivo.caminho_arquivo)[1].lower()
-        if extensao == '.webp':
-            mimetype = 'image/webp'
+        # 🖼️ IMAGENS: usar versão otimizada Base64
+        if arquivo.imagem_otimizada_base64:
+            print(f"📸 Servindo IMAGEM do Base64: {arquivo.nome_original}")
+            
+            # Extrair Base64 puro (remover prefixo data:image/webp;base64,)
+            if ',' in arquivo.imagem_otimizada_base64:
+                base64_data = arquivo.imagem_otimizada_base64.split(',', 1)[1]
+            else:
+                base64_data = arquivo.imagem_otimizada_base64
+            
+            # Decodificar Base64 para bytes
+            arquivo_bytes = base64.b64decode(base64_data)
+            
+            # Criar BytesIO e servir
+            buffer = BytesIO(arquivo_bytes)
+            buffer.seek(0)
+            
+            return send_file(
+                buffer,
+                mimetype='image/webp',
+                as_attachment=False,
+                download_name=arquivo.nome_original
+            )
+        
+        # 📄 OUTROS ARQUIVOS: usar arquivo_base64
+        elif arquivo.arquivo_base64:
+            print(f"📄 Servindo ARQUIVO do Base64: {arquivo.nome_original}")
+            
+            # Extrair Base64 puro
+            if ',' in arquivo.arquivo_base64:
+                base64_data = arquivo.arquivo_base64.split(',', 1)[1]
+            else:
+                base64_data = arquivo.arquivo_base64
+            
+            # Decodificar Base64 para bytes
+            arquivo_bytes = base64.b64decode(base64_data)
+            
+            # Criar BytesIO e servir
+            buffer = BytesIO(arquivo_bytes)
+            buffer.seek(0)
+            
+            # Detectar mimetype correto
+            mimetype = arquivo.tipo_arquivo or mimetypes.guess_type(arquivo.nome_original)[0] or 'application/octet-stream'
+            
+            return send_file(
+                buffer,
+                mimetype=mimetype,
+                as_attachment=False,
+                download_name=arquivo.nome_original
+            )
+        
+        # ===== FALLBACK: Arquivo físico antigo (BACKWARD COMPATIBILITY) =====
+        elif arquivo.caminho_arquivo and not arquivo.caminho_arquivo.startswith('base64://'):
+            print(f"⚠️ FALLBACK: Servindo arquivo físico (legado): {arquivo.caminho_arquivo}")
+            
+            if not os.path.exists(arquivo.caminho_arquivo):
+                flash('Arquivo não encontrado no servidor', 'error')
+                return redirect(url_for('propostas.index'))
+            
+            # Determinar mimetype correto baseado na extensão real do arquivo
+            extensao = os.path.splitext(arquivo.caminho_arquivo)[1].lower()
+            if extensao == '.webp':
+                mimetype = 'image/webp'
+            else:
+                mimetype = arquivo.tipo_arquivo or mimetypes.guess_type(arquivo.caminho_arquivo)[0]
+            
+            return send_file(
+                arquivo.caminho_arquivo,
+                as_attachment=False,
+                download_name=arquivo.nome_original,
+                mimetype=mimetype
+            )
+        
+        # ===== ERRO: Nenhuma fonte de dados disponível =====
         else:
-            mimetype = arquivo.tipo_arquivo or mimetypes.guess_type(arquivo.caminho_arquivo)[0]
-        
-        return send_file(
-            arquivo.caminho_arquivo,
-            as_attachment=False,
-            download_name=arquivo.nome_original,
-            mimetype=mimetype
-        )
+            print(f"❌ ERRO: Arquivo {arquivo.nome_original} sem dados Base64 nem arquivo físico")
+            flash('Arquivo não disponível', 'error')
+            return redirect(url_for('propostas.index'))
         
     except Exception as e:
         print(f"ERRO DOWNLOAD ARQUIVO: {str(e)}")
+        import traceback
+        traceback.print_exc()
         flash(f'Erro ao baixar arquivo: {str(e)}', 'error')
         return redirect(url_for('propostas.index'))
 
@@ -1326,22 +1462,22 @@ def download_arquivo(arquivo_id):
 @login_required
 @admin_required
 def deletar_arquivo(arquivo_id):
-    """Deletar arquivo anexado"""
+    """Deletar arquivo anexado - SISTEMA BASE64 (sem arquivos físicos)"""
     try:
         admin_id = get_admin_id()
         arquivo = PropostaArquivo.query.filter_by(id=arquivo_id, admin_id=admin_id).first_or_404()
         
         proposta_id = arquivo.proposta_id
+        nome_original = arquivo.nome_original
         
-        # Remover arquivo físico
-        if os.path.exists(arquivo.caminho_arquivo):
-            os.remove(arquivo.caminho_arquivo)
+        # ===== APENAS DELETAR DO BANCO =====
+        # Arquivos Base64 são salvos no banco de dados, não há arquivos físicos para deletar
+        # NOTA: Backward compatibility - arquivos antigos físicos permanecem no disco (não causam problema)
         
-        # Remover do banco
         db.session.delete(arquivo)
         db.session.commit()
         
-        print(f"DEBUG DELETE: Arquivo {arquivo.nome_original} excluído")
+        print(f"✅ Arquivo {nome_original} removido do banco (Base64)")
         
         return jsonify({
             'success': True,
@@ -1351,6 +1487,8 @@ def deletar_arquivo(arquivo_id):
     except Exception as e:
         db.session.rollback()
         print(f"ERRO DELETAR ARQUIVO: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': f'Erro ao excluir arquivo: {str(e)}'}), 500
 
 print("✅ Propostas Consolidated Blueprint carregado com padrões de resiliência")
