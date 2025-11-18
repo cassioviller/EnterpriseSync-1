@@ -4,12 +4,29 @@
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-file-contract me-2"></i> {{ proposta.numero }}</h2>
+        <div>
+            <h2><i class="fas fa-file-contract me-2"></i> {{ proposta.numero }} - {{ proposta.cliente_nome }}</h2>
+            <p class="text-muted mb-0">{{ proposta.titulo or 'Sem título' }}</p>
+        </div>
         <div class="btn-group">
-            {% if proposta.status == 'rascunho' %}
+            {% if proposta.status == 'rascunho' or proposta.status == 'RASCUNHO' %}
+            <button class="btn btn-success" onclick="alterarStatus('enviada')">
+                <i class="fas fa-paper-plane me-1"></i> Enviar
+            </button>
             <a href="{{ url_for('propostas.editar', id=proposta.id) }}" class="btn btn-primary">
                 <i class="fas fa-edit me-1"></i> Editar
             </a>
+            {% elif proposta.status == 'enviada' or proposta.status == 'ENVIADA' %}
+            <button class="btn btn-warning" onclick="alterarStatus('em_analise')">
+                <i class="fas fa-clock me-1"></i> Em Análise
+            </button>
+            {% elif proposta.status == 'em_analise' or proposta.status == 'EM_ANALISE' %}
+            <button class="btn btn-success" onclick="alterarStatus('aprovada')">
+                <i class="fas fa-check me-1"></i> Aprovar
+            </button>
+            <button class="btn btn-danger" onclick="alterarStatus('rejeitada')">
+                <i class="fas fa-times me-1"></i> Rejeitar
+            </button>
             {% endif %}
             
             <a href="{{ url_for('propostas.gerar_pdf', id=proposta.id) }}" class="btn btn-success" target="_blank">
@@ -57,7 +74,69 @@
                 </div>
             </div>
 
-            <!-- Serviços -->
+            <!-- Tabelas de Serviços por Template (igual ao Portal do Cliente) -->
+            {% if proposta.templates_organizados %}
+                {% for template_info in proposta.templates_organizados %}
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-list-alt"></i> {{ template_info.template_nome }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 40px; text-align: center;">Item</th>
+                                        <th style="min-width: 120px;">Descrição</th>
+                                        <th style="width: 60px; text-align: center;">Qtd</th>
+                                        <th style="width: 50px; text-align: center;">Un.</th>
+                                        <th style="width: 100px; text-align: right;">Preço Unit.</th>
+                                        <th style="width: 100px; text-align: right;">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for categoria, itens_categoria in template_info.categorias %}
+                                        {% if categoria and categoria != 'Serviços' %}
+                                        <tr class="table-secondary">
+                                            <td colspan="6" class="fw-bold">{{ categoria }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% for item in itens_categoria %}
+                                        <tr>
+                                            <td class="text-center fw-bold">{{ item.item_numero }}</td>
+                                            <td style="word-break: break-word;">{{ item.descricao }}</td>
+                                            <td class="text-center">{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                            <td class="text-center">{{ item.unidade }}</td>
+                                            <td class="text-end">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                            <td class="text-end fw-bold text-success">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-info">
+                                    <tr class="fw-bold">
+                                        <td colspan="5" class="text-end fs-6 py-2">SUBTOTAL:</td>
+                                        <td class="text-end fs-6 py-2">R$ {{ "{:,.2f}".format(template_info.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <!-- Total Geral -->
+                <div class="card mb-4" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none;">
+                    <div class="card-body text-center py-4">
+                        <h4 class="mb-2" style="font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Valor Total da Proposta</h4>
+                        <div style="font-size: 2.5rem; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+                            R$ {{ "{:,.2f}".format(total_geral or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Serviços (formato antigo - mantido para compatibilidade) -->
             {% if proposta.servicos %}
             <div class="card mb-4">
                 <div class="card-header">
@@ -257,7 +336,65 @@
 }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+function alterarStatus(novoStatus) {
+    Swal.fire({
+        title: 'Alterar Status',
+        html: `
+            <p>Deseja alterar o status para <strong>${novoStatus.toUpperCase()}</strong>?</p>
+            <textarea id="motivoStatus" class="form-control mt-3" placeholder="Motivo (opcional)" rows="3"></textarea>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Confirmar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#28a745',
+        cancelButtonColor: '#6c757d'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const motivo = document.getElementById('motivoStatus').value;
+            
+            fetch(`/propostas/{{ proposta.id }}/status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    status: novoStatus,
+                    motivo: motivo
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: data.message
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao alterar status da proposta'
+                });
+            });
+        }
+    });
+}
+
 function copiarLinkPortal(btn) {
     const linkInput = document.getElementById('linkPortalCliente');
     if (linkInput) {
