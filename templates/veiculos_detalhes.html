@@ -247,7 +247,7 @@ console.log('Initializing Detalhes Veículo with light theme...');
             
             <div class="info-item">
                 <div class="info-label">KM Atual</div>
-                <div class="info-value">{{ "{:,}".format(veiculo.km_atual).replace(',', '.') }} km</div>
+                <div class="info-value">{{ "{:,}".format(veiculo.km_atual or 0).replace(',', '.') }} km</div>
             </div>
             
             {% if veiculo.cor %}
@@ -259,7 +259,7 @@ console.log('Initializing Detalhes Veículo with light theme...');
             
             <div class="info-item">
                 <div class="info-label">Combustível</div>
-                <div class="info-value">{{ veiculo.combustivel }}</div>
+                <div class="info-value">{{ veiculo.combustivel or 'N/A' }}</div>
             </div>
         </div>
     </div>
