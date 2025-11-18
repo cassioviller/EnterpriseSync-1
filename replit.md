@@ -2,6 +2,17 @@
 SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management system for SMBs, designed to automate and streamline core operations. It covers commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations.
 
 ## Recent Changes (November 2025)
+**v9.3.0 - Portal Enhancements: Configurable Logo & Fixed Button Bug (CRITICAL)**
+- **FEATURE**: Company logo size now configurable in settings (pequeno/medio/grande)
+- Added Migration 54: `logo_tamanho_portal` field to `configuracao_empresa` table
+- Added Migration 55: `token_cliente` field to `proposta` table with automatic token generation
+- Dynamic CSS in portal adjusts logo based on configuration (100px/160px/240px desktop)
+- **BUG FIX**: Floating action buttons (Aprovar/Rejeitar) now correctly hidden for draft proposals
+- Fixed security issue: Draft proposals showed action buttons allowing premature approval
+- Improved UX: Draft proposals show warning message without fixed positioning
+- Status-based rendering: Only 'enviada' status shows floating buttons with backdrop blur
+- **Impact**: Professional portal with consistent branding, secure token-based access, and proper workflow gating
+
 **v9.2.0 - Multi-Template Organization System (CRITICAL)**
 - **FEATURE**: Proposals with multiple templates now render as separate tables with individual subtotals
 - New `organizar_itens_por_template()` function groups items by `template_origem_nome` → then by `categoria_titulo`

@@ -2628,6 +2628,94 @@ def _migration_54_logo_tamanho_portal():
             except:
                 pass
 
+def _migration_55_token_cliente_proposta():
+    """
+    Migração 55: Adicionar campo token_cliente em proposta
+    - token_cliente: VARCHAR(100) UNIQUE
+    - Token único para acesso público ao portal do cliente
+    - Gerado automaticamente para propostas existentes usando secrets.token_urlsafe(32)
+    """
+    logger.info("=" * 80)
+    logger.info("🔥 MIGRAÇÃO 55: Campo token_cliente em proposta")
+    logger.info("=" * 80)
+    
+    connection = None
+    cursor = None
+    
+    try:
+        import secrets
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se coluna já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'proposta' 
+            AND column_name = 'token_cliente'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("🔧 Adicionando coluna 'token_cliente' em proposta...")
+            cursor.execute("""
+                ALTER TABLE proposta 
+                ADD COLUMN token_cliente VARCHAR(100) UNIQUE
+            """)
+            logger.info("✅ Coluna 'token_cliente' adicionada!")
+            
+            # Gerar tokens para propostas existentes
+            logger.info("🔄 Gerando tokens para propostas existentes...")
+            cursor.execute("SELECT id FROM proposta WHERE token_cliente IS NULL")
+            propostas = cursor.fetchall()
+            
+            tokens_gerados = 0
+            for proposta in propostas:
+                proposta_id = proposta[0]
+                token = secrets.token_urlsafe(32)
+                cursor.execute("""
+                    UPDATE proposta 
+                    SET token_cliente = %s 
+                    WHERE id = %s
+                """, (token, proposta_id))
+                tokens_gerados += 1
+            
+            logger.info(f"✅ {tokens_gerados} tokens gerados para propostas existentes")
+        else:
+            logger.debug("✅ Coluna 'token_cliente' já existe - skip")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 55 CONCLUÍDA!")
+        logger.info("   📊 Campo token_cliente para acesso público ao portal")
+        logger.info("   🔒 Tokens únicos gerados automaticamente")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 55: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2675,6 +2763,7 @@ def executar_migracoes():
             (52, "RDO Foto - otimização de campos", _migration_52_rdo_foto_campos_otimizacao),
             (53, "RDO Foto - persistência Base64", _migration_53_rdo_foto_base64),
             (54, "Tamanho logo portal do cliente", _migration_54_logo_tamanho_portal),
+            (55, "Token cliente para portal público", _migration_55_token_cliente_proposta),
         ]
         
         # Executar cada migração com rastreamento
