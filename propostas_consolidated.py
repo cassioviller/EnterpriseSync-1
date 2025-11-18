@@ -1389,11 +1389,14 @@ def download_arquivo(arquivo_id):
             buffer = BytesIO(arquivo_bytes)
             buffer.seek(0)
             
+            # 🔧 FIX: Renomear extensão para .webp (imagem foi convertida no upload)
+            nome_download = os.path.splitext(arquivo.nome_original)[0] + '.webp'
+            
             return send_file(
                 buffer,
                 mimetype='image/webp',
                 as_attachment=False,
-                download_name=arquivo.nome_original
+                download_name=nome_download
             )
         
         # 📄 OUTROS ARQUIVOS: usar arquivo_base64
