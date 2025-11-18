@@ -478,12 +478,28 @@ def visualizar(id):
             []
         )
         
+        # Organizar itens por template e categoria (igual ao portal do cliente)
+        if hasattr(proposta, 'itens') and proposta.itens:
+            templates_organizados = organizar_itens_por_template(proposta.itens)
+            proposta.templates_organizados = templates_organizados
+        else:
+            proposta.templates_organizados = []
+        
+        # Calcular total geral: priorizar valor_total da proposta (manual), senão calcular dos itens
+        if proposta.valor_total:
+            total_geral = proposta.valor_total
+        elif proposta.itens:
+            total_geral = sum(item.quantidade * item.preco_unitario for item in proposta.itens)
+        else:
+            total_geral = 0
+        
         print(f"DEBUG VISUALIZAR: Proposta {proposta.numero} - {len(itens)} itens")
         
         return render_template('propostas/detalhes_proposta.html',
                              proposta=proposta,
                              itens=itens,
                              arquivos=arquivos,
+                             total_geral=total_geral,
                              date=date)
         
     except Exception as e:

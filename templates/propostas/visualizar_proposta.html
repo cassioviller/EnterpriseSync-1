@@ -7,8 +7,8 @@
     <!-- Cabeçalho -->
     <div class="row mb-4">
         <div class="col-md-8">
-            <h2><i class="fas fa-file-contract"></i> Proposta {{ proposta.numero }}</h2>
-            <p class="text-muted">{{ proposta.titulo or 'Sem título' }} - {{ proposta.cliente_nome }}</p>
+            <h2><i class="fas fa-file-contract"></i> Proposta {{ proposta.numero }} - {{ proposta.cliente_nome }}</h2>
+            <p class="text-muted">{{ proposta.titulo or 'Sem título' }}</p>
         </div>
         <div class="col-md-4 text-end">
             <div class="btn-group" role="group">
@@ -158,6 +158,70 @@
                 </div>
             </div>
 
+            <!-- Tabelas de Serviços por Template (igual ao Portal do Cliente) -->
+            {% if proposta.templates_organizados %}
+                {% for template_info in proposta.templates_organizados %}
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-list-alt"></i> {{ template_info.template_nome }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 40px; text-align: center;">Item</th>
+                                        <th style="min-width: 120px;">Descrição</th>
+                                        <th style="width: 60px; text-align: center;">Qtd</th>
+                                        <th style="width: 50px; text-align: center;">Un.</th>
+                                        <th style="width: 100px; text-align: right;">Preço Unit.</th>
+                                        <th style="width: 100px; text-align: right;">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for categoria, itens_categoria in template_info.categorias %}
+                                        {% if categoria and categoria != 'Serviços' %}
+                                        <tr class="table-secondary">
+                                            <td colspan="6" class="fw-bold">{{ categoria }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% for item in itens_categoria %}
+                                        <tr>
+                                            <td class="text-center fw-bold">{{ item.item_numero }}</td>
+                                            <td style="word-break: break-word;">{{ item.descricao }}</td>
+                                            <td class="text-center">{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                            <td class="text-center">{{ item.unidade }}</td>
+                                            <td class="text-end">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                            <td class="text-end fw-bold text-success">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-info">
+                                    <tr class="fw-bold">
+                                        <td colspan="5" class="text-end fs-6 py-2">SUBTOTAL:</td>
+                                        <td class="text-end fs-6 py-2">R$ {{ "{:,.2f}".format(template_info.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <!-- Total Geral -->
+                <div class="card mb-4" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none;">
+                    <div class="card-body text-center py-4">
+                        <h4 class="mb-2" style="font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Valor Total da Proposta</h4>
+                        <div style="font-size: 2.5rem; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+                            R$ {{ "{:,.2f}".format(total_geral or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Escopo de Serviços (Tabela Antiga - removida caso existam templates organizados) -->
+            {% if not proposta.templates_organizados %}
             <!-- Escopo de Serviços -->
             <div class="card mb-4">
                 <div class="card-header">
@@ -213,6 +277,7 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
 
             <!-- Condições -->
             {% if proposta.condicoes_pagamento or proposta.garantias or proposta.observacoes %}
