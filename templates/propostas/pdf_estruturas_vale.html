@@ -484,14 +484,14 @@
                             <td>{{ item.item_numero }}</td>
                             <td>{{ item.descricao }}</td>
                             <td>{{ item.unidade }}</td>
-                            <td>{{ "%.2f"|format(item.quantidade) }}</td>
-                            <td class="price">{{ "R$ %.2f"|format(item.preco_unitario) }}</td>
-                            <td class="price"><strong>{{ "R$ %.2f"|format(item.subtotal) }}</strong></td>
+                            <td>{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                            <td class="price">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                            <td class="price"><strong>R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong></td>
                         </tr>
                         {% endfor %}
                         <tr>
                             <td colspan="5"><strong>VALOR TOTAL DA PROPOSTA:</strong></td>
-                            <td class="price"><strong>{{ "R$ %.2f"|format(proposta.valor_total or 0) }}</strong></td>
+                            <td class="price"><strong>R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong></td>
                         </tr>
                     </tbody>
                 </table>
