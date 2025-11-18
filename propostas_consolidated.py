@@ -1145,12 +1145,12 @@ def otimizar_imagem(caminho_arquivo, max_width=1920, qualidade=85):
     """Otimiza imagens redimensionando e comprimindo
     
     Args:
-        caminho_arquivo: Caminho do arquivo de imagem
+        caminho_arquivo: Caminho do arquivo de imagem original
         max_width: Largura máxima em pixels
         qualidade: Qualidade de compressão (1-100)
     
     Returns:
-        Tamanho final do arquivo otimizado
+        Tupla (novo_caminho, tamanho_bytes) - caminho pode ser diferente se convertido para WebP
     """
     try:
         with Image.open(caminho_arquivo) as img:
@@ -1175,17 +1175,21 @@ def otimizar_imagem(caminho_arquivo, max_width=1920, qualidade=85):
                 caminho_webp = os.path.splitext(caminho_arquivo)[0] + '.webp'
                 img.save(caminho_webp, 'WEBP', quality=qualidade, optimize=True)
                 
-                # Remover arquivo original e renomear WebP
+                # Remover arquivo original
                 os.remove(caminho_arquivo)
-                os.rename(caminho_webp, caminho_arquivo)
+                
+                # Retornar caminho WebP e tamanho
+                return caminho_webp, os.path.getsize(caminho_webp)
             else:
                 # Para outros formatos, apenas comprimir
                 img.save(caminho_arquivo, quality=qualidade, optimize=True)
-            
-            return os.path.getsize(caminho_arquivo)
+                return caminho_arquivo, os.path.getsize(caminho_arquivo)
     except Exception as e:
         print(f"ERRO OTIMIZAR IMAGEM: {str(e)}")
-        return os.path.getsize(caminho_arquivo)
+        import traceback
+        traceback.print_exc()
+        # Em caso de erro, retornar arquivo original
+        return caminho_arquivo, os.path.getsize(caminho_arquivo)
 
 def get_file_category(filename):
     """Determina a categoria do arquivo baseado na extensão"""
@@ -1242,10 +1246,12 @@ def upload_arquivo(id):
             # Otimizar se for imagem
             if ext in ['jpg', 'jpeg', 'png', 'gif']:
                 print(f"DEBUG UPLOAD: Otimizando imagem {nome_original}...")
-                tamanho_otimizado = otimizar_imagem(caminho_completo)
-                print(f"DEBUG UPLOAD: Imagem otimizada: {tamanho_otimizado} bytes")
-            
-            tamanho_bytes = os.path.getsize(caminho_completo)
+                caminho_completo, tamanho_bytes = otimizar_imagem(caminho_completo)
+                print(f"DEBUG UPLOAD: Imagem otimizada: {tamanho_bytes} bytes")
+                # Atualizar nome do arquivo se foi convertido para WebP
+                nome_arquivo = os.path.basename(caminho_completo)
+            else:
+                tamanho_bytes = os.path.getsize(caminho_completo)
             
             # Salvar no banco
             proposta_arquivo = PropostaArquivo()
@@ -1297,11 +1303,18 @@ def download_arquivo(arquivo_id):
             flash('Arquivo não encontrado no servidor', 'error')
             return redirect(url_for('propostas.index'))
         
+        # Determinar mimetype correto baseado na extensão real do arquivo
+        extensao = os.path.splitext(arquivo.caminho_arquivo)[1].lower()
+        if extensao == '.webp':
+            mimetype = 'image/webp'
+        else:
+            mimetype = arquivo.tipo_arquivo or mimetypes.guess_type(arquivo.caminho_arquivo)[0]
+        
         return send_file(
             arquivo.caminho_arquivo,
             as_attachment=False,
             download_name=arquivo.nome_original,
-            mimetype=arquivo.tipo_arquivo
+            mimetype=mimetype
         )
         
     except Exception as e:
