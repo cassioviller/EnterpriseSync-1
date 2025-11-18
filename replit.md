@@ -2,6 +2,18 @@
 SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management system for SMBs, designed to automate and streamline core operations. It covers commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations.
 
 ## Recent Changes (November 2025)
+**v9.4.0 - File Attachment System with Intelligent Optimization (CRITICAL)**
+- **FEATURE**: Complete file attachment system for proposals (PDF, images, DWG, DXF, documents)
+- Added routes: POST /propostas/<id>/upload-arquivo, GET /propostas/arquivo/<id>, POST /propostas/arquivo/<id>/delete
+- **Intelligent Image Optimization**: Automatic WebP conversion with 85% quality, max 1920px width
+- **Performance Impact**: 91.5% file size reduction (8231 bytes → 950 bytes in tests)
+- File categorization: PDF (red icon), Image (green), DWG (blue), Documents (gray)
+- UI: "Arquivos de Referência" section with 2-column grid, download/delete per file
+- SweetAlert2 integration for upload progress and delete confirmations
+- Secure storage with UUID-based filenames in static/uploads/propostas/<id>/
+- Database integrity: preserves original filename while storing optimized WebP
+- **Impact**: Professional proposal attachments with automatic optimization for performance
+
 **v9.3.0 - Portal Enhancements: Configurable Logo & Fixed Button Bug (CRITICAL)**
 - **FEATURE**: Company logo size now configurable in settings (pequeno/medio/grande)
 - Added Migration 54: `logo_tamanho_portal` field to `configuracao_empresa` table
@@ -82,7 +94,7 @@ The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL. Jinja2
 -   **Dynamic PDF Generation:** Supports custom headers, dynamic content, and multi-category displays.
 -   **Company Customization:** Allows dynamic branding via logo uploads and custom color schemes.
 -   **Core Modules:**
-    -   **Proposal Management:** Reusable templates with **multi-template loading system** (allows loading multiple template tables simultaneously in proposals), automated calculations with inline editing, real-time total recalculation, **HTML-based PDF generation** with 9-section structure (objeto, preços, inclusos, exclusos, pagamento, entrega, garantias, considerações, validade), and history tracking. Template system supports structured JSON data with editable quantity/pricing fields. **Client portal** with token-based access for public proposal viewing, approval, and rejection without login. **Portal link visibility:** Link to client portal now appears immediately upon proposal creation (even for drafts), with contextual warning banner for draft status. Templates protected against None-type errors with defensive rendering patterns. **PDF item rendering:** Tables render when proposal contains items (PropostaItem records); empty proposals show section headers only.
+    -   **Proposal Management:** Reusable templates with **multi-template loading system** (allows loading multiple template tables simultaneously in proposals), automated calculations with inline editing, real-time total recalculation, **HTML-based PDF generation** with 9-section structure (objeto, preços, inclusos, exclusos, pagamento, entrega, garantias, considerações, validade), and history tracking. Template system supports structured JSON data with editable quantity/pricing fields. **Client portal** with token-based access for public proposal viewing, approval, and rejection without login. **Portal link visibility:** Link to client portal now appears immediately upon proposal creation (even for drafts), with contextual warning banner for draft status. Templates protected against None-type errors with defensive rendering patterns. **PDF item rendering:** Tables render when proposal contains items (PropostaItem records); empty proposals show section headers only. **File Attachment System:** Complete CRUD for proposal attachments with intelligent image optimization (automatic WebP conversion achieving 91.5% size reduction), support for PDF/DWG/DXF/images/documents, secure UUID-based storage, category-based icons, and SweetAlert2 integration for upload/delete operations.
     -   **Employee Management:** Registration, automated time clocking, and overtime calculations.
     -   **Construction Project Management (RDO):** Daily Work Reports, dynamic service progress, consolidated routing, and a comprehensive mobile-first photo upload system with automatic WebP optimization, thumbnail generation, custom full-screen lightbox, inline captioning, and **database-based base64 storage** for production-grade photo persistence (prevents photo loss on container restarts). **Advanced filtering system** with obra, status, funcionário (via JOIN on RDOMaoObra), date range filters, and dynamic ordering (date desc/asc, obra alphabetical, status).
     -   **Payroll:** Automated CLT-compliant calculations, late deduction processing, and dynamic PDF holerite generation with automated accounting integration.
