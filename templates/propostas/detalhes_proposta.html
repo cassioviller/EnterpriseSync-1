@@ -33,6 +33,10 @@
                 <i class="fas fa-file-pdf me-1"></i> Gerar PDF
             </a>
             
+            <button class="btn btn-danger" onclick="excluirProposta()">
+                <i class="fas fa-trash me-1"></i> Excluir
+            </button>
+            
             <a href="{{ url_for('propostas.index') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left me-1"></i> Voltar
             </a>
@@ -431,6 +435,43 @@ function copiarLinkPortal(btn) {
             alert('Erro ao copiar link: ' + err);
         });
     }
+}
+
+function excluirProposta() {
+    Swal.fire({
+        title: 'Excluir Proposta',
+        html: `
+            <p>Tem certeza que deseja <strong>EXCLUIR PERMANENTEMENTE</strong> esta proposta?</p>
+            <p class="text-danger"><strong>Esta ação não pode ser desfeita!</strong></p>
+            <textarea id="motivoExclusao" class="form-control mt-3" placeholder="Motivo da exclusão (opcional)" rows="3"></textarea>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, excluir!',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        backdrop: 'rgba(0, 0, 0, 0.4)'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Criar formulário e enviar POST para deletar
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/propostas/deletar/{{ proposta.id }}';
+            
+            const motivo = document.getElementById('motivoExclusao').value;
+            if (motivo) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'motivo';
+                input.value = motivo;
+                form.appendChild(input);
+            }
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
 }
 </script>
 {% endblock %}
