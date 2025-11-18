@@ -20,6 +20,7 @@ import uuid
 import mimetypes
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, desc, or_, and_, text
+from PIL import Image
 
 # Importar utilitários de resiliência
 try:
@@ -1137,5 +1138,206 @@ def api_clientes():
     except Exception as e:
         print(f"ERRO API CLIENTES: {str(e)}")
         return jsonify({'error': str(e)}), 400
+
+# ===== ROTAS DE ARQUIVOS =====
+
+def otimizar_imagem(caminho_arquivo, max_width=1920, qualidade=85):
+    """Otimiza imagens redimensionando e comprimindo
+    
+    Args:
+        caminho_arquivo: Caminho do arquivo de imagem
+        max_width: Largura máxima em pixels
+        qualidade: Qualidade de compressão (1-100)
+    
+    Returns:
+        Tamanho final do arquivo otimizado
+    """
+    try:
+        with Image.open(caminho_arquivo) as img:
+            # Converter RGBA para RGB se necessário
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+            
+            # Redimensionar se necessário
+            if img.width > max_width:
+                ratio = max_width / img.width
+                new_height = int(img.height * ratio)
+                img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+            
+            # Salvar otimizado (converter para WebP se for imagem)
+            extensao = os.path.splitext(caminho_arquivo)[1].lower()
+            if extensao in ['.jpg', '.jpeg', '.png', '.gif']:
+                # Converter para WebP para melhor compressão
+                caminho_webp = os.path.splitext(caminho_arquivo)[0] + '.webp'
+                img.save(caminho_webp, 'WEBP', quality=qualidade, optimize=True)
+                
+                # Remover arquivo original e renomear WebP
+                os.remove(caminho_arquivo)
+                os.rename(caminho_webp, caminho_arquivo)
+            else:
+                # Para outros formatos, apenas comprimir
+                img.save(caminho_arquivo, quality=qualidade, optimize=True)
+            
+            return os.path.getsize(caminho_arquivo)
+    except Exception as e:
+        print(f"ERRO OTIMIZAR IMAGEM: {str(e)}")
+        return os.path.getsize(caminho_arquivo)
+
+def get_file_category(filename):
+    """Determina a categoria do arquivo baseado na extensão"""
+    ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+    
+    if ext in ['dwg', 'dxf']:
+        return 'dwg'
+    elif ext in ['pdf']:
+        return 'pdf'
+    elif ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+        return 'imagem'
+    elif ext in ['doc', 'docx', 'xlsx', 'xls', 'txt']:
+        return 'documento'
+    else:
+        return 'outros'
+
+@propostas_bp.route('/<int:id>/upload-arquivo', methods=['POST'])
+@login_required
+@admin_required
+def upload_arquivo(id):
+    """Upload de múltiplos arquivos para uma proposta com otimização"""
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        if 'arquivos' not in request.files:
+            return jsonify({'success': False, 'message': 'Nenhum arquivo selecionado'}), 400
+        
+        arquivos = request.files.getlist('arquivos')
+        arquivos_salvos = []
+        
+        for arquivo in arquivos:
+            if arquivo.filename == '':
+                continue
+            
+            # Validar extensão
+            filename = arquivo.filename
+            ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+            if ext not in ALLOWED_EXTENSIONS:
+                continue
+            
+            # Criar diretório se não existir
+            upload_path = os.path.join(UPLOAD_FOLDER, str(proposta.id))
+            os.makedirs(upload_path, exist_ok=True)
+            
+            # Gerar nome único
+            nome_original = secure_filename(filename)
+            nome_arquivo = f"{uuid.uuid4().hex}.{ext}"
+            caminho_completo = os.path.join(upload_path, nome_arquivo)
+            
+            # Salvar arquivo
+            arquivo.save(caminho_completo)
+            
+            # Otimizar se for imagem
+            if ext in ['jpg', 'jpeg', 'png', 'gif']:
+                print(f"DEBUG UPLOAD: Otimizando imagem {nome_original}...")
+                tamanho_otimizado = otimizar_imagem(caminho_completo)
+                print(f"DEBUG UPLOAD: Imagem otimizada: {tamanho_otimizado} bytes")
+            
+            tamanho_bytes = os.path.getsize(caminho_completo)
+            
+            # Salvar no banco
+            proposta_arquivo = PropostaArquivo()
+            proposta_arquivo.admin_id = admin_id
+            proposta_arquivo.proposta_id = proposta.id
+            proposta_arquivo.nome_arquivo = nome_arquivo
+            proposta_arquivo.nome_original = nome_original
+            proposta_arquivo.tipo_arquivo = mimetypes.guess_type(nome_original)[0]
+            proposta_arquivo.tamanho_bytes = tamanho_bytes
+            proposta_arquivo.caminho_arquivo = caminho_completo
+            proposta_arquivo.categoria = get_file_category(nome_original)
+            proposta_arquivo.enviado_por = current_user.id
+            
+            db.session.add(proposta_arquivo)
+            arquivos_salvos.append({
+                'id': proposta_arquivo.id,
+                'nome': nome_original,
+                'tamanho': tamanho_bytes,
+                'categoria': proposta_arquivo.categoria
+            })
+        
+        db.session.commit()
+        
+        print(f"DEBUG UPLOAD: {len(arquivos_salvos)} arquivos salvos para proposta {proposta.numero}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'{len(arquivos_salvos)} arquivo(s) enviado(s) com sucesso!',
+            'arquivos': arquivos_salvos
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO UPLOAD ARQUIVO: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Erro ao fazer upload: {str(e)}'}), 500
+
+@propostas_bp.route('/arquivo/<int:arquivo_id>')
+@login_required
+@admin_required
+def download_arquivo(arquivo_id):
+    """Download/visualização de arquivo anexado"""
+    try:
+        admin_id = get_admin_id()
+        arquivo = PropostaArquivo.query.filter_by(id=arquivo_id, admin_id=admin_id).first_or_404()
+        
+        if not os.path.exists(arquivo.caminho_arquivo):
+            flash('Arquivo não encontrado no servidor', 'error')
+            return redirect(url_for('propostas.index'))
+        
+        return send_file(
+            arquivo.caminho_arquivo,
+            as_attachment=False,
+            download_name=arquivo.nome_original,
+            mimetype=arquivo.tipo_arquivo
+        )
+        
+    except Exception as e:
+        print(f"ERRO DOWNLOAD ARQUIVO: {str(e)}")
+        flash(f'Erro ao baixar arquivo: {str(e)}', 'error')
+        return redirect(url_for('propostas.index'))
+
+@propostas_bp.route('/arquivo/<int:arquivo_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def deletar_arquivo(arquivo_id):
+    """Deletar arquivo anexado"""
+    try:
+        admin_id = get_admin_id()
+        arquivo = PropostaArquivo.query.filter_by(id=arquivo_id, admin_id=admin_id).first_or_404()
+        
+        proposta_id = arquivo.proposta_id
+        
+        # Remover arquivo físico
+        if os.path.exists(arquivo.caminho_arquivo):
+            os.remove(arquivo.caminho_arquivo)
+        
+        # Remover do banco
+        db.session.delete(arquivo)
+        db.session.commit()
+        
+        print(f"DEBUG DELETE: Arquivo {arquivo.nome_original} excluído")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Arquivo excluído com sucesso!'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO DELETAR ARQUIVO: {str(e)}")
+        return jsonify({'success': False, 'message': f'Erro ao excluir arquivo: {str(e)}'}), 500
 
 print("✅ Propostas Consolidated Blueprint carregado com padrões de resiliência")

@@ -46,6 +46,75 @@
     <div class="row">
         <!-- Informações Gerais -->
         <div class="col-md-8">
+            <!-- Arquivos de Referência -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-paperclip me-2"></i>Arquivos de Referência</h5>
+                    <button class="btn btn-light btn-sm" onclick="document.getElementById('uploadInput').click()">
+                        <i class="fas fa-upload me-1"></i> Adicionar Arquivos
+                    </button>
+                </div>
+                <div class="card-body">
+                    <form id="uploadForm" style="display: none;">
+                        <input type="file" id="uploadInput" name="arquivos" multiple 
+                               accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xlsx,.xls"
+                               onchange="uploadArquivos()">
+                    </form>
+                    
+                    <div id="listaArquivos">
+                        {% if arquivos %}
+                        <div class="row">
+                            {% for arquivo in arquivos %}
+                            <div class="col-md-6 mb-3" id="arquivo-{{ arquivo.id }}">
+                                <div class="card h-100">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex align-items-start">
+                                            <div class="me-3">
+                                                {% if arquivo.categoria == 'imagem' %}
+                                                <i class="fas fa-image fa-2x text-success"></i>
+                                                {% elif arquivo.categoria == 'pdf' %}
+                                                <i class="fas fa-file-pdf fa-2x text-danger"></i>
+                                                {% elif arquivo.categoria == 'dwg' %}
+                                                <i class="fas fa-drafting-compass fa-2x text-primary"></i>
+                                                {% else %}
+                                                <i class="fas fa-file fa-2x text-secondary"></i>
+                                                {% endif %}
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <h6 class="mb-1">{{ arquivo.nome_original }}</h6>
+                                                <small class="text-muted">
+                                                    {{ (arquivo.tamanho_bytes / 1024) | round(2) }} KB
+                                                    {% if arquivo.enviado_em %}
+                                                    • {{ arquivo.enviado_em.strftime('%d/%m/%Y %H:%M') }}
+                                                    {% endif %}
+                                                </small>
+                                                <div class="mt-2">
+                                                    <a href="{{ url_for('propostas.download_arquivo', arquivo_id=arquivo.id) }}" 
+                                                       class="btn btn-sm btn-outline-primary" target="_blank">
+                                                        <i class="fas fa-download"></i> Baixar
+                                                    </a>
+                                                    <button class="btn btn-sm btn-outline-danger" 
+                                                            onclick="deletarArquivo({{ arquivo.id }})">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted text-center py-3">
+                            <i class="fas fa-folder-open fa-3x mb-2"></i><br>
+                            Nenhum arquivo anexado. Clique em "Adicionar Arquivos" para enviar PDFs, imagens ou arquivos DWG.
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">Detalhes da Proposta</h5>
@@ -470,6 +539,109 @@ function excluirProposta() {
             
             document.body.appendChild(form);
             form.submit();
+        }
+    });
+}
+
+function uploadArquivos() {
+    const input = document.getElementById('uploadInput');
+    const files = input.files;
+    
+    if (files.length === 0) return;
+    
+    // Mostrar loading
+    Swal.fire({
+        title: 'Enviando arquivos...',
+        html: `Fazendo upload de ${files.length} arquivo(s)`,
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('arquivos', files[i]);
+    }
+    
+    fetch('/propostas/{{ proposta.id }}/upload-arquivo', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: data.message
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message || 'Erro ao fazer upload dos arquivos'
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao fazer upload dos arquivos'
+        });
+    });
+}
+
+function deletarArquivo(arquivoId) {
+    Swal.fire({
+        title: 'Excluir Arquivo',
+        text: 'Tem certeza que deseja excluir este arquivo?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, excluir!',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`/propostas/arquivo/${arquivoId}/delete`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remover card do arquivo da interface
+                    const arquivoCard = document.getElementById(`arquivo-${arquivoId}`);
+                    if (arquivoCard) {
+                        arquivoCard.remove();
+                    }
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Arquivo excluído!',
+                        text: data.message,
+                        timer: 2000
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao excluir arquivo'
+                });
+            });
         }
     });
 }
