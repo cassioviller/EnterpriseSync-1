@@ -491,6 +491,70 @@ def visualizar(id):
         flash(f'Erro ao carregar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.index'))
 
+@propostas_bp.route('/<int:id>/status', methods=['POST'])
+@login_required
+@admin_required
+def alterar_status(id):
+    """Altera o status da proposta"""
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        
+        data = request.get_json()
+        novo_status = data.get('status', '').upper()
+        motivo = data.get('motivo', '')
+        
+        status_validos = ['RASCUNHO', 'ENVIADA', 'EM_ANALISE', 'APROVADA', 'REJEITADA', 'EXPIRADA']
+        if novo_status not in status_validos:
+            return jsonify({
+                'success': False,
+                'message': f'Status inválido. Use: {", ".join(status_validos)}'
+            }), 400
+        
+        status_anterior = proposta.status
+        proposta.status = novo_status
+        
+        if novo_status == 'ENVIADA':
+            proposta.data_envio = datetime.utcnow()
+        elif novo_status == 'APROVADA':
+            proposta.data_aprovacao = datetime.utcnow()
+        elif novo_status == 'REJEITADA':
+            proposta.data_resposta_cliente = datetime.utcnow()
+        
+        historico = PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao=f'status_alterado_{status_anterior.lower()}_para_{novo_status.lower()}',
+            observacao=motivo if motivo else f'Status alterado de {status_anterior} para {novo_status}',
+            data_hora=datetime.utcnow()
+        )
+        
+        db.session.add(historico)
+        db.session.commit()
+        
+        mensagens_status = {
+            'ENVIADA': 'Proposta enviada com sucesso! O cliente pode visualizar e responder.',
+            'APROVADA': 'Proposta aprovada!',
+            'REJEITADA': 'Proposta rejeitada.',
+            'EM_ANALISE': 'Proposta marcada como "Em Análise".',
+            'RASCUNHO': 'Proposta voltou para rascunho.',
+            'EXPIRADA': 'Proposta marcada como expirada.'
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': mensagens_status.get(novo_status, 'Status alterado com sucesso!'),
+            'novo_status': novo_status
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERRO ALTERAR STATUS: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao alterar status: {str(e)}'
+        }), 500
+
 @propostas_bp.route('/<int:id>/pdf')
 @login_required
 @admin_required
