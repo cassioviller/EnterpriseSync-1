@@ -2550,6 +2550,84 @@ def _migration_53_rdo_foto_base64():
             except:
                 pass
 
+def _migration_54_logo_tamanho_portal():
+    """
+    Migração 54: Adicionar campo logo_tamanho_portal em configuracao_empresa
+    - logo_tamanho_portal: VARCHAR(20) DEFAULT 'medio'
+    - Permite configurar tamanho da logo no portal do cliente
+    - Opções: 'pequeno', 'medio', 'grande'
+    """
+    logger.info("=" * 80)
+    logger.info("🔥 MIGRAÇÃO 54: Campo logo_tamanho_portal em configuracao_empresa")
+    logger.info("=" * 80)
+    
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se coluna já existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'configuracao_empresa' 
+            AND column_name = 'logo_tamanho_portal'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("🔧 Adicionando coluna 'logo_tamanho_portal' em configuracao_empresa...")
+            cursor.execute("""
+                ALTER TABLE configuracao_empresa 
+                ADD COLUMN logo_tamanho_portal VARCHAR(20) DEFAULT 'medio'
+            """)
+            logger.info("✅ Coluna 'logo_tamanho_portal' adicionada!")
+            
+            # Aplicar valor padrão em registros existentes
+            cursor.execute("""
+                UPDATE configuracao_empresa 
+                SET logo_tamanho_portal = 'medio' 
+                WHERE logo_tamanho_portal IS NULL
+            """)
+            updated_rows = cursor.rowcount
+            logger.info(f"✅ {updated_rows} registros atualizados com valor padrão 'medio'")
+        else:
+            logger.debug("✅ Coluna 'logo_tamanho_portal' já existe - skip")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 54 CONCLUÍDA!")
+        logger.info("   📊 Campo configurável de tamanho de logo no portal")
+        logger.info("   🎯 Opções: pequeno (100px), medio (160px), grande (240px)")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 54: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2596,6 +2674,7 @@ def executar_migracoes():
             (51, "Schema completo tabela custo_veiculo", _migration_51_custo_veiculo_schema_completo),
             (52, "RDO Foto - otimização de campos", _migration_52_rdo_foto_campos_otimizacao),
             (53, "RDO Foto - persistência Base64", _migration_53_rdo_foto_base64),
+            (54, "Tamanho logo portal do cliente", _migration_54_logo_tamanho_portal),
         ]
         
         # Executar cada migração com rastreamento

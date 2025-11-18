@@ -16,6 +16,7 @@
             background: linear-gradient(135deg, var(--cor-primaria) 0%, var(--cor-secundaria) 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-bottom: 120px;
         }
         .portal-container {
             max-width: 1000px;
@@ -38,8 +39,16 @@
             line-height: 1.2;
         }
         .company-logo img {
+            {% if config_empresa and config_empresa.logo_tamanho_portal == 'pequeno' %}
+            max-height: 100px;
+            max-width: 250px;
+            {% elif config_empresa and config_empresa.logo_tamanho_portal == 'grande' %}
+            max-height: 240px;
+            max-width: 600px;
+            {% else %}
             max-height: 160px;
             max-width: 400px;
+            {% endif %}
             margin-bottom: 20px;
             object-fit: contain;
         }
@@ -67,14 +76,17 @@
             margin: 20px 0;
         }
         .action-buttons {
-            position: sticky;
-            bottom: 20px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             background: white;
-            padding: 15px;
-            border-radius: 15px;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+            padding: 20px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
             text-align: center;
-            margin-top: 20px;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.98);
         }
         .btn-approve {
             background: linear-gradient(45deg, #28a745, #20c997);
@@ -84,9 +96,14 @@
             color: white;
             font-weight: bold;
             font-size: 1.1rem;
-            margin: 10px;
+            margin: 5px;
             min-width: 200px;
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+            transition: all 0.3s ease;
+        }
+        .btn-approve:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.5);
         }
         .btn-reject {
             background: linear-gradient(45deg, #dc3545, #e74c3c);
@@ -96,9 +113,14 @@
             color: white;
             font-weight: bold;
             font-size: 1.1rem;
-            margin: 10px;
+            margin: 5px;
             min-width: 200px;
-            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
+            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
+            transition: all 0.3s ease;
+        }
+        .btn-reject:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(220, 53, 69, 0.5);
         }
         .section-title {
             color: var(--cor-primaria);
@@ -150,8 +172,16 @@
             }
             
             .company-logo img {
+                {% if config_empresa and config_empresa.logo_tamanho_portal == 'pequeno' %}
+                max-height: 60px;
+                max-width: 180px;
+                {% elif config_empresa and config_empresa.logo_tamanho_portal == 'grande' %}
+                max-height: 120px;
+                max-width: 350px;
+                {% else %}
                 max-height: 80px;
                 max-width: 280px;
+                {% endif %}
                 margin-bottom: 12px;
             }
             
@@ -699,6 +729,15 @@
                 {% if proposta.data_resposta_cliente %}
                 <small class="text-muted">Rejeitada em {{ proposta.data_resposta_cliente.strftime('%d/%m/%Y às %H:%M') }}</small>
                 {% endif %}
+            </div>
+        </div>
+        {% elif proposta.status == 'rascunho' or proposta.status == 'draft' %}
+        <!-- Aviso de proposta em rascunho (SEM botões flutuantes) -->
+        <div class="proposal-card mt-3">
+            <div class="alert alert-warning text-center mb-0">
+                <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                <h4>Proposta em Elaboração</h4>
+                <p class="mb-0">Esta proposta ainda está sendo elaborada e não está disponível para aprovação. Aguarde o envio oficial por parte de nossa equipe.</p>
             </div>
         </div>
         {% endif %}

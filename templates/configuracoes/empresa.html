@@ -175,6 +175,30 @@
                             </div>
                         </div>
                         
+                        <!-- Tamanho da Logo no Portal -->
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="logo_tamanho_portal" class="form-label">
+                                        <i class="fas fa-expand-arrows-alt me-2"></i>
+                                        Tamanho da Logo no Portal do Cliente
+                                    </label>
+                                    <select class="form-select" id="logo_tamanho_portal" name="logo_tamanho_portal">
+                                        <option value="pequeno" {% if config and config.logo_tamanho_portal == 'pequeno' %}selected{% endif %}>
+                                            Pequeno (100px)
+                                        </option>
+                                        <option value="medio" {% if not config or config.logo_tamanho_portal == 'medio' %}selected{% endif %}>
+                                            Médio (160px) - Padrão
+                                        </option>
+                                        <option value="grande" {% if config and config.logo_tamanho_portal == 'grande' %}selected{% endif %}>
+                                            Grande (240px)
+                                        </option>
+                                    </select>
+                                    <small class="text-muted">Define o tamanho máximo da logo exibida no portal do cliente</small>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <hr class="my-4">
                         
                         <!-- Seção de Cores -->

@@ -2754,6 +2754,7 @@ class ConfiguracaoEmpresa(db.Model):
     cor_primaria = db.Column(db.String(7), default='#007bff')  # Cor primária em hexadecimal
     cor_secundaria = db.Column(db.String(7), default='#6c757d')  # Cor secundária
     cor_fundo_proposta = db.Column(db.String(7), default='#f8f9fa')  # Cor de fundo das propostas
+    logo_tamanho_portal = db.Column(db.String(20), default='medio')  # Tamanho da logo no portal: pequeno, medio, grande
     
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 

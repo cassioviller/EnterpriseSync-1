@@ -96,12 +96,14 @@ def salvar_empresa():
         cor_primaria = request.form.get('cor_primaria', '#007bff')
         cor_secundaria = request.form.get('cor_secundaria', '#6c757d') 
         cor_fundo = request.form.get('cor_fundo_proposta', '#f8f9fa')
+        logo_tamanho = request.form.get('logo_tamanho_portal', 'medio')
         
         config.cor_primaria = cor_primaria
         config.cor_secundaria = cor_secundaria
         config.cor_fundo_proposta = cor_fundo
+        config.logo_tamanho_portal = logo_tamanho
         
-        print(f"DEBUG CORES: primaria={cor_primaria}, secundaria={cor_secundaria}, fundo={cor_fundo}")
+        print(f"DEBUG CORES: primaria={cor_primaria}, secundaria={cor_secundaria}, fundo={cor_fundo}, logo_tamanho={logo_tamanho}")
         
         config.itens_inclusos_padrao = request.form.get('itens_inclusos_padrao')
         config.itens_exclusos_padrao = request.form.get('itens_exclusos_padrao')
