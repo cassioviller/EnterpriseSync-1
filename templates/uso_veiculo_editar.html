@@ -700,7 +700,7 @@ console.log('Initializing Uso Veículo Editar with light theme...');
         
         <div class="veiculo-stats">
             <div class="stat-item">
-                <div class="stat-value">{{ "{:,}".format(veiculo.km_atual).replace(',', '.') }} km</div>
+                <div class="stat-value">{{ "{:,}".format(veiculo.km_atual or 0).replace(',', '.') }} km</div>
                 <div class="stat-label">KM Atual</div>
             </div>
             <div class="stat-item">
