@@ -46,7 +46,7 @@ def lista():
         # DEBUG: print(f"🔍 [FROTA_LISTA] tenant_admin_id = {tenant_admin_id}")
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Capturar filtros da URL
         filtros = {
@@ -128,7 +128,7 @@ def novo():
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         if request.method == 'GET':
             return render_template('veiculos_novo.html')
@@ -190,7 +190,7 @@ def detalhes(id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar veículo da frota
         veiculo = FrotaVeiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
@@ -290,7 +290,7 @@ def editar(id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar veículo da frota
         veiculo = FrotaVeiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
@@ -361,7 +361,7 @@ def reativar(id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar veículo inativo
         veiculo = FrotaVeiculo.query.filter_by(id=id, admin_id=tenant_admin_id, ativo=False).first()
@@ -398,7 +398,7 @@ def novo_uso(veiculo_id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar veículo da frota
         veiculo = FrotaVeiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
@@ -529,7 +529,7 @@ def novo_custo(veiculo_id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar veículo da frota
         veiculo = FrotaVeiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
@@ -629,7 +629,7 @@ def editar_uso(uso_id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar uso da frota
         uso = FrotaUtilizacao.query.filter_by(id=uso_id, admin_id=tenant_admin_id).first()
@@ -731,7 +731,7 @@ def deletar_uso(uso_id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar uso da frota
         uso = FrotaUtilizacao.query.filter_by(id=uso_id, admin_id=tenant_admin_id).first()
@@ -798,7 +798,7 @@ def editar_custo(custo_id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar custo da frota
         custo = FrotaDespesa.query.filter_by(id=custo_id, admin_id=tenant_admin_id).first()
@@ -884,7 +884,7 @@ def deletar_custo(custo_id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar custo da frota
         custo = FrotaDespesa.query.filter_by(id=custo_id, admin_id=tenant_admin_id).first()
@@ -919,7 +919,7 @@ def deletar_veiculo(id):
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Buscar veículo da frota
         veiculo = FrotaVeiculo.query.filter_by(id=id, admin_id=tenant_admin_id).first()
@@ -961,7 +961,7 @@ def dashboard():
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
         
         # Capturar filtros da URL
         filtro_tipo = request.args.get('tipo')

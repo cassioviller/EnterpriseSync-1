@@ -1,0 +1,729 @@
+{% extends "base_completo.html" %}
+
+{% block head %}
+<script>
+// Garantir light theme para Veículos (idêntico ao RDO)
+console.log('Initializing Editar Veículo with light theme...');
+</script>
+{% endblock %}
+
+{% block title %}Editar Veículo - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+/* ===== OVERRIDE ESPECÍFICO PARA VEÍCULOS (IDÊNTICO AO RDO) ===== */
+.veiculos-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    min-height: 100vh;
+    padding-top: 2rem;
+}
+
+.veiculos-container,
+.veiculos-container * {
+    color: #212529 !important;
+}
+
+.veiculos-container .card,
+.veiculos-container .form-container {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(222, 226, 230, 0.8) !important;
+    backdrop-filter: blur(10px);
+}
+
+.veiculos-container .form-control,
+.veiculos-container .form-select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #495057 !important;
+    border: 1px solid #ced4da !important;
+}
+
+/* ===== DESIGN SYSTEM MODERNO PROFISSIONAL (IDÊNTICO AO RDO) ===== */
+:root {
+    --primary-green: #198754;
+    --dark-green: #145a3e;
+    --light-green: #d1e7dd;
+    --accent-green: #20c997;
+    --blue-primary: #0d6efd;
+    --blue-light: #e7f3ff;
+    --yellow-warning: #ffc107;
+    --yellow-light: #fff3cd;
+    --red-danger: #dc3545;
+    --red-light: #f8d7da;
+    --white: #ffffff;
+    --gray-50: #f8f9fa;
+    --gray-100: #e9ecef;
+    --gray-200: #dee2e6;
+    --gray-300: #ced4da;
+    --gray-400: #adb5bd;
+    --gray-500: #6c757d;
+    --gray-600: #495057;
+    --gray-700: #343a40;
+    --gray-800: #212529;
+    --gray-900: #000000;
+    
+    /* Sombras Profissionais */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.2);
+    
+    /* Bordas e Transições */
+    --border-radius: 16px;
+    --border-radius-lg: 20px;
+    --border-radius-xl: 24px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Gradientes */
+    --gradient-primary: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    --gradient-card: linear-gradient(135deg, var(--white) 0%, var(--gray-50) 100%);
+    --gradient-success: linear-gradient(135deg, var(--accent-green) 0%, var(--primary-green) 100%);
+}
+
+/* ===== CONTAINER PRINCIPAL ===== */
+.veiculos-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0;
+    background: #f8f9fa !important;
+    min-height: 100vh;
+    color: #212529 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* ===== HEADER MODERNO COM GRADIENTE ===== */
+.page-header {
+    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 3rem 0 !important;
+    margin: 0 0 3rem 0;
+    border-radius: 0 0 24px 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title h1 {
+    font-size: 3rem !important;
+    font-weight: 800 !important;
+    margin: 0;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.02em;
+}
+
+.header-title p {
+    font-size: 1.25rem !important;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    font-weight: 400;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-voltar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-voltar:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: white;
+    text-decoration: none;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ===== FORMULÁRIO MODERNO ===== */
+.form-container {
+    background: #ffffff !important;
+    padding: 3rem;
+    border-radius: 24px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    margin: 0 2rem 3rem 2rem;
+    border: 1px solid #e5e7eb !important;
+    position: relative;
+    color: #374151 !important;
+}
+
+.form-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+    border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
+}
+
+.form-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.form-header i {
+    color: var(--primary-green);
+    font-size: 2rem;
+}
+
+.form-header h2 {
+    color: var(--gray-800);
+    font-weight: 700;
+    font-size: 1.75rem;
+    margin: 0;
+}
+
+.form-section {
+    margin-bottom: 3rem;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    color: var(--gray-700);
+    font-weight: 600;
+    font-size: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.section-title i {
+    color: var(--primary-green);
+    font-size: 1.25rem;
+}
+
+.form-grid {
+    display: grid;
+    gap: 2rem;
+}
+
+.form-grid-2 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.form-grid-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.form-grid-4 {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-group .required {
+    color: var(--red-danger);
+}
+
+.modern-input, .modern-select, .modern-textarea {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid var(--gray-300) !important;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    transition: var(--transition);
+    background: var(--white) !important;
+    box-shadow: var(--shadow-sm);
+    color: var(--gray-800) !important;
+    font-family: inherit;
+}
+
+.modern-input:focus, .modern-select:focus, .modern-textarea:focus {
+    outline: none;
+    border-color: var(--primary-green);
+    box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.15);
+    transform: translateY(-2px);
+}
+
+.modern-textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.input-help {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-top: 0.5rem;
+    font-style: italic;
+}
+
+/* ===== BOTÕES DE AÇÃO ===== */
+.form-actions {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: flex-end;
+    align-items: center;
+    padding-top: 2rem;
+    border-top: 2px solid var(--gray-200);
+    margin-top: 3rem;
+}
+
+.btn-action {
+    padding: 1rem 2.5rem;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.btn-primary-custom {
+    background: var(--gradient-primary);
+    color: white;
+    border: 2px solid transparent;
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-secondary-custom {
+    background: transparent;
+    color: var(--gray-600);
+    border: 2px solid var(--gray-400);
+}
+
+.btn-secondary-custom:hover {
+    background: var(--gray-100);
+    color: var(--gray-800);
+    border-color: var(--gray-500);
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+/* ===== ALERTAS E MENSAGENS ===== */
+.alert-custom {
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 2rem;
+    border: 1px solid;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.alert-info {
+    background: var(--blue-light);
+    color: var(--blue-primary);
+    border-color: rgba(13, 110, 253, 0.2);
+}
+
+.alert-info i {
+    font-size: 1.25rem;
+}
+
+/* ===== RESPONSIVIDADE ===== */
+@media (max-width: 768px) {
+    .form-container {
+        margin: 0 1rem 2rem 1rem;
+        padding: 2rem 1.5rem;
+    }
+    
+    .form-grid-2,
+    .form-grid-3,
+    .form-grid-4 {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 2rem;
+        text-align: center;
+    }
+    
+    .form-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+    
+    .btn-action {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 992px) {
+    .form-grid-3,
+    .form-grid-4 {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="veiculos-container">
+    <!-- Header Moderno com Gradiente -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>🚗 Editar Veículo</h1>
+                <p>Atualização de dados do veículo {{ veiculo.placa }}</p>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('frota.lista') }}" class="btn-voltar">
+                    <i class="fas fa-arrow-left"></i>
+                    Voltar à Lista
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário Principal -->
+    <div class="form-container">
+        <div class="form-header">
+            <i class="fas fa-car-side"></i>
+            <h2>Edição de Veículo</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('frota.editar', id=veiculo.id) }}" id="formVeiculo">
+            <input type="hidden" name="csrf_token" value=""/>
+            
+            <!-- Alerta Informativo -->
+            <div class="alert-custom alert-info">
+                <i class="fas fa-info-circle"></i>
+                <div>
+                    <strong>Informações importantes:</strong> Os campos marcados com * são obrigatórios. 
+                    A placa deve ser única na sua empresa e seguir o padrão brasileiro.
+                </div>
+            </div>
+
+            <!-- Seção 1: Dados Básicos -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-id-card"></i>
+                    <span>Dados Básicos</span>
+                </div>
+                
+                <div class="form-grid form-grid-2">
+                    <div class="form-group">
+                        <label for="placa">Placa <span class="required">*</span></label>
+                        <input type="text" 
+                               id="placa" 
+                               name="placa" 
+                               class="modern-input" 
+                               placeholder="ABC-1234 ou ABC1D234"
+                               pattern="[A-Z]{3}-?[0-9]{4}|[A-Z]{3}[0-9][A-Z][0-9]{2}"
+                               maxlength="8"
+                               required
+                               value="{{ veiculo.placa }}">
+                        <div class="input-help">Formato: ABC-1234 (antigo) ou ABC1D234 (Mercosul)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="tipo">Tipo <span class="required">*</span></label>
+                        <select id="tipo" name="tipo" class="modern-select" required>
+                            <option value="">Selecione o tipo</option>
+                            <option value="Utilitário" {% if veiculo.tipo == 'Utilitário' %}selected{% endif %}>Utilitário</option>
+                            <option value="Caminhão" {% if veiculo.tipo == 'Caminhão' %}selected{% endif %}>Caminhão</option>
+                            <option value="Van" {% if veiculo.tipo == 'Van' %}selected{% endif %}>Van</option>
+                            <option value="Carro" {% if veiculo.tipo == 'Carro' %}selected{% endif %}>Carro</option>
+                            <option value="Motocicleta" {% if veiculo.tipo == 'Motocicleta' %}selected{% endif %}>Motocicleta</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-grid form-grid-3">
+                    <div class="form-group">
+                        <label for="marca">Marca <span class="required">*</span></label>
+                        <input type="text" 
+                               id="marca" 
+                               name="marca" 
+                               class="modern-input" 
+                               placeholder="Ex: Ford, Volkswagen"
+                               required
+                               value="{{ veiculo.marca or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="modelo">Modelo <span class="required">*</span></label>
+                        <input type="text" 
+                               id="modelo" 
+                               name="modelo" 
+                               class="modern-input" 
+                               placeholder="Ex: Ranger, Saveiro"
+                               required
+                               value="{{ veiculo.modelo or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ano">Ano <span class="required">*</span></label>
+                        <input type="number" 
+                               id="ano" 
+                               name="ano" 
+                               class="modern-input" 
+                               placeholder="Ex: 2020"
+                               min="1900" 
+                               max="2030"
+                               required
+                               value="{{ veiculo.ano or '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 2: Características -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-cogs"></i>
+                    <span>Características</span>
+                </div>
+                
+                <div class="form-grid form-grid-3">
+                    <div class="form-group">
+                        <label for="cor">Cor</label>
+                        <input type="text" 
+                               id="cor" 
+                               name="cor" 
+                               class="modern-input" 
+                               placeholder="Ex: Branco, Prata"
+                               value="{{ veiculo.cor or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="combustivel">Combustível</label>
+                        <select id="combustivel" name="combustivel" class="modern-select">
+                            <option value="Gasolina" {% if (veiculo.combustivel) == 'Gasolina' %}selected{% endif %}>Gasolina</option>
+                            <option value="Álcool" {% if veiculo.combustivel == 'Álcool' %}selected{% endif %}>Álcool</option>
+                            <option value="Diesel" {% if veiculo.combustivel == 'Diesel' %}selected{% endif %}>Diesel</option>
+                            <option value="Flex" {% if veiculo.combustivel == 'Flex' %}selected{% endif %}>Flex</option>
+                            <option value="GNV" {% if veiculo.combustivel == 'GNV' %}selected{% endif %}>GNV</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="status">Status Inicial</label>
+                        <select id="status" name="status" class="modern-select">
+                            <option value="Disponível" {% if (veiculo.status or 'Disponível') == 'Disponível' %}selected{% endif %}>Disponível</option>
+                            <option value="Manutenção" {% if veiculo.status == 'Manutenção' %}selected{% endif %}>Manutenção</option>
+                            <option value="Inativo" {% if veiculo.status == 'Inativo' %}selected{% endif %}>Inativo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 3: Documentação -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Documentação</span>
+                </div>
+                
+                <div class="form-grid form-grid-2">
+                    <div class="form-group">
+                        <label for="chassi">Chassi</label>
+                        <input type="text" 
+                               id="chassi" 
+                               name="chassi" 
+                               class="modern-input" 
+                               placeholder="Número do chassi"
+                               value="{{ veiculo.chassi or '' }}">
+                        <div class="input-help">17 dígitos alfanuméricos</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="renavam">RENAVAM</label>
+                        <input type="text" 
+                               id="renavam" 
+                               name="renavam" 
+                               class="modern-input" 
+                               placeholder="Número do RENAVAM"
+                               value="{{ veiculo.renavam or '' }}">
+                        <div class="input-help">Registro Nacional de Veículos Automotores</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção 4: Quilometragem e Manutenção -->
+            <div class="form-section">
+                <div class="section-title">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Quilometragem e Manutenção</span>
+                </div>
+                
+                <div class="form-grid form-grid-4">
+                    <div class="form-group">
+                        <label for="km_atual">KM Atual</label>
+                        <input type="number" 
+                               id="km_atual" 
+                               name="km_atual" 
+                               class="modern-input" 
+                               placeholder="0"
+                               min="0"
+                               value="{{ veiculo.km_atual or '0' }}">
+                        <div class="input-help">Quilometragem atual do veículo</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="data_ultima_manutencao">Última Manutenção</label>
+                        <input type="date" 
+                               id="data_ultima_manutencao" 
+                               name="data_ultima_manutencao" 
+                               class="modern-input"
+                               value="{{ veiculo.data_ultima_manutencao or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="data_proxima_manutencao">Próxima Manutenção</label>
+                        <input type="date" 
+                               id="data_proxima_manutencao" 
+                               name="data_proxima_manutencao" 
+                               class="modern-input"
+                               value="{{ veiculo.data_proxima_manutencao or '' }}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="km_proxima_manutencao">KM Próxima Manutenção</label>
+                        <input type="number" 
+                               id="km_proxima_manutencao" 
+                               name="km_proxima_manutencao" 
+                               class="modern-input" 
+                               placeholder="Ex: 50000"
+                               min="0"
+                               value="{{ veiculo.km_proxima_manutencao or '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="form-actions">
+                <a href="{{ url_for('frota.lista') }}" class="btn-action btn-secondary-custom">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </a>
+                <button type="submit" class="btn-action btn-primary-custom">
+                    <i class="fas fa-save"></i>
+                    Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Máscara para placa
+    const placaInput = document.getElementById('placa');
+    placaInput.addEventListener('input', function(e) {
+        let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        
+        // Formato antigo: ABC-1234
+        if (value.length <= 7 && /^[A-Z]{1,3}[0-9]{0,4}$/.test(value)) {
+            if (value.length > 3) {
+                value = value.substring(0, 3) + '-' + value.substring(3);
+            }
+        }
+        // Formato Mercosul: ABC1D23
+        else if (value.length <= 7) {
+            // Permitir formato Mercosul sem hífen
+        }
+        
+        e.target.value = value;
+    });
+    
+    // Converter texto para maiúsculo
+    const textInputs = document.querySelectorAll('#placa, #marca, #modelo, #cor');
+    textInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase();
+        });
+    });
+    
+    // Validação do formulário
+    const form = document.getElementById('formVeiculo');
+    form.addEventListener('submit', function(e) {
+        const placa = document.getElementById('placa').value;
+        const marca = document.getElementById('marca').value;
+        const modelo = document.getElementById('modelo').value;
+        const ano = document.getElementById('ano').value;
+        const tipo = document.getElementById('tipo').value;
+        
+        if (!placa || !marca || !modelo || !ano || !tipo) {
+            e.preventDefault();
+            alert('Por favor, preencha todos os campos obrigatórios.');
+            return false;
+        }
+        
+        // Validar formato da placa
+        const placaRegex = /^[A-Z]{3}-?[0-9]{4}$|^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
+        if (!placaRegex.test(placa)) {
+            e.preventDefault();
+            alert('Formato de placa inválido. Use ABC-1234 ou ABC1D234.');
+            return false;
+        }
+        
+        // Validar ano
+        const anoAtual = new Date().getFullYear();
+        if (ano < 1900 || ano > anoAtual + 2) {
+            e.preventDefault();
+            alert('Ano deve estar entre 1900 e ' + (anoAtual + 2) + '.');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -669,11 +669,11 @@ console.log('Initializing Veículos with light theme...');
                     </div>
                     <div class="info-item">
                         <span class="info-label">KM Atual</span>
-                        <span class="info-value">{{ "{:,}".format(veiculo.km_atual).replace(',', '.') }} km</span>
+                        <span class="info-value">{{ "{:,}".format(veiculo.km_atual or 0).replace(',', '.') }} km</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">Combustível</span>
-                        <span class="info-value">{{ veiculo.combustivel }}</span>
+                        <span class="info-value">{{ veiculo.combustivel or 'N/A' }}</span>
                     </div>
                 </div>
                 
