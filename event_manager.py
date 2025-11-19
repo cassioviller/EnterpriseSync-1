@@ -306,54 +306,75 @@ def criar_conta_pagar_entrada_material(data: dict, admin_id: int):
         
         logger.info(f"✅ Conta a pagar criada: ID {conta.id} - R$ {valor_total} - Fornecedor: {fornecedor.razao_social if fornecedor else movimento.fornecedor_id}")
         
-        # ✅ NOVO: Criar lançamento contábil (partidas dobradas)
+        # ✅ NOVO: Criar lançamento contábil (partidas dobradas) - COM VALIDAÇÃO DE CONTAS
         try:
-            from models import LancamentoContabil, PartidaContabil
+            from models import LancamentoContabil, PartidaContabil, PlanoContas
             from sqlalchemy import func
             
-            # Gerar número sequencial do lançamento
-            ultimo_numero = db.session.query(func.max(LancamentoContabil.numero)).filter_by(admin_id=admin_id).scalar()
-            numero_lancamento = (ultimo_numero + 1) if ultimo_numero else 1
+            # ✅ VALIDAR se as contas contábeis existem ANTES de criar lançamentos
+            conta_estoque = PlanoContas.query.filter_by(
+                codigo='1.1.05.001',  # Estoque de Materiais
+                admin_id=admin_id
+            ).first()
             
-            # Criar lançamento principal
-            lancamento = LancamentoContabil(
-                admin_id=admin_id,
-                numero=numero_lancamento,
-                data_lancamento=movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date(),
-                historico=f"Entrada de material - {item.nome if item else 'Material'} (Movimento #{movimento_id})",
-                origem='ALMOXARIFADO_ENTRADA',
-                origem_id=movimento_id,
-                valor_total=valor_total
-            )
-            db.session.add(lancamento)
-            db.session.flush()  # Gera lancamento.id
+            conta_fornecedores = PlanoContas.query.filter_by(
+                codigo='2.1.01.001',  # Fornecedores a Pagar
+                admin_id=admin_id
+            ).first()
             
-            # PARTIDA 1: DÉBITO - Estoque de Materiais (Ativo)
-            partida_debito = PartidaContabil(
-                admin_id=admin_id,
-                lancamento_id=lancamento.id,
-                conta_codigo='1.1.05.001',  # Estoque de Materiais
-                tipo_partida='DEBITO',
-                valor=valor_total,
-                historico_complementar=f"Entrada de material - {item.nome if item else 'Material'}",
-                sequencia=1
-            )
-            db.session.add(partida_debito)
-            
-            # PARTIDA 2: CRÉDITO - Fornecedores a Pagar (Passivo)
-            partida_credito = PartidaContabil(
-                admin_id=admin_id,
-                lancamento_id=lancamento.id,
-                conta_codigo='2.1.01.001',  # Fornecedores a Pagar
-                tipo_partida='CREDITO',
-                valor=valor_total,
-                historico_complementar=f"Compra de material - Fornecedor: {fornecedor.razao_social if fornecedor else movimento.fornecedor_id}",
-                sequencia=2
-            )
-            db.session.add(partida_credito)
-            
-            db.session.commit()
-            logger.info(f"✅ Lançamento contábil criado: ID {lancamento.id} (#{numero_lancamento}) - D: 1.1.05.001 / C: 2.1.01.001 - R$ {valor_total}")
+            if not conta_estoque or not conta_fornecedores:
+                contas_faltando = []
+                if not conta_estoque:
+                    contas_faltando.append('1.1.05.001 (Estoque de Materiais)')
+                if not conta_fornecedores:
+                    contas_faltando.append('2.1.01.001 (Fornecedores a Pagar)')
+                
+                logger.warning(f"⚠️ Lançamento contábil NÃO criado para movimento {movimento_id}: Contas contábeis não configuradas: {', '.join(contas_faltando)}")
+                logger.warning(f"⚠️ ContaPagar foi criada (ID {conta.id}), mas sem lançamento contábil. Configure o plano de contas para habilitar integração contábil.")
+            else:
+                # Gerar número sequencial do lançamento
+                ultimo_numero = db.session.query(func.max(LancamentoContabil.numero)).filter_by(admin_id=admin_id).scalar()
+                numero_lancamento = (ultimo_numero + 1) if ultimo_numero else 1
+                
+                # Criar lançamento principal
+                lancamento = LancamentoContabil(
+                    admin_id=admin_id,
+                    numero=numero_lancamento,
+                    data_lancamento=movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date(),
+                    historico=f"Entrada de material - {item.nome if item else 'Material'} (Movimento #{movimento_id})",
+                    origem='ALMOXARIFADO_ENTRADA',
+                    origem_id=movimento_id,
+                    valor_total=valor_total
+                )
+                db.session.add(lancamento)
+                db.session.flush()  # Gera lancamento.id
+                
+                # PARTIDA 1: DÉBITO - Estoque de Materiais (Ativo)
+                partida_debito = PartidaContabil(
+                    admin_id=admin_id,
+                    lancamento_id=lancamento.id,
+                    conta_codigo='1.1.05.001',  # Estoque de Materiais
+                    tipo_partida='DEBITO',
+                    valor=valor_total,
+                    historico_complementar=f"Entrada de material - {item.nome if item else 'Material'}",
+                    sequencia=1
+                )
+                db.session.add(partida_debito)
+                
+                # PARTIDA 2: CRÉDITO - Fornecedores a Pagar (Passivo)
+                partida_credito = PartidaContabil(
+                    admin_id=admin_id,
+                    lancamento_id=lancamento.id,
+                    conta_codigo='2.1.01.001',  # Fornecedores a Pagar
+                    tipo_partida='CREDITO',
+                    valor=valor_total,
+                    historico_complementar=f"Compra de material - Fornecedor: {fornecedor.razao_social if fornecedor else movimento.fornecedor_id}",
+                    sequencia=2
+                )
+                db.session.add(partida_credito)
+                
+                db.session.commit()
+                logger.info(f"✅ Lançamento contábil criado: ID {lancamento.id} (#{numero_lancamento}) - D: 1.1.05.001 / C: 2.1.01.001 - R$ {valor_total}")
             
         except Exception as e:
             db.session.rollback()
