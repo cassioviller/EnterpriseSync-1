@@ -2798,6 +2798,87 @@ def _migration_56_proposta_arquivo_base64():
             except:
                 pass
 
+def _migration_57_almoxarifado_movimento_campos_crud():
+    """
+    Migração 57: Adicionar campos para CRUD de movimentações manuais
+    - origem_manual: BOOLEAN DEFAULT FALSE (identifica movimentos criados via UI)
+    - impacta_estoque: BOOLEAN DEFAULT TRUE (define se movimento afeta estoque)
+    - updated_at: TIMESTAMP (para optimistic locking em edições)
+    
+    Solução: Habilita edição/exclusão de movimentações manuais com controle de concorrência
+    """
+    logger.info("=" * 80)
+    logger.info("📦 MIGRAÇÃO 57: Campos CRUD em AlmoxarifadoMovimento")
+    logger.info("=" * 80)
+    
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Campos para adicionar
+        campos_crud = {
+            'origem_manual': 'BOOLEAN DEFAULT FALSE',
+            'impacta_estoque': 'BOOLEAN DEFAULT TRUE',
+            'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
+        }
+        
+        colunas_adicionadas = 0
+        
+        for coluna, definicao in campos_crud.items():
+            # Verificar se coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'almoxarifado_movimento' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                logger.info(f"🔧 Adicionando coluna '{coluna}' em almoxarifado_movimento...")
+                cursor.execute(f"ALTER TABLE almoxarifado_movimento ADD COLUMN {coluna} {definicao}")
+                logger.info(f"✅ Coluna '{coluna}' adicionada!")
+                colunas_adicionadas += 1
+            else:
+                logger.debug(f"✅ Coluna '{coluna}' já existe - skip")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 57 CONCLUÍDA!")
+        logger.info(f"   📊 {colunas_adicionadas} colunas adicionadas")
+        logger.info("   ✏️  origem_manual: Identifica movimentos criados manualmente")
+        logger.info("   📦 impacta_estoque: Define se movimento afeta estoque físico")
+        logger.info("   🔒 updated_at: Optimistic locking para edições concorrentes")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 57: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2847,6 +2928,7 @@ def executar_migracoes():
             (54, "Tamanho logo portal do cliente", _migration_54_logo_tamanho_portal),
             (55, "Token cliente para portal público", _migration_55_token_cliente_proposta),
             (56, "PropostaArquivo - persistência Base64", _migration_56_proposta_arquivo_base64),
+            (57, "Campos CRUD movimentações almoxarifado", _migration_57_almoxarifado_movimento_campos_crud),
         ]
         
         # Executar cada migração com rastreamento
