@@ -158,10 +158,22 @@
                                 <i class="fas fa-save me-1"></i>
                                 {{ 'Atualizar' if movimento else 'Criar' }}
                             </button>
-                            <a href="{{ url_for('almoxarifado.itens_movimentacoes', id=(movimento.item_id if movimento else '')) }}" class="btn btn-secondary">
-                                <i class="fas fa-times me-1"></i>
-                                Cancelar
-                            </a>
+                            {% if movimento %}
+                                <a href="{{ url_for('almoxarifado.itens_movimentacoes', id=movimento.item_id) }}" class="btn btn-secondary">
+                                    <i class="fas fa-times me-1"></i>
+                                    Cancelar
+                                </a>
+                            {% elif request.args.get('item_id') %}
+                                <a href="{{ url_for('almoxarifado.itens_movimentacoes', id=request.args.get('item_id')) }}" class="btn btn-secondary">
+                                    <i class="fas fa-times me-1"></i>
+                                    Cancelar
+                                </a>
+                            {% else %}
+                                <a href="{{ url_for('almoxarifado.itens') }}" class="btn btn-secondary">
+                                    <i class="fas fa-times me-1"></i>
+                                    Cancelar
+                                </a>
+                            {% endif %}
                         </div>
                     </form>
                 </div>
