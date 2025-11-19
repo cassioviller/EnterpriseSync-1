@@ -39,7 +39,7 @@ The system is built with a Flask backend, SQLAlchemy ORM, and PostgreSQL, utiliz
     -   **Accounting:** Supports double-entry bookkeeping, automated journal entries, chart of accounts, trial balance, and DRE.
     -   **Fleet Management System:** Manages vehicles, expenses, TCO dashboards, and critical alert notifications.
     -   **Food Management System:** Manages restaurant and food entries, integrating with the financial module, supporting hybrid data models.
-    -   **Warehouse Management:** Manages materials, tools, and PPE with traceability, including a complete CRUD system for supplier management with multi-tenant isolation, soft delete, and robust validation.
+    -   **Warehouse Management:** Manages materials, tools, and PPE with traceability, including a complete CRUD system for supplier management with multi-tenant isolation, soft delete, and robust validation. Features comprehensive material flow workflows (entrada/saída/devolução) with correct `funcionario_atual_id` tracking in AlmoxarifadoEstoque, and an enhanced API endpoint that returns all consumable items with `permite_devolucao` flag for frontend decision-making.
     -   **Shared Device Time Clock System (Ponto Eletrônico):** Mobile-first time clock with GPS tracking and an advanced Excel import system for batch point records.
 -   **Automated Database Error Diagnostics:** A `DatabaseDiagnostics` system analyzes SQLAlchemy errors, reports missing columns, and generates diagnostic reports, integrated with `@capture_db_errors` decorators.
 -   **Híbrido Data Model Support:** For food management, aggregates data from legacy and new models for seamless coexistence.
