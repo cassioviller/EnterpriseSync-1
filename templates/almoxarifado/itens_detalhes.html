@@ -77,9 +77,14 @@
 
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title border-bottom pb-2 mb-3">
-                        <i class="fas fa-history me-2"></i>Últimas Movimentações
-                    </h5>
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-history me-2"></i>Últimas Movimentações
+                        </h5>
+                        <a href="{{ url_for('almoxarifado.itens_movimentacoes', id=item.id) }}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-list me-1"></i> Ver Histórico Completo
+                        </a>
+                    </div>
                     {% if movimentos %}
                     <div class="table-responsive">
                         <table class="table table-sm table-hover">

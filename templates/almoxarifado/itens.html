@@ -113,6 +113,10 @@
                                    class="btn btn-sm btn-outline-info" title="Ver Detalhes">
                                     <i class="fas fa-eye"></i>
                                 </a>
+                                <a href="{{ url_for('almoxarifado.itens_movimentacoes', id=item.id) }}" 
+                                   class="btn btn-sm btn-outline-secondary" title="Histórico">
+                                    <i class="fas fa-history"></i>
+                                </a>
                                 <a href="{{ url_for('almoxarifado.itens_editar', id=item.id) }}" 
                                    class="btn btn-sm btn-outline-primary" title="Editar">
                                     <i class="fas fa-edit"></i>

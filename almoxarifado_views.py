@@ -464,6 +464,92 @@ def itens_detalhes(id):
                          itens_estoque=itens_estoque,
                          movimentos=movimentos)
 
+@almoxarifado_bp.route('/itens/<int:id>/movimentacoes')
+@login_required
+def itens_movimentacoes(id):
+    """Histórico completo de movimentações com filtros avançados"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    
+    # Filtros da query string
+    tipo_filtro = request.args.get('tipo', '')
+    funcionario_filtro = request.args.get('funcionario', '')
+    obra_filtro = request.args.get('obra', '')
+    data_inicio = request.args.get('data_inicio', '')
+    data_fim = request.args.get('data_fim', '')
+    
+    # Query base
+    query = AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id)
+    
+    # Aplicar filtros
+    if tipo_filtro:
+        query = query.filter(AlmoxarifadoMovimento.tipo_movimento == tipo_filtro)
+    
+    if funcionario_filtro:
+        query = query.filter(AlmoxarifadoMovimento.funcionario_id == int(funcionario_filtro))
+    
+    if obra_filtro:
+        query = query.filter(AlmoxarifadoMovimento.obra_id == int(obra_filtro))
+    
+    if data_inicio:
+        try:
+            dt_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+            query = query.filter(AlmoxarifadoMovimento.data_movimento >= dt_inicio)
+        except ValueError:
+            pass
+    
+    if data_fim:
+        try:
+            dt_fim = datetime.strptime(data_fim, '%Y-%m-%d')
+            # Adicionar 1 dia para incluir movimentos do dia inteiro
+            dt_fim = dt_fim + timedelta(days=1)
+            query = query.filter(AlmoxarifadoMovimento.data_movimento < dt_fim)
+        except ValueError:
+            pass
+    
+    # Ordenar e buscar
+    movimentos = query.order_by(AlmoxarifadoMovimento.data_movimento.desc()).all()
+    
+    # Buscar listas para filtros
+    funcionarios = db.session.query(Funcionario).join(
+        AlmoxarifadoMovimento,
+        Funcionario.id == AlmoxarifadoMovimento.funcionario_id
+    ).filter(
+        AlmoxarifadoMovimento.item_id == id,
+        AlmoxarifadoMovimento.admin_id == admin_id
+    ).distinct().order_by(Funcionario.nome).all()
+    
+    obras = db.session.query(Obra).join(
+        AlmoxarifadoMovimento,
+        Obra.id == AlmoxarifadoMovimento.obra_id
+    ).filter(
+        AlmoxarifadoMovimento.item_id == id,
+        AlmoxarifadoMovimento.admin_id == admin_id
+    ).distinct().order_by(Obra.nome).all()
+    
+    # Estatísticas
+    total_entradas = sum(m.quantidade or 0 for m in movimentos if m.tipo_movimento == 'ENTRADA')
+    total_saidas = sum(m.quantidade or 0 for m in movimentos if m.tipo_movimento == 'SAIDA')
+    total_devolucoes = sum(m.quantidade or 0 for m in movimentos if m.tipo_movimento == 'DEVOLUCAO')
+    
+    return render_template('almoxarifado/itens_movimentacoes.html',
+                         item=item,
+                         movimentos=movimentos,
+                         funcionarios=funcionarios,
+                         obras=obras,
+                         tipo_filtro=tipo_filtro,
+                         funcionario_filtro=funcionario_filtro,
+                         obra_filtro=obra_filtro,
+                         data_inicio=data_inicio,
+                         data_fim=data_fim,
+                         total_entradas=total_entradas,
+                         total_saidas=total_saidas,
+                         total_devolucoes=total_devolucoes)
+
 @almoxarifado_bp.route('/itens/deletar/<int:id>', methods=['POST'])
 @login_required
 def itens_deletar(id):

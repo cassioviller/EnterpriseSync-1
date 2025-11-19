@@ -1,0 +1,283 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Histórico de Movimentações - {{ item.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Cabeçalho -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-history text-primary me-2"></i>
+                Histórico de Movimentações
+            </h1>
+            <p class="text-muted mb-0">{{ item.codigo }} - {{ item.nome }}</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('almoxarifado.itens_detalhes', id=item.id) }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle bg-success bg-opacity-10 p-3">
+                                <i class="fas fa-arrow-down fa-2x text-success"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Total de Entradas</h6>
+                            <h3 class="mb-0">{{ total_entradas }}</h3>
+                            <small class="text-muted">{{ item.unidade or 'un' }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle bg-danger bg-opacity-10 p-3">
+                                <i class="fas fa-arrow-up fa-2x text-danger"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Total de Saídas</h6>
+                            <h3 class="mb-0">{{ total_saidas }}</h3>
+                            <small class="text-muted">{{ item.unidade or 'un' }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle bg-info bg-opacity-10 p-3">
+                                <i class="fas fa-undo fa-2x text-info"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Total de Devoluções</h6>
+                            <h3 class="mb-0">{{ total_devolucoes }}</h3>
+                            <small class="text-muted">{{ item.unidade or 'un' }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">
+                <i class="fas fa-filter me-2"></i>Filtros
+            </h5>
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Tipo de Movimento</label>
+                    <select name="tipo" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="ENTRADA" {% if tipo_filtro == 'ENTRADA' %}selected{% endif %}>Entrada</option>
+                        <option value="SAIDA" {% if tipo_filtro == 'SAIDA' %}selected{% endif %}>Saída</option>
+                        <option value="DEVOLUCAO" {% if tipo_filtro == 'DEVOLUCAO' %}selected{% endif %}>Devolução</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Funcionário</label>
+                    <select name="funcionario" class="form-select">
+                        <option value="">Todos</option>
+                        {% for func in funcionarios %}
+                        <option value="{{ func.id }}" {% if funcionario_filtro == func.id|string %}selected{% endif %}>
+                            {{ func.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted">Obra</label>
+                    <select name="obra" class="form-select">
+                        <option value="">Todas</option>
+                        {% for obra in obras %}
+                        <option value="{{ obra.id }}" {% if obra_filtro == obra.id|string %}selected{% endif %}>
+                            {{ obra.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted">Data Início</label>
+                    <input type="date" name="data_inicio" class="form-control" value="{{ data_inicio }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted">Data Fim</label>
+                    <input type="date" name="data_fim" class="form-control" value="{{ data_fim }}">
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i> Filtrar
+                    </button>
+                    <a href="{{ url_for('almoxarifado.itens_movimentacoes', id=item.id) }}" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i> Limpar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Movimentações -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title border-bottom pb-2 mb-3">
+                <i class="fas fa-list me-2"></i>Movimentações
+                <span class="badge bg-secondary ms-2">{{ movimentos|length }}</span>
+            </h5>
+            
+            {% if movimentos %}
+            <div class="row g-3">
+                {% for mov in movimentos %}
+                <div class="col-12">
+                    <div class="card border-start border-4 {% if mov.tipo_movimento == 'ENTRADA' %}border-success{% elif mov.tipo_movimento == 'SAIDA' %}border-danger{% else %}border-info{% endif %} shadow-sm">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <!-- Tipo e Data -->
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        {% if mov.tipo_movimento == 'ENTRADA' %}
+                                            <i class="fas fa-arrow-down fa-2x text-success mb-2"></i>
+                                            <div><span class="badge bg-success">Entrada</span></div>
+                                        {% elif mov.tipo_movimento == 'SAIDA' %}
+                                            <i class="fas fa-arrow-up fa-2x text-danger mb-2"></i>
+                                            <div><span class="badge bg-danger">Saída</span></div>
+                                        {% elif mov.tipo_movimento == 'DEVOLUCAO' %}
+                                            <i class="fas fa-undo fa-2x text-info mb-2"></i>
+                                            <div><span class="badge bg-info">Devolução</span></div>
+                                        {% endif %}
+                                        <small class="text-muted d-block mt-1">
+                                            {{ mov.data_movimento.strftime('%d/%m/%Y') if mov.data_movimento else '-' }}
+                                        </small>
+                                        <small class="text-muted d-block">
+                                            {{ mov.data_movimento.strftime('%H:%M') if mov.data_movimento else '-' }}
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- Informações Principais -->
+                                <div class="col-md-7">
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <label class="text-muted small">Quantidade</label>
+                                            <div><strong>{{ mov.quantidade }} {{ item.unidade or 'un' }}</strong></div>
+                                        </div>
+                                        {% if mov.valor_unitario %}
+                                        <div class="col-md-6">
+                                            <label class="text-muted small">Valor Unitário</label>
+                                            <div><strong>R$ {{ "%.2f"|format(mov.valor_unitario) }}</strong></div>
+                                        </div>
+                                        {% endif %}
+                                        {% if mov.funcionario %}
+                                        <div class="col-md-6">
+                                            <label class="text-muted small">Funcionário</label>
+                                            <div>
+                                                <i class="fas fa-user text-primary me-1"></i>
+                                                {{ mov.funcionario.nome }}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% if mov.obra %}
+                                        <div class="col-md-6">
+                                            <label class="text-muted small">Obra</label>
+                                            <div>
+                                                <i class="fas fa-building text-warning me-1"></i>
+                                                {{ mov.obra.nome }}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% if mov.fornecedor %}
+                                        <div class="col-md-6">
+                                            <label class="text-muted small">Fornecedor</label>
+                                            <div>
+                                                <i class="fas fa-truck text-info me-1"></i>
+                                                {{ mov.fornecedor.nome }}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% if mov.numero_serie %}
+                                        <div class="col-md-6">
+                                            <label class="text-muted small">Número de Série</label>
+                                            <div><code>{{ mov.numero_serie }}</code></div>
+                                        </div>
+                                        {% endif %}
+                                        {% if mov.lote %}
+                                        <div class="col-md-6">
+                                            <label class="text-muted small">Lote</label>
+                                            <div><code>{{ mov.lote }}</code></div>
+                                        </div>
+                                        {% endif %}
+                                        {% if mov.nota_fiscal %}
+                                        <div class="col-md-6">
+                                            <label class="text-muted small">Nota Fiscal</label>
+                                            <div>{{ mov.nota_fiscal }}</div>
+                                        </div>
+                                        {% endif %}
+                                        {% if mov.condicao_item %}
+                                        <div class="col-md-6">
+                                            <label class="text-muted small">Condição do Item</label>
+                                            <div>
+                                                {% if mov.condicao_item == 'BOM' %}
+                                                    <span class="badge bg-success">Bom</span>
+                                                {% elif mov.condicao_item == 'DANIFICADO' %}
+                                                    <span class="badge bg-warning">Danificado</span>
+                                                {% elif mov.condicao_item == 'PERDIDO' %}
+                                                    <span class="badge bg-danger">Perdido</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">{{ mov.condicao_item }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- Observações e Usuário -->
+                                <div class="col-md-3">
+                                    {% if mov.observacao %}
+                                    <div class="mb-2">
+                                        <label class="text-muted small">Observações</label>
+                                        <div class="border-start border-3 border-secondary ps-2">
+                                            <small>{{ mov.observacao }}</small>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    <div class="text-muted small">
+                                        <i class="fas fa-user-circle me-1"></i>
+                                        Registrado por: {{ mov.usuario.username if mov.usuario else '-' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info border-0 mb-0">
+                <i class="fas fa-info-circle me-2"></i>
+                Nenhuma movimentação encontrada com os filtros aplicados.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
