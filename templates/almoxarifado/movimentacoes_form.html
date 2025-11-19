@@ -1,0 +1,225 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if movimento else 'Nova' }} Movimentação Manual{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-exchange-alt text-primary me-2"></i>
+                {{ 'Editar' if movimento else 'Nova' }} Movimentação Manual
+            </h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="POST">
+                        <!-- Tipo de Movimento -->
+                        <div class="mb-3">
+                            <label for="tipo_movimento" class="form-label">Tipo de Movimento *</label>
+                            <select class="form-select" id="tipo_movimento" name="tipo_movimento" required>
+                                <option value="">Selecione...</option>
+                                <option value="ENTRADA" {{ 'selected' if movimento and movimento.tipo_movimento == 'ENTRADA' else '' }}>
+                                    Entrada - Adicionar ao estoque
+                                </option>
+                                <option value="SAIDA" {{ 'selected' if movimento and movimento.tipo_movimento == 'SAIDA' else '' }}>
+                                    Saída - Retirar do estoque
+                                </option>
+                                <option value="DEVOLUCAO" {{ 'selected' if movimento and movimento.tipo_movimento == 'DEVOLUCAO' else '' }}>
+                                    Devolução - Retornar ao estoque
+                                </option>
+                                <option value="AJUSTE" {{ 'selected' if movimento and movimento.tipo_movimento == 'AJUSTE' else '' }}>
+                                    Ajuste - Correção de estoque
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Item -->
+                        <div class="mb-3">
+                            <label for="item_id" class="form-label">Item *</label>
+                            <select class="form-select" id="item_id" name="item_id" required {{ 'disabled' if movimento else '' }}>
+                                <option value="">Selecione um item...</option>
+                                {% for item in itens %}
+                                <option value="{{ item.id }}" {{ 'selected' if (movimento and movimento.item_id == item.id) or (not movimento and item_id_pre and item.id == item_id_pre|int) else '' }}>
+                                    {{ item.codigo }} - {{ item.nome }} ({{ item.unidade or 'un' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% if movimento %}
+                            <input type="hidden" name="item_id" value="{{ movimento.item_id }}">
+                            <div class="form-text">O item não pode ser alterado após criação</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Campo hidden para optimistic locking (proteção contra edição concorrente) -->
+                        {% if movimento and movimento.updated_at %}
+                        <input type="hidden" name="updated_at_original" value="{{ movimento.updated_at }}">
+                        {% endif %}
+
+                        <div class="row">
+                            <!-- Quantidade -->
+                            <div class="col-md-6 mb-3">
+                                <label for="quantidade" class="form-label">Quantidade *</label>
+                                <input type="number" class="form-control" id="quantidade" name="quantidade" 
+                                       value="{{ movimento.quantidade if movimento else '' }}" 
+                                       step="0.01" min="0.01" required>
+                            </div>
+
+                            <!-- Data -->
+                            <div class="col-md-6 mb-3">
+                                <label for="data_movimento" class="form-label">Data do Movimento *</label>
+                                <input type="date" class="form-control" id="data_movimento" name="data_movimento" 
+                                       value="{{ movimento.data_movimento.strftime('%Y-%m-%d') if movimento else hoje }}" 
+                                       max="{{ hoje }}" required>
+                                <div class="form-text">Não pode ser data futura</div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- Valor Unitário -->
+                            <div class="col-md-6 mb-3">
+                                <label for="valor_unitario" class="form-label">Valor Unitário (R$)</label>
+                                <input type="number" class="form-control" id="valor_unitario" name="valor_unitario" 
+                                       value="{{ movimento.valor_unitario if movimento else '' }}" 
+                                       step="0.01" min="0">
+                                <div class="form-text">Opcional - Para controle de custos</div>
+                            </div>
+
+                            <!-- Lote -->
+                            <div class="col-md-6 mb-3">
+                                <label for="lote" class="form-label">Lote</label>
+                                <input type="text" class="form-control" id="lote" name="lote" 
+                                       value="{{ movimento.lote if movimento else '' }}" 
+                                       maxlength="50">
+                            </div>
+                        </div>
+
+                        <!-- Número de Série -->
+                        <div class="mb-3" id="numero_serie_group" style="display: none;">
+                            <label for="numero_serie" class="form-label">Número de Série</label>
+                            <input type="text" class="form-control" id="numero_serie" name="numero_serie" 
+                                   value="{{ movimento.numero_serie if movimento else '' }}" 
+                                   maxlength="100">
+                            <div class="form-text">Obrigatório para itens serializados</div>
+                        </div>
+
+                        <!-- Funcionário -->
+                        <div class="mb-3">
+                            <label for="funcionario_id" class="form-label">Funcionário</label>
+                            <select class="form-select" id="funcionario_id" name="funcionario_id">
+                                <option value="">Nenhum</option>
+                                {% for func in funcionarios %}
+                                <option value="{{ func.id }}" {{ 'selected' if movimento and movimento.funcionario_id == func.id else '' }}>
+                                    {{ func.codigo }} - {{ func.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Funcionário responsável pela movimentação</div>
+                        </div>
+
+                        <!-- Obra -->
+                        <div class="mb-3">
+                            <label for="obra_id" class="form-label">Obra</label>
+                            <select class="form-select" id="obra_id" name="obra_id">
+                                <option value="">Nenhuma</option>
+                                {% for obra in obras %}
+                                <option value="{{ obra.id }}" {{ 'selected' if movimento and movimento.obra_id == obra.id else '' }}>
+                                    {{ obra.codigo or obra.id }} - {{ obra.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Obra relacionada à movimentação</div>
+                        </div>
+
+                        <!-- Observação -->
+                        <div class="mb-3">
+                            <label for="observacao" class="form-label">Observação</label>
+                            <textarea class="form-control" id="observacao" name="observacao" rows="3">{{ movimento.observacao if movimento else '' }}</textarea>
+                            <div class="form-text">Detalhes ou justificativa da movimentação</div>
+                        </div>
+
+                        <!-- Impacta Estoque -->
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="impacta_estoque" 
+                                   name="impacta_estoque" 
+                                   {{ 'checked' if not movimento or movimento.impacta_estoque else '' }}>
+                            <label class="form-check-label" for="impacta_estoque">
+                                <strong>Impactar Estoque</strong>
+                            </label>
+                            <div class="form-text">Marque para que esta movimentação altere as quantidades do estoque</div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {{ 'Atualizar' if movimento else 'Criar' }}
+                            </button>
+                            <a href="{{ url_for('almoxarifado.itens_movimentacoes', id=(movimento.item_id if movimento else '')) }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>
+                                Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm bg-light">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-info-circle me-2"></i>Informações</h5>
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <strong>Entrada:</strong> Adiciona itens ao estoque (compras, recebimentos)
+                        </li>
+                        <li class="mb-2">
+                            <strong>Saída:</strong> Remove itens do estoque (uso em obra, consumo)
+                        </li>
+                        <li class="mb-2">
+                            <strong>Devolução:</strong> Retorna itens ao estoque (ferramentas, EPIs)
+                        </li>
+                        <li class="mb-2">
+                            <strong>Ajuste:</strong> Correção manual de estoque (inventário, perdas)
+                        </li>
+                    </ul>
+                    
+                    <hr>
+                    
+                    <h6 class="mb-2">⚠️ Atenção</h6>
+                    <ul class="small mb-0">
+                        <li>Movimentações manuais podem ser editadas ou excluídas</li>
+                        <li>Saídas validam estoque disponível</li>
+                        <li>Datas futuras não são permitidas</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Mostrar/ocultar campo de número de série baseado no item selecionado
+document.getElementById('item_id').addEventListener('change', function() {
+    const itemId = this.value;
+    const numeroSerieGroup = document.getElementById('numero_serie_group');
+    
+    if (itemId) {
+        // Aqui você pode fazer uma chamada AJAX para buscar o tipo de controle do item
+        // Por simplicidade, vamos mostrar sempre
+        // Em produção, seria ideal verificar se o item é SERIALIZADO
+        // numeroSerieGroup.style.display = 'block';
+    }
+});
+
+// Definir data de hoje como máximo
+const dataInput = document.getElementById('data_movimento');
+if (!dataInput.value) {
+    const hoje = new Date().toISOString().split('T')[0];
+    dataInput.value = hoje;
+}
+</script>
+{% endblock %}

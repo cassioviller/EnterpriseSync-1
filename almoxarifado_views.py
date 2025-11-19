@@ -2574,3 +2574,372 @@ def fornecedores_deletar(id):
         flash(f'Erro ao desativar fornecedor: {str(e)}', 'danger')
     
     return redirect(url_for('almoxarifado.fornecedores'))
+
+# ========================================
+# CRUD MOVIMENTAÇÕES MANUAIS
+# ========================================
+
+@almoxarifado_bp.route('/movimentacoes/criar', methods=['GET', 'POST'])
+@login_required
+def movimentacoes_criar():
+    """Criar nova movimentação manual"""
+    from almoxarifado_utils import apply_movimento_manual
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    if request.method == 'POST':
+        try:
+            tipo_movimento = request.form.get('tipo_movimento')
+            item_id = request.form.get('item_id')
+            quantidade = request.form.get('quantidade')
+            data_movimento = request.form.get('data_movimento')
+            funcionario_id = request.form.get('funcionario_id')
+            obra_id = request.form.get('obra_id')
+            observacao = request.form.get('observacao', '').strip()
+            impacta_estoque = request.form.get('impacta_estoque') == 'on'
+            valor_unitario = request.form.get('valor_unitario')
+            lote = request.form.get('lote', '').strip()
+            numero_serie = request.form.get('numero_serie', '').strip()
+            
+            # Validações
+            if not tipo_movimento or not item_id or not quantidade:
+                flash('Tipo de movimento, item e quantidade são obrigatórios', 'danger')
+                return redirect(url_for('almoxarifado.movimentacoes_criar'))
+            
+            try:
+                quantidade = float(quantidade)
+                if quantidade <= 0:
+                    flash('Quantidade deve ser maior que zero', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_criar'))
+            except ValueError:
+                flash('Quantidade inválida', 'danger')
+                return redirect(url_for('almoxarifado.movimentacoes_criar'))
+            
+            # Validar data
+            if data_movimento:
+                data_mov = datetime.strptime(data_movimento, '%Y-%m-%d')
+                if data_mov.date() > datetime.now().date():
+                    flash('Data do movimento não pode ser futura', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_criar'))
+            else:
+                data_mov = datetime.now()
+            
+            # Validar item
+            item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
+            if not item:
+                flash('Item não encontrado', 'danger')
+                return redirect(url_for('almoxarifado.movimentacoes_criar'))
+            
+            # Validar funcionário e obra (se fornecidos)
+            if funcionario_id:
+                funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
+                if not funcionario:
+                    flash('Funcionário não encontrado', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_criar'))
+            else:
+                funcionario_id = None
+            
+            if obra_id:
+                obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+                if not obra:
+                    flash('Obra não encontrada', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_criar'))
+            else:
+                obra_id = None
+            
+            # Processar valor unitário
+            if valor_unitario:
+                try:
+                    valor_unitario = float(valor_unitario)
+                except ValueError:
+                    valor_unitario = None
+            else:
+                valor_unitario = None
+            
+            # Criar movimentação
+            movimento = AlmoxarifadoMovimento(
+                tipo_movimento=tipo_movimento,
+                item_id=item_id,
+                quantidade=quantidade,
+                data_movimento=data_mov,
+                funcionario_id=funcionario_id,
+                obra_id=obra_id,
+                observacao=observacao or None,
+                impacta_estoque=impacta_estoque,
+                origem_manual=True,
+                usuario_id=current_user.id,
+                admin_id=admin_id,
+                valor_unitario=valor_unitario,
+                lote=lote or None,
+                numero_serie=numero_serie or None
+            )
+            
+            db.session.add(movimento)
+            db.session.flush()
+            
+            # Aplicar ao estoque se necessário
+            if impacta_estoque:
+                resultado = apply_movimento_manual(movimento)
+                if not resultado['sucesso']:
+                    db.session.rollback()
+                    flash(f'Erro ao aplicar movimento ao estoque: {resultado["mensagem"]}', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_criar'))
+            
+            db.session.commit()
+            
+            flash(f'Movimentação manual criada com sucesso!', 'success')
+            return redirect(url_for('almoxarifado.itens_movimentacoes', id=item_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Erro ao criar movimentação manual: {str(e)}')
+            flash(f'Erro ao criar movimentação: {str(e)}', 'danger')
+            return redirect(url_for('almoxarifado.movimentacoes_criar'))
+    
+    # GET - Carregar dados para o formulário
+    itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoItem.nome).all()
+    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    
+    # Item pré-selecionado da query string
+    item_id_pre = request.args.get('item_id')
+    
+    # Data de hoje
+    hoje = datetime.now().strftime('%Y-%m-%d')
+    
+    return render_template('almoxarifado/movimentacoes_form.html',
+                         movimento=None,
+                         itens=itens,
+                         funcionarios=funcionarios,
+                         obras=obras,
+                         item_id_pre=item_id_pre,
+                         hoje=hoje)
+
+@almoxarifado_bp.route('/movimentacoes/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def movimentacoes_editar(id):
+    """Editar movimentação manual existente com proteção contra concorrência"""
+    from almoxarifado_utils import apply_movimento_manual, rollback_movimento_manual
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    movimento = AlmoxarifadoMovimento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    
+    # Validar que é movimento manual
+    if not movimento.origem_manual:
+        flash('Apenas movimentações manuais podem ser editadas', 'danger')
+        return redirect(url_for('almoxarifado.itens_movimentacoes', id=movimento.item_id))
+    
+    if request.method == 'POST':
+        try:
+            # ===== PROTEÇÃO DE CONCORRÊNCIA: Optimistic Locking =====
+            # Validar timestamp para detectar edições concorrentes
+            updated_at_original = request.form.get('updated_at_original')
+            if updated_at_original:
+                try:
+                    updated_at_check = datetime.strptime(updated_at_original, '%Y-%m-%d %H:%M:%S.%f')
+                except ValueError:
+                    updated_at_check = datetime.strptime(updated_at_original, '%Y-%m-%d %H:%M:%S')
+                
+                # Recarregar movimento do banco para verificar se foi modificado
+                db.session.refresh(movimento)
+                
+                if movimento.updated_at and movimento.updated_at > updated_at_check:
+                    flash(
+                        'ERRO: Este registro foi modificado por outro usuário. '
+                        'Por favor, recarregue a página e tente novamente.',
+                        'danger'
+                    )
+                    return redirect(url_for('almoxarifado.movimentacoes_editar', id=id))
+            
+            # ===== TRANSAÇÃO ATÔMICA =====
+            # Iniciar transação explícita para garantir atomicidade
+            
+            # Salvar estado anterior para rollback
+            impactava_estoque_antes = movimento.impacta_estoque
+            
+            # Rollback do estoque anterior se estava impactando
+            if impactava_estoque_antes:
+                resultado = rollback_movimento_manual(movimento)
+                if not resultado['sucesso']:
+                    db.session.rollback()
+                    flash(f'Erro ao reverter movimento anterior: {resultado["mensagem"]}', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_editar', id=id))
+            
+            # Atualizar campos
+            tipo_movimento = request.form.get('tipo_movimento')
+            quantidade = request.form.get('quantidade')
+            data_movimento = request.form.get('data_movimento')
+            funcionario_id = request.form.get('funcionario_id')
+            obra_id = request.form.get('obra_id')
+            observacao = request.form.get('observacao', '').strip()
+            impacta_estoque = request.form.get('impacta_estoque') == 'on'
+            valor_unitario = request.form.get('valor_unitario')
+            lote = request.form.get('lote', '').strip()
+            numero_serie = request.form.get('numero_serie', '').strip()
+            
+            # Validações
+            if not tipo_movimento or not quantidade:
+                flash('Tipo de movimento e quantidade são obrigatórios', 'danger')
+                return redirect(url_for('almoxarifado.movimentacoes_editar', id=id))
+            
+            try:
+                quantidade = float(quantidade)
+                if quantidade <= 0:
+                    flash('Quantidade deve ser maior que zero', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_editar', id=id))
+            except ValueError:
+                flash('Quantidade inválida', 'danger')
+                return redirect(url_for('almoxarifado.movimentacoes_editar', id=id))
+            
+            # Validar data
+            if data_movimento:
+                data_mov = datetime.strptime(data_movimento, '%Y-%m-%d')
+                if data_mov.date() > datetime.now().date():
+                    flash('Data do movimento não pode ser futura', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_editar', id=id))
+            else:
+                data_mov = movimento.data_movimento
+            
+            # Validar funcionário e obra (se fornecidos)
+            if funcionario_id:
+                funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
+                if not funcionario:
+                    flash('Funcionário não encontrado', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_editar', id=id))
+            else:
+                funcionario_id = None
+            
+            if obra_id:
+                obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+                if not obra:
+                    flash('Obra não encontrada', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_editar', id=id))
+            else:
+                obra_id = None
+            
+            # Processar valor unitário
+            if valor_unitario:
+                try:
+                    valor_unitario = float(valor_unitario)
+                except ValueError:
+                    valor_unitario = None
+            else:
+                valor_unitario = None
+            
+            # Atualizar movimento
+            movimento.tipo_movimento = tipo_movimento
+            movimento.quantidade = quantidade
+            movimento.data_movimento = data_mov
+            movimento.funcionario_id = funcionario_id
+            movimento.obra_id = obra_id
+            movimento.observacao = observacao or None
+            movimento.impacta_estoque = impacta_estoque
+            movimento.valor_unitario = valor_unitario
+            movimento.lote = lote or None
+            movimento.numero_serie = numero_serie or None
+            
+            db.session.flush()
+            
+            # Aplicar novo movimento ao estoque se necessário
+            if impacta_estoque:
+                resultado = apply_movimento_manual(movimento)
+                if not resultado['sucesso']:
+                    db.session.rollback()
+                    flash(f'Erro ao aplicar movimento ao estoque: {resultado["mensagem"]}', 'danger')
+                    return redirect(url_for('almoxarifado.movimentacoes_editar', id=id))
+            
+            db.session.commit()
+            
+            flash('Movimentação atualizada com sucesso!', 'success')
+            return redirect(url_for('almoxarifado.itens_movimentacoes', id=movimento.item_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Erro ao editar movimentação: {str(e)}')
+            flash(f'Erro ao editar movimentação: {str(e)}', 'danger')
+    
+    # GET - Carregar dados para o formulário
+    itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoItem.nome).all()
+    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    
+    # Data de hoje
+    hoje = datetime.now().strftime('%Y-%m-%d')
+    
+    return render_template('almoxarifado/movimentacoes_form.html',
+                         movimento=movimento,
+                         itens=itens,
+                         funcionarios=funcionarios,
+                         obras=obras,
+                         hoje=hoje)
+
+@almoxarifado_bp.route('/movimentacoes/deletar/<int:id>', methods=['POST'])
+@login_required
+def movimentacoes_deletar(id):
+    """Deletar movimentação manual com proteção contra concorrência"""
+    from almoxarifado_utils import rollback_movimento_manual
+    
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    movimento = AlmoxarifadoMovimento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    
+    # Validar que é movimento manual
+    if not movimento.origem_manual:
+        flash('Apenas movimentações manuais podem ser excluídas', 'danger')
+        return redirect(url_for('almoxarifado.itens_movimentacoes', id=movimento.item_id))
+    
+    item_id = movimento.item_id
+    
+    try:
+        # ===== PROTEÇÃO DE CONCORRÊNCIA: Optimistic Locking =====
+        # Validar timestamp para detectar modificações concorrentes
+        updated_at_original = request.form.get('updated_at_original')
+        if updated_at_original:
+            try:
+                updated_at_check = datetime.strptime(updated_at_original, '%Y-%m-%d %H:%M:%S.%f')
+            except ValueError:
+                updated_at_check = datetime.strptime(updated_at_original, '%Y-%m-%d %H:%M:%S')
+            
+            # Recarregar movimento do banco para verificar se foi modificado
+            db.session.refresh(movimento)
+            
+            if movimento.updated_at and movimento.updated_at > updated_at_check:
+                flash(
+                    'ERRO: Este registro foi modificado por outro usuário. '
+                    'A exclusão foi cancelada. Por favor, recarregue a página.',
+                    'danger'
+                )
+                return redirect(url_for('almoxarifado.itens_movimentacoes', id=item_id))
+        
+        # ===== TRANSAÇÃO ATÔMICA =====
+        
+        # Rollback do estoque se estava impactando
+        if movimento.impacta_estoque:
+            resultado = rollback_movimento_manual(movimento)
+            if not resultado['sucesso']:
+                db.session.rollback()
+                flash(f'Erro ao reverter estoque: {resultado["mensagem"]}', 'danger')
+                return redirect(url_for('almoxarifado.itens_movimentacoes', id=item_id))
+        
+        # Hard delete (pode mudar para soft delete se necessário)
+        db.session.delete(movimento)
+        db.session.commit()
+        
+        flash('Movimentação excluída com sucesso!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Erro ao deletar movimentação: {str(e)}')
+        flash(f'Erro ao excluir movimentação: {str(e)}', 'danger')
+    
+    return redirect(url_for('almoxarifado.itens_movimentacoes', id=item_id))

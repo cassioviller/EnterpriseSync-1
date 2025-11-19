@@ -3696,6 +3696,8 @@ class AlmoxarifadoMovimento(db.Model):
     data_movimento = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    origem_manual = db.Column(db.Boolean, default=False)
+    impacta_estoque = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships

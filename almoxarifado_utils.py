@@ -540,3 +540,429 @@ def calcular_kpis_almoxarifado(admin_id):
         'taxa_reposicao': round((produtos_baixo / total_produtos * 100) if total_produtos > 0 else 0, 2),
         'giro_mes': round((saidas_mes / total_produtos) if total_produtos > 0 else 0, 2)
     }
+
+# ===== FUNÇÕES DE MOVIMENTAÇÃO MANUAL (CRUD) =====
+
+def apply_movimento_manual(movimento):
+    """
+    Aplica um movimento manual ao estoque com controle de lote/valor/FIFO
+    
+    Args:
+        movimento: Objeto AlmoxarifadoMovimento
+        
+    Returns:
+        dict: {'sucesso': bool, 'mensagem': str}
+    """
+    from models import AlmoxarifadoItem, AlmoxarifadoEstoque
+    from sqlalchemy import func
+    
+    try:
+        if not movimento.impacta_estoque:
+            return {'sucesso': True, 'mensagem': 'Movimento não impacta estoque'}
+        
+        item = AlmoxarifadoItem.query.get(movimento.item_id)
+        if not item:
+            return {'sucesso': False, 'mensagem': 'Item não encontrado'}
+        
+        # ===== SERIALIZADOS =====
+        if item.tipo_controle == 'SERIALIZADO':
+            if movimento.tipo_movimento == 'ENTRADA':
+                # Verificar se número de série já existe
+                estoque_existente = AlmoxarifadoEstoque.query.filter_by(
+                    item_id=item.id,
+                    numero_serie=movimento.numero_serie,
+                    admin_id=movimento.admin_id
+                ).first()
+                
+                if estoque_existente:
+                    return {'sucesso': False, 'mensagem': f'Número de série {movimento.numero_serie} já cadastrado'}
+                
+                novo_estoque = AlmoxarifadoEstoque(
+                    item_id=item.id,
+                    numero_serie=movimento.numero_serie,
+                    quantidade=1,
+                    status='DISPONIVEL',
+                    valor_unitario=movimento.valor_unitario,
+                    lote=movimento.lote,
+                    admin_id=movimento.admin_id
+                )
+                db.session.add(novo_estoque)
+                
+            elif movimento.tipo_movimento == 'SAIDA':
+                # Buscar item DISPONIVEL (não EM_USO)
+                estoque = AlmoxarifadoEstoque.query.filter_by(
+                    item_id=item.id,
+                    numero_serie=movimento.numero_serie,
+                    status='DISPONIVEL',
+                    admin_id=movimento.admin_id
+                ).first()
+                
+                if not estoque:
+                    return {'sucesso': False, 'mensagem': f'Item serializado {movimento.numero_serie} não disponível no estoque'}
+                
+                estoque.status = 'EM_USO'
+                estoque.funcionario_atual_id = movimento.funcionario_id
+                estoque.obra_id = movimento.obra_id
+                
+            elif movimento.tipo_movimento == 'DEVOLUCAO':
+                # Buscar item EM_USO para devolver
+                estoque = AlmoxarifadoEstoque.query.filter_by(
+                    item_id=item.id,
+                    numero_serie=movimento.numero_serie,
+                    status='EM_USO',
+                    admin_id=movimento.admin_id
+                ).first()
+                
+                if not estoque:
+                    return {'sucesso': False, 'mensagem': f'Item serializado {movimento.numero_serie} não está em uso'}
+                
+                estoque.status = 'DISPONIVEL'
+                estoque.funcionario_atual_id = None
+                estoque.obra_id = None
+        
+        # ===== CONSUMÍVEIS =====
+        else:
+            if movimento.tipo_movimento == 'ENTRADA':
+                # ENTRADA: Criar novo registro por lote/valor ou incrementar existente exato
+                if movimento.lote or movimento.valor_unitario:
+                    # Buscar registro com mesmo lote E valor (segregação correta)
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        lote=movimento.lote,
+                        valor_unitario=movimento.valor_unitario,
+                        admin_id=movimento.admin_id
+                    ).first()
+                    
+                    if estoque:
+                        # Incrementa no mesmo lote/valor
+                        estoque.quantidade += movimento.quantidade
+                    else:
+                        # Cria novo registro para novo lote/valor
+                        novo_estoque = AlmoxarifadoEstoque(
+                            item_id=item.id,
+                            quantidade=movimento.quantidade,
+                            status='DISPONIVEL',
+                            valor_unitario=movimento.valor_unitario,
+                            lote=movimento.lote,
+                            admin_id=movimento.admin_id
+                        )
+                        db.session.add(novo_estoque)
+                else:
+                    # Sem lote/valor: usa primeiro disponível
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        admin_id=movimento.admin_id
+                    ).first()
+                    
+                    if estoque:
+                        estoque.quantidade += movimento.quantidade
+                    else:
+                        novo_estoque = AlmoxarifadoEstoque(
+                            item_id=item.id,
+                            quantidade=movimento.quantidade,
+                            status='DISPONIVEL',
+                            valor_unitario=movimento.valor_unitario,
+                            lote=movimento.lote,
+                            admin_id=movimento.admin_id
+                        )
+                        db.session.add(novo_estoque)
+                    
+            elif movimento.tipo_movimento == 'SAIDA':
+                # VALIDAR estoque total ANTES de aplicar
+                estoque_total = db.session.query(func.coalesce(func.sum(AlmoxarifadoEstoque.quantidade), 0)).filter_by(
+                    item_id=item.id,
+                    status='DISPONIVEL',
+                    admin_id=movimento.admin_id
+                ).scalar() or 0
+                
+                if estoque_total < movimento.quantidade:
+                    return {
+                        'sucesso': False, 
+                        'mensagem': f'Estoque insuficiente. Disponível: {estoque_total} {item.unidade or "un"}'
+                    }
+                
+                # SAIDA: Consumir por FIFO (primeiro lote mais antigo) ou lote específico
+                quantidade_restante = movimento.quantidade
+                
+                if movimento.lote:
+                    # Consumir de lote específico
+                    estoques = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        lote=movimento.lote,
+                        admin_id=movimento.admin_id
+                    ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()
+                else:
+                    # FIFO: lotes mais antigos primeiro
+                    estoques = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        admin_id=movimento.admin_id
+                    ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()
+                
+                # Consumir de múltiplos lotes se necessário
+                for estoque in estoques:
+                    if quantidade_restante <= 0:
+                        break
+                    
+                    if estoque.quantidade >= quantidade_restante:
+                        # Este lote tem suficiente
+                        estoque.quantidade -= quantidade_restante
+                        quantidade_restante = 0
+                    else:
+                        # Consumir tudo deste lote e continuar
+                        quantidade_restante -= estoque.quantidade
+                        estoque.quantidade = 0
+                
+                if quantidade_restante > 0:
+                    return {
+                        'sucesso': False, 
+                        'mensagem': f'Erro ao consumir estoque. Faltam {quantidade_restante} unidades'
+                    }
+                    
+            elif movimento.tipo_movimento == 'DEVOLUCAO':
+                # DEVOLUÇÃO: Incrementar no lote original ou criar novo
+                if movimento.lote:
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        lote=movimento.lote,
+                        admin_id=movimento.admin_id
+                    ).first()
+                    
+                    if estoque:
+                        estoque.quantidade += movimento.quantidade
+                    else:
+                        novo_estoque = AlmoxarifadoEstoque(
+                            item_id=item.id,
+                            quantidade=movimento.quantidade,
+                            status='DISPONIVEL',
+                            valor_unitario=movimento.valor_unitario,
+                            lote=movimento.lote,
+                            admin_id=movimento.admin_id
+                        )
+                        db.session.add(novo_estoque)
+                else:
+                    # Sem lote: usar primeiro disponível ou criar
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        admin_id=movimento.admin_id
+                    ).first()
+                    
+                    if estoque:
+                        estoque.quantidade += movimento.quantidade
+                    else:
+                        novo_estoque = AlmoxarifadoEstoque(
+                            item_id=item.id,
+                            quantidade=movimento.quantidade,
+                            status='DISPONIVEL',
+                            valor_unitario=movimento.valor_unitario,
+                            admin_id=movimento.admin_id
+                        )
+                        db.session.add(novo_estoque)
+        
+        db.session.flush()
+        return {'sucesso': True, 'mensagem': 'Estoque atualizado com sucesso'}
+        
+    except Exception as e:
+        logger.error(f'Erro ao aplicar movimento {movimento.id}: {str(e)}')
+        return {'sucesso': False, 'mensagem': f'Erro ao aplicar movimento: {str(e)}'}
+
+
+def rollback_movimento_manual(movimento):
+    """
+    Reverte um movimento manual do estoque (para edição/exclusão)
+    Lógica inversa ao apply_movimento_manual
+    
+    Args:
+        movimento: Objeto AlmoxarifadoMovimento
+        
+    Returns:
+        dict: {'sucesso': bool, 'mensagem': str}
+    """
+    from models import AlmoxarifadoItem, AlmoxarifadoEstoque
+    from sqlalchemy import func
+    
+    try:
+        if not movimento.impacta_estoque:
+            return {'sucesso': True, 'mensagem': 'Movimento não impacta estoque'}
+        
+        item = AlmoxarifadoItem.query.get(movimento.item_id)
+        if not item:
+            return {'sucesso': False, 'mensagem': 'Item não encontrado'}
+        
+        # ===== SERIALIZADOS =====
+        if item.tipo_controle == 'SERIALIZADO':
+            if movimento.tipo_movimento == 'ENTRADA':
+                # Rollback ENTRADA: Remover item do estoque (não importa o status)
+                estoque = AlmoxarifadoEstoque.query.filter_by(
+                    item_id=item.id,
+                    numero_serie=movimento.numero_serie,
+                    admin_id=movimento.admin_id
+                ).first()
+                
+                if estoque:
+                    db.session.delete(estoque)
+                else:
+                    logger.warning(f'Rollback ENTRADA: Item serializado {movimento.numero_serie} não encontrado')
+                    
+            elif movimento.tipo_movimento == 'SAIDA':
+                # Rollback SAIDA: Item está EM_USO, reverter para DISPONIVEL
+                estoque = AlmoxarifadoEstoque.query.filter_by(
+                    item_id=item.id,
+                    numero_serie=movimento.numero_serie,
+                    admin_id=movimento.admin_id
+                ).first()
+                
+                if estoque:
+                    # Verificar se está realmente EM_USO (esperado após SAIDA)
+                    if estoque.status == 'EM_USO':
+                        estoque.status = 'DISPONIVEL'
+                        estoque.funcionario_atual_id = None
+                        estoque.obra_id = None
+                    else:
+                        logger.warning(f'Rollback SAIDA: Item {movimento.numero_serie} com status inesperado {estoque.status}')
+                        # Reverter mesmo assim para não travar
+                        estoque.status = 'DISPONIVEL'
+                        estoque.funcionario_atual_id = None
+                        estoque.obra_id = None
+                else:
+                    return {'sucesso': False, 'mensagem': f'Item serializado {movimento.numero_serie} não encontrado para rollback'}
+                    
+            elif movimento.tipo_movimento == 'DEVOLUCAO':
+                # Rollback DEVOLUCAO: Item está DISPONIVEL, reverter para EM_USO
+                estoque = AlmoxarifadoEstoque.query.filter_by(
+                    item_id=item.id,
+                    numero_serie=movimento.numero_serie,
+                    admin_id=movimento.admin_id
+                ).first()
+                
+                if estoque:
+                    # Verificar se está DISPONIVEL (esperado após DEVOLUCAO)
+                    if estoque.status == 'DISPONIVEL':
+                        estoque.status = 'EM_USO'
+                        estoque.funcionario_atual_id = movimento.funcionario_id
+                        estoque.obra_id = movimento.obra_id
+                    else:
+                        logger.warning(f'Rollback DEVOLUCAO: Item {movimento.numero_serie} com status inesperado {estoque.status}')
+                        # Reverter mesmo assim
+                        estoque.status = 'EM_USO'
+                        estoque.funcionario_atual_id = movimento.funcionario_id
+                        estoque.obra_id = movimento.obra_id
+                else:
+                    return {'sucesso': False, 'mensagem': f'Item serializado {movimento.numero_serie} não encontrado para rollback'}
+        
+        # ===== CONSUMÍVEIS =====
+        else:
+            if movimento.tipo_movimento == 'ENTRADA':
+                # Rollback ENTRADA: Subtrair quantidade (reverter adição)
+                # Buscar pelo lote/valor específico se existir
+                if movimento.lote or movimento.valor_unitario:
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        lote=movimento.lote,
+                        valor_unitario=movimento.valor_unitario,
+                        admin_id=movimento.admin_id
+                    ).first()
+                else:
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        admin_id=movimento.admin_id
+                    ).first()
+                
+                if estoque:
+                    if estoque.quantidade >= movimento.quantidade:
+                        estoque.quantidade -= movimento.quantidade
+                        # Remover registro se quantidade zerar
+                        if estoque.quantidade == 0:
+                            db.session.delete(estoque)
+                    else:
+                        logger.warning(f'Rollback ENTRADA: Quantidade insuficiente para reverter. Estoque: {estoque.quantidade}, Movimento: {movimento.quantidade}')
+                        # Zerar mesmo assim para não deixar negativo
+                        db.session.delete(estoque)
+                else:
+                    logger.warning(f'Rollback ENTRADA: Estoque não encontrado para item {item.id}')
+                    
+            elif movimento.tipo_movimento == 'SAIDA':
+                # Rollback SAIDA: Adicionar quantidade de volta (reverter subtração)
+                # Preferir adicionar no lote original se existir
+                if movimento.lote:
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        lote=movimento.lote,
+                        admin_id=movimento.admin_id
+                    ).first()
+                    
+                    if estoque:
+                        estoque.quantidade += movimento.quantidade
+                    else:
+                        # Criar novo registro com o lote original
+                        novo_estoque = AlmoxarifadoEstoque(
+                            item_id=item.id,
+                            quantidade=movimento.quantidade,
+                            status='DISPONIVEL',
+                            valor_unitario=movimento.valor_unitario,
+                            lote=movimento.lote,
+                            admin_id=movimento.admin_id
+                        )
+                        db.session.add(novo_estoque)
+                else:
+                    # Sem lote: adicionar em registro existente ou criar novo
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        admin_id=movimento.admin_id
+                    ).first()
+                    
+                    if estoque:
+                        estoque.quantidade += movimento.quantidade
+                    else:
+                        novo_estoque = AlmoxarifadoEstoque(
+                            item_id=item.id,
+                            quantidade=movimento.quantidade,
+                            status='DISPONIVEL',
+                            valor_unitario=movimento.valor_unitario,
+                            admin_id=movimento.admin_id
+                        )
+                        db.session.add(novo_estoque)
+                    
+            elif movimento.tipo_movimento == 'DEVOLUCAO':
+                # Rollback DEVOLUCAO: Subtrair quantidade (reverter adição)
+                if movimento.lote:
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        lote=movimento.lote,
+                        admin_id=movimento.admin_id
+                    ).first()
+                else:
+                    estoque = AlmoxarifadoEstoque.query.filter_by(
+                        item_id=item.id,
+                        status='DISPONIVEL',
+                        admin_id=movimento.admin_id
+                    ).first()
+                
+                if estoque:
+                    if estoque.quantidade >= movimento.quantidade:
+                        estoque.quantidade -= movimento.quantidade
+                        # Remover se zerar
+                        if estoque.quantidade == 0:
+                            db.session.delete(estoque)
+                    else:
+                        logger.warning(f'Rollback DEVOLUCAO: Quantidade insuficiente. Zerando estoque.')
+                        db.session.delete(estoque)
+                else:
+                    logger.warning(f'Rollback DEVOLUCAO: Estoque não encontrado para item {item.id}')
+        
+        db.session.flush()
+        return {'sucesso': True, 'mensagem': 'Movimento revertido com sucesso'}
+        
+    except Exception as e:
+        logger.error(f'Erro ao reverter movimento {movimento.id}: {str(e)}')
+        return {'sucesso': False, 'mensagem': f'Erro ao reverter movimento: {str(e)}'}
