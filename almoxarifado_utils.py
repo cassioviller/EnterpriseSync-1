@@ -10,6 +10,9 @@ import base64
 import io
 from datetime import date, datetime, timedelta
 from collections import defaultdict
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ===== FUNÇÕES DE CÓDIGO DE BARRAS =====
 
@@ -564,6 +567,10 @@ def apply_movimento_manual(movimento):
         if not item:
             return {'sucesso': False, 'mensagem': 'Item não encontrado'}
         
+        # Garantir que quantidade é Decimal (evitar erro de tipo Decimal + float)
+        if not isinstance(movimento.quantidade, Decimal):
+            movimento.quantidade = Decimal(str(movimento.quantidade))
+        
         # ===== SERIALIZADOS =====
         if item.tipo_controle == 'SERIALIZADO':
             if movimento.tipo_movimento == 'ENTRADA':
@@ -793,6 +800,10 @@ def rollback_movimento_manual(movimento):
         item = AlmoxarifadoItem.query.get(movimento.item_id)
         if not item:
             return {'sucesso': False, 'mensagem': 'Item não encontrado'}
+        
+        # Garantir que quantidade é Decimal (evitar erro de tipo Decimal + float)
+        if not isinstance(movimento.quantidade, Decimal):
+            movimento.quantidade = Decimal(str(movimento.quantidade))
         
         # ===== SERIALIZADOS =====
         if item.tipo_controle == 'SERIALIZADO':

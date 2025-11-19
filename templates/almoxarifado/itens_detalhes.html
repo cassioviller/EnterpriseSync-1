@@ -96,6 +96,7 @@
                                     <th>Funcionário</th>
                                     <th>Obra</th>
                                     <th>Observação</th>
+                                    <th class="text-center">Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -112,16 +113,85 @@
                                         {% else %}
                                             <span class="badge bg-secondary">{{ mov.tipo_movimento }}</span>
                                         {% endif %}
+                                        {% if mov.origem_manual %}
+                                            <span class="badge bg-warning text-dark ms-1" title="Movimentação criada manualmente"><i class="fas fa-hand-paper"></i></span>
+                                        {% endif %}
                                     </td>
                                     <td>{{ mov.quantidade }}</td>
                                     <td>{{ mov.funcionario.nome if mov.funcionario else '-' }}</td>
                                     <td>{{ mov.obra.nome if mov.obra else '-' }}</td>
                                     <td>{{ mov.observacao or '-' }}</td>
+                                    <td class="text-center">
+                                        {% if mov.origem_manual %}
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{{ url_for('almoxarifado.movimentacoes_editar', id=mov.id) }}" 
+                                               class="btn btn-outline-primary btn-sm" 
+                                               title="Editar movimentação">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button type="button" 
+                                                    class="btn btn-outline-danger btn-sm" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#modalExcluir{{ mov.id }}"
+                                                    title="Excluir movimentação">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted small">-</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Modais de Confirmação de Exclusão -->
+                    {% for mov in movimentos %}
+                    {% if mov.origem_manual %}
+                    <div class="modal fade" id="modalExcluir{{ mov.id }}" tabindex="-1" aria-labelledby="modalExcluirLabel{{ mov.id }}" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title" id="modalExcluirLabel{{ mov.id }}">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="mb-3">Tem certeza que deseja excluir esta movimentação manual?</p>
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <p class="mb-1"><strong>Tipo:</strong> {{ mov.tipo_movimento }}</p>
+                                            <p class="mb-1"><strong>Quantidade:</strong> {{ mov.quantidade }} {{ item.unidade or 'un' }}</p>
+                                            <p class="mb-1"><strong>Data:</strong> {{ mov.data_movimento.strftime('%d/%m/%Y %H:%M') if mov.data_movimento else '-' }}</p>
+                                            {% if mov.observacao %}
+                                            <p class="mb-0"><strong>Observação:</strong> {{ mov.observacao }}</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="alert alert-warning mt-3 mb-0">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>Atenção:</strong> Esta ação reverterá o impacto desta movimentação no estoque e não poderá ser desfeita.
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <i class="fas fa-times me-1"></i>Cancelar
+                                    </button>
+                                    <form method="POST" action="{{ url_for('almoxarifado.movimentacoes_deletar', id=mov.id) }}" style="display: inline;">
+                                        <input type="hidden" name="updated_at_original" value="{{ mov.updated_at }}">
+                                        <button type="submit" class="btn btn-danger">
+                                            <i class="fas fa-trash me-1"></i>Sim, Excluir
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
                     {% else %}
                     <div class="alert alert-info border-0 mb-0">
                         <i class="fas fa-info-circle me-2"></i>
