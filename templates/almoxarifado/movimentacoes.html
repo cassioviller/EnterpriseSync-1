@@ -209,11 +209,6 @@
                                     {% else %}
                                         <span class="badge bg-secondary badge-movimento">{{ mov.tipo_movimento }}</span>
                                     {% endif %}
-                                    {% if mov.origem_manual %}
-                                        <br><span class="badge bg-warning text-dark mt-1" title="Movimentação criada manualmente">
-                                            <i class="fas fa-hand-paper"></i> Manual
-                                        </span>
-                                    {% endif %}
                                 </td>
 
                                 <!-- Item -->
@@ -263,7 +258,6 @@
 
                                 <!-- Ações -->
                                 <td class="text-center">
-                                    {% if mov.origem_manual %}
                                     <div class="btn-group btn-group-sm" role="group">
                                         <a href="{{ url_for('almoxarifado.movimentacoes_editar', id=mov.id) }}" 
                                            class="btn btn-outline-primary" 
@@ -283,14 +277,6 @@
                                             <i data-feather="eye" style="width: 14px; height: 14px;"></i>
                                         </a>
                                     </div>
-                                    {% else %}
-                                    <a href="{{ url_for('almoxarifado.itens_detalhes', id=mov.item.id) }}" 
-                                       class="btn btn-sm btn-outline-success" 
-                                       title="Ver Detalhes do Item">
-                                        <i data-feather="eye" style="width: 14px; height: 14px;"></i>
-                                        Detalhes
-                                    </a>
-                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -300,7 +286,6 @@
                 
                 <!-- Modais de Confirmação de Exclusão -->
                 {% for mov in movimentacoes.items %}
-                {% if mov.origem_manual %}
                 <div class="modal fade" id="modalExcluir{{ mov.id }}" tabindex="-1" aria-labelledby="modalExcluirLabel{{ mov.id }}" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
@@ -311,7 +296,7 @@
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <p class="mb-3">Tem certeza que deseja excluir esta movimentação manual?</p>
+                                <p class="mb-3">Tem certeza que deseja excluir esta movimentação?</p>
                                 <div class="card bg-light">
                                     <div class="card-body">
                                         <p class="mb-1"><strong>Tipo:</strong> {{ mov.tipo_movimento }}</p>
@@ -333,7 +318,7 @@
                                     <i class="fas fa-times me-1"></i>Cancelar
                                 </button>
                                 <form method="POST" action="{{ url_for('almoxarifado.movimentacoes_deletar', id=mov.id) }}" style="display: inline;">
-                                    <input type="hidden" name="updated_at_original" value="{{ mov.updated_at }}">
+                                    <input type="hidden" name="updated_at_original" value="{{ mov.updated_at if mov.updated_at else '' }}">
                                     <button type="submit" class="btn btn-danger">
                                         <i class="fas fa-trash me-1"></i>Sim, Excluir
                                     </button>
@@ -342,7 +327,6 @@
                         </div>
                     </div>
                 </div>
-                {% endif %}
                 {% endfor %}
 
                 <!-- Paginação -->
@@ -432,11 +416,14 @@
 </div>
 
 <script>
-// Inicializar Feather Icons
-feather.replace();
-
-// Melhorar UX dos selects longos (opcional: adicionar select2)
+// Inicializar Feather Icons após carregar o DOM
 document.addEventListener('DOMContentLoaded', function() {
+    // Garantir que feather está carregado
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+    
+    // Melhorar UX dos selects longos (opcional: adicionar select2)
     // Se houver muitas opções, considere adicionar Select2 para melhor UX
     // $('#item_id, #funcionario_id, #obra_id').select2();
 });

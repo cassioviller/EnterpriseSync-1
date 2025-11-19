@@ -2731,11 +2731,6 @@ def movimentacoes_editar(id):
     
     movimento = AlmoxarifadoMovimento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
-    # Validar que é movimento manual
-    if not movimento.origem_manual:
-        flash('Apenas movimentações manuais podem ser editadas', 'danger')
-        return redirect(url_for('almoxarifado.itens_movimentacoes', id=movimento.item_id))
-    
     if request.method == 'POST':
         try:
             # ===== PROTEÇÃO DE CONCORRÊNCIA: Optimistic Locking =====
@@ -2892,11 +2887,6 @@ def movimentacoes_deletar(id):
         return redirect(url_for('main.index'))
     
     movimento = AlmoxarifadoMovimento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
-    
-    # Validar que é movimento manual
-    if not movimento.origem_manual:
-        flash('Apenas movimentações manuais podem ser excluídas', 'danger')
-        return redirect(url_for('almoxarifado.itens_movimentacoes', id=movimento.item_id))
     
     item_id = movimento.item_id
     
