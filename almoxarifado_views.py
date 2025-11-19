@@ -1067,7 +1067,7 @@ def processar_saida():
                 
                 # Atualizar estoque
                 estoque.status = 'EM_USO'
-                estoque.funcionario_id = funcionario_id
+                estoque.funcionario_atual_id = funcionario_id
                 estoque.obra_id = obra_id
                 estoque.updated_at = datetime.utcnow()
                 
@@ -1301,7 +1301,7 @@ def processar_saida_multipla():
                 
                 # Atualizar estoque
                 estoque.status = 'EM_USO'
-                estoque.funcionario_id = funcionario_id
+                estoque.funcionario_atual_id = funcionario_id
                 estoque.obra_id = obra_id
                 estoque.updated_at = datetime.utcnow()
                 
@@ -1437,9 +1437,9 @@ def api_itens_funcionario(funcionario_id):
     
     itens_retornaveis = []
     
-    # 1. SERIALIZADOS em posse (status='EM_USO' e funcionario_id)
+    # 1. SERIALIZADOS em posse (status='EM_USO' e funcionario_atual_id)
     estoques_serializados = AlmoxarifadoEstoque.query.filter_by(
-        funcionario_id=funcionario_id,
+        funcionario_atual_id=funcionario_id,
         status='EM_USO',
         admin_id=admin_id
     ).join(AlmoxarifadoItem).filter(
@@ -1457,15 +1457,14 @@ def api_itens_funcionario(funcionario_id):
             'data_saida': est.updated_at.strftime('%d/%m/%Y') if est.updated_at else 'N/A'
         })
     
-    # 2. CONSUMÍVEIS retornáveis (permite_devolucao=True)
-    # Buscar movimentos de SAÍDA deste funcionário para itens retornáveis
+    # 2. CONSUMÍVEIS em posse do funcionário
+    # ✅ CORREÇÃO: Buscar TODOS os movimentos de SAÍDA (não apenas permite_devolucao=True)
     movimentos_saida = AlmoxarifadoMovimento.query.filter_by(
         funcionario_id=funcionario_id,
         tipo_movimento='SAIDA',
         admin_id=admin_id
     ).join(AlmoxarifadoItem).filter(
-        AlmoxarifadoItem.tipo_controle == 'CONSUMIVEL',
-        AlmoxarifadoItem.permite_devolucao == True
+        AlmoxarifadoItem.tipo_controle == 'CONSUMIVEL'
     ).all()
     
     # Agrupar por item e calcular quantidade disponível para devolução
@@ -1499,7 +1498,8 @@ def api_itens_funcionario(funcionario_id):
                 'item_nome': dados['item'].nome,
                 'tipo_controle': 'CONSUMIVEL',
                 'quantidade_disponivel': qtd_disponivel,
-                'unidade': dados['item'].unidade
+                'unidade': dados['item'].unidade,
+                'permite_devolucao': dados['item'].permite_devolucao  # ✅ Flag para frontend
             })
     
     return jsonify({'itens': itens_retornaveis})
@@ -1545,7 +1545,7 @@ def processar_devolucao():
             for estoque_id in estoque_ids:
                 estoque = AlmoxarifadoEstoque.query.filter_by(
                     id=int(estoque_id),
-                    funcionario_id=funcionario_id,
+                    funcionario_atual_id=funcionario_id,
                     status='EM_USO',
                     admin_id=admin_id
                 ).first()
@@ -1557,7 +1557,7 @@ def processar_devolucao():
                 
                 # Atualizar estoque
                 estoque.status = 'DISPONIVEL'
-                estoque.funcionario_id = None
+                estoque.funcionario_atual_id = None
                 estoque.obra_id = None
                 estoque.updated_at = datetime.utcnow()
                 
@@ -1773,7 +1773,7 @@ def processar_devolucao_multipla():
                 
                 # Limpar vinculo com funcionário e obra
                 obra_id_movimento = estoque.obra_id
-                estoque.funcionario_id = None
+                estoque.funcionario_atual_id = None
                 estoque.obra_id = None
                 estoque.updated_at = datetime.utcnow()
                 
