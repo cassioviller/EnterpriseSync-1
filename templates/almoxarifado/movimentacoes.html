@@ -209,6 +209,11 @@
                                     {% else %}
                                         <span class="badge bg-secondary badge-movimento">{{ mov.tipo_movimento }}</span>
                                     {% endif %}
+                                    {% if mov.origem_manual %}
+                                        <br><span class="badge bg-warning text-dark mt-1" title="Movimentação criada manualmente">
+                                            <i class="fas fa-hand-paper"></i> Manual
+                                        </span>
+                                    {% endif %}
                                 </td>
 
                                 <!-- Item -->
@@ -258,18 +263,87 @@
 
                                 <!-- Ações -->
                                 <td class="text-center">
+                                    {% if mov.origem_manual %}
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ url_for('almoxarifado.movimentacoes_editar', id=mov.id) }}" 
+                                           class="btn btn-outline-primary" 
+                                           title="Editar movimentação">
+                                            <i data-feather="edit-2" style="width: 14px; height: 14px;"></i>
+                                        </a>
+                                        <button type="button" 
+                                                class="btn btn-outline-danger" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modalExcluir{{ mov.id }}"
+                                                title="Excluir movimentação">
+                                            <i data-feather="trash-2" style="width: 14px; height: 14px;"></i>
+                                        </button>
+                                        <a href="{{ url_for('almoxarifado.itens_detalhes', id=mov.item.id) }}" 
+                                           class="btn btn-outline-success" 
+                                           title="Ver Detalhes do Item">
+                                            <i data-feather="eye" style="width: 14px; height: 14px;"></i>
+                                        </a>
+                                    </div>
+                                    {% else %}
                                     <a href="{{ url_for('almoxarifado.itens_detalhes', id=mov.item.id) }}" 
                                        class="btn btn-sm btn-outline-success" 
                                        title="Ver Detalhes do Item">
                                         <i data-feather="eye" style="width: 14px; height: 14px;"></i>
                                         Detalhes
                                     </a>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                
+                <!-- Modais de Confirmação de Exclusão -->
+                {% for mov in movimentacoes.items %}
+                {% if mov.origem_manual %}
+                <div class="modal fade" id="modalExcluir{{ mov.id }}" tabindex="-1" aria-labelledby="modalExcluirLabel{{ mov.id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title" id="modalExcluirLabel{{ mov.id }}">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="mb-3">Tem certeza que deseja excluir esta movimentação manual?</p>
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <p class="mb-1"><strong>Tipo:</strong> {{ mov.tipo_movimento }}</p>
+                                        <p class="mb-1"><strong>Item:</strong> {{ mov.item.nome }}</p>
+                                        <p class="mb-1"><strong>Quantidade:</strong> {{ mov.quantidade }} {{ mov.item.unidade or 'un' }}</p>
+                                        <p class="mb-1"><strong>Data:</strong> {{ mov.data_movimento.strftime('%d/%m/%Y %H:%M') if mov.data_movimento else '-' }}</p>
+                                        {% if mov.observacao %}
+                                        <p class="mb-0"><strong>Observação:</strong> {{ mov.observacao }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="alert alert-warning mt-3 mb-0">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Atenção:</strong> Esta ação reverterá o impacto desta movimentação no estoque e não poderá ser desfeita.
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="fas fa-times me-1"></i>Cancelar
+                                </button>
+                                <form method="POST" action="{{ url_for('almoxarifado.movimentacoes_deletar', id=mov.id) }}" style="display: inline;">
+                                    <input type="hidden" name="updated_at_original" value="{{ mov.updated_at }}">
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="fas fa-trash me-1"></i>Sim, Excluir
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
 
                 <!-- Paginação -->
                 {% if movimentacoes.pages > 1 %}
