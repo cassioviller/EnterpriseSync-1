@@ -1,0 +1,203 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if fornecedor else 'Novo' }} Fornecedor{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-truck text-primary me-2"></i>
+                {{ 'Editar' if fornecedor else 'Novo' }} Fornecedor
+            </h1>
+        </div>
+    </div>
+
+    <form method="POST">
+        <div class="row">
+            <!-- Coluna Esquerda: Dados Principais -->
+            <div class="col-lg-6 mb-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-building me-2"></i>Dados da Empresa</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="razao_social" class="form-label">Razão Social *</label>
+                            <input type="text" class="form-control" id="razao_social" name="razao_social" 
+                                   value="{{ fornecedor.razao_social if fornecedor else '' }}" 
+                                   required placeholder="Ex: Empresa LTDA">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="nome_fantasia" class="form-label">Nome Fantasia</label>
+                            <input type="text" class="form-control" id="nome_fantasia" name="nome_fantasia" 
+                                   value="{{ fornecedor.nome_fantasia if fornecedor else '' }}"
+                                   placeholder="Ex: Materiais Silva">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="cnpj" class="form-label">CNPJ *</label>
+                                <input type="text" class="form-control" id="cnpj" name="cnpj" 
+                                       value="{{ fornecedor.cnpj if fornecedor else '' }}" 
+                                       required placeholder="00.000.000/0000-00"
+                                       maxlength="18">
+                                <div class="form-text">Apenas números ou formatado</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="inscricao_estadual" class="form-label">Inscrição Estadual</label>
+                                <input type="text" class="form-control" id="inscricao_estadual" name="inscricao_estadual" 
+                                       value="{{ fornecedor.inscricao_estadual if fornecedor else '' }}"
+                                       placeholder="Ex: 123.456.789.012">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna Direita: Endereço e Contato -->
+            <div class="col-lg-6 mb-4">
+                <!-- Endereço -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Endereço</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="endereco" class="form-label">Endereço Completo</label>
+                            <input type="text" class="form-control" id="endereco" name="endereco" 
+                                   value="{{ fornecedor.endereco if fornecedor else '' }}"
+                                   placeholder="Rua, número, complemento, bairro">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="cidade" class="form-label">Cidade</label>
+                                <input type="text" class="form-control" id="cidade" name="cidade" 
+                                       value="{{ fornecedor.cidade if fornecedor else '' }}"
+                                       placeholder="Ex: São Paulo">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="estado" class="form-label">UF</label>
+                                <select class="form-select" id="estado" name="estado">
+                                    <option value="">-</option>
+                                    {% set estados = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] %}
+                                    {% for uf in estados %}
+                                    <option value="{{ uf }}" {{ 'selected' if fornecedor and fornecedor.estado == uf else '' }}>{{ uf }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="cep" class="form-label">CEP</label>
+                                <input type="text" class="form-control" id="cep" name="cep" 
+                                       value="{{ fornecedor.cep if fornecedor else '' }}"
+                                       placeholder="00000-000" maxlength="9">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contato -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="fas fa-phone me-2"></i>Contato</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="telefone" class="form-label">Telefone</label>
+                            <input type="text" class="form-control" id="telefone" name="telefone" 
+                                   value="{{ fornecedor.telefone if fornecedor else '' }}"
+                                   placeholder="(00) 0000-0000 ou (00) 00000-0000">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">E-mail</label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   value="{{ fornecedor.email if fornecedor else '' }}"
+                                   placeholder="contato@fornecedor.com.br">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="contato_responsavel" class="form-label">Nome do Responsável</label>
+                            <input type="text" class="form-control" id="contato_responsavel" name="contato_responsavel" 
+                                   value="{{ fornecedor.contato_responsavel if fornecedor else '' }}"
+                                   placeholder="Ex: João Silva">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {{ 'Atualizar' if fornecedor else 'Cadastrar' }} Fornecedor
+                            </button>
+                            <a href="{{ url_for('almoxarifado.fornecedores') }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>
+                                Cancelar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Máscaras de Input -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Máscara CNPJ
+    const cnpjInput = document.getElementById('cnpj');
+    if (cnpjInput) {
+        cnpjInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 14) {
+                value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+                value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+                value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+                value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                e.target.value = value;
+            }
+        });
+    }
+
+    // Máscara CEP
+    const cepInput = document.getElementById('cep');
+    if (cepInput) {
+        cepInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 8) {
+                value = value.replace(/^(\d{5})(\d)/, '$1-$2');
+                e.target.value = value;
+            }
+        });
+    }
+
+    // Máscara Telefone
+    const telefoneInput = document.getElementById('telefone');
+    if (telefoneInput) {
+        telefoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 11) {
+                if (value.length <= 10) {
+                    value = value.replace(/^(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                } else {
+                    value = value.replace(/^(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                }
+                e.target.value = value;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

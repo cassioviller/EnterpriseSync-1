@@ -1,94 +1,157 @@
 {% extends "base_completo.html" %}
 
+{% block title %}Fornecedores - Almoxarifado{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <!-- Cabeçalho -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0 text-gray-800">
-            <i class="fas fa-truck"></i> Fornecedores
-        </h1>
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-truck text-primary me-2"></i>
+                Fornecedores
+            </h1>
+            <p class="text-muted mb-0">Gerencie os fornecedores de materiais e equipamentos</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('almoxarifado.fornecedores_criar') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Novo Fornecedor
+            </a>
+        </div>
     </div>
 
-    <!-- Lista de Fornecedores -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">
-                Fornecedores Cadastrados ({{ fornecedores|length }})
+    <!-- Barra de Busca -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('almoxarifado.fornecedores') }}" class="row g-3">
+                <div class="col-md-10">
+                    <input type="text" class="form-control" name="busca" 
+                           placeholder="Buscar por Razão Social, Nome Fantasia ou CNPJ..." 
+                           value="{{ busca or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i> Buscar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if fornecedores %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+            <h6 class="mb-0 text-primary">
+                <i class="fas fa-list me-2"></i>
+                {{ fornecedores|length }} fornecedor(es) encontrado(s)
             </h6>
         </div>
-        <div class="card-body">
-            {% if fornecedores %}
-                <div class="table-responsive">
-                    <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                        <thead>
-                            <tr>
-                                <th>CNPJ</th>
-                                <th>Razão Social</th>
-                                <th>Nome Fantasia</th>
-                                <th>Contato</th>
-                                <th>Última Compra</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for fornecedor in fornecedores %}
-                            <tr>
-                                <td>{{ fornecedor.cnpj_formatado }}</td>
-                                <td>
-                                    <strong>{{ fornecedor.razao_social }}</strong>
-                                    {% if fornecedor.inscricao_estadual %}
-                                    <br><small class="text-muted">IE: {{ fornecedor.inscricao_estadual }}</small>
-                                    {% endif %}
-                                </td>
-                                <td>{{ fornecedor.nome_fantasia or '-' }}</td>
-                                <td>
-                                    {% if fornecedor.telefone %}
-                                    <i class="fas fa-phone"></i> {{ fornecedor.telefone }}<br>
-                                    {% endif %}
-                                    {% if fornecedor.email %}
-                                    <i class="fas fa-envelope"></i> {{ fornecedor.email }}
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if fornecedor.ultima_compra %}
-                                    {{ fornecedor.ultima_compra.strftime('%d/%m/%Y') }}
-                                    {% else %}
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Razão Social</th>
+                            <th>Nome Fantasia</th>
+                            <th>CNPJ</th>
+                            <th>Cidade/UF</th>
+                            <th>Contato</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fornecedor in fornecedores %}
+                        <tr>
+                            <td>
+                                <strong>{{ fornecedor.razao_social }}</strong>
+                                {% if fornecedor.inscricao_estadual %}
+                                <br><small class="text-muted">IE: {{ fornecedor.inscricao_estadual }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ fornecedor.nome_fantasia or '-' }}</td>
+                            <td>
+                                <code class="small">{{ fornecedor.cnpj_formatado }}</code>
+                            </td>
+                            <td>
+                                {% if fornecedor.cidade %}
+                                    {{ fornecedor.cidade }}{% if fornecedor.estado %}/{{ fornecedor.estado }}{% endif %}
+                                {% else %}
                                     <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if fornecedor.ativo %}
-                                        <span class="badge badge-success">Ativo</span>
-                                    {% else %}
-                                        <span class="badge badge-secondary">Inativo</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="text-center py-4">
-                    <i class="fas fa-truck fa-3x text-muted mb-3"></i>
-                    <h5 class="text-muted">Nenhum fornecedor cadastrado</h5>
-                    <p class="text-muted">Os fornecedores são criados automaticamente ao importar notas fiscais.</p>
-                </div>
-            {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if fornecedor.telefone %}
+                                <div><i class="fas fa-phone text-muted me-1"></i> {{ fornecedor.telefone }}</div>
+                                {% endif %}
+                                {% if fornecedor.email %}
+                                <div><i class="fas fa-envelope text-muted me-1"></i> {{ fornecedor.email }}</div>
+                                {% endif %}
+                                {% if not fornecedor.telefone and not fornecedor.email %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('almoxarifado.fornecedores_editar', id=fornecedor.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                        data-bs-toggle="modal" data-bs-target="#deleteModal{{ fornecedor.id }}"
+                                        title="Desativar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        
+                        <!-- Modal de Confirmação de Exclusão -->
+                        <div class="modal fade" id="deleteModal{{ fornecedor.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Confirmar Desativação</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p>Tem certeza que deseja desativar o fornecedor:</p>
+                                        <p class="fw-bold mb-0">{{ fornecedor.razao_social }}</p>
+                                        <p class="small text-muted">CNPJ: {{ fornecedor.cnpj_formatado }}</p>
+                                        <div class="alert alert-warning small mb-0">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            O fornecedor será desativado e não aparecerá mais nas listagens.
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <form method="POST" action="{{ url_for('almoxarifado.fornecedores_deletar', id=fornecedor.id) }}" style="display:inline">
+                                            <button type="submit" class="btn btn-danger">Desativar</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
+    {% else %}
+    <div class="alert alert-info border-0 shadow-sm">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle fa-2x me-3"></i>
+            <div>
+                <strong>Nenhum fornecedor encontrado</strong>
+                <p class="mb-0 mt-1">
+                    {% if busca %}
+                        Não encontramos fornecedores com o termo "{{ busca }}". 
+                        <a href="{{ url_for('almoxarifado.fornecedores') }}">Ver todos</a>
+                    {% else %}
+                        Cadastre o primeiro fornecedor para começar. 
+                        <a href="{{ url_for('almoxarifado.fornecedores_criar') }}">Criar fornecedor</a>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
-
-<script>
-// DataTable
-$(document).ready(function() {
-    $('#dataTable').DataTable({
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json"
-        },
-        "order": [[ 1, "asc" ]],
-        "pageLength": 25
-    });
-});
-</script>
 {% endblock %}
