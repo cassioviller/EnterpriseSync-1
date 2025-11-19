@@ -276,7 +276,17 @@ def criar_conta_pagar_entrada_material(data: dict, admin_id: int):
         
         item = AlmoxarifadoItem.query.get(movimento.item_id)
         
-        # Criar conta a pagar
+        # ✅ VERIFICAR se conta contábil existe antes de criar ContaPagar
+        from models import PlanoContas
+        conta_contabil = PlanoContas.query.filter_by(
+            codigo='2.1.01.001',
+            admin_id=admin_id
+        ).first()
+        
+        if not conta_contabil:
+            logger.warning(f"⚠️ Conta contábil 2.1.01.001 não encontrada para admin {admin_id}. ContaPagar será criada sem vinculação contábil.")
+        
+        # Criar conta a pagar (com ou sem conta contábil)
         conta = ContaPagar(
             admin_id=admin_id,
             fornecedor_id=movimento.fornecedor_id,
@@ -288,7 +298,7 @@ def criar_conta_pagar_entrada_material(data: dict, admin_id: int):
             data_emissao=movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date(),
             data_vencimento=(movimento.data_movimento + timedelta(days=30)).date() if movimento.data_movimento else (datetime.now() + timedelta(days=30)).date(),
             status='PENDENTE',
-            conta_contabil_codigo='2.1.01.001'
+            conta_contabil_codigo='2.1.01.001' if conta_contabil else None
         )
         
         db.session.add(conta)
