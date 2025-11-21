@@ -286,8 +286,8 @@
                 
                 <!-- Modais de Confirmação de Exclusão -->
                 {% for mov in movimentacoes.items %}
-                <div class="modal fade" id="modalExcluir{{ mov.id }}" tabindex="-1" aria-labelledby="modalExcluirLabel{{ mov.id }}" aria-hidden="true">
-                    <div class="modal-dialog">
+                <div class="modal fade" id="modalExcluir{{ mov.id }}" tabindex="-1" aria-labelledby="modalExcluirLabel{{ mov.id }}" aria-hidden="true" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header bg-danger text-white">
                                 <h5 class="modal-title" id="modalExcluirLabel{{ mov.id }}">
@@ -416,16 +416,25 @@
 </div>
 
 <script>
-// Inicializar Feather Icons após carregar o DOM
-document.addEventListener('DOMContentLoaded', function() {
-    // Garantir que feather está carregado
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
+// Inicializar Feather Icons apenas uma vez
+(function() {
+    let featherInitialized = false;
     
-    // Melhorar UX dos selects longos (opcional: adicionar select2)
-    // Se houver muitas opções, considere adicionar Select2 para melhor UX
-    // $('#item_id, #funcionario_id, #obra_id').select2();
-});
+    document.addEventListener('DOMContentLoaded', function() {
+        // Garantir que feather está carregado e executar apenas uma vez
+        if (typeof feather !== 'undefined' && !featherInitialized) {
+            feather.replace();
+            featherInitialized = true;
+        }
+    });
+    
+    // Prevenir que feather.replace() seja executado novamente quando modais abrem
+    document.querySelectorAll('.modal').forEach(function(modal) {
+        modal.addEventListener('shown.bs.modal', function(e) {
+            // Não executar feather.replace() aqui para evitar refluxo
+            // Os ícones já foram inicializados no DOMContentLoaded
+        });
+    });
+})();
 </script>
 {% endblock %}
