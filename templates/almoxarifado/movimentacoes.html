@@ -478,7 +478,7 @@
                 }
                 
                 // Configurar action do formulário
-                form.action = '/almoxarifado/movimentacoes/' + movId + '/deletar';
+                form.action = '/almoxarifado/movimentacoes/deletar/' + movId;
                 
                 // Configurar campo hidden para optimistic locking
                 document.getElementById('modal-updated-at').value = movUpdatedAt;

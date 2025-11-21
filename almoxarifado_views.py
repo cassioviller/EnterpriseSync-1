@@ -2932,4 +2932,11 @@ def movimentacoes_deletar(id):
         logger.error(f'Erro ao deletar movimentação: {str(e)}')
         flash(f'Erro ao excluir movimentação: {str(e)}', 'danger')
     
-    return redirect(url_for('almoxarifado.itens_movimentacoes', id=item_id))
+    # Redirecionar de volta para a página de origem
+    # Se veio da lista principal de movimentações, volta para lá
+    # Se veio da página do item, volta para a página do item
+    referrer = request.referrer
+    if referrer and '/almoxarifado/movimentacoes' in referrer and f'/itens/{item_id}' not in referrer:
+        return redirect(url_for('almoxarifado.movimentacoes'))
+    else:
+        return redirect(url_for('almoxarifado.itens_movimentacoes', id=item_id))
