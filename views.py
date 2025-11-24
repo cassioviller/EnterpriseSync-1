@@ -1880,12 +1880,14 @@ def funcionario_perfil(id):
     for item_id, dados in itens_consumiveis_dict.items():
         qtd_em_posse = dados['quantidade_saida'] - dados['quantidade_devolvida'] - dados['quantidade_consumida']
         if qtd_em_posse > 0:
+            # Acesso seguro ao valor_unitario (pode não existir no modelo)
+            valor_unit = getattr(dados['item'], 'valor_unitario', None) or Decimal('0')
             itens_consumiveis_posse.append({
                 'item': dados['item'],
                 'quantidade': qtd_em_posse,
                 'tipo_controle': 'CONSUMIVEL',
-                'valor_unitario': dados['item'].valor_unitario or Decimal('0'),
-                'valor_total': (dados['item'].valor_unitario or Decimal('0')) * qtd_em_posse,
+                'valor_unitario': valor_unit,
+                'valor_total': valor_unit * qtd_em_posse,
                 'ultima_movimentacao': dados['ultima_saida'],
                 'obra': dados['obra'],
                 'status': 'EM_USO'
@@ -1895,9 +1897,9 @@ def funcionario_perfil(id):
     itens_almoxarifado = list(itens_serializados) + itens_consumiveis_posse
     
     # Calcular valor total dos itens em posse
-    valor_total_serializados = sum((item.valor_unitario or 0) * (item.quantidade or 1) for item in itens_serializados)
-    valor_total_consumiveis = sum(item['valor_total'] for item in itens_consumiveis_posse)
-    valor_total_itens = valor_total_serializados + float(valor_total_consumiveis)
+    valor_total_serializados = sum((float(item.valor_unitario or 0) * float(item.quantidade or 1)) for item in itens_serializados)
+    valor_total_consumiveis = sum(float(item['valor_total']) for item in itens_consumiveis_posse)
+    valor_total_itens = valor_total_serializados + valor_total_consumiveis
     
     # Buscar opções para dropdowns do modal de edição
     departamentos = Departamento.query.filter_by(admin_id=admin_id).all()
