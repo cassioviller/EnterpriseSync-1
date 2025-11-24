@@ -782,49 +782,91 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for estoque in itens_almoxarifado %}
+                            {% for item_posse in itens_almoxarifado %}
                             <tr>
                                 <td>
                                     <div class="d-flex flex-column">
-                                        <span class="fw-bold">{{ estoque.item.codigo }}</span>
-                                        <small class="text-muted">{{ estoque.item.nome }}</small>
+                                        {% if item_posse is mapping %}
+                                            <span class="fw-bold">{{ item_posse.item.codigo }}</span>
+                                            <small class="text-muted">{{ item_posse.item.nome }}</small>
+                                            <span class="badge bg-warning mt-1" style="width: fit-content;">CONSUMÍVEL</span>
+                                        {% else %}
+                                            <span class="fw-bold">{{ item_posse.item.codigo }}</span>
+                                            <small class="text-muted">{{ item_posse.item.nome }}</small>
+                                            <span class="badge bg-primary mt-1" style="width: fit-content;">SERIALIZADO</span>
+                                        {% endif %}
                                     </div>
                                 </td>
                                 <td>
-                                    {% if estoque.numero_serie %}
-                                        <span class="badge bg-info">{{ estoque.numero_serie }}</span>
+                                    {% if item_posse is mapping %}
+                                        <span class="fw-bold text-primary">{{ item_posse.quantidade }} {{ item_posse.item.unidade or 'un' }}</span>
+                                    {% elif item_posse.numero_serie %}
+                                        <span class="badge bg-info">{{ item_posse.numero_serie }}</span>
                                     {% else %}
-                                        <span class="fw-bold">{{ estoque.quantidade or 1 }}</span>
+                                        <span class="fw-bold">{{ item_posse.quantidade or 1 }}</span>
                                     {% endif %}
                                 </td>
-                                <td>R$ {{ '{:,.2f}'.format(estoque.valor_unitario or 0) }}</td>
-                                <td class="fw-bold">R$ {{ '{:,.2f}'.format((estoque.valor_unitario or 0) * (estoque.quantidade or 1)) }}</td>
-                                <td>{{ estoque.created_at.strftime('%d/%m/%Y') if estoque.created_at else '-' }}</td>
                                 <td>
-                                    {% if estoque.obra %}
-                                        <span class="badge bg-secondary">{{ estoque.obra.nome }}</span>
+                                    {% if item_posse is mapping %}
+                                        R$ {{ '{:,.2f}'.format(item_posse.valor_unitario or 0) }}
+                                    {% else %}
+                                        R$ {{ '{:,.2f}'.format(item_posse.valor_unitario or 0) }}
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold">
+                                    {% if item_posse is mapping %}
+                                        R$ {{ '{:,.2f}'.format(item_posse.valor_total) }}
+                                    {% else %}
+                                        R$ {{ '{:,.2f}'.format((item_posse.valor_unitario or 0) * (item_posse.quantidade or 1)) }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item_posse is mapping %}
+                                        {{ item_posse.ultima_movimentacao.strftime('%d/%m/%Y') if item_posse.ultima_movimentacao else '-' }}
+                                    {% else %}
+                                        {{ item_posse.created_at.strftime('%d/%m/%Y') if item_posse.created_at else '-' }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item_posse is mapping %}
+                                        {% if item_posse.obra %}
+                                            <span class="badge bg-secondary">{{ item_posse.obra.nome }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    {% elif item_posse.obra %}
+                                        <span class="badge bg-secondary">{{ item_posse.obra.nome }}</span>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if estoque.status == 'EM_USO' %}
+                                    {% if item_posse.status == 'EM_USO' %}
                                         <span class="badge bg-info">Em Uso</span>
-                                    {% elif estoque.status == 'DISPONIVEL' %}
+                                    {% elif item_posse.status == 'DISPONIVEL' %}
                                         <span class="badge bg-success">Disponível</span>
-                                    {% elif estoque.status == 'MANUTENCAO' %}
+                                    {% elif item_posse.status == 'MANUTENCAO' %}
                                         <span class="badge bg-warning">Manutenção</span>
                                     {% else %}
-                                        <span class="badge bg-secondary">{{ estoque.status }}</span>
+                                        <span class="badge bg-secondary">{{ item_posse.status }}</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="/almoxarifado/itens/{{ estoque.item_id }}" 
-                                       class="btn btn-sm btn-outline-primary" 
-                                       data-bs-toggle="tooltip" 
-                                       title="Ver no Almoxarifado">
-                                        <i data-feather="external-link"></i>
-                                    </a>
+                                    {% if item_posse is mapping %}
+                                        <a href="/almoxarifado/itens/{{ item_posse.item.id }}" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           data-bs-toggle="tooltip" 
+                                           title="Ver no Almoxarifado">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                    {% else %}
+                                        <a href="/almoxarifado/itens/{{ item_posse.item_id }}" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           data-bs-toggle="tooltip" 
+                                           title="Ver no Almoxarifado">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}

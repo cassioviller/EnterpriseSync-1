@@ -1815,15 +1815,89 @@ def funcionario_perfil(id):
     obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
     
     # Buscar itens do almoxarifado em posse do funcionário (MULTI-TENANT)
-    from models import AlmoxarifadoEstoque, AlmoxarifadoItem
-    itens_almoxarifado = AlmoxarifadoEstoque.query.filter_by(
+    from models import AlmoxarifadoEstoque, AlmoxarifadoItem, AlmoxarifadoMovimento
+    from sqlalchemy import func
+    from decimal import Decimal
+    
+    # 1. ITENS SERIALIZADOS - via AlmoxarifadoEstoque
+    itens_serializados = AlmoxarifadoEstoque.query.filter_by(
         admin_id=admin_id,
         funcionario_atual_id=funcionario.id,
         status='EM_USO'
     ).join(AlmoxarifadoItem).order_by(AlmoxarifadoEstoque.updated_at.desc()).all()
     
+    # 2. ITENS CONSUMÍVEIS - calcular via movimentos (SAIDA - DEVOLUCAO - CONSUMIDO)
+    itens_consumiveis_dict = {}
+    
+    # Buscar todas as SAIDAS para o funcionário
+    saidas = AlmoxarifadoMovimento.query.filter_by(
+        admin_id=admin_id,
+        funcionario_id=funcionario.id,
+        tipo_movimento='SAIDA'
+    ).join(AlmoxarifadoItem).all()
+    
+    for saida in saidas:
+        if saida.item.tipo_controle == 'CONSUMIVEL':
+            if saida.item_id not in itens_consumiveis_dict:
+                itens_consumiveis_dict[saida.item_id] = {
+                    'item': saida.item,
+                    'quantidade_saida': Decimal('0'),
+                    'quantidade_devolvida': Decimal('0'),
+                    'quantidade_consumida': Decimal('0'),
+                    'ultima_saida': saida.created_at,
+                    'obra': saida.obra
+                }
+            itens_consumiveis_dict[saida.item_id]['quantidade_saida'] += (saida.quantidade or Decimal('0'))
+            # Manter a obra da última saída
+            if saida.created_at > itens_consumiveis_dict[saida.item_id]['ultima_saida']:
+                itens_consumiveis_dict[saida.item_id]['ultima_saida'] = saida.created_at
+                itens_consumiveis_dict[saida.item_id]['obra'] = saida.obra
+    
+    # Buscar todas as DEVOLUÇÕES
+    devolucoes = AlmoxarifadoMovimento.query.filter_by(
+        admin_id=admin_id,
+        funcionario_id=funcionario.id,
+        tipo_movimento='DEVOLUCAO'
+    ).all()
+    
+    for devolucao in devolucoes:
+        if devolucao.item_id in itens_consumiveis_dict:
+            itens_consumiveis_dict[devolucao.item_id]['quantidade_devolvida'] += (devolucao.quantidade or Decimal('0'))
+    
+    # Buscar todas as CONSUMIDOS
+    consumidos = AlmoxarifadoMovimento.query.filter_by(
+        admin_id=admin_id,
+        funcionario_id=funcionario.id,
+        tipo_movimento='CONSUMIDO'
+    ).all()
+    
+    for consumido in consumidos:
+        if consumido.item_id in itens_consumiveis_dict:
+            itens_consumiveis_dict[consumido.item_id]['quantidade_consumida'] += (consumido.quantidade or Decimal('0'))
+    
+    # Criar lista de itens consumíveis em posse (quantidade > 0)
+    itens_consumiveis_posse = []
+    for item_id, dados in itens_consumiveis_dict.items():
+        qtd_em_posse = dados['quantidade_saida'] - dados['quantidade_devolvida'] - dados['quantidade_consumida']
+        if qtd_em_posse > 0:
+            itens_consumiveis_posse.append({
+                'item': dados['item'],
+                'quantidade': qtd_em_posse,
+                'tipo_controle': 'CONSUMIVEL',
+                'valor_unitario': dados['item'].valor_unitario or Decimal('0'),
+                'valor_total': (dados['item'].valor_unitario or Decimal('0')) * qtd_em_posse,
+                'ultima_movimentacao': dados['ultima_saida'],
+                'obra': dados['obra'],
+                'status': 'EM_USO'
+            })
+    
+    # Combinar serializados + consumíveis
+    itens_almoxarifado = list(itens_serializados) + itens_consumiveis_posse
+    
     # Calcular valor total dos itens em posse
-    valor_total_itens = sum((item.valor_unitario or 0) * (item.quantidade or 1) for item in itens_almoxarifado)
+    valor_total_serializados = sum((item.valor_unitario or 0) * (item.quantidade or 1) for item in itens_serializados)
+    valor_total_consumiveis = sum(item['valor_total'] for item in itens_consumiveis_posse)
+    valor_total_itens = valor_total_serializados + float(valor_total_consumiveis)
     
     # Buscar opções para dropdowns do modal de edição
     departamentos = Departamento.query.filter_by(admin_id=admin_id).all()
