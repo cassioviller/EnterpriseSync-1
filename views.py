@@ -1880,8 +1880,20 @@ def funcionario_perfil(id):
     for item_id, dados in itens_consumiveis_dict.items():
         qtd_em_posse = dados['quantidade_saida'] - dados['quantidade_devolvida'] - dados['quantidade_consumida']
         if qtd_em_posse > 0:
-            # Acesso seguro ao valor_unitario (pode não existir no modelo)
-            valor_unit = getattr(dados['item'], 'valor_unitario', None) or Decimal('0')
+            # Buscar valor médio ponderado dos lotes ativos deste item em posse do funcionário
+            # Calcular baseado nas saídas registradas para este funcionário
+            saidas_func = AlmoxarifadoMovimento.query.filter_by(
+                admin_id=admin_id,
+                funcionario_id=funcionario.id,
+                item_id=item_id,
+                tipo_movimento='SAIDA'
+            ).all()
+            
+            # Calcular valor médio ponderado das saídas
+            valor_total_saidas = sum((mov.valor_unitario or Decimal('0')) * (mov.quantidade or Decimal('0')) for mov in saidas_func)
+            qtd_total_saidas = sum(mov.quantidade or Decimal('0') for mov in saidas_func)
+            valor_unit = (valor_total_saidas / qtd_total_saidas) if qtd_total_saidas > 0 else Decimal('0')
+            
             itens_consumiveis_posse.append({
                 'item': dados['item'],
                 'quantidade': qtd_em_posse,
