@@ -1447,28 +1447,65 @@ def processar_saida_multipla():
                 from decimal import Decimal
                 quantidade_raw = item_data.get('quantidade', 0)
                 quantidade = Decimal(str(quantidade_raw)) if quantidade_raw else Decimal('0')
+                lote_allocations = item_data.get('lote_allocations', [])
                 
                 # Validar: quantidade > 0
                 if quantidade <= 0:
                     erros.append(f"Item {idx+1} ({item.nome}): Quantidade deve ser maior que zero")
                     continue
                 
-                # VALIDAR: Estoque FIFO suficiente usando quantidade_disponivel?
-                estoque_total = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade_disponivel)).filter_by(
-                    item_id=item_id,
-                    status='DISPONIVEL',
-                    admin_id=admin_id
-                ).scalar() or 0
-                
-                if estoque_total < quantidade:
-                    erros.append(f"Item {idx+1} ({item.nome}): Estoque insuficiente (disponível: {estoque_total}, solicitado: {quantidade})")
-                    continue
+                # VALIDAR alocações de lotes (se fornecidas)
+                if lote_allocations:
+                    # Validar que a soma das alocações = quantidade total
+                    total_alocado = sum(Decimal(str(alloc.get('quantidade', 0))) for alloc in lote_allocations)
+                    if abs(total_alocado - quantidade) >= Decimal('0.001'):
+                        erros.append(f"Item {idx+1} ({item.nome}): Soma das alocações ({total_alocado}) diferente da quantidade total ({quantidade})")
+                        continue
+                    
+                    # Validar cada alocação
+                    for alloc_idx, alloc in enumerate(lote_allocations):
+                        estoque_id = alloc.get('estoque_id')
+                        qtd_alloc = Decimal(str(alloc.get('quantidade', 0)))
+                        
+                        if qtd_alloc <= 0:
+                            erros.append(f"Item {idx+1} ({item.nome}), Lote {alloc_idx+1}: Quantidade deve ser maior que zero")
+                            continue
+                        
+                        # Verificar se o lote existe e pertence ao admin
+                        lote_estoque = AlmoxarifadoEstoque.query.filter_by(
+                            id=estoque_id,
+                            item_id=item_id,
+                            status='DISPONIVEL',
+                            admin_id=admin_id
+                        ).first()
+                        
+                        if not lote_estoque:
+                            erros.append(f"Item {idx+1} ({item.nome}), Lote {alloc_idx+1}: Lote não encontrado ou não disponível")
+                            continue
+                        
+                        # Verificar quantidade disponível
+                        qtd_disponivel = lote_estoque.quantidade_disponivel if lote_estoque.quantidade_disponivel else lote_estoque.quantidade
+                        if qtd_alloc > qtd_disponivel:
+                            erros.append(f"Item {idx+1} ({item.nome}), Lote {alloc_idx+1}: Quantidade solicitada ({qtd_alloc}) maior que disponível ({qtd_disponivel})")
+                            continue
+                else:
+                    # Sem alocações manuais - validar estoque total apenas
+                    estoque_total = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade_disponivel)).filter_by(
+                        item_id=item_id,
+                        status='DISPONIVEL',
+                        admin_id=admin_id
+                    ).scalar() or 0
+                    
+                    if estoque_total < quantidade:
+                        erros.append(f"Item {idx+1} ({item.nome}): Estoque insuficiente (disponível: {estoque_total}, solicitado: {quantidade})")
+                        continue
                 
                 # Se passou nas validações, adicionar à lista de processamento
                 itens_validados.append({
                     'item': item,
                     'tipo_controle': tipo_controle,
-                    'quantidade': quantidade
+                    'quantidade': quantidade,
+                    'lote_allocations': lote_allocations
                 })
         
         # Se houver QUALQUER erro, abortar TUDO
@@ -1518,59 +1555,104 @@ def processar_saida_multipla():
             else:  # CONSUMIVEL
                 from decimal import Decimal
                 quantidade = item_validado['quantidade']
+                lote_allocations = item_validado.get('lote_allocations', [])
                 
-                # Implementar consumo FIFO pelos lotes mais antigos
-                lotes = AlmoxarifadoEstoque.query.filter_by(
-                    item_id=item.id,
-                    status='DISPONIVEL',
-                    admin_id=admin_id
-                ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()  # FIFO: mais antigos primeiro
-                
-                qtd_restante = quantidade
-                
-                for lote in lotes:
-                    if qtd_restante <= 0:
-                        break
-                    
-                    # Usar quantidade_disponivel para rastreamento FIFO
-                    qtd_disponivel_lote = lote.quantidade_disponivel if lote.quantidade_disponivel else lote.quantidade
-                    
-                    if qtd_disponivel_lote <= 0:
-                        continue  # Pular lotes já consumidos
-                    
-                    # Quantidade a consumir deste lote
-                    if qtd_disponivel_lote >= qtd_restante:
-                        qtd_consumida = qtd_restante
-                        qtd_restante = Decimal('0')
-                    else:
-                        qtd_consumida = qtd_disponivel_lote
-                        qtd_restante -= qtd_disponivel_lote
-                    
-                    # Atualizar lote (FIFO tracking)
-                    lote.quantidade_disponivel = qtd_disponivel_lote - qtd_consumida
-                    lote.quantidade = lote.quantidade_disponivel  # Manter sincronizado
-                    
-                    if lote.quantidade_disponivel == 0:
-                        lote.status = 'CONSUMIDO'
-                    
-                    lote.updated_at = datetime.utcnow()
-                    
-                    # Criar movimento individual para este lote consumido
-                    # Isso permite rastrear o valor_unitario correto de cada lote
-                    movimento = AlmoxarifadoMovimento(
+                # PROCESSAMENTO: Escolha Manual vs FIFO Automático
+                if lote_allocations:
+                    # ========================================
+                    # MODO: SELEÇÃO MANUAL DE LOTES
+                    # ========================================
+                    for alloc in lote_allocations:
+                        estoque_id = alloc.get('estoque_id')
+                        qtd_consumida = Decimal(str(alloc.get('quantidade', 0)))
+                        
+                        # Buscar o lote específico
+                        lote = AlmoxarifadoEstoque.query.filter_by(
+                            id=estoque_id,
+                            item_id=item.id,
+                            status='DISPONIVEL',
+                            admin_id=admin_id
+                        ).first()
+                        
+                        if not lote:
+                            continue  # Já validado anteriormente, não deve acontecer
+                        
+                        qtd_disponivel_lote = lote.quantidade_disponivel if lote.quantidade_disponivel else lote.quantidade
+                        
+                        # Atualizar lote
+                        lote.quantidade_disponivel = qtd_disponivel_lote - qtd_consumida
+                        lote.quantidade = lote.quantidade_disponivel
+                        
+                        if lote.quantidade_disponivel == 0:
+                            lote.status = 'CONSUMIDO'
+                        
+                        lote.updated_at = datetime.utcnow()
+                        
+                        # Criar movimento para este lote consumido
+                        movimento = AlmoxarifadoMovimento(
+                            item_id=item.id,
+                            tipo_movimento='SAIDA',
+                            quantidade=qtd_consumida,
+                            valor_unitario=lote.valor_unitario,
+                            funcionario_id=funcionario_id,
+                            obra_id=obra_id,
+                            observacao=observacoes,
+                            estoque_id=lote.id,
+                            lote=lote.lote,
+                            admin_id=admin_id,
+                            usuario_id=current_user.id
+                        )
+                        db.session.add(movimento)
+                else:
+                    # ========================================
+                    # MODO: FIFO AUTOMÁTICO (LEGADO)
+                    # ========================================
+                    lotes = AlmoxarifadoEstoque.query.filter_by(
                         item_id=item.id,
-                        tipo_movimento='SAIDA',
-                        quantidade=qtd_consumida,
-                        valor_unitario=lote.valor_unitario,  # Valor do lote específico
-                        funcionario_id=funcionario_id,
-                        obra_id=obra_id,
-                        observacao=observacoes,
-                        estoque_id=lote.id,
-                        lote=lote.lote,
-                        admin_id=admin_id,
-                        usuario_id=current_user.id
-                    )
-                    db.session.add(movimento)
+                        status='DISPONIVEL',
+                        admin_id=admin_id
+                    ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()
+                    
+                    qtd_restante = quantidade
+                    
+                    for lote in lotes:
+                        if qtd_restante <= 0:
+                            break
+                        
+                        qtd_disponivel_lote = lote.quantidade_disponivel if lote.quantidade_disponivel else lote.quantidade
+                        
+                        if qtd_disponivel_lote <= 0:
+                            continue
+                        
+                        if qtd_disponivel_lote >= qtd_restante:
+                            qtd_consumida = qtd_restante
+                            qtd_restante = Decimal('0')
+                        else:
+                            qtd_consumida = qtd_disponivel_lote
+                            qtd_restante -= qtd_disponivel_lote
+                        
+                        lote.quantidade_disponivel = qtd_disponivel_lote - qtd_consumida
+                        lote.quantidade = lote.quantidade_disponivel
+                        
+                        if lote.quantidade_disponivel == 0:
+                            lote.status = 'CONSUMIDO'
+                        
+                        lote.updated_at = datetime.utcnow()
+                        
+                        movimento = AlmoxarifadoMovimento(
+                            item_id=item.id,
+                            tipo_movimento='SAIDA',
+                            quantidade=qtd_consumida,
+                            valor_unitario=lote.valor_unitario,
+                            funcionario_id=funcionario_id,
+                            obra_id=obra_id,
+                            observacao=observacoes,
+                            estoque_id=lote.id,
+                            lote=lote.lote,
+                            admin_id=admin_id,
+                            usuario_id=current_user.id
+                        )
+                        db.session.add(movimento)
                 
                 total_processados += 1
         
