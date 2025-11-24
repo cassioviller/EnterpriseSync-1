@@ -2879,6 +2879,177 @@ def _migration_57_almoxarifado_movimento_campos_crud():
             except:
                 pass
 
+def _migration_58_almoxarifado_lotes_fifo():
+    """
+    Migração 58: Sistema de Rastreamento de Lotes com FIFO para Almoxarifado
+    - quantidade_inicial: NUMERIC(10,2) - quantidade original da entrada deste lote
+    - quantidade_disponivel: NUMERIC(10,2) - quantidade ainda disponível para saída
+    - entrada_movimento_id: INTEGER FK - vincula ao movimento de entrada que criou este lote
+    - idx_almox_estoque_entrada_mov: Índice em entrada_movimento_id
+    - idx_almox_estoque_fifo: Índice composto (item_id, status, created_at) para queries FIFO
+    
+    Solução: Permite rastreamento correto de custos por lote (FIFO) e saldo disponível
+    """
+    logger.info("=" * 80)
+    logger.info("📦 MIGRAÇÃO 58: Sistema de Rastreamento de Lotes FIFO - Almoxarifado")
+    logger.info("=" * 80)
+    
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # ========================================
+        # PASSO 1: Adicionar novos campos
+        # ========================================
+        logger.info("🔧 Adicionando campos de rastreamento de lotes...")
+        
+        campos_lote = {
+            'quantidade_inicial': 'NUMERIC(10,2)',
+            'quantidade_disponivel': 'NUMERIC(10,2)',
+            'entrada_movimento_id': 'INTEGER'
+        }
+        
+        colunas_adicionadas = 0
+        
+        for coluna, definicao in campos_lote.items():
+            # Verificar se coluna já existe
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'almoxarifado_estoque' 
+                AND column_name = %s
+            """, (coluna,))
+            
+            if not cursor.fetchone():
+                cursor.execute(f"""
+                    ALTER TABLE almoxarifado_estoque 
+                    ADD COLUMN {coluna} {definicao}
+                """)
+                logger.info(f"  ✅ Coluna '{coluna}' adicionada")
+                colunas_adicionadas += 1
+            else:
+                logger.info(f"  ⏭️  Coluna '{coluna}' já existe")
+        
+        # ========================================
+        # PASSO 2: Adicionar Foreign Key
+        # ========================================
+        logger.info("🔗 Configurando foreign key para entrada_movimento_id...")
+        
+        # Verificar se FK já existe
+        cursor.execute("""
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'almoxarifado_estoque' 
+            AND constraint_type = 'FOREIGN KEY'
+            AND constraint_name = 'fk_almox_estoque_entrada_movimento'
+        """)
+        
+        if not cursor.fetchone():
+            cursor.execute("""
+                ALTER TABLE almoxarifado_estoque
+                ADD CONSTRAINT fk_almox_estoque_entrada_movimento
+                FOREIGN KEY (entrada_movimento_id) 
+                REFERENCES almoxarifado_movimento(id)
+                ON DELETE SET NULL
+            """)
+            logger.info("  ✅ Foreign key criada")
+        else:
+            logger.info("  ⏭️  Foreign key já existe")
+        
+        # ========================================
+        # PASSO 3: Criar índices
+        # ========================================
+        logger.info("📊 Criando índices para otimização FIFO...")
+        
+        # Índice simples em entrada_movimento_id
+        cursor.execute("""
+            SELECT indexname 
+            FROM pg_indexes 
+            WHERE tablename = 'almoxarifado_estoque' 
+            AND indexname = 'idx_almox_estoque_entrada_mov'
+        """)
+        
+        if not cursor.fetchone():
+            cursor.execute("""
+                CREATE INDEX idx_almox_estoque_entrada_mov 
+                ON almoxarifado_estoque(entrada_movimento_id)
+            """)
+            logger.info("  ✅ Índice idx_almox_estoque_entrada_mov criado")
+        else:
+            logger.info("  ⏭️  Índice idx_almox_estoque_entrada_mov já existe")
+        
+        # Índice composto para queries FIFO (item_id, status, created_at)
+        cursor.execute("""
+            SELECT indexname 
+            FROM pg_indexes 
+            WHERE tablename = 'almoxarifado_estoque' 
+            AND indexname = 'idx_almox_estoque_fifo'
+        """)
+        
+        if not cursor.fetchone():
+            cursor.execute("""
+                CREATE INDEX idx_almox_estoque_fifo 
+                ON almoxarifado_estoque(item_id, status, created_at)
+            """)
+            logger.info("  ✅ Índice composto idx_almox_estoque_fifo criado")
+        else:
+            logger.info("  ⏭️  Índice composto idx_almox_estoque_fifo já existe")
+        
+        # ========================================
+        # PASSO 4: Migrar dados existentes
+        # ========================================
+        logger.info("🔄 Migrando dados existentes...")
+        
+        # Para estoques existentes, popular quantidade_inicial e quantidade_disponivel
+        # com os valores atuais de quantidade
+        cursor.execute("""
+            UPDATE almoxarifado_estoque
+            SET 
+                quantidade_inicial = quantidade,
+                quantidade_disponivel = quantidade
+            WHERE quantidade_inicial IS NULL
+        """)
+        
+        registros_atualizados = cursor.rowcount
+        logger.info(f"  ✅ {registros_atualizados} registros de estoque atualizados com valores iniciais")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 58 CONCLUÍDA COM SUCESSO!")
+        logger.info(f"   📝 Colunas adicionadas: {colunas_adicionadas}")
+        logger.info(f"   📊 Índices criados: 2")
+        logger.info(f"   🔄 Registros migrados: {registros_atualizados}")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 58: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -2929,6 +3100,7 @@ def executar_migracoes():
             (55, "Token cliente para portal público", _migration_55_token_cliente_proposta),
             (56, "PropostaArquivo - persistência Base64", _migration_56_proposta_arquivo_base64),
             (57, "Campos CRUD movimentações almoxarifado", _migration_57_almoxarifado_movimento_campos_crud),
+            (58, "Sistema de Rastreamento de Lotes FIFO", _migration_58_almoxarifado_lotes_fifo),
         ]
         
         # Executar cada migração com rastreamento

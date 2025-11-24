@@ -3645,14 +3645,20 @@ class AlmoxarifadoItem(db.Model):
     )
 
 class AlmoxarifadoEstoque(db.Model):
-    """Controle de estoque (serializado e consumível)"""
+    """Controle de estoque (serializado e consumível) com rastreamento de lotes FIFO"""
     __tablename__ = 'almoxarifado_estoque'
     
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_item.id'), nullable=False)
     numero_serie = db.Column(db.String(100))  # Para SERIALIZADO
-    quantidade = db.Column(db.Numeric(10, 2), default=0)  # Para CONSUMIVEL
-    status = db.Column(db.String(20), default='DISPONIVEL')  # DISPONIVEL, EM_USO, MANUTENCAO, DESCARTADO
+    quantidade = db.Column(db.Numeric(10, 2), default=0)  # Para CONSUMIVEL (quantidade atual)
+    
+    # NOVOS CAMPOS PARA RASTREAMENTO DE LOTES FIFO
+    quantidade_inicial = db.Column(db.Numeric(10, 2))  # Quantidade original da entrada deste lote
+    quantidade_disponivel = db.Column(db.Numeric(10, 2))  # Quantidade ainda disponível para saída
+    entrada_movimento_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_movimento.id'))  # Vincula ao movimento de entrada
+    
+    status = db.Column(db.String(20), default='DISPONIVEL')  # DISPONIVEL, EM_USO, MANUTENCAO, DESCARTADO, CONSUMIDO
     funcionario_atual_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     valor_unitario = db.Column(db.Numeric(10, 2))
@@ -3667,12 +3673,15 @@ class AlmoxarifadoEstoque(db.Model):
     funcionario_atual = db.relationship('Funcionario', backref='itens_almoxarifado_posse')
     obra = db.relationship('Obra', backref='itens_almoxarifado_obra')
     admin = db.relationship('Usuario', backref='almoxarifado_estoque')
+    entrada_movimento = db.relationship('AlmoxarifadoMovimento', foreign_keys=[entrada_movimento_id], backref='lotes_criados')
     
     __table_args__ = (
         db.Index('idx_almox_estoque_item_status', 'item_id', 'status'),
         db.Index('idx_almox_estoque_funcionario', 'funcionario_atual_id'),
         db.Index('idx_almox_estoque_admin', 'admin_id'),
         db.Index('idx_almox_estoque_numero_serie', 'numero_serie'),
+        db.Index('idx_almox_estoque_entrada_mov', 'entrada_movimento_id'),
+        db.Index('idx_almox_estoque_fifo', 'item_id', 'status', 'created_at'),  # Índice composto para queries FIFO
     )
 
 class AlmoxarifadoMovimento(db.Model):

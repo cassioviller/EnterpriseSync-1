@@ -705,16 +705,7 @@ def processar_entrada():
             movimentos_criados = 0
             movimentos_ids = []
             for serie in series:
-                estoque = AlmoxarifadoEstoque(
-                    item_id=item_id,
-                    numero_serie=serie,
-                    quantidade=1,
-                    valor_unitario=valor_unitario,
-                    status='DISPONIVEL',
-                    admin_id=admin_id
-                )
-                db.session.add(estoque)
-                
+                # Primeiro criar o movimento
                 movimento = AlmoxarifadoMovimento(
                     item_id=item_id,
                     tipo_movimento='ENTRADA',
@@ -730,7 +721,22 @@ def processar_entrada():
                     obra_id=None
                 )
                 db.session.add(movimento)
-                db.session.flush()
+                db.session.flush()  # Flush para obter movimento.id
+                
+                # Agora criar o estoque com rastreamento de lote
+                estoque = AlmoxarifadoEstoque(
+                    item_id=item_id,
+                    numero_serie=serie,
+                    quantidade=1,
+                    quantidade_inicial=1,
+                    quantidade_disponivel=1,
+                    entrada_movimento_id=movimento.id,
+                    valor_unitario=valor_unitario,
+                    status='DISPONIVEL',
+                    admin_id=admin_id
+                )
+                db.session.add(estoque)
+                
                 movimentos_ids.append(movimento.id)
                 movimentos_criados += 1
             
@@ -753,18 +759,9 @@ def processar_entrada():
                 flash('Quantidade deve ser maior que zero', 'danger')
                 return redirect(url_for('almoxarifado.entrada'))
             
-            # Criar 1 registro de estoque com quantidade
-            estoque = AlmoxarifadoEstoque(
-                item_id=item_id,
-                quantidade=quantidade,
-                valor_unitario=valor_unitario,
-                status='DISPONIVEL',
-                admin_id=admin_id
-            )
-            db.session.add(estoque)
-            db.session.flush()
+            logger.debug(f'Processando entrada CONSUMIVEL - valor_unitario recebido: {valor_unitario}')
             
-            # Criar 1 movimento
+            # Primeiro criar o movimento
             movimento = AlmoxarifadoMovimento(
                 item_id=item_id,
                 tipo_movimento='ENTRADA',
@@ -772,13 +769,32 @@ def processar_entrada():
                 valor_unitario=valor_unitario,
                 nota_fiscal=nota_fiscal,
                 observacao=observacoes,
-                estoque_id=estoque.id,
+                estoque_id=None,  # Será atualizado após criar estoque
                 fornecedor_id=fornecedor_id,
                 admin_id=admin_id,
                 usuario_id=current_user.id,
                 obra_id=None
             )
             db.session.add(movimento)
+            db.session.flush()  # Flush para obter movimento.id
+            
+            # Agora criar registro de estoque com rastreamento de lote FIFO
+            estoque = AlmoxarifadoEstoque(
+                item_id=item_id,
+                quantidade=quantidade,
+                quantidade_inicial=quantidade,
+                quantidade_disponivel=quantidade,
+                entrada_movimento_id=movimento.id,
+                valor_unitario=valor_unitario,
+                status='DISPONIVEL',
+                lote=nota_fiscal,  # Usar nota fiscal como identificador de lote
+                admin_id=admin_id
+            )
+            db.session.add(estoque)
+            db.session.flush()
+            
+            # Atualizar movimento com estoque_id
+            movimento.estoque_id = estoque.id
             
             db.session.commit()
             
@@ -925,16 +941,7 @@ def processar_entrada_multipla():
                 series = item_validado['series']
                 
                 for serie in series:
-                    estoque = AlmoxarifadoEstoque(
-                        item_id=item.id,
-                        numero_serie=serie,
-                        quantidade=1,
-                        valor_unitario=valor_unitario,
-                        status='DISPONIVEL',
-                        admin_id=admin_id
-                    )
-                    db.session.add(estoque)
-                    
+                    # Primeiro criar o movimento
                     movimento = AlmoxarifadoMovimento(
                         item_id=item.id,
                         tipo_movimento='ENTRADA',
@@ -952,6 +959,20 @@ def processar_entrada_multipla():
                     db.session.add(movimento)
                     db.session.flush()
                     
+                    # Agora criar estoque com rastreamento de lote
+                    estoque = AlmoxarifadoEstoque(
+                        item_id=item.id,
+                        numero_serie=serie,
+                        quantidade=1,
+                        quantidade_inicial=1,
+                        quantidade_disponivel=1,
+                        entrada_movimento_id=movimento.id,
+                        valor_unitario=valor_unitario,
+                        status='DISPONIVEL',
+                        admin_id=admin_id
+                    )
+                    db.session.add(estoque)
+                    
                     # Emitir evento se tem fornecedor
                     if fornecedor_id:
                         EventManager.emit('material_entrada', {
@@ -965,16 +986,7 @@ def processar_entrada_multipla():
             else:  # CONSUMIVEL
                 quantidade = item_validado['quantidade']
                 
-                estoque = AlmoxarifadoEstoque(
-                    item_id=item.id,
-                    quantidade=quantidade,
-                    valor_unitario=valor_unitario,
-                    status='DISPONIVEL',
-                    admin_id=admin_id
-                )
-                db.session.add(estoque)
-                db.session.flush()
-                
+                # Primeiro criar o movimento
                 movimento = AlmoxarifadoMovimento(
                     item_id=item.id,
                     tipo_movimento='ENTRADA',
@@ -982,7 +994,7 @@ def processar_entrada_multipla():
                     valor_unitario=valor_unitario,
                     nota_fiscal=nota_fiscal,
                     observacao=observacoes,
-                    estoque_id=estoque.id,
+                    estoque_id=None,
                     fornecedor_id=fornecedor_id,
                     admin_id=admin_id,
                     usuario_id=current_user.id,
@@ -990,6 +1002,24 @@ def processar_entrada_multipla():
                 )
                 db.session.add(movimento)
                 db.session.flush()
+                
+                # Agora criar estoque com rastreamento de lote FIFO
+                estoque = AlmoxarifadoEstoque(
+                    item_id=item.id,
+                    quantidade=quantidade,
+                    quantidade_inicial=quantidade,
+                    quantidade_disponivel=quantidade,
+                    entrada_movimento_id=movimento.id,
+                    valor_unitario=valor_unitario,
+                    status='DISPONIVEL',
+                    lote=nota_fiscal,
+                    admin_id=admin_id
+                )
+                db.session.add(estoque)
+                db.session.flush()
+                
+                # Atualizar movimento com estoque_id
+                movimento.estoque_id = estoque.id
                 
                 # Emitir evento se tem fornecedor
                 if fornecedor_id:
@@ -1086,6 +1116,62 @@ def api_estoque_disponivel(item_id):
             'quantidade_disponivel': quantidade_total,
             'unidade': item.unidade
         })
+
+@almoxarifado_bp.route('/api/lotes-disponiveis/<int:item_id>')
+@login_required
+def api_lotes_disponiveis(item_id):
+    """Retorna lotes disponíveis de um item ordenados por FIFO (created_at ASC)"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        return jsonify({'error': 'Não autenticado'}), 401
+    
+    item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
+    if not item:
+        return jsonify({'error': 'Item não encontrado'}), 404
+    
+    # Buscar todos estoques disponíveis deste item ordenados por data (FIFO)
+    lotes = AlmoxarifadoEstoque.query.filter_by(
+        item_id=item_id,
+        status='DISPONIVEL',
+        admin_id=admin_id
+    ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()
+    
+    lotes_data = []
+    for lote in lotes:
+        # Buscar informação da nota fiscal do movimento de entrada
+        nota_fiscal = None
+        if lote.entrada_movimento_id:
+            movimento_entrada = AlmoxarifadoMovimento.query.filter_by(
+                id=lote.entrada_movimento_id,
+                admin_id=admin_id
+            ).first()
+            if movimento_entrada:
+                nota_fiscal = movimento_entrada.nota_fiscal
+        
+        # Para CONSUMIVEL, usar quantidade_disponivel; para SERIALIZADO, sempre 1
+        qtd_disponivel = float(lote.quantidade_disponivel) if lote.quantidade_disponivel else float(lote.quantidade)
+        
+        lotes_data.append({
+            'estoque_id': lote.id,
+            'lote': lote.lote,
+            'numero_serie': lote.numero_serie,  # Para itens SERIALIZADO
+            'quantidade_disponivel': qtd_disponivel,
+            'quantidade_inicial': float(lote.quantidade_inicial) if lote.quantidade_inicial else float(lote.quantidade),
+            'valor_unitario': float(lote.valor_unitario) if lote.valor_unitario else 0.0,
+            'data_entrada': lote.created_at.strftime('%d/%m/%Y %H:%M'),
+            'nota_fiscal': nota_fiscal,
+            'data_validade': lote.data_validade.strftime('%d/%m/%Y') if lote.data_validade else None
+        })
+    
+    return jsonify({
+        'success': True,
+        'item_id': item_id,
+        'item_nome': item.nome,
+        'tipo_controle': item.tipo_controle,
+        'unidade': item.unidade,
+        'lotes': lotes_data,
+        'total_disponivel': sum(l['quantidade_disponivel'] for l in lotes_data)
+    })
 
 @almoxarifado_bp.route('/processar-saida', methods=['POST'])
 @login_required
@@ -1184,53 +1270,75 @@ def processar_saida():
                 flash('Quantidade deve ser maior que zero', 'danger')
                 return redirect(url_for('almoxarifado.saida'))
             
-            # Verificar quantidade disponível
-            quantidade_disponivel = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
+            # Verificar quantidade disponível usando quantidade_disponivel (FIFO)
+            quantidade_disponivel_total = db.session.query(
+                func.sum(AlmoxarifadoEstoque.quantidade_disponivel)
+            ).filter_by(
                 item_id=item_id,
                 status='DISPONIVEL',
                 admin_id=admin_id
-            ).scalar() or 0
+            ).scalar() or Decimal('0')
             
-            if quantidade > quantidade_disponivel:
-                flash(f'Quantidade insuficiente! Disponível: {quantidade_disponivel} {item.unidade}', 'danger')
+            logger.debug(f'Saída CONSUMIVEL - Quantidade solicitada: {quantidade}, Disponível: {quantidade_disponivel_total}')
+            
+            if quantidade > quantidade_disponivel_total:
+                flash(f'Quantidade insuficiente! Disponível: {quantidade_disponivel_total} {item.unidade}', 'danger')
                 return redirect(url_for('almoxarifado.saida'))
             
-            # Consumir quantidade de estoque disponível (FIFO)
-            estoques = AlmoxarifadoEstoque.query.filter_by(
+            # Implementar consumo FIFO pelos lotes mais antigos
+            lotes = AlmoxarifadoEstoque.query.filter_by(
                 item_id=item_id,
                 status='DISPONIVEL',
                 admin_id=admin_id
-            ).order_by(AlmoxarifadoEstoque.created_at).all()
+            ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()  # FIFO: mais antigos primeiro
             
             quantidade_restante = quantidade
-            for est in estoques:
+            
+            for lote in lotes:
                 if quantidade_restante <= 0:
                     break
                 
-                if est.quantidade >= quantidade_restante:
-                    est.quantidade -= quantidade_restante
-                    quantidade_restante = 0
-                    if est.quantidade == 0:
-                        est.status = 'CONSUMIDO'
-                else:
-                    quantidade_restante -= est.quantidade
-                    est.quantidade = 0
-                    est.status = 'CONSUMIDO'
+                # Usar quantidade_disponivel para rastreamento FIFO
+                qtd_disponivel_lote = lote.quantidade_disponivel if lote.quantidade_disponivel else lote.quantidade
                 
-                est.updated_at = datetime.utcnow()
-            
-            # Criar movimento
-            movimento = AlmoxarifadoMovimento(
-                item_id=item_id,
-                tipo_movimento='SAIDA',
-                quantidade=quantidade,
-                funcionario_id=funcionario_id,
-                obra_id=obra_id,
-                observacao=observacoes,
-                admin_id=admin_id,
-                usuario_id=current_user.id
-            )
-            db.session.add(movimento)
+                if qtd_disponivel_lote <= 0:
+                    continue  # Pular lotes já consumidos
+                
+                # Quantidade a consumir deste lote
+                if qtd_disponivel_lote >= quantidade_restante:
+                    qtd_consumida = quantidade_restante
+                    quantidade_restante = Decimal('0')
+                else:
+                    qtd_consumida = qtd_disponivel_lote
+                    quantidade_restante -= qtd_disponivel_lote
+                
+                # Atualizar lote (FIFO tracking)
+                lote.quantidade_disponivel = qtd_disponivel_lote - qtd_consumida
+                lote.quantidade = lote.quantidade_disponivel  # Manter sincronizado
+                
+                if lote.quantidade_disponivel == 0:
+                    lote.status = 'CONSUMIDO'
+                
+                lote.updated_at = datetime.utcnow()
+                
+                # Criar movimento individual para este lote consumido
+                # Isso permite rastrear o valor_unitario correto de cada lote
+                movimento = AlmoxarifadoMovimento(
+                    item_id=item_id,
+                    tipo_movimento='SAIDA',
+                    quantidade=qtd_consumida,
+                    valor_unitario=lote.valor_unitario,  # Valor do lote específico
+                    funcionario_id=funcionario_id,
+                    obra_id=obra_id,
+                    observacao=observacoes,
+                    estoque_id=lote.id,
+                    lote=lote.lote,
+                    admin_id=admin_id,
+                    usuario_id=current_user.id
+                )
+                db.session.add(movimento)
+                
+                logger.debug(f'Lote {lote.id} - Consumido: {qtd_consumida}, Restante no lote: {lote.quantidade_disponivel}, Valor unitário: {lote.valor_unitario}')
             
             db.session.commit()
             
@@ -1345,8 +1453,8 @@ def processar_saida_multipla():
                     erros.append(f"Item {idx+1} ({item.nome}): Quantidade deve ser maior que zero")
                     continue
                 
-                # VALIDAR: Estoque FIFO suficiente?
-                estoque_total = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
+                # VALIDAR: Estoque FIFO suficiente usando quantidade_disponivel?
+                estoque_total = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade_disponivel)).filter_by(
                     item_id=item_id,
                     status='DISPONIVEL',
                     admin_id=admin_id
@@ -1408,43 +1516,57 @@ def processar_saida_multipla():
                 total_processados += 1
             
             else:  # CONSUMIVEL
+                from decimal import Decimal
                 quantidade = item_validado['quantidade']
                 
-                # Usar FIFO para consumir estoque
-                estoques = AlmoxarifadoEstoque.query.filter_by(
+                # Implementar consumo FIFO pelos lotes mais antigos
+                lotes = AlmoxarifadoEstoque.query.filter_by(
                     item_id=item.id,
                     status='DISPONIVEL',
                     admin_id=admin_id
-                ).order_by(AlmoxarifadoEstoque.created_at).all()
+                ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()  # FIFO: mais antigos primeiro
                 
                 qtd_restante = quantidade
-                for est in estoques:
+                
+                for lote in lotes:
                     if qtd_restante <= 0:
                         break
                     
-                    if est.quantidade >= qtd_restante:
-                        est.quantidade -= qtd_restante
-                        qtd_saida = qtd_restante
-                        qtd_restante = 0
-                        if est.quantidade == 0:
-                            est.status = 'CONSUMIDO'
+                    # Usar quantidade_disponivel para rastreamento FIFO
+                    qtd_disponivel_lote = lote.quantidade_disponivel if lote.quantidade_disponivel else lote.quantidade
+                    
+                    if qtd_disponivel_lote <= 0:
+                        continue  # Pular lotes já consumidos
+                    
+                    # Quantidade a consumir deste lote
+                    if qtd_disponivel_lote >= qtd_restante:
+                        qtd_consumida = qtd_restante
+                        qtd_restante = Decimal('0')
                     else:
-                        qtd_saida = est.quantidade
-                        qtd_restante -= est.quantidade
-                        est.quantidade = 0
-                        est.status = 'CONSUMIDO'
+                        qtd_consumida = qtd_disponivel_lote
+                        qtd_restante -= qtd_disponivel_lote
                     
-                    est.updated_at = datetime.utcnow()
+                    # Atualizar lote (FIFO tracking)
+                    lote.quantidade_disponivel = qtd_disponivel_lote - qtd_consumida
+                    lote.quantidade = lote.quantidade_disponivel  # Manter sincronizado
                     
-                    # Criar movimento
+                    if lote.quantidade_disponivel == 0:
+                        lote.status = 'CONSUMIDO'
+                    
+                    lote.updated_at = datetime.utcnow()
+                    
+                    # Criar movimento individual para este lote consumido
+                    # Isso permite rastrear o valor_unitario correto de cada lote
                     movimento = AlmoxarifadoMovimento(
                         item_id=item.id,
                         tipo_movimento='SAIDA',
-                        quantidade=qtd_saida,
+                        quantidade=qtd_consumida,
+                        valor_unitario=lote.valor_unitario,  # Valor do lote específico
                         funcionario_id=funcionario_id,
                         obra_id=obra_id,
                         observacao=observacoes,
-                        estoque_id=est.id,
+                        estoque_id=lote.id,
+                        lote=lote.lote,
                         admin_id=admin_id,
                         usuario_id=current_user.id
                     )
