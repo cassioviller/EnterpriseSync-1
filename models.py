@@ -3711,7 +3711,7 @@ class AlmoxarifadoMovimento(db.Model):
     
     # Relationships
     item = db.relationship('AlmoxarifadoItem', backref='movimentos')
-    estoque = db.relationship('AlmoxarifadoEstoque', backref='movimentos')
+    estoque = db.relationship('AlmoxarifadoEstoque', foreign_keys=[estoque_id], backref='movimentos')
     funcionario = db.relationship('Funcionario', backref='movimentos_almoxarifado')
     obra = db.relationship('Obra', backref='movimentos_almoxarifado')
     fornecedor = db.relationship('Fornecedor', backref='movimentos_almoxarifado')
