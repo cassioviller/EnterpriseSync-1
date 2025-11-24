@@ -1575,9 +1575,28 @@ def api_itens_funcionario(funcionario_id):
         if mov.item_id in consumiveis_dict:
             consumiveis_dict[mov.item_id]['quantidade_devolvida'] += mov.quantidade or 0
     
-    # Adicionar consumíveis com quantidade disponível > 0
+    # Subtrair consumidos
+    movimentos_consumido = AlmoxarifadoMovimento.query.filter_by(
+        funcionario_id=funcionario_id,
+        tipo_movimento='CONSUMIDO',
+        admin_id=admin_id
+    ).all()
+    
+    for mov in movimentos_consumido:
+        if mov.item_id not in consumiveis_dict:
+            consumiveis_dict[mov.item_id] = {
+                'item': mov.item,
+                'quantidade_saida': 0,
+                'quantidade_devolvida': 0
+            }
+        if 'quantidade_consumida' not in consumiveis_dict[mov.item_id]:
+            consumiveis_dict[mov.item_id]['quantidade_consumida'] = 0
+        consumiveis_dict[mov.item_id]['quantidade_consumida'] += mov.quantidade or 0
+    
+    # Adicionar consumíveis com quantidade disponível > 0 (SAIDA - DEVOLUCAO - CONSUMIDO)
     for item_id, dados in consumiveis_dict.items():
-        qtd_disponivel = dados['quantidade_saida'] - dados['quantidade_devolvida']
+        quantidade_consumida = dados.get('quantidade_consumida', 0)
+        qtd_disponivel = dados['quantidade_saida'] - dados['quantidade_devolvida'] - quantidade_consumida
         if qtd_disponivel > 0:
             itens_retornaveis.append({
                 'item_id': item_id,

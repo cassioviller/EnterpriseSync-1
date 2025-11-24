@@ -348,31 +348,33 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '';
         itens.forEach((item, index) => {
             html += `
-                <div class="mb-3 p-3 border-bottom item-consumivel" data-item-id="${item.item_id}">
+                <div class="mb-3 p-3 border rounded item-consumivel" data-item-id="${item.item_id}">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div>
                             <strong class="text-success">${item.item_nome}</strong>
                             <div class="small text-muted">
-                                Disponível para devolução: <strong>${item.quantidade_disponivel} ${item.unidade}</strong>
+                                Em posse: <strong class="text-primary">${item.quantidade_disponivel} ${item.unidade}</strong>
                             </div>
                         </div>
                     </div>
                     <div class="row align-items-end">
-                        <div class="col-md-4">
-                            <label for="qtd_${item.item_id}" class="form-label small">Quantidade</label>
+                        <div class="col-md-3">
+                            <label for="qtd_${item.item_id}" class="form-label small fw-bold">Quantidade</label>
                             <div class="input-group input-group-sm">
                                 <input type="number" class="form-control input-consumivel" 
                                        id="qtd_${item.item_id}" 
                                        data-item-id="${item.item_id}"
                                        data-item-nome="${item.item_nome}"
                                        data-unidade="${item.unidade}"
+                                       data-qtd-disponivel="${item.quantidade_disponivel}"
                                        step="0.01" min="0.01" max="${item.quantidade_disponivel}"
                                        placeholder="0.00">
                                 <span class="input-group-text">${item.unidade}</span>
                             </div>
+                            <small class="text-muted">Máx: ${item.quantidade_disponivel}</small>
                         </div>
-                        <div class="col-md-5">
-                            <label for="cond_${item.item_id}" class="form-label small">Condição *</label>
+                        <div class="col-md-4">
+                            <label for="cond_${item.item_id}" class="form-label small fw-bold">Condição</label>
                             <select class="form-select form-select-sm select-condicao-consumivel" 
                                     id="cond_${item.item_id}" 
                                     data-item-id="${item.item_id}">
@@ -384,10 +386,24 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <option value="Inutilizado">Inutilizado</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <small class="text-muted">
-                                Máx: ${item.quantidade_disponivel}
-                            </small>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-bold">Ação</label>
+                            <div class="btn-group w-100" role="group">
+                                <button type="button" class="btn btn-sm btn-success btn-devolver-consumivel" 
+                                        data-item-id="${item.item_id}"
+                                        data-item-nome="${item.item_nome}"
+                                        data-unidade="${item.unidade}"
+                                        title="Devolver ao estoque">
+                                    <i class="fas fa-undo me-1"></i> Devolver
+                                </button>
+                                <button type="button" class="btn btn-sm btn-warning btn-consumir" 
+                                        data-item-id="${item.item_id}"
+                                        data-item-nome="${item.item_nome}"
+                                        data-unidade="${item.unidade}"
+                                        title="Marcar como consumido">
+                                    <i class="fas fa-fire me-1"></i> Consumido
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -405,6 +421,128 @@ document.addEventListener('DOMContentLoaded', function() {
         selects.forEach(select => {
             select.addEventListener('change', validarBotaoAdicionar);
         });
+
+        // Event listeners para botões de Devolver e Consumir
+        const btnsDevolver = document.querySelectorAll('.btn-devolver-consumivel');
+        btnsDevolver.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const itemId = this.dataset.itemId;
+                const itemNome = this.dataset.itemNome;
+                const unidade = this.dataset.unidade;
+                
+                const inputQtd = document.querySelector(`#qtd_${itemId}`);
+                const selectCondicao = document.querySelector(`#cond_${itemId}`);
+                
+                const quantidade = parseFloat(inputQtd.value);
+                const condicao = selectCondicao.value;
+                
+                // Validar
+                if (!quantidade || quantidade <= 0) {
+                    alert('Por favor, informe a quantidade a devolver.');
+                    inputQtd.focus();
+                    return;
+                }
+                
+                if (!condicao) {
+                    alert('Por favor, selecione a condição do item.');
+                    selectCondicao.focus();
+                    return;
+                }
+                
+                const qtdDisponivel = parseFloat(inputQtd.dataset.qtdDisponivel);
+                if (quantidade > qtdDisponivel) {
+                    alert(`Quantidade inválida! Máximo disponível: ${qtdDisponivel} ${unidade}`);
+                    return;
+                }
+                
+                // Processar devolução imediatamente via form POST
+                processarDevolucaoConsumivelDireta(itemId, quantidade, condicao, itemNome, unidade);
+            });
+        });
+        
+        const btnsConsumir = document.querySelectorAll('.btn-consumir');
+        btnsConsumir.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const itemId = this.dataset.itemId;
+                const itemNome = this.dataset.itemNome;
+                const unidade = this.dataset.unidade;
+                
+                const inputQtd = document.querySelector(`#qtd_${itemId}`);
+                const quantidade = parseFloat(inputQtd.value);
+                
+                // Validar
+                if (!quantidade || quantidade <= 0) {
+                    alert('Por favor, informe a quantidade consumida.');
+                    inputQtd.focus();
+                    return;
+                }
+                
+                const qtdDisponivel = parseFloat(inputQtd.dataset.qtdDisponivel);
+                if (quantidade > qtdDisponivel) {
+                    alert(`Quantidade inválida! Máximo disponível: ${qtdDisponivel} ${unidade}`);
+                    return;
+                }
+                
+                // Confirmar consumo
+                if (confirm(`Confirma o consumo de ${quantidade} ${unidade} de "${itemNome}"?\n\nEsta ação não pode ser desfeita.`)) {
+                    processarConsumoConsumivelDireta(itemId, quantidade, itemNome, unidade);
+                }
+            });
+        });
+    }
+    
+    function processarDevolucaoConsumivelDireta(itemId, quantidade, condicao, itemNome, unidade) {
+        const funcionarioId = funcionarioSelect.value;
+        
+        // Criar form oculto e submeter
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/almoxarifado/processar-devolucao';
+        
+        const inputs = {
+            'funcionario_id': funcionarioId,
+            'tipo_controle': 'CONSUMIVEL',
+            'item_id': itemId,
+            'quantidade': quantidade,
+            'condicao_devolucao': condicao
+        };
+        
+        for (const [name, value] of Object.entries(inputs)) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            form.appendChild(input);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+    
+    function processarConsumoConsumivelDireta(itemId, quantidade, itemNome, unidade) {
+        const funcionarioId = funcionarioSelect.value;
+        
+        // Criar form oculto e submeter
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/almoxarifado/processar-consumo';
+        
+        const inputs = {
+            'funcionario_id': funcionarioId,
+            'item_id': itemId,
+            'quantidade': quantidade
+        };
+        
+        for (const [name, value] of Object.entries(inputs)) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            form.appendChild(input);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
     }
 
     function validarBotaoAdicionar() {
