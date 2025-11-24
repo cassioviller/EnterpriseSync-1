@@ -1716,6 +1716,93 @@ def processar_devolucao():
         flash('Erro ao processar devolução de material', 'danger')
         return redirect(url_for('almoxarifado.devolucao'))
 
+@almoxarifado_bp.route('/processar-consumo', methods=['POST'])
+@login_required
+def processar_consumo():
+    """Processa consumo de materiais consumíveis"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    try:
+        funcionario_id = request.form.get('funcionario_id', type=int)
+        item_id = request.form.get('item_id', type=int)
+        quantidade = request.form.get('quantidade', type=float)
+        observacoes = request.form.get('observacoes', '').strip()
+        
+        # Validações
+        if not funcionario_id:
+            flash('Funcionário é obrigatório', 'danger')
+            return redirect(url_for('almoxarifado.devolucao'))
+        
+        if not item_id or not quantidade or quantidade <= 0:
+            flash('Item e quantidade válida são obrigatórios', 'danger')
+            return redirect(url_for('almoxarifado.devolucao'))
+        
+        funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
+        if not funcionario:
+            flash('Funcionário não encontrado', 'danger')
+            return redirect(url_for('almoxarifado.devolucao'))
+        
+        item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
+        if not item or item.tipo_controle != 'CONSUMIVEL':
+            flash('Item não encontrado ou não é consumível', 'danger')
+            return redirect(url_for('almoxarifado.devolucao'))
+        
+        # Calcular quantidade em posse
+        from decimal import Decimal
+        quantidade_saida = db.session.query(func.sum(AlmoxarifadoMovimento.quantidade)).filter_by(
+            item_id=item_id,
+            funcionario_id=funcionario_id,
+            tipo_movimento='SAIDA',
+            admin_id=admin_id
+        ).scalar() or Decimal('0')
+        
+        quantidade_devolvida = db.session.query(func.sum(AlmoxarifadoMovimento.quantidade)).filter_by(
+            item_id=item_id,
+            funcionario_id=funcionario_id,
+            tipo_movimento='DEVOLUCAO',
+            admin_id=admin_id
+        ).scalar() or Decimal('0')
+        
+        quantidade_consumida = db.session.query(func.sum(AlmoxarifadoMovimento.quantidade)).filter_by(
+            item_id=item_id,
+            funcionario_id=funcionario_id,
+            tipo_movimento='CONSUMIDO',
+            admin_id=admin_id
+        ).scalar() or Decimal('0')
+        
+        quantidade_em_posse = quantidade_saida - quantidade_devolvida - quantidade_consumida
+        
+        # Verificar se tem quantidade suficiente
+        if Decimal(str(quantidade)) > quantidade_em_posse:
+            flash(f'Quantidade insuficiente! Funcionário possui apenas {quantidade_em_posse} {item.unidade} em posse.', 'danger')
+            return redirect(url_for('almoxarifado.devolucao'))
+        
+        # Criar movimento de consumo
+        movimento = AlmoxarifadoMovimento(
+            item_id=item_id,
+            tipo_movimento='CONSUMIDO',
+            quantidade=quantidade,
+            funcionario_id=funcionario_id,
+            observacao=observacoes,
+            admin_id=admin_id,
+            usuario_id=current_user.id,
+            obra_id=None
+        )
+        db.session.add(movimento)
+        db.session.commit()
+        
+        flash(f'Consumo registrado com sucesso! {quantidade} {item.unidade} de "{item.nome}" consumidos por {funcionario.nome}.', 'success')
+        return redirect(url_for('almoxarifado.devolucao'))
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Erro ao processar consumo: {str(e)}')
+        flash('Erro ao processar consumo de material', 'danger')
+        return redirect(url_for('almoxarifado.devolucao'))
+
 @almoxarifado_bp.route('/processar-devolucao-multipla', methods=['POST'])
 @login_required
 def processar_devolucao_multipla():
