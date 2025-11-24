@@ -129,35 +129,51 @@
                                 </small>
                             </div>
 
-                            <!-- Informação de Lotes Disponíveis (apenas para visualização) -->
-                            <div id="infoLotes" class="card border-info mb-3" style="display: none;">
-                                <div class="card-header bg-light">
+                            <!-- Seleção MANUAL de Lotes -->
+                            <div id="infoLotes" class="card border-primary mb-3" style="display: none;">
+                                <div class="card-header bg-primary text-white">
                                     <h6 class="mb-0">
-                                        <i class="fas fa-layer-group text-info me-2"></i>
-                                        Lotes Disponíveis (FIFO Automático)
+                                        <i class="fas fa-hand-pointer me-2"></i>
+                                        Selecione os Lotes para Saída
                                     </h6>
                                 </div>
-                                <div class="card-body p-0">
+                                <div class="card-body">
+                                    <div class="alert alert-warning border-0 mb-3">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        <strong>Escolha Manual:</strong> Selecione qual(is) lote(s) usar e informe as quantidades. 
+                                        A soma deve ser igual à quantidade total da saída.
+                                    </div>
+                                    
                                     <div id="listaLotes" class="table-responsive">
-                                        <table class="table table-sm mb-0">
+                                        <table class="table table-sm table-hover mb-0">
                                             <thead class="table-light">
                                                 <tr>
-                                                    <th width="15%">Lote</th>
-                                                    <th width="20%">Data Entrada</th>
-                                                    <th width="15%">Qtd. Disponível</th>
-                                                    <th width="20%">Valor Unit.</th>
-                                                    <th width="30%">Nota Fiscal</th>
+                                                    <th width="5%"><i class="fas fa-check-square"></i></th>
+                                                    <th width="15%">Lote / NF</th>
+                                                    <th width="15%">Data Entrada</th>
+                                                    <th width="15%">Disponível</th>
+                                                    <th width="15%">Valor Unit.</th>
+                                                    <th width="35%">Quantidade a Usar</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="tbodyLotes">
-                                                <tr><td colspan="5" class="text-center text-muted">Selecione um item para ver os lotes</td></tr>
+                                                <tr><td colspan="6" class="text-center text-muted">Selecione um item para ver os lotes</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
-                                    <div class="card-footer bg-light small">
-                                        <i class="fas fa-info-circle text-info me-1"></i>
-                                        <strong>FIFO Automático:</strong> A saída será processada automaticamente dos lotes mais antigos primeiro. 
-                                        O sistema garantirá que o custo correto seja registrado.
+                                    
+                                    <div class="card-footer bg-light">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-6">
+                                                <span class="text-muted">Quantidade necessária:</span>
+                                                <strong id="qtdNecessaria" class="text-primary ms-2">0.00</strong>
+                                            </div>
+                                            <div class="col-md-6 text-end">
+                                                <span class="text-muted">Total alocado:</span>
+                                                <strong id="qtdAlocada" class="ms-2">0.00</strong>
+                                                <span id="validacaoAlocacao" class="ms-2"></span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -295,6 +311,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let itemAtualData = null;
     let quantidadeMaxima = 0;
     let estoqueSerializadoData = [];
+    let lotesDisponiveis = [];
+    let loteAllocations = [];
 
     itemSelect.addEventListener('change', async function() {
         const itemId = this.value;
@@ -403,6 +421,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!itemId) {
             infoLotes.style.display = 'none';
+            lotesDisponiveis = [];
+            loteAllocations = [];
             return;
         }
         
@@ -410,30 +430,70 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.lotes && data.lotes.length > 0) {
+                    lotesDisponiveis = data.lotes;
+                    loteAllocations = [];
+                    
                     let html = '';
                     data.lotes.forEach((lote, index) => {
-                        const rowClass = index === 0 ? 'table-success' : '';
-                        const badge = index === 0 ? '<span class="badge bg-success ms-2">Próximo</span>' : '';
-                        
                         html += `
-                            <tr class="${rowClass}">
-                                <td>${lote.lote || '-'}${badge}</td>
-                                <td>${formatarData(lote.data_entrada)}</td>
-                                <td class="fw-bold">${parseFloat(lote.quantidade_disponivel).toFixed(2)}</td>
-                                <td class="text-success fw-bold">R$ ${parseFloat(lote.valor_unitario || 0).toFixed(2)}</td>
-                                <td>${lote.nota_fiscal || '-'}</td>
+                            <tr>
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input checkbox-lote" 
+                                           id="lote_${lote.estoque_id}" 
+                                           data-estoque-id="${lote.estoque_id}"
+                                           data-max="${parseFloat(lote.quantidade_disponivel)}">
+                                </td>
+                                <td>
+                                    <small class="fw-bold">${lote.nota_fiscal || 'Lote ' + (index + 1)}</small>
+                                </td>
+                                <td><small>${formatarData(lote.data_entrada)}</small></td>
+                                <td><span class="badge bg-info">${parseFloat(lote.quantidade_disponivel).toFixed(2)}</span></td>
+                                <td><span class="text-success fw-bold">R$ ${parseFloat(lote.valor_unitario || 0).toFixed(2)}</span></td>
+                                <td>
+                                    <input type="number" class="form-control form-control-sm input-qtd-lote" 
+                                           id="qtd_${lote.estoque_id}" 
+                                           data-estoque-id="${lote.estoque_id}"
+                                           placeholder="0.00" 
+                                           step="0.01" 
+                                           min="0"
+                                           max="${parseFloat(lote.quantidade_disponivel)}"
+                                           disabled>
+                                </td>
                             </tr>
                         `;
                     });
                     tbodyLotes.innerHTML = html;
+                    
+                    // Adicionar event listeners aos checkboxes
+                    document.querySelectorAll('.checkbox-lote').forEach(cb => {
+                        cb.addEventListener('change', function() {
+                            const estoqueId = this.dataset.estoqueId;
+                            const inputQtd = document.getElementById(`qtd_${estoqueId}`);
+                            inputQtd.disabled = !this.checked;
+                            if (!this.checked) {
+                                inputQtd.value = '';
+                            }
+                            validarAlocacaoLotes();
+                        });
+                    });
+                    
+                    // Adicionar event listeners aos inputs de quantidade
+                    document.querySelectorAll('.input-qtd-lote').forEach(input => {
+                        input.addEventListener('input', validarAlocacaoLotes);
+                    });
+                    
                     infoLotes.style.display = 'block';
                 } else {
                     infoLotes.style.display = 'none';
+                    lotesDisponiveis = [];
+                    loteAllocations = [];
                 }
             })
             .catch(error => {
                 console.error('Erro ao carregar lotes:', error);
                 infoLotes.style.display = 'none';
+                lotesDisponiveis = [];
+                loteAllocations = [];
             });
     }
 
@@ -441,6 +501,54 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!dataStr) return '-';
         const data = new Date(dataStr);
         return data.toLocaleDateString('pt-BR');
+    }
+
+    function validarAlocacaoLotes() {
+        const qtdNecessaria = parseFloat(quantidadeInput.value) || 0;
+        const qtdNecessariaEl = document.getElementById('qtdNecessaria');
+        const qtdAlocadaEl = document.getElementById('qtdAlocada');
+        const validacaoEl = document.getElementById('validacaoAlocacao');
+        
+        // Atualizar quantidade necessária
+        qtdNecessariaEl.textContent = qtdNecessaria.toFixed(2);
+        
+        // Calcular total alocado
+        let totalAlocado = 0;
+        loteAllocations = [];
+        
+        document.querySelectorAll('.checkbox-lote:checked').forEach(cb => {
+            const estoqueId = cb.dataset.estoqueId;
+            const inputQtd = document.getElementById(`qtd_${estoqueId}`);
+            const qtd = parseFloat(inputQtd.value) || 0;
+            
+            if (qtd > 0) {
+                totalAlocado += qtd;
+                loteAllocations.push({
+                    estoque_id: parseInt(estoqueId),
+                    quantidade: qtd
+                });
+            }
+        });
+        
+        // Atualizar display de total alocado
+        qtdAlocadaEl.textContent = totalAlocado.toFixed(2);
+        
+        // Validação visual
+        if (qtdNecessaria === 0) {
+            validacaoEl.innerHTML = '';
+            qtdAlocadaEl.className = 'ms-2';
+        } else if (Math.abs(totalAlocado - qtdNecessaria) < 0.001) {
+            validacaoEl.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
+            qtdAlocadaEl.className = 'ms-2 text-success fw-bold';
+        } else if (totalAlocado > qtdNecessaria) {
+            validacaoEl.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
+            qtdAlocadaEl.className = 'ms-2 text-danger fw-bold';
+        } else {
+            validacaoEl.innerHTML = '<i class="fas fa-exclamation-circle text-warning"></i>';
+            qtdAlocadaEl.className = 'ms-2 text-warning fw-bold';
+        }
+        
+        validarBotaoAdicionar();
     }
 
     function validarBotaoAdicionar() {
@@ -456,7 +564,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const algumMarcado = Array.from(document.querySelectorAll('.checkbox-serializado:checked')).length > 0;
             btnAdicionarCarrinho.disabled = !algumMarcado;
         } else {
-            btnAdicionarCarrinho.disabled = quantidadeMaxima <= 0;
+            const qtdNecessaria = parseFloat(quantidadeInput.value) || 0;
+            const totalAlocado = loteAllocations.reduce((sum, alloc) => sum + alloc.quantidade, 0);
+            
+            // Desabilita se não tiver quantidade ou se alocação não bater
+            btnAdicionarCarrinho.disabled = (
+                quantidadeMaxima <= 0 || 
+                qtdNecessaria <= 0 || 
+                Math.abs(totalAlocado - qtdNecessaria) >= 0.001
+            );
         }
     }
 
@@ -468,6 +584,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (valor > quantidadeMaxima) {
             this.value = quantidadeMaxima;
         }
+        validarAlocacaoLotes();
     });
 
     btnAdicionarCarrinho.addEventListener('click', function() {
@@ -532,6 +649,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Validar alocações de lotes
+            if (loteAllocations.length === 0) {
+                alert('Por favor, selecione os lotes e informe as quantidades.');
+                return;
+            }
+            
+            const totalAlocado = loteAllocations.reduce((sum, alloc) => sum + alloc.quantidade, 0);
+            if (Math.abs(totalAlocado - qtd) >= 0.001) {
+                alert(`A soma das quantidades alocadas (${totalAlocado.toFixed(2)}) deve ser igual à quantidade total (${qtd.toFixed(2)}).`);
+                return;
+            }
+
             carrinho.push({
                 item_id: itemId,
                 item_nome: itemNome,
@@ -541,7 +670,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 funcionario_id: funcionarioId,
                 funcionario_nome: funcionarioNome,
                 obra_id: obraId,
-                obra_nome: obraNome
+                obra_nome: obraNome,
+                lote_allocations: loteAllocations.map(a => ({...a})) // Clone do array
             });
         }
 
