@@ -399,9 +399,17 @@ console.log('Initializing Restaurantes with light theme...');
                 <p>Cadastro e controle de fornecedores de alimentação</p>
             </div>
             <div class="header-actions">
+                <a href="{{ url_for('alimentacao.lancamento_novo_v2') }}" class="btn-light" style="background: rgba(255,255,255,0.95); color: #198754;">
+                    <i class="fas fa-utensils"></i>
+                    Novo Lançamento
+                </a>
+                <a href="{{ url_for('alimentacao.itens_lista') }}" class="btn-light">
+                    <i class="fas fa-list"></i>
+                    Itens
+                </a>
                 <a href="{{ url_for('alimentacao.restaurante_novo') }}" class="btn-light">
                     <i class="fas fa-plus"></i>
-                    Novo Restaurante
+                    Restaurante
                 </a>
                 <a href="{{ url_for('main.dashboard') }}" class="btn-voltar">
                     <i class="fas fa-arrow-left"></i>
@@ -460,7 +468,7 @@ console.log('Initializing Restaurantes with light theme...');
                         <i class="fas fa-eye"></i>
                         Ver Detalhes
                     </a>
-                    <a href="{{ url_for('alimentacao.lancamento_novo') }}" class="btn-action btn-outline-custom">
+                    <a href="{{ url_for('alimentacao.lancamento_novo_v2') }}?restaurante_id={{ restaurante.id }}" class="btn-action btn-outline-custom">
                         <i class="fas fa-plus"></i>
                         Novo Lançamento
                     </a>

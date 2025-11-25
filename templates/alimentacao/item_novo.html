@@ -1,0 +1,235 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Novo Item - Alimentação{% endblock %}
+
+{% block styles %}
+<style>
+:root {
+    --primary: #198754;
+    --primary-dark: #145a3e;
+}
+
+.page-container {
+    background: #f8f9fa;
+    min-height: 100vh;
+}
+
+.page-header {
+    background: linear-gradient(135deg, var(--primary) 0%, #20c997 100%);
+    color: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.content-section {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 1rem 2rem 1rem;
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 2rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    font-weight: 500;
+    color: #212529;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.form-label.required::after {
+    content: ' *';
+    color: #dc3545;
+}
+
+.form-control, .form-select {
+    padding: 0.75rem 1rem;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 1rem;
+    width: 100%;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.15);
+    outline: none;
+}
+
+.form-text {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+.icon-preview {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--primary) 0%, #20c997 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    margin-top: 0.5rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+    margin-top: 1rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+}
+
+.icons-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.icon-option {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.icon-option:hover {
+    border-color: var(--primary);
+    background: rgba(25, 135, 84, 0.1);
+}
+
+.icon-option.selected {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center" style="max-width: 600px; margin: 0 auto;">
+            <div>
+                <h1><i class="fas fa-plus-circle me-2"></i>Novo Item</h1>
+                <p class="mb-0 opacity-75">Cadastre um novo item de alimentação</p>
+            </div>
+            <a href="{{ url_for('alimentacao.itens_lista') }}" class="btn btn-light">
+                <i class="fas fa-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <div class="card">
+            <form method="POST" action="{{ url_for('alimentacao.item_novo') }}">
+                <div class="form-group">
+                    <label class="form-label required">Nome do Item</label>
+                    <input type="text" class="form-control" name="nome" required placeholder="Ex: Marmita, Refrigerante">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Preço Padrão (R$)</label>
+                    <input type="number" class="form-control" name="preco_padrao" step="0.01" min="0" required placeholder="0.00">
+                    <small class="form-text">Valor sugerido para este item nos lançamentos</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Descrição</label>
+                    <textarea class="form-control" name="descricao" rows="2" placeholder="Descrição opcional do item"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Ícone</label>
+                    <select class="form-select" name="icone" id="iconeSelect">
+                        <option value="fas fa-utensils">🍽️ Utensílios</option>
+                        <option value="fas fa-drumstick-bite">🍗 Frango</option>
+                        <option value="fas fa-hamburger">🍔 Hambúrguer</option>
+                        <option value="fas fa-pizza-slice">🍕 Pizza</option>
+                        <option value="fas fa-coffee">☕ Café</option>
+                        <option value="fas fa-glass-water">🥤 Bebida</option>
+                        <option value="fas fa-apple-alt">🍎 Fruta</option>
+                        <option value="fas fa-bread-slice">🍞 Pão</option>
+                        <option value="fas fa-fish">🐟 Peixe</option>
+                        <option value="fas fa-carrot">🥕 Vegetais</option>
+                    </select>
+                    <div class="icon-preview" id="iconPreview">
+                        <i class="fas fa-utensils"></i>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Ordem de Exibição</label>
+                    <input type="number" class="form-control" name="ordem" value="0" min="0">
+                    <small class="form-text">Itens com menor número aparecem primeiro</small>
+                </div>
+
+                <div class="form-actions">
+                    <a href="{{ url_for('alimentacao.itens_lista') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('iconeSelect').addEventListener('change', function() {
+    document.querySelector('#iconPreview i').className = this.value;
+});
+</script>
+{% endblock %}

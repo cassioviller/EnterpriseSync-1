@@ -1,10 +1,11 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from models import db, Restaurante, AlimentacaoLancamento, RegistroAlimentacao, Funcionario, Obra
+from models import db, Restaurante, AlimentacaoLancamento, RegistroAlimentacao, Funcionario, Obra, AlimentacaoItem, AlimentacaoLancamentoItem
 from datetime import datetime
 from sqlalchemy import func
 from decimal import Decimal
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +259,266 @@ def lancamento_novo():
                          restaurantes=restaurantes, 
                          obras=obras, 
                          funcionarios=funcionarios)
+
+
+# ===== NOVO SISTEMA v2 - MÚLTIPLOS ITENS =====
+@alimentacao_bp.route('/lancamentos/novo-v2', methods=['GET', 'POST'])
+@login_required
+def lancamento_novo_v2():
+    """Criar novo lançamento v2 com múltiplos itens e seleção mobile-friendly"""
+    admin_id = get_admin_id()
+    
+    if request.method == 'POST':
+        try:
+            logger.info(f"🍽️ [ALIMENTACAO_V2] Processando novo lançamento para admin_id={admin_id}")
+            
+            # Validação básica
+            obra_id = request.form.get('obra_id')
+            if not obra_id:
+                flash('Selecione uma obra', 'error')
+                return redirect(url_for('alimentacao.lancamento_novo_v2'))
+            
+            obra = Obra.query.filter_by(id=int(obra_id), admin_id=admin_id).first()
+            if not obra:
+                flash('Obra inválida', 'error')
+                return redirect(url_for('alimentacao.lancamento_novo_v2'))
+            
+            # Restaurante (opcional agora)
+            restaurante_id = request.form.get('restaurante_id')
+            restaurante = None
+            if restaurante_id:
+                restaurante = Restaurante.query.filter_by(id=int(restaurante_id), admin_id=admin_id).first()
+            
+            # Validar funcionários
+            funcionarios_ids = request.form.getlist('funcionarios')
+            if not funcionarios_ids:
+                flash('Selecione pelo menos um funcionário', 'error')
+                return redirect(url_for('alimentacao.lancamento_novo_v2'))
+            
+            funcionarios_validos = []
+            for func_id in funcionarios_ids:
+                funcionario = Funcionario.query.filter_by(id=int(func_id), admin_id=admin_id).first()
+                if funcionario:
+                    funcionarios_validos.append(funcionario)
+            
+            if not funcionarios_validos:
+                flash('Nenhum funcionário válido selecionado', 'error')
+                return redirect(url_for('alimentacao.lancamento_novo_v2'))
+            
+            # Processar itens do formulário
+            itens_data = []
+            form_data = request.form.to_dict(flat=False)
+            
+            # Encontrar todos os índices de itens
+            indices = set()
+            for key in form_data.keys():
+                match = re.match(r'itens\[(\d+)\]', key)
+                if match:
+                    indices.add(int(match.group(1)))
+            
+            for idx in sorted(indices):
+                item_id = request.form.get(f'itens[{idx}][item_id]')
+                preco = request.form.get(f'itens[{idx}][preco]')
+                nome_custom = request.form.get(f'itens[{idx}][nome]')
+                
+                if preco:
+                    preco_decimal = Decimal(preco)
+                    if preco_decimal > 0:
+                        # Determinar nome do item
+                        if item_id and item_id != 'custom':
+                            item_ref = AlimentacaoItem.query.filter_by(id=int(item_id), admin_id=admin_id).first()
+                            nome_item = item_ref.nome if item_ref else nome_custom or 'Item'
+                        else:
+                            nome_item = nome_custom or 'Item personalizado'
+                        
+                        itens_data.append({
+                            'item_id': int(item_id) if item_id and item_id != 'custom' else None,
+                            'nome': nome_item,
+                            'preco': preco_decimal,
+                            'quantidade': len(funcionarios_validos)
+                        })
+            
+            if not itens_data:
+                flash('Adicione pelo menos um item com preço válido', 'error')
+                return redirect(url_for('alimentacao.lancamento_novo_v2'))
+            
+            # Calcular valor total
+            valor_total = sum(item['preco'] * item['quantidade'] for item in itens_data)
+            
+            # Validação adicional: valor total deve ser maior que zero
+            if valor_total <= 0:
+                flash('O valor total do lançamento deve ser maior que zero', 'error')
+                return redirect(url_for('alimentacao.lancamento_novo_v2'))
+            
+            # Criar lançamento principal
+            lancamento = AlimentacaoLancamento(
+                data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
+                valor_total=valor_total,
+                descricao=request.form.get('descricao', ''),
+                restaurante_id=restaurante.id if restaurante else None,
+                obra_id=obra.id,
+                admin_id=admin_id
+            )
+            db.session.add(lancamento)
+            db.session.flush()
+            
+            # Associar funcionários
+            for funcionario in funcionarios_validos:
+                lancamento.funcionarios.append(funcionario)
+            
+            # Criar itens do lançamento
+            for item in itens_data:
+                lancamento_item = AlimentacaoLancamentoItem(
+                    lancamento_id=lancamento.id,
+                    item_id=item['item_id'],
+                    nome_item=item['nome'],
+                    preco_unitario=item['preco'],
+                    quantidade=item['quantidade'],
+                    subtotal=item['preco'] * item['quantidade'],
+                    admin_id=admin_id
+                )
+                db.session.add(lancamento_item)
+            
+            db.session.commit()
+            
+            # Emitir evento para integração
+            try:
+                from event_manager import EventManager
+                EventManager.emit('alimentacao_lancamento_criado', {
+                    'lancamento_id': lancamento.id,
+                    'restaurante_id': lancamento.restaurante_id,
+                    'obra_id': lancamento.obra_id,
+                    'valor_total': float(lancamento.valor_total)
+                }, admin_id)
+                logger.info(f"✅ Evento 'alimentacao_lancamento_criado' emitido para lançamento {lancamento.id}")
+            except Exception as e:
+                logger.error(f"❌ Erro ao emitir evento: {e}")
+            
+            flash(f'Lançamento criado com sucesso! Total: R$ {valor_total:.2f} ({len(funcionarios_validos)} funcionários)', 'success')
+            return redirect(url_for('alimentacao.index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao criar lançamento v2: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            flash(f'Erro ao criar lançamento: {str(e)}', 'error')
+    
+    # GET - carregar dados para o formulário
+    restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+    itens_cadastrados = AlimentacaoItem.query.filter_by(admin_id=admin_id, ativo=True).order_by(AlimentacaoItem.ordem).all()
+    
+    # Criar item padrão "Marmita" se nenhum item existir
+    if not itens_cadastrados:
+        try:
+            item_marmita = AlimentacaoItem(
+                nome='Marmita',
+                preco_padrao=Decimal('18.00'),
+                descricao='Marmita padrão',
+                icone='fas fa-drumstick-bite',
+                is_default=True,
+                ordem=0,
+                admin_id=admin_id
+            )
+            db.session.add(item_marmita)
+            db.session.commit()
+            itens_cadastrados = [item_marmita]
+            logger.info(f"✅ Item padrão 'Marmita' criado para admin_id={admin_id}")
+        except Exception as e:
+            logger.error(f"Erro ao criar item padrão: {e}")
+            db.session.rollback()
+    
+    # Pré-selecionar restaurante se passado na URL
+    restaurante_id_selecionado = request.args.get('restaurante_id', type=int)
+    
+    return render_template('alimentacao/lancamento_novo_v2.html', 
+                         restaurantes=restaurantes, 
+                         obras=obras, 
+                         funcionarios=funcionarios,
+                         itens_cadastrados=itens_cadastrados,
+                         restaurante_id_selecionado=restaurante_id_selecionado)
+
+
+# ===== API PARA ITENS CADASTRADOS =====
+@alimentacao_bp.route('/api/itens')
+@login_required
+def api_itens():
+    """Retorna lista de itens cadastrados para AJAX"""
+    admin_id = get_admin_id()
+    itens = AlimentacaoItem.query.filter_by(admin_id=admin_id, ativo=True).order_by(AlimentacaoItem.ordem).all()
+    return jsonify([{
+        'id': item.id,
+        'nome': item.nome,
+        'preco_padrao': float(item.preco_padrao),
+        'icone': item.icone,
+        'is_default': item.is_default
+    } for item in itens])
+
+
+# ===== CRUD DE ITENS CADASTRADOS =====
+@alimentacao_bp.route('/itens')
+@login_required
+def itens_lista():
+    """Lista itens cadastrados de alimentação"""
+    admin_id = get_admin_id()
+    itens = AlimentacaoItem.query.filter_by(admin_id=admin_id).order_by(AlimentacaoItem.ordem).all()
+    return render_template('alimentacao/itens_lista.html', itens=itens)
+
+
+@alimentacao_bp.route('/itens/novo', methods=['GET', 'POST'])
+@login_required
+def item_novo():
+    """Criar novo item de alimentação"""
+    admin_id = get_admin_id()
+    
+    if request.method == 'POST':
+        try:
+            item = AlimentacaoItem(
+                nome=request.form['nome'],
+                preco_padrao=Decimal(request.form.get('preco_padrao', '0')),
+                descricao=request.form.get('descricao', ''),
+                icone=request.form.get('icone', 'fas fa-utensils'),
+                ordem=int(request.form.get('ordem', '0')),
+                admin_id=admin_id
+            )
+            db.session.add(item)
+            db.session.commit()
+            flash('Item cadastrado com sucesso!', 'success')
+            return redirect(url_for('alimentacao.itens_lista'))
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Erro ao criar item: {e}")
+            flash('Erro ao cadastrar item', 'error')
+    
+    return render_template('alimentacao/item_novo.html')
+
+
+@alimentacao_bp.route('/itens/<int:item_id>/editar', methods=['GET', 'POST'])
+@login_required
+def item_editar(item_id):
+    """Editar item de alimentação"""
+    admin_id = get_admin_id()
+    item = AlimentacaoItem.query.filter_by(id=item_id, admin_id=admin_id).first_or_404()
+    
+    if request.method == 'POST':
+        try:
+            item.nome = request.form['nome']
+            item.preco_padrao = Decimal(request.form.get('preco_padrao', '0'))
+            item.descricao = request.form.get('descricao', '')
+            item.icone = request.form.get('icone', 'fas fa-utensils')
+            item.ordem = int(request.form.get('ordem', '0'))
+            item.ativo = request.form.get('ativo') == 'on'
+            db.session.commit()
+            flash('Item atualizado com sucesso!', 'success')
+            return redirect(url_for('alimentacao.itens_lista'))
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Erro ao editar item: {e}")
+            flash('Erro ao atualizar item', 'error')
+    
+    return render_template('alimentacao/item_editar.html', item=item)
 
 
 # ===== DASHBOARD DE ALIMENTAÇÃO (TAREFA 8) =====

@@ -1,0 +1,264 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Itens de Alimentação - SIGE{% endblock %}
+
+{% block styles %}
+<style>
+:root {
+    --primary: #198754;
+    --primary-dark: #145a3e;
+}
+
+.page-container {
+    background: #f8f9fa;
+    min-height: 100vh;
+}
+
+.page-header {
+    background: linear-gradient(135deg, var(--primary) 0%, #20c997 100%);
+    color: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.content-section {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 1rem 2rem 1rem;
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-add {
+    background: var(--primary);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-add:hover {
+    background: var(--primary-dark);
+    color: white;
+}
+
+.items-list {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.item-row {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    gap: 1rem;
+}
+
+.item-row:last-child {
+    border-bottom: none;
+}
+
+.item-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--primary) 0%, #20c997 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+}
+
+.item-info {
+    flex: 1;
+}
+
+.item-name {
+    font-weight: 600;
+    color: #212529;
+    font-size: 1rem;
+}
+
+.item-description {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.item-price {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+.item-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.item-status.active {
+    background: rgba(25, 135, 84, 0.1);
+    color: var(--primary);
+}
+
+.item-status.inactive {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+}
+
+.item-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-edit, .btn-default {
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.btn-edit {
+    background: #e9ecef;
+    color: #495057;
+}
+
+.btn-edit:hover {
+    background: #dee2e6;
+}
+
+.btn-default {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+@media (max-width: 576px) {
+    .item-row {
+        flex-wrap: wrap;
+    }
+    .item-actions {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 0.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center" style="max-width: 1000px; margin: 0 auto;">
+            <div>
+                <h1><i class="fas fa-utensils me-2"></i>Itens de Alimentação</h1>
+                <p class="mb-0 opacity-75">Gerencie os itens pré-cadastrados para lançamentos</p>
+            </div>
+            <a href="{{ url_for('alimentacao.index') }}" class="btn btn-light">
+                <i class="fas fa-arrow-left me-2"></i>Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="content-section">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <div class="card-header">
+                <span><strong>{{ itens|length }}</strong> itens cadastrados</span>
+                <a href="{{ url_for('alimentacao.item_novo') }}" class="btn-add">
+                    <i class="fas fa-plus"></i> Novo Item
+                </a>
+            </div>
+
+            {% if itens %}
+            <ul class="items-list">
+                {% for item in itens %}
+                <li class="item-row">
+                    <div class="item-icon">
+                        <i class="{{ item.icone or 'fas fa-utensils' }}"></i>
+                    </div>
+                    <div class="item-info">
+                        <div class="item-name">
+                            {{ item.nome }}
+                            {% if item.is_default %}
+                            <span class="badge bg-warning text-dark ms-2">Padrão</span>
+                            {% endif %}
+                        </div>
+                        <div class="item-description">{{ item.descricao or 'Sem descrição' }}</div>
+                    </div>
+                    <div class="item-price">R$ {{ '%.2f' % item.preco_padrao }}</div>
+                    <span class="item-status {{ 'active' if item.ativo else 'inactive' }}">
+                        {{ 'Ativo' if item.ativo else 'Inativo' }}
+                    </span>
+                    <div class="item-actions">
+                        <a href="{{ url_for('alimentacao.item_editar', item_id=item.id) }}" class="btn-edit">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-utensils"></i>
+                <h5>Nenhum item cadastrado</h5>
+                <p>Cadastre itens como Marmita, Refrigerante, etc. para usar nos lançamentos.</p>
+                <a href="{{ url_for('alimentacao.item_novo') }}" class="btn btn-success">
+                    <i class="fas fa-plus me-2"></i>Cadastrar Primeiro Item
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

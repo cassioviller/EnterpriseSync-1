@@ -15,11 +15,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # 🔒 CRITICAL SECURITY: SESSION_SECRET handling
-# SESSION_SECRET fixo no código (pode ser sobrescrito por variável de ambiente)
-secret_key = os.environ.get("SESSION_SECRET", "Oqv_zfDLhygGT5AF8t3llIIC_qnryXzGWXxgM0jCvC4")
+# Requer SESSION_SECRET como variável de ambiente - NÃO usar fallback hardcoded
+secret_key = os.environ.get("SESSION_SECRET")
 
-if secret_key == "Oqv_zfDLhygGT5AF8t3llIIC_qnryXzGWXxgM0jCvC4":
-    logger.info("✅ Usando SESSION_SECRET padrão do código")
+if not secret_key:
+    import secrets
+    secret_key = secrets.token_urlsafe(64)
+    logger.warning("⚠️ SESSION_SECRET não configurado - usando chave temporária gerada (não persiste entre reinícios)")
 else:
     logger.info("✅ Usando SESSION_SECRET da variável de ambiente")
 
