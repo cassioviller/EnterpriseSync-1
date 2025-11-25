@@ -3050,6 +3050,189 @@ def _migration_58_almoxarifado_lotes_fifo():
             except:
                 pass
 
+
+def _migration_59_alimentacao_itens_sistema():
+    """
+    Migração 59: Sistema de Itens de Alimentação v2.0
+    
+    Cria tabelas para:
+    - alimentacao_item: Itens pré-cadastrados (Marmita, Refrigerante, etc.)
+    - alimentacao_lancamento_item: Itens de cada lançamento com quantidade e preço
+    
+    Popular itens padrão automaticamente para cada admin
+    """
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("🍽️  MIGRAÇÃO 59: Sistema de Itens de Alimentação v2.0")
+        logger.info("=" * 80)
+        
+        tabelas_criadas = 0
+        
+        # ========================================
+        # PASSO 1: Criar tabela alimentacao_item
+        # ========================================
+        logger.info("📦 Criando tabela alimentacao_item...")
+        
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables 
+                WHERE table_name = 'alimentacao_item'
+            )
+        """)
+        
+        if not cursor.fetchone()[0]:
+            cursor.execute("""
+                CREATE TABLE alimentacao_item (
+                    id SERIAL PRIMARY KEY,
+                    nome VARCHAR(100) NOT NULL,
+                    preco_padrao NUMERIC(10,2) DEFAULT 0.00,
+                    descricao TEXT,
+                    icone VARCHAR(50) DEFAULT 'fas fa-utensils',
+                    ordem INTEGER DEFAULT 0,
+                    ativo BOOLEAN DEFAULT TRUE,
+                    is_default BOOLEAN DEFAULT FALSE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX idx_alimentacao_item_admin 
+                ON alimentacao_item(admin_id)
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX idx_alimentacao_item_ativo 
+                ON alimentacao_item(ativo, ordem)
+            """)
+            
+            tabelas_criadas += 1
+            logger.info("  ✅ Tabela alimentacao_item criada com índices")
+        else:
+            logger.info("  ⏭️  Tabela alimentacao_item já existe")
+        
+        # ========================================
+        # PASSO 2: Criar tabela alimentacao_lancamento_item
+        # ========================================
+        logger.info("📦 Criando tabela alimentacao_lancamento_item...")
+        
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables 
+                WHERE table_name = 'alimentacao_lancamento_item'
+            )
+        """)
+        
+        if not cursor.fetchone()[0]:
+            cursor.execute("""
+                CREATE TABLE alimentacao_lancamento_item (
+                    id SERIAL PRIMARY KEY,
+                    lancamento_id INTEGER NOT NULL REFERENCES alimentacao_lancamento(id) ON DELETE CASCADE,
+                    item_id INTEGER REFERENCES alimentacao_item(id) ON DELETE SET NULL,
+                    nome_item VARCHAR(100) NOT NULL,
+                    preco_unitario NUMERIC(10,2) NOT NULL,
+                    quantidade INTEGER NOT NULL DEFAULT 1,
+                    subtotal NUMERIC(10,2) NOT NULL,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX idx_alimentacao_lancamento_item_lancamento 
+                ON alimentacao_lancamento_item(lancamento_id)
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX idx_alimentacao_lancamento_item_admin 
+                ON alimentacao_lancamento_item(admin_id)
+            """)
+            
+            tabelas_criadas += 1
+            logger.info("  ✅ Tabela alimentacao_lancamento_item criada com índices")
+        else:
+            logger.info("  ⏭️  Tabela alimentacao_lancamento_item já existe")
+        
+        # ========================================
+        # PASSO 3: Popular itens padrão para cada admin
+        # ========================================
+        logger.info("🍽️  Populando itens padrão de alimentação...")
+        
+        itens_padrao = [
+            ('Marmita', 18.00, 'Refeição completa', 'fas fa-utensils', 1, True),
+            ('Refrigerante', 5.00, 'Refrigerante 350ml', 'fas fa-glass-cheers', 2, False),
+            ('Água', 3.00, 'Água mineral 500ml', 'fas fa-tint', 3, False),
+            ('Suco', 6.00, 'Suco natural', 'fas fa-lemon', 4, False),
+            ('Café', 2.00, 'Café expresso', 'fas fa-coffee', 5, False),
+            ('Lanche', 8.00, 'Lanche rápido', 'fas fa-hamburger', 6, False),
+        ]
+        
+        cursor.execute("""
+            SELECT DISTINCT id FROM usuario 
+            WHERE tipo_usuario = 'admin' OR tipo_usuario = 'super_admin'
+        """)
+        
+        admins = cursor.fetchall()
+        itens_criados = 0
+        
+        for (admin_id,) in admins:
+            for nome, preco, descricao, icone, ordem, is_default in itens_padrao:
+                cursor.execute("""
+                    SELECT id FROM alimentacao_item 
+                    WHERE nome = %s AND admin_id = %s
+                """, (nome, admin_id))
+                
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO alimentacao_item 
+                        (nome, preco_padrao, descricao, icone, ordem, is_default, admin_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (nome, preco, descricao, icone, ordem, is_default, admin_id))
+                    itens_criados += 1
+        
+        logger.info(f"  ✅ {itens_criados} itens padrão criados para {len(admins)} admin(s)")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 59 CONCLUÍDA COM SUCESSO!")
+        logger.info(f"   📦 Tabelas criadas: {tabelas_criadas}")
+        logger.info(f"   🍽️  Itens padrão criados: {itens_criados}")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 59: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -3101,6 +3284,7 @@ def executar_migracoes():
             (56, "PropostaArquivo - persistência Base64", _migration_56_proposta_arquivo_base64),
             (57, "Campos CRUD movimentações almoxarifado", _migration_57_almoxarifado_movimento_campos_crud),
             (58, "Sistema de Rastreamento de Lotes FIFO", _migration_58_almoxarifado_lotes_fifo),
+            (59, "Sistema de Itens de Alimentação v2.0", _migration_59_alimentacao_itens_sistema),
         ]
         
         # Executar cada migração com rastreamento

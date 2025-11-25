@@ -813,6 +813,43 @@ class AlimentacaoLancamento(db.Model):
         return self.valor_total / num_funcionarios
 
 
+class AlimentacaoItem(db.Model):
+    """Itens pré-cadastrados de alimentação (Marmita, Refrigerante, etc.)"""
+    __tablename__ = 'alimentacao_item'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    preco_padrao = db.Column(db.Numeric(10, 2), default=0.0)
+    descricao = db.Column(db.Text)
+    icone = db.Column(db.String(50), default='fas fa-utensils')
+    ordem = db.Column(db.Integer, default=0)
+    ativo = db.Column(db.Boolean, default=True)
+    is_default = db.Column(db.Boolean, default=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AlimentacaoLancamentoItem(db.Model):
+    """Itens de um lançamento de alimentação com quantidade e preço"""
+    __tablename__ = 'alimentacao_lancamento_item'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    lancamento_id = db.Column(db.Integer, db.ForeignKey('alimentacao_lancamento.id', ondelete='CASCADE'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('alimentacao_item.id'), nullable=True)
+    
+    nome_item = db.Column(db.String(100), nullable=False)
+    preco_unitario = db.Column(db.Numeric(10, 2), nullable=False)
+    quantidade = db.Column(db.Integer, nullable=False, default=1)
+    subtotal = db.Column(db.Numeric(10, 2), nullable=False)
+    
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    lancamento = db.relationship('AlimentacaoLancamento', backref=db.backref('itens', lazy='selectin', cascade='all, delete-orphan'))
+    item = db.relationship('AlimentacaoItem', backref='lancamento_itens')
+
+
 class DocumentoFiscal(db.Model):
     """Controle de documentos fiscais relacionados a veículos"""
     __tablename__ = 'documento_fiscal'
