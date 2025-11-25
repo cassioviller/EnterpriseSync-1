@@ -155,11 +155,12 @@ def novo_rdo():
         if obra_id:
             obra_selecionada = next((obra for obra in obras if obra.id == obra_id), None)
         
-        return render_template('rdo_form.html',
+        return render_template('rdo/novo.html',
                              obras=obras,
                              funcionarios=funcionarios,
                              subatividades=subatividades,
                              obra_selecionada=obra_selecionada,
+                             data_hoje=datetime.now().strftime('%Y-%m-%d'),
                              rdo=None,
                              acao='Criar')
         

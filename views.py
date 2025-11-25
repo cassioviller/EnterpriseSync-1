@@ -9577,18 +9577,12 @@ def salvar_rdo_flexivel():
                         continue
         
         if not subactivities:
-            # LOG DETALHADO PARA DEBUG PRODUÇÃO
-            logger.error("❌ NENHUMA SUBATIVIDADE ENCONTRADA - DEBUG PRODUÇÃO:")
-            logger.error(f"🔍 Total de campos no formulário: {len(request.form)}")
-            logger.error(f"🔍 Campos do formulário:")
-            for key, value in request.form.items():
-                logger.error(f"  📝 {key} = {value}")
-            logger.error(f"🔍 Target service ID: {target_service_id}")
-            logger.error(f"🔍 Admin ID: {admin_id}")
-            logger.error(f"🔍 Obra ID: {obra_id}")
-            
-            flash(f'ERRO DEBUG: Nenhuma subatividade encontrada. Total campos: {len(request.form)}. Verifique logs para detalhes.', 'error')
-            return redirect(url_for('main.funcionario_rdo_novo'))
+            # ✅ CORREÇÃO: Permitir RDOs sem subatividades (registros simples de presença)
+            logger.warning("⚠️ RDO sem subatividades - será salvo apenas com funcionários")
+            logger.info(f"🔍 Total de campos no formulário: {len(request.form)}")
+            logger.info(f"🔍 Target service ID: {target_service_id}")
+            logger.info(f"🔍 Admin ID: {admin_id}")
+            logger.info(f"🔍 Obra ID: {obra_id}")
             
         logger.info(f"🎯 SUBATIVIDADES PROCESSADAS: {len(subactivities)} itens")
         
