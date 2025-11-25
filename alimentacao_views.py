@@ -430,6 +430,15 @@ def lancamento_novo_v2():
             logger.error(f"Erro ao criar item padrão: {e}")
             db.session.rollback()
     
+    # Converter itens para dicionários para serialização JSON no template
+    itens_json = [{
+        'id': item.id,
+        'nome': item.nome,
+        'preco_padrao': float(item.preco_padrao),
+        'icone': item.icone or 'fas fa-utensils',
+        'is_default': item.is_default
+    } for item in itens_cadastrados]
+    
     # Pré-selecionar restaurante se passado na URL
     restaurante_id_selecionado = request.args.get('restaurante_id', type=int)
     
@@ -438,6 +447,7 @@ def lancamento_novo_v2():
                          obras=obras, 
                          funcionarios=funcionarios,
                          itens_cadastrados=itens_cadastrados,
+                         itens_json=itens_json,
                          restaurante_id_selecionado=restaurante_id_selecionado)
 
 

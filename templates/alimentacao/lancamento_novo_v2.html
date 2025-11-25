@@ -616,7 +616,7 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
 
 <script>
 let itemIndex = 1;
-const itensData = {{ itens_cadastrados | tojson | safe if itens_cadastrados else '[]' }};
+const itensData = {{ itens_json | tojson | safe if itens_json else '[]' }};
 
 document.addEventListener('DOMContentLoaded', function() {
     const hoje = new Date().toISOString().split('T')[0];

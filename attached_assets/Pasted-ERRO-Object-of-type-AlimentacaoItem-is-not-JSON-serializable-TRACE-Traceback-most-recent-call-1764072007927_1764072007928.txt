@@ -1,0 +1,55 @@
+ERRO: Object of type AlimentacaoItem is not JSON serializable
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask_login/utils.py&#34;, line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/alimentacao_views.py&#34;, line 436, in lancamento_novo_v2
+    return render_template(&#39;alimentacao/lancamento_novo_v2.html&#39;,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py&#34;, line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/templating.py&#34;, line 131, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 1295, in render
+    self.environment.handle_exception()
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/environment.py&#34;, line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File &#34;/home/runner/workspace/templates/alimentacao/lancamento_novo_v2.html&#34;, line 1, in top-level template code
+    {% extends &#34;base_completo.html&#34; %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/templates/base_completo.html&#34;, line 880, in top-level template code
+    {% block content %}{% endblock %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/templates/alimentacao/lancamento_novo_v2.html&#34;, line 619, in block &#39;content&#39;
+    const itensData = {{ itens_cadastrados | tojson | safe if itens_cadastrados else &#39;[]&#39; }};
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/filters.py&#34;, line 1721, in do_tojson
+    return htmlsafe_json_dumps(value, dumps=dumps, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/jinja2/utils.py&#34;, line 669, in htmlsafe_json_dumps
+    dumps(obj, **kwargs)
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/json/provider.py&#34;, line 179, in dumps
+    return json.dumps(obj, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/nix/store/7d088dip86hlzri9sk0h78b63yfmx0a0-python3-3.11.13/lib/python3.11/json/__init__.py&#34;, line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File &#34;/nix/store/7d088dip86hlzri9sk0h78b63yfmx0a0-python3-3.11.13/lib/python3.11/json/encoder.py&#34;, line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/nix/store/7d088dip86hlzri9sk0h78b63yfmx0a0-python3-3.11.13/lib/python3.11/json/encoder.py&#34;, line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File &#34;/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/json/provider.py&#34;, line 121, in _default
+    raise TypeError(f&#34;Object of type {type(o).__name__} is not JSON serializable&#34;)
+TypeError: Object of type AlimentacaoItem is not JSON serializable
