@@ -774,9 +774,11 @@ class Restaurante(db.Model):
 
 
 # Tabela de associação para relacionamento Many-to-Many entre AlimentacaoLancamento e Funcionario
+# Inclui admin_id para multi-tenant (já existe no banco)
 alimentacao_funcionarios_assoc = db.Table('alimentacao_funcionarios_assoc',
     db.Column('lancamento_id', db.Integer, db.ForeignKey('alimentacao_lancamento.id'), primary_key=True),
-    db.Column('funcionario_id', db.Integer, db.ForeignKey('funcionario.id'), primary_key=True)
+    db.Column('funcionario_id', db.Integer, db.ForeignKey('funcionario.id'), primary_key=True),
+    db.Column('admin_id', db.Integer, db.ForeignKey('usuario.id'), nullable=False)
 )
 
 

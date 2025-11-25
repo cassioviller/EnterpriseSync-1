@@ -166,6 +166,19 @@ def index():
     restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
     return render_template('alimentacao/index.html', restaurantes=restaurantes)
 
+@alimentacao_bp.route('/lancamentos')
+@login_required
+def lancamentos_lista():
+    """Lista todos os lançamentos de alimentação"""
+    admin_id = get_admin_id()
+    
+    # Buscar lançamentos do modelo novo (AlimentacaoLancamento)
+    lancamentos = AlimentacaoLancamento.query.filter_by(admin_id=admin_id).order_by(
+        AlimentacaoLancamento.data.desc()
+    ).all()
+    
+    return render_template('alimentacao/lancamentos_lista.html', lancamentos=lancamentos)
+
 @alimentacao_bp.route('/lancamentos/novo', methods=['GET', 'POST'])
 @login_required
 def lancamento_novo():
@@ -223,9 +236,15 @@ def lancamento_novo():
             db.session.add(lancamento)
             db.session.flush()
             
-            # Associar apenas funcionários validados
+            # Associar funcionários com admin_id (INSERT direto pois tabela tem coluna admin_id)
+            from sqlalchemy import text
             for funcionario in funcionarios_validos:
-                lancamento.funcionarios.append(funcionario)
+                db.session.execute(
+                    text("""INSERT INTO alimentacao_funcionarios_assoc 
+                            (lancamento_id, funcionario_id, admin_id) 
+                            VALUES (:lancamento_id, :funcionario_id, :admin_id)"""),
+                    {'lancamento_id': lancamento.id, 'funcionario_id': funcionario.id, 'admin_id': admin_id}
+                )
             
             db.session.commit()
             
@@ -362,9 +381,15 @@ def lancamento_novo_v2():
             db.session.add(lancamento)
             db.session.flush()
             
-            # Associar funcionários
+            # Associar funcionários com admin_id (INSERT direto pois tabela tem coluna admin_id)
+            from sqlalchemy import text
             for funcionario in funcionarios_validos:
-                lancamento.funcionarios.append(funcionario)
+                db.session.execute(
+                    text("""INSERT INTO alimentacao_funcionarios_assoc 
+                            (lancamento_id, funcionario_id, admin_id) 
+                            VALUES (:lancamento_id, :funcionario_id, :admin_id)"""),
+                    {'lancamento_id': lancamento.id, 'funcionario_id': funcionario.id, 'admin_id': admin_id}
+                )
             
             # Criar itens do lançamento
             for item in itens_data:
