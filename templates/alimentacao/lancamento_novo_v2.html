@@ -319,7 +319,7 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
 
 .item-fields {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
     gap: 0.75rem;
     align-items: end;
 }
@@ -331,6 +331,33 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
     .item-fields > div:first-child {
         grid-column: span 2;
     }
+}
+
+.item-quantidade {
+    text-align: center;
+    font-weight: 600;
+    color: var(--gray-600);
+    padding: 0.625rem;
+    background: var(--gray-200);
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.item-custom-input {
+    display: none;
+    margin-top: 0.5rem;
+}
+
+.item-custom-input.visible {
+    display: block;
+}
+
+.item-custom-input input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid var(--primary);
+    border-radius: 8px;
+    font-size: 0.9rem;
 }
 
 .item-fields input, .item-fields select {
@@ -542,10 +569,11 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
                 <div id="itensContainer">
                     <div class="item-row default" data-index="0">
                         <div class="item-header">
-                            <span class="item-name"><i class="fas fa-drumstick-bite"></i> Marmita (automático)</span>
+                            <span class="item-name"><i class="fas fa-drumstick-bite"></i> Marmita (padrão)</span>
                         </div>
                         <div class="item-fields">
                             <div>
+                                <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Item</label>
                                 <select class="item-select" name="itens[0][item_id]" onchange="updateItemPrice(this)">
                                     {% for item in itens_cadastrados %}
                                     <option value="{{ item.id }}" 
@@ -555,17 +583,28 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
                                         {{ item.nome }}
                                     </option>
                                     {% endfor %}
-                                    <option value="custom">+ Item personalizado</option>
+                                    <option value="custom">+ Personalizado</option>
                                 </select>
-                                <input type="hidden" name="itens[0][nome]" class="item-nome-hidden">
+                                <div class="item-custom-input">
+                                    <input type="text" class="item-nome-custom" placeholder="Nome do item" 
+                                           onchange="atualizarNomeItem(this)">
+                                </div>
+                                <input type="hidden" name="itens[0][nome]" class="item-nome-hidden" 
+                                       value="{{ itens_cadastrados[0].nome if itens_cadastrados else 'Marmita' }}">
                             </div>
                             <div>
+                                <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Preço Unit.</label>
                                 <input type="number" class="item-preco" name="itens[0][preco]" 
-                                       placeholder="R$ 0,00" step="0.01" min="0" 
+                                       placeholder="0,00" step="0.01" min="0" 
                                        onchange="calcularTotais()" value="{{ itens_cadastrados[0].preco_padrao if itens_cadastrados else '18.00' }}">
                             </div>
-                            <div class="item-subtotal" data-index="0">
-                                R$ 0,00
+                            <div>
+                                <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Qtd.</label>
+                                <div class="item-quantidade" data-index="0">0</div>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Subtotal</label>
+                                <div class="item-subtotal" data-index="0">R$ 0,00</div>
                             </div>
                         </div>
                     </div>
@@ -685,32 +724,44 @@ function toggleSelectAll() {
 
 function adicionarItem() {
     const container = document.getElementById('itensContainer');
+    const funcionarios = document.querySelectorAll('input[name="funcionarios"]:checked').length;
     const optionsHtml = itensData.map(item => 
         `<option value="${item.id}" data-preco="${item.preco_padrao}" data-nome="${item.nome}">${item.nome}</option>`
-    ).join('') + '<option value="custom">+ Item personalizado</option>';
+    ).join('') + '<option value="custom">+ Personalizado</option>';
     
     const itemHtml = `
         <div class="item-row" data-index="${itemIndex}">
             <div class="item-header">
-                <span class="item-name"><i class="fas fa-plus-circle"></i> Item adicional</span>
+                <span class="item-name"><i class="fas fa-plus-circle"></i> Novo item</span>
                 <button type="button" class="btn-remove-item" onclick="removerItem(this)">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="item-fields">
                 <div>
+                    <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Item</label>
                     <select class="item-select" name="itens[${itemIndex}][item_id]" onchange="updateItemPrice(this)">
                         <option value="">Selecione...</option>
                         ${optionsHtml}
                     </select>
+                    <div class="item-custom-input">
+                        <input type="text" class="item-nome-custom" placeholder="Nome do item" 
+                               onchange="atualizarNomeItem(this)">
+                    </div>
                     <input type="hidden" name="itens[${itemIndex}][nome]" class="item-nome-hidden">
                 </div>
                 <div>
+                    <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Preço Unit.</label>
                     <input type="number" class="item-preco" name="itens[${itemIndex}][preco]" 
-                           placeholder="R$ 0,00" step="0.01" min="0" onchange="calcularTotais()">
+                           placeholder="0,00" step="0.01" min="0" onchange="calcularTotais()">
                 </div>
-                <div class="item-subtotal" data-index="${itemIndex}">
-                    R$ 0,00
+                <div>
+                    <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Qtd.</label>
+                    <div class="item-quantidade" data-index="${itemIndex}">${funcionarios}</div>
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Subtotal</label>
+                    <div class="item-subtotal" data-index="${itemIndex}">R$ 0,00</div>
                 </div>
             </div>
         </div>
@@ -732,22 +783,38 @@ function updateItemPrice(select) {
     const row = select.closest('.item-row');
     const precoInput = row.querySelector('.item-preco');
     const nomeHidden = row.querySelector('.item-nome-hidden');
+    const customInput = row.querySelector('.item-custom-input');
+    const nomeCustom = row.querySelector('.item-nome-custom');
     const option = select.options[select.selectedIndex];
     
     if (option.value === 'custom') {
-        const nome = prompt('Nome do item:');
-        if (nome) {
-            nomeHidden.value = nome;
-            row.querySelector('.item-name').innerHTML = `<i class="fas fa-edit"></i> ${nome}`;
-        }
+        customInput.classList.add('visible');
+        nomeCustom.focus();
         precoInput.value = '';
-        precoInput.focus();
+        nomeHidden.value = '';
+        row.querySelector('.item-name').innerHTML = `<i class="fas fa-edit"></i> Item personalizado`;
     } else if (option.value) {
+        customInput.classList.remove('visible');
         precoInput.value = option.dataset.preco || '';
         nomeHidden.value = option.dataset.nome || '';
+        row.querySelector('.item-name').innerHTML = `<i class="fas fa-utensils"></i> ${option.dataset.nome}`;
+    } else {
+        customInput.classList.remove('visible');
+        nomeHidden.value = '';
     }
     
     calcularTotais();
+}
+
+function atualizarNomeItem(input) {
+    const row = input.closest('.item-row');
+    const nomeHidden = row.querySelector('.item-nome-hidden');
+    const nome = input.value.trim();
+    
+    if (nome) {
+        nomeHidden.value = nome;
+        row.querySelector('.item-name').innerHTML = `<i class="fas fa-edit"></i> ${nome}`;
+    }
 }
 
 function calcularTotais() {
@@ -761,6 +828,11 @@ function calcularTotais() {
         
         const subtotalEl = row.querySelector('.item-subtotal');
         subtotalEl.textContent = 'R$ ' + subtotal.toFixed(2).replace('.', ',');
+        
+        const qtdEl = row.querySelector('.item-quantidade');
+        if (qtdEl) {
+            qtdEl.textContent = funcionarios;
+        }
     });
     
     document.getElementById('valorTotal').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
