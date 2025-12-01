@@ -3051,6 +3051,70 @@ def _migration_58_almoxarifado_lotes_fifo():
                 pass
 
 
+def _migration_60_centro_custo_created_at():
+    """
+    Migração 60: Adicionar coluna created_at na tabela centro_custo_contabil
+    
+    Corrige o erro:
+    sqlalchemy.exc.ProgrammingError: column centro_custo_contabil.created_at does not exist
+    """
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("📅 MIGRAÇÃO 60: Adicionar created_at em centro_custo_contabil")
+        logger.info("=" * 80)
+        
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'centro_custo_contabil' AND column_name = 'created_at'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("  ➕ Adicionando coluna created_at...")
+            cursor.execute("""
+                ALTER TABLE centro_custo_contabil 
+                ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            """)
+            connection.commit()
+            logger.info("  ✅ Coluna created_at adicionada com sucesso!")
+        else:
+            logger.info("  ⏭️ Coluna created_at já existe")
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 60 CONCLUÍDA COM SUCESSO!")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 60: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
+
 def _migration_59_alimentacao_itens_sistema():
     """
     Migração 59: Sistema de Itens de Alimentação v2.0
@@ -3285,6 +3349,7 @@ def executar_migracoes():
             (57, "Campos CRUD movimentações almoxarifado", _migration_57_almoxarifado_movimento_campos_crud),
             (58, "Sistema de Rastreamento de Lotes FIFO", _migration_58_almoxarifado_lotes_fifo),
             (59, "Sistema de Itens de Alimentação v2.0", _migration_59_alimentacao_itens_sistema),
+            (60, "Adicionar created_at em centro_custo_contabil", _migration_60_centro_custo_created_at),
         ]
         
         # Executar cada migração com rastreamento
