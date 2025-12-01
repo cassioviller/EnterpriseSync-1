@@ -203,7 +203,7 @@
                                         </td>
                                         <td>
                                             <small class="text-muted">
-                                                {{ template.criado_em.strftime('%d/%m/%Y') }}
+                                                {{ template.criado_em.strftime('%d/%m/%Y') if template.criado_em else '-' }}
                                             </small>
                                         </td>
                                         <td>
