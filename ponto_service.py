@@ -5,7 +5,7 @@
 
 from datetime import date, datetime, time, timedelta
 from app import db
-from models import RegistroPonto, Funcionario, Obra, ConfiguracaoHorario
+from models import RegistroPonto, Funcionario, Obra, ConfiguracaoHorario, FuncionarioObrasPonto
 from multitenant_helper import get_admin_id as get_tenant_admin_id
 import logging
 
@@ -32,12 +32,28 @@ class PontoService:
         
         admin_id = get_tenant_admin_id()
         
-        # Buscar funcionários ativos na obra
-        funcionarios = Funcionario.query.filter_by(
-            obra_atual_id=obra_id,
+        # Buscar funcionários associados à obra via FuncionarioObrasPonto
+        # ou todos os funcionários ativos se não houver configuração específica
+        funcionarios_obra = FuncionarioObrasPonto.query.filter_by(
+            obra_id=obra_id,
             admin_id=admin_id,
             ativo=True
-        ).order_by(Funcionario.nome).all()
+        ).all()
+        
+        if funcionarios_obra:
+            # Usar funcionários configurados para esta obra
+            func_ids = [fo.funcionario_id for fo in funcionarios_obra]
+            funcionarios = Funcionario.query.filter(
+                Funcionario.id.in_(func_ids),
+                Funcionario.admin_id == admin_id,
+                Funcionario.ativo == True
+            ).order_by(Funcionario.nome).all()
+        else:
+            # Fallback: mostrar todos os funcionários ativos (sem configuração específica)
+            funcionarios = Funcionario.query.filter_by(
+                admin_id=admin_id,
+                ativo=True
+            ).order_by(Funcionario.nome).all()
         
         status_funcionarios = []
         
@@ -292,7 +308,7 @@ class PontoService:
             logger.error(f"Erro ao calcular horas: {e}")
     
     @staticmethod
-    def registrar_falta(funcionario_id, data_falta, motivo, observacoes=None):
+    def registrar_falta(funcionario_id, data_falta, motivo, observacoes=None, obra_id=None):
         """Registra falta de funcionário"""
         try:
             admin_id = get_tenant_admin_id()
@@ -305,12 +321,19 @@ class PontoService:
             ).first()
             
             if not registro:
-                # Buscar obra atual do funcionário
-                funcionario = Funcionario.query.get(funcionario_id)
+                # Se obra_id não foi fornecido, tentar buscar da configuração do funcionário
+                if not obra_id:
+                    obra_config = FuncionarioObrasPonto.query.filter_by(
+                        funcionario_id=funcionario_id,
+                        admin_id=admin_id,
+                        ativo=True
+                    ).first()
+                    if obra_config:
+                        obra_id = obra_config.obra_id
                 
                 registro = RegistroPonto(
                     funcionario_id=funcionario_id,
-                    obra_id=funcionario.obra_atual_id,
+                    obra_id=obra_id,  # Pode ser None se não houver configuração
                     data=data_falta,
                     admin_id=admin_id,
                     tipo_registro=motivo  # 'falta', 'falta_justificada', etc
