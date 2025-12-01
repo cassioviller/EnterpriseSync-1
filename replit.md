@@ -2,9 +2,28 @@
 SIGE v9.0 (Sistema de Gestão Empresarial) is a production-ready multi-tenant business management system for SMBs, validated through comprehensive E2E testing. Its purpose is to automate and streamline core operations, covering commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations, ultimately enhancing business management for SMBs.
 
 ## Recent Changes (December 2025)
-- **Ponto Eletrônico Fix**: Refactored ponto_service.py to use FuncionarioObrasPonto association table instead of non-existent Funcionario.obra_atual_id field
-- **E2E Testing Complete**: 13/13 modules tested and validated for production deployment
+- **Phase 2 E2E Testing Complete**: Extended coverage to 25+ modules with 4 bugs fixed
+- **Financeiro Module Fixes**: Added missing KPI fields (total_entradas, total_saidas, saldo_periodo, receitas_pendentes) and fixed Fluxo de Caixa template dead link
+- **Templates Module Fix**: Added null-check for criado_em field in dashboard
+- **Contabilidade Fix**: Added Migration 60 for centro_custo_contabil.created_at column
+- **Ponto Eletrônico Fix**: Refactored ponto_service.py to use FuncionarioObrasPonto association table
 - **Mobile Responsiveness**: Verified mobile-first design on 375x667 viewport across all major modules
+
+## E2E Test Coverage Summary
+**Phase 1 (Core):** 13/13 modules validated
+**Phase 2 (Extended):** 12/12 additional modules validated
+- Configurações: ✅ (Empresa, Departamentos, Funções, Horários)
+- Financeiro: ✅ (Dashboard KPIs, Contas a Pagar/Receber, Fluxo de Caixa, Bancos)
+- Equipes: ✅ (Alocação semanal, calendário)
+- Templates: ✅ (Dashboard, CRUD)
+- Serviços: ✅ (Catálogo CRUD)
+- Relatórios: ✅ (Folha, Contabilidade, Ponto)
+- Alimentação: ✅ (Main, Itens, Restaurantes)
+- Frota: ✅ (Dashboard)
+- Folha: ✅ (Dashboard, Adiantamentos)
+- Contabilidade: ✅ (Dashboard, Relatórios, Centros de Custo)
+- Almoxarifado: ✅ (Dashboard, Entrada)
+- Usuários: ✅ (List)
 
 ## User Preferences
 - Priorizar soluções automáticas que funcionem no deploy
