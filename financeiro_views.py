@@ -123,7 +123,7 @@ def criar_conta_pagar():
         admin_id = get_admin_id()
         
         fornecedor_nome = request.form.get('fornecedor_nome')
-        fornecedor_cpf_cnpj = request.form.get('fornecedor_cpf_cnpj') or 'SEM_CNPJ'
+        fornecedor_cpf_cnpj = request.form.get('fornecedor_cpf_cnpj') or None
         obra_id_input = request.form.get('obra_id', type=int) or None
         descricao = request.form.get('descricao')
         valor = Decimal(request.form.get('valor'))
@@ -143,14 +143,32 @@ def criar_conta_pagar():
             else:
                 logger.warning(f"⚠️ Tentativa de vincular obra {obra_id_input} de outro tenant pelo admin {admin_id}")
         
-        # Buscar ou criar fornecedor
-        fornecedor = Fornecedor.query.filter_by(
-            admin_id=admin_id,
-            cnpj=fornecedor_cpf_cnpj
-        ).first()
+        # Buscar fornecedor existente por CNPJ (se fornecido) ou por razao_social exata
+        fornecedor = None
+        if fornecedor_cpf_cnpj:
+            fornecedor = Fornecedor.query.filter_by(
+                admin_id=admin_id,
+                cnpj=fornecedor_cpf_cnpj
+            ).first()
         
         if not fornecedor:
+            # Buscar por razao_social exata também (para fornecedores sem CNPJ)
+            fornecedor = Fornecedor.query.filter_by(
+                admin_id=admin_id,
+                razao_social=fornecedor_nome
+            ).first()
+        
+        if not fornecedor:
+            # Gerar CNPJ único se não fornecido (max 18 chars conforme coluna)
+            import uuid
+            if fornecedor_cpf_cnpj:
+                cnpj_unique = fornecedor_cpf_cnpj
+            else:
+                # Formato: S{admin_id 2 dig}{uuid 6 chars} = max 9 chars para caber em 18
+                cnpj_unique = f"S{str(admin_id)[-2:]}{uuid.uuid4().hex[:8].upper()}"
+            
             # Criar fornecedor com todos os campos obrigatórios
+            # Nota: DB tem coluna 'nome' NOT NULL além de razao_social e nome_fantasia
             fornecedor = db.session.execute(
                 db.text("""
                     INSERT INTO fornecedor (nome, cnpj, razao_social, nome_fantasia, admin_id, ativo, created_at)
@@ -159,7 +177,7 @@ def criar_conta_pagar():
                 """),
                 {
                     'nome': fornecedor_nome,
-                    'cnpj': fornecedor_cpf_cnpj,
+                    'cnpj': cnpj_unique,
                     'razao_social': fornecedor_nome,
                     'nome_fantasia': fornecedor_nome,
                     'admin_id': admin_id

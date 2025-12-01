@@ -533,7 +533,9 @@ class FinanceiroService:
                 'total_entradas': float(total_receber),
                 'total_saidas': float(total_pagar),
                 'saldo_periodo': float(total_receber - total_pagar),
-                'receitas_pendentes': float(total_receber)
+                'receitas_pendentes': float(total_receber),
+                'resumo_categorias': {},
+                'obras_com_desvio': []
             }
             
         except Exception as e:
