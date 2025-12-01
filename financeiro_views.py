@@ -530,17 +530,44 @@ def fluxo_caixa():
     data_inicio = date.today()
     data_fim = data_inicio + timedelta(days=30)
     
-    # Permitir customização
+    # Permitir customização via query params
     if request.args.get('data_inicio'):
         data_inicio = datetime.strptime(request.args.get('data_inicio'), '%Y-%m-%d').date()
     if request.args.get('data_fim'):
         data_fim = datetime.strptime(request.args.get('data_fim'), '%Y-%m-%d').date()
+    
+    obra_id = request.args.get('obra_id', type=int) or 0
+    centro_custo_id = request.args.get('centro_custo_id', type=int) or 0
+    tipo_movimento = request.args.get('tipo_movimento', '')
+    
+    # Criar objeto filtros para o template
+    filtros = {
+        'data_inicio': data_inicio.strftime('%Y-%m-%d') if data_inicio else '',
+        'data_fim': data_fim.strftime('%Y-%m-%d') if data_fim else '',
+        'obra_id': obra_id,
+        'centro_custo_id': centro_custo_id,
+        'tipo_movimento': tipo_movimento
+    }
+    
+    # Buscar obras e centros de custo para os dropdowns
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
+    
+    # Tentar buscar centros de custo se existir a tabela
+    centros_custo = []
+    try:
+        from models import CentroCusto
+        centros_custo = CentroCusto.query.filter_by(admin_id=admin_id, ativo=True).all()
+    except Exception:
+        pass
     
     fluxo = FinanceiroService.calcular_fluxo_caixa(admin_id, data_inicio, data_fim)
     
     return render_template(
         'financeiro/fluxo_caixa.html',
         fluxo=fluxo,
+        filtros=filtros,
+        obras=obras,
+        centros_custo=centros_custo,
         data_inicio=data_inicio,
         data_fim=data_fim
     )

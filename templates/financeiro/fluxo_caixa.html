@@ -75,27 +75,35 @@
 
     <!-- Resumo do Fluxo -->
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h5><i class="fas fa-wallet me-2"></i>Saldo Inicial</h5>
+                    <h3>R$ {{ "%.2f"|format(fluxo.saldo_inicial|default(0)) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
             <div class="card bg-success text-white">
                 <div class="card-body text-center">
-                    <h5><i class="fas fa-arrow-up me-2"></i>Total Entradas</h5>
-                    <h3>R$ {{ "%.2f"|format(fluxo.total_entradas) }}</h3>
+                    <h5><i class="fas fa-arrow-up me-2"></i>Entradas Previstas</h5>
+                    <h3>R$ {{ "%.2f"|format(fluxo.entradas_previstas|default(0)) }}</h3>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card bg-danger text-white">
                 <div class="card-body text-center">
-                    <h5><i class="fas fa-arrow-down me-2"></i>Total Saídas</h5>
-                    <h3>R$ {{ "%.2f"|format(fluxo.total_saidas) }}</h3>
+                    <h5><i class="fas fa-arrow-down me-2"></i>Saídas Previstas</h5>
+                    <h3>R$ {{ "%.2f"|format(fluxo.saidas_previstas|default(0)) }}</h3>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card bg-{% if fluxo.saldo_periodo >= 0 %}primary{% else %}warning{% endif %} {% if fluxo.saldo_periodo >= 0 %}text-white{% else %}text-dark{% endif %}">
+        <div class="col-md-3">
+            <div class="card bg-{% if fluxo.saldo_final_projetado|default(0) >= 0 %}primary{% else %}warning{% endif %} {% if fluxo.saldo_final_projetado|default(0) >= 0 %}text-white{% else %}text-dark{% endif %}">
                 <div class="card-body text-center">
-                    <h5><i class="fas fa-balance-scale me-2"></i>Saldo Período</h5>
-                    <h3>R$ {{ "%.2f"|format(fluxo.saldo_periodo) }}</h3>
+                    <h5><i class="fas fa-balance-scale me-2"></i>Saldo Projetado</h5>
+                    <h3>R$ {{ "%.2f"|format(fluxo.saldo_final_projetado|default(0)) }}</h3>
                 </div>
             </div>
         </div>
@@ -106,31 +114,28 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5><i class="fas fa-list me-2"></i>Movimentos ({{ movimentos|length }} registros)</h5>
+                    <h5><i class="fas fa-list me-2"></i>Movimentos Previstos ({{ fluxo.detalhes|default([])|length }} registros)</h5>
                 </div>
                 <div class="card-body">
-                    {% if movimentos %}
+                    {% if fluxo.detalhes %}
                         <div class="table-responsive">
                             <table class="table table-hover" id="movimentosTable">
                                 <thead>
                                     <tr>
                                         <th>Data</th>
                                         <th>Tipo</th>
-                                        <th>Categoria</th>
+                                        <th>Origem</th>
                                         <th>Descrição</th>
-                                        <th>Obra</th>
-                                        <th>Centro de Custo</th>
                                         <th>Valor</th>
-                                        <th>Referência</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for movimento in movimentos %}
-                                    <tr class="{% if movimento.tipo_movimento == 'ENTRADA' %}table-success{% else %}table-danger{% endif %}">
-                                        <td>{{ movimento.data_movimento.strftime('%d/%m/%Y') }}</td>
+                                    {% for movimento in fluxo.detalhes %}
+                                    <tr class="{% if movimento.tipo == 'ENTRADA' %}table-success{% else %}table-danger{% endif %}">
+                                        <td>{{ movimento.data.strftime('%d/%m/%Y') if movimento.data else '-' }}</td>
                                         <td>
-                                            <span class="badge bg-{% if movimento.tipo_movimento == 'ENTRADA' %}success{% else %}danger{% endif %}">
-                                                {% if movimento.tipo_movimento == 'ENTRADA' %}
+                                            <span class="badge bg-{% if movimento.tipo == 'ENTRADA' %}success{% else %}danger{% endif %}">
+                                                {% if movimento.tipo == 'ENTRADA' %}
                                                     <i class="fas fa-arrow-up me-1"></i>Entrada
                                                 {% else %}
                                                     <i class="fas fa-arrow-down me-1"></i>Saída
@@ -139,40 +144,15 @@
                                         </td>
                                         <td>
                                             <span class="badge bg-secondary">
-                                                {{ movimento.categoria.title() }}
+                                                {{ movimento.origem|default('') }}
                                             </span>
                                         </td>
-                                        <td>{{ movimento.descricao }}</td>
-                                        <td>
-                                            {% if movimento.obra %}
-                                                <a href="{{ url_for('main.obra_detalhes', id=movimento.obra.id) }}">
-                                                    {{ movimento.obra.nome }}
-                                                </a>
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if movimento.centro_custo %}
-                                                {{ movimento.centro_custo.nome }}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
+                                        <td>{{ movimento.descricao|default('-') }}</td>
                                         <td class="text-end">
-                                            <strong class="{% if movimento.tipo_movimento == 'ENTRADA' %}text-success{% else %}text-danger{% endif %}">
-                                                {% if movimento.tipo_movimento == 'ENTRADA' %}+{% else %}-{% endif %}
-                                                R$ {{ "%.2f"|format(movimento.valor) }}
+                                            <strong class="{% if movimento.tipo == 'ENTRADA' %}text-success{% else %}text-danger{% endif %}">
+                                                {% if movimento.tipo == 'ENTRADA' %}+{% else %}-{% endif %}
+                                                R$ {{ "%.2f"|format(movimento.valor|default(0)) }}
                                             </strong>
-                                        </td>
-                                        <td>
-                                            {% if movimento.referencia_tabela and movimento.referencia_id %}
-                                                <small class="text-muted">
-                                                    {{ movimento.referencia_tabela }}#{{ movimento.referencia_id }}
-                                                </small>
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -208,37 +188,7 @@ $(document).ready(function() {
 });
 
 function sincronizarFluxo() {
-    if (confirm('Deseja sincronizar o fluxo de caixa com todos os dados do sistema? Esta operação pode levar alguns minutos.')) {
-        // Mostrar loading
-        const btn = event.target;
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
-        btn.disabled = true;
-        
-        fetch('{{ url_for("main.sincronizar_fluxo") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': ''
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Erro ao sincronizar: ' + data.message);
-            }
-        })
-        .catch(error => {
-            alert('Erro ao sincronizar fluxo de caixa.');
-            console.error('Error:', error);
-        })
-        .finally(() => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        });
-    }
+    location.reload();
 }
 </script>
 {% endblock %}
