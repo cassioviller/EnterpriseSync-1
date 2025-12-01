@@ -2,6 +2,14 @@
 SIGE v9.0 (Sistema de Gestão Empresarial) is a production-ready multi-tenant business management system for SMBs, validated through comprehensive E2E testing. Its purpose is to automate and streamline core operations, covering commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations, ultimately enhancing business management for SMBs.
 
 ## Recent Changes (December 2025)
+- **Phase 3 Advanced E2E Testing**: Critical business operations validated with bugs fixed
+  - Financeiro: ✅ Create conta a pagar, process payment (baixar), dashboard KPIs
+  - Folha: ✅ Dashboard, adiantamentos form functional
+  - Propostas: ✅ Create proposal, view details, list navigation
+- **Financeiro Bug Fixes (Dec 1)**:
+  - Added 'nome' column to fornecedor INSERT (DB NOT NULL constraint fix)
+  - Added missing KPI fields (resumo_categorias, obras_com_desvio) to financeiro dashboard
+  - CNPJ placeholder format optimized (max 10 chars unique identifier)
 - **Phase 2 E2E Testing Complete**: Extended coverage to 25+ modules with 4 bugs fixed
 - **Financeiro Module Fixes**: Added missing KPI fields (total_entradas, total_saidas, saldo_periodo, receitas_pendentes) and fixed Fluxo de Caixa template dead link
 - **Templates Module Fix**: Added null-check for criado_em field in dashboard
