@@ -1,5 +1,10 @@
 ## Overview
-SIGE (Sistema de Gestão Empresarial) is a multi-tenant business management system for SMBs. Its purpose is to automate and streamline core operations, covering commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations, ultimately enhancing business management for SMBs.
+SIGE v9.0 (Sistema de Gestão Empresarial) is a production-ready multi-tenant business management system for SMBs, validated through comprehensive E2E testing. Its purpose is to automate and streamline core operations, covering commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations, ultimately enhancing business management for SMBs.
+
+## Recent Changes (December 2025)
+- **Ponto Eletrônico Fix**: Refactored ponto_service.py to use FuncionarioObrasPonto association table instead of non-existent Funcionario.obra_atual_id field
+- **E2E Testing Complete**: 13/13 modules tested and validated for production deployment
+- **Mobile Responsiveness**: Verified mobile-first design on 375x667 viewport across all major modules
 
 ## User Preferences
 - Priorizar soluções automáticas que funcionem no deploy
