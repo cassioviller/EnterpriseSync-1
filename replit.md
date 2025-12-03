@@ -2,6 +2,10 @@
 SIGE v9.0 (Sistema de Gestão Empresarial) is a production-ready multi-tenant business management system for SMBs, validated through comprehensive E2E testing. Its purpose is to automate and streamline core operations, covering commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations, ultimately enhancing business management for SMBs.
 
 ## Recent Changes (December 2025)
+- **Ponto Eletrônico Bug Fixes (Dec 3)**:
+  - Fixed `lancamento_finais_semana`: Added missing `admin_id` when creating weekend records (NOT NULL violation fix)
+  - Fixed `novo_ponto`: Added `admin_id`, `obra_id`, and multi-tenant validation
+  - E2E validated: 8 employees, 64 weekend records created successfully with admin_id=54
 - **Phase 3 Advanced E2E Testing**: Critical business operations validated with bugs fixed
   - Financeiro: ✅ Create conta a pagar, process payment (baixar), dashboard KPIs
   - Folha: ✅ Dashboard, adiantamentos form functional
