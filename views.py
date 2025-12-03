@@ -5838,7 +5838,8 @@ def lancamento_finais_semana():
                             data=data_folga,
                             tipo_registro=tipo_folga,
                             horas_trabalhadas=0.0,
-                            observacoes=f'Lançamento automático - {competencia}'
+                            observacoes=f'Lançamento automático - {competencia}',
+                            admin_id=admin_id
                         )
                         
                         db.session.add(novo_registro)
@@ -10162,21 +10163,33 @@ def novo_ponto():
         if not funcionario_id:
             return jsonify({'success': False, 'message': 'Funcionário não informado'}), 400
         
-        # Buscar funcionário
-        funcionario = Funcionario.query.get(funcionario_id)
+        # Obter admin_id para multi-tenancy
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+        
+        # Buscar funcionário com validação multi-tenant
+        funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
         if not funcionario:
             return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 404
+        
+        # Obter obra_id (opcional)
+        obra_id = data.get('obra_id')
+        if obra_id:
+            obra_id = int(obra_id)
         
         # Criar registro de ponto
         registro = RegistroPonto(
             funcionario_id=funcionario_id,
+            obra_id=obra_id,
             data=datetime.strptime(data.get('data'), '%Y-%m-%d').date(),
             hora_entrada=datetime.strptime(data.get('hora_entrada'), '%H:%M').time() if data.get('hora_entrada') else None,
             hora_saida=datetime.strptime(data.get('hora_saida'), '%H:%M').time() if data.get('hora_saida') else None,
             hora_almoco_saida=datetime.strptime(data.get('hora_almoco_saida'), '%H:%M').time() if data.get('hora_almoco_saida') else None,
             hora_almoco_retorno=datetime.strptime(data.get('hora_almoco_retorno'), '%H:%M').time() if data.get('hora_almoco_retorno') else None,
             observacoes=data.get('observacoes', ''),
-            tipo_registro=data.get('tipo_lancamento', 'trabalho_normal')
+            tipo_registro=data.get('tipo_lancamento', 'trabalho_normal'),
+            admin_id=admin_id
         )
         
         # Calcular horas trabalhadas se possível
