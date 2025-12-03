@@ -5481,39 +5481,84 @@ def api_funcao(funcao_id):
 @main_bp.route('/api/ponto/lancamento-multiplo', methods=['POST'])
 @login_required
 def api_ponto_lancamento_multiplo():
-    """API para lançamento múltiplo de ponto"""
+    """API para lançamento múltiplo de ponto - processa período de datas para múltiplos funcionários"""
     try:
         data = request.get_json()
         print(f"🔧 DEBUG LANÇAMENTO MÚLTIPLO: Dados recebidos: {data}")
         
-        # Validar dados obrigatórios
-        funcionarios_ids = data.get('funcionarios_ids', [])
+        # Aceitar tanto 'funcionarios' (frontend) quanto 'funcionarios_ids' (legacy)
+        funcionarios_ids = data.get('funcionarios', []) or data.get('funcionarios_ids', [])
         obra_id = data.get('obra_id')
-        data_lancamento = data.get('data')
+        
+        # Aceitar período (frontend) ou data única (legacy)
+        periodo_inicio = data.get('periodo_inicio')
+        periodo_fim = data.get('periodo_fim')
+        data_unica = data.get('data')
         
         if not funcionarios_ids:
             return jsonify({'success': False, 'message': 'Nenhum funcionário selecionado'}), 400
         
         if not obra_id:
             return jsonify({'success': False, 'message': 'Obra não selecionada'}), 400
-            
-        if not data_lancamento:
-            return jsonify({'success': False, 'message': 'Data não informada'}), 400
+        
+        # Determinar datas a processar
+        if periodo_inicio and periodo_fim:
+            data_inicio = datetime.strptime(periodo_inicio, '%Y-%m-%d').date()
+            data_final = datetime.strptime(periodo_fim, '%Y-%m-%d').date()
+        elif data_unica:
+            data_inicio = datetime.strptime(data_unica, '%Y-%m-%d').date()
+            data_final = data_inicio
+        else:
+            return jsonify({'success': False, 'message': 'Período ou data não informado'}), 400
         
         # Obter admin_id
         admin_id = get_tenant_admin_id()
         if not admin_id:
             return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
         
-        print(f"🔧 DEBUG: admin_id={admin_id}, obra_id={obra_id}, funcionarios={funcionarios_ids}")
+        # Validar obra pertence ao admin
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'message': 'Obra não encontrada ou não pertence ao seu cadastro'}), 403
+        
+        print(f"🔧 DEBUG: admin_id={admin_id}, obra_id={obra_id}, funcionarios={funcionarios_ids}, periodo={data_inicio} a {data_final}")
+        
+        # Extrair horários do request
+        hora_entrada = data.get('hora_entrada') or None
+        hora_saida = data.get('hora_saida') or None
+        hora_almoco_inicio = data.get('hora_almoco_inicio') or None
+        hora_almoco_fim = data.get('hora_almoco_fim') or None
+        tipo_lancamento = data.get('tipo_lancamento', 'trabalho_normal')
+        # Tratar sem_intervalo corretamente (pode vir como True, False, 'true', 'false', None)
+        sem_intervalo_raw = data.get('sem_intervalo', False)
+        sem_intervalo = sem_intervalo_raw in [True, 'true', 'True', 1, '1']
+        observacoes = data.get('observacoes', '')
+        
+        print(f"📝 HORÁRIOS RECEBIDOS: entrada={hora_entrada}, saida={hora_saida}, "
+              f"almoco_inicio={hora_almoco_inicio}, almoco_fim={hora_almoco_fim}, "
+              f"sem_intervalo_raw={sem_intervalo_raw}, sem_intervalo={sem_intervalo}")
         
         # Processar lançamentos
-        registros_criados = []
+        registros_criados = 0
+        registros_existentes = 0
         erros = []
+        
+        # Gerar lista de datas no período
+        from datetime import timedelta
+        datas_periodo = []
+        data_atual = data_inicio
+        while data_atual <= data_final:
+            datas_periodo.append(data_atual)
+            data_atual += timedelta(days=1)
+        
+        print(f"📅 Processando {len(datas_periodo)} datas para {len(funcionarios_ids)} funcionários")
         
         for funcionario_id in funcionarios_ids:
             try:
-                # Verificar se funcionário existe e está ativo
+                # Converter para int se necessário
+                funcionario_id = int(funcionario_id)
+                
+                # Verificar se funcionário existe e pertence ao admin
                 funcionario = Funcionario.query.filter_by(
                     id=funcionario_id, 
                     ativo=True,
@@ -5521,75 +5566,92 @@ def api_ponto_lancamento_multiplo():
                 ).first()
                 
                 if not funcionario:
-                    erros.append(f"Funcionário ID {funcionario_id} não encontrado")
+                    erros.append(f"Funcionário ID {funcionario_id} não encontrado ou inativo")
                     continue
                 
-                # Verificar se já existe registro para esta data
-                data_obj = datetime.strptime(data_lancamento, '%Y-%m-%d').date()
-                registro_existente = RegistroPonto.query.filter_by(
-                    funcionario_id=funcionario_id,
-                    data=data_obj
-                ).first()
-                
-                if registro_existente:
-                    erros.append(f"Já existe registro para {funcionario.nome} na data {data_lancamento}")
-                    continue
-                
-                # Criar registro de ponto
-                registro = RegistroPonto(
-                    funcionario_id=funcionario_id,
-                    obra_id=obra_id,
-                    data=data_obj,
-                    hora_entrada=datetime.strptime(data.get('hora_entrada'), '%H:%M').time() if data.get('hora_entrada') else None,
-                    hora_saida=datetime.strptime(data.get('hora_saida'), '%H:%M').time() if data.get('hora_saida') else None,
-                    hora_almoco_saida=datetime.strptime(data.get('hora_almoco_saida'), '%H:%M').time() if data.get('hora_almoco_saida') else None,
-                    hora_almoco_retorno=datetime.strptime(data.get('hora_almoco_retorno'), '%H:%M').time() if data.get('hora_almoco_retorno') else None,
-                    observacoes=data.get('observacoes', ''),
-                    tipo_registro=data.get('tipo_lancamento', 'trabalho_normal'),
-                    admin_id=admin_id
-                )
-                
-                # Calcular horas trabalhadas
-                if registro.hora_entrada and registro.hora_saida:
+                # Processar cada data do período
+                for data_obj in datas_periodo:
                     try:
-                        from utils import calcular_horas_trabalhadas
-                        horas_calc = calcular_horas_trabalhadas(
-                            registro.hora_entrada,
-                            registro.hora_saida,
-                            registro.hora_almoco_saida,
-                            registro.hora_almoco_retorno,
-                            registro.data
+                        # Verificar se já existe registro para esta data
+                        registro_existente = RegistroPonto.query.filter_by(
+                            funcionario_id=funcionario_id,
+                            data=data_obj
+                        ).first()
+                        
+                        if registro_existente:
+                            registros_existentes += 1
+                            continue
+                        
+                        # Determinar se é final de semana (sábado=5, domingo=6)
+                        dia_semana = data_obj.weekday()
+                        if dia_semana == 5:  # Sábado
+                            tipo_reg = 'sabado_folga' if tipo_lancamento == 'trabalho_normal' else tipo_lancamento
+                        elif dia_semana == 6:  # Domingo
+                            tipo_reg = 'domingo_folga' if tipo_lancamento == 'trabalho_normal' else tipo_lancamento
+                        else:
+                            tipo_reg = tipo_lancamento
+                        
+                        # Criar registro de ponto
+                        registro = RegistroPonto(
+                            funcionario_id=funcionario_id,
+                            obra_id=obra_id,
+                            data=data_obj,
+                            tipo_registro=tipo_reg,
+                            observacoes=observacoes,
+                            admin_id=admin_id
                         )
-                        registro.horas_trabalhadas = horas_calc.get('total', 0)
-                        registro.horas_extras = horas_calc.get('extras', 0)
-                    except Exception as calc_e:
-                        print(f"⚠️ Erro ao calcular horas para {funcionario.nome}: {calc_e}")
-                        # Usar valores padrão se o cálculo falhar
-                        registro.horas_trabalhadas = 8.0
-                        registro.horas_extras = 0.0
-                
-                db.session.add(registro)
-                registros_criados.append({
-                    'funcionario_id': funcionario_id,
-                    'funcionario_nome': funcionario.nome
-                })
-                
-                print(f"✅ Registro criado para {funcionario.nome}")
+                        
+                        # Adicionar horários se não for folga e não for final de semana
+                        if tipo_reg == 'trabalho_normal' and dia_semana < 5:
+                            if hora_entrada:
+                                registro.hora_entrada = datetime.strptime(hora_entrada, '%H:%M').time()
+                            if hora_saida:
+                                registro.hora_saida = datetime.strptime(hora_saida, '%H:%M').time()
+                            if not sem_intervalo:
+                                if hora_almoco_inicio:
+                                    registro.hora_almoco_saida = datetime.strptime(hora_almoco_inicio, '%H:%M').time()
+                                if hora_almoco_fim:
+                                    registro.hora_almoco_retorno = datetime.strptime(hora_almoco_fim, '%H:%M').time()
+                            
+                            # Calcular horas trabalhadas
+                            if registro.hora_entrada and registro.hora_saida:
+                                try:
+                                    from utils import calcular_horas_trabalhadas
+                                    horas_calc = calcular_horas_trabalhadas(
+                                        registro.hora_entrada,
+                                        registro.hora_saida,
+                                        registro.hora_almoco_saida,
+                                        registro.hora_almoco_retorno,
+                                        registro.data
+                                    )
+                                    registro.horas_trabalhadas = horas_calc.get('total', 0)
+                                    registro.horas_extras = horas_calc.get('extras', 0)
+                                except Exception as calc_e:
+                                    print(f"⚠️ Erro ao calcular horas: {calc_e}")
+                                    registro.horas_trabalhadas = 8.0
+                                    registro.horas_extras = 0.0
+                        
+                        db.session.add(registro)
+                        registros_criados += 1
+                        
+                    except Exception as e:
+                        erros.append(f"Erro ao processar {funcionario.nome} em {data_obj}: {str(e)}")
+                        print(f"❌ Erro processando {funcionario.nome} em {data_obj}: {e}")
                 
             except Exception as e:
-                erro_msg = f"Erro ao processar {funcionario.nome if 'funcionario' in locals() and funcionario else f'ID {funcionario_id}'}: {str(e)}"
-                erros.append(erro_msg)
-                print(f"❌ {erro_msg}")
+                erros.append(f"Erro ao processar funcionário ID {funcionario_id}: {str(e)}")
+                print(f"❌ Erro funcionário {funcionario_id}: {e}")
         
         # Commit se houver registros criados
-        if registros_criados:
+        if registros_criados > 0:
             db.session.commit()
-            print(f"✅ {len(registros_criados)} registros salvos no banco")
+            print(f"✅ {registros_criados} registros salvos no banco")
         
         return jsonify({
             'success': True,
-            'message': f'{len(registros_criados)} registros criados com sucesso',
-            'registros_criados': registros_criados,
+            'message': f'{registros_criados} lançamentos criados com sucesso',
+            'total_lancamentos': registros_criados,
+            'registros_existentes': registros_existentes,
             'erros': erros
         })
         
