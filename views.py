@@ -10220,35 +10220,66 @@ def novo_ponto():
     """Cria novo registro de ponto"""
     try:
         data = request.form.to_dict()
+        print(f"🔧 DEBUG novo_ponto: Dados recebidos: {data}")
         
         funcionario_id = data.get('funcionario_id')
         if not funcionario_id:
+            print(f"❌ DEBUG novo_ponto: funcionario_id não informado")
             return jsonify({'success': False, 'message': 'Funcionário não informado'}), 400
         
         # Obter admin_id para multi-tenancy
         admin_id = get_tenant_admin_id()
         if not admin_id:
+            print(f"❌ DEBUG novo_ponto: admin_id não identificado")
             return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+        
+        print(f"🔧 DEBUG novo_ponto: admin_id={admin_id}, funcionario_id={funcionario_id}")
         
         # Buscar funcionário com validação multi-tenant
         funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
         if not funcionario:
+            print(f"❌ DEBUG novo_ponto: funcionario não encontrado para id={funcionario_id}, admin_id={admin_id}")
             return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 404
         
-        # Obter obra_id (opcional)
+        # Obter obra_id (opcional) - tratar string vazia
         obra_id = data.get('obra_id')
-        if obra_id:
+        if obra_id and obra_id.strip():
             obra_id = int(obra_id)
+        else:
+            obra_id = None
+        
+        # Processar horários - aceitar formato HH:MM ou HH:MM AM/PM
+        def parse_time(time_str):
+            if not time_str:
+                return None
+            time_str = time_str.strip()
+            # Tentar formato 24h primeiro
+            for fmt in ['%H:%M', '%I:%M %p', '%I:%M%p']:
+                try:
+                    return datetime.strptime(time_str, fmt).time()
+                except ValueError:
+                    continue
+            print(f"⚠️ DEBUG novo_ponto: Formato de hora inválido: {time_str}")
+            return None
+        
+        print(f"🔧 DEBUG novo_ponto: Processando horários...")
+        hora_entrada = parse_time(data.get('hora_entrada'))
+        hora_saida = parse_time(data.get('hora_saida'))
+        hora_almoco_saida = parse_time(data.get('hora_almoco_saida'))
+        hora_almoco_retorno = parse_time(data.get('hora_almoco_retorno'))
+        
+        print(f"🔧 DEBUG novo_ponto: hora_entrada={hora_entrada}, hora_saida={hora_saida}")
+        print(f"🔧 DEBUG novo_ponto: hora_almoco_saida={hora_almoco_saida}, hora_almoco_retorno={hora_almoco_retorno}")
         
         # Criar registro de ponto
         registro = RegistroPonto(
             funcionario_id=funcionario_id,
             obra_id=obra_id,
             data=datetime.strptime(data.get('data'), '%Y-%m-%d').date(),
-            hora_entrada=datetime.strptime(data.get('hora_entrada'), '%H:%M').time() if data.get('hora_entrada') else None,
-            hora_saida=datetime.strptime(data.get('hora_saida'), '%H:%M').time() if data.get('hora_saida') else None,
-            hora_almoco_saida=datetime.strptime(data.get('hora_almoco_saida'), '%H:%M').time() if data.get('hora_almoco_saida') else None,
-            hora_almoco_retorno=datetime.strptime(data.get('hora_almoco_retorno'), '%H:%M').time() if data.get('hora_almoco_retorno') else None,
+            hora_entrada=hora_entrada,
+            hora_saida=hora_saida,
+            hora_almoco_saida=hora_almoco_saida,
+            hora_almoco_retorno=hora_almoco_retorno,
             observacoes=data.get('observacoes', ''),
             tipo_registro=data.get('tipo_lancamento', 'trabalho_normal'),
             admin_id=admin_id
@@ -10270,6 +10301,8 @@ def novo_ponto():
         db.session.add(registro)
         db.session.commit()
         
+        print(f"✅ DEBUG novo_ponto: Registro criado com sucesso, id={registro.id}")
+        
         return jsonify({
             'success': True,
             'message': 'Registro de ponto criado com sucesso!',
@@ -10278,6 +10311,9 @@ def novo_ponto():
         
     except Exception as e:
         db.session.rollback()
+        import traceback
+        print(f"❌ DEBUG novo_ponto: ERRO: {str(e)}")
+        print(f"❌ DEBUG novo_ponto: Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
 
 # CONTINUAÇÃO DO SISTEMA ANTIGO (TEMPORÁRIO PARA COMPATIBILITY)

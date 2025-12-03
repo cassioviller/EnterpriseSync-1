@@ -1855,7 +1855,7 @@ function salvarPonto(event) {
         body = JSON.stringify(dados);
     } else {
         // Novo registro - usar POST com FormData para a rota correta
-        url = '/ponto/novo';
+        url = '/novo_ponto';
         method = 'POST';
         body = formData;
     }
