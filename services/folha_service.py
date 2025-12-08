@@ -39,6 +39,144 @@ ALIQUOTA_FGTS = Decimal('8.0')
 
 
 # ========================================
+# FUNÇÕES PARA PARÂMETROS LEGAIS DINÂMICOS
+# ========================================
+
+_cache_parametros_legais = {}
+
+def _obter_parametros_legais(admin_id: int, ano: int):
+    """
+    Busca ParametrosLegais por admin_id e ano_vigencia.
+    Cacheia o resultado para evitar queries repetidas no mesmo cálculo.
+    
+    Args:
+        admin_id: ID do administrador
+        ano: Ano de vigência dos parâmetros
+        
+    Returns:
+        ParametrosLegais ou None se não encontrar
+    """
+    cache_key = (admin_id, ano)
+    
+    if cache_key in _cache_parametros_legais:
+        return _cache_parametros_legais[cache_key]
+    
+    try:
+        params = ParametrosLegais.query.filter_by(
+            admin_id=admin_id,
+            ano_vigencia=ano,
+            ativo=True
+        ).first()
+        
+        _cache_parametros_legais[cache_key] = params
+        
+        if params:
+            logger.debug(f"[_obter_parametros_legais] Encontrado ParametrosLegais para admin={admin_id}, ano={ano}")
+        else:
+            logger.debug(f"[_obter_parametros_legais] Não encontrado ParametrosLegais para admin={admin_id}, ano={ano}, usando fallback")
+        
+        return params
+    except Exception as e:
+        logger.error(f"[_obter_parametros_legais] Erro ao buscar parâmetros: {e}")
+        return None
+
+
+def limpar_cache_parametros_legais():
+    """Limpa o cache de parâmetros legais (útil após atualizações)"""
+    global _cache_parametros_legais
+    _cache_parametros_legais = {}
+    logger.debug("[limpar_cache_parametros_legais] Cache limpo")
+
+
+def _gerar_tabela_inss(params):
+    """
+    Gera tabela INSS a partir de ParametrosLegais.
+    
+    Args:
+        params: Objeto ParametrosLegais ou None
+        
+    Returns:
+        Lista de dicionários com faixas de INSS
+    """
+    if not params:
+        return TABELA_INSS_2025
+    
+    return [
+        {'limite': Decimal(str(params.inss_faixa1_limite)), 'aliquota': Decimal(str(params.inss_faixa1_percentual))},
+        {'limite': Decimal(str(params.inss_faixa2_limite)), 'aliquota': Decimal(str(params.inss_faixa2_percentual))},
+        {'limite': Decimal(str(params.inss_faixa3_limite)), 'aliquota': Decimal(str(params.inss_faixa3_percentual))},
+        {'limite': Decimal(str(params.inss_faixa4_limite)), 'aliquota': Decimal(str(params.inss_faixa4_percentual))},
+    ]
+
+
+def _gerar_tabela_irrf(params):
+    """
+    Gera tabela IRRF a partir de ParametrosLegais.
+    
+    Args:
+        params: Objeto ParametrosLegais ou None
+        
+    Returns:
+        Lista de dicionários com faixas de IRRF
+    """
+    if not params:
+        return TABELA_IR_2025
+    
+    return [
+        {'limite': Decimal(str(params.irrf_isencao)), 'aliquota': Decimal('0'), 'parcela_deduzir': Decimal('0')},
+        {'limite': Decimal(str(params.irrf_faixa1_limite)), 'aliquota': Decimal(str(params.irrf_faixa1_percentual)), 'parcela_deduzir': Decimal(str(params.irrf_faixa1_deducao))},
+        {'limite': Decimal(str(params.irrf_faixa2_limite)), 'aliquota': Decimal(str(params.irrf_faixa2_percentual)), 'parcela_deduzir': Decimal(str(params.irrf_faixa2_deducao))},
+        {'limite': Decimal(str(params.irrf_faixa3_limite)), 'aliquota': Decimal(str(params.irrf_faixa3_percentual)), 'parcela_deduzir': Decimal(str(params.irrf_faixa3_deducao))},
+        {'limite': Decimal('999999.99'), 'aliquota': Decimal(str(params.irrf_faixa4_percentual)), 'parcela_deduzir': Decimal(str(params.irrf_faixa4_deducao))},
+    ]
+
+
+def _obter_aliquota_fgts(params) -> Decimal:
+    """
+    Obtém alíquota de FGTS do ParametrosLegais ou usa fallback.
+    
+    Args:
+        params: Objeto ParametrosLegais ou None
+        
+    Returns:
+        Decimal: Alíquota de FGTS
+    """
+    if params and params.fgts_percentual:
+        return Decimal(str(params.fgts_percentual))
+    return ALIQUOTA_FGTS
+
+
+def _obter_salario_minimo(params) -> Decimal:
+    """
+    Obtém salário mínimo do ParametrosLegais ou usa fallback.
+    
+    Args:
+        params: Objeto ParametrosLegais ou None
+        
+    Returns:
+        Decimal: Valor do salário mínimo
+    """
+    if params and params.salario_minimo:
+        return Decimal(str(params.salario_minimo))
+    return SALARIO_MINIMO_2025
+
+
+def _obter_deducao_dependente(params) -> Decimal:
+    """
+    Obtém valor de dedução por dependente do ParametrosLegais ou usa fallback.
+    
+    Args:
+        params: Objeto ParametrosLegais ou None
+        
+    Returns:
+        Decimal: Valor de dedução por dependente
+    """
+    if params and params.irrf_dependente_valor:
+        return Decimal(str(params.irrf_dependente_valor))
+    return DEDUCAO_DEPENDENTE_IR
+
+
+# ========================================
 # FUNÇÕES DE CÁLCULO DE HORAS
 # ========================================
 
@@ -563,12 +701,13 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
 # CÁLCULOS DE DESCONTOS
 # ========================================
 
-def calcular_inss(salario_bruto: Decimal) -> Decimal:
+def calcular_inss(salario_bruto: Decimal, tabela_inss=None) -> Decimal:
     """
-    Calcula INSS progressivo conforme tabela vigente
+    Calcula INSS progressivo conforme tabela vigente.
     
     Args:
         salario_bruto: Valor do salário bruto
+        tabela_inss: Tabela de faixas do INSS (opcional, usa TABELA_INSS_2025 como fallback)
         
     Returns:
         Decimal: Valor do desconto de INSS
@@ -576,48 +715,54 @@ def calcular_inss(salario_bruto: Decimal) -> Decimal:
     if salario_bruto <= 0:
         return Decimal('0')
     
+    if tabela_inss is None:
+        tabela_inss = TABELA_INSS_2025
+    
     inss_total = Decimal('0')
     salario_restante = salario_bruto
     limite_anterior = Decimal('0')
     
-    for faixa in TABELA_INSS_2025:
+    for faixa in tabela_inss:
         if salario_restante <= 0:
             break
         
-        # Calcular faixa de incidência
         valor_faixa = min(salario_restante, faixa['limite'] - limite_anterior)
         
-        # Aplicar alíquota
         inss_faixa = valor_faixa * (faixa['aliquota'] / 100)
         inss_total += inss_faixa
         
-        # Atualizar valores
         salario_restante -= valor_faixa
         limite_anterior = faixa['limite']
     
     return inss_total.quantize(Decimal('0.01'))
 
 
-def calcular_irrf(salario_bruto: Decimal, inss: Decimal, dependentes: int = 0) -> Decimal:
+def calcular_irrf(salario_bruto: Decimal, inss: Decimal, dependentes: int = 0, tabela_irrf=None, deducao_dependente=None) -> Decimal:
     """
-    Calcula Imposto de Renda Retido na Fonte
+    Calcula Imposto de Renda Retido na Fonte.
     
     Args:
         salario_bruto: Valor do salário bruto
         inss: Valor do INSS calculado
         dependentes: Número de dependentes
+        tabela_irrf: Tabela de faixas do IRRF (opcional, usa TABELA_IR_2025 como fallback)
+        deducao_dependente: Valor de dedução por dependente (opcional, usa DEDUCAO_DEPENDENTE_IR como fallback)
         
     Returns:
         Decimal: Valor do IR a ser retido
     """
-    # Base de cálculo = Salário Bruto - INSS - Deduções por dependente
-    base_calculo = salario_bruto - inss - (Decimal(str(dependentes)) * DEDUCAO_DEPENDENTE_IR)
+    if tabela_irrf is None:
+        tabela_irrf = TABELA_IR_2025
     
-    if base_calculo <= TABELA_IR_2025[0]['limite']:
+    if deducao_dependente is None:
+        deducao_dependente = DEDUCAO_DEPENDENTE_IR
+    
+    base_calculo = salario_bruto - inss - (Decimal(str(dependentes)) * deducao_dependente)
+    
+    if base_calculo <= tabela_irrf[0]['limite']:
         return Decimal('0')
     
-    # Encontrar faixa aplicável
-    for faixa in TABELA_IR_2025:
+    for faixa in tabela_irrf:
         if base_calculo <= faixa['limite']:
             ir = (base_calculo * (faixa['aliquota'] / 100)) - faixa['parcela_deduzir']
             return max(Decimal('0'), ir).quantize(Decimal('0.01'))
@@ -625,31 +770,37 @@ def calcular_irrf(salario_bruto: Decimal, inss: Decimal, dependentes: int = 0) -
     return Decimal('0')
 
 
-def calcular_descontos(salario_bruto: Decimal, funcionario: Funcionario) -> Dict:
+def calcular_descontos(salario_bruto: Decimal, funcionario: Funcionario, params=None) -> Dict:
     """
-    Calcula todos os descontos (INSS, IR, benefícios, etc)
+    Calcula todos os descontos (INSS, IR, benefícios, etc).
     
     Args:
         salario_bruto: Valor do salário bruto
         funcionario: Objeto Funcionario
+        params: Objeto ParametrosLegais (opcional, usa fallback se não informado)
         
     Returns:
         dict: Dicionário com todos os descontos
     """
-    # INSS
-    inss = calcular_inss(salario_bruto)
+    if params:
+        tabela_inss = _gerar_tabela_inss(params)
+        tabela_irrf = _gerar_tabela_irrf(params)
+        deducao_dep = _obter_deducao_dependente(params)
+    else:
+        tabela_inss = None
+        tabela_irrf = None
+        deducao_dep = None
     
-    # Buscar dependentes da configuração salarial
+    inss = calcular_inss(salario_bruto, tabela_inss)
+    
     config = ConfiguracaoSalarial.query.filter_by(
         funcionario_id=funcionario.id,
         ativo=True
     ).first()
     dependentes = config.dependentes if config else 0
     
-    # IR
-    irrf = calcular_irrf(salario_bruto, inss, dependentes)
+    irrf = calcular_irrf(salario_bruto, inss, dependentes, tabela_irrf, deducao_dep)
     
-    # Benefícios com desconto
     beneficios = BeneficioFuncionario.query.filter_by(
         funcionario_id=funcionario.id,
         ativo=True
@@ -665,12 +816,10 @@ def calcular_descontos(salario_bruto: Decimal, funcionario: Funcionario) -> Dict
         valor_beneficio = beneficio.valor
         total_beneficios += valor_beneficio
         
-        # Calcular desconto do funcionário
         if beneficio.percentual_desconto:
             desconto = valor_beneficio * (beneficio.percentual_desconto / 100)
             desconto_beneficios += desconto
     
-    # Total de descontos
     total_descontos = inss + irrf + desconto_beneficios
     
     return {
@@ -687,24 +836,23 @@ def calcular_descontos(salario_bruto: Decimal, funcionario: Funcionario) -> Dict
 # ENCARGOS PATRONAIS
 # ========================================
 
-def calcular_encargos_patronais(salario_bruto: Decimal) -> Dict:
+def calcular_encargos_patronais(salario_bruto: Decimal, params=None) -> Dict:
     """
-    Calcula encargos patronais (FGTS, INSS Patronal, etc)
+    Calcula encargos patronais (FGTS, INSS Patronal, etc).
     
     Args:
         salario_bruto: Valor do salário bruto
+        params: Objeto ParametrosLegais (opcional, usa fallback se não informado)
         
     Returns:
         dict: Dicionário com todos os encargos
     """
-    # FGTS (8%)
-    fgts = salario_bruto * (ALIQUOTA_FGTS / 100)
+    aliquota_fgts = _obter_aliquota_fgts(params)
     
-    # INSS Patronal (20% base + RAT 1-3% + Terceiros ~5.8%)
-    # Simplificado: 20% base
+    fgts = salario_bruto * (aliquota_fgts / 100)
+    
     inss_patronal = salario_bruto * Decimal('0.20')
     
-    # Total de encargos
     total_encargos = fgts + inss_patronal
     
     return {
@@ -720,38 +868,36 @@ def calcular_encargos_patronais(salario_bruto: Decimal) -> Dict:
 # PROCESSAMENTO COMPLETO
 # ========================================
 
-def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int) -> Dict:
+def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, params=None) -> Dict:
     """
-    Processa a folha completa de um funcionário
+    Processa a folha completa de um funcionário.
     
     Args:
         funcionario: Objeto Funcionario
         ano: Ano de referência
         mes: Mês de referência
+        params: Objeto ParametrosLegais (opcional, busca automaticamente se não informado)
         
     Returns:
         dict: Dados completos da folha processada
     """
     try:
-        # Calcular datas do período
         import calendar
         data_inicio = date(ano, mes, 1)
         ultimo_dia = calendar.monthrange(ano, mes)[1]
         data_fim = date(ano, mes, ultimo_dia)
         
-        # 1. Calcular horas do mês
+        if params is None and funcionario.admin_id:
+            params = _obter_parametros_legais(funcionario.admin_id, ano)
+        
         horas_info = calcular_horas_mes(funcionario.id, ano, mes)
         
-        # 2. Calcular salário bruto
         salario_bruto = calcular_salario_bruto(funcionario, horas_info, data_inicio, data_fim)
         
-        # 3. Calcular descontos
-        descontos = calcular_descontos(salario_bruto, funcionario)
+        descontos = calcular_descontos(salario_bruto, funcionario, params)
         
-        # 4. Calcular encargos patronais
-        encargos = calcular_encargos_patronais(salario_bruto)
+        encargos = calcular_encargos_patronais(salario_bruto, params)
         
-        # 5. Calcular salário líquido
         salario_liquido = salario_bruto - Decimal(str(descontos['total']))
         
         return {
@@ -774,5 +920,5 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int) ->
         }
         
     except Exception as e:
-        print(f"Erro ao processar folha do funcionário {funcionario.id}: {e}")
+        logger.error(f"Erro ao processar folha do funcionário {funcionario.id}: {e}", exc_info=True)
         return None
