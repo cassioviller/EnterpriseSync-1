@@ -3272,6 +3272,71 @@ def _migration_61_horario_dia_sistema():
                 pass
 
 
+def _migration_62_horario_trabalho_nullable():
+    """
+    Migração 62: Tornar colunas legadas de HorarioTrabalho nullable
+    
+    Com o novo modelo HorarioDia, as colunas entrada, saida, saida_almoco,
+    retorno_almoco e dias_semana em horario_trabalho são opcionais.
+    """
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("📅 MIGRAÇÃO 62: Tornar colunas legadas de HorarioTrabalho nullable")
+        logger.info("=" * 80)
+        
+        # Lista de colunas para tornar nullable
+        colunas = ['entrada', 'saida', 'saida_almoco', 'retorno_almoco', 'dias_semana']
+        
+        for coluna in colunas:
+            try:
+                cursor.execute(f"""
+                    ALTER TABLE horario_trabalho 
+                    ALTER COLUMN {coluna} DROP NOT NULL
+                """)
+                logger.info(f"  ✅ Coluna '{coluna}' agora é nullable")
+            except Exception as e:
+                # Ignorar se já é nullable ou coluna não existe
+                if 'column' not in str(e).lower() and 'does not exist' not in str(e).lower():
+                    logger.debug(f"  ⏭️ Coluna '{coluna}' já é nullable ou não existe: {e}")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 62 CONCLUÍDA COM SUCESSO!")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 62: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
+
 def _migration_59_alimentacao_itens_sistema():
     """
     Migração 59: Sistema de Itens de Alimentação v2.0
@@ -3508,6 +3573,7 @@ def executar_migracoes():
             (59, "Sistema de Itens de Alimentação v2.0", _migration_59_alimentacao_itens_sistema),
             (60, "Adicionar created_at em centro_custo_contabil", _migration_60_centro_custo_created_at),
             (61, "Sistema HorarioDia para horários flexíveis", _migration_61_horario_dia_sistema),
+            (62, "Tornar colunas legadas de HorarioTrabalho nullable", _migration_62_horario_trabalho_nullable),
         ]
         
         # Executar cada migração com rastreamento

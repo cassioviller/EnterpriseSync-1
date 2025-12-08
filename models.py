@@ -141,6 +141,7 @@ class HorarioDia(db.Model):
     saida = db.Column(db.Time, nullable=True)
     pausa_horas = db.Column(db.Numeric(4, 2), default=1.0)  # Tempo de almoço/pausa em horas
     trabalha = db.Column(db.Boolean, default=True)  # Se é dia de trabalho
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # Multi-tenant
     
     # Constraint única para evitar duplicatas
     __table_args__ = (

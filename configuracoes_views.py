@@ -384,7 +384,8 @@ def criar_horario():
                     trabalha=trabalha,
                     entrada=datetime.strptime(entrada_str, '%H:%M').time() if trabalha and entrada_str else None,
                     saida=datetime.strptime(saida_str, '%H:%M').time() if trabalha and saida_str else None,
-                    pausa_horas=Decimal(pausa_str) if trabalha else Decimal('1.0')
+                    pausa_horas=Decimal(pausa_str) if trabalha else Decimal('1.0'),
+                    admin_id=admin_id
                 )
                 db.session.add(horario_dia)
             
@@ -421,7 +422,8 @@ def editar_horario(id):
                 if not horario_dia:
                     horario_dia = HorarioDia(
                         horario_id=horario.id,
-                        dia_semana=i
+                        dia_semana=i,
+                        admin_id=admin_id
                     )
                     db.session.add(horario_dia)
                 

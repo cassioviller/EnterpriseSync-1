@@ -209,8 +209,16 @@ def _calcular_horas_contratuais_reais(horario_padrao, ano: int, mes: int, feriad
         feriados_set = {f.data for f in feriados_db}
     
     horarios_dia_map = {}
-    for hd in horario_padrao.dias:
-        horarios_dia_map[hd.dia_semana] = hd
+    # Usar .all() para evitar erro com lazy='dynamic'
+    try:
+        if hasattr(horario_padrao.dias, 'all'):
+            dias_list = horario_padrao.dias.all()
+        else:
+            dias_list = list(horario_padrao.dias)
+        for hd in dias_list:
+            horarios_dia_map[hd.dia_semana] = hd
+    except Exception as e:
+        logger.warning(f"Erro ao carregar HorarioDia: {e}")
     
     total_horas = Decimal('0')
     dia_atual = primeiro_dia

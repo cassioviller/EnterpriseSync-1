@@ -33,8 +33,16 @@ def _obter_horas_diarias_funcionario(funcionario) -> float:
         horario = funcionario.horario_trabalho
         
         # Tentar usar HorarioDia (novo modelo)
-        if hasattr(horario, 'dias') and horario.dias:
-            dias_list = list(horario.dias)
+        # Usar .all() para evitar erro com lazy='dynamic'
+        if hasattr(horario, 'dias'):
+            try:
+                # Suportar tanto lazy='dynamic' (.all()) quanto lazy='select' (lista)
+                if hasattr(horario.dias, 'all'):
+                    dias_list = list(horario.dias.all())
+                else:
+                    dias_list = list(horario.dias)
+            except Exception:
+                dias_list = []
             if dias_list:
                 total_horas_semana = sum(
                     float(hd.calcular_horas()) 
