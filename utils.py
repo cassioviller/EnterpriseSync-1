@@ -13,6 +13,47 @@ def _round2(x: float) -> float:
     """Arredondar para 2 casas decimais (meio para cima)"""
     return float(Decimal(x).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
+def _obter_horas_diarias_funcionario(funcionario) -> float:
+    """
+    Calcula média de horas diárias do funcionário baseado no HorarioDia (novo modelo)
+    ou campo legado horas_diarias.
+    
+    Prioridade:
+    1. HorarioDia (novo modelo) - calcula média dos dias de trabalho
+    2. horas_diarias (campo legado) - valor direto
+    3. 8.8 (padrão) - fallback
+    
+    Returns:
+        float: Média de horas diárias de trabalho
+    """
+    try:
+        if not funcionario or not funcionario.horario_trabalho:
+            return 8.8
+        
+        horario = funcionario.horario_trabalho
+        
+        # Tentar usar HorarioDia (novo modelo)
+        if hasattr(horario, 'dias') and horario.dias:
+            dias_list = list(horario.dias)
+            if dias_list:
+                total_horas_semana = sum(
+                    float(hd.calcular_horas()) 
+                    for hd in dias_list 
+                    if hd.trabalha
+                )
+                dias_trabalho = sum(1 for hd in dias_list if hd.trabalha)
+                if dias_trabalho > 0:
+                    return float(total_horas_semana / dias_trabalho)
+        
+        # Fallback: campo legado horas_diarias
+        if hasattr(horario, 'horas_diarias') and horario.horas_diarias:
+            return float(horario.horas_diarias)
+        
+        # Padrão
+        return 8.8
+    except Exception:
+        return 8.8
+
 def _particionar_semanas(inicio: date, fim: date, semana_comeca_em: str = "domingo"):
     """Particiona período em semanas (domingo-sábado por padrão)"""
     semanas = []
@@ -177,12 +218,8 @@ def calcular_valor_hora_corrigido(funcionario):
         if data_check.weekday() < 5:  # Segunda a sexta
             dias_uteis += 1
     
-    # Determinar horas diárias baseado no horário do funcionário
-    if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
-        horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
-    else:
-        # Padrão: 7h12-17h = 9h48min - 1h almoço = 8h48min = 8.8h
-        horas_diarias = 8.8
+    # Determinar horas diárias baseado no horário do funcionário (HorarioDia ou legado)
+    horas_diarias = _obter_horas_diarias_funcionario(funcionario)
     
     # Horas mensais reais = dias_úteis × horas_diarias
     horas_mensais_reais = dias_uteis * horas_diarias
@@ -220,11 +257,8 @@ def calcular_valor_hora_periodo(funcionario, data_inicio, data_fim):
         if data_check.weekday() < 5:  # Segunda a sexta
             dias_uteis += 1
     
-    # Determinar horas diárias
-    if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
-        horas_diarias = float(funcionario.horario_trabalho.horas_diarias)
-    else:
-        horas_diarias = 8.8
+    # Determinar horas diárias (HorarioDia ou legado)
+    horas_diarias = _obter_horas_diarias_funcionario(funcionario)
     
     # Horas mensais do período específico
     horas_mensais_reais = dias_uteis * horas_diarias
@@ -554,11 +588,8 @@ def calcular_valor_hora_funcionario(funcionario, data_referencia):
         if data_check.weekday() < 5:  # Segunda a sexta
             dias_uteis += 1
     
-    # Usar horário específico do funcionário
-    if funcionario.horario_trabalho and funcionario.horario_trabalho.horas_diarias:
-        horas_diarias = funcionario.horario_trabalho.horas_diarias
-    else:
-        horas_diarias = 8.8  # Padrão baseado no horário Carlos Alberto
+    # Usar horário específico do funcionário (HorarioDia ou legado)
+    horas_diarias = _obter_horas_diarias_funcionario(funcionario)
     
     # Horas mensais = horas/dia × dias úteis do mês
     horas_mensais = horas_diarias * dias_uteis
