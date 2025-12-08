@@ -60,20 +60,117 @@ class Funcao(db.Model):
     funcionarios = db.relationship('Funcionario', backref='funcao_ref', lazy=True)
 
 class HorarioTrabalho(db.Model):
+    """
+    Modelo "molde" de horário de trabalho.
+    Define um padrão de horário que pode ser associado a funcionários.
+    Os detalhes por dia da semana são armazenados em HorarioDia.
+    """
+    __tablename__ = 'horario_trabalho'
+    
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), unique=True, nullable=False)
-    entrada = db.Column(db.Time, nullable=False)
-    saida_almoco = db.Column(db.Time, nullable=False)
-    retorno_almoco = db.Column(db.Time, nullable=False)
-    saida = db.Column(db.Time, nullable=False)
-    dias_semana = db.Column(db.String(20), nullable=False)  # Ex: "1,2,3,4,5" (Segunda=1, Domingo=7)
-    horas_diarias = db.Column(db.Float, default=8.0)  # Horas trabalhadas por dia
-    valor_hora = db.Column(db.Float, default=12.0)  # Valor por hora
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ativo = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # CAMPOS LEGADOS - mantidos temporariamente para compatibilidade
+    # Serão removidos após migração completa
+    entrada = db.Column(db.Time, nullable=True)
+    saida_almoco = db.Column(db.Time, nullable=True)
+    retorno_almoco = db.Column(db.Time, nullable=True)
+    saida = db.Column(db.Time, nullable=True)
+    dias_semana = db.Column(db.String(20), nullable=True)
+    horas_diarias = db.Column(db.Float, default=8.0)
+    valor_hora = db.Column(db.Float, default=12.0)
+    
+    # Relacionamento com HorarioDia (detalhes por dia da semana)
+    dias = db.relationship('HorarioDia', backref='horario', lazy='dynamic', cascade="all, delete-orphan")
     
     def __repr__(self):
         return f'<HorarioTrabalho {self.nome}>'
+    
+    def get_horario_dia(self, dia_semana: int):
+        """
+        Retorna o HorarioDia para um dia específico da semana.
+        dia_semana: 0=Segunda, 1=Terça, ..., 6=Domingo
+        """
+        return HorarioDia.query.filter_by(
+            horario_id=self.id, 
+            dia_semana=dia_semana
+        ).first()
+    
+    def calcular_horas_contratuais_dia(self, dia_semana: int):
+        """
+        Calcula as horas contratuais para um dia específico.
+        Retorna 0 se o dia não for dia de trabalho.
+        """
+        from decimal import Decimal
+        horario_dia = self.get_horario_dia(dia_semana)
+        
+        if not horario_dia or not horario_dia.trabalha:
+            return Decimal('0')
+        
+        if horario_dia.entrada and horario_dia.saida:
+            from datetime import datetime, timedelta
+            entrada_dt = datetime.combine(datetime.today(), horario_dia.entrada)
+            saida_dt = datetime.combine(datetime.today(), horario_dia.saida)
+            
+            if saida_dt < entrada_dt:
+                saida_dt += timedelta(days=1)
+            
+            diferenca = saida_dt - entrada_dt
+            horas_brutas = Decimal(str(diferenca.total_seconds() / 3600))
+            pausa = Decimal(str(horario_dia.pausa_horas or 1))
+            
+            return max(horas_brutas - pausa, Decimal('0'))
+        
+        return Decimal('0')
+
+
+class HorarioDia(db.Model):
+    """
+    Detalha o horário de trabalho para cada dia da semana.
+    Permite configurar horários diferentes para cada dia (ex: sexta mais curta).
+    """
+    __tablename__ = 'horario_dia'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    horario_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'), nullable=False)
+    dia_semana = db.Column(db.Integer, nullable=False)  # 0=Segunda, 1=Terça, ..., 6=Domingo
+    entrada = db.Column(db.Time, nullable=True)
+    saida = db.Column(db.Time, nullable=True)
+    pausa_horas = db.Column(db.Numeric(4, 2), default=1.0)  # Tempo de almoço/pausa em horas
+    trabalha = db.Column(db.Boolean, default=True)  # Se é dia de trabalho
+    
+    # Constraint única para evitar duplicatas
+    __table_args__ = (
+        db.UniqueConstraint('horario_id', 'dia_semana', name='uk_horario_dia'),
+    )
+    
+    def __repr__(self):
+        dias_nomes = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+        nome_dia = dias_nomes[self.dia_semana] if 0 <= self.dia_semana <= 6 else 'Inválido'
+        return f'<HorarioDia {nome_dia} {self.entrada}-{self.saida}>'
+    
+    def calcular_horas(self):
+        """Calcula as horas de trabalho deste dia."""
+        from decimal import Decimal
+        from datetime import datetime, timedelta
+        
+        if not self.trabalha or not self.entrada or not self.saida:
+            return Decimal('0')
+        
+        entrada_dt = datetime.combine(datetime.today(), self.entrada)
+        saida_dt = datetime.combine(datetime.today(), self.saida)
+        
+        if saida_dt < entrada_dt:
+            saida_dt += timedelta(days=1)
+        
+        diferenca = saida_dt - entrada_dt
+        horas_brutas = Decimal(str(diferenca.total_seconds() / 3600))
+        pausa = Decimal(str(self.pausa_horas or 1))
+        
+        return max(horas_brutas - pausa, Decimal('0'))
 
 class Funcionario(db.Model):
     id = db.Column(db.Integer, primary_key=True)

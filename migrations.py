@@ -3115,6 +3115,163 @@ def _migration_60_centro_custo_created_at():
                 pass
 
 
+def _migration_61_horario_dia_sistema():
+    """
+    Migração 61: Sistema HorarioDia para horários flexíveis por dia da semana
+    
+    Cria tabela horario_dia que permite:
+    - Horários diferentes para cada dia da semana (Seg-Sex 9h, Sex 8h)
+    - Flag 'trabalha' para marcar dias de descanso (sábado/domingo)
+    - Pausa customizada por dia
+    
+    Migra dados existentes de horario_trabalho para horario_dia
+    """
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("📅 MIGRAÇÃO 61: Sistema HorarioDia para horários flexíveis")
+        logger.info("=" * 80)
+        
+        # ========================================
+        # PASSO 1: Criar tabela horario_dia
+        # ========================================
+        cursor.execute("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_name = 'horario_dia'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("  ➕ Criando tabela horario_dia...")
+            cursor.execute("""
+                CREATE TABLE horario_dia (
+                    id SERIAL PRIMARY KEY,
+                    horario_id INTEGER NOT NULL REFERENCES horario_trabalho(id) ON DELETE CASCADE,
+                    dia_semana INTEGER NOT NULL CHECK (dia_semana >= 0 AND dia_semana <= 6),
+                    entrada TIME,
+                    saida TIME,
+                    pausa_horas NUMERIC(4,2) DEFAULT 1.0,
+                    trabalha BOOLEAN DEFAULT TRUE,
+                    CONSTRAINT uk_horario_dia UNIQUE (horario_id, dia_semana)
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX idx_horario_dia_horario ON horario_dia(horario_id)
+            """)
+            
+            connection.commit()
+            logger.info("  ✅ Tabela horario_dia criada com sucesso!")
+            
+            # ========================================
+            # PASSO 2: Migrar dados existentes
+            # ========================================
+            logger.info("  🔄 Migrando dados existentes de horario_trabalho...")
+            
+            cursor.execute("""
+                SELECT id, entrada, saida, dias_semana, horas_diarias 
+                FROM horario_trabalho 
+                WHERE entrada IS NOT NULL
+            """)
+            
+            horarios_existentes = cursor.fetchall()
+            migrados = 0
+            
+            for horario_id, entrada, saida, dias_semana, horas_diarias in horarios_existentes:
+                # Parsear dias_semana (formato "1,2,3,4,5" onde 1=Segunda, 7=Domingo)
+                dias_trabalho = set()
+                if dias_semana:
+                    try:
+                        dias_str = dias_semana.split(',')
+                        for d in dias_str:
+                            d = d.strip()
+                            if d.isdigit():
+                                # Converter: 1=Segunda (0), 2=Terça (1), ..., 7=Domingo (6)
+                                dia_num = int(d) - 1  
+                                if 0 <= dia_num <= 6:
+                                    dias_trabalho.add(dia_num)
+                    except:
+                        # Default: Segunda a Sexta
+                        dias_trabalho = {0, 1, 2, 3, 4}
+                else:
+                    # Default: Segunda a Sexta
+                    dias_trabalho = {0, 1, 2, 3, 4}
+                
+                # Criar HorarioDia para cada dia da semana
+                for dia_semana_num in range(7):
+                    trabalha = dia_semana_num in dias_trabalho
+                    
+                    cursor.execute("""
+                        INSERT INTO horario_dia (horario_id, dia_semana, entrada, saida, pausa_horas, trabalha)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (horario_id, dia_semana) DO NOTHING
+                    """, (
+                        horario_id,
+                        dia_semana_num,
+                        entrada if trabalha else None,
+                        saida if trabalha else None,
+                        1.0,  # Pausa padrão de 1 hora
+                        trabalha
+                    ))
+                    migrados += 1
+            
+            connection.commit()
+            logger.info(f"  ✅ {migrados} registros HorarioDia criados!")
+            
+        else:
+            logger.info("  ⏭️ Tabela horario_dia já existe")
+        
+        # ========================================
+        # PASSO 3: Adicionar coluna 'ativo' em horario_trabalho se não existir
+        # ========================================
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'horario_trabalho' AND column_name = 'ativo'
+        """)
+        
+        if not cursor.fetchone():
+            logger.info("  ➕ Adicionando coluna 'ativo' em horario_trabalho...")
+            cursor.execute("""
+                ALTER TABLE horario_trabalho 
+                ADD COLUMN ativo BOOLEAN DEFAULT TRUE
+            """)
+            connection.commit()
+            logger.info("  ✅ Coluna 'ativo' adicionada!")
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 61 CONCLUÍDA COM SUCESSO!")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 61: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
+
 def _migration_59_alimentacao_itens_sistema():
     """
     Migração 59: Sistema de Itens de Alimentação v2.0
@@ -3350,6 +3507,7 @@ def executar_migracoes():
             (58, "Sistema de Rastreamento de Lotes FIFO", _migration_58_almoxarifado_lotes_fifo),
             (59, "Sistema de Itens de Alimentação v2.0", _migration_59_alimentacao_itens_sistema),
             (60, "Adicionar created_at em centro_custo_contabil", _migration_60_centro_custo_created_at),
+            (61, "Sistema HorarioDia para horários flexíveis", _migration_61_horario_dia_sistema),
         ]
         
         # Executar cada migração com rastreamento
