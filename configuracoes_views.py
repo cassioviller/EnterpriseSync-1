@@ -4,7 +4,7 @@ Blueprint para configurações da empresa
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app import db
-from models import ConfiguracaoEmpresa, Departamento, Funcao, HorarioTrabalho, Funcionario
+from models import ConfiguracaoEmpresa, Departamento, Funcao, HorarioTrabalho, HorarioDia, Funcionario
 from decorators import admin_required
 from datetime import datetime, time
 
@@ -354,23 +354,40 @@ def horarios():
 @login_required
 @admin_required
 def criar_horario():
-    """Criar horário de trabalho"""
+    """Criar horário de trabalho com horários flexíveis por dia"""
     if request.method == 'POST':
         try:
             from multitenant_helper import get_admin_id
+            from decimal import Decimal
             admin_id = get_admin_id()
+            
             horario = HorarioTrabalho(
                 nome=request.form['nome'],
-                entrada=datetime.strptime(request.form['entrada'], '%H:%M').time(),
-                saida_almoco=datetime.strptime(request.form['saida_almoco'], '%H:%M').time(),
-                retorno_almoco=datetime.strptime(request.form['retorno_almoco'], '%H:%M').time(),
-                saida=datetime.strptime(request.form['saida'], '%H:%M').time(),
-                dias_semana=request.form['dias_semana'],
-                horas_diarias=float(request.form.get('horas_diarias', 8.0)),
-                valor_hora=float(request.form.get('valor_hora', 12.0)),
-                admin_id=admin_id
+                admin_id=admin_id,
+                ativo=True
             )
             db.session.add(horario)
+            db.session.flush()
+            
+            DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']
+            
+            for i, dia_nome in enumerate(DIAS_SEMANA):
+                trabalha = request.form.get(f'{dia_nome}_trabalha') == 'on'
+                
+                entrada_str = request.form.get(f'{dia_nome}_entrada', '08:00')
+                saida_str = request.form.get(f'{dia_nome}_saida', '17:00')
+                pausa_str = request.form.get(f'{dia_nome}_pausa', '1.0')
+                
+                horario_dia = HorarioDia(
+                    horario_id=horario.id,
+                    dia_semana=i,
+                    trabalha=trabalha,
+                    entrada=datetime.strptime(entrada_str, '%H:%M').time() if trabalha and entrada_str else None,
+                    saida=datetime.strptime(saida_str, '%H:%M').time() if trabalha and saida_str else None,
+                    pausa_horas=Decimal(pausa_str) if trabalha else Decimal('1.0')
+                )
+                db.session.add(horario_dia)
+            
             db.session.commit()
             flash('Horário criado com sucesso!', 'success')
             return redirect(url_for('configuracoes.horarios'))
@@ -378,27 +395,45 @@ def criar_horario():
             db.session.rollback()
             flash(f'Erro ao criar horário: {str(e)}', 'danger')
     
-    return render_template('configuracoes/horario_form.html', horario=None)
+    return render_template('configuracoes/horarios.html', horarios=[], horario=None, modo='criar')
 
 @configuracoes_bp.route('/horarios/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def editar_horario(id):
-    """Editar horário de trabalho"""
+    """Editar horário de trabalho com horários flexíveis por dia"""
     from multitenant_helper import get_admin_id
+    from decimal import Decimal
     admin_id = get_admin_id()
     horario = HorarioTrabalho.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     if request.method == 'POST':
         try:
             horario.nome = request.form['nome']
-            horario.entrada = datetime.strptime(request.form['entrada'], '%H:%M').time()
-            horario.saida_almoco = datetime.strptime(request.form['saida_almoco'], '%H:%M').time()
-            horario.retorno_almoco = datetime.strptime(request.form['retorno_almoco'], '%H:%M').time()
-            horario.saida = datetime.strptime(request.form['saida'], '%H:%M').time()
-            horario.dias_semana = request.form['dias_semana']
-            horario.horas_diarias = float(request.form.get('horas_diarias', 8.0))
-            horario.valor_hora = float(request.form.get('valor_hora', 12.0))
+            
+            DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']
+            
+            for i, dia_nome in enumerate(DIAS_SEMANA):
+                trabalha = request.form.get(f'{dia_nome}_trabalha') == 'on'
+                
+                horario_dia = HorarioDia.query.filter_by(horario_id=horario.id, dia_semana=i).first()
+                
+                if not horario_dia:
+                    horario_dia = HorarioDia(
+                        horario_id=horario.id,
+                        dia_semana=i
+                    )
+                    db.session.add(horario_dia)
+                
+                entrada_str = request.form.get(f'{dia_nome}_entrada', '08:00')
+                saida_str = request.form.get(f'{dia_nome}_saida', '17:00')
+                pausa_str = request.form.get(f'{dia_nome}_pausa', '1.0')
+                
+                horario_dia.trabalha = trabalha
+                horario_dia.entrada = datetime.strptime(entrada_str, '%H:%M').time() if trabalha and entrada_str else None
+                horario_dia.saida = datetime.strptime(saida_str, '%H:%M').time() if trabalha and saida_str else None
+                horario_dia.pausa_horas = Decimal(pausa_str) if trabalha else Decimal('1.0')
+            
             db.session.commit()
             flash('Horário atualizado com sucesso!', 'success')
             return redirect(url_for('configuracoes.horarios'))
@@ -406,7 +441,8 @@ def editar_horario(id):
             db.session.rollback()
             flash(f'Erro ao atualizar horário: {str(e)}', 'danger')
     
-    return render_template('configuracoes/horario_form.html', horario=horario)
+    horarios = HorarioTrabalho.query.filter_by(admin_id=admin_id).all()
+    return render_template('configuracoes/horarios.html', horarios=horarios, horario=horario, modo='editar')
 
 @configuracoes_bp.route('/horarios/deletar/<int:id>', methods=['POST'])
 @login_required

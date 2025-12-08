@@ -6,7 +6,7 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1><i class="fas fa-clock"></i> Horários de Trabalho</h1>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#horarioModal">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#horarioModal" onclick="prepararNovoHorario()">
             <i class="fas fa-plus"></i> Novo Horário
         </button>
     </div>
@@ -14,7 +14,7 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
@@ -29,11 +29,8 @@
                     <thead>
                         <tr>
                             <th>Nome</th>
-                            <th>Entrada</th>
-                            <th>Saída Almoço</th>
-                            <th>Retorno Almoço</th>
-                            <th>Saída</th>
-                            <th>Dias da Semana</th>
+                            <th>Dias de Trabalho</th>
+                            <th>Horas Semanais</th>
                             <th>Funcionários</th>
                             <th>Ações</th>
                         </tr>
@@ -42,34 +39,47 @@
                         {% for horario in horarios %}
                             <tr>
                                 <td><strong>{{ horario.nome }}</strong></td>
-                                <td>{{ horario.entrada.strftime('%H:%M') }}</td>
-                                <td>{{ horario.saida_almoco.strftime('%H:%M') }}</td>
-                                <td>{{ horario.retorno_almoco.strftime('%H:%M') }}</td>
-                                <td>{{ horario.saida.strftime('%H:%M') }}</td>
                                 <td>
-                                    {% if horario.dias_semana == '1,2,3,4,5' %}
-                                        <span class="badge bg-primary">Segunda a Sexta</span>
-                                    {% elif horario.dias_semana == '1,2,3,4,5,6' %}
-                                        <span class="badge bg-info">Segunda a Sábado</span>
-                                    {% elif horario.dias_semana == '1,2,3,4,6' %}
-                                        <span class="badge bg-warning">Segunda a Quinta e Sábado</span>
-                                    {% elif horario.dias_semana == '2,4,6' %}
-                                        <span class="badge bg-secondary">Terça, Quinta e Sábado</span>
-                                    {% elif horario.dias_semana == '1,3,5' %}
-                                        <span class="badge bg-success">Segunda, Quarta e Sexta</span>
-                                    {% elif horario.dias_semana == '7' %}
-                                        <span class="badge bg-danger">Domingo</span>
-                                    {% elif horario.dias_semana == '6,7' %}
-                                        <span class="badge bg-dark">Sábado e Domingo</span>
-                                    {% else %}
+                                    {% set dias_nomes = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'] %}
+                                    {% set dias_trabalho = [] %}
+                                    {% set total_horas = namespace(valor=0) %}
+                                    {% for dia in horario.dias %}
+                                        {% if dia.trabalha %}
+                                            {% set _ = dias_trabalho.append(dias_nomes[dia.dia_semana]) %}
+                                            {% set horas_dia = dia.calcular_horas() %}
+                                            {% set total_horas.valor = total_horas.valor + (horas_dia|float) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if dias_trabalho %}
+                                        {% for dia in dias_trabalho %}
+                                            <span class="badge bg-primary me-1">{{ dia }}</span>
+                                        {% endfor %}
+                                    {% elif horario.dias_semana %}
                                         <span class="badge bg-secondary">{{ horario.dias_semana }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Não configurado</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if horario.dias.count() > 0 %}
+                                        {% set total = namespace(horas=0) %}
+                                        {% for dia in horario.dias %}
+                                            {% if dia.trabalha %}
+                                                {% set total.horas = total.horas + (dia.calcular_horas()|float) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        <span class="badge bg-info">{{ "%.1f"|format(total.horas) }}h</span>
+                                    {% elif horario.horas_diarias %}
+                                        <span class="badge bg-secondary">{{ "%.1f"|format(horario.horas_diarias * 5) }}h</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
                                 <td>
                                     <span class="badge bg-info">{{ horario.funcionarios|length }}</span>
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="editarHorario({{ horario.id }}, '{{ horario.nome }}', '{{ horario.entrada.strftime('%H:%M') }}', '{{ horario.saida_almoco.strftime('%H:%M') }}', '{{ horario.retorno_almoco.strftime('%H:%M') }}', '{{ horario.saida.strftime('%H:%M') }}', '{{ horario.dias_semana }}')">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editarHorario({{ horario.id }})">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     {% if horario.funcionarios|length == 0 %}
@@ -93,9 +103,8 @@
     </div>
 </div>
 
-<!-- Modal para Novo/Editar Horário -->
 <div class="modal fade" id="horarioModal" tabindex="-1" aria-labelledby="horarioModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="POST" id="horarioForm" action="{{ url_for('configuracoes.criar_horario') }}">
                 <input type="hidden" name="csrf_token" value=""/>
@@ -105,55 +114,74 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="nome" class="form-label">Nome do Horário</label>
-                        <input type="text" class="form-control" id="nome" name="nome" required>
+                    <div class="mb-4">
+                        <label for="nome" class="form-label fw-bold">Nome do Horário</label>
+                        <input type="text" class="form-control" id="nome" name="nome" required placeholder="Ex: Comercial, Administrativo, Obra...">
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="entrada" class="form-label">Hora de Entrada</label>
-                                <input type="time" class="form-control" id="entrada" name="entrada" required>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold"><i class="fas fa-calendar-week me-2"></i>Configuração por Dia da Semana</span>
+                                <span class="badge bg-primary" id="totalSemanalBadge">Total: 0h</span>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="saida_almoco" class="form-label">Saída para Almoço</label>
-                                <input type="time" class="form-control" id="saida_almoco" name="saida_almoco" required>
+                        <div class="card-body p-0">
+                            {% set dias_config = [
+                                ('segunda', 'Segunda-feira', true),
+                                ('terca', 'Terça-feira', true),
+                                ('quarta', 'Quarta-feira', true),
+                                ('quinta', 'Quinta-feira', true),
+                                ('sexta', 'Sexta-feira', true),
+                                ('sabado', 'Sábado', false),
+                                ('domingo', 'Domingo', false)
+                            ] %}
+                            
+                            {% for dia_id, dia_nome, checked_default in dias_config %}
+                            <div class="border-bottom p-3 dia-container" id="container_{{ dia_id }}">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input dia-checkbox" type="checkbox" id="{{ dia_id }}_trabalha" name="{{ dia_id }}_trabalha" 
+                                               {% if checked_default %}checked{% endif %} onchange="toggleDiaFields('{{ dia_id }}')">
+                                        <label class="form-check-label fw-semibold" for="{{ dia_id }}_trabalha">
+                                            {{ dia_nome }}
+                                        </label>
+                                    </div>
+                                    <span class="badge bg-success horas-dia-badge" id="{{ dia_id }}_horas">8h</span>
+                                </div>
+                                <div class="dia-fields row g-2" id="fields_{{ dia_id }}" {% if not checked_default %}style="display: none;"{% endif %}>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted mb-1">Entrada</label>
+                                        <input type="time" class="form-control form-control-sm horario-input" 
+                                               id="{{ dia_id }}_entrada" name="{{ dia_id }}_entrada" value="08:00"
+                                               onchange="calcularHorasDia('{{ dia_id }}')">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted mb-1">Saída</label>
+                                        <input type="time" class="form-control form-control-sm horario-input" 
+                                               id="{{ dia_id }}_saida" name="{{ dia_id }}_saida" value="17:00"
+                                               onchange="calcularHorasDia('{{ dia_id }}')">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted mb-1">Pausa (horas)</label>
+                                        <select class="form-select form-select-sm" id="{{ dia_id }}_pausa" name="{{ dia_id }}_pausa"
+                                                onchange="calcularHorasDia('{{ dia_id }}')">
+                                            <option value="0">Sem pausa</option>
+                                            <option value="0.5">30 min</option>
+                                            <option value="1.0" selected>1 hora</option>
+                                            <option value="1.5">1h30</option>
+                                            <option value="2.0">2 horas</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
+                            {% endfor %}
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="retorno_almoco" class="form-label">Retorno do Almoço</label>
-                                <input type="time" class="form-control" id="retorno_almoco" name="retorno_almoco" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="saida" class="form-label">Hora de Saída</label>
-                                <input type="time" class="form-control" id="saida" name="saida" required>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="dias_semana" class="form-label">Dias da Semana</label>
-                        <select class="form-select" id="dias_semana" name="dias_semana" required>
-                            <option value="">Selecione...</option>
-                            <option value="1,2,3,4,5">Segunda a Sexta</option>
-                            <option value="1,2,3,4,5,6">Segunda a Sábado</option>
-                            <option value="1,2,3,4,6">Segunda a Quinta e Sábado</option>
-                            <option value="2,4,6">Terça, Quinta e Sábado</option>
-                            <option value="1,3,5">Segunda, Quarta e Sexta</option>
-                            <option value="7">Domingo</option>
-                            <option value="6,7">Sábado e Domingo</option>
-                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Salvar</button>
                 </div>
             </form>
         </div>
@@ -161,45 +189,179 @@
 </div>
 
 <script>
-    // Inicializar DataTable
-    document.addEventListener('DOMContentLoaded', function() {
-        if ($.fn.DataTable) {
-            $('#horariosTable').DataTable({
-                language: {
-                    url: '//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json'
-                },
-                pageLength: 10,
-                responsive: true,
-                order: [[0, 'asc']]
-            });
+const DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
+
+const horariosData = {
+    {% for horario in horarios %}
+    {{ horario.id }}: {
+        nome: "{{ horario.nome }}",
+        dias: {
+            {% for dia in horario.dias %}
+            {{ dia.dia_semana }}: {
+                trabalha: {{ 'true' if dia.trabalha else 'false' }},
+                entrada: "{{ dia.entrada.strftime('%H:%M') if dia.entrada else '08:00' }}",
+                saida: "{{ dia.saida.strftime('%H:%M') if dia.saida else '17:00' }}",
+                pausa: "{{ dia.pausa_horas|default(1.0) }}"
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
         }
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
 
-        // Limpar form ao fechar modal
-        $('#horarioModal').on('hidden.bs.modal', function () {
-            document.getElementById('horarioForm').reset();
-            document.getElementById('horarioForm').action = '{{ url_for("configuracoes.criar_horario") }}';
-            document.getElementById('horarioModalLabel').textContent = 'Novo Horário de Trabalho';
-            document.getElementById('horario_id').value = '';
-        });
-    });
-
-    function editarHorario(id, nome, entrada, saida_almoco, retorno_almoco, saida, dias_semana) {
-        // Atualizar form action para edição
-        document.getElementById('horarioForm').action = '{{ url_for("configuracoes.editar_horario", id=0) }}'.replace('0', id);
-        document.getElementById('horarioModalLabel').textContent = 'Editar Horário de Trabalho';
-        document.getElementById('horario_id').value = id;
-        
-        // Preencher campos
-        document.getElementById('nome').value = nome;
-        document.getElementById('entrada').value = entrada;
-        document.getElementById('saida_almoco').value = saida_almoco;
-        document.getElementById('retorno_almoco').value = retorno_almoco;
-        document.getElementById('saida').value = saida;
-        document.getElementById('dias_semana').value = dias_semana;
-        
-        // Mostrar modal
-        const modal = new bootstrap.Modal(document.getElementById('horarioModal'));
-        modal.show();
+function toggleDiaFields(diaId) {
+    const checkbox = document.getElementById(`${diaId}_trabalha`);
+    const fieldsDiv = document.getElementById(`fields_${diaId}`);
+    const horasBadge = document.getElementById(`${diaId}_horas`);
+    
+    if (checkbox.checked) {
+        fieldsDiv.style.display = 'flex';
+        calcularHorasDia(diaId);
+    } else {
+        fieldsDiv.style.display = 'none';
+        horasBadge.textContent = '0h';
+        horasBadge.className = 'badge bg-secondary horas-dia-badge';
     }
+    calcularTotalSemanal();
+}
+
+function calcularHorasDia(diaId) {
+    const entrada = document.getElementById(`${diaId}_entrada`).value;
+    const saida = document.getElementById(`${diaId}_saida`).value;
+    const pausa = parseFloat(document.getElementById(`${diaId}_pausa`).value) || 0;
+    const horasBadge = document.getElementById(`${diaId}_horas`);
+    
+    if (entrada && saida) {
+        const [entradaH, entradaM] = entrada.split(':').map(Number);
+        const [saidaH, saidaM] = saida.split(':').map(Number);
+        
+        let totalMinutos = (saidaH * 60 + saidaM) - (entradaH * 60 + entradaM);
+        if (totalMinutos < 0) totalMinutos += 24 * 60;
+        
+        const horasBrutas = totalMinutos / 60;
+        const horasLiquidas = Math.max(0, horasBrutas - pausa);
+        
+        horasBadge.textContent = horasLiquidas.toFixed(1) + 'h';
+        horasBadge.className = 'badge bg-success horas-dia-badge';
+    }
+    calcularTotalSemanal();
+}
+
+function calcularTotalSemanal() {
+    let totalHoras = 0;
+    
+    DIAS_SEMANA.forEach(dia => {
+        const checkbox = document.getElementById(`${dia}_trabalha`);
+        if (checkbox && checkbox.checked) {
+            const horasBadge = document.getElementById(`${dia}_horas`);
+            if (horasBadge) {
+                const horas = parseFloat(horasBadge.textContent) || 0;
+                totalHoras += horas;
+            }
+        }
+    });
+    
+    document.getElementById('totalSemanalBadge').textContent = `Total: ${totalHoras.toFixed(1)}h`;
+}
+
+function prepararNovoHorario() {
+    document.getElementById('horarioForm').action = '{{ url_for("configuracoes.criar_horario") }}';
+    document.getElementById('horarioModalLabel').textContent = 'Novo Horário de Trabalho';
+    document.getElementById('horario_id').value = '';
+    document.getElementById('nome').value = '';
+    
+    DIAS_SEMANA.forEach((dia, index) => {
+        const checkbox = document.getElementById(`${dia}_trabalha`);
+        const trabalha = index < 5;
+        checkbox.checked = trabalha;
+        
+        document.getElementById(`${dia}_entrada`).value = '08:00';
+        document.getElementById(`${dia}_saida`).value = '17:00';
+        document.getElementById(`${dia}_pausa`).value = '1.0';
+        
+        toggleDiaFields(dia);
+    });
+    
+    calcularTotalSemanal();
+}
+
+function editarHorario(id) {
+    const horario = horariosData[id];
+    if (!horario) {
+        console.error('Horário não encontrado:', id);
+        return;
+    }
+    
+    document.getElementById('horarioForm').action = '{{ url_for("configuracoes.editar_horario", id=0) }}'.replace('0', id);
+    document.getElementById('horarioModalLabel').textContent = 'Editar Horário de Trabalho';
+    document.getElementById('horario_id').value = id;
+    document.getElementById('nome').value = horario.nome;
+    
+    DIAS_SEMANA.forEach((dia, index) => {
+        const diaData = horario.dias[index];
+        const checkbox = document.getElementById(`${dia}_trabalha`);
+        
+        if (diaData) {
+            checkbox.checked = diaData.trabalha;
+            document.getElementById(`${dia}_entrada`).value = diaData.entrada || '08:00';
+            document.getElementById(`${dia}_saida`).value = diaData.saida || '17:00';
+            document.getElementById(`${dia}_pausa`).value = diaData.pausa || '1.0';
+        } else {
+            checkbox.checked = index < 5;
+            document.getElementById(`${dia}_entrada`).value = '08:00';
+            document.getElementById(`${dia}_saida`).value = '17:00';
+            document.getElementById(`${dia}_pausa`).value = '1.0';
+        }
+        
+        toggleDiaFields(dia);
+    });
+    
+    calcularTotalSemanal();
+    
+    const modal = new bootstrap.Modal(document.getElementById('horarioModal'));
+    modal.show();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if ($.fn.DataTable) {
+        $('#horariosTable').DataTable({
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.10.24/i18n/Portuguese-Brasil.json'
+            },
+            pageLength: 10,
+            responsive: true,
+            order: [[0, 'asc']]
+        });
+    }
+    
+    $('#horarioModal').on('hidden.bs.modal', function() {
+        prepararNovoHorario();
+    });
+    
+    DIAS_SEMANA.forEach(dia => {
+        const checkbox = document.getElementById(`${dia}_trabalha`);
+        if (checkbox && checkbox.checked) {
+            calcularHorasDia(dia);
+        }
+    });
+    calcularTotalSemanal();
+});
 </script>
+
+<style>
+.dia-container {
+    transition: background-color 0.2s;
+}
+.dia-container:hover {
+    background-color: #f8f9fa;
+}
+.horas-dia-badge {
+    min-width: 45px;
+    text-align: center;
+}
+.dia-fields {
+    margin-left: 1.5rem;
+    padding-top: 0.5rem;
+}
+</style>
 {% endblock %}
