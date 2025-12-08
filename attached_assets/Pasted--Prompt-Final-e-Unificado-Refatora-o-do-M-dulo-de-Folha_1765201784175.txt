@@ -1,0 +1,150 @@
+
+# Prompt Final e Unificado: Refatoração do Módulo de Folha com Análise de Impacto
+
+## 1. Objetivo Final e Análise de Impacto
+
+O objetivo é refatorar o módulo de folha de pagamento para que ele compare um **Horário de Trabalho Padrão** (contratual) com os **Registros de Ponto** (reais) para apurar automaticamente horas extras e faltas. 
+
+**Análise de Impacto (Sua Pergunta: "Mudar fórmulas ou tabelas?")**
+
+Você levantou um ponto crucial sobre o risco de alterar a tabela `HorarioTrabalho`. Investiguei o código e confirmei que a tabela atual é usada em várias partes do sistema (`configuracoes_views.py`, `equipe_views.py`, `utils.py`).
+
+No entanto, a estrutura atual da tabela **não suporta o seu requisito principal**: especificar horários diferentes para cada dia da semana. A tabela atual tem apenas um conjunto de `entrada`, `saida`, etc.
+
+*   **Mudar só as fórmulas não é possível**: Não podemos calcular a diferença entre o ponto real e o horário padrão de uma terça-feira se a tabela só armazena um horário genérico.
+*   **A mudança na tabela é indispensável**: Para que o sistema saiba qual era o horário esperado em cada dia específico da semana, a estrutura do banco de dados **precisa** ser alterada. A proposta de dividir `HorarioTrabalho` em um "molde" e `HorarioDia` para os detalhes é a única forma correta e profissional de implementar sua visão.
+
+**Conclusão**: A refatoração das views e utils que usam `HorarioTrabalho` é um passo necessário e inevitável para acomodar a nova, e mais poderosa, regra de negócio. O prompt a seguir inclui a adaptação desses pontos.
+
+**Parâmetros Anuais (INSS/IRRF)**
+
+Você também mencionou que as alíquotas mudam anualmente. O sistema já possui a tabela `ParametrosLegais` para isso. O prompt instrui o agente a **utilizar essa tabela**, garantindo que os cálculos sempre usem os valores corretos para o ano de referência da folha.
+
+---
+
+## 2. Passos Detalhados para Implementação
+
+### Passo 1: Evolução dos Modelos de Dados (`models.py`)
+
+**Tarefa**: Modifique os modelos para suportar um cadastro flexível de horários de trabalho.
+
+1.  **Refatore o modelo `HorarioTrabalho`**: Este modelo passará a ser um "molde" ou "padrão" de horário. Remova os campos de horário específicos dele.
+    *   **Arquivo**: `models.py`
+    *   **Modelo**: `HorarioTrabalho`
+    *   **Ação**: Deixe o modelo com a seguinte estrutura:
+
+        ```python
+        class HorarioTrabalho(db.Model):
+            __tablename__ = 'horario_trabalho'
+            id = db.Column(db.Integer, primary_key=True)
+            nome = db.Column(db.String(100), nullable=False, unique=True)
+            admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+            ativo = db.Column(db.Boolean, default=True)
+            created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+            dias = db.relationship('HorarioDia', backref='horario', lazy='dynamic', cascade="all, delete-orphan")
+        ```
+
+2.  **Crie o novo modelo `HorarioDia`**:
+    *   **Arquivo**: `models.py`
+    *   **Ação**: Adicione o seguinte novo modelo:
+
+        ```python
+        class HorarioDia(db.Model):
+            __tablename__ = 'horario_dia'
+            id = db.Column(db.Integer, primary_key=True)
+            horario_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'), nullable=False)
+            dia_semana = db.Column(db.Integer, nullable=False) # 0=Segunda, 1=Terça, ..., 6=Domingo
+            entrada = db.Column(db.Time, nullable=True)
+            saida = db.Column(db.Time, nullable=True)
+            pausa_horas = db.Column(db.Numeric(4, 2), default=1.0)
+            trabalha = db.Column(db.Boolean, default=True)
+
+            __table_args__ = (db.UniqueConstraint('horario_id', 'dia_semana', name='uk_horario_dia'),)
+        ```
+
+3.  **Atualize o modelo `Funcionario`**:
+    *   **Arquivo**: `models.py`
+    *   **Ação**: Verifique e ajuste o relacionamento:
+
+        ```python
+        class Funcionario(db.Model):
+            # ... outros campos ...
+            horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'), nullable=True)
+            horario_trabalho = db.relationship('HorarioTrabalho', backref='funcionarios')
+            # ... outros campos ...
+        ```
+
+### Passo 2: Crie o Script de Migração do Banco de Dados (`migrations.py`)
+
+**Tarefa**: Adicione uma nova função de migração para aplicar as mudanças do Passo 1.
+
+*   **Ação**: Crie uma nova função de migração que execute as seguintes operações SQL:
+    1.  Crie a nova tabela `horario_dia`.
+    2.  Altere a tabela `horario_trabalho`, removendo as colunas `entrada`, `saida_almoco`, `retorno_almoco`, `saida`, `dias_semana`, `horas_diarias`, `valor_hora`.
+    3.  Adicione a nova migração à lista de execuções.
+
+### Passo 3: Refatoração Completa do `services/folha_service.py`
+
+**Tarefa**: Reescreva a lógica de apuração de horas e cálculo da folha.
+
+1.  **Refatore `processar_folha_funcionario(funcionario, ano, mes)`**:
+    *   **Carregue os dados essenciais**: O `HorarioTrabalho` do funcionário (com seus 7 `HorarioDia`), todos os `RegistroPonto` do mês, e todos os feriados (`CalendarioUtil`) do mês.
+    *   **Inicialize acumuladores**: `total_he_50`, `total_he_100`, `total_horas_falta`.
+    *   **Crie um loop principal que itere por todos os dias do mês de referência**.
+    *   **Dentro do loop (para cada dia)**:
+        1.  Determine o dia da semana (0-6) e obtenha o `HorarioDia` padrão correspondente.
+        2.  Calcule as **horas contratuais** a partir do `HorarioDia`.
+        3.  Encontre o `RegistroPonto` daquele dia.
+        4.  Se não houver ponto em dia de trabalho, some as `horas_contratuais` ao `total_horas_falta`.
+        5.  Se houver ponto, calcule as **horas reais** e o **delta diário** (`horas_reais - horas_contratuais`).
+        6.  Se `delta > 0`, adicione às horas extras (100% para domingos/feriados, 50% para os demais).
+        7.  Se `delta < 0`, adicione o valor absoluto ao `total_horas_falta`.
+
+2.  **Implemente a Lógica de Cálculo Financeiro Detalhada**:
+    *   **Use `ParametrosLegais`**: Busque os parâmetros do `ano` da folha para obter as alíquotas de INSS, IRRF, etc.
+    *   **Valor da Hora**: `valor_hora = salario_base / (horas_semanais_contratuais * 5)`.
+    *   **Horas Extras**: `valor_he_50 = total_he_50 * valor_hora * 1.5`, `valor_he_100 = total_he_100 * valor_hora * 2.0`.
+    *   **DSR sobre Extras**: `valor_dsr = (valor_total_he / dias_uteis_no_mes) * domingos_e_feriados_no_mes`.
+    *   **Desconto Faltas/Atrasos**: `desconto_faltas = total_horas_falta * valor_hora`.
+    *   **Base INSS**: `salario_base + valor_total_he + valor_dsr + beneficios - desconto_faltas`.
+    *   **Desconto INSS**: Aplique a tabela progressiva obtida dos `ParametrosLegais`.
+    *   **Base IRRF**: `base_inss - desconto_inss - (dependentes * valor_deducao_dependente) - pensao`.
+    *   **Desconto IRRF**: Aplique a tabela progressiva dos `ParametrosLegais`.
+    *   **Desconto VT**: `min(valor_gasto_vt, salario_base * 0.06)`.
+    *   **Salário Líquido**: `Proventos - Descontos`.
+
+### Passo 4: Refatoração das Interfaces e Utils
+
+1.  **Gestão de Horários (`configuracoes_views.py`)**: Reescreva o CRUD de `HorarioTrabalho` para que o formulário (`horario_form.html`) permita editar os 7 `HorarioDia` (entrada, saída, pausa, flag `trabalha`) associados a um padrão.
+
+2.  **Associação no Funcionário (`views.py`)**: Adapte o formulário de edição de funcionário para usar o dropdown de `horario_trabalho_id`.
+
+3.  **Adaptação do `utils.py`**: Encontre as funções que usavam `horario_trabalho.horas_diarias` e adapte-as para a nova estrutura. Elas agora precisarão receber uma data específica para saber qual `HorarioDia` consultar e calcular a jornada daquele dia.
+
+---
+
+## 3. Exemplo de Dados de Teste para Validação
+
+Use este cenário para validar a implementação no `folha_service.py`.
+
+*   **Funcionário**: João da Silva
+*   **Salário Base Mensal**: R$ 3.000,00
+*   **Dependentes**: 2
+*   **Mês de Referência**: Maio de 2025 (21 dias úteis, 5 dias de descanso/feriado)
+*   **Horário Padrão**: 44h/semana (Seg-Qui 9h, Sex 8h).
+*   **Eventos de Ponto**:
+    *   01/05 (Feriado): Trabalhou 4h -> **4.0h extra 100%**.
+    *   05/05 (Segunda): Atrasou 0.5h -> **0.5h de falta**.
+    *   12/05 (Segunda): Trabalhou 2h a mais -> **2.0h extra 50%**.
+    *   19/05 (Segunda): Faltou -> **9.0h de falta**.
+*   **Outros Dados**: Benefício R$100, Gasto VT R$250, Convênio R$150, Pensão R$300, Outros Descontos R$50.
+
+### Resultado Esperado do Cálculo (Referência)
+
+*   **Valor da Hora**: R$ 13,64 (calculado de R$3000 / 220h)
+*   **Proventos**: R$ 3.285,76 (Salário Base + HE + DSR + Benefícios)
+*   **Descontos**: R$ 1.087,14 (INSS + VT + Convênio + Pensão + Outros + Faltas)
+*   **Salário Líquido Final**: **R$ 2.198,62**
+
+(Os cálculos detalhados estão no documento de análise anterior para conferência).
