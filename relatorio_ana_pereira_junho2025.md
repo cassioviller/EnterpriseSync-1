@@ -502,7 +502,78 @@ Custo Total = R$ 4.961,87 + R$ 1.389,32 = R$ 6.351,19
 
 ---
 
-## 12. CONCLUSÃO
+## 12. POLÍTICA DE BANCO DE HORAS
+
+### 12.1 Comportamento Atual do Sistema
+
+O SIGE v9.0 **NÃO implementa compensação automática de horas** (banco de horas com compensação em dias subsequentes). O sistema segue o modelo padrão CLT:
+
+| Situação | Tratamento |
+|----------|------------|
+| **Horas Extras** | Pagas como adicional no mesmo mês (50% ou 100%) |
+| **Faltas/Atrasos** | Descontados do salário no mesmo mês |
+| **Compensação** | **NÃO há compensação automática entre meses** |
+
+### 12.2 Justificativa
+
+A CLT (Art. 59 §2º) permite acordos de banco de horas, mas a implementação automática requer:
+
+1. **Acordo formal:** Individual ou coletivo documentado
+2. **Período de compensação:** Máximo 6 meses (acordo individual) ou 1 ano (CCT)
+3. **Controle de saldos:** Acumulado positivo e negativo com limites
+4. **Pagamento final:** Horas não compensadas no prazo devem ser pagas
+
+### 12.3 Implicações no Cálculo
+
+Para Ana Pereira (junho/2025):
+
+```
+Horas Extras: +5h (50%) e +4h (100%) → PAGAS no mês
+Faltas: 4h → DESCONTADAS no mês
+```
+
+**Sem banco de horas:** As 9h extras NÃO compensam as 4h de falta. Cada item é processado separadamente.
+
+### 12.4 Sistema de Tolerância (Migração 63)
+
+A partir de Dezembro/2025, o sistema implementa **tolerância configurável**:
+
+| Parâmetro | Valor Padrão | Descrição |
+|-----------|--------------|-----------|
+| `tolerancia_minutos` | 10 minutos | Variações dentro desse limite são ignoradas |
+
+**Aplicação simétrica:** A tolerância se aplica tanto para horas extras (delta positivo) quanto para atrasos/faltas (delta negativo). Se o funcionário sai 8 minutos mais cedo, a falta não é computada.
+
+**Nota:** A tolerância atualmente se aplica a todos os dias, incluindo domingos/feriados trabalhados. Se for necessário comportamento diferenciado, requer ajuste de requisitos.
+
+**Exemplo para hora extra:**
+- Trabalhador faz 8h05min em dia de 8h contratual
+- Delta: +5 minutos (dentro da tolerância de 10min)
+- Resultado: **0 horas extras** (ignorado por tolerância)
+
+Se delta fosse 15 minutos:
+- Excede tolerância: 15min - 10min = 5min
+- Resultado: **5 minutos de hora extra**
+
+**Exemplo para atraso:**
+- Trabalhador faz 7h55min em dia de 8h contratual
+- Delta: -5 minutos (dentro da tolerância de 10min)
+- Resultado: **0 horas de falta** (ignorado por tolerância)
+
+### 12.5 Configuração Futura
+
+Para empresas que desejarem banco de horas:
+
+1. **Implementar modelo `BancoHoras`** com saldo acumulado por funcionário
+2. **Adicionar flag `usa_banco_horas`** em configurações da empresa
+3. **Criar lógica de compensação** antes de calcular pagamento/desconto
+4. **Gerar relatório de saldo** para controle do RH
+
+**Status:** Não implementado - aguardando definição de requisitos de negócio.
+
+---
+
+## 13. CONCLUSÃO
 
 O sistema de horários flexíveis (HorarioDia) está funcionando corretamente:
 
