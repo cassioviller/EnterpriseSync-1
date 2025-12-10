@@ -2009,6 +2009,10 @@ class ParametrosLegais(db.Model):
     hora_extra_50_percentual = db.Column(db.Numeric(5, 2), default=50.0)
     hora_extra_100_percentual = db.Column(db.Numeric(5, 2), default=100.0)
     
+    # TOLERÂNCIA PARA HORAS EXTRAS E ATRASOS (Dez/2025)
+    # Variações em minutos dentro dessa tolerância não são computadas como extras ou atrasos
+    tolerancia_minutos = db.Column(db.Integer, default=10)  # Padrão: 10 minutos de tolerância
+    
     # Controle
     ativo = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

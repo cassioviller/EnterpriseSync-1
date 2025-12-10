@@ -3337,6 +3337,71 @@ def _migration_62_horario_trabalho_nullable():
                 pass
 
 
+def _migration_63_tolerancia_minutos():
+    """
+    Migração 63: Adicionar tolerância em minutos para horas extras/atrasos
+    
+    Adiciona campo tolerancia_minutos à tabela parametros_legais.
+    Variações dentro dessa tolerância não são computadas como extras ou atrasos.
+    Padrão: 10 minutos (prática comum de mercado)
+    """
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("⏱️  MIGRAÇÃO 63: Tolerância para horas extras/atrasos")
+        logger.info("=" * 80)
+        
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'parametros_legais' AND column_name = 'tolerancia_minutos'
+        """)
+        
+        if cursor.fetchone():
+            logger.info("  ⏭️ Coluna tolerancia_minutos já existe - SKIP")
+        else:
+            cursor.execute("""
+                ALTER TABLE parametros_legais 
+                ADD COLUMN tolerancia_minutos INTEGER DEFAULT 10
+            """)
+            logger.info("  ✅ Coluna tolerancia_minutos adicionada com default=10")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 63 CONCLUÍDA COM SUCESSO!")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 63: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
+
 def _migration_59_alimentacao_itens_sistema():
     """
     Migração 59: Sistema de Itens de Alimentação v2.0
@@ -3574,6 +3639,7 @@ def executar_migracoes():
             (60, "Adicionar created_at em centro_custo_contabil", _migration_60_centro_custo_created_at),
             (61, "Sistema HorarioDia para horários flexíveis", _migration_61_horario_dia_sistema),
             (62, "Tornar colunas legadas de HorarioTrabalho nullable", _migration_62_horario_trabalho_nullable),
+            (63, "Tolerância minutos para horas extras/atrasos", _migration_63_tolerancia_minutos),
         ]
         
         # Executar cada migração com rastreamento

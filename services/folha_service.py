@@ -311,10 +311,17 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
         
         horario_trabalho = funcionario.horario_trabalho
         
+        tolerancia_minutos = 10
+        if funcionario.admin_id:
+            params = _obter_parametros_legais(funcionario.admin_id, ano)
+            if params and hasattr(params, 'tolerancia_minutos') and params.tolerancia_minutos is not None:
+                tolerancia_minutos = params.tolerancia_minutos
+        
         if horario_trabalho and horario_trabalho.dias.count() > 0:
             return _calcular_horas_mes_novo(
                 funcionario, horario_trabalho, registros, 
-                primeiro_dia, ultimo_dia, datas_feriados, ano, mes
+                primeiro_dia, ultimo_dia, datas_feriados, ano, mes,
+                tolerancia_minutos=tolerancia_minutos
             )
         else:
             logger.debug(f"[calcular_horas_mes] Func {funcionario_id} sem HorarioTrabalho, usando lógica legada")
@@ -353,11 +360,26 @@ def _calcular_horas_mes_novo(
     ultimo_dia: date,
     datas_feriados: set,
     ano: int,
-    mes: int
+    mes: int,
+    tolerancia_minutos: int = 10
 ) -> Dict:
     """
     Nova lógica de cálculo baseada em HorarioDia.
     Compara horas trabalhadas com horas contratuais para cada dia.
+    
+    ATUALIZADO (Dez/2025): Aplica tolerância configurável para evitar
+    que pequenas variações de minutos sejam computadas como extras ou atrasos.
+    
+    Args:
+        funcionario: Objeto Funcionario
+        horario_trabalho: Objeto HorarioTrabalho com dias associados
+        registros: Lista de RegistroPonto do período
+        primeiro_dia: Data de início do período
+        ultimo_dia: Data de fim do período
+        datas_feriados: Set de datas que são feriados
+        ano: Ano de referência
+        mes: Mês de referência
+        tolerancia_minutos: Minutos de tolerância para extras/atrasos (default: 10)
     """
     from datetime import timedelta
     
@@ -378,6 +400,8 @@ def _calcular_horas_mes_novo(
     dias_uteis_esperados = 0
     domingos_feriados = 0
     sabados = 0
+    
+    tolerancia_horas = Decimal(str(tolerancia_minutos)) / Decimal('60')
     
     dia_atual = primeiro_dia
     while dia_atual <= ultimo_dia:
@@ -412,13 +436,17 @@ def _calcular_horas_mes_novo(
             
             delta = horas_reais - horas_contratuais_dia
             
-            if delta > 0:
+            if abs(delta) <= tolerancia_horas:
+                pass
+            elif delta > 0:
+                delta_efetivo = delta - tolerancia_horas if delta > tolerancia_horas else delta
                 if dia_semana == 6 or eh_feriado:
-                    horas_extras_100 += delta
+                    horas_extras_100 += delta_efetivo
                 else:
-                    horas_extras_50 += delta
+                    horas_extras_50 += delta_efetivo
             elif delta < 0:
-                horas_falta += abs(delta)
+                delta_efetivo = abs(delta) - tolerancia_horas if abs(delta) > tolerancia_horas else abs(delta)
+                horas_falta += delta_efetivo
         
         elif eh_dia_trabalho:
             horas_falta += horas_contratuais_dia
@@ -430,8 +458,8 @@ def _calcular_horas_mes_novo(
     
     logger.debug(
         f"[_calcular_horas_mes_novo] Func {funcionario.id} ({funcionario.nome}) - "
-        f"Horas contratuais: {horas_contratuais_mes}, Trabalhadas: {total_horas}, "
-        f"HE50: {horas_extras_50}, HE100: {horas_extras_100}, Faltas(h): {horas_falta}"
+        f"Tolerância: {tolerancia_minutos}min, Horas contratuais: {horas_contratuais_mes}, "
+        f"Trabalhadas: {total_horas}, HE50: {horas_extras_50}, HE100: {horas_extras_100}, Faltas(h): {horas_falta}"
     )
     
     return {
@@ -446,7 +474,8 @@ def _calcular_horas_mes_novo(
         'faltas': faltas_dias,
         'horas_falta': float(horas_falta),
         'horas_contratuais_mes': float(horas_contratuais_mes),
-        'total_minutos_atraso': total_minutos_atraso
+        'total_minutos_atraso': total_minutos_atraso,
+        'tolerancia_minutos': tolerancia_minutos
     }
 
 
