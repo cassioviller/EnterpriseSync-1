@@ -1,0 +1,92 @@
+
+# Análise do Código Atualizado e Cenário de Teste End-to-End
+
+## 1. Análise e Considerações sobre a Implementação
+
+Após sincronizar e analisar as últimas atualizações no repositório, a implementação da nova lógica de folha de pagamento foi verificada. A seguir, minhas considerações técnicas sobre o trabalho realizado.
+
+### 1.1. Estrutura de Dados (`models.py`)
+
+*   **Ponto Positivo**: A criação do modelo `HorarioDia` e a refatoração do `HorarioTrabalho` foram implementadas exatamente como planejado. A estrutura agora é robusta e permite a configuração de jornadas de trabalho flexíveis por dia da semana.
+*   **Ponto de Atenção (e boa solução)**: O desenvolvedor optou por **manter os campos legados** (`entrada`, `saida`, etc.) no modelo `HorarioTrabalho` por enquanto. Isso é uma **excelente prática de transição**, pois evita que o sistema quebre em partes que ainda não foram migradas. A lógica no `folha_service.py` prioriza a nova estrutura (`HorarioDia`) e usa a legada como fallback, o que é ideal.
+
+### 1.2. Lógica de Cálculo (`services/folha_service.py`)
+
+*   **Ponto Positivo**: A lógica principal foi implementada na função `_calcular_horas_mes_novo`. Ela corretamente itera sobre os dias do mês, compara as horas do `RegistroPonto` com as horas do `HorarioDia` e acumula horas extras (50/100) e faltas.
+*   **Ponto Positivo**: O cálculo do **valor da hora foi corrigido** e agora usa a função `_calcular_horas_contratuais_reais`, que apura as horas teóricas do mês com base no calendário real, exatamente como solicitado na última interação. Isso garante a precisão dos cálculos.
+*   **Ponto Positivo**: O serviço agora consulta os `ParametrosLegais` para obter as tabelas de INSS e IRRF, tornando o sistema flexível a mudanças anuais na legislação.
+
+### 1.3. Interface de Usuário (`configuracoes/horarios.html`)
+
+*   **Ponto Positivo**: A interface para gerenciar os horários de trabalho foi completamente refeita. Agora, um modal permite a configuração detalhada de cada dia da semana (entrada, saída, pausa e se é um dia de trabalho), com cálculos de horas em tempo real via JavaScript. A interface está intuitiva e funcional.
+
+### 1.4. Considerações Gerais
+
+*   **Qualidade do Código**: A implementação foi bem-sucedida e seguiu as diretrizes do prompt. O código está bem estruturado, com separação de responsabilidades e tratamento de casos de fallback para a lógica legada, o que demonstra um bom planejamento de migração.
+*   **Próximo Passo Sugerido**: O próximo passo natural seria refatorar as partes do sistema que ainda dependem dos campos legados de `HorarioTrabalho` para que, no futuro, esses campos possam ser removidos em definitivo do banco de dados.
+
+**Conclusão da Análise**: O sistema foi atualizado com sucesso para a nova lógica de cálculo de folha de pagamento. A implementação está correta, robusta e pronta para ser testada.
+
+---
+
+## 2. Cenário de Teste Completo (End-to-End)
+
+Este cenário descreve um fluxo completo, desde a configuração inicial até a verificação do resultado final, para garantir que todos os componentes estejam funcionando como esperado.
+
+### Passo 1: Configuração do Horário de Trabalho
+
+1.  **Acesse o Sistema**: Faça login como administrador.
+2.  **Navegue para Configurações**: Vá para o menu "Configurações" > "Horários de Trabalho".
+3.  **Crie um Novo Horário**:
+    *   Clique em "Novo Horário".
+    *   **Nome do Horário**: `Administrativo 40h`
+    *   **Configure os Dias**:
+        *   **Segunda a Quinta**: Marque como dia de trabalho, `Entrada: 09:00`, `Saída: 18:00`, `Pausa: 1.0 hora`.
+        *   **Sexta-feira**: Marque como dia de trabalho, `Entrada: 09:00`, `Saída: 13:00`, `Pausa: Sem pausa`.
+        *   **Sábado e Domingo**: Desmarque a caixa "Trabalha".
+    *   **Salve** o novo horário.
+
+### Passo 2: Cadastro e Configuração do Funcionário
+
+1.  **Navegue para Funcionários**: Vá para a seção de gerenciamento de funcionários.
+2.  **Crie um Novo Funcionário**:
+    *   **Nome**: `Ana Pereira`
+    *   **Salário Base**: `R$ 4.500,00`
+    *   **Horário de Trabalho**: No dropdown, selecione o horário `Administrativo 40h` criado no passo anterior.
+    *   **Dependentes**: 1
+    *   Preencha os demais campos obrigatórios e salve.
+
+### Passo 3: Lançamento dos Registros de Ponto
+
+Vamos simular o mês de **Junho de 2025** para a funcionária Ana Pereira.
+
+1.  **Navegue para a Página de Ponto**: Acesse a interface de lançamento de pontos.
+2.  **Lance os Seguintes Pontos**:
+    *   **02/06/2025 (Segunda-feira)**: Lance um ponto normal. `Entrada: 09:00`, `Saída: 18:00`, `Pausa: 1h`. (Cumpriu o horário).
+    *   **03/06/2025 (Terça-feira)**: Lance um ponto com **horas extras**. `Entrada: 09:00`, `Saída: 20:00`, `Pausa: 1h`. (2 horas extras a 50%).
+    *   **04/06/2025 (Quarta-feira)**: Lance um ponto com **atraso**. `Entrada: 10:00`, `Saída: 18:00`, `Pausa: 1h`. (1 hora de falta/atraso).
+    *   **06/06/2025 (Sexta-feira)**: Não lance nenhum ponto para este dia (simulando uma **falta** de 4 horas).
+    *   **08/06/2025 (Domingo)**: Lance um ponto em um dia de folga. `Entrada: 10:00`, `Saída: 14:00`, `Pausa: Sem pausa`. (4 horas extras a 100%).
+
+### Passo 4: Verificação dos KPIs e Cálculo do Salário
+
+1.  **Acesse o Dashboard de Folha de Pagamento**: Navegue para a área de KPIs ou para a tela de processamento de folha.
+2.  **Selecione o Funcionário e o Período**: Filtre por `Ana Pereira` e o mês de `Junho de 2025`.
+3.  **Verifique os KPIs de Horas**:
+    *   O sistema deve exibir um resumo das horas apuradas para o mês, mostrando:
+        *   Total de Horas Extras 50%: `2.0 horas`
+        *   Total de Horas Extras 100%: `4.0 horas`
+        *   Total de Horas de Falta/Atraso: `5.0 horas` (1h do atraso + 4h da falta).
+
+4.  **Processe o Salário**:
+    *   Execute a ação para calcular a folha de pagamento de Ana Pereira para Junho de 2025.
+    *   **Insira os Dados Adicionais** (se a interface permitir):
+        *   **Gasto com VT**: R$ 200,00
+        *   **Convênio Médico**: R$ 250,00
+
+5.  **Analise o Holerite/Resultado Final**:
+    *   O sistema deve apresentar um resumo do salário com os valores calculados. Verifique se os descontos de INSS, IRRF (se aplicável), VT, e os proventos de horas extras e DSR estão corretos, seguindo a lógica implementada no `folha_service.py`.
+    *   O **valor da hora** deve ter sido calculado com base nas horas contratuais reais de Junho de 2025 para o horário `Administrativo 40h`.
+    *   O **salário líquido final** deve refletir todos os proventos e descontos apurados.
+
+Este cenário de teste cobre a criação de uma configuração do zero, o registro de pontos com diferentes cenários e a verificação do resultado final, garantindo um teste completo da nova funcionalidade.
