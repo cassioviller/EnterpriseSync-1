@@ -628,12 +628,17 @@ def calcular_valor_hora_dinamico(funcionario: Funcionario, horas_info: Dict, dat
         return Decimal(str(calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)))
 
 
-def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inicio: date, data_fim: date) -> Decimal:
+def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inicio: date, data_fim: date) -> Dict:
     """
     Calcula salário bruto considerando tipo de salário e horas extras.
     
-    ATUALIZADO: Usa horas contratuais reais do mês para calcular valor_hora
-    e desconto de faltas baseado em horas_falta quando disponível.
+    ATUALIZADO (Dez/2025): Retorna dicionário com salário bruto (base para impostos)
+    e descontos de faltas/atrasos separados (aplicados apenas no líquido).
+    
+    CORREÇÃO IMPORTANTE: O desconto de faltas NÃO deve reduzir a base de cálculo
+    do INSS/IRRF. O salário bruto (base para impostos) é calculado sobre o que
+    o funcionário teria direito se não tivesse faltado. O desconto de faltas
+    é aplicado apenas no cálculo do salário líquido final.
     
     Args:
         funcionario: Objeto Funcionario
@@ -642,7 +647,16 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
         data_fim: Data de fim do período
         
     Returns:
-        Decimal: Valor do salário bruto
+        Dict: {
+            'salario_bruto': Decimal - base para INSS/IRRF (sem faltas),
+            'total_proventos': Decimal - soma de todos os proventos,
+            'desconto_faltas': Decimal - valor a descontar do líquido,
+            'desconto_atrasos': Decimal - valor a descontar do líquido,
+            'salario_normal': Decimal - salário base,
+            'valor_extras': Decimal - valor das horas extras,
+            'valor_dsr': Decimal - DSR sobre extras,
+            'valor_hora': Decimal - valor da hora calculado
+        }
     """
     try:
         config = ConfiguracaoSalarial.query.filter_by(
@@ -689,20 +703,45 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
         else:
             valor_desconto_atrasos = Decimal('0')
         
-        salario_bruto = salario_normal + valor_extras + valor_dsr - valor_desconto_faltas - valor_desconto_atrasos
+        salario_bruto = salario_normal + valor_extras + valor_dsr
+        
+        total_proventos = salario_bruto - valor_desconto_faltas - valor_desconto_atrasos
         
         logger.debug(
             f"[calcular_salario_bruto] Func {funcionario.id}: "
             f"Normal={salario_normal}, HE={valor_extras}, DSR={valor_dsr}, "
+            f"Bruto(base impostos)={salario_bruto}, "
             f"DescFaltas={valor_desconto_faltas}, DescAtrasos={valor_desconto_atrasos}, "
-            f"Bruto={salario_bruto}"
+            f"TotalProventos(líquido)={total_proventos}"
         )
         
-        return salario_bruto
+        return {
+            'salario_bruto': salario_bruto,
+            'total_proventos': total_proventos,
+            'desconto_faltas': valor_desconto_faltas,
+            'desconto_atrasos': valor_desconto_atrasos,
+            'salario_normal': salario_normal,
+            'valor_extras': valor_extras,
+            'valor_he_50': valor_he_50,
+            'valor_he_100': valor_he_100,
+            'valor_dsr': valor_dsr,
+            'valor_hora': valor_hora_normal
+        }
         
     except Exception as e:
         logger.error(f"Erro ao calcular salário bruto: {e}", exc_info=True)
-        return Decimal('0')
+        return {
+            'salario_bruto': Decimal('0'),
+            'total_proventos': Decimal('0'),
+            'desconto_faltas': Decimal('0'),
+            'desconto_atrasos': Decimal('0'),
+            'salario_normal': Decimal('0'),
+            'valor_extras': Decimal('0'),
+            'valor_he_50': Decimal('0'),
+            'valor_he_100': Decimal('0'),
+            'valor_dsr': Decimal('0'),
+            'valor_hora': Decimal('0')
+        }
 
 
 # ========================================
@@ -880,6 +919,9 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, pa
     """
     Processa a folha completa de um funcionário.
     
+    ATUALIZADO (Dez/2025): Corrigido cálculo para que o desconto de faltas
+    seja aplicado apenas no líquido, não na base de INSS/IRRF.
+    
     Args:
         funcionario: Objeto Funcionario
         ano: Ano de referência
@@ -900,13 +942,25 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, pa
         
         horas_info = calcular_horas_mes(funcionario.id, ano, mes)
         
-        salario_bruto = calcular_salario_bruto(funcionario, horas_info, data_inicio, data_fim)
+        resultado_bruto = calcular_salario_bruto(funcionario, horas_info, data_inicio, data_fim)
+        
+        salario_bruto = resultado_bruto['salario_bruto']
+        desconto_faltas = resultado_bruto['desconto_faltas']
+        desconto_atrasos = resultado_bruto['desconto_atrasos']
+        total_proventos = resultado_bruto['total_proventos']
         
         descontos = calcular_descontos(salario_bruto, funcionario, params)
         
         encargos = calcular_encargos_patronais(salario_bruto, params)
         
-        salario_liquido = salario_bruto - Decimal(str(descontos['total']))
+        salario_liquido = total_proventos - Decimal(str(descontos['total']))
+        
+        logger.debug(
+            f"[processar_folha_funcionario] Func {funcionario.id}: "
+            f"Bruto(base impostos)={salario_bruto}, TotalProventos={total_proventos}, "
+            f"DescFaltas={desconto_faltas}, Descontos(INSS+IRRF)={descontos['total']}, "
+            f"Líquido={salario_liquido}"
+        )
         
         return {
             'funcionario_id': funcionario.id,
@@ -914,13 +968,22 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, pa
             'salario_base': float(funcionario.salario or 0),
             'horas_trabalhadas': horas_info['total'],
             'horas_extras': horas_info['extras'],
+            'horas_extras_50': horas_info.get('extras_50', 0),
+            'horas_extras_100': horas_info.get('extras_100', 0),
             'dias_trabalhados': horas_info['dias_trabalhados'],
             'faltas': horas_info['faltas'],
-            'total_proventos': float(salario_bruto),
+            'horas_falta': horas_info.get('horas_falta', 0),
+            'salario_bruto': float(salario_bruto),
+            'total_proventos': float(total_proventos),
+            'desconto_faltas': float(desconto_faltas),
+            'desconto_atrasos': float(desconto_atrasos),
+            'valor_he_50': float(resultado_bruto.get('valor_he_50', 0)),
+            'valor_he_100': float(resultado_bruto.get('valor_he_100', 0)),
+            'valor_dsr': float(resultado_bruto.get('valor_dsr', 0)),
             'inss': descontos['inss'],
             'irrf': descontos['ir'],
             'outros_descontos': descontos['beneficios'],
-            'total_descontos': descontos['total'],
+            'total_descontos': descontos['total'] + float(desconto_faltas) + float(desconto_atrasos),
             'salario_liquido': float(salario_liquido),
             'fgts': encargos['fgts'],
             'encargos_patronais': encargos['total'],
