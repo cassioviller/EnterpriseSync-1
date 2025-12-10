@@ -1,0 +1,91 @@
+
+# Prompt para Agente Replit: Ajustes Finais no Módulo de Folha de Pagamento
+
+## 1. Contexto
+
+A implementação principal da nova lógica de folha de pagamento foi um sucesso. No entanto, a análise do primeiro relatório gerado revelou a necessidade de alguns ajustes finos nas regras de negócio para garantir 100% de precisão e conformidade com as práticas de RH. Este prompt detalha as correções necessárias.
+
+---
+
+## 2. Correções a Serem Implementadas
+
+### Correção 1: Implementar Tolerância para Apuração de Horas (Prioridade Baixa)
+
+*   **Problema**: O sistema está computando pequenas variações de minutos como horas extras ou atrasos, o que pode gerar ruído na folha de pagamento.
+*   **Arquivo a ser Modificado**: `services/folha_service.py`
+*   **Função a ser Modificada**: `_calcular_horas_mes_novo`
+*   **Lógica a ser Implementada**:
+    1.  **Adicionar Parâmetro de Tolerância**: No modelo `ParametrosLegais`, adicione um novo campo `tolerancia_minutos_ponto` (Integer, default 10).
+    2.  **Buscar a Tolerância**: No início da função `_calcular_horas_mes_novo`, busque o valor de `tolerancia_minutos_ponto` dos `ParametrosLegais` do ano.
+    3.  **Aplicar a Tolerância**: Ao calcular o `delta` diário em minutos (`delta_minutos = (horas_reais - horas_contratuais) * 60`), aplique a seguinte regra:
+
+        ```python
+        if abs(delta_minutos) <= tolerancia_minutos_ponto:
+            # Dentro da tolerância, não faz nada
+            pass
+        elif delta_minutos > 0:
+            # Computa apenas o que exceder a tolerância como HE
+            minutos_extras = delta_minutos - tolerancia_minutos_ponto
+            horas_extras_50 += (minutos_extras / 60)
+        elif delta_minutos < 0:
+            # Computa apenas o que exceder a tolerância como falta/atraso
+            minutos_falta = abs(delta_minutos) - tolerancia_minutos_ponto
+            horas_falta += (minutos_falta / 60)
+        ```
+
+### Correção 2: Esclarecer e Implementar Regra de Banco de Horas (Prioridade Média)
+
+*   **Problema**: A apuração de `horas_falta` parece estar fazendo uma compensação automática com horas extras, mas a regra não está clara nem consistente.
+*   **Decisão da Regra de Negócio**: **NÃO haverá banco de horas automático**. Horas extras são sempre pagas e faltas/atrasos são sempre descontados. Não deve haver compensação entre eles.
+*   **Arquivo a ser Modificado**: `services/folha_service.py`
+*   **Função a ser Modificada**: `_calcular_horas_mes_novo`
+*   **Lógica a ser Implementada**:
+    *   Garanta que a lógica de apuração de `horas_falta` e `horas_extras` seja totalmente independente. Remova qualquer lógica que possa estar subtraindo um do outro. O `delta` de cada dia deve ser somado ao seu respectivo acumulador (extras ou faltas) sem nenhuma outra condição.
+
+        ```python
+        # Lógica correta e simples
+        delta = horas_reais - horas_contratuais_dia
+
+        if delta > 0:
+            if dia_semana == 6 or eh_feriado:
+                horas_extras_100 += delta
+            else:
+                horas_extras_50 += delta
+        elif delta < 0:
+            horas_falta += abs(delta)
+        ```
+
+### Correção 3: Ajuste no Cálculo do Salário Bruto (Prioridade Alta)
+
+*   **Problema**: A função `calcular_salario_bruto` está retornando um `total_proventos` que já subtrai o desconto de faltas, o que leva a um cálculo incorreto da base para INSS e IRRF.
+*   **Arquivo a ser Modificado**: `services/folha_service.py`
+*   **Função a ser Modificada**: `calcular_salario_bruto`
+*   **Lógica a ser Implementada**:
+    1.  A função já calcula `salario_bruto = salario_normal + valor_extras + valor_dsr`. Este valor está **correto** e deve ser a base para os impostos.
+    2.  O problema está no retorno. A chave `total_proventos` retornada pela função está incorreta. Ela deve ser a mesma que `salario_bruto`.
+    3.  O `valor_desconto_faltas` e `valor_desconto_atrasos` devem ser retornados separadamente, como já está sendo feito, para serem usados **apenas no cálculo do salário líquido final**.
+
+    *   **Ação**: Revise a função `processar_folha_funcionario` para garantir que ela use o `salario_bruto` retornado como base para `calcular_inss` e `calcular_irrf`, e que os descontos de faltas/atrasos sejam subtraídos apenas no final para se chegar ao `salario_liquido`.
+
+        ```python
+        # Em processar_folha_funcionario
+
+        # ...
+        bruto_info = calcular_salario_bruto(...)
+        base_impostos = bruto_info["salario_bruto"] # CORRETO
+
+        desconto_inss = calcular_inss(base_impostos, ...)
+        
+        base_irrf = base_impostos - desconto_inss # ... outras deduções
+        desconto_irrf = calcular_irrf(base_irrf, ...)
+
+        # ... outros descontos
+
+        salario_liquido = base_impostos - desconto_inss - desconto_irrf - bruto_info["desconto_faltas"] - ...
+        ```
+
+---
+
+## 3. Conclusão
+
+Após a aplicação destas três correções, o sistema de folha de pagamento estará em conformidade com as práticas contábeis padrão e as regras de negócio definidas. A Correção 3 é a mais crítica e deve ser priorizada.
