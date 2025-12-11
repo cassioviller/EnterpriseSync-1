@@ -1,0 +1,25 @@
+
+# Relatório de Conformidade com a CLT - Módulo de Folha de Pagamento
+
+## 1. Introdução
+
+Este relatório valida se a lógica de cálculo implementada no `services/folha_service.py` está em conformidade com as principais regras da Consolidação das Leis do Trabalho (CLT) e com a legislação tributária brasileira vigente em 2025. A análise foi baseada na pesquisa de fontes oficiais e na inspeção do código-fonte.
+
+## 2. Análise de Conformidade
+
+| Item | Regra CLT / Legal | Implementação no Código | Status |
+| :--- | :--- | :--- | :--- |
+| **Horas Extras** | Adicional de no mínimo 50% para dias úteis e 100% para domingos e feriados. | A função `calcular_salario_bruto` (linhas 717-719) aplica corretamente os multiplicadores de `1.5` e `2.0` sobre o valor da hora. | ✅ **Conforme** |
+| **DSR sobre Extras** | O valor das horas extras habituais deve refletir no Descanso Semanal Remunerado. A fórmula é: `(Total HE / Dias Úteis) * Dias de Descanso`. | A função `calcular_dsr` (linhas 582-603) implementa exatamente esta fórmula, separando o cálculo para HE 50% e 100% e somando os resultados. | ✅ **Conforme** |
+| **Cálculo do INSS** | Tabela progressiva com alíquotas de 7,5% a 14% para 2025. O cálculo é feito por faixas de salário. | A função `calcular_inss` (linhas 780-813) implementa o cálculo progressivo por faixas, iterando sobre a tabela e aplicando a alíquota correspondente a cada parte do salário. | ✅ **Conforme** |
+| **Cálculo do IRRF** | Tabela progressiva com alíquotas de 0% a 27,5% e parcelas a deduzir. A base de cálculo é: `Salário Bruto - INSS - Dependentes - Pensão`. | A função `calcular_irrf` (linhas 816-867) calcula a base de IRRF corretamente e aplica a fórmula `(Base * Alíquota) - Parcela a Deduzir`. | ✅ **Conforme** |
+| **Base de Impostos** | O desconto de faltas não deve reduzir a base de cálculo do INSS e do IRRF. | A função `processar_folha_funcionario` (linhas 974-985) foi corrigida e agora utiliza o `salario_bruto` (sem o desconto de faltas) como base para os impostos. | ✅ **Conforme** |
+| **Valor da Hora** | Para mensalistas, o divisor padrão é 220 horas, mas o ideal é usar as horas contratuais reais do mês. | A função `calcular_valor_hora_dinamico` (linhas 606-657) prioriza o cálculo com base nas `horas_contratuais_mes` apuradas pelo novo sistema, o que é mais preciso que a regra geral. | ✅ **Conforme** |
+
+## 3. Pontos de Atenção e Melhorias
+
+*   **Tabelas de Impostos**: As tabelas de INSS e IRRF (`TABELA_INSS_2025` e `TABELA_IR_2025`) estão fixas no código (`hardcoded`). Embora a função `_gerar_tabela_inss` já busque os valores dos `ParametrosLegais`, a implementação principal ainda usa a tabela fixa como fallback. Seria ideal que o sistema **sempre** utilizasse os parâmetros do banco de dados, tornando o `ParametrosLegais` a única fonte da verdade e facilitando a atualização anual das alíquotas sem a necessidade de alterar o código.
+
+## 4. Conclusão
+
+O sistema demonstra um **alto grau de conformidade** com a legislação trabalhista e tributária brasileira para os itens analisados. A lógica de cálculo para os principais proventos e descontos está correta e alinhada com as melhores práticas. A recomendação principal é evoluir o sistema para que as tabelas de impostos sejam lidas exclusivamente do banco de dados, eliminando a necessidade de mantê-las fixas no código.

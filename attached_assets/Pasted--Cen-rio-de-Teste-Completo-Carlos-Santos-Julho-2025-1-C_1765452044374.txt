@@ -1,0 +1,62 @@
+# Cenário de Teste Completo: Carlos Santos - Julho/2025
+
+## 1. Contexto
+
+Este documento descreve o passo a passo para um teste completo (end-to-end) do módulo de folha de pagamento, utilizando um novo cenário para validar as correções e a conformidade do sistema com as regras de negócio e a CLT.
+
+## 2. Passos do Teste
+
+### Passo 1: Configuração do Horário de Trabalho
+
+1.  **Acesse o Sistema**: Faça login como administrador.
+2.  **Crie um Novo Horário**:
+    *   **Nome do Horário**: `Operacional 12x36`
+    *   **Configure os Dias**:
+        *   **Segunda-feira**: Marque como dia de trabalho, `Entrada: 07:00`, `Saída: 19:00`, `Pausa: 1.0 hora`.
+        *   **Terça-feira**: Desmarque a caixa "Trabalha".
+        *   **Quarta-feira**: Marque como dia de trabalho, `Entrada: 07:00`, `Saída: 19:00`, `Pausa: 1.0 hora`.
+        *   **Quinta-feira**: Desmarque a caixa "Trabalha".
+        *   **Sexta-feira**: Marque como dia de trabalho, `Entrada: 07:00`, `Saída: 19:00`, `Pausa: 1.0 hora`.
+        *   **Sábado e Domingo**: Desmarque a caixa "Trabalha".
+    *   **Salve** o novo horário.
+
+### Passo 2: Cadastro e Configuração do Funcionário
+
+1.  **Crie um Novo Funcionário**:
+    *   **Nome**: `Carlos Santos`
+    *   **Salário Base**: `R$ 2.800,00`
+    *   **Horário de Trabalho**: Selecione o horário `Operacional 12x36`.
+    *   **Dependentes**: 0
+    *   Salve o funcionário.
+
+### Passo 3: Lançamento dos Registros de Ponto (Julho/2025)
+
+1.  **Acesse a Página de Ponto**.
+2.  **Lance os Seguintes Pontos para Carlos Santos**:
+    *   **02/07/2025 (Quarta-feira)**: Ponto normal. `Entrada: 07:00`, `Saída: 19:00`, `Pausa: 1h`. (Cumpriu o horário de 11h).
+    *   **04/07/2025 (Sexta-feira)**: Ponto com **saída antecipada**. `Entrada: 07:00`, `Saída: 17:00`, `Pausa: 1h`. (2 horas de falta).
+    *   **07/07/2025 (Segunda-feira)**: Ponto com **horas extras**. `Entrada: 07:00`, `Saída: 21:00`, `Pausa: 1h`. (2 horas extras a 50%).
+    *   **09/07/2025 (Quarta-feira)**: Feriado Estadual (SP) - Dia da Revolução Constitucionalista. O funcionário **trabalhou** normalmente. `Entrada: 07:00`, `Saída: 19:00`, `Pausa: 1h`. (11 horas extras a 100%).
+    *   **11/07/2025 (Sexta-feira)**: Não lance nenhum ponto para este dia (simulando uma **falta total** de 11 horas).
+
+### Passo 4: Processamento da Folha e Geração do Relatório
+
+1.  **Processe a Folha de Pagamento**: Calcule a folha de Carlos Santos para **Julho de 2025**.
+    *   **Dados Adicionais**: Considere um desconto de **R$ 80,00** para **Convênio Odontológico**.
+
+2.  **Gere um Novo Relatório Detalhado**:
+    *   **Tarefa**: Crie um novo arquivo Markdown chamado `relatorio_carlos_santos_julho2025.md`.
+    *   **Conteúdo do Relatório**: O relatório deve seguir **exatamente a mesma estrutura** do `relatorio_ana_pereira_junho2025.md`, mas com os dados do novo cenário. Ele deve conter:
+        1.  Dados contratuais do funcionário.
+        2.  Detalhes do horário contratual `Operacional 12x36`.
+        3.  Calendário de Julho/2025 e cálculo das horas contratuais do mês.
+        4.  Tabela completa dos registros de ponto lançados.
+        5.  Análise da lógica de cálculo, mostrando como o `_calcular_horas_mes_novo` processou cada dia.
+        6.  Resultado da apuração de horas (total de HE 50%, HE 100% e faltas).
+        7.  Cálculo detalhado do salário bruto (com a base de impostos correta).
+        8.  Cálculo detalhado dos descontos de INSS e IRRF.
+        9.  Demonstrativo final da folha de pagamento com proventos, descontos e salário líquido.
+
+## 3. Objetivo Final
+
+O objetivo é ter o arquivo `relatorio_carlos_santos_julho2025.md` gerado e validado. Este relatório servirá como prova final de que as correções foram bem-sucedidas e que o sistema está calculando a folha de pagamento de forma precisa e consistente com as novas regras de negócio e com a CLT.

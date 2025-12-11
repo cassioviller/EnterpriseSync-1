@@ -18,14 +18,22 @@ logger = logging.getLogger(__name__)
 # TABELAS DE CÁLCULO (2025)
 # ========================================
 
-TABELA_INSS_2025 = [
+# ========================================
+# CONSTANTES DE FALLBACK (APENAS EMERGÊNCIA)
+# ========================================
+# IMPORTANTE: Estas tabelas só são usadas se ParametrosLegais não estiver
+# configurado no banco. O sistema emitirá um WARNING quando isso acontecer.
+# A fonte de verdade deve ser SEMPRE o banco de dados (tabela parametros_legais).
+# ========================================
+
+_FALLBACK_TABELA_INSS_2025 = [
     {'limite': Decimal('1412.00'), 'aliquota': Decimal('7.5')},
     {'limite': Decimal('2666.68'), 'aliquota': Decimal('9.0')},
     {'limite': Decimal('4000.03'), 'aliquota': Decimal('12.0')},
     {'limite': Decimal('7786.02'), 'aliquota': Decimal('14.0')},
 ]
 
-TABELA_IR_2025 = [
+_FALLBACK_TABELA_IR_2025 = [
     {'limite': Decimal('2259.20'), 'aliquota': Decimal('0'), 'parcela_deduzir': Decimal('0')},
     {'limite': Decimal('2826.65'), 'aliquota': Decimal('7.5'), 'parcela_deduzir': Decimal('169.44')},
     {'limite': Decimal('3751.05'), 'aliquota': Decimal('15.0'), 'parcela_deduzir': Decimal('381.44')},
@@ -33,9 +41,12 @@ TABELA_IR_2025 = [
     {'limite': Decimal('999999.99'), 'aliquota': Decimal('27.5'), 'parcela_deduzir': Decimal('896.00')},
 ]
 
-DEDUCAO_DEPENDENTE_IR = Decimal('189.59')
-SALARIO_MINIMO_2025 = Decimal('1412.00')
+_FALLBACK_DEDUCAO_DEPENDENTE_IR = Decimal('189.59')
+_FALLBACK_SALARIO_MINIMO = Decimal('1412.00')
 ALIQUOTA_FGTS = Decimal('8.0')
+
+# Flag para controlar alertas de fallback (evita spam de logs)
+_fallback_warning_emitted = set()
 
 
 # ========================================
@@ -98,8 +109,17 @@ def _gerar_tabela_inss(params):
     Returns:
         Lista de dicionários com faixas de INSS
     """
+    global _fallback_warning_emitted
+    
     if not params:
-        return TABELA_INSS_2025
+        warning_key = 'inss_fallback'
+        if warning_key not in _fallback_warning_emitted:
+            logger.warning(
+                "⚠️ ATENÇÃO: Usando tabela INSS de FALLBACK (hardcoded). "
+                "Configure ParametrosLegais no banco de dados para o ano vigente!"
+            )
+            _fallback_warning_emitted.add(warning_key)
+        return _FALLBACK_TABELA_INSS_2025
     
     return [
         {'limite': Decimal(str(params.inss_faixa1_limite)), 'aliquota': Decimal(str(params.inss_faixa1_percentual))},
@@ -119,8 +139,17 @@ def _gerar_tabela_irrf(params):
     Returns:
         Lista de dicionários com faixas de IRRF
     """
+    global _fallback_warning_emitted
+    
     if not params:
-        return TABELA_IR_2025
+        warning_key = 'irrf_fallback'
+        if warning_key not in _fallback_warning_emitted:
+            logger.warning(
+                "⚠️ ATENÇÃO: Usando tabela IRRF de FALLBACK (hardcoded). "
+                "Configure ParametrosLegais no banco de dados para o ano vigente!"
+            )
+            _fallback_warning_emitted.add(warning_key)
+        return _FALLBACK_TABELA_IR_2025
     
     return [
         {'limite': Decimal(str(params.irrf_isencao)), 'aliquota': Decimal('0'), 'parcela_deduzir': Decimal('0')},
@@ -158,7 +187,7 @@ def _obter_salario_minimo(params) -> Decimal:
     """
     if params and params.salario_minimo:
         return Decimal(str(params.salario_minimo))
-    return SALARIO_MINIMO_2025
+    return _FALLBACK_SALARIO_MINIMO
 
 
 def _obter_deducao_dependente(params) -> Decimal:
@@ -173,7 +202,7 @@ def _obter_deducao_dependente(params) -> Decimal:
     """
     if params and params.irrf_dependente_valor:
         return Decimal(str(params.irrf_dependente_valor))
-    return DEDUCAO_DEPENDENTE_IR
+    return _FALLBACK_DEDUCAO_DEPENDENTE_IR
 
 
 # ========================================
@@ -783,7 +812,7 @@ def calcular_inss(salario_bruto: Decimal, tabela_inss=None) -> Decimal:
     
     Args:
         salario_bruto: Valor do salário bruto
-        tabela_inss: Tabela de faixas do INSS (opcional, usa TABELA_INSS_2025 como fallback)
+        tabela_inss: Tabela de faixas do INSS (gerada via _gerar_tabela_inss)
         
     Returns:
         Decimal: Valor do desconto de INSS
@@ -792,7 +821,7 @@ def calcular_inss(salario_bruto: Decimal, tabela_inss=None) -> Decimal:
         return Decimal('0')
     
     if tabela_inss is None:
-        tabela_inss = TABELA_INSS_2025
+        tabela_inss = _gerar_tabela_inss(None)
     
     inss_total = Decimal('0')
     salario_restante = salario_bruto
@@ -821,17 +850,17 @@ def calcular_irrf(salario_bruto: Decimal, inss: Decimal, dependentes: int = 0, t
         salario_bruto: Valor do salário bruto
         inss: Valor do INSS calculado
         dependentes: Número de dependentes
-        tabela_irrf: Tabela de faixas do IRRF (opcional, usa TABELA_IR_2025 como fallback)
-        deducao_dependente: Valor de dedução por dependente (opcional, usa DEDUCAO_DEPENDENTE_IR como fallback)
+        tabela_irrf: Tabela de faixas do IRRF (gerada via _gerar_tabela_irrf)
+        deducao_dependente: Valor de dedução por dependente (obtido via _obter_deducao_dependente)
         
     Returns:
         Decimal: Valor do IR a ser retido
     """
     if tabela_irrf is None:
-        tabela_irrf = TABELA_IR_2025
+        tabela_irrf = _gerar_tabela_irrf(None)
     
     if deducao_dependente is None:
-        deducao_dependente = DEDUCAO_DEPENDENTE_IR
+        deducao_dependente = _obter_deducao_dependente(None)
     
     base_calculo = salario_bruto - inss - (Decimal(str(dependentes)) * deducao_dependente)
     
@@ -853,19 +882,28 @@ def calcular_descontos(salario_bruto: Decimal, funcionario: Funcionario, params=
     Args:
         salario_bruto: Valor do salário bruto
         funcionario: Objeto Funcionario
-        params: Objeto ParametrosLegais (opcional, usa fallback se não informado)
+        params: Objeto ParametrosLegais (OBRIGATÓRIO para cálculos precisos)
         
     Returns:
         dict: Dicionário com todos os descontos
+        
+    Raises:
+        ValueError: Se params não for fornecido (modo estrito)
     """
-    if params:
-        tabela_inss = _gerar_tabela_inss(params)
-        tabela_irrf = _gerar_tabela_irrf(params)
-        deducao_dep = _obter_deducao_dependente(params)
-    else:
-        tabela_inss = None
-        tabela_irrf = None
-        deducao_dep = None
+    if not params:
+        logger.error(
+            "⛔ ERRO: ParametrosLegais não fornecido para calcular_descontos(). "
+            "O sistema requer parâmetros legais do banco de dados para cálculos precisos. "
+            "Configure ParametrosLegais para o ano vigente antes de processar folhas."
+        )
+        raise ValueError(
+            "ParametrosLegais não configurado. "
+            "Configure os parâmetros legais (INSS/IRRF) para o ano antes de processar folhas."
+        )
+    
+    tabela_inss = _gerar_tabela_inss(params)
+    tabela_irrf = _gerar_tabela_irrf(params)
+    deducao_dep = _obter_deducao_dependente(params)
     
     inss = calcular_inss(salario_bruto, tabela_inss)
     
@@ -968,6 +1006,16 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, pa
         
         if params is None and funcionario.admin_id:
             params = _obter_parametros_legais(funcionario.admin_id, ano)
+        
+        if params is None:
+            logger.error(
+                f"⛔ ERRO: ParametrosLegais não encontrado para admin_id={funcionario.admin_id}, ano={ano}. "
+                "Configure os parâmetros legais antes de processar folhas."
+            )
+            raise ValueError(
+                f"ParametrosLegais não configurado para o ano {ano}. "
+                "Configure os parâmetros legais (INSS/IRRF) em Configurações > Parâmetros Legais."
+            )
         
         horas_info = calcular_horas_mes(funcionario.id, ano, mes)
         
