@@ -1,0 +1,599 @@
+# Prompt: Integrar Dashboard de Custos de Mão de Obra na Página de Detalhes da Obra
+
+## Contexto
+
+O sistema EnterpriseSync-1 possui uma página de detalhes da obra (`/obras/<int:id>` e `/obras/detalhes/<int:id>`) que exibe informações gerais, KPIs financeiros e dados operacionais de cada obra. Atualmente, a página já calcula e exibe alguns dados de custo de mão de obra de forma básica.
+
+**Objetivo:** Integrar um dashboard completo e profissional de custos de mão de obra dentro da página de detalhes da obra, utilizando os dados do **novo método de cálculo de folha de pagamento** que foi implementado no `folha_service.py`.
+
+## Estrutura Atual
+
+### View: `detalhes_obra` (views.py, linha 3090)
+
+A função `detalhes_obra` já:
+- Filtra por período (data_inicio e data_fim via query params)
+- Busca funcionários que trabalharam na obra (via RegistroPonto)
+- Calcula custos de mão de obra básicos usando uma query SQL direta
+- Renderiza o template `obras/detalhes_obra_profissional.html`
+
+**Variáveis já disponíveis no contexto do template:**
+- `obra`: objeto da obra
+- `kpis`: dicionário com KPIs calculados (custo_total, custo_mao_obra, total_horas, etc.)
+- `data_inicio` e `data_fim`: período filtrado
+- `funcionarios_obra`: lista de funcionários que trabalharam na obra
+- `custos_mao_obra`: lista de custos calculados
+- `rdos_recentes`: RDOs da obra
+
+### Template: `obras/detalhes_obra_profissional.html`
+
+O template atual possui:
+- Header com título e status da obra
+- Seção de filtros de período
+- Cards de KPIs financeiros (custo por m², margem de lucro, etc.)
+- Gráficos de progresso e custos
+- Tabela de funcionários
+- Seção de RDOs recentes
+
+## Tarefa: Integração do Dashboard de Custos de Mão de Obra
+
+### Passo 1: Criar Função de Consulta de Dados de Folha
+
+**Arquivo:** `services/folha_service.py`
+
+Adicionar uma nova função que consulte os dados processados de folha de pagamento para uma obra específica em um período:
+
+```python
+def obter_dados_folha_obra(obra_id, data_inicio, data_fim, admin_id=None):
+    """
+    Retorna dados consolidados de folha de pagamento para uma obra em um período.
+    
+    Args:
+        obra_id: ID da obra
+        data_inicio: Data inicial do período
+        data_fim: Data final do período
+        admin_id: ID do admin (opcional, para multi-tenancy)
+    
+    Returns:
+        dict com:
+            - funcionarios: lista de funcionários com dados individuais
+            - totais: dicionário com totais consolidados
+            - composicao: breakdown dos componentes do custo
+            - evolucao_mensal: dados para gráfico de evolução
+    """
+    from models import Funcionario, RegistroPonto, HorarioTrabalho
+    from sqlalchemy import func, extract
+    from decimal import Decimal
+    
+    # Buscar registros de ponto da obra no período
+    query_pontos = RegistroPonto.query.filter(
+        RegistroPonto.obra_id == obra_id,
+        RegistroPonto.data >= data_inicio,
+        RegistroPonto.data <= data_fim
+    )
+    
+    if admin_id:
+        query_pontos = query_pontos.join(Funcionario).filter(
+            Funcionario.admin_id == admin_id
+        )
+    
+    registros = query_pontos.all()
+    
+    # Agrupar por funcionário e mês
+    dados_por_funcionario = {}
+    dados_por_mes = {}
+    
+    for registro in registros:
+        func_id = registro.funcionario_id
+        mes_ref = f"{registro.data.year}-{registro.data.month:02d}"
+        
+        if func_id not in dados_por_funcionario:
+            funcionario = Funcionario.query.get(func_id)
+            dados_por_funcionario[func_id] = {
+                'funcionario': funcionario,
+                'meses': {},
+                'total_horas_normais': Decimal('0'),
+                'total_he_50': Decimal('0'),
+                'total_he_100': Decimal('0'),
+                'total_faltas': Decimal('0'),
+                'total_salario_bruto': Decimal('0'),
+                'total_encargos': Decimal('0'),
+                'total_custo': Decimal('0')
+            }
+        
+        if mes_ref not in dados_por_funcionario[func_id]['meses']:
+            dados_por_funcionario[func_id]['meses'][mes_ref] = {
+                'registros': [],
+                'processado': False
+            }
+        
+        dados_por_funcionario[func_id]['meses'][mes_ref]['registros'].append(registro)
+    
+    # Processar folha de cada funcionário para cada mês
+    for func_id, dados_func in dados_por_funcionario.items():
+        funcionario = dados_func['funcionario']
+        
+        for mes_ref, dados_mes in dados_func['meses'].items():
+            ano, mes = map(int, mes_ref.split('-'))
+            
+            # Processar folha do mês usando a nova lógica
+            resultado_folha = processar_folha_funcionario(
+                funcionario_id=func_id,
+                mes=mes,
+                ano=ano,
+                admin_id=admin_id
+            )
+            
+            if resultado_folha:
+                # Acumular totais
+                dados_func['total_horas_normais'] += resultado_folha.get('horas_normais', Decimal('0'))
+                dados_func['total_he_50'] += resultado_folha.get('horas_extras_50', Decimal('0'))
+                dados_func['total_he_100'] += resultado_folha.get('horas_extras_100', Decimal('0'))
+                dados_func['total_faltas'] += resultado_folha.get('horas_faltas', Decimal('0'))
+                dados_func['total_salario_bruto'] += resultado_folha.get('salario_bruto', Decimal('0'))
+                
+                # Calcular encargos (estimativa: 40% do salário bruto)
+                encargos = resultado_folha.get('salario_bruto', Decimal('0')) * Decimal('0.4')
+                dados_func['total_encargos'] += encargos
+                dados_func['total_custo'] += resultado_folha.get('salario_bruto', Decimal('0')) + encargos
+                
+                # Guardar dados do mês para evolução
+                if mes_ref not in dados_por_mes:
+                    dados_por_mes[mes_ref] = {
+                        'salario_base': Decimal('0'),
+                        'he_50': Decimal('0'),
+                        'he_100': Decimal('0'),
+                        'dsr': Decimal('0'),
+                        'encargos': Decimal('0'),
+                        'total': Decimal('0')
+                    }
+                
+                dados_por_mes[mes_ref]['salario_base'] += resultado_folha.get('salario_base', Decimal('0'))
+                dados_por_mes[mes_ref]['he_50'] += resultado_folha.get('valor_he_50', Decimal('0'))
+                dados_por_mes[mes_ref]['he_100'] += resultado_folha.get('valor_he_100', Decimal('0'))
+                dados_por_mes[mes_ref]['dsr'] += resultado_folha.get('dsr', Decimal('0'))
+                dados_por_mes[mes_ref]['encargos'] += encargos
+                dados_por_mes[mes_ref]['total'] += resultado_folha.get('salario_bruto', Decimal('0')) + encargos
+    
+    # Calcular totais consolidados
+    total_custo = sum(d['total_custo'] for d in dados_por_funcionario.values())
+    total_horas = sum(d['total_horas_normais'] + d['total_he_50'] + d['total_he_100'] for d in dados_por_funcionario.values())
+    total_he = sum(d['total_he_50'] + d['total_he_100'] for d in dados_por_funcionario.values())
+    custo_por_hora = total_custo / total_horas if total_horas > 0 else Decimal('0')
+    percentual_he = (total_he / total_horas * 100) if total_horas > 0 else Decimal('0')
+    
+    # Composição do custo
+    total_salario_base = sum(d['total_salario_bruto'] for d in dados_por_funcionario.values())
+    total_encargos = sum(d['total_encargos'] for d in dados_por_funcionario.values())
+    
+    composicao = [
+        {'categoria': 'Salário Base', 'valor': float(total_salario_base)},
+        {'categoria': 'Encargos', 'valor': float(total_encargos)}
+    ]
+    
+    # Evolução mensal
+    evolucao = [
+        {
+            'mes': mes_ref,
+            'custo': float(dados['total'])
+        }
+        for mes_ref, dados in sorted(dados_por_mes.items())
+    ]
+    
+    # Preparar lista de funcionários para o template
+    funcionarios_lista = [
+        {
+            'id': func_id,
+            'nome': dados['funcionario'].nome,
+            'salarioBruto': float(dados['total_salario_bruto']),
+            'encargos': float(dados['total_encargos']),
+            'custoTotal': float(dados['total_custo']),
+            'horasNormais': float(dados['total_horas_normais']),
+            'he50': float(dados['total_he_50']),
+            'he100': float(dados['total_he_100']),
+            'horasFalta': float(dados['total_faltas'])
+        }
+        for func_id, dados in dados_por_funcionario.items()
+    ]
+    
+    return {
+        'funcionarios': funcionarios_lista,
+        'totais': {
+            'custo_total': float(total_custo),
+            'total_horas': float(total_horas),
+            'custo_por_hora': float(custo_por_hora),
+            'percentual_he': float(percentual_he),
+            'total_he': float(total_he)
+        },
+        'composicao': composicao,
+        'evolucao_mensal': evolucao
+    }
+```
+
+### Passo 2: Modificar a View `detalhes_obra`
+
+**Arquivo:** `views.py` (linha 3090)
+
+Adicionar a chamada para a nova função e passar os dados para o template:
+
+```python
+# Após a linha 3461 (antes do return render_template)
+
+# Buscar dados de folha de pagamento usando o novo método
+from services.folha_service import obter_dados_folha_obra
+
+try:
+    dados_folha = obter_dados_folha_obra(
+        obra_id=obra_id,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        admin_id=admin_id
+    )
+except Exception as e:
+    print(f"ERRO ao buscar dados de folha: {e}")
+    dados_folha = {
+        'funcionarios': [],
+        'totais': {},
+        'composicao': [],
+        'evolucao_mensal': []
+    }
+
+# Adicionar ao contexto do template
+return render_template('obras/detalhes_obra_profissional.html', 
+                     obra=obra, 
+                     kpis=kpis_obra,
+                     data_inicio=data_inicio,
+                     data_fim=data_fim,
+                     date=date,
+                     funcionarios_obra=funcionarios_obra,
+                     custos_mao_obra=custos_mao_obra,
+                     rdos_recentes=rdos_recentes,
+                     dados_folha=dados_folha)  # <-- NOVO
+```
+
+### Passo 3: Adicionar Seção no Template
+
+**Arquivo:** `templates/obras/detalhes_obra_profissional.html`
+
+Adicionar uma nova seção após os KPIs financeiros existentes (após a linha ~200) com o dashboard de custos de mão de obra:
+
+```html
+<!-- Dashboard de Custos de Mão de Obra -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="obra-card">
+            <div class="obra-card-header">
+                <h3>
+                    <i class="fas fa-users-cog"></i> Dashboard de Custos de Mão de Obra
+                </h3>
+            </div>
+            <div class="card-body p-4">
+                
+                <!-- KPIs de Mão de Obra -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-success">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h6 class="kpi-label">Custo Total de Mão de Obra</h6>
+                                <h4 class="kpi-value text-success">
+                                    R$ {{ "%.2f"|format(dados_folha.totais.custo_total|default(0)) }}
+                                </h4>
+                                <small class="text-muted">Incluindo encargos</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-primary">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h6 class="kpi-label">Total de Horas</h6>
+                                <h4 class="kpi-value text-primary">
+                                    {{ "%.0f"|format(dados_folha.totais.total_horas|default(0)) }}h
+                                </h4>
+                                <small class="text-muted">Normais + Extras</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-purple">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h6 class="kpi-label">Custo por Hora</h6>
+                                <h4 class="kpi-value text-purple">
+                                    R$ {{ "%.2f"|format(dados_folha.totais.custo_por_hora|default(0)) }}
+                                </h4>
+                                <small class="text-muted">Média ponderada</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <div class="kpi-card">
+                            <div class="kpi-icon bg-warning">
+                                <i class="fas fa-percentage"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <h6 class="kpi-label">Horas Extras</h6>
+                                <h4 class="kpi-value text-warning">
+                                    {{ "%.1f"|format(dados_folha.totais.percentual_he|default(0)) }}%
+                                </h4>
+                                <small class="text-muted">{{ "%.0f"|format(dados_folha.totais.total_he|default(0)) }}h extras</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gráficos -->
+                <div class="row mb-4">
+                    <!-- Gráfico de Composição -->
+                    <div class="col-md-6 mb-3">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Composição do Custo</h5>
+                            <canvas id="chartComposicaoCusto" height="250"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Gráfico de Evolução -->
+                    <div class="col-md-6 mb-3">
+                        <div class="chart-container">
+                            <h5 class="mb-3">Evolução Mensal</h5>
+                            <canvas id="chartEvolucaoMensal" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabela Detalhada -->
+                <div class="row">
+                    <div class="col-12">
+                        <h5 class="mb-3">Detalhamento por Funcionário</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Funcionário</th>
+                                        <th class="text-end">Salário Bruto</th>
+                                        <th class="text-end">Encargos</th>
+                                        <th class="text-end">Custo Total</th>
+                                        <th class="text-center">Horas Normais</th>
+                                        <th class="text-center">HE 50%</th>
+                                        <th class="text-center">HE 100%</th>
+                                        <th class="text-center">Faltas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for func in dados_folha.funcionarios %}
+                                    <tr>
+                                        <td class="fw-semibold">{{ func.nome }}</td>
+                                        <td class="text-end text-success fw-semibold">
+                                            R$ {{ "%.2f"|format(func.salarioBruto) }}
+                                        </td>
+                                        <td class="text-end">
+                                            R$ {{ "%.2f"|format(func.encargos) }}
+                                        </td>
+                                        <td class="text-end text-primary fw-bold">
+                                            R$ {{ "%.2f"|format(func.custoTotal) }}
+                                        </td>
+                                        <td class="text-center">{{ "%.0f"|format(func.horasNormais) }}h</td>
+                                        <td class="text-center text-warning">{{ "%.0f"|format(func.he50) }}h</td>
+                                        <td class="text-center text-danger">{{ "%.0f"|format(func.he100) }}h</td>
+                                        <td class="text-center text-muted">{{ "%.0f"|format(func.horasFalta) }}h</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-secondary fw-bold">
+                                    <tr>
+                                        <td>TOTAL</td>
+                                        <td class="text-end text-success">
+                                            R$ {{ "%.2f"|format(dados_folha.funcionarios|sum(attribute='salarioBruto')) }}
+                                        </td>
+                                        <td class="text-end">
+                                            R$ {{ "%.2f"|format(dados_folha.funcionarios|sum(attribute='encargos')) }}
+                                        </td>
+                                        <td class="text-end text-primary">
+                                            R$ {{ "%.2f"|format(dados_folha.totais.custo_total) }}
+                                        </td>
+                                        <td class="text-center">{{ "%.0f"|format(dados_folha.funcionarios|sum(attribute='horasNormais')) }}h</td>
+                                        <td class="text-center text-warning">{{ "%.0f"|format(dados_folha.funcionarios|sum(attribute='he50')) }}h</td>
+                                        <td class="text-center text-danger">{{ "%.0f"|format(dados_folha.funcionarios|sum(attribute='he100')) }}h</td>
+                                        <td class="text-center text-muted">{{ "%.0f"|format(dados_folha.funcionarios|sum(attribute='horasFalta')) }}h</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts para os gráficos -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+// Gráfico de Composição
+const ctxComposicao = document.getElementById('chartComposicaoCusto').getContext('2d');
+const dadosComposicao = {{ dados_folha.composicao|tojson }};
+
+new Chart(ctxComposicao, {
+    type: 'doughnut',
+    data: {
+        labels: dadosComposicao.map(d => d.categoria),
+        datasets: [{
+            data: dadosComposicao.map(d => d.valor),
+            backgroundColor: ['#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#3b82f6'],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.label + ': R$ ' + context.parsed.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Gráfico de Evolução
+const ctxEvolucao = document.getElementById('chartEvolucaoMensal').getContext('2d');
+const dadosEvolucao = {{ dados_folha.evolucao_mensal|tojson }};
+
+new Chart(ctxEvolucao, {
+    type: 'line',
+    data: {
+        labels: dadosEvolucao.map(d => d.mes),
+        datasets: [{
+            label: 'Custo (R$)',
+            data: dadosEvolucao.map(d => d.custo),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'Custo: R$ ' + context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'R$ ' + value.toLocaleString('pt-BR');
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+
+<style>
+.kpi-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.kpi-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.kpi-icon.bg-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+.kpi-icon.bg-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+.kpi-icon.bg-purple { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+.kpi-icon.bg-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+
+.kpi-content {
+    flex: 1;
+}
+
+.kpi-label {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.kpi-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.text-purple {
+    color: #8b5cf6 !important;
+}
+
+.chart-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+</style>
+```
+
+### Passo 4: Adicionar Estilos CSS (se necessário)
+
+Os estilos já foram incluídos no bloco `<style>` acima. Se preferir, pode movê-los para um arquivo CSS separado.
+
+### Passo 5: Testar a Integração
+
+1. Acesse a página de detalhes de uma obra: `/obras/<id>`
+2. Verifique se os KPIs de mão de obra estão sendo exibidos corretamente
+3. Teste os filtros de período para ver se os dados são atualizados
+4. Valide se os gráficos estão renderizando corretamente
+5. Confira se a tabela de funcionários está mostrando os dados do novo método de cálculo
+
+## Observações Importantes
+
+1. **Performance**: A função `obter_dados_folha_obra` pode ser lenta se houver muitos funcionários e meses. Considere implementar cache ou processamento assíncrono se necessário.
+
+2. **Encargos**: A função usa uma estimativa de 40% para encargos. Ajuste conforme a realidade da empresa ou implemente um cálculo mais preciso.
+
+3. **Tratamento de Erros**: Adicione tratamento de erros adequado para casos onde não há dados de folha processados.
+
+4. **Responsividade**: Os gráficos e tabelas devem ser responsivos para funcionar bem em dispositivos móveis.
+
+5. **Permissões**: Verifique se apenas usuários autorizados podem visualizar os dados de custos de mão de obra.
+
+## Resultado Esperado
+
+Após a implementação, a página de detalhes da obra terá uma nova seção completa com:
+- 4 KPIs principais de mão de obra
+- 2 gráficos interativos (composição e evolução)
+- 1 tabela detalhada por funcionário
+- Dados precisos baseados no novo método de cálculo de folha de pagamento
+- Design profissional e consistente com o resto do sistema

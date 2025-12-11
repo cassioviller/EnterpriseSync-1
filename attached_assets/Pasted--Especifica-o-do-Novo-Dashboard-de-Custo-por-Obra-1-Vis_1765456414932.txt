@@ -1,0 +1,103 @@
+
+# Especificação do Novo Dashboard de Custo por Obra
+
+## 1. Visão Geral
+
+O objetivo deste novo dashboard é fornecer uma visão detalhada e precisa dos custos de mão de obra por obra, utilizando os dados do novo módulo de folha de pagamento. Ele substituirá a lógica de cálculo legada e apresentará KPIs mais alinhados com a realidade contábil e de RH.
+
+## 2. Estrutura do Dashboard
+
+O dashboard será uma nova página no sistema, acessível pelo menu "Custos" -> "Dashboard de Custo por Obra". Ele será composto pelos seguintes elementos:
+
+### 2.1. Filtros
+
+*   **Período**: Seletores de data para "Início" e "Fim" (obrigatório).
+*   **Obra**: Dropdown para selecionar uma ou mais obras (opcional, padrão: todas).
+*   **Funcionário**: Dropdown para selecionar um ou mais funcionários (opcional, padrão: todos).
+
+### 2.2. KPIs Principais
+
+*   **Custo Total de Mão de Obra**: Soma do `salario_bruto` + `encargos_patronais` de todos os funcionários no período e obra selecionados.
+*   **Total de Horas Trabalhadas**: Soma das horas normais, extras e de DSR.
+*   **Custo Médio por Hora**: `Custo Total de Mão de Obra` / `Total de Horas Trabalhadas`.
+*   **Percentual de Horas Extras**: `(Total Horas Extras / Total Horas Trabalhadas) * 100`.
+
+### 2.3. Gráficos
+
+*   **Custo de Mão de Obra por Obra (Gráfico de Pizza)**: Mostra a distribuição percentual do custo de mão de obra entre as obras selecionadas.
+*   **Evolução do Custo de Mão de Obra (Gráfico de Linhas)**: Mostra a evolução do custo de mão de obra ao longo do tempo (agrupado por mês) para a obra selecionada.
+*   **Composição do Custo de Mão de Obra (Gráfico de Barras Empilhadas)**: Para a obra selecionada, mostra a composição do custo de mão de obra, com barras para:
+    *   Salário Base
+    *   Horas Extras 50%
+    *   Horas Extras 100%
+    *   DSR sobre Extras
+    *   Encargos Patronais (FGTS + INSS Patronal)
+
+### 2.4. Tabela Detalhada
+
+Uma tabela com os seguintes dados para cada funcionário na obra e período selecionados:
+
+| Funcionário | Salário Bruto | Encargos | Custo Total | Horas Normais | HE 50% | HE 100% | Horas Falta |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+
+## 3. Integração com a Nova Lógica de Folha
+
+### 3.1. Fonte de Dados
+
+O dashboard **não** fará cálculos de folha. Ele consumirá os dados já processados pelo `folha_service.py`. Para isso, será criada uma nova tabela no banco de dados, chamada `FolhaProcessada`, que armazenará o resultado do processamento da folha de cada funcionário para cada mês.
+
+**Modelo `FolhaProcessada` (proposta):**
+
+```python
+class FolhaProcessada(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True) # Se o funcionário estiver alocado a uma obra
+    ano = db.Column(db.Integer, nullable=False)
+    mes = db.Column(db.Integer, nullable=False)
+    
+    # Dados do cálculo
+    salario_base = db.Column(db.Numeric(10, 2))
+    salario_bruto = db.Column(db.Numeric(10, 2)) # Base para impostos
+    total_proventos = db.Column(db.Numeric(10, 2))
+    total_descontos = db.Column(db.Numeric(10, 2))
+    salario_liquido = db.Column(db.Numeric(10, 2))
+    
+    # Componentes do custo
+    valor_he_50 = db.Column(db.Numeric(10, 2))
+    valor_he_100 = db.Column(db.Numeric(10, 2))
+    valor_dsr = db.Column(db.Numeric(10, 2))
+    encargos_fgts = db.Column(db.Numeric(10, 2))
+    encargos_inss_patronal = db.Column(db.Numeric(10, 2))
+    
+    # Horas
+    horas_contratuais = db.Column(db.Numeric(10, 2))
+    horas_trabalhadas = db.Column(db.Numeric(10, 2))
+    horas_extras_50 = db.Column(db.Numeric(10, 2))
+    horas_extras_100 = db.Column(db.Numeric(10, 2))
+    horas_falta = db.Column(db.Numeric(10, 2))
+```
+
+### 3.2. Fluxo de Dados
+
+1.  O `folha_service.py` será modificado para, ao final do processamento de um funcionário, salvar um registro na tabela `FolhaProcessada`.
+2.  A view do novo dashboard (`custos_views.py`) fará queries diretamente na tabela `FolhaProcessada`, aplicando os filtros de período, obra e funcionário.
+3.  Os dados agregados serão passados para o template do dashboard (`custos/dashboard_obra.html`) para renderizar os KPIs, gráficos e a tabela.
+
+## 4. Exemplo de Query (SQL)
+
+Para calcular o **Custo Total de Mão de Obra** para a Obra X no período Y:
+
+```sql
+SELECT 
+    SUM(salario_bruto + encargos_fgts + encargos_inss_patronal) as custo_total
+FROM folha_processada
+WHERE 
+    obra_id = [ID da Obra X] AND
+    (ano > [Ano Início] OR (ano = [Ano Início] AND mes >= [Mês Início])) AND
+    (ano < [Ano Fim] OR (ano = [Ano Fim] AND mes <= [Mês Fim]));
+```
+
+## 5. Mockup Visual
+
+(Será criado na fase de implementação do protótipo)
