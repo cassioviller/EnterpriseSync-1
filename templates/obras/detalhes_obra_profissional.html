@@ -878,6 +878,197 @@
         </div>
         {% endif %}
 
+        <!-- Dashboard de Custos de Mão de Obra -->
+        <div class="obra-card">
+            <div class="obra-card-header" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+                <h3>
+                    <i class="fas fa-users-cog"></i> Dashboard de Custos de Mão de Obra
+                    {% if dados_folha and dados_folha.totais.total_funcionarios > 0 %}
+                    <span class="badge bg-light text-success ms-2">{{ dados_folha.totais.total_funcionarios }} funcionários</span>
+                    {% endif %}
+                </h3>
+            </div>
+            <div class="card-body p-4">
+                {% if dados_folha and dados_folha.totais.custo_total > 0 %}
+                <!-- KPIs de Mão de Obra -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="kpi-card" style="border-left: 4px solid #059669;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #059669 0%, #047857 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-dollar-sign" style="color: white; font-size: 1.5rem;"></i>
+                                </div>
+                                <div style="text-align: left;">
+                                    <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">Custo Total Mão de Obra</h6>
+                                    <h4 style="margin: 0.25rem 0 0 0; color: #059669; font-weight: 700;">
+                                        R$ {{ "%.2f"|format(dados_folha.totais.custo_total|default(0))|replace('.', ',') }}
+                                    </h4>
+                                    <small style="color: #9ca3af;">Incluindo encargos</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <div class="kpi-card" style="border-left: 4px solid #3b82f6;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-clock" style="color: white; font-size: 1.5rem;"></i>
+                                </div>
+                                <div style="text-align: left;">
+                                    <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">Total de Horas</h6>
+                                    <h4 style="margin: 0.25rem 0 0 0; color: #3b82f6; font-weight: 700;">
+                                        {{ "%.0f"|format(dados_folha.totais.total_horas|default(0)) }}h
+                                    </h4>
+                                    <small style="color: #9ca3af;">Normais + Extras</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <div class="kpi-card" style="border-left: 4px solid #8b5cf6;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-chart-line" style="color: white; font-size: 1.5rem;"></i>
+                                </div>
+                                <div style="text-align: left;">
+                                    <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">Custo Médio/Hora</h6>
+                                    <h4 style="margin: 0.25rem 0 0 0; color: #8b5cf6; font-weight: 700;">
+                                        R$ {{ "%.2f"|format(dados_folha.totais.custo_por_hora|default(0))|replace('.', ',') }}
+                                    </h4>
+                                    <small style="color: #9ca3af;">Por hora trabalhada</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <div class="kpi-card" style="border-left: 4px solid #f59e0b;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-percentage" style="color: white; font-size: 1.5rem;"></i>
+                                </div>
+                                <div style="text-align: left;">
+                                    <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">% Horas Extras</h6>
+                                    <h4 style="margin: 0.25rem 0 0 0; color: #f59e0b; font-weight: 700;">
+                                        {{ "%.1f"|format(dados_folha.totais.percentual_he|default(0)) }}%
+                                    </h4>
+                                    <small style="color: #9ca3af;">{{ "%.0f"|format(dados_folha.totais.total_he|default(0)) }}h extras</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gráficos -->
+                <div class="row mb-4">
+                    <!-- Composição do Custo -->
+                    <div class="col-md-6 mb-3">
+                        <div style="background: #f8fafc; border-radius: 12px; padding: 1.5rem;">
+                            <h6 style="margin: 0 0 1rem 0; color: #374151; font-weight: 600;">
+                                <i class="fas fa-chart-pie me-2" style="color: #059669;"></i>Composição do Custo
+                            </h6>
+                            <canvas id="chartComposicaoCusto" height="220"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Evolução Mensal -->
+                    <div class="col-md-6 mb-3">
+                        <div style="background: #f8fafc; border-radius: 12px; padding: 1.5rem;">
+                            <h6 style="margin: 0 0 1rem 0; color: #374151; font-weight: 600;">
+                                <i class="fas fa-chart-line me-2" style="color: #3b82f6;"></i>Evolução Mensal
+                            </h6>
+                            {% if dados_folha.evolucao_mensal|length > 0 %}
+                            <canvas id="chartEvolucaoMensal" height="220"></canvas>
+                            {% else %}
+                            <div style="text-align: center; padding: 3rem; color: #9ca3af;">
+                                <i class="fas fa-chart-line" style="font-size: 2rem; opacity: 0.5;"></i>
+                                <p style="margin: 1rem 0 0 0;">Dados de evolução serão exibidos conforme o processamento da folha</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabela de Funcionários -->
+                {% if dados_folha.funcionarios|length > 0 %}
+                <div style="background: #f8fafc; border-radius: 12px; padding: 1.5rem;">
+                    <h6 style="margin: 0 0 1rem 0; color: #374151; font-weight: 600;">
+                        <i class="fas fa-users me-2" style="color: #6366f1;"></i>Detalhamento por Funcionário
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0" style="font-size: 0.9rem;">
+                            <thead style="background: #e2e8f0;">
+                                <tr>
+                                    <th>Funcionário</th>
+                                    <th>Cargo</th>
+                                    <th class="text-end">Salário Bruto</th>
+                                    <th class="text-end">Encargos</th>
+                                    <th class="text-end">Custo Total</th>
+                                    <th class="text-center">Horas</th>
+                                    <th class="text-center">HE 50%</th>
+                                    <th class="text-center">HE 100%</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for func in dados_folha.funcionarios %}
+                                <tr>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.8rem;">
+                                                {{ func.nome[0]|upper }}
+                                            </div>
+                                            {{ func.nome }}
+                                        </div>
+                                    </td>
+                                    <td><span class="text-muted">{{ func.cargo }}</span></td>
+                                    <td class="text-end">R$ {{ "%.2f"|format(func.salarioBruto)|replace('.', ',') }}</td>
+                                    <td class="text-end">R$ {{ "%.2f"|format(func.encargos)|replace('.', ',') }}</td>
+                                    <td class="text-end"><strong style="color: #059669;">R$ {{ "%.2f"|format(func.custoTotal)|replace('.', ',') }}</strong></td>
+                                    <td class="text-center">{{ "%.0f"|format(func.horasNormais) }}h</td>
+                                    <td class="text-center">
+                                        {% if func.he50 > 0 %}
+                                        <span class="badge bg-warning text-dark">{{ "%.1f"|format(func.he50) }}h</span>
+                                        {% else %}-{% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if func.he100 > 0 %}
+                                        <span class="badge bg-danger">{{ "%.1f"|format(func.he100) }}h</span>
+                                        {% else %}-{% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot style="background: #e2e8f0; font-weight: 600;">
+                                <tr>
+                                    <td colspan="4" class="text-end">TOTAL:</td>
+                                    <td class="text-end" style="color: #059669;">R$ {{ "%.2f"|format(dados_folha.totais.custo_total)|replace('.', ',') }}</td>
+                                    <td class="text-center">{{ "%.0f"|format(dados_folha.totais.total_horas) }}h</td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% else %}
+                <!-- Estado vazio -->
+                <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                    <i class="fas fa-calculator" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; color: #059669;"></i>
+                    <h5 style="margin-bottom: 0.5rem; color: #374151;">Dados de Folha Não Processados</h5>
+                    <p style="margin: 0 0 1.5rem 0; max-width: 400px; margin-left: auto; margin-right: auto;">
+                        Processe a folha de pagamento dos funcionários desta obra para visualizar os custos detalhados de mão de obra.
+                    </p>
+                    <a href="{{ url_for('main.folha_dashboard') }}" class="btn btn-success">
+                        <i class="fas fa-play-circle me-2"></i>Ir para Folha de Pagamento
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- RDOs Recentes -->
         {% if rdos %}
         <div class="obra-card">
@@ -1655,6 +1846,101 @@ function toggleAllFuncionarios() {
         }, 300);
     }
 }
+
+// =============================================
+// GRÁFICOS CHART.JS - DASHBOARD CUSTOS MÃO DE OBRA
+// =============================================
+
+{% if dados_folha and dados_folha.totais.custo_total > 0 %}
+document.addEventListener('DOMContentLoaded', function() {
+    // Dados de composição do custo
+    const composicaoData = {{ dados_folha.composicao | tojson | safe }};
+    
+    if (composicaoData && composicaoData.length > 0 && document.getElementById('chartComposicaoCusto')) {
+        new Chart(document.getElementById('chartComposicaoCusto'), {
+            type: 'doughnut',
+            data: {
+                labels: composicaoData.map(c => c.categoria),
+                datasets: [{
+                    data: composicaoData.map(c => c.valor),
+                    backgroundColor: composicaoData.map(c => c.cor),
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${context.label}: R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Dados de evolução mensal
+    const evolucaoData = {{ dados_folha.evolucao_mensal | tojson | safe }};
+    
+    if (evolucaoData && evolucaoData.length > 0 && document.getElementById('chartEvolucaoMensal')) {
+        new Chart(document.getElementById('chartEvolucaoMensal'), {
+            type: 'bar',
+            data: {
+                labels: evolucaoData.map(e => e.mes_label),
+                datasets: [{
+                    label: 'Custo Total',
+                    data: evolucaoData.map(e => e.custo),
+                    backgroundColor: 'rgba(5, 150, 105, 0.7)',
+                    borderColor: '#059669',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return 'R$ ' + value.toLocaleString('pt-BR');
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'R$ ' + context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+{% endif %}
+
 </script>
 
 <style>

@@ -3460,6 +3460,32 @@ def detalhes_obra(id):
         print(f"DEBUG KPIs FINAIS: Total={kpis_obra['custo_total']:.2f}, Mão Obra={kpis_obra['custo_mao_obra']:.2f}, Horas={kpis_obra['total_horas']:.1f}")
         print(f"DEBUG FUNCIONÁRIOS: {kpis_obra['funcionarios_periodo']} no período, {kpis_obra['dias_trabalhados']} dias trabalhados")
         
+        # ===== DADOS DE FOLHA PROCESSADA PARA DASHBOARD DE CUSTOS =====
+        try:
+            from services.folha_service import obter_dados_folha_obra
+            dados_folha = obter_dados_folha_obra(
+                obra_id=obra_id,
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+                admin_id=admin_id
+            )
+            print(f"DEBUG FOLHA: {dados_folha['totais'].get('total_funcionarios', 0)} funcionários com folha processada")
+        except Exception as e:
+            print(f"ERRO ao buscar dados de folha: {e}")
+            dados_folha = {
+                'funcionarios': [],
+                'totais': {
+                    'custo_total': 0,
+                    'total_horas': 0,
+                    'custo_por_hora': 0,
+                    'percentual_he': 0,
+                    'total_he': 0,
+                    'total_funcionarios': 0
+                },
+                'composicao': [],
+                'evolucao_mensal': []
+            }
+        
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
                              kpis=kpis_obra,
@@ -3477,7 +3503,8 @@ def detalhes_obra(id):
                              custos_obra=custos_obra,
                              custos_transporte=custos_transporte,
                              custos_transporte_total=custos_transporte_total,
-                             funcionarios_obra=funcionarios_obra)
+                             funcionarios_obra=funcionarios_obra,
+                             dados_folha=dados_folha)
     except Exception as e:
         import traceback
         error_traceback = traceback.format_exc()
