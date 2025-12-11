@@ -1070,3 +1070,350 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, pa
     except Exception as e:
         logger.error(f"Erro ao processar folha do funcionário {funcionario.id}: {e}", exc_info=True)
         return None
+
+
+# ========================================
+# FUNÇÕES PARA DASHBOARD DE CUSTOS POR OBRA
+# ========================================
+
+def salvar_folha_processada(funcionario_id: int, obra_id: Optional[int], ano: int, mes: int, 
+                            dados_folha: Dict, admin_id: int) -> bool:
+    """
+    Salva os resultados do processamento de folha na tabela FolhaProcessada.
+    Permite consultas eficientes para dashboards de custos por obra.
+    
+    Args:
+        funcionario_id: ID do funcionário
+        obra_id: ID da obra (pode ser None se funcionário não alocado)
+        ano: Ano de referência
+        mes: Mês de referência
+        dados_folha: Dicionário retornado por processar_folha_funcionario()
+        admin_id: ID do administrador (multi-tenant)
+    
+    Returns:
+        bool: True se salvou com sucesso, False caso contrário
+    """
+    try:
+        from models import FolhaProcessada
+        
+        folha_existente = FolhaProcessada.query.filter_by(
+            funcionario_id=funcionario_id,
+            obra_id=obra_id,
+            ano=ano,
+            mes=mes
+        ).first()
+        
+        if folha_existente:
+            folha_existente.salario_base = Decimal(str(dados_folha.get('salario_base', 0)))
+            folha_existente.salario_bruto = Decimal(str(dados_folha.get('salario_bruto', 0)))
+            folha_existente.total_proventos = Decimal(str(dados_folha.get('total_proventos', 0)))
+            folha_existente.total_descontos = Decimal(str(dados_folha.get('total_descontos', 0)))
+            folha_existente.salario_liquido = Decimal(str(dados_folha.get('salario_liquido', 0)))
+            folha_existente.valor_he_50 = Decimal(str(dados_folha.get('valor_he_50', 0)))
+            folha_existente.valor_he_100 = Decimal(str(dados_folha.get('valor_he_100', 0)))
+            folha_existente.valor_dsr = Decimal(str(dados_folha.get('valor_dsr', 0)))
+            folha_existente.encargos_fgts = Decimal(str(dados_folha.get('fgts', 0)))
+            folha_existente.encargos_inss_patronal = Decimal(str(dados_folha.get('encargos_patronais', 0))) * Decimal('0.7')
+            folha_existente.custo_total_empresa = Decimal(str(dados_folha.get('custo_total_empresa', 0)))
+            folha_existente.inss_funcionario = Decimal(str(dados_folha.get('inss', 0)))
+            folha_existente.irrf = Decimal(str(dados_folha.get('irrf', 0)))
+            folha_existente.desconto_faltas = Decimal(str(dados_folha.get('desconto_faltas', 0)))
+            folha_existente.desconto_atrasos = Decimal(str(dados_folha.get('desconto_atrasos', 0)))
+            folha_existente.horas_trabalhadas = Decimal(str(dados_folha.get('horas_trabalhadas', 0)))
+            folha_existente.horas_extras_50 = Decimal(str(dados_folha.get('horas_extras_50', 0)))
+            folha_existente.horas_extras_100 = Decimal(str(dados_folha.get('horas_extras_100', 0)))
+            folha_existente.horas_falta = Decimal(str(dados_folha.get('horas_falta', 0)))
+            folha_existente.processado_em = datetime.utcnow()
+            
+            logger.debug(f"[salvar_folha_processada] Atualizado: func={funcionario_id}, obra={obra_id}, {mes:02d}/{ano}")
+        else:
+            nova_folha = FolhaProcessada(
+                funcionario_id=funcionario_id,
+                obra_id=obra_id,
+                admin_id=admin_id,
+                ano=ano,
+                mes=mes,
+                salario_base=Decimal(str(dados_folha.get('salario_base', 0))),
+                salario_bruto=Decimal(str(dados_folha.get('salario_bruto', 0))),
+                total_proventos=Decimal(str(dados_folha.get('total_proventos', 0))),
+                total_descontos=Decimal(str(dados_folha.get('total_descontos', 0))),
+                salario_liquido=Decimal(str(dados_folha.get('salario_liquido', 0))),
+                valor_he_50=Decimal(str(dados_folha.get('valor_he_50', 0))),
+                valor_he_100=Decimal(str(dados_folha.get('valor_he_100', 0))),
+                valor_dsr=Decimal(str(dados_folha.get('valor_dsr', 0))),
+                encargos_fgts=Decimal(str(dados_folha.get('fgts', 0))),
+                encargos_inss_patronal=Decimal(str(dados_folha.get('encargos_patronais', 0))) * Decimal('0.7'),
+                custo_total_empresa=Decimal(str(dados_folha.get('custo_total_empresa', 0))),
+                inss_funcionario=Decimal(str(dados_folha.get('inss', 0))),
+                irrf=Decimal(str(dados_folha.get('irrf', 0))),
+                desconto_faltas=Decimal(str(dados_folha.get('desconto_faltas', 0))),
+                desconto_atrasos=Decimal(str(dados_folha.get('desconto_atrasos', 0))),
+                horas_trabalhadas=Decimal(str(dados_folha.get('horas_trabalhadas', 0))),
+                horas_extras_50=Decimal(str(dados_folha.get('horas_extras_50', 0))),
+                horas_extras_100=Decimal(str(dados_folha.get('horas_extras_100', 0))),
+                horas_falta=Decimal(str(dados_folha.get('horas_falta', 0))),
+                processado_em=datetime.utcnow()
+            )
+            db.session.add(nova_folha)
+            logger.debug(f"[salvar_folha_processada] Criado: func={funcionario_id}, obra={obra_id}, {mes:02d}/{ano}")
+        
+        db.session.commit()
+        return True
+        
+    except Exception as e:
+        logger.error(f"[salvar_folha_processada] Erro ao salvar: {e}", exc_info=True)
+        db.session.rollback()
+        return False
+
+
+def obter_dados_folha_obra(obra_id: int, data_inicio: date, data_fim: date, admin_id: Optional[int] = None) -> Dict:
+    """
+    Retorna dados consolidados de folha de pagamento para uma obra em um período.
+    Usa dados da tabela FolhaProcessada para consultas eficientes.
+    
+    Args:
+        obra_id: ID da obra
+        data_inicio: Data inicial do período
+        data_fim: Data final do período
+        admin_id: ID do admin (opcional, para multi-tenancy)
+    
+    Returns:
+        dict com:
+            - funcionarios: lista de funcionários com dados individuais
+            - totais: dicionário com totais consolidados
+            - composicao: breakdown dos componentes do custo
+            - evolucao_mensal: dados para gráfico de evolução
+    """
+    try:
+        from models import FolhaProcessada, Funcionario, RegistroPonto
+        
+        ano_inicio = data_inicio.year
+        mes_inicio = data_inicio.month
+        ano_fim = data_fim.year
+        mes_fim = data_fim.month
+        
+        query = FolhaProcessada.query.filter(
+            FolhaProcessada.obra_id == obra_id
+        )
+        
+        if ano_inicio == ano_fim:
+            query = query.filter(
+                FolhaProcessada.ano == ano_inicio,
+                FolhaProcessada.mes >= mes_inicio,
+                FolhaProcessada.mes <= mes_fim
+            )
+        else:
+            query = query.filter(
+                db.or_(
+                    db.and_(FolhaProcessada.ano == ano_inicio, FolhaProcessada.mes >= mes_inicio),
+                    db.and_(FolhaProcessada.ano > ano_inicio, FolhaProcessada.ano < ano_fim),
+                    db.and_(FolhaProcessada.ano == ano_fim, FolhaProcessada.mes <= mes_fim)
+                )
+            )
+        
+        if admin_id:
+            query = query.filter(FolhaProcessada.admin_id == admin_id)
+        
+        folhas = query.all()
+        
+        dados_por_funcionario = {}
+        dados_por_mes = {}
+        
+        for folha in folhas:
+            func_id = folha.funcionario_id
+            mes_ref = f"{folha.ano}-{folha.mes:02d}"
+            
+            if func_id not in dados_por_funcionario:
+                funcionario = Funcionario.query.get(func_id)
+                dados_por_funcionario[func_id] = {
+                    'funcionario': funcionario,
+                    'total_salario_bruto': Decimal('0'),
+                    'total_encargos': Decimal('0'),
+                    'total_custo': Decimal('0'),
+                    'total_horas_normais': Decimal('0'),
+                    'total_he_50': Decimal('0'),
+                    'total_he_100': Decimal('0'),
+                    'total_faltas': Decimal('0')
+                }
+            
+            dados_por_funcionario[func_id]['total_salario_bruto'] += folha.salario_bruto or Decimal('0')
+            encargos = (folha.encargos_fgts or Decimal('0')) + (folha.encargos_inss_patronal or Decimal('0'))
+            dados_por_funcionario[func_id]['total_encargos'] += encargos
+            dados_por_funcionario[func_id]['total_custo'] += folha.custo_total_empresa or Decimal('0')
+            
+            horas_normais = (folha.horas_trabalhadas or Decimal('0')) - \
+                           (folha.horas_extras_50 or Decimal('0')) - \
+                           (folha.horas_extras_100 or Decimal('0'))
+            dados_por_funcionario[func_id]['total_horas_normais'] += max(horas_normais, Decimal('0'))
+            dados_por_funcionario[func_id]['total_he_50'] += folha.horas_extras_50 or Decimal('0')
+            dados_por_funcionario[func_id]['total_he_100'] += folha.horas_extras_100 or Decimal('0')
+            dados_por_funcionario[func_id]['total_faltas'] += folha.horas_falta or Decimal('0')
+            
+            if mes_ref not in dados_por_mes:
+                dados_por_mes[mes_ref] = {
+                    'salario_base': Decimal('0'),
+                    'he_50': Decimal('0'),
+                    'he_100': Decimal('0'),
+                    'dsr': Decimal('0'),
+                    'encargos': Decimal('0'),
+                    'total': Decimal('0')
+                }
+            
+            dados_por_mes[mes_ref]['salario_base'] += folha.salario_base or Decimal('0')
+            dados_por_mes[mes_ref]['he_50'] += folha.valor_he_50 or Decimal('0')
+            dados_por_mes[mes_ref]['he_100'] += folha.valor_he_100 or Decimal('0')
+            dados_por_mes[mes_ref]['dsr'] += folha.valor_dsr or Decimal('0')
+            dados_por_mes[mes_ref]['encargos'] += encargos
+            dados_por_mes[mes_ref]['total'] += folha.custo_total_empresa or Decimal('0')
+        
+        total_custo = sum(d['total_custo'] for d in dados_por_funcionario.values())
+        total_horas = sum(
+            d['total_horas_normais'] + d['total_he_50'] + d['total_he_100'] 
+            for d in dados_por_funcionario.values()
+        )
+        total_he = sum(d['total_he_50'] + d['total_he_100'] for d in dados_por_funcionario.values())
+        custo_por_hora = total_custo / total_horas if total_horas > 0 else Decimal('0')
+        percentual_he = (total_he / total_horas * 100) if total_horas > 0 else Decimal('0')
+        
+        total_salario_base = sum(d['total_salario_bruto'] for d in dados_por_funcionario.values())
+        total_encargos = sum(d['total_encargos'] for d in dados_por_funcionario.values())
+        total_he_50_valor = sum(dados_por_mes[m]['he_50'] for m in dados_por_mes)
+        total_he_100_valor = sum(dados_por_mes[m]['he_100'] for m in dados_por_mes)
+        total_dsr_valor = sum(dados_por_mes[m]['dsr'] for m in dados_por_mes)
+        
+        composicao = [
+            {'categoria': 'Salário Base', 'valor': float(total_salario_base), 'cor': '#4CAF50'},
+            {'categoria': 'HE 50%', 'valor': float(total_he_50_valor), 'cor': '#FF9800'},
+            {'categoria': 'HE 100%', 'valor': float(total_he_100_valor), 'cor': '#F44336'},
+            {'categoria': 'DSR s/ Extras', 'valor': float(total_dsr_valor), 'cor': '#9C27B0'},
+            {'categoria': 'Encargos Patronais', 'valor': float(total_encargos), 'cor': '#2196F3'}
+        ]
+        
+        evolucao = [
+            {
+                'mes': mes_ref,
+                'mes_label': f"{mes_ref.split('-')[1]}/{mes_ref.split('-')[0][-2:]}",
+                'custo': float(dados['total']),
+                'salario': float(dados['salario_base']),
+                'encargos': float(dados['encargos'])
+            }
+            for mes_ref, dados in sorted(dados_por_mes.items())
+        ]
+        
+        funcionarios_lista = [
+            {
+                'id': func_id,
+                'nome': dados['funcionario'].nome if dados['funcionario'] else f"ID {func_id}",
+                'cargo': dados['funcionario'].funcao_ref.nome if dados['funcionario'] and dados['funcionario'].funcao_ref else '-',
+                'salarioBruto': float(dados['total_salario_bruto']),
+                'encargos': float(dados['total_encargos']),
+                'custoTotal': float(dados['total_custo']),
+                'horasNormais': float(dados['total_horas_normais']),
+                'he50': float(dados['total_he_50']),
+                'he100': float(dados['total_he_100']),
+                'horasFalta': float(dados['total_faltas'])
+            }
+            for func_id, dados in dados_por_funcionario.items()
+        ]
+        
+        funcionarios_lista.sort(key=lambda x: x['custoTotal'], reverse=True)
+        
+        return {
+            'funcionarios': funcionarios_lista,
+            'totais': {
+                'custo_total': float(total_custo),
+                'total_horas': float(total_horas),
+                'custo_por_hora': float(custo_por_hora),
+                'percentual_he': float(percentual_he),
+                'total_he': float(total_he),
+                'total_funcionarios': len(funcionarios_lista)
+            },
+            'composicao': composicao,
+            'evolucao_mensal': evolucao
+        }
+        
+    except Exception as e:
+        logger.error(f"[obter_dados_folha_obra] Erro: {e}", exc_info=True)
+        return {
+            'funcionarios': [],
+            'totais': {
+                'custo_total': 0,
+                'total_horas': 0,
+                'custo_por_hora': 0,
+                'percentual_he': 0,
+                'total_he': 0,
+                'total_funcionarios': 0
+            },
+            'composicao': [],
+            'evolucao_mensal': []
+        }
+
+
+def processar_e_salvar_folha_obra(obra_id: int, ano: int, mes: int, admin_id: int) -> Dict:
+    """
+    Processa e salva folhas de todos os funcionários que trabalharam em uma obra no período.
+    Útil para recalcular dados de custo de uma obra.
+    
+    Args:
+        obra_id: ID da obra
+        ano: Ano de referência
+        mes: Mês de referência
+        admin_id: ID do administrador
+    
+    Returns:
+        dict com estatísticas do processamento
+    """
+    try:
+        from models import RegistroPonto
+        
+        funcionarios_ids = db.session.query(RegistroPonto.funcionario_id).filter(
+            RegistroPonto.obra_id == obra_id,
+            extract('year', RegistroPonto.data) == ano,
+            extract('month', RegistroPonto.data) == mes
+        ).distinct().all()
+        
+        funcionarios_ids = [f[0] for f in funcionarios_ids]
+        
+        processados = 0
+        erros = 0
+        
+        for func_id in funcionarios_ids:
+            try:
+                funcionario = Funcionario.query.get(func_id)
+                if not funcionario:
+                    continue
+                
+                dados_folha = processar_folha_funcionario(funcionario, ano, mes)
+                
+                if dados_folha:
+                    if salvar_folha_processada(func_id, obra_id, ano, mes, dados_folha, admin_id):
+                        processados += 1
+                    else:
+                        erros += 1
+                else:
+                    erros += 1
+                    
+            except Exception as e:
+                logger.error(f"[processar_e_salvar_folha_obra] Erro func={func_id}: {e}")
+                erros += 1
+        
+        return {
+            'obra_id': obra_id,
+            'ano': ano,
+            'mes': mes,
+            'funcionarios_encontrados': len(funcionarios_ids),
+            'processados_com_sucesso': processados,
+            'erros': erros
+        }
+        
+    except Exception as e:
+        logger.error(f"[processar_e_salvar_folha_obra] Erro geral: {e}", exc_info=True)
+        return {
+            'obra_id': obra_id,
+            'ano': ano,
+            'mes': mes,
+            'funcionarios_encontrados': 0,
+            'processados_com_sucesso': 0,
+            'erros': 1,
+            'erro_mensagem': str(e)
+        }
