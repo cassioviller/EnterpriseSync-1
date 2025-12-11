@@ -3402,6 +3402,129 @@ def _migration_63_tolerancia_minutos():
                 pass
 
 
+def _migration_64_folha_processada():
+    """
+    Migração 64: Criar tabela folha_processada para dashboard de custos por obra
+    
+    Armazena resultados consolidados do processamento de folha.
+    Usado para consultas eficientes de custos de mão de obra por obra.
+    """
+    connection = None
+    cursor = None
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("=" * 80)
+        logger.info("💰 MIGRAÇÃO 64: Tabela folha_processada para dashboard custos")
+        logger.info("=" * 80)
+        
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables 
+                WHERE table_name = 'folha_processada'
+            )
+        """)
+        
+        if cursor.fetchone()[0]:
+            logger.info("  ⏭️ Tabela folha_processada já existe - SKIP")
+        else:
+            cursor.execute("""
+                CREATE TABLE folha_processada (
+                    id SERIAL PRIMARY KEY,
+                    funcionario_id INTEGER NOT NULL REFERENCES funcionario(id) ON DELETE CASCADE,
+                    obra_id INTEGER REFERENCES obra(id) ON DELETE SET NULL,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+                    ano INTEGER NOT NULL,
+                    mes INTEGER NOT NULL,
+                    
+                    -- Dados do salário
+                    salario_base NUMERIC(10, 2) DEFAULT 0,
+                    salario_bruto NUMERIC(10, 2) DEFAULT 0,
+                    total_proventos NUMERIC(10, 2) DEFAULT 0,
+                    total_descontos NUMERIC(10, 2) DEFAULT 0,
+                    salario_liquido NUMERIC(10, 2) DEFAULT 0,
+                    
+                    -- Componentes de horas extras e DSR
+                    valor_he_50 NUMERIC(10, 2) DEFAULT 0,
+                    valor_he_100 NUMERIC(10, 2) DEFAULT 0,
+                    valor_dsr NUMERIC(10, 2) DEFAULT 0,
+                    
+                    -- Encargos
+                    encargos_fgts NUMERIC(10, 2) DEFAULT 0,
+                    encargos_inss_patronal NUMERIC(10, 2) DEFAULT 0,
+                    custo_total_empresa NUMERIC(10, 2) DEFAULT 0,
+                    
+                    -- Descontos do funcionário
+                    inss_funcionario NUMERIC(10, 2) DEFAULT 0,
+                    irrf NUMERIC(10, 2) DEFAULT 0,
+                    desconto_faltas NUMERIC(10, 2) DEFAULT 0,
+                    desconto_atrasos NUMERIC(10, 2) DEFAULT 0,
+                    
+                    -- Horas
+                    horas_contratuais NUMERIC(10, 2) DEFAULT 0,
+                    horas_trabalhadas NUMERIC(10, 2) DEFAULT 0,
+                    horas_extras_50 NUMERIC(10, 2) DEFAULT 0,
+                    horas_extras_100 NUMERIC(10, 2) DEFAULT 0,
+                    horas_falta NUMERIC(10, 2) DEFAULT 0,
+                    
+                    -- Metadados
+                    processado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
+                    CONSTRAINT uq_folha_func_obra_periodo UNIQUE (funcionario_id, obra_id, ano, mes)
+                )
+            """)
+            logger.info("  ✅ Tabela folha_processada criada")
+            
+            cursor.execute("""
+                CREATE INDEX idx_folha_processada_obra ON folha_processada(obra_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_folha_processada_periodo ON folha_processada(ano, mes)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_folha_processada_admin ON folha_processada(admin_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_folha_processada_funcionario ON folha_processada(funcionario_id)
+            """)
+            logger.info("  ✅ Índices criados")
+        
+        connection.commit()
+        
+        logger.info("=" * 80)
+        logger.info("✅ MIGRAÇÃO 64 CONCLUÍDA COM SUCESSO!")
+        logger.info("=" * 80)
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na Migração 64: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                connection.close()
+            except:
+                pass
+
+
 def _migration_59_alimentacao_itens_sistema():
     """
     Migração 59: Sistema de Itens de Alimentação v2.0
@@ -3640,6 +3763,7 @@ def executar_migracoes():
             (61, "Sistema HorarioDia para horários flexíveis", _migration_61_horario_dia_sistema),
             (62, "Tornar colunas legadas de HorarioTrabalho nullable", _migration_62_horario_trabalho_nullable),
             (63, "Tolerância minutos para horas extras/atrasos", _migration_63_tolerancia_minutos),
+            (64, "Tabela folha_processada para dashboard custos obra", _migration_64_folha_processada),
         ]
         
         # Executar cada migração com rastreamento

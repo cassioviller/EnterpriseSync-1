@@ -3892,6 +3892,76 @@ class MigrationHistory(db.Model):
         return f'<Migration #{self.migration_number}: {self.migration_name}>'
 
 # ================================
+# FOLHA PROCESSADA (DASHBOARD CUSTOS)
+# ================================
+class FolhaProcessada(db.Model):
+    """
+    Armazena resultados consolidados do processamento de folha.
+    Usado para dashboards de custos de mão de obra por obra.
+    Cada registro representa um funcionário/mês/obra processado.
+    """
+    __tablename__ = 'folha_processada'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    ano = db.Column(db.Integer, nullable=False)
+    mes = db.Column(db.Integer, nullable=False)
+    
+    # Dados do salário
+    salario_base = db.Column(db.Numeric(10, 2), default=0)
+    salario_bruto = db.Column(db.Numeric(10, 2), default=0)
+    total_proventos = db.Column(db.Numeric(10, 2), default=0)
+    total_descontos = db.Column(db.Numeric(10, 2), default=0)
+    salario_liquido = db.Column(db.Numeric(10, 2), default=0)
+    
+    # Componentes de horas extras e DSR
+    valor_he_50 = db.Column(db.Numeric(10, 2), default=0)
+    valor_he_100 = db.Column(db.Numeric(10, 2), default=0)
+    valor_dsr = db.Column(db.Numeric(10, 2), default=0)
+    
+    # Encargos
+    encargos_fgts = db.Column(db.Numeric(10, 2), default=0)
+    encargos_inss_patronal = db.Column(db.Numeric(10, 2), default=0)
+    custo_total_empresa = db.Column(db.Numeric(10, 2), default=0)
+    
+    # Descontos do funcionário
+    inss_funcionario = db.Column(db.Numeric(10, 2), default=0)
+    irrf = db.Column(db.Numeric(10, 2), default=0)
+    desconto_faltas = db.Column(db.Numeric(10, 2), default=0)
+    desconto_atrasos = db.Column(db.Numeric(10, 2), default=0)
+    
+    # Horas
+    horas_contratuais = db.Column(db.Numeric(10, 2), default=0)
+    horas_trabalhadas = db.Column(db.Numeric(10, 2), default=0)
+    horas_extras_50 = db.Column(db.Numeric(10, 2), default=0)
+    horas_extras_100 = db.Column(db.Numeric(10, 2), default=0)
+    horas_falta = db.Column(db.Numeric(10, 2), default=0)
+    
+    # Metadados
+    processado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    funcionario = db.relationship('Funcionario', backref='folhas_processadas')
+    obra = db.relationship('Obra', backref='folhas_processadas')
+    admin = db.relationship('Usuario', backref='folhas_processadas_admin')
+    
+    __table_args__ = (
+        db.UniqueConstraint('funcionario_id', 'obra_id', 'ano', 'mes', name='uq_folha_func_obra_periodo'),
+        db.Index('idx_folha_processada_obra', 'obra_id'),
+        db.Index('idx_folha_processada_periodo', 'ano', 'mes'),
+        db.Index('idx_folha_processada_admin', 'admin_id'),
+        db.Index('idx_folha_processada_funcionario', 'funcionario_id'),
+    )
+    
+    def __repr__(self):
+        return f'<FolhaProcessada func={self.funcionario_id} obra={self.obra_id} {self.mes:02d}/{self.ano}>'
+
+
+# ================================
 # ALIASES PARA COMPATIBILIDADE
 # ================================
 # Manter compatibilidade com código legado que importa Frota*
