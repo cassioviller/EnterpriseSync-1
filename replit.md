@@ -2,6 +2,12 @@
 SIGE v9.0 (Sistema de Gestão Empresarial) is a production-ready multi-tenant business management system for SMBs, validated through comprehensive E2E testing. Its purpose is to automate and streamline core operations, covering commercial proposal generation, employee management, construction project control (Daily Work Reports - RDO), and automated payroll processing. The system aims to boost efficiency and provide comprehensive operational oversight from sales to project management and financial calculations, ultimately enhancing business management for SMBs.
 
 ## Recent Changes (December 2025)
+- **Validação Estrita ParametrosLegais (Dec 11)**:
+  - `calcular_descontos()` agora lança ValueError se ParametrosLegais não for fornecido
+  - `processar_folha_funcionario()` valida presença de params e exibe mensagem user-friendly
+  - Constantes hardcoded renomeadas para `_FALLBACK_*` e isoladas do fluxo principal
+  - Sistema BLOQUEIA processamento de folha se parâmetros do ano não configurados
+  - Mensagem de erro direciona usuário para Configurações > Parâmetros Legais
 - **Sistema de Horários Flexíveis - VALIDADO END-TO-END (Dec 10)**:
   - Novo modelo `HorarioDia` para horários diferentes por dia da semana (ex: 8h seg-qui, 4h sexta)
   - Migração 61: Criada tabela `horario_dia` e coluna `ativo` em `horario_trabalho`
