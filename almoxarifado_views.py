@@ -573,8 +573,8 @@ def itens_deletar(id):
         nome = item.nome
         
         if force:
-            AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).delete()
-            AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).delete()
+            AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).delete(synchronize_session='fetch')
+            AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).delete(synchronize_session='fetch')
             logger.info(f'Exclusão forçada: {qtd_estoque} estoques e {qtd_movimentos} movimentos removidos para item {nome}')
         
         db.session.delete(item)
@@ -584,12 +584,13 @@ def itens_deletar(id):
             flash(f'Item "{nome}" e todos os registros relacionados foram excluídos!', 'success')
         else:
             flash(f'Item "{nome}" excluído com sucesso!', 'success')
+        
+        return redirect(url_for('almoxarifado.itens'))
     except Exception as e:
         db.session.rollback()
         logger.error(f'Erro ao deletar item: {str(e)}')
-        flash('Erro ao excluir item', 'danger')
-    
-    return redirect(url_for('almoxarifado.itens'))
+        flash(f'Erro ao excluir item: {str(e)}', 'danger')
+        return redirect(url_for('almoxarifado.itens'))
 
 # ========================================
 # ENTRADA DE MATERIAIS
