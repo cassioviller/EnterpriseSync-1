@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var nome = this.getAttribute('data-nome');
             
             document.getElementById('nomeItemExcluir').textContent = nome;
-            document.getElementById('formExcluirItem').action = '/almoxarifado/itens/' + id + '/deletar';
+            document.getElementById('formExcluirItem').action = '/almoxarifado/itens/deletar/' + id;
             
             bsModal.show();
         });
