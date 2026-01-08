@@ -553,25 +553,37 @@ def itens_movimentacoes(id):
 @almoxarifado_bp.route('/itens/deletar/<int:id>', methods=['POST'])
 @login_required
 def itens_deletar(id):
-    """Deletar item"""
+    """Deletar item - com suporte a exclusão forçada"""
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
         return redirect(url_for('main.index'))
     
     item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    force = request.form.get('force', '0') == '1'
     
-    tem_estoque = AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).count() > 0
-    if tem_estoque:
-        flash(f'Não é possível excluir o item "{item.nome}" pois possui registros de estoque', 'danger')
+    qtd_estoque = AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).count()
+    qtd_movimentos = AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).count()
+    
+    if (qtd_estoque > 0 or qtd_movimentos > 0) and not force:
+        flash(f'Item "{item.nome}" possui {qtd_estoque} registros de estoque e {qtd_movimentos} movimentações. Use exclusão forçada.', 'warning')
         return redirect(url_for('almoxarifado.itens'))
     
     try:
         nome = item.nome
+        
+        if force:
+            AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).delete()
+            AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).delete()
+            logger.info(f'Exclusão forçada: {qtd_estoque} estoques e {qtd_movimentos} movimentos removidos para item {nome}')
+        
         db.session.delete(item)
         db.session.commit()
         
-        flash(f'Item "{nome}" excluído com sucesso!', 'success')
+        if force:
+            flash(f'Item "{nome}" e todos os registros relacionados foram excluídos!', 'success')
+        else:
+            flash(f'Item "{nome}" excluído com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
         logger.error(f'Erro ao deletar item: {str(e)}')
