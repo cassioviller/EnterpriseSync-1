@@ -578,11 +578,12 @@ def itens_deletar(id):
     
     try:
         if force:
-            db.session.execute(text("DELETE FROM almoxarifado_estoque WHERE item_id = :item_id AND admin_id = :admin_id"), 
-                             {"item_id": id, "admin_id": admin_id})
+            # ORDEM CORRETA: movimento primeiro (referencia estoque), depois estoque
             db.session.execute(text("DELETE FROM almoxarifado_movimento WHERE item_id = :item_id AND admin_id = :admin_id"), 
                              {"item_id": id, "admin_id": admin_id})
-            logger.info(f'Exclusão forçada: {qtd_estoque} estoques e {qtd_movimentos} movimentos removidos para item {nome}')
+            db.session.execute(text("DELETE FROM almoxarifado_estoque WHERE item_id = :item_id AND admin_id = :admin_id"), 
+                             {"item_id": id, "admin_id": admin_id})
+            logger.info(f'Exclusão forçada: {qtd_movimentos} movimentos e {qtd_estoque} estoques removidos para item {nome}')
         
         db.session.execute(text("DELETE FROM almoxarifado_item WHERE id = :id AND admin_id = :admin_id"), 
                          {"id": id, "admin_id": admin_id})
