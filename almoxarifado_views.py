@@ -18,6 +18,7 @@ def get_admin_id():
         if hasattr(current_user, 'admin_id') and current_user.admin_id:
             return current_user.admin_id
         return current_user.id
+    logger.warning(f'get_admin_id: usuário não autenticado - is_authenticated={getattr(current_user, "is_authenticated", "N/A")}')
     return None
 
 @almoxarifado_bp.route('/')
@@ -260,63 +261,71 @@ def categorias_deletar(id):
 @login_required
 def itens():
     """Lista todos os itens do almoxarifado com busca e filtros"""
-    admin_id = get_admin_id()
-    if not admin_id:
-        flash('Erro de autenticação', 'danger')
-        return redirect(url_for('main.index'))
-    
-    busca = request.args.get('busca', '').strip()
-    categoria_id = request.args.get('categoria_id', type=int)
-    tipo_controle = request.args.get('tipo_controle', '')
-    
-    query = AlmoxarifadoItem.query.filter_by(admin_id=admin_id)
-    
-    if busca:
-        query = query.filter(
-            or_(
-                AlmoxarifadoItem.codigo.ilike(f'%{busca}%'),
-                AlmoxarifadoItem.nome.ilike(f'%{busca}%')
-            )
-        )
-    
-    if categoria_id:
-        query = query.filter_by(categoria_id=categoria_id)
-    
-    if tipo_controle:
-        query = query.filter_by(tipo_controle=tipo_controle)
-    
-    itens = query.order_by(AlmoxarifadoItem.nome).all()
-    categorias = AlmoxarifadoCategoria.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoCategoria.nome).all()
-    
-    itens_com_estoque = []
-    for item in itens:
-        if item.tipo_controle == 'SERIALIZADO':
-            estoque_atual = AlmoxarifadoEstoque.query.filter_by(
-                item_id=item.id,
-                status='DISPONIVEL',
-                admin_id=admin_id
-            ).count()
-        else:
-            estoque_atual = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
-                item_id=item.id,
-                status='DISPONIVEL',
-                admin_id=admin_id
-            ).scalar() or 0
+    try:
+        admin_id = get_admin_id()
+        if not admin_id:
+            user_info = f"user_id={getattr(current_user, 'id', 'N/A')}, admin_id={getattr(current_user, 'admin_id', 'N/A')}, is_auth={current_user.is_authenticated}"
+            logger.error(f'ALMOX ITENS - Falha admin_id: {user_info}')
+            flash(f'DEBUG PRODUÇÃO: admin_id vazio. Info: {user_info}', 'danger')
+            return redirect(url_for('dashboard'))
         
-        # Tratar estoque_minimo NULL (padronizar como 0)
-        estoque_minimo = item.estoque_minimo if item.estoque_minimo is not None else 0
-        itens_com_estoque.append({
-            'item': item,
-            'estoque_atual': estoque_atual,
-            'status_estoque': 'baixo' if estoque_atual <= estoque_minimo else 'normal'
-        })
-    
-    return render_template('almoxarifado/itens.html',
-                         itens_com_estoque=itens_com_estoque,
-                         categorias=categorias,
-                         busca=busca,
-                         categoria_id=categoria_id,
-                         tipo_controle=tipo_controle)
+        busca = request.args.get('busca', '').strip()
+        categoria_id = request.args.get('categoria_id', type=int)
+        tipo_controle = request.args.get('tipo_controle', '')
+        
+        query = AlmoxarifadoItem.query.filter_by(admin_id=admin_id)
+        
+        if busca:
+            query = query.filter(
+                or_(
+                    AlmoxarifadoItem.codigo.ilike(f'%{busca}%'),
+                    AlmoxarifadoItem.nome.ilike(f'%{busca}%')
+                )
+            )
+        
+        if categoria_id:
+            query = query.filter_by(categoria_id=categoria_id)
+        
+        if tipo_controle:
+            query = query.filter_by(tipo_controle=tipo_controle)
+        
+        itens = query.order_by(AlmoxarifadoItem.nome).all()
+        categorias = AlmoxarifadoCategoria.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoCategoria.nome).all()
+        
+        itens_com_estoque = []
+        for item in itens:
+            if item.tipo_controle == 'SERIALIZADO':
+                estoque_atual = AlmoxarifadoEstoque.query.filter_by(
+                    item_id=item.id,
+                    status='DISPONIVEL',
+                    admin_id=admin_id
+                ).count()
+            else:
+                estoque_atual = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
+                    item_id=item.id,
+                    status='DISPONIVEL',
+                    admin_id=admin_id
+                ).scalar() or 0
+            
+            estoque_minimo = item.estoque_minimo if item.estoque_minimo is not None else 0
+            itens_com_estoque.append({
+                'item': item,
+                'estoque_atual': estoque_atual,
+                'status_estoque': 'baixo' if estoque_atual <= estoque_minimo else 'normal'
+            })
+        
+        return render_template('almoxarifado/itens.html',
+                             itens_com_estoque=itens_com_estoque,
+                             categorias=categorias,
+                             busca=busca,
+                             categoria_id=categoria_id,
+                             tipo_controle=tipo_controle)
+    except Exception as e:
+        import traceback
+        erro_completo = traceback.format_exc()
+        logger.error(f'ALMOX ITENS ERRO: {str(e)}\n{erro_completo}')
+        flash(f'DEBUG ERRO: {str(e)}', 'danger')
+        return redirect(url_for('dashboard'))
 
 @almoxarifado_bp.route('/itens/criar', methods=['GET', 'POST'])
 @login_required
