@@ -553,31 +553,39 @@ def itens_movimentacoes(id):
 @almoxarifado_bp.route('/itens/deletar/<int:id>', methods=['POST'])
 @login_required
 def itens_deletar(id):
-    """Deletar item - com suporte a exclusão forçada"""
+    """Deletar item - com suporte a exclusão forçada (usando SQL direto para evitar problemas de sessão)"""
+    from sqlalchemy import text
+    
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
-        return redirect(url_for('main.index'))
+        return redirect(url_for('almoxarifado.itens'))
     
-    item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first()
+    if not item:
+        flash('Item não encontrado', 'danger')
+        return redirect(url_for('almoxarifado.itens'))
+    
     force = request.form.get('force', '0') == '1'
+    nome = item.nome
     
     qtd_estoque = AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).count()
     qtd_movimentos = AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).count()
     
     if (qtd_estoque > 0 or qtd_movimentos > 0) and not force:
-        flash(f'Item "{item.nome}" possui {qtd_estoque} registros de estoque e {qtd_movimentos} movimentações. Use exclusão forçada.', 'warning')
+        flash(f'Item "{nome}" possui {qtd_estoque} registros de estoque e {qtd_movimentos} movimentações. Marque "Forçar exclusão" para confirmar.', 'warning')
         return redirect(url_for('almoxarifado.itens'))
     
     try:
-        nome = item.nome
-        
         if force:
-            AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).delete(synchronize_session='fetch')
-            AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).delete(synchronize_session='fetch')
+            db.session.execute(text("DELETE FROM almoxarifado_estoque WHERE item_id = :item_id AND admin_id = :admin_id"), 
+                             {"item_id": id, "admin_id": admin_id})
+            db.session.execute(text("DELETE FROM almoxarifado_movimento WHERE item_id = :item_id AND admin_id = :admin_id"), 
+                             {"item_id": id, "admin_id": admin_id})
             logger.info(f'Exclusão forçada: {qtd_estoque} estoques e {qtd_movimentos} movimentos removidos para item {nome}')
         
-        db.session.delete(item)
+        db.session.execute(text("DELETE FROM almoxarifado_item WHERE id = :id AND admin_id = :admin_id"), 
+                         {"id": id, "admin_id": admin_id})
         db.session.commit()
         
         if force:
@@ -585,12 +593,12 @@ def itens_deletar(id):
         else:
             flash(f'Item "{nome}" excluído com sucesso!', 'success')
         
-        return redirect(url_for('almoxarifado.itens'))
     except Exception as e:
         db.session.rollback()
         logger.error(f'Erro ao deletar item: {str(e)}')
         flash(f'Erro ao excluir item: {str(e)}', 'danger')
-        return redirect(url_for('almoxarifado.itens'))
+    
+    return redirect(url_for('almoxarifado.itens'))
 
 # ========================================
 # ENTRADA DE MATERIAIS
