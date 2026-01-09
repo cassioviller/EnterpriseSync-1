@@ -230,7 +230,24 @@ register_error_handlers(app)
 
 @login_manager.user_loader
 def load_user(user_id):
-    return Usuario.query.get(int(user_id))
+    """Carrega usuário com proteção contra erros de conexão"""
+    try:
+        user = Usuario.query.get(int(user_id))
+        if user is None:
+            logging.warning(f'USER_LOADER: Usuário {user_id} não encontrado no banco')
+        return user
+    except Exception as e:
+        logging.error(f'USER_LOADER ERRO: Falha ao carregar user_id={user_id}: {str(e)}')
+        # Tenta reconectar ao banco
+        try:
+            db.session.rollback()
+            db.session.remove()
+            user = Usuario.query.get(int(user_id))
+            logging.info(f'USER_LOADER: Recuperado após reconexão - user_id={user_id}')
+            return user
+        except Exception as e2:
+            logging.error(f'USER_LOADER ERRO CRÍTICO: Falha mesmo após reconexão: {str(e2)}')
+            return None
 
 # Função para templates
 @app.template_global()
