@@ -563,40 +563,58 @@ def itens_movimentacoes(id):
 @login_required
 def itens_deletar(id):
     """Deletar item - com suporte a exclusão forçada (usando SQL direto para evitar problemas de sessão)"""
+    import traceback
     from sqlalchemy import text
     
-    admin_id = get_admin_id()
-    if not admin_id:
-        flash('Erro de autenticação', 'danger')
-        return redirect(url_for('almoxarifado.itens'))
-    
-    item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first()
-    if not item:
-        flash('Item não encontrado', 'danger')
-        return redirect(url_for('almoxarifado.itens'))
-    
-    force = request.form.get('force', '0') == '1'
-    nome = item.nome
-    
-    qtd_estoque = AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).count()
-    qtd_movimentos = AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).count()
-    
-    if (qtd_estoque > 0 or qtd_movimentos > 0) and not force:
-        flash(f'Item "{nome}" possui {qtd_estoque} registros de estoque e {qtd_movimentos} movimentações. Marque "Forçar exclusão" para confirmar.', 'warning')
-        return redirect(url_for('almoxarifado.itens'))
+    # LOG DETALHADO PARA DEBUG PRODUÇÃO
+    logger.warning(f'=== DELETAR ITEM INICIADO === item_id={id}')
+    logger.warning(f'current_user.is_authenticated={current_user.is_authenticated}')
+    logger.warning(f'current_user.id={getattr(current_user, "id", "N/A")}')
+    logger.warning(f'current_user.admin_id={getattr(current_user, "admin_id", "N/A")}')
     
     try:
+        admin_id = get_admin_id()
+        logger.warning(f'admin_id obtido: {admin_id}')
+        
+        if not admin_id:
+            logger.error(f'FALHA: admin_id vazio para user_id={getattr(current_user, "id", "N/A")}')
+            flash('Erro de autenticação', 'danger')
+            return redirect(url_for('almoxarifado.itens'))
+        
+        item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first()
+        if not item:
+            logger.error(f'FALHA: Item {id} não encontrado para admin_id={admin_id}')
+            flash('Item não encontrado', 'danger')
+            return redirect(url_for('almoxarifado.itens'))
+        
+        force = request.form.get('force', '0') == '1'
+        nome = item.nome
+        logger.warning(f'Item encontrado: {nome}, force={force}')
+        
+        qtd_estoque = AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).count()
+        qtd_movimentos = AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).count()
+        logger.warning(f'Dependências: {qtd_estoque} estoques, {qtd_movimentos} movimentos')
+        
+        if (qtd_estoque > 0 or qtd_movimentos > 0) and not force:
+            flash(f'Item "{nome}" possui {qtd_estoque} registros de estoque e {qtd_movimentos} movimentações. Marque "Forçar exclusão" para confirmar.', 'warning')
+            return redirect(url_for('almoxarifado.itens'))
+        
         if force:
-            # ORDEM CORRETA: movimento primeiro (referencia estoque), depois estoque
+            logger.warning(f'Executando DELETE movimento...')
             db.session.execute(text("DELETE FROM almoxarifado_movimento WHERE item_id = :item_id AND admin_id = :admin_id"), 
                              {"item_id": id, "admin_id": admin_id})
+            logger.warning(f'Executando DELETE estoque...')
             db.session.execute(text("DELETE FROM almoxarifado_estoque WHERE item_id = :item_id AND admin_id = :admin_id"), 
                              {"item_id": id, "admin_id": admin_id})
-            logger.info(f'Exclusão forçada: {qtd_movimentos} movimentos e {qtd_estoque} estoques removidos para item {nome}')
+            logger.warning(f'Exclusão forçada: {qtd_movimentos} movimentos e {qtd_estoque} estoques removidos')
         
+        logger.warning(f'Executando DELETE item...')
         db.session.execute(text("DELETE FROM almoxarifado_item WHERE id = :id AND admin_id = :admin_id"), 
                          {"id": id, "admin_id": admin_id})
+        
+        logger.warning(f'Executando COMMIT...')
         db.session.commit()
+        logger.warning(f'=== DELETAR ITEM SUCESSO === {nome}')
         
         if force:
             flash(f'Item "{nome}" e todos os registros relacionados foram excluídos!', 'success')
@@ -604,10 +622,13 @@ def itens_deletar(id):
             flash(f'Item "{nome}" excluído com sucesso!', 'success')
         
     except Exception as e:
+        erro_completo = traceback.format_exc()
+        logger.error(f'=== DELETAR ITEM ERRO === {str(e)}')
+        logger.error(f'Traceback completo:\n{erro_completo}')
         db.session.rollback()
-        logger.error(f'Erro ao deletar item: {str(e)}')
         flash(f'Erro ao excluir item: {str(e)}', 'danger')
     
+    logger.warning(f'=== REDIRECIONANDO PARA ITENS ===')
     return redirect(url_for('almoxarifado.itens'))
 
 # ========================================
