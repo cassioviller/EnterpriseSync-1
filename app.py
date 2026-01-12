@@ -31,13 +31,17 @@ logger.info(f"✅ Secret key configurado (length: {len(secret_key)})")
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
-# CONFIGURAÇÕES DE SESSÃO PARA PRODUÇÃO
-# Detecta ambiente de produção (EasyPanel) vs desenvolvimento (Replit)
+# ======================================================================
+# CONFIGURAÇÕES DE SESSÃO PARA PRODUÇÃO (Alternativa sem SERVER_NAME)
+# ======================================================================
 IS_PRODUCTION = 'REPL_ID' not in os.environ
 
 if IS_PRODUCTION:
-    logger.info("🔒 PRODUÇÃO: Configurando cookies de sessão seguros")
+    logger.info("🔒 PRODUÇÃO: Configurando cookies de sessão seguros com SESSION_COOKIE_DOMAIN")
     app.config.update(
+        # SESSION_COOKIE_DOMAIN: Define o domínio para o qual o cookie é válido
+        # O ponto no início faz com que seja válido para subdomínios também
+        SESSION_COOKIE_DOMAIN=".sige.cassioviller.tech",
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='Lax',

@@ -1,0 +1,89 @@
+# Prompt de Correção Definitiva: Sessão Vazia em Produção
+
+## Prompt para o Replit Agent
+
+Cole o texto abaixo diretamente no chat do Replit Agent.
+
+```
+**AÇÃO DE CORREÇÃO CRÍTICA: Sessão Vazia em Produção**
+
+**Contexto e Diagnóstico:**
+
+Recebi os logs de produção. O diagnóstico é claro e definitivo:
+
+-   **Log:** `Session Keys: []`
+-   **Causa Raiz:** A sessão do Flask **não está sendo criada ou persistida** no ambiente de produção. O cookie de sessão não está sendo aceito pelo navegador, resultando em uma sessão vazia a cada nova requisição. O problema não é o CSRF em si, mas a falha da sessão que o suporta.
+
+Isso ocorre por uma configuração incompleta para ambientes de produção com domínio customizado e HTTPS.
+
+**Sua Tarefa:**
+
+Aplique uma **configuração de produção robusta e completa** no arquivo `main.py`. Substitua qualquer configuração anterior de `ProxyFix` ou de cookies pela nova configuração consolidada abaixo para garantir que não haja conflitos.
+
+**Passo 1: Verifique a `SECRET_KEY`**
+
+-   **Ação:** Garanta que a `app.config['SECRET_KEY']` seja uma **string estática e secreta**. Se ela estiver sendo gerada aleatoriamente (ex: com `os.urandom`), a sessão será invalidada a cada reinicialização. Ela deve ser um valor fixo.
+
+**Passo 2: Aplique a Configuração Consolidada de Produção**
+
+-   **Ação:** No arquivo `main.py`, localize a linha `app = Flask(__name__)` e **substitua todo o bloco de configuração de produção existente** pelo código abaixo. Ele inclui o `ProxyFix` e todas as diretivas de cookie necessárias.
+
+```python
+# Adicione esta importação no topo do main.py, se não existir
+from werkzeug.middleware.proxy_fix import ProxyFix
+import os
+
+# ... (após a linha app = Flask(__name__))
+
+# ======================================================================
+# == CONFIGURAÇÃO CONSOLIDADA PARA PRODUÇÃO (Easypanel/Docker) ==
+# ======================================================================
+
+# Garanta que a SECRET_KEY é uma string estática e não gerada aleatoriamente
+# Exemplo: app.config['SECRET_KEY'] = 'minha-chave-secreta-muito-longa-e-segura'
+
+# 1. ProxyFix: Essencial para que o Flask confie nos headers do proxy do Easypanel
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+# 2. Detecção de Ambiente de Produção
+IS_PRODUCTION = 'REPL_ID' not in os.environ
+
+# 3. Aplica configurações de sessão APENAS em produção
+if IS_PRODUCTION:
+    app.config.update(
+        # SERVER_NAME: CRÍTICO para a sessão funcionar em um domínio customizado.
+        # Ele informa ao Flask qual o domínio da aplicação.
+        SERVER_NAME='sige.cassioviller.tech',
+        
+        # SESSION_COOKIE_SECURE: Garante que o cookie só seja enviado via HTTPS.
+        SESSION_COOKIE_SECURE=True,
+        
+        # SESSION_COOKIE_HTTPONLY: Previne que o cookie de sessão seja acessado por JavaScript.
+        SESSION_COOKIE_HTTPONLY=True,
+        
+        # SESSION_COOKIE_SAMESITE: Mitiga ataques CSRF.
+        SESSION_COOKIE_SAMESITE='Lax'
+    )
+
+# ======================================================================
+# == FIM DA CONFIGURAÇÃO DE PRODUÇÃO ==
+# ======================================================================
+
+# ... (resto do código, como a inicialização do CSRFProtect, etc.)
+```
+
+**Resumo da Ação:**
+
+1.  Você irá substituir as configurações de produção anteriores pelo novo bloco consolidado.
+2.  A adição mais importante é a `SERVER_NAME='sige.cassioviller.tech'`, que é **essencial** para que os cookies de sessão sejam válidos para o seu domínio.
+3.  O `ProxyFix` foi atualizado para `x_host=1` e `x_prefix=1` para maior robustez.
+
+**Instruções para Mim (após você aplicar o código):**
+
+1.  Eu farei o deploy deste código no Easypanel.
+2.  Vou limpar os cookies do meu navegador **completamente**.
+3.  Vou acessar `https://www.sige.cassioviller.tech` e tentar fazer login e cadastrar uma obra.
+4.  Vou verificar os logs novamente e te informar se as `Session Keys` agora contêm dados (como `_user_id`, `csrf_token`, etc.).
+
+**Execute a correção definitiva agora.**
+```
