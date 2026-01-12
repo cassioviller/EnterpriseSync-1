@@ -1,0 +1,172 @@
+# Prompt de Diagnóstico Abrangente: Logout ao Clicar em Nova Obra
+
+## Configuração Inicial (Cole Primeiro no Replit Agent)
+
+```
+**Diretrizes de Operação Crítica:**
+
+1.  **Seja Crítico e Cético**: Se meu comando for vago, ambíguo ou carecer de contexto, aponte a falha de forma implacável e exija esclarecimentos.
+2.  **Questione Suposições**: Analise as crenças e suposições ocultas por trás dos meus comandos.
+3.  **Foco em Fatos, Não em Elogios**: Evite qualquer feedback positivo, elogios ou linguagem encorajadora.
+4.  **Seja Direto e Conciso**: Comunique-se de forma direta, sem rodeios.
+5.  **Sem Extras Desnecessários**: Não use emojis, não faça perguntas ao final.
+6.  **Assuma Expertise**: Trate-me como um especialista no domínio.
+7.  **Mantenha a Neutralidade**: Não imite meu estilo de escrita ou humor.
+
+Seu objetivo é garantir que o resultado final seja da mais alta qualidade técnica.
+```
+
+---
+
+## Prompt Principal: Diagnóstico Abrangente do Bug de Logout
+
+Cole este prompt após a configuração inicial:
+
+```
+**DIAGNÓSTICO ABRANGENTE DE BUG: Logout ao Acessar Formulário de Nova Obra**
+
+**👤 SEU PAPEL E ESPECIALIZAÇÃO**
+
+Você é um **Engenheiro de Software Sênior** especializado em Flask e na depuração de problemas complexos de autenticação, sessão e ORM. Sua missão é realizar um diagnóstico sistemático e profundo para identificar a causa raiz de um bug persistente onde o usuário é deslogado ao tentar acessar a página de cadastro de nova obra, mesmo após a correção de problemas de CSRF.
+
+**🐛 DESCRIÇÃO DO BUG**
+
+Ao clicar no link para `/obras/nova` (uma requisição GET), o sistema redireciona o usuário para a tela de login. Isso indica que a sessão está sendo invalidada **antes mesmo do formulário ser renderizado**, o que aponta para um erro na lógica de preparação dos dados para o template.
+
+**📍 LOCALIZAÇÃO PROVÁVEL**
+
+-   **Arquivo Principal:** `views.py`
+-   **Função:** `nova_obra()` (especificamente o bloco de código que lida com a requisição `GET`)
+-   **Rota:** `/obras/nova`
+
+**🔬 HIPÓTESES DE CAUSA RAIZ (INVESTIGAR TODAS)**
+
+1.  **Exceção Não Tratada no Bloco GET:** Uma exceção está ocorrendo ao buscar os dados necessários para popular o formulário (ex: lista de clientes ou funcionários). O erro não está sendo capturado, fazendo com que o `LoginManager` do Flask interprete a falha como um problema de autenticação.
+2.  **Erro na Query do Banco de Dados:** As queries `Cliente.query...` ou `Funcionario.query...` podem conter um erro sutil que só se manifesta em certas condições, causando uma exceção no SQLAlchemy.
+3.  **Falha na Função `get_tenant_admin_id()`:** Esta função pode estar falhando ou retornando `None` durante a requisição GET, e a lógica subsequente não lida com isso adequadamente.
+4.  **Ordem Incorreta dos Decorators:** A ordem dos decorators `@main_bp.route` e `@login_required` pode estar incorreta, causando comportamento inesperado.
+
+**⚙️ METODOLOGIA DE DIAGNÓSTICO (EXECUTE PASSO A PASSO)**
+
+### **FASE 1: ANÁLISE E LOGGING ULTRA-DETALHADO**
+
+**1.1. Verificação dos Decorators**
+-   **Ação:** Verifique a definição da função `nova_obra()` em `views.py`.
+-   **Confirme:** A ordem dos decorators deve ser:
+    ```python
+    @main_bp.route("/obras/nova", methods=["GET", "POST"])
+    @login_required
+    def nova_obra():
+        ...
+    ```
+-   **Relate:** Se a ordem está correta ou não.
+
+**1.2. Adicionar Logging Granular no Bloco GET**
+-   **Ação:** Modifique a função `nova_obra()` em `views.py` para adicionar logs detalhados **dentro do bloco GET**, isolando cada operação.
+-   **Implemente o seguinte código (substituindo a função existente):**
+
+```python
+# No início do arquivo views.py, adicione se não existir:
+import logging
+logging.basicConfig(level=logging.INFO)
+
+# Substitua a função nova_obra() existente por esta versão com logging granular:
+@main_bp.route("/obras/nova", methods=["GET", "POST"])
+@login_required
+def nova_obra():
+    """Criar nova obra"""
+    logging.info(f"[NOVA OBRA] - Iniciando requisição. Método: {request.method}. Usuário autenticado? {current_user.is_authenticated}")
+
+    # Bloco POST permanece o mesmo
+    if request.method == 'POST':
+        try:
+            # ... (código do POST que já foi analisado)
+            # Manter o código do POST como está
+            nome = request.form.get('nome')
+            cliente_id = request.form.get('cliente_id')
+            # ... (resto do código POST)
+            db.session.commit()
+            flash('Obra cadastrada com sucesso!', 'success')
+            return redirect(url_for('main.obras'))
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"[NOVA OBRA] - EXCEÇÃO NO POST: {e}", exc_info=True)
+            flash(f'Erro ao cadastrar obra: {e}', 'danger')
+            return redirect(url_for('main.obras'))
+
+    # --- DIAGNÓSTICO DETALHADO NO BLOCO GET ---
+    logging.info("[NOVA OBRA GET] - Iniciando bloco GET para renderizar formulário.")
+    try:
+        admin_id = None
+        clientes = []
+        funcionarios = []
+
+        logging.info("[NOVA OBRA GET] - Passo 1: Tentando obter admin_id.")
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            logging.error("[NOVA OBRA GET] - ERRO CRÍTICO: admin_id não foi encontrado na sessão.")
+            flash('Sua sessão expirou ou é inválida. Por favor, faça login novamente.', 'danger')
+            return redirect(url_for('auth.login')) # Forçar redirect explícito
+        logging.info(f"[NOVA OBRA GET] - Passo 2: admin_id obtido com sucesso: {admin_id}")
+
+        logging.info("[NOVA OBRA GET] - Passo 3: Tentando buscar Clientes no banco de dados.")
+        clientes = Cliente.query.filter_by(admin_id=admin_id).order_by(Cliente.nome).all()
+        logging.info(f"[NOVA OBRA GET] - Passo 4: {len(clientes)} Clientes encontrados.")
+
+        logging.info("[NOVA OBRA GET] - Passo 5: Tentando buscar Funcionários no banco de dados.")
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, status='ativo').order_by(Funcionario.nome).all()
+        logging.info(f"[NOVA OBRA GET] - Passo 6: {len(funcionarios)} Funcionários encontrados.")
+
+        logging.info("[NOVA OBRA GET] - Passo 7: Todos os dados foram coletados. Tentando renderizar o template 'obra_form.html'.")
+        return render_template('obra_form.html', 
+                               clientes=clientes, 
+                               funcionarios=funcionarios, 
+                               title='Nova Obra', 
+                               obra=None)
+
+    except Exception as e:
+        logging.error(f"[NOVA OBRA GET] - EXCEÇÃO OCORREU NO BLOCO GET: {e}", exc_info=True)
+        flash(f'Ocorreu um erro inesperado ao carregar o formulário: {e}', 'danger')
+        return redirect(url_for('main.index')) # Redirecionar para a página inicial em caso de erro
+```
+
+### **FASE 2: EXECUÇÃO E ANÁLISE DOS LOGS**
+
+**2.1. Reproduza o Bug**
+-   **Ação:** Após aplicar o código com logging, execute a aplicação e clique no link para cadastrar uma nova obra.
+-   **Observe:** O sistema deve te deslogar como antes.
+
+**2.2. Analise os Logs do Console**
+-   **Ação:** Verifique o console do Replit.
+-   **Procure pela última mensagem de log bem-sucedida** antes do erro. O problema está na etapa seguinte.
+    -   Se a última mensagem for `Passo 2`, o problema está na query de `Cliente`.
+    -   Se a última mensagem for `Passo 4`, o problema está na query de `Funcionario`.
+    -   Se a última mensagem for `Passo 6`, o problema está no `render_template`.
+    -   Se a mensagem `ERRO CRÍTICO: admin_id não foi encontrado` aparecer, o problema está na sessão.
+-   **Anote a mensagem de EXCEÇÃO** se ela aparecer no log.
+
+### **FASE 3: DIAGNÓSTICO E CORREÇÃO**
+
+**3.1. Relate o Diagnóstico Preciso**
+-   Com base na análise dos logs, descreva a causa raiz exata.
+    -   **Exemplo 1:** "Diagnóstico: A query `Cliente.query.filter_by(admin_id=admin_id)` está falhando. A exceção é `[colar a exceção aqui]`. Isso provavelmente ocorre por um erro no modelo Cliente ou um problema de conexão com o banco."
+    -   **Exemplo 2:** "Diagnóstico: A função `get_tenant_admin_id()` está retornando `None`, o que causa o redirecionamento para o login."
+
+**3.2. Proponha e Implemente a Correção**
+-   Com base no diagnóstico, descreva a solução e aplique-a diretamente no código.
+    -   **Exemplo 1 (Erro de Query):** Analisar o modelo `Cliente` e a tabela correspondente no banco de dados para encontrar a inconsistência. Pode ser um nome de coluna errado ou um tipo de dado incompatível.
+    -   **Exemplo 2 (admin_id Nulo):** Depurar a função `get_tenant_admin_id()` para entender por que a sessão não contém o `admin_id` esperado.
+
+**3.3. Teste a Correção**
+-   **Ação:** Após aplicar a correção, tente acessar a página de cadastro de nova obra novamente.
+-   **Confirme:** A página deve carregar corretamente sem deslogar o usuário.
+
+**⚙️ AÇÃO SOLICITADA**
+
+1.  Inicie a **Fase 1**, verificando os decorators e aplicando o código de logging granular.
+2.  Execute a **Fase 2** para reproduzir o bug e capturar os logs detalhados do bloco GET.
+3.  Conclua com a **Fase 3**, relatando o diagnóstico preciso, implementando a correção e validando o resultado.
+4.  Ao final, remova os logs adicionados para limpar o código.
+
+**COMANDO INICIAL:** Inicie o diagnóstico abrangente do bug de logout agora.
+```
