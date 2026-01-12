@@ -3,7 +3,7 @@ import logging
 from flask import Flask, url_for
 from flask_login import LoginManager
 from flask_migrate import Migrate
-# CSRFProtect removido - causa conflito 405 quando WTF_CSRF_ENABLED=False
+from flask_wtf.csrf import CSRFProtect
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -70,7 +70,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "echo": False  # Desabilitar logs SQL em produção
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config['WTF_CSRF_ENABLED'] = False
+app.config['WTF_CSRF_ENABLED'] = True
 
 # Configurações v10.0 Digital Mastery
 app.config['DIGITAL_MASTERY_MODE'] = True
@@ -106,6 +106,10 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
+
+# Initialize CSRF Protection
+csrf = CSRFProtect()
+csrf.init_app(app)
 
 # Context processor para configurações da empresa
 @app.context_processor
