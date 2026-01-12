@@ -72,14 +72,6 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['WTF_CSRF_ENABLED'] = True
 
-# ✅ Configuração de Sessão - Garantir persistência de cookies
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-# SESSION_COOKIE_SECURE: True em produção (HTTPS), False em desenvolvimento
-is_production = 'neon' not in database_url and 'localhost' not in database_url
-app.config['SESSION_COOKIE_SECURE'] = is_production
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 horas
-
 # Configurações v10.0 Digital Mastery
 app.config['DIGITAL_MASTERY_MODE'] = True
 app.config['OBSERVABILITY_ENABLED'] = True
