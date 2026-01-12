@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from app import csrf
 from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
@@ -362,7 +361,6 @@ def health_check_veiculos():
 
 # ===== ROTAS DE AUTENTICAÇÃO =====
 @main_bp.route('/login', methods=['GET', 'POST'])
-@csrf.exempt
 def login():
     if request.method == 'POST':
         login_field = request.form.get('email') or request.form.get('username')
