@@ -144,12 +144,12 @@
         <div class="card-body">
             <h5 class="card-title border-bottom pb-2 mb-3">
                 <i class="fas fa-list me-2"></i>Movimentações
-                <span class="badge bg-secondary ms-2">{{ movimentos|length }}</span>
+                <span class="badge bg-secondary ms-2">{{ movimentos.total }}</span>
             </h5>
             
-            {% if movimentos %}
+            {% if movimentos.items %}
             <div class="row g-3">
-                {% for mov in movimentos %}
+                {% for mov in movimentos.items %}
                 <div class="col-12">
                     <div class="card border-start border-4 {% if mov.tipo_movimento == 'ENTRADA' %}border-success{% elif mov.tipo_movimento == 'SAIDA' %}border-danger{% else %}border-info{% endif %} shadow-sm">
                         <div class="card-body">
@@ -343,6 +343,63 @@
                 <i class="fas fa-info-circle me-2"></i>
                 Nenhuma movimentação encontrada com os filtros aplicados.
             </div>
+            {% endif %}
+            
+            <!-- Paginação (preserva todos os filtros ativos) -->
+            {% if movimentos.pages > 1 %}
+            {% set base_args = {'tipo': tipo_filtro or '', 'funcionario': funcionario_filtro or '', 'obra': obra_filtro or '', 'data_inicio': data_inicio or '', 'data_fim': data_fim or ''} %}
+            <nav aria-label="Navegação de páginas" class="mt-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="text-muted small">
+                        Exibindo {{ ((movimentos.page - 1) * movimentos.per_page) + 1 }} a 
+                        {{ [movimentos.page * movimentos.per_page, movimentos.total]|min }} 
+                        de {{ movimentos.total }} registros
+                    </div>
+                    <ul class="pagination mb-0">
+                        {% if movimentos.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('almoxarifado.itens_movimentacoes', id=item.id, page=1, **base_args) }}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('almoxarifado.itens_movimentacoes', id=item.id, page=movimentos.prev_num, **base_args) }}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for p in movimentos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                            {% if p %}
+                                {% if p == movimentos.page %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ p }}</span>
+                                </li>
+                                {% else %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('almoxarifado.itens_movimentacoes', id=item.id, page=p, **base_args) }}">{{ p }}</a>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if movimentos.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('almoxarifado.itens_movimentacoes', id=item.id, page=movimentos.next_num, **base_args) }}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('almoxarifado.itens_movimentacoes', id=item.id, page=movimentos.pages, **base_args) }}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </nav>
             {% endif %}
         </div>
     </div>

@@ -36,26 +36,45 @@ def dashboard():
     total_itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).count()
     
     # ========================================
-    # KPI 2: Estoque Baixo
+    # KPI 2: Estoque Baixo (OTIMIZADO - sem N+1 queries)
     # ========================================
-    itens_estoque_baixo = []
-    itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).all()
+    # Subquery para estoque de consumíveis (soma quantidade)
+    estoque_consumivel = db.session.query(
+        AlmoxarifadoEstoque.item_id,
+        func.coalesce(func.sum(AlmoxarifadoEstoque.quantidade), 0).label('estoque_atual')
+    ).filter(
+        AlmoxarifadoEstoque.admin_id == admin_id,
+        AlmoxarifadoEstoque.status == 'DISPONIVEL'
+    ).group_by(AlmoxarifadoEstoque.item_id).subquery()
     
-    for item in itens:
-        if item.tipo_controle == 'SERIALIZADO':
-            estoque_atual = AlmoxarifadoEstoque.query.filter_by(
-                item_id=item.id,
-                status='DISPONIVEL',
-                admin_id=admin_id
-            ).count()
-        else:
-            estoque_atual = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
-                item_id=item.id,
-                status='DISPONIVEL',
-                admin_id=admin_id
-            ).scalar() or 0
-        
-        # Tratar estoque_minimo NULL (padronizar como 0)
+    # Subquery para estoque de serializados (contagem)
+    estoque_serializado = db.session.query(
+        AlmoxarifadoEstoque.item_id,
+        func.count(AlmoxarifadoEstoque.id).label('estoque_atual')
+    ).filter(
+        AlmoxarifadoEstoque.admin_id == admin_id,
+        AlmoxarifadoEstoque.status == 'DISPONIVEL'
+    ).group_by(AlmoxarifadoEstoque.item_id).subquery()
+    
+    # Query única para itens com estoque baixo
+    itens_estoque_baixo = []
+    itens_com_estoque = db.session.query(
+        AlmoxarifadoItem,
+        func.coalesce(
+            func.case(
+                (AlmoxarifadoItem.tipo_controle == 'SERIALIZADO', estoque_serializado.c.estoque_atual),
+                else_=estoque_consumivel.c.estoque_atual
+            ), 0
+        ).label('estoque_atual')
+    ).outerjoin(
+        estoque_consumivel, AlmoxarifadoItem.id == estoque_consumivel.c.item_id
+    ).outerjoin(
+        estoque_serializado, AlmoxarifadoItem.id == estoque_serializado.c.item_id
+    ).filter(
+        AlmoxarifadoItem.admin_id == admin_id
+    ).all()
+    
+    for item, estoque_atual in itens_com_estoque:
         estoque_minimo = item.estoque_minimo if item.estoque_minimo is not None else 0
         if estoque_atual < estoque_minimo:
             itens_estoque_baixo.append({
@@ -289,24 +308,41 @@ def itens():
         if tipo_controle:
             query = query.filter_by(tipo_controle=tipo_controle)
         
-        itens = query.order_by(AlmoxarifadoItem.nome).all()
         categorias = AlmoxarifadoCategoria.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoCategoria.nome).all()
         
+        # OTIMIZADO: Subqueries para evitar N+1 queries
+        estoque_consumivel = db.session.query(
+            AlmoxarifadoEstoque.item_id,
+            func.coalesce(func.sum(AlmoxarifadoEstoque.quantidade), 0).label('estoque_atual')
+        ).filter(
+            AlmoxarifadoEstoque.admin_id == admin_id,
+            AlmoxarifadoEstoque.status == 'DISPONIVEL'
+        ).group_by(AlmoxarifadoEstoque.item_id).subquery()
+        
+        estoque_serializado = db.session.query(
+            AlmoxarifadoEstoque.item_id,
+            func.count(AlmoxarifadoEstoque.id).label('estoque_atual')
+        ).filter(
+            AlmoxarifadoEstoque.admin_id == admin_id,
+            AlmoxarifadoEstoque.status == 'DISPONIVEL'
+        ).group_by(AlmoxarifadoEstoque.item_id).subquery()
+        
+        # Query principal com JOIN nos estoques
+        resultados = query.add_columns(
+            func.coalesce(
+                func.case(
+                    (AlmoxarifadoItem.tipo_controle == 'SERIALIZADO', estoque_serializado.c.estoque_atual),
+                    else_=estoque_consumivel.c.estoque_atual
+                ), 0
+            ).label('estoque_atual')
+        ).outerjoin(
+            estoque_consumivel, AlmoxarifadoItem.id == estoque_consumivel.c.item_id
+        ).outerjoin(
+            estoque_serializado, AlmoxarifadoItem.id == estoque_serializado.c.item_id
+        ).order_by(AlmoxarifadoItem.nome).all()
+        
         itens_com_estoque = []
-        for item in itens:
-            if item.tipo_controle == 'SERIALIZADO':
-                estoque_atual = AlmoxarifadoEstoque.query.filter_by(
-                    item_id=item.id,
-                    status='DISPONIVEL',
-                    admin_id=admin_id
-                ).count()
-            else:
-                estoque_atual = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
-                    item_id=item.id,
-                    status='DISPONIVEL',
-                    admin_id=admin_id
-                ).scalar() or 0
-            
+        for item, estoque_atual in resultados:
             estoque_minimo = item.estoque_minimo if item.estoque_minimo is not None else 0
             itens_com_estoque.append({
                 'item': item,
@@ -485,6 +521,7 @@ def itens_movimentacoes(id):
     item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     # Filtros da query string
+    page = request.args.get('page', 1, type=int)
     tipo_filtro = request.args.get('tipo', '')
     funcionario_filtro = request.args.get('funcionario', '')
     obra_filtro = request.args.get('obra', '')
@@ -526,8 +563,10 @@ def itens_movimentacoes(id):
         except ValueError:
             pass
     
-    # Ordenar e buscar
-    movimentos = query.order_by(AlmoxarifadoMovimento.data_movimento.desc()).all()
+    # Ordenar e paginar (50 por página)
+    movimentos_paginados = query.order_by(AlmoxarifadoMovimento.data_movimento.desc()).paginate(
+        page=page, per_page=50, error_out=False
+    )
     
     # Buscar listas para filtros
     funcionarios = db.session.query(Funcionario).join(
@@ -546,14 +585,27 @@ def itens_movimentacoes(id):
         AlmoxarifadoMovimento.admin_id == admin_id
     ).distinct().order_by(Obra.nome).all()
     
-    # Estatísticas
-    total_entradas = sum(m.quantidade or 0 for m in movimentos if m.tipo_movimento == 'ENTRADA')
-    total_saidas = sum(m.quantidade or 0 for m in movimentos if m.tipo_movimento == 'SAIDA')
-    total_devolucoes = sum(m.quantidade or 0 for m in movimentos if m.tipo_movimento == 'DEVOLUCAO')
+    # Estatísticas globais (todos os movimentos, não apenas da página atual)
+    stats_query = AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id)
+    total_entradas = db.session.query(func.sum(AlmoxarifadoMovimento.quantidade)).filter(
+        AlmoxarifadoMovimento.item_id == id,
+        AlmoxarifadoMovimento.admin_id == admin_id,
+        AlmoxarifadoMovimento.tipo_movimento == 'ENTRADA'
+    ).scalar() or 0
+    total_saidas = db.session.query(func.sum(AlmoxarifadoMovimento.quantidade)).filter(
+        AlmoxarifadoMovimento.item_id == id,
+        AlmoxarifadoMovimento.admin_id == admin_id,
+        AlmoxarifadoMovimento.tipo_movimento == 'SAIDA'
+    ).scalar() or 0
+    total_devolucoes = db.session.query(func.sum(AlmoxarifadoMovimento.quantidade)).filter(
+        AlmoxarifadoMovimento.item_id == id,
+        AlmoxarifadoMovimento.admin_id == admin_id,
+        AlmoxarifadoMovimento.tipo_movimento == 'DEVOLUCAO'
+    ).scalar() or 0
     
     return render_template('almoxarifado/itens_movimentacoes.html',
                          item=item,
-                         movimentos=movimentos,
+                         movimentos=movimentos_paginados,
                          funcionarios=funcionarios,
                          obras=obras,
                          tipo_filtro=tipo_filtro,
@@ -563,24 +615,17 @@ def itens_movimentacoes(id):
                          data_fim=data_fim,
                          total_entradas=total_entradas,
                          total_saidas=total_saidas,
-                         total_devolucoes=total_devolucoes)
+                         total_devolucoes=total_devolucoes,
+                         page=page)
 
 @almoxarifado_bp.route('/itens/deletar/<int:id>', methods=['POST'])
 @login_required
 def itens_deletar(id):
-    """Deletar item - com suporte a exclusão forçada (usando SQL direto para evitar problemas de sessão)"""
+    """Deletar item - usando ORM com cascade adequado para manutenibilidade"""
     import traceback
-    from sqlalchemy import text
-    
-    # LOG DETALHADO PARA DEBUG PRODUÇÃO
-    logger.warning(f'=== DELETAR ITEM INICIADO === item_id={id}')
-    logger.warning(f'current_user.is_authenticated={current_user.is_authenticated}')
-    logger.warning(f'current_user.id={getattr(current_user, "id", "N/A")}')
-    logger.warning(f'current_user.admin_id={getattr(current_user, "admin_id", "N/A")}')
     
     try:
         admin_id = get_admin_id()
-        logger.warning(f'admin_id obtido: {admin_id}')
         
         if not admin_id:
             logger.error(f'FALHA: admin_id vazio para user_id={getattr(current_user, "id", "N/A")}')
@@ -589,38 +634,28 @@ def itens_deletar(id):
         
         item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first()
         if not item:
-            logger.error(f'FALHA: Item {id} não encontrado para admin_id={admin_id}')
             flash('Item não encontrado', 'danger')
             return redirect(url_for('almoxarifado.itens'))
         
         force = request.form.get('force', '0') == '1'
         nome = item.nome
-        logger.warning(f'Item encontrado: {nome}, force={force}')
         
         qtd_estoque = AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).count()
         qtd_movimentos = AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).count()
-        logger.warning(f'Dependências: {qtd_estoque} estoques, {qtd_movimentos} movimentos')
         
         if (qtd_estoque > 0 or qtd_movimentos > 0) and not force:
             flash(f'Item "{nome}" possui {qtd_estoque} registros de estoque e {qtd_movimentos} movimentações. Marque "Forçar exclusão" para confirmar.', 'warning')
             return redirect(url_for('almoxarifado.itens'))
         
         if force:
-            logger.warning(f'Executando DELETE movimento...')
-            db.session.execute(text("DELETE FROM almoxarifado_movimento WHERE item_id = :item_id AND admin_id = :admin_id"), 
-                             {"item_id": id, "admin_id": admin_id})
-            logger.warning(f'Executando DELETE estoque...')
-            db.session.execute(text("DELETE FROM almoxarifado_estoque WHERE item_id = :item_id AND admin_id = :admin_id"), 
-                             {"item_id": id, "admin_id": admin_id})
-            logger.warning(f'Exclusão forçada: {qtd_movimentos} movimentos e {qtd_estoque} estoques removidos')
+            # Usar ORM para deletar registros relacionados (respeita cascade e triggers)
+            AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).delete(synchronize_session=False)
+            AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).delete(synchronize_session=False)
+            logger.info(f'Exclusão forçada: {qtd_movimentos} movimentos e {qtd_estoque} estoques removidos para item {nome}')
         
-        logger.warning(f'Executando DELETE item...')
-        db.session.execute(text("DELETE FROM almoxarifado_item WHERE id = :id AND admin_id = :admin_id"), 
-                         {"id": id, "admin_id": admin_id})
-        
-        logger.warning(f'Executando COMMIT...')
+        # Deletar item via ORM
+        db.session.delete(item)
         db.session.commit()
-        logger.warning(f'=== DELETAR ITEM SUCESSO === {nome}')
         
         if force:
             flash(f'Item "{nome}" e todos os registros relacionados foram excluídos!', 'success')
@@ -629,12 +664,10 @@ def itens_deletar(id):
         
     except Exception as e:
         erro_completo = traceback.format_exc()
-        logger.error(f'=== DELETAR ITEM ERRO === {str(e)}')
-        logger.error(f'Traceback completo:\n{erro_completo}')
+        logger.error(f'Erro ao deletar item {id}: {str(e)}\n{erro_completo}')
         db.session.rollback()
         flash(f'Erro ao excluir item: {str(e)}', 'danger')
     
-    logger.warning(f'=== REDIRECIONANDO PARA ITENS ===')
     return redirect(url_for('almoxarifado.itens'))
 
 # ========================================
@@ -1280,7 +1313,7 @@ def processar_saida():
                 flash('Selecione ao menos um item para saída', 'danger')
                 return redirect(url_for('almoxarifado.saida'))
             
-            # Validar estoque e atualizar status
+            # Validar estoque e atualizar status (com lock pessimista para evitar race condition)
             itens_processados = 0
             for estoque_id in estoque_ids:
                 estoque = AlmoxarifadoEstoque.query.filter_by(
@@ -1288,7 +1321,7 @@ def processar_saida():
                     item_id=item_id,
                     status='DISPONIVEL',
                     admin_id=admin_id
-                ).first()
+                ).with_for_update().first()
                 
                 if not estoque:
                     db.session.rollback()
@@ -1343,12 +1376,12 @@ def processar_saida():
                 flash(f'Quantidade insuficiente! Disponível: {quantidade_disponivel_total} {item.unidade}', 'danger')
                 return redirect(url_for('almoxarifado.saida'))
             
-            # Implementar consumo FIFO pelos lotes mais antigos
+            # Implementar consumo FIFO pelos lotes mais antigos (com lock pessimista)
             lotes = AlmoxarifadoEstoque.query.filter_by(
                 item_id=item_id,
                 status='DISPONIVEL',
                 admin_id=admin_id
-            ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()  # FIFO: mais antigos primeiro
+            ).with_for_update().order_by(AlmoxarifadoEstoque.created_at.asc()).all()  # FIFO: mais antigos primeiro
             
             quantidade_restante = quantidade
             
@@ -1480,13 +1513,13 @@ def processar_saida_multipla():
                 estoque_id = item_data.get('estoque_id')
                 numero_serie = item_data.get('numero_serie')
                 
-                # VALIDAR: Série existe e está disponível?
+                # VALIDAR: Série existe e está disponível? (lock pessimista)
                 estoque = AlmoxarifadoEstoque.query.filter_by(
                     id=estoque_id,
                     item_id=item_id,
                     status='DISPONIVEL',
                     admin_id=admin_id
-                ).first()
+                ).with_for_update().first()
                 
                 if not estoque:
                     erros.append(f"Item {idx+1} ({item.nome}): Número de série {numero_serie} não disponível")
@@ -1529,13 +1562,13 @@ def processar_saida_multipla():
                             erros.append(f"Item {idx+1} ({item.nome}), Lote {alloc_idx+1}: Quantidade deve ser maior que zero")
                             continue
                         
-                        # Verificar se o lote existe e pertence ao admin
+                        # Verificar se o lote existe e pertence ao admin (lock pessimista)
                         lote_estoque = AlmoxarifadoEstoque.query.filter_by(
                             id=estoque_id,
                             item_id=item_id,
                             status='DISPONIVEL',
                             admin_id=admin_id
-                        ).first()
+                        ).with_for_update().first()
                         
                         if not lote_estoque:
                             erros.append(f"Item {idx+1} ({item.nome}), Lote {alloc_idx+1}: Lote não encontrado ou não disponível")
