@@ -29,7 +29,21 @@ app.secret_key = secret_key
 app.config["SECRET_KEY"] = secret_key
 logger.info(f"✅ Secret key configurado (length: {len(secret_key)})")
 
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# CONFIGURAÇÕES DE SESSÃO PARA PRODUÇÃO
+# Detecta ambiente de produção (EasyPanel) vs desenvolvimento (Replit)
+IS_PRODUCTION = 'REPL_ID' not in os.environ
+
+if IS_PRODUCTION:
+    logger.info("🔒 PRODUÇÃO: Configurando cookies de sessão seguros")
+    app.config.update(
+        SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE='Lax',
+    )
+else:
+    logger.info("🔧 DESENVOLVIMENTO: Cookies de sessão padrão")
 
 # Database configuration - v10.0 Digital Mastery
 database_url = os.environ.get("DATABASE_URL", "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable")
@@ -90,7 +104,7 @@ app.config['RDO_MASTERY_ENABLED'] = True
 # Configurações específicas para resolver erro SERVER_NAME  
 app.config['SERVER_NAME'] = None  # Permite qualquer host
 app.config['APPLICATION_ROOT'] = '/'  # Raiz da aplicação  
-app.config['PREFERRED_URL_SCHEME'] = 'http'  # Esquema padrão
+app.config['PREFERRED_URL_SCHEME'] = 'https' if IS_PRODUCTION else 'http'
 
 # Configure CORS for AJAX requests
 CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
