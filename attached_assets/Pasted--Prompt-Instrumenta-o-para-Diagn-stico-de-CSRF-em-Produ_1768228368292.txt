@@ -1,0 +1,92 @@
+# Prompt: Instrumentação para Diagnóstico de CSRF em Produção
+
+## Prompt para o Replit Agent
+
+Cole o texto abaixo diretamente no chat do Replit Agent.
+
+```
+**AÇÃO DE DIAGNÓSTICO: Instrumentar a Aplicação para Depurar Erro de CSRF em Produção**
+
+**Contexto:**
+
+1.  **O Problema:** Continuo recebendo o erro `CSRF session token is missing` **apenas no ambiente de produção**.
+2.  **Seu Acesso:** Você não tem acesso ao ambiente de produção (deploy via Dockerfile no Easypanel).
+3.  **Meu Papel:** Eu serei seus "olhos e mãos". Vou fazer o deploy do código que você gerar, reproduzir o erro e te enviar os logs que você precisa para o diagnóstico.
+
+**Sua Tarefa:**
+
+Modifique a aplicação para gerar logs detalhados sobre o estado da sessão e dos tokens CSRF. O objetivo é que eu possa capturar esses logs em produção e te fornecer a informação necessária para identificar a causa raiz do problema.
+
+**Passo 1: Adicione um Middleware de Logging**
+
+-   **Ação:** No arquivo `main.py`, adicione uma função que será executada antes de cada requisição para logar informações cruciais da sessão e dos headers.
+
+```python
+# Adicione estas importações no topo do main.py
+import logging
+from flask import request, session
+
+# Configure o logging básico
+logging.basicConfig(level=logging.INFO)
+
+# ... (após a configuração do app e do ProxyFix)
+
+@app.before_request
+def log_request_info():
+    """Loga informações de diagnóstico antes de cada requisição."""
+    # Headers importantes enviados pelo proxy (Easypanel)
+    headers = {
+        'Host': request.headers.get('Host'),
+        'X-Forwarded-For': request.headers.get('X-Forwarded-For'),
+        'X-Forwarded-Proto': request.headers.get('X-Forwarded-Proto'),
+        'Cookie': request.headers.get('Cookie'),
+    }
+    logging.info(f"[CSRF_DEBUG] Path: {request.path}")
+    logging.info(f"[CSRF_DEBUG] Headers: {headers}")
+    logging.info(f"[CSRF_DEBUG] Session ANTES da requisição: {dict(session)}")
+```
+
+**Passo 2: Adicione Logging Específico na Rota de CSRF**
+
+-   **Ação:** Modifique a função `nova_obra()` em `views.py` para logar o estado do token CSRF durante a renderização (GET) e a validação (POST).
+
+```python
+# Em views.py, dentro da função nova_obra()
+
+# ... (no final do bloco GET, antes do return render_template)
+if request.method == 'GET':
+    # ... (código existente do GET)
+    try:
+        from flask_wtf.csrf import generate_csrf
+        token = generate_csrf()
+        logging.info(f"[CSRF_DEBUG] Token gerado para o formulário (GET): {token}")
+        logging.info(f"[CSRF_DEBUG] Session APÓS gerar token (GET): {dict(session)}")
+    except Exception as e:
+        logging.error(f"[CSRF_DEBUG] Erro ao gerar token CSRF manualmente: {e}")
+    return render_template('obra_form.html', ...)
+
+# ... (no início do bloco POST, dentro do try)
+if request.method == 'POST':
+    try:
+        form_token = request.form.get('csrf_token')
+        session_token = session.get('csrf_token')
+        logging.info(f"[CSRF_DEBUG] Token recebido do formulário (POST): {form_token}")
+        logging.info(f"[CSRF_DEBUG] Token esperado na sessão (POST): {session_token}")
+        # ... (resto do código do POST)
+```
+
+**Resumo da Ação:**
+
+1.  Você irá adicionar um middleware em `main.py` que loga os headers e a sessão em **toda requisição**.
+2.  Você irá modificar a função `nova_obra` em `views.py` para logar o token CSRF que está sendo gerado e o que está sendo comparado.
+
+**Instruções para Mim (após você aplicar o código):**
+
+1.  Eu farei o deploy deste código modificado no Easypanel.
+2.  Vou limpar os cookies do meu navegador.
+3.  Vou acessar a aplicação, fazer login e tentar submeter o formulário de "Nova Obra".
+4.  Vou acessar os logs do container no Easypanel.
+5.  Vou copiar **TODAS** as linhas que contêm o prefixo `[CSRF_DEBUG]` e colar aqui para você analisar.
+
+**Execute a instrumentação de logging agora.**
+```

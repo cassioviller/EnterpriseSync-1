@@ -45,6 +45,34 @@ if IS_PRODUCTION:
 else:
     logger.info("🔧 DESENVOLVIMENTO: Cookies de sessão padrão")
 
+# ============================================================
+# MIDDLEWARE DE DIAGNÓSTICO CSRF - PRODUÇÃO
+# ============================================================
+@app.before_request
+def log_csrf_debug():
+    """Loga informações de diagnóstico CSRF antes de cada requisição POST."""
+    from flask import request, session
+    
+    # Só logar para requisições POST em rotas críticas
+    if request.method == 'POST' or '/obras/nova' in request.path:
+        headers_debug = {
+            'Host': request.headers.get('Host'),
+            'X-Forwarded-For': request.headers.get('X-Forwarded-For'),
+            'X-Forwarded-Proto': request.headers.get('X-Forwarded-Proto'),
+            'Cookie-Present': 'Yes' if request.headers.get('Cookie') else 'No',
+        }
+        logger.info(f"[CSRF_DEBUG] Path: {request.path} | Method: {request.method}")
+        logger.info(f"[CSRF_DEBUG] Headers: {headers_debug}")
+        logger.info(f"[CSRF_DEBUG] Session Keys: {list(session.keys())}")
+        logger.info(f"[CSRF_DEBUG] csrf_token in session: {'Yes' if 'csrf_token' in session else 'No'}")
+        
+        if request.method == 'POST':
+            form_token = request.form.get('csrf_token', 'NOT_IN_FORM')
+            session_token = session.get('csrf_token', 'NOT_IN_SESSION')
+            logger.info(f"[CSRF_DEBUG] Form Token (first 20): {str(form_token)[:20]}...")
+            logger.info(f"[CSRF_DEBUG] Session Token (first 20): {str(session_token)[:20]}...")
+            logger.info(f"[CSRF_DEBUG] Tokens Match: {form_token == session_token}")
+
 # Database configuration - v10.0 Digital Mastery
 database_url = os.environ.get("DATABASE_URL", "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable")
 
