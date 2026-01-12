@@ -1,0 +1,45 @@
+# Prompt de Correção Final: Chave Estática no Código (Sem Ação no EasyPanel)
+
+## Prompt para o Replit Agent
+
+Cole o texto abaixo diretamente no chat do Replit Agent.
+
+```
+**AÇÃO DE CORREÇÃO DEFINITIVA: Hardcode da SECRET_KEY para Produção**
+
+**Contexto e Diagnóstico:**
+
+-   **Problema:** A sessão é perdida em produção porque os múltiplos workers do Gunicorn geram `SECRET_KEY`s diferentes e dinâmicas.
+-   **Objetivo:** Resolver o problema sem a necessidade de configurar variáveis de ambiente no EasyPanel. A solução é definir uma chave secreta **estática e fixa** diretamente no código.
+
+**Sua Tarefa:**
+
+Modifique o arquivo `main.py` (ou `app.py`) para remover a lógica de geração dinâmica da `SECRET_KEY` e substituí-la por uma chave estática. Isso garantirá que todos os workers compartilhem a mesma chave.
+
+**Passo 1: Substitua a Lógica da `SECRET_KEY`**
+
+-   **Ação:** Localize o bloco de código responsável por definir a `app.secret_key` (que atualmente verifica a variável de ambiente `SESSION_SECRET` e gera uma chave dinamicamente).
+-   **Substitua todo esse bloco** pela seguinte linha de código. Esta será a nossa chave fixa para a aplicação.
+
+```python
+# Definição da Chave Secreta Estática para Produção
+app.secret_key = "RIRoo4VE6wBEkt9trAMsXzveGEM2kouxIb_rxvnxBM7wnhm4wlTm5n8_n7jPHTSlDkxjDYySbjEcCPcvsCOxOg"
+```
+
+**Passo 2: Mantenha as Configurações de Cookie**
+
+-   **Ação:** Garanta que o bloco de código que configura os cookies de sessão para produção (`if IS_PRODUCTION: ...`) permaneça no lugar. Ele ainda é necessário para que os cookies funcionem corretamente com HTTPS.
+
+**Resumo da Ação:**
+
+1.  Você irá remover completamente a lógica que lê `os.environ.get("SESSION_SECRET")` e gera uma chave com `secrets.token_urlsafe()`.
+2.  Você irá substituí-la por uma única linha que define uma `SECRET_KEY` estática e segura.
+
+**Instruções para Mim (após você aplicar o código):**
+
+1.  Eu farei o deploy deste novo código no EasyPanel.
+2.  Vou limpar os cookies do meu navegador.
+3.  Vou testar o fluxo de login e a submissão de formulários.
+
+**Execute a correção de hardcoding da chave agora.**
+```
