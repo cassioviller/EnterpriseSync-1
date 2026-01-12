@@ -1,0 +1,49 @@
+# Prompt de Análise Completa: Problema de Sessão em Produção
+
+## Prompt para o Replit Agent (Etapa 1 de 2)
+
+Cole o texto abaixo diretamente no chat do Replit Agent.
+
+```
+**AÇÃO DE ANÁLISE PROFUNDA: Causa Raiz do Problema de Sessão em Produção**
+
+**Contexto:**
+
+1.  **O Problema:** No ambiente de produção (deploy via Dockerfile no Easypanel), qualquer submissão de formulário (requisição POST) falha e redireciona o usuário para a tela de login. O problema não ocorre no ambiente de desenvolvimento do Replit.
+2.  **Seu Papel:** Você é um **Arquiteto de Software Sênior** especializado em Flask e infraestrutura. Sua missão é analisar todo o código relacionado à configuração da aplicação, sessão, CSRF e autenticação para formular uma hipótese clara e detalhada sobre a causa raiz do problema.
+3.  **Minha Ação Futura:** Com base na sua análise, eu pedirei que você gere um prompt de correção em uma segunda etapa.
+
+**Sua Tarefa:**
+
+Realize uma análise completa dos arquivos de configuração e dos mecanismos de sessão da aplicação. Você deve investigar como a aplicação está configurada e por que a sessão pode não estar persistindo corretamente no ambiente de produção.
+
+**Passo 1: Analise a Configuração da Aplicação (`main.py`)**
+
+-   **Ação:** Revise o arquivo `main.py` e procure por todas as configurações relacionadas a:
+    -   `SECRET_KEY`: Como ela é definida? É estática ou gerada dinamicamente?
+    -   `CSRFProtect`: Como e onde ela é inicializada?
+    -   `ProxyFix`: Está sendo usada? Como está configurada?
+    -   Qualquer configuração de `SESSION_COOKIE` (como `SECURE`, `SAMESITE`, `DOMAIN`, etc.).
+
+**Passo 2: Analise a Inicialização do LoginManager**
+
+-   **Ação:** Verifique como o `LoginManager` do Flask-Login é inicializado. Preste atenção em:
+    -   Onde `login_manager.init_app(app)` é chamado.
+    -   Qualquer configuração personalizada do `LoginManager`.
+
+**Passo 3: Analise o Dockerfile**
+
+-   **Ação:** Revise o `Dockerfile` para entender como a aplicação é executada em produção.
+    -   Qual servidor WSGI está sendo usado (Gunicorn, uWSGI, etc.)?
+    -   Quantos `workers` estão configurados? Se houver mais de um worker e a `SECRET_KEY` for gerada dinamicamente, cada worker terá uma chave diferente, o que invalida a sessão entre as requisições.
+
+**Passo 4: Formule a Análise e a Hipótese**
+
+-   **Ação:** Com base em toda a informação coletada, escreva um relatório de análise detalhado. O relatório deve conter:
+    1.  **Resumo da Configuração Atual:** Descreva como a aplicação está configurada atualmente (CSRF, ProxyFix, SECRET_KEY, etc.).
+    2.  **Identificação de Pontos de Falha:** Aponte as configurações que são problemáticas ou ausentes para um ambiente de produção com proxy reverso (Easypanel).
+    3.  **Hipótese Principal:** Explique, de forma clara e técnica, por que você acredita que a sessão não está persistindo em produção. Conecte a configuração do Dockerfile (ex: múltiplos workers) com a configuração do Flask (ex: SECRET_KEY dinâmica).
+    4.  **Plano de Correção Proposto:** Descreva em alto nível as alterações que você pretende fazer para corrigir o problema (ex: "Tornar a SECRET_KEY estática", "Adicionar a configuração SESSION_COOKIE_DOMAIN", etc.).
+
+**Execute a análise completa agora e me forneça o relatório detalhado.**
+```
