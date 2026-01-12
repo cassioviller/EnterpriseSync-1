@@ -1,0 +1,88 @@
+# Prompt de Correção Final: Problema de Sessão em Produção
+
+## Prompt para o Replit Agent
+
+Cole o texto abaixo diretamente no chat do Replit Agent.
+
+```
+**AÇÃO DE CORREÇÃO DEFINITIVA: Problema de Sessão com Múltiplos Workers**
+
+**Contexto e Diagnóstico:**
+
+Sua análise foi perfeita e identificou a causa raiz do problema:
+
+-   **Causa Raiz:** A `SECRET_KEY` é gerada dinamicamente, mas o `Dockerfile` configura **2 workers** para o Gunicorn. Cada worker gera sua própria `SECRET_KEY`, o que invalida a sessão do usuário quando o load balancer alterna entre eles.
+
+**Sua Tarefa:**
+
+Modifique o código para garantir que a sessão funcione corretamente em um ambiente com múltiplos workers. A correção principal será feita no EasyPanel, mas vamos adicionar configurações de cookie no código como uma boa prática de produção.
+
+**Passo 1: Adicione Configurações de Session Cookie**
+
+-   **Ação:** No arquivo `main.py` (ou `app.py`), adicione as seguintes configurações de cookie. Elas garantem que os cookies de sessão se comportem corretamente em um ambiente de produção com HTTPS.
+
+```python
+# Adicione estas linhas após a definição da app.secret_key
+
+# ======================================================================
+# == CONFIGURAÇÃO DE COOKIES PARA PRODUÇÃO ==
+# ======================================================================
+
+# Detecção de Ambiente de Produção
+import os
+IS_PRODUCTION = "REPL_ID" not in os.environ
+
+# Aplica configurações de sessão APENAS em produção
+if IS_PRODUCTION:
+    app.config.update(
+        # SESSION_COOKIE_SECURE: Garante que o cookie só seja enviado via HTTPS.
+        SESSION_COOKIE_SECURE=True,
+        
+        # SESSION_COOKIE_HTTPONLY: Previne que o cookie de sessão seja acessado por JavaScript.
+        SESSION_COOKIE_HTTPONLY=True,
+        
+        # SESSION_COOKIE_SAMESITE: Mitiga ataques CSRF.
+        SESSION_COOKIE_SAMESITE="Lax"
+    )
+
+# ======================================================================
+```
+
+**Passo 2: Remova o Failsafe de Geração Dinâmica (Opcional, mas Recomendado)**
+
+-   **Ação:** Para evitar que este problema ocorra no futuro, modifique a lógica de definição da `SECRET_KEY` para falhar explicitamente se a variável de ambiente não estiver definida. Isso força a configuração correta em produção.
+
+```python
+# Substitua o bloco de código que define a secret_key por este:
+
+secret_key = os.environ.get("SESSION_SECRET")
+if not secret_key:
+    # Em desenvolvimento (Replit), podemos usar uma chave fixa e não secreta.
+    if not IS_PRODUCTION:
+        app.secret_key = "dev-secret-key-for-replit"
+        logger.warning("Usando chave de desenvolvimento para sessão.")
+    else:
+        # Em produção, falhar se a chave não estiver definida é mais seguro.
+        logger.error("FATAL: SESSION_SECRET não está definida no ambiente de produção!")
+        raise ValueError("SESSION_SECRET must be set in the production environment")
+else:
+    app.secret_key = secret_key
+    logger.info("Usando SESSION_SECRET da variável de ambiente.")
+```
+
+**Resumo da Ação:**
+
+1.  Você irá adicionar configurações de cookie para produção.
+2.  Você irá alterar a lógica da `SECRET_KEY` para ser mais segura e explícita, evitando a geração dinâmica em produção.
+
+**Instruções para Mim (após você aplicar o código):**
+
+1.  Eu farei o deploy deste código no Easypanel.
+2.  **AÇÃO MAIS IMPORTANTE:** No painel do EasyPanel, na configuração da sua aplicação, eu vou adicionar a seguinte **variável de ambiente**:
+    -   **Nome:** `SESSION_SECRET`
+    -   **Valor:** `<uma-chave-secreta-muito-longa-e-aleatoria>`
+3.  Vou gerar a chave com o comando `python -c "import secrets; print(secrets.token_urlsafe(64))"`.
+4.  Vou limpar os cookies do meu navegador e testar tudo novamente.
+
+**Execute as modificações de código agora.**
+```

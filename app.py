@@ -14,20 +14,55 @@ logger = logging.getLogger(__name__)
 # Create app instance
 app = Flask(__name__)
 
-# 🔒 CRITICAL SECURITY: SESSION_SECRET handling
-# Requer SESSION_SECRET como variável de ambiente - NÃO usar fallback hardcoded
+# ======================================================================
+# == DETECÇÃO DE AMBIENTE: PRODUÇÃO vs DESENVOLVIMENTO ==
+# ======================================================================
+# REPL_ID existe apenas no ambiente Replit (desenvolvimento)
+# Em produção (EasyPanel/Docker), esta variável não existe
+IS_PRODUCTION = "REPL_ID" not in os.environ
+logger.info(f"🌍 Ambiente detectado: {'PRODUÇÃO' if IS_PRODUCTION else 'DESENVOLVIMENTO (Replit)'}")
+
+# ======================================================================
+# == 🔒 CRITICAL SECURITY: SESSION_SECRET handling ==
+# ======================================================================
 secret_key = os.environ.get("SESSION_SECRET")
 
 if not secret_key:
-    import secrets
-    secret_key = secrets.token_urlsafe(64)
-    logger.warning("⚠️ SESSION_SECRET não configurado - usando chave temporária gerada (não persiste entre reinícios)")
+    if not IS_PRODUCTION:
+        # Em desenvolvimento (Replit), usar chave fixa para conveniência
+        secret_key = "dev-secret-key-for-replit-environment-only"
+        logger.warning("⚠️ [DEV] Usando chave de desenvolvimento para sessão (não usar em produção!)")
+    else:
+        # Em produção, FALHAR se SESSION_SECRET não estiver definida
+        # Isso força a configuração correta no EasyPanel
+        logger.error("❌ FATAL: SESSION_SECRET não está definida no ambiente de produção!")
+        logger.error("❌ Configure a variável de ambiente SESSION_SECRET no EasyPanel")
+        logger.error("❌ Gere com: python -c \"import secrets; print(secrets.token_urlsafe(64))\"")
+        raise ValueError("SESSION_SECRET must be set in the production environment. Add it in EasyPanel environment variables.")
 else:
     logger.info("✅ Usando SESSION_SECRET da variável de ambiente")
 
 app.secret_key = secret_key
 app.config["SECRET_KEY"] = secret_key
 logger.info(f"✅ Secret key configurado (length: {len(secret_key)})")
+
+# ======================================================================
+# == CONFIGURAÇÃO DE COOKIES PARA PRODUÇÃO ==
+# ======================================================================
+if IS_PRODUCTION:
+    app.config.update(
+        # SESSION_COOKIE_SECURE: Garante que o cookie só seja enviado via HTTPS
+        SESSION_COOKIE_SECURE=True,
+        
+        # SESSION_COOKIE_HTTPONLY: Previne acesso ao cookie via JavaScript (XSS protection)
+        SESSION_COOKIE_HTTPONLY=True,
+        
+        # SESSION_COOKIE_SAMESITE: Mitiga ataques CSRF
+        SESSION_COOKIE_SAMESITE="Lax"
+    )
+    logger.info("✅ [PROD] Configurações de cookie seguras aplicadas (SECURE=True, HTTPONLY=True, SAMESITE=Lax)")
+else:
+    logger.info("ℹ️ [DEV] Configurações de cookie padrão para desenvolvimento")
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
