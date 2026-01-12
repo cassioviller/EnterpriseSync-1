@@ -3,7 +3,7 @@ import logging
 from flask import Flask, url_for
 from flask_login import LoginManager
 from flask_migrate import Migrate
-from flask_wtf.csrf import CSRFProtect
+# CSRFProtect removido - causa conflito 405 quando WTF_CSRF_ENABLED=False
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -29,53 +29,7 @@ app.secret_key = secret_key
 app.config["SECRET_KEY"] = secret_key
 logger.info(f"✅ Secret key configurado (length: {len(secret_key)})")
 
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-
-# ======================================================================
-# CONFIGURAÇÕES DE SESSÃO PARA PRODUÇÃO (Alternativa sem SERVER_NAME)
-# ======================================================================
-IS_PRODUCTION = 'REPL_ID' not in os.environ
-
-if IS_PRODUCTION:
-    logger.info("🔒 PRODUÇÃO: Configurando cookies de sessão seguros com SESSION_COOKIE_DOMAIN")
-    app.config.update(
-        # SESSION_COOKIE_DOMAIN: Define o domínio para o qual o cookie é válido
-        # O ponto no início faz com que seja válido para subdomínios também
-        SESSION_COOKIE_DOMAIN=".sige.cassioviller.tech",
-        SESSION_COOKIE_SECURE=True,
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE='Lax',
-    )
-else:
-    logger.info("🔧 DESENVOLVIMENTO: Cookies de sessão padrão")
-
-# ============================================================
-# MIDDLEWARE DE DIAGNÓSTICO CSRF - PRODUÇÃO
-# ============================================================
-@app.before_request
-def log_csrf_debug():
-    """Loga informações de diagnóstico CSRF antes de cada requisição POST."""
-    from flask import request, session
-    
-    # Só logar para requisições POST em rotas críticas
-    if request.method == 'POST' or '/obras/nova' in request.path:
-        headers_debug = {
-            'Host': request.headers.get('Host'),
-            'X-Forwarded-For': request.headers.get('X-Forwarded-For'),
-            'X-Forwarded-Proto': request.headers.get('X-Forwarded-Proto'),
-            'Cookie-Present': 'Yes' if request.headers.get('Cookie') else 'No',
-        }
-        logger.info(f"[CSRF_DEBUG] Path: {request.path} | Method: {request.method}")
-        logger.info(f"[CSRF_DEBUG] Headers: {headers_debug}")
-        logger.info(f"[CSRF_DEBUG] Session Keys: {list(session.keys())}")
-        logger.info(f"[CSRF_DEBUG] csrf_token in session: {'Yes' if 'csrf_token' in session else 'No'}")
-        
-        if request.method == 'POST':
-            form_token = request.form.get('csrf_token', 'NOT_IN_FORM')
-            session_token = session.get('csrf_token', 'NOT_IN_SESSION')
-            logger.info(f"[CSRF_DEBUG] Form Token (first 20): {str(form_token)[:20]}...")
-            logger.info(f"[CSRF_DEBUG] Session Token (first 20): {str(session_token)[:20]}...")
-            logger.info(f"[CSRF_DEBUG] Tokens Match: {form_token == session_token}")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Database configuration - v10.0 Digital Mastery
 database_url = os.environ.get("DATABASE_URL", "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable")
@@ -116,7 +70,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "echo": False  # Desabilitar logs SQL em produção
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config['WTF_CSRF_ENABLED'] = True
+app.config['WTF_CSRF_ENABLED'] = False
 
 # Configurações v10.0 Digital Mastery
 app.config['DIGITAL_MASTERY_MODE'] = True
@@ -136,7 +90,7 @@ app.config['RDO_MASTERY_ENABLED'] = True
 # Configurações específicas para resolver erro SERVER_NAME  
 app.config['SERVER_NAME'] = None  # Permite qualquer host
 app.config['APPLICATION_ROOT'] = '/'  # Raiz da aplicação  
-app.config['PREFERRED_URL_SCHEME'] = 'https' if IS_PRODUCTION else 'http'
+app.config['PREFERRED_URL_SCHEME'] = 'http'  # Esquema padrão
 
 # Configure CORS for AJAX requests
 CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
@@ -152,10 +106,6 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
-
-# Initialize CSRF Protection
-csrf = CSRFProtect()
-csrf.init_app(app)
 
 # Context processor para configurações da empresa
 @app.context_processor
@@ -280,24 +230,7 @@ register_error_handlers(app)
 
 @login_manager.user_loader
 def load_user(user_id):
-    """Carrega usuário com proteção contra erros de conexão"""
-    try:
-        user = Usuario.query.get(int(user_id))
-        if user is None:
-            logging.warning(f'USER_LOADER: Usuário {user_id} não encontrado no banco')
-        return user
-    except Exception as e:
-        logging.error(f'USER_LOADER ERRO: Falha ao carregar user_id={user_id}: {str(e)}')
-        # Tenta reconectar ao banco
-        try:
-            db.session.rollback()
-            db.session.remove()
-            user = Usuario.query.get(int(user_id))
-            logging.info(f'USER_LOADER: Recuperado após reconexão - user_id={user_id}')
-            return user
-        except Exception as e2:
-            logging.error(f'USER_LOADER ERRO CRÍTICO: Falha mesmo após reconexão: {str(e2)}')
-            return None
+    return Usuario.query.get(int(user_id))
 
 # Função para templates
 @app.template_global()

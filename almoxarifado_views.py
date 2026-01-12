@@ -18,7 +18,6 @@ def get_admin_id():
         if hasattr(current_user, 'admin_id') and current_user.admin_id:
             return current_user.admin_id
         return current_user.id
-    logger.warning(f'get_admin_id: usuário não autenticado - is_authenticated={getattr(current_user, "is_authenticated", "N/A")}')
     return None
 
 @almoxarifado_bp.route('/')
@@ -36,45 +35,26 @@ def dashboard():
     total_itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).count()
     
     # ========================================
-    # KPI 2: Estoque Baixo (OTIMIZADO - sem N+1 queries)
+    # KPI 2: Estoque Baixo
     # ========================================
-    # Subquery para estoque de consumíveis (soma quantidade)
-    estoque_consumivel = db.session.query(
-        AlmoxarifadoEstoque.item_id,
-        func.coalesce(func.sum(AlmoxarifadoEstoque.quantidade), 0).label('estoque_atual')
-    ).filter(
-        AlmoxarifadoEstoque.admin_id == admin_id,
-        AlmoxarifadoEstoque.status == 'DISPONIVEL'
-    ).group_by(AlmoxarifadoEstoque.item_id).subquery()
-    
-    # Subquery para estoque de serializados (contagem)
-    estoque_serializado = db.session.query(
-        AlmoxarifadoEstoque.item_id,
-        func.count(AlmoxarifadoEstoque.id).label('estoque_atual')
-    ).filter(
-        AlmoxarifadoEstoque.admin_id == admin_id,
-        AlmoxarifadoEstoque.status == 'DISPONIVEL'
-    ).group_by(AlmoxarifadoEstoque.item_id).subquery()
-    
-    # Query única para itens com estoque baixo
     itens_estoque_baixo = []
-    itens_com_estoque = db.session.query(
-        AlmoxarifadoItem,
-        func.coalesce(
-            func.case(
-                (AlmoxarifadoItem.tipo_controle == 'SERIALIZADO', estoque_serializado.c.estoque_atual),
-                else_=estoque_consumivel.c.estoque_atual
-            ), 0
-        ).label('estoque_atual')
-    ).outerjoin(
-        estoque_consumivel, AlmoxarifadoItem.id == estoque_consumivel.c.item_id
-    ).outerjoin(
-        estoque_serializado, AlmoxarifadoItem.id == estoque_serializado.c.item_id
-    ).filter(
-        AlmoxarifadoItem.admin_id == admin_id
-    ).all()
+    itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).all()
     
-    for item, estoque_atual in itens_com_estoque:
+    for item in itens:
+        if item.tipo_controle == 'SERIALIZADO':
+            estoque_atual = AlmoxarifadoEstoque.query.filter_by(
+                item_id=item.id,
+                status='DISPONIVEL',
+                admin_id=admin_id
+            ).count()
+        else:
+            estoque_atual = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
+                item_id=item.id,
+                status='DISPONIVEL',
+                admin_id=admin_id
+            ).scalar() or 0
+        
+        # Tratar estoque_minimo NULL (padronizar como 0)
         estoque_minimo = item.estoque_minimo if item.estoque_minimo is not None else 0
         if estoque_atual < estoque_minimo:
             itens_estoque_baixo.append({
@@ -280,88 +260,63 @@ def categorias_deletar(id):
 @login_required
 def itens():
     """Lista todos os itens do almoxarifado com busca e filtros"""
-    try:
-        admin_id = get_admin_id()
-        if not admin_id:
-            user_info = f"user_id={getattr(current_user, 'id', 'N/A')}, admin_id={getattr(current_user, 'admin_id', 'N/A')}, is_auth={current_user.is_authenticated}"
-            logger.error(f'ALMOX ITENS - Falha admin_id: {user_info}')
-            flash(f'DEBUG PRODUÇÃO: admin_id vazio. Info: {user_info}', 'danger')
-            return redirect(url_for('dashboard'))
-        
-        busca = request.args.get('busca', '').strip()
-        categoria_id = request.args.get('categoria_id', type=int)
-        tipo_controle = request.args.get('tipo_controle', '')
-        
-        query = AlmoxarifadoItem.query.filter_by(admin_id=admin_id)
-        
-        if busca:
-            query = query.filter(
-                or_(
-                    AlmoxarifadoItem.codigo.ilike(f'%{busca}%'),
-                    AlmoxarifadoItem.nome.ilike(f'%{busca}%')
-                )
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    busca = request.args.get('busca', '').strip()
+    categoria_id = request.args.get('categoria_id', type=int)
+    tipo_controle = request.args.get('tipo_controle', '')
+    
+    query = AlmoxarifadoItem.query.filter_by(admin_id=admin_id)
+    
+    if busca:
+        query = query.filter(
+            or_(
+                AlmoxarifadoItem.codigo.ilike(f'%{busca}%'),
+                AlmoxarifadoItem.nome.ilike(f'%{busca}%')
             )
+        )
+    
+    if categoria_id:
+        query = query.filter_by(categoria_id=categoria_id)
+    
+    if tipo_controle:
+        query = query.filter_by(tipo_controle=tipo_controle)
+    
+    itens = query.order_by(AlmoxarifadoItem.nome).all()
+    categorias = AlmoxarifadoCategoria.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoCategoria.nome).all()
+    
+    itens_com_estoque = []
+    for item in itens:
+        if item.tipo_controle == 'SERIALIZADO':
+            estoque_atual = AlmoxarifadoEstoque.query.filter_by(
+                item_id=item.id,
+                status='DISPONIVEL',
+                admin_id=admin_id
+            ).count()
+        else:
+            estoque_atual = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
+                item_id=item.id,
+                status='DISPONIVEL',
+                admin_id=admin_id
+            ).scalar() or 0
         
-        if categoria_id:
-            query = query.filter_by(categoria_id=categoria_id)
-        
-        if tipo_controle:
-            query = query.filter_by(tipo_controle=tipo_controle)
-        
-        categorias = AlmoxarifadoCategoria.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoCategoria.nome).all()
-        
-        # OTIMIZADO: Subqueries para evitar N+1 queries
-        estoque_consumivel = db.session.query(
-            AlmoxarifadoEstoque.item_id,
-            func.coalesce(func.sum(AlmoxarifadoEstoque.quantidade), 0).label('estoque_atual')
-        ).filter(
-            AlmoxarifadoEstoque.admin_id == admin_id,
-            AlmoxarifadoEstoque.status == 'DISPONIVEL'
-        ).group_by(AlmoxarifadoEstoque.item_id).subquery()
-        
-        estoque_serializado = db.session.query(
-            AlmoxarifadoEstoque.item_id,
-            func.count(AlmoxarifadoEstoque.id).label('estoque_atual')
-        ).filter(
-            AlmoxarifadoEstoque.admin_id == admin_id,
-            AlmoxarifadoEstoque.status == 'DISPONIVEL'
-        ).group_by(AlmoxarifadoEstoque.item_id).subquery()
-        
-        # Query principal com JOIN nos estoques
-        resultados = query.add_columns(
-            func.coalesce(
-                func.case(
-                    (AlmoxarifadoItem.tipo_controle == 'SERIALIZADO', estoque_serializado.c.estoque_atual),
-                    else_=estoque_consumivel.c.estoque_atual
-                ), 0
-            ).label('estoque_atual')
-        ).outerjoin(
-            estoque_consumivel, AlmoxarifadoItem.id == estoque_consumivel.c.item_id
-        ).outerjoin(
-            estoque_serializado, AlmoxarifadoItem.id == estoque_serializado.c.item_id
-        ).order_by(AlmoxarifadoItem.nome).all()
-        
-        itens_com_estoque = []
-        for item, estoque_atual in resultados:
-            estoque_minimo = item.estoque_minimo if item.estoque_minimo is not None else 0
-            itens_com_estoque.append({
-                'item': item,
-                'estoque_atual': estoque_atual,
-                'status_estoque': 'baixo' if estoque_atual <= estoque_minimo else 'normal'
-            })
-        
-        return render_template('almoxarifado/itens.html',
-                             itens_com_estoque=itens_com_estoque,
-                             categorias=categorias,
-                             busca=busca,
-                             categoria_id=categoria_id,
-                             tipo_controle=tipo_controle)
-    except Exception as e:
-        import traceback
-        erro_completo = traceback.format_exc()
-        logger.error(f'ALMOX ITENS ERRO: {str(e)}\n{erro_completo}')
-        flash(f'DEBUG ERRO: {str(e)}', 'danger')
-        return redirect(url_for('dashboard'))
+        # Tratar estoque_minimo NULL (padronizar como 0)
+        estoque_minimo = item.estoque_minimo if item.estoque_minimo is not None else 0
+        itens_com_estoque.append({
+            'item': item,
+            'estoque_atual': estoque_atual,
+            'status_estoque': 'baixo' if estoque_atual <= estoque_minimo else 'normal'
+        })
+    
+    return render_template('almoxarifado/itens.html',
+                         itens_com_estoque=itens_com_estoque,
+                         categorias=categorias,
+                         busca=busca,
+                         categoria_id=categoria_id,
+                         tipo_controle=tipo_controle)
 
 @almoxarifado_bp.route('/itens/criar', methods=['GET', 'POST'])
 @login_required
@@ -521,7 +476,6 @@ def itens_movimentacoes(id):
     item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
     # Filtros da query string
-    page = request.args.get('page', 1, type=int)
     tipo_filtro = request.args.get('tipo', '')
     funcionario_filtro = request.args.get('funcionario', '')
     obra_filtro = request.args.get('obra', '')
@@ -536,16 +490,10 @@ def itens_movimentacoes(id):
         query = query.filter(AlmoxarifadoMovimento.tipo_movimento == tipo_filtro)
     
     if funcionario_filtro:
-        try:
-            query = query.filter(AlmoxarifadoMovimento.funcionario_id == int(funcionario_filtro))
-        except (ValueError, TypeError):
-            pass  # Ignora filtro inválido
+        query = query.filter(AlmoxarifadoMovimento.funcionario_id == int(funcionario_filtro))
     
     if obra_filtro:
-        try:
-            query = query.filter(AlmoxarifadoMovimento.obra_id == int(obra_filtro))
-        except (ValueError, TypeError):
-            pass  # Ignora filtro inválido
+        query = query.filter(AlmoxarifadoMovimento.obra_id == int(obra_filtro))
     
     if data_inicio:
         try:
@@ -563,10 +511,8 @@ def itens_movimentacoes(id):
         except ValueError:
             pass
     
-    # Ordenar e paginar (50 por página)
-    movimentos_paginados = query.order_by(AlmoxarifadoMovimento.data_movimento.desc()).paginate(
-        page=page, per_page=50, error_out=False
-    )
+    # Ordenar e buscar
+    movimentos = query.order_by(AlmoxarifadoMovimento.data_movimento.desc()).all()
     
     # Buscar listas para filtros
     funcionarios = db.session.query(Funcionario).join(
@@ -585,27 +531,14 @@ def itens_movimentacoes(id):
         AlmoxarifadoMovimento.admin_id == admin_id
     ).distinct().order_by(Obra.nome).all()
     
-    # Estatísticas globais (todos os movimentos, não apenas da página atual)
-    stats_query = AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id)
-    total_entradas = db.session.query(func.sum(AlmoxarifadoMovimento.quantidade)).filter(
-        AlmoxarifadoMovimento.item_id == id,
-        AlmoxarifadoMovimento.admin_id == admin_id,
-        AlmoxarifadoMovimento.tipo_movimento == 'ENTRADA'
-    ).scalar() or 0
-    total_saidas = db.session.query(func.sum(AlmoxarifadoMovimento.quantidade)).filter(
-        AlmoxarifadoMovimento.item_id == id,
-        AlmoxarifadoMovimento.admin_id == admin_id,
-        AlmoxarifadoMovimento.tipo_movimento == 'SAIDA'
-    ).scalar() or 0
-    total_devolucoes = db.session.query(func.sum(AlmoxarifadoMovimento.quantidade)).filter(
-        AlmoxarifadoMovimento.item_id == id,
-        AlmoxarifadoMovimento.admin_id == admin_id,
-        AlmoxarifadoMovimento.tipo_movimento == 'DEVOLUCAO'
-    ).scalar() or 0
+    # Estatísticas
+    total_entradas = sum(m.quantidade or 0 for m in movimentos if m.tipo_movimento == 'ENTRADA')
+    total_saidas = sum(m.quantidade or 0 for m in movimentos if m.tipo_movimento == 'SAIDA')
+    total_devolucoes = sum(m.quantidade or 0 for m in movimentos if m.tipo_movimento == 'DEVOLUCAO')
     
     return render_template('almoxarifado/itens_movimentacoes.html',
                          item=item,
-                         movimentos=movimentos_paginados,
+                         movimentos=movimentos,
                          funcionarios=funcionarios,
                          obras=obras,
                          tipo_filtro=tipo_filtro,
@@ -615,58 +548,34 @@ def itens_movimentacoes(id):
                          data_fim=data_fim,
                          total_entradas=total_entradas,
                          total_saidas=total_saidas,
-                         total_devolucoes=total_devolucoes,
-                         page=page)
+                         total_devolucoes=total_devolucoes)
 
 @almoxarifado_bp.route('/itens/deletar/<int:id>', methods=['POST'])
 @login_required
 def itens_deletar(id):
-    """Deletar item - usando ORM com cascade adequado para manutenibilidade"""
-    import traceback
+    """Deletar item"""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+    
+    item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    
+    tem_estoque = AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).count() > 0
+    if tem_estoque:
+        flash(f'Não é possível excluir o item "{item.nome}" pois possui registros de estoque', 'danger')
+        return redirect(url_for('almoxarifado.itens'))
     
     try:
-        admin_id = get_admin_id()
-        
-        if not admin_id:
-            logger.error(f'FALHA: admin_id vazio para user_id={getattr(current_user, "id", "N/A")}')
-            flash('Erro de autenticação', 'danger')
-            return redirect(url_for('almoxarifado.itens'))
-        
-        item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first()
-        if not item:
-            flash('Item não encontrado', 'danger')
-            return redirect(url_for('almoxarifado.itens'))
-        
-        force = request.form.get('force', '0') == '1'
         nome = item.nome
-        
-        qtd_estoque = AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).count()
-        qtd_movimentos = AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).count()
-        
-        if (qtd_estoque > 0 or qtd_movimentos > 0) and not force:
-            flash(f'Item "{nome}" possui {qtd_estoque} registros de estoque e {qtd_movimentos} movimentações. Marque "Forçar exclusão" para confirmar.', 'warning')
-            return redirect(url_for('almoxarifado.itens'))
-        
-        if force:
-            # Usar ORM para deletar registros relacionados (respeita cascade e triggers)
-            AlmoxarifadoMovimento.query.filter_by(item_id=id, admin_id=admin_id).delete(synchronize_session=False)
-            AlmoxarifadoEstoque.query.filter_by(item_id=id, admin_id=admin_id).delete(synchronize_session=False)
-            logger.info(f'Exclusão forçada: {qtd_movimentos} movimentos e {qtd_estoque} estoques removidos para item {nome}')
-        
-        # Deletar item via ORM
         db.session.delete(item)
         db.session.commit()
         
-        if force:
-            flash(f'Item "{nome}" e todos os registros relacionados foram excluídos!', 'success')
-        else:
-            flash(f'Item "{nome}" excluído com sucesso!', 'success')
-        
+        flash(f'Item "{nome}" excluído com sucesso!', 'success')
     except Exception as e:
-        erro_completo = traceback.format_exc()
-        logger.error(f'Erro ao deletar item {id}: {str(e)}\n{erro_completo}')
         db.session.rollback()
-        flash(f'Erro ao excluir item: {str(e)}', 'danger')
+        logger.error(f'Erro ao deletar item: {str(e)}')
+        flash('Erro ao excluir item', 'danger')
     
     return redirect(url_for('almoxarifado.itens'))
 
@@ -1313,7 +1222,7 @@ def processar_saida():
                 flash('Selecione ao menos um item para saída', 'danger')
                 return redirect(url_for('almoxarifado.saida'))
             
-            # Validar estoque e atualizar status (com lock pessimista para evitar race condition)
+            # Validar estoque e atualizar status
             itens_processados = 0
             for estoque_id in estoque_ids:
                 estoque = AlmoxarifadoEstoque.query.filter_by(
@@ -1321,7 +1230,7 @@ def processar_saida():
                     item_id=item_id,
                     status='DISPONIVEL',
                     admin_id=admin_id
-                ).with_for_update().first()
+                ).first()
                 
                 if not estoque:
                     db.session.rollback()
@@ -1376,12 +1285,12 @@ def processar_saida():
                 flash(f'Quantidade insuficiente! Disponível: {quantidade_disponivel_total} {item.unidade}', 'danger')
                 return redirect(url_for('almoxarifado.saida'))
             
-            # Implementar consumo FIFO pelos lotes mais antigos (com lock pessimista)
+            # Implementar consumo FIFO pelos lotes mais antigos
             lotes = AlmoxarifadoEstoque.query.filter_by(
                 item_id=item_id,
                 status='DISPONIVEL',
                 admin_id=admin_id
-            ).with_for_update().order_by(AlmoxarifadoEstoque.created_at.asc()).all()  # FIFO: mais antigos primeiro
+            ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()  # FIFO: mais antigos primeiro
             
             quantidade_restante = quantidade
             
@@ -1513,13 +1422,13 @@ def processar_saida_multipla():
                 estoque_id = item_data.get('estoque_id')
                 numero_serie = item_data.get('numero_serie')
                 
-                # VALIDAR: Série existe e está disponível? (lock pessimista)
+                # VALIDAR: Série existe e está disponível?
                 estoque = AlmoxarifadoEstoque.query.filter_by(
                     id=estoque_id,
                     item_id=item_id,
                     status='DISPONIVEL',
                     admin_id=admin_id
-                ).with_for_update().first()
+                ).first()
                 
                 if not estoque:
                     erros.append(f"Item {idx+1} ({item.nome}): Número de série {numero_serie} não disponível")
@@ -1562,13 +1471,13 @@ def processar_saida_multipla():
                             erros.append(f"Item {idx+1} ({item.nome}), Lote {alloc_idx+1}: Quantidade deve ser maior que zero")
                             continue
                         
-                        # Verificar se o lote existe e pertence ao admin (lock pessimista)
+                        # Verificar se o lote existe e pertence ao admin
                         lote_estoque = AlmoxarifadoEstoque.query.filter_by(
                             id=estoque_id,
                             item_id=item_id,
                             status='DISPONIVEL',
                             admin_id=admin_id
-                        ).with_for_update().first()
+                        ).first()
                         
                         if not lote_estoque:
                             erros.append(f"Item {idx+1} ({item.nome}), Lote {alloc_idx+1}: Lote não encontrado ou não disponível")
@@ -1994,12 +1903,10 @@ def processar_devolucao():
                 flash('Item não permite devolução', 'danger')
                 return redirect(url_for('almoxarifado.devolucao'))
             
-            # Criar novo registro de estoque com quantidade devolvida (com campos FIFO)
+            # Criar novo registro de estoque com quantidade devolvida
             estoque = AlmoxarifadoEstoque(
                 item_id=item_id,
                 quantidade=quantidade,
-                quantidade_inicial=quantidade,
-                quantidade_disponivel=quantidade,
                 status='DISPONIVEL',
                 admin_id=admin_id
             )
@@ -2020,10 +1927,6 @@ def processar_devolucao():
                 obra_id=None
             )
             db.session.add(movimento)
-            db.session.flush()
-            
-            # Vincular estoque ao movimento de entrada (FIFO)
-            estoque.entrada_movimento_id = movimento.id
             
             db.session.commit()
             flash(f'Devolução processada com sucesso! {quantidade} {item.unidade} de "{item.nome}" devolvidos por {funcionario.nome}.', 'success')
@@ -2189,7 +2092,7 @@ def processar_devolucao_multipla():
                 # VALIDAR: Item pertence ao funcionário (status='EM_USO')?
                 estoque = AlmoxarifadoEstoque.query.filter_by(
                     id=estoque_id,
-                    funcionario_atual_id=funcionario_id,
+                    funcionario_id=funcionario_id,
                     status='EM_USO',
                     admin_id=admin_id
                 ).first()
@@ -2290,12 +2193,10 @@ def processar_devolucao_multipla():
             else:  # CONSUMIVEL
                 quantidade = item_validado['quantidade']
                 
-                # Criar novo registro de estoque com quantidade devolvida (com campos FIFO)
+                # Criar novo registro de estoque com quantidade devolvida
                 estoque = AlmoxarifadoEstoque(
                     item_id=item.id,
                     quantidade=quantidade,
-                    quantidade_inicial=quantidade,
-                    quantidade_disponivel=quantidade,
                     status='DISPONIVEL',
                     admin_id=admin_id
                 )
@@ -2316,10 +2217,6 @@ def processar_devolucao_multipla():
                     usuario_id=current_user.id
                 )
                 db.session.add(movimento)
-                db.session.flush()
-                
-                # Vincular estoque ao movimento de entrada (FIFO)
-                estoque.entrada_movimento_id = movimento.id
                 total_processados += 1
         
         # Commit APENAS se TODOS itens foram processados
@@ -2459,8 +2356,8 @@ def relatorios():
         tipo_controle = request.args.get('tipo_controle', '')
         condicao = request.args.get('condicao', '')
         
-        # Query base com multi-tenant (removido filtro ativo=True - campo não existe no modelo)
-        query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id)
+        # Query base com multi-tenant
+        query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id, ativo=True)
         query = query.join(AlmoxarifadoItem, AlmoxarifadoEstoque.item_id == AlmoxarifadoItem.id)
         query = query.join(AlmoxarifadoCategoria, AlmoxarifadoItem.categoria_id == AlmoxarifadoCategoria.id)
         

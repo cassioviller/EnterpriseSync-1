@@ -122,7 +122,6 @@
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                                         <form method="POST" action="{{ url_for('almoxarifado.fornecedores_deletar', id=fornecedor.id) }}" style="display:inline">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                             <button type="submit" class="btn btn-danger">Desativar</button>
                                         </form>
                                     </div>

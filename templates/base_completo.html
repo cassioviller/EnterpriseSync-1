@@ -7,7 +7,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#198754">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="manifest" href="/static/manifest.json">
     <title>{% block title %}SIGE - Estruturas do Vale{% endblock %}</title>
     
@@ -889,34 +888,6 @@
     {% block scripts %}{% endblock %}
     
     <script>
-        // Auto-inject CSRF token into all POST forms
-        (function() {
-            var csrfToken = document.querySelector('meta[name="csrf-token"]');
-            if (csrfToken) {
-                var token = csrfToken.getAttribute('content');
-                // Inject into all existing forms
-                document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(function(form) {
-                    if (!form.querySelector('input[name="csrf_token"]')) {
-                        var input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = 'csrf_token';
-                        input.value = token;
-                        form.appendChild(input);
-                    }
-                });
-                // Set up AJAX to include CSRF token
-                if (typeof $ !== 'undefined') {
-                    $.ajaxSetup({
-                        beforeSend: function(xhr, settings) {
-                            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
-                                xhr.setRequestHeader("X-CSRFToken", token);
-                            }
-                        }
-                    });
-                }
-            }
-        })();
-        
         // Inicialização global do sistema
         $(document).ready(function() {
             console.log('Initializing SIGE application...');

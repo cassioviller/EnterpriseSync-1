@@ -121,12 +121,32 @@
                                    class="btn btn-sm btn-outline-primary" title="Editar">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-excluir-item" 
-                                        data-id="{{ item.id }}" data-nome="{{ item.nome }}" title="Excluir">
+                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                        data-bs-toggle="modal" data-bs-target="#deleteModal{{ item.id }}" title="Excluir">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </td>
                         </tr>
+                        
+                        <div class="modal fade" id="deleteModal{{ item.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Confirmar Exclusão</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        Tem certeza que deseja excluir o item <strong>{{ item.nome }}</strong>?
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <form method="POST" action="{{ url_for('almoxarifado.itens_deletar', id=item.id) }}" style="display:inline">
+                                            <button type="submit" class="btn btn-danger">Excluir</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -140,60 +160,4 @@
     </div>
     {% endif %}
 </div>
-
-<!-- Modal de Exclusão com opção de forçar -->
-<div class="modal fade" id="modalExcluirItem" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
-            </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja excluir o item <strong id="nomeItemExcluir"></strong>?</p>
-                <div class="form-check mt-3 p-3 bg-warning bg-opacity-10 border border-warning rounded">
-                    <input class="form-check-input" type="checkbox" id="checkForcarExclusao">
-                    <label class="form-check-label" for="checkForcarExclusao">
-                        <strong>Forçar exclusão</strong> - Excluir também todos os registros de estoque e movimentações
-                    </label>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form id="formExcluirItem" method="POST" style="display:inline">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <input type="hidden" name="force" id="inputForce" value="0">
-                    <button type="submit" class="btn btn-danger">Excluir</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    var modal = document.getElementById('modalExcluirItem');
-    var bsModal = new bootstrap.Modal(modal);
-    var checkForcar = document.getElementById('checkForcarExclusao');
-    var inputForce = document.getElementById('inputForce');
-    
-    checkForcar.addEventListener('change', function() {
-        inputForce.value = this.checked ? '1' : '0';
-    });
-    
-    document.querySelectorAll('.btn-excluir-item').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            var nome = this.getAttribute('data-nome');
-            
-            document.getElementById('nomeItemExcluir').textContent = nome;
-            document.getElementById('formExcluirItem').action = '/almoxarifado/itens/deletar/' + id;
-            checkForcar.checked = false;
-            inputForce.value = '0';
-            
-            bsModal.show();
-        });
-    });
-});
-</script>
 {% endblock %}

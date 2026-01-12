@@ -2223,18 +2223,8 @@ def obras():
 @login_required
 def nova_obra():
     """Criar nova obra"""
-    import logging
-    csrf_logger = logging.getLogger('csrf_debug')
-    
     if request.method == 'POST':
         try:
-            # DIAGNÓSTICO CSRF - POST
-            from flask import session
-            form_token = request.form.get('csrf_token')
-            session_token = session.get('csrf_token')
-            csrf_logger.info(f"[CSRF_DEBUG] nova_obra POST - Form Token: {str(form_token)[:20] if form_token else 'NONE'}...")
-            csrf_logger.info(f"[CSRF_DEBUG] nova_obra POST - Session Token: {str(session_token)[:20] if session_token else 'NONE'}...")
-            csrf_logger.info(f"[CSRF_DEBUG] nova_obra POST - Session Dict: {list(session.keys())}")
             # Obter dados do formulário - Campos novos incluídos
             nome = request.form.get('nome')
             endereco = request.form.get('endereco', '')
@@ -2336,17 +2326,6 @@ def nova_obra():
     
     # GET request - carregar lista de funcionários e serviços para o formulário
     try:
-        # DIAGNÓSTICO CSRF - GET
-        from flask import session
-        from flask_wtf.csrf import generate_csrf
-        try:
-            token = generate_csrf()
-            csrf_logger.info(f"[CSRF_DEBUG] nova_obra GET - Token gerado: {str(token)[:20]}...")
-            csrf_logger.info(f"[CSRF_DEBUG] nova_obra GET - Session Keys APÓS gerar: {list(session.keys())}")
-            csrf_logger.info(f"[CSRF_DEBUG] nova_obra GET - csrf_token in session: {'Yes' if 'csrf_token' in session else 'No'}")
-        except Exception as csrf_e:
-            csrf_logger.error(f"[CSRF_DEBUG] nova_obra GET - ERRO ao gerar token: {csrf_e}")
-        
         admin_id = 10  # Padrão
         if hasattr(current_user, 'admin_id') and current_user.admin_id:
             admin_id = current_user.admin_id

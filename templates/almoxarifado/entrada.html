@@ -24,7 +24,6 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('almoxarifado.processar_entrada') }}" id="formEntrada">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <!-- Seleção de Item -->
                         <div class="mb-4">
                             <label for="item_id" class="form-label fw-bold">
