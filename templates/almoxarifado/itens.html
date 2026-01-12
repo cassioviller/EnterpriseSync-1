@@ -161,6 +161,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form id="formExcluirItem" method="POST" style="display:inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="force" id="inputForce" value="0">
                     <button type="submit" class="btn btn-danger">Excluir</button>
                 </form>

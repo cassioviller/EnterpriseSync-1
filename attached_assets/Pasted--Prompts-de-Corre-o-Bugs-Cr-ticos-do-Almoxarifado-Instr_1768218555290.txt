@@ -1,0 +1,300 @@
+# Prompts de Correção - Bugs Críticos do Almoxarifado
+
+## Instruções de Uso
+
+1. **Configure o Agent em Modo Crítico** (cole primeiro):
+
+```
+**Diretrizes de Operação Crítica:**
+
+1. **Seja Crítico e Cético**: Se meu comando for vago, ambíguo ou carecer de contexto, aponte a falha de forma implacável e exija esclarecimentos.
+2. **Questione Suposições**: Analise as crenças e suposições ocultas por trás dos meus comandos.
+3. **Foco em Fatos, Não em Elogios**: Evite qualquer feedback positivo, elogios ou linguagem encorajadora.
+4. **Seja Direto e Conciso**: Comunique-se de forma direta, sem rodeios.
+5. **Sem Extras Desnecessários**: Não use emojis, não faça perguntas ao final.
+6. **Assuma Expertise**: Trate-me como um especialista no domínio.
+7. **Mantenha a Neutralidade**: Não imite meu estilo de escrita ou humor.
+
+Seu objetivo é garantir que o resultado final seja da mais alta qualidade técnica.
+```
+
+2. **Cole cada prompt de correção abaixo, um de cada vez**
+3. **Revise o código gerado antes de aplicar**
+4. **Teste cada correção individualmente**
+
+---
+
+## PROMPT #1: Correção BUG #001 - Filtro em Campo Inexistente
+
+```
+**CORREÇÃO DE BUG CRÍTICO #001 - ALMOXARIFADO**
+
+**📋 REFERÊNCIA DO BUG**
+
+**BUG #001 - [SEVERIDADE: CRÍTICO] - Filtro em Campo Inexistente Causa Crash**
+
+**Descrição:**  
+A rota de relatórios filtra `AlmoxarifadoEstoque` pelo campo `ativo=True`, porém este campo **não existe** no modelo `AlmoxarifadoEstoque`.
+
+**Localização:**  
+- **Arquivo:** `almoxarifado_views.py`
+- **Função:** `relatorios()`
+- **Linha:** 2412
+
+**Código Problemático:**
+```python
+query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id, ativo=True)
+```
+
+**Impacto:**  
+Crash com `AttributeError` ou query SQL inválida ao acessar relatório de posição de estoque.
+
+**Comportamento Esperado:**  
+Relatório carrega normalmente, exibindo apenas estoques disponíveis.
+
+**Comportamento Atual:**  
+Erro 500 ou página em branco ao acessar a rota de relatórios.
+
+**Recomendação de Correção:**  
+Remover filtro `ativo=True` ou usar campo existente como `status='DISPONIVEL'`.
+
+**⚙️ AÇÃO SOLICITADA**
+
+1. Localize o arquivo `almoxarifado_views.py` e a função `relatorios()` na linha 2412.
+2. Verifique o modelo `AlmoxarifadoEstoque` em `models.py` para confirmar os campos disponíveis.
+3. Corrija o filtro para usar um campo existente (provavelmente `status='DISPONIVEL'`).
+4. Verifique se há outros locais no código que usam o filtro `ativo=True` em `AlmoxarifadoEstoque` e corrija-os também.
+5. Teste a rota de relatórios para garantir que funciona corretamente.
+6. Forneça um resumo das alterações realizadas.
+
+**COMANDO INICIAL:** Inicie a correção do BUG #001 agora.
+```
+
+---
+
+## PROMPT #2: Correção BUG #002 - Ausência de CSRF Protection
+
+```
+**CORREÇÃO DE BUG CRÍTICO #002 - ALMOXARIFADO**
+
+**📋 REFERÊNCIA DO BUG**
+
+**BUG #002 - [SEVERIDADE: CRÍTICO] - Ausência de CSRF Protection em Todos os Formulários**
+
+**Descrição:**  
+NENHUM dos formulários POST no módulo de Almoxarifado possui token CSRF (`csrf_token()` ou `form.hidden_tag()`).
+
+**Localização:**  
+- **Arquivos:** Todos os templates em `templates/almoxarifado/`
+- **Total:** 15+ formulários POST vulneráveis
+
+**Templates Afetados:**
+- `itens.html` (linha 163)
+- `entrada.html` (linha 26)
+- `categorias_form.html` (linha 20)
+- `itens_form.html` (linha 20)
+- `fornecedores_form.html` (linha 16)
+- `categorias.html` (linha 77)
+- `fornecedores.html` (linha 124)
+- `movimentacoes.html` (linha 411)
+- E outros...
+
+**Impacto:**  
+Vulnerabilidade CSRF permite que atacantes executem ações não autorizadas em nome de usuários autenticados (exclusão de itens, movimentações falsas, alteração de estoque, etc.).
+
+**Comportamento Esperado:**  
+Todos os formulários POST devem ter proteção CSRF ativa, rejeitando requisições sem token válido.
+
+**Comportamento Atual:**  
+Formulários aceitam qualquer requisição POST, mesmo de origens externas maliciosas.
+
+**Recomendação de Correção:**  
+Adicionar `{{ csrf_token() }}` ou `{{ form.hidden_tag() }}` em todos os formulários POST.
+
+**⚙️ AÇÃO SOLICITADA**
+
+1. Localize todos os templates em `templates/almoxarifado/`.
+2. Identifique todos os formulários que usam `method="POST"`.
+3. Adicione `<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>` logo após a tag `<form>` de abertura em cada formulário.
+4. Verifique se o Flask-WTF está configurado corretamente no projeto (deve estar, pois outros módulos provavelmente usam).
+5. Liste todos os arquivos modificados e o número de formulários corrigidos.
+6. Forneça um resumo das alterações.
+
+**EXEMPLO DE CORREÇÃO:**
+
+Antes:
+```html
+<form method="POST" action="/almoxarifado/entrada">
+    <input type="text" name="item_id" required>
+    ...
+</form>
+```
+
+Depois:
+```html
+<form method="POST" action="/almoxarifado/entrada">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <input type="text" name="item_id" required>
+    ...
+</form>
+```
+
+**COMANDO INICIAL:** Inicie a correção do BUG #002 agora, adicionando CSRF protection em todos os formulários.
+```
+
+---
+
+## PROMPT #3: Correção BUG #003 - Dados FIFO Incompletos em Devoluções
+
+```
+**CORREÇÃO DE BUG CRÍTICO #003 - ALMOXARIFADO**
+
+**📋 REFERÊNCIA DO BUG**
+
+**BUG #003 - [SEVERIDADE: CRÍTICO] - Dados FIFO Incompletos em Devoluções**
+
+**Descrição:**  
+Ao criar registro de estoque em devoluções, os campos FIFO (`quantidade_inicial`, `quantidade_disponivel`, `entrada_movimento_id`) não são preenchidos, quebrando o rastreamento de lotes.
+
+**Localização:**  
+- **Arquivo:** `almoxarifado_views.py`
+- **Funções:** `processar_devolucao()`, `processar_devolucao_multipla()`
+- **Linhas:** 1959-1966, 2248-2256
+
+**Código Problemático:**
+```python
+estoque = AlmoxarifadoEstoque(
+    item_id=item.id,
+    quantidade=quantidade_devolvida,
+    status='DISPONIVEL',
+    # FALTAM: quantidade_inicial, quantidade_disponivel, entrada_movimento_id
+)
+```
+
+**Impacto:**  
+- Queries FIFO retornam resultados incorretos
+- Impossível rastrear origem de itens devolvidos
+- Relatórios de lotes inconsistentes
+- Sistema de rastreamento de lotes completamente quebrado para devoluções
+
+**Comportamento Esperado:**  
+Devoluções criam registros de estoque completos com todos os campos FIFO preenchidos, permitindo rastreamento adequado.
+
+**Comportamento Atual:**  
+Registros de estoque de devoluções ficam incompletos, sem referência à movimentação de entrada.
+
+**Recomendação de Correção:**  
+Adicionar campos FIFO ao criar estoque de devolução:
+```python
+estoque = AlmoxarifadoEstoque(
+    item_id=item.id,
+    quantidade=quantidade_devolvida,
+    quantidade_inicial=quantidade_devolvida,
+    quantidade_disponivel=quantidade_devolvida,
+    status='DISPONIVEL',
+    admin_id=admin_id
+)
+db.session.add(estoque)
+db.session.flush()
+estoque.entrada_movimento_id = movimento.id
+```
+
+**⚙️ AÇÃO SOLICITADA**
+
+1. Localize o arquivo `almoxarifado_views.py`.
+2. Encontre as funções `processar_devolucao()` (linha ~1959) e `processar_devolucao_multipla()` (linha ~2248).
+3. Identifique onde o objeto `AlmoxarifadoEstoque` é criado em cada função.
+4. Adicione os campos FIFO faltantes (`quantidade_inicial`, `quantidade_disponivel`, `entrada_movimento_id`) conforme a recomendação.
+5. Certifique-se de que o `entrada_movimento_id` é definido APÓS o flush (para ter o ID do movimento).
+6. Verifique se há outras funções de devolução que possam ter o mesmo problema.
+7. Teste a funcionalidade de devolução para garantir que os dados FIFO são salvos corretamente.
+8. Forneça um resumo das alterações realizadas.
+
+**COMANDO INICIAL:** Inicie a correção do BUG #003 agora.
+```
+
+---
+
+## PROMPT #4: Correção BUG #004 - ValueError Não Tratado
+
+```
+**CORREÇÃO DE BUG CRÍTICO #004 - ALMOXARIFADO**
+
+**📋 REFERÊNCIA DO BUG**
+
+**BUG #004 - [SEVERIDADE: CRÍTICO] - ValueError Não Tratado em Conversão de Filtros**
+
+**Descrição:**  
+A conversão `int(funcionario_filtro)` pode lançar `ValueError` se o parâmetro contiver valor não numérico, causando crash da aplicação.
+
+**Localização:**  
+- **Arquivo:** `almoxarifado_views.py`
+- **Função:** `itens_movimentacoes()`
+- **Linhas:** 501-505
+
+**Código Problemático:**
+```python
+if funcionario_filtro:
+    query = query.filter(AlmoxarifadoMovimento.funcionario_id == int(funcionario_filtro))
+```
+
+**Impacto:**  
+Erro 500 se usuário manipular URL com valor inválido (ex: `/movimentacoes?funcionario_filtro=abc`).
+
+**Comportamento Esperado:**  
+Filtros inválidos são ignorados silenciosamente ou exibem mensagem de erro amigável ao usuário.
+
+**Comportamento Atual:**  
+Aplicação retorna erro 500 com stack trace exposto.
+
+**Recomendação de Correção:**  
+```python
+if funcionario_filtro:
+    try:
+        query = query.filter(AlmoxarifadoMovimento.funcionario_id == int(funcionario_filtro))
+    except (ValueError, TypeError):
+        pass  # Ignora filtro inválido
+```
+
+**⚙️ AÇÃO SOLICITADA**
+
+1. Localize o arquivo `almoxarifado_views.py` e a função `itens_movimentacoes()` na linha ~501.
+2. Encontre o código que converte `funcionario_filtro` para inteiro.
+3. Adicione tratamento de exceção `try/except` para capturar `ValueError` e `TypeError`.
+4. Verifique se há OUTROS locais no código onde filtros de URL são convertidos para int sem tratamento de erro (busque por padrões como `int(request.args.get(...))`).
+5. Aplique a mesma correção em todos os locais encontrados.
+6. Teste a rota com parâmetros inválidos (ex: `?funcionario_filtro=abc`, `?funcionario_filtro=null`) para garantir que não há mais crashes.
+7. Forneça um resumo de todos os locais corrigidos.
+
+**COMANDO INICIAL:** Inicie a correção do BUG #004 agora, e busque por padrões similares em todo o arquivo.
+```
+
+---
+
+## Resumo dos Bugs Críticos
+
+| Bug | Título | Prioridade | Impacto |
+|-----|--------|-----------|---------|
+| #001 | Filtro em Campo Inexistente | IMEDIATA | Crash ao acessar relatórios |
+| #002 | Ausência de CSRF Protection | IMEDIATA | Vulnerabilidade de segurança |
+| #003 | Dados FIFO Incompletos | ALTA | Rastreamento de lotes quebrado |
+| #004 | ValueError Não Tratado | ALTA | Crash com parâmetros inválidos |
+
+## Ordem Recomendada de Correção
+
+1. **BUG #001** (mais rápido, impacto imediato)
+2. **BUG #004** (rápido, previne crashes)
+3. **BUG #002** (mais trabalhoso, mas crítico para segurança)
+4. **BUG #003** (requer mais atenção, mas essencial para integridade dos dados)
+
+## Após Corrigir os Bugs Críticos
+
+Execute os testes:
+1. Acesse a rota de relatórios e verifique se carrega sem erros
+2. Teste todos os formulários POST para garantir que CSRF está funcionando
+3. Faça uma devolução e verifique se os campos FIFO foram salvos corretamente
+4. Teste filtros com valores inválidos nas URLs
+
+## Próximos Passos
+
+Após corrigir os bugs críticos, você pode prosseguir com os bugs de severidade ALTA e MÉDIA usando o mesmo formato de prompt.

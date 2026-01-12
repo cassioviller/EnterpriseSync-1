@@ -18,6 +18,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <!-- Tipo de Movimento -->
                         <div class="mb-3">
                             <label for="tipo_movimento" class="form-label">Tipo de Movimento *</label>

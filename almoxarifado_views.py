@@ -499,10 +499,16 @@ def itens_movimentacoes(id):
         query = query.filter(AlmoxarifadoMovimento.tipo_movimento == tipo_filtro)
     
     if funcionario_filtro:
-        query = query.filter(AlmoxarifadoMovimento.funcionario_id == int(funcionario_filtro))
+        try:
+            query = query.filter(AlmoxarifadoMovimento.funcionario_id == int(funcionario_filtro))
+        except (ValueError, TypeError):
+            pass  # Ignora filtro inválido
     
     if obra_filtro:
-        query = query.filter(AlmoxarifadoMovimento.obra_id == int(obra_filtro))
+        try:
+            query = query.filter(AlmoxarifadoMovimento.obra_id == int(obra_filtro))
+        except (ValueError, TypeError):
+            pass  # Ignora filtro inválido
     
     if data_inicio:
         try:
@@ -1955,10 +1961,12 @@ def processar_devolucao():
                 flash('Item não permite devolução', 'danger')
                 return redirect(url_for('almoxarifado.devolucao'))
             
-            # Criar novo registro de estoque com quantidade devolvida
+            # Criar novo registro de estoque com quantidade devolvida (com campos FIFO)
             estoque = AlmoxarifadoEstoque(
                 item_id=item_id,
                 quantidade=quantidade,
+                quantidade_inicial=quantidade,
+                quantidade_disponivel=quantidade,
                 status='DISPONIVEL',
                 admin_id=admin_id
             )
@@ -1979,6 +1987,10 @@ def processar_devolucao():
                 obra_id=None
             )
             db.session.add(movimento)
+            db.session.flush()
+            
+            # Vincular estoque ao movimento de entrada (FIFO)
+            estoque.entrada_movimento_id = movimento.id
             
             db.session.commit()
             flash(f'Devolução processada com sucesso! {quantidade} {item.unidade} de "{item.nome}" devolvidos por {funcionario.nome}.', 'success')
@@ -2144,7 +2156,7 @@ def processar_devolucao_multipla():
                 # VALIDAR: Item pertence ao funcionário (status='EM_USO')?
                 estoque = AlmoxarifadoEstoque.query.filter_by(
                     id=estoque_id,
-                    funcionario_id=funcionario_id,
+                    funcionario_atual_id=funcionario_id,
                     status='EM_USO',
                     admin_id=admin_id
                 ).first()
@@ -2245,10 +2257,12 @@ def processar_devolucao_multipla():
             else:  # CONSUMIVEL
                 quantidade = item_validado['quantidade']
                 
-                # Criar novo registro de estoque com quantidade devolvida
+                # Criar novo registro de estoque com quantidade devolvida (com campos FIFO)
                 estoque = AlmoxarifadoEstoque(
                     item_id=item.id,
                     quantidade=quantidade,
+                    quantidade_inicial=quantidade,
+                    quantidade_disponivel=quantidade,
                     status='DISPONIVEL',
                     admin_id=admin_id
                 )
@@ -2269,6 +2283,10 @@ def processar_devolucao_multipla():
                     usuario_id=current_user.id
                 )
                 db.session.add(movimento)
+                db.session.flush()
+                
+                # Vincular estoque ao movimento de entrada (FIFO)
+                estoque.entrada_movimento_id = movimento.id
                 total_processados += 1
         
         # Commit APENAS se TODOS itens foram processados
@@ -2408,8 +2426,8 @@ def relatorios():
         tipo_controle = request.args.get('tipo_controle', '')
         condicao = request.args.get('condicao', '')
         
-        # Query base com multi-tenant
-        query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id, ativo=True)
+        # Query base com multi-tenant (removido filtro ativo=True - campo não existe no modelo)
+        query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id)
         query = query.join(AlmoxarifadoItem, AlmoxarifadoEstoque.item_id == AlmoxarifadoItem.id)
         query = query.join(AlmoxarifadoCategoria, AlmoxarifadoItem.categoria_id == AlmoxarifadoCategoria.id)
         
