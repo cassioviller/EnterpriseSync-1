@@ -1323,7 +1323,8 @@ class Fornecedor(db.Model):
     __tablename__ = 'fornecedor'
     
     id = db.Column(db.Integer, primary_key=True)
-    razao_social = db.Column(db.String(200), nullable=False)
+    nome = db.Column(db.String(100), nullable=False)  # Campo legado obrigatório
+    razao_social = db.Column(db.String(200))
     nome_fantasia = db.Column(db.String(200))
     cnpj = db.Column(db.String(18), nullable=False)
     inscricao_estadual = db.Column(db.String(20))

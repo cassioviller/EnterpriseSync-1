@@ -2757,7 +2757,9 @@ def fornecedores_criar():
                 return redirect(url_for('almoxarifado.fornecedores_criar'))
             
             # Criar fornecedor
+            # NOTA: Campo 'nome' é obrigatório no banco - usar razao_social como valor
             fornecedor = Fornecedor(
+                nome=razao_social,  # Campo legado obrigatório no banco
                 razao_social=razao_social,
                 nome_fantasia=nome_fantasia or None,
                 cnpj=cnpj,
@@ -2833,6 +2835,7 @@ def fornecedores_editar(id):
                 return redirect(url_for('almoxarifado.fornecedores_editar', id=id))
             
             # Atualizar fornecedor
+            fornecedor.nome = razao_social  # Campo legado obrigatório
             fornecedor.razao_social = razao_social
             fornecedor.nome_fantasia = nome_fantasia or None
             fornecedor.cnpj = cnpj
