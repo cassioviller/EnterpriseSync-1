@@ -549,6 +549,11 @@ def criar_servico():
         nome = request.form.get('nome', '').strip()
         descricao = request.form.get('descricao', '').strip()
         categoria = request.form.get('categoria', 'Outros')
+        unidade_medida = request.form.get('unidade_medida', 'un').strip() or 'un'
+        unidade_simbolo = request.form.get('unidade_simbolo', '').strip() or unidade_medida
+        custo_unitario = float(request.form.get('custo_unitario', 0) or 0)
+        complexidade = int(request.form.get('complexidade', 3) or 3)
+        requer_especializacao = request.form.get('requer_especializacao') == 'true'
         
         # Validação
         if not nome:
@@ -571,6 +576,11 @@ def criar_servico():
             nome=nome,
             descricao=descricao,
             categoria=categoria,
+            unidade_medida=unidade_medida,
+            unidade_simbolo=unidade_simbolo,
+            custo_unitario=custo_unitario,
+            complexidade=complexidade,
+            requer_especializacao=requer_especializacao,
             admin_id=admin_id,
             ativo=True
         )
