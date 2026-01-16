@@ -549,6 +549,15 @@ def criar_servico():
         nome = request.form.get('nome', '').strip()
         descricao = request.form.get('descricao', '').strip()
         categoria = request.form.get('categoria', 'Outros')
+        unidade_medida = request.form.get('unidade_medida', 'un').strip() or 'un'  # Default 'un' (unidade)
+        unidade_simbolo = request.form.get('unidade_simbolo', '').strip() or unidade_medida
+        custo_unitario = request.form.get('custo_unitario', '0')
+        
+        # Converter custo para float
+        try:
+            custo_unitario = float(custo_unitario.replace(',', '.')) if custo_unitario else 0.0
+        except (ValueError, AttributeError):
+            custo_unitario = 0.0
         
         # Validação
         if not nome:
@@ -571,6 +580,9 @@ def criar_servico():
             nome=nome,
             descricao=descricao,
             categoria=categoria,
+            unidade_medida=unidade_medida,
+            unidade_simbolo=unidade_simbolo,
+            custo_unitario=custo_unitario,
             admin_id=admin_id,
             ativo=True
         )

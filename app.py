@@ -23,13 +23,25 @@ IS_PRODUCTION = "REPL_ID" not in os.environ
 logger.info(f"🌍 Ambiente detectado: {'PRODUÇÃO' if IS_PRODUCTION else 'DESENVOLVIMENTO (Replit)'}")
 
 # ======================================================================
-# == 🔒 CHAVE SECRETA ESTÁTICA PARA PRODUÇÃO ==
+# == 🔒 CHAVE SECRETA SEGURA ==
 # ======================================================================
-# Chave fixa compartilhada por todos os workers do Gunicorn
-# Isso garante que a sessão persista entre requisições em múltiplos workers
-app.secret_key = "RIRoo4VE6wBEkt9trAMsXzveGEM2kouxIb_rxvnxBM7wnhm4wlTm5n8_n7jPHTSlDkxjDYySbjEcCPcvsCOxOg"
-app.config["SECRET_KEY"] = app.secret_key
-logger.info(f"✅ Secret key estática configurada (length: {len(app.secret_key)})")
+# Em produção: usa SESSION_SECRET do ambiente (OBRIGATÓRIO em Easypanel/Docker)
+# Em desenvolvimento: usa SESSION_SECRET do Replit Secrets ou gera fallback
+_secret_key = os.environ.get("SESSION_SECRET")
+if not _secret_key:
+    if IS_PRODUCTION:
+        # Em produção, SESSION_SECRET é OBRIGATÓRIO para persistência de sessão
+        logger.error("❌ ERRO CRÍTICO: SESSION_SECRET não configurado em produção!")
+        logger.error("   Configure SESSION_SECRET nas variáveis de ambiente do Easypanel")
+        raise RuntimeError("SESSION_SECRET é obrigatório em produção para persistência de sessão entre workers")
+    else:
+        # Apenas em desenvolvimento: gera chave temporária
+        import secrets
+        _secret_key = secrets.token_hex(32)
+        logger.warning("⚠️ SESSION_SECRET não encontrado - usando chave temporária (apenas para dev)")
+app.secret_key = _secret_key
+app.config["SECRET_KEY"] = _secret_key
+logger.info(f"✅ Secret key configurada via ambiente (length: {len(_secret_key)})")
 
 # ======================================================================
 # == CONFIGURAÇÃO DE COOKIES PARA PRODUÇÃO ==
