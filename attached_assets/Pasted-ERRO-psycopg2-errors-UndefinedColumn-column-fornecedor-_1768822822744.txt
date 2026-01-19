@@ -1,0 +1,80 @@
+ERRO: (psycopg2.errors.UndefinedColumn) column fornecedor.nome does not exist
+LINE 1: SELECT fornecedor.id AS fornecedor_id, fornecedor.nome AS fo...
+                                               ^
+
+[SQL: SELECT fornecedor.id AS fornecedor_id, fornecedor.nome AS fornecedor_nome, fornecedor.razao_social AS fornecedor_razao_social, fornecedor.nome_fantasia AS fornecedor_nome_fantasia, fornecedor.cnpj AS fornecedor_cnpj, fornecedor.inscricao_estadual AS fornecedor_inscricao_estadual, fornecedor.endereco AS fornecedor_endereco, fornecedor.cidade AS fornecedor_cidade, fornecedor.estado AS fornecedor_estado, fornecedor.cep AS fornecedor_cep, fornecedor.telefone AS fornecedor_telefone, fornecedor.email AS fornecedor_email, fornecedor.contato_responsavel AS fornecedor_contato_responsavel, fornecedor.ativo AS fornecedor_ativo, fornecedor.admin_id AS fornecedor_admin_id, fornecedor.created_at AS fornecedor_created_at, fornecedor.updated_at AS fornecedor_updated_at 
+FROM fornecedor 
+WHERE fornecedor.admin_id = %(admin_id_1)s AND fornecedor.ativo = true ORDER BY fornecedor.razao_social]
+[parameters: {&#39;admin_id_1&#39;: 2}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column fornecedor.nome does not exist
+LINE 1: SELECT fornecedor.id AS fornecedor_id, fornecedor.nome AS fo...
+                                               ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask_login/utils.py&#34;, line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/almoxarifado_views.py&#34;, line 596, in entrada
+    fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(Fornecedor.razao_social).all()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/context.py&#34;, line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1419, in execute
+    return meth(
+           ^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py&#34;, line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column fornecedor.nome does not exist
+LINE 1: SELECT fornecedor.id AS fornecedor_id, fornecedor.nome AS fo...
+                                               ^
+
+[SQL: SELECT fornecedor.id AS fornecedor_id, fornecedor.nome AS fornecedor_nome, fornecedor.razao_social AS fornecedor_razao_social, fornecedor.nome_fantasia AS fornecedor_nome_fantasia, fornecedor.cnpj AS fornecedor_cnpj, fornecedor.inscricao_estadual AS fornecedor_inscricao_estadual, fornecedor.endereco AS fornecedor_endereco, fornecedor.cidade AS fornecedor_cidade, fornecedor.estado AS fornecedor_estado, fornecedor.cep AS fornecedor_cep, fornecedor.telefone AS fornecedor_telefone, fornecedor.email AS fornecedor_email, fornecedor.contato_responsavel AS fornecedor_contato_responsavel, fornecedor.ativo AS fornecedor_ativo, fornecedor.admin_id AS fornecedor_admin_id, fornecedor.created_at AS fornecedor_created_at, fornecedor.updated_at AS fornecedor_updated_at 
+FROM fornecedor 
+WHERE fornecedor.admin_id = %(admin_id_1)s AND fornecedor.ativo = true ORDER BY fornecedor.razao_social]
+[parameters: {&#39;admin_id_1&#39;: 2}]
+(Background on this error at: https://sqlalche.me/e/20/f405)

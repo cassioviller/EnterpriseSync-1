@@ -3764,6 +3764,7 @@ def executar_migracoes():
             (62, "Tornar colunas legadas de HorarioTrabalho nullable", _migration_62_horario_trabalho_nullable),
             (63, "Tolerância minutos para horas extras/atrasos", _migration_63_tolerancia_minutos),
             (64, "Tabela folha_processada para dashboard custos obra", _migration_64_folha_processada),
+            (65, "Adicionar coluna nome em fornecedor", _migration_65_fornecedor_nome),
         ]
         
         # Executar cada migração com rastreamento
@@ -6094,3 +6095,72 @@ def _migration_48_adicionar_admin_id_modelos_faltantes():
             except:
                 pass
         raise
+
+
+# ============================================================================
+# MIGRAÇÃO 65 - Adicionar coluna 'nome' na tabela fornecedor
+# ============================================================================
+
+def _migration_65_fornecedor_nome():
+    """
+    MIGRAÇÃO 65: Adicionar coluna 'nome' na tabela fornecedor
+    A coluna 'nome' é obrigatória no modelo mas pode não existir em bancos antigos
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("🔄 MIGRAÇÃO 65: Verificando coluna 'nome' na tabela fornecedor")
+        
+        # Verificar se coluna existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'fornecedor' AND column_name = 'nome'
+        """)
+        
+        coluna_existe = cursor.fetchone()
+        
+        if coluna_existe:
+            logger.info("  ✅ Coluna 'nome' já existe na tabela fornecedor")
+        else:
+            logger.info("  📝 Adicionando coluna 'nome' na tabela fornecedor...")
+            
+            # Adicionar coluna com valor default temporário
+            cursor.execute("""
+                ALTER TABLE fornecedor 
+                ADD COLUMN nome VARCHAR(100)
+            """)
+            
+            # Preencher com razao_social ou 'Fornecedor' como fallback
+            cursor.execute("""
+                UPDATE fornecedor 
+                SET nome = COALESCE(razao_social, nome_fantasia, 'Fornecedor ' || id::text)
+                WHERE nome IS NULL
+            """)
+            
+            # Tornar NOT NULL após preencher
+            cursor.execute("""
+                ALTER TABLE fornecedor 
+                ALTER COLUMN nome SET NOT NULL
+            """)
+            
+            logger.info("  ✅ Coluna 'nome' adicionada e populada com sucesso")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("✅ MIGRAÇÃO 65 CONCLUÍDA!")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na migração 65: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
