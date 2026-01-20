@@ -6567,8 +6567,22 @@ def rdos():
         Session = sessionmaker(bind=engine)
         session = Session()
         # Determinar admin_id baseado no tipo de usuário
-        if current_user.tipo_usuario == TipoUsuario.ADMIN or current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-            admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        if current_user.tipo_usuario == TipoUsuario.ADMIN:
+            admin_id = current_user.id
+        elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+            # SUPER_ADMIN pode ver tudo - buscar admin_id com mais obras
+            obra_counts = db.session.execute(
+                text("SELECT admin_id, COUNT(*) as total FROM obra WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+            ).fetchone()
+            if obra_counts and obra_counts[0]:
+                admin_id = obra_counts[0]
+                print(f"✅ SUPER_ADMIN rdos(): usando admin_id={admin_id} ({obra_counts[1]} obras)")
+            else:
+                # Fallback para funcionários
+                func_counts = db.session.execute(
+                    text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+                ).fetchone()
+                admin_id = func_counts[0] if func_counts and func_counts[0] else current_user.id
         else:
             # Funcionário - buscar admin_id através do funcionário
             email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
