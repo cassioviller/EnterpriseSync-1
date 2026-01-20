@@ -6283,12 +6283,32 @@ def api_remover_servico_obra():
 def get_admin_id_dinamico():
     """Função helper para detectar admin_id dinamicamente no sistema multi-tenant"""
     try:
+        from sqlalchemy import text
+        
         # 1. Se usuário autenticado, usar sua lógica
         if current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 return current_user.id
-            else:
+            elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+                # SUPER_ADMIN pode ver tudo - buscar admin_id com mais dados
+                obra_counts = db.session.execute(
+                    text("SELECT admin_id, COUNT(*) as total FROM obra WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+                ).fetchone()
+                if obra_counts and obra_counts[0]:
+                    print(f"✅ SUPER_ADMIN: usando admin_id={obra_counts[0]} ({obra_counts[1]} obras)")
+                    return obra_counts[0]
+                # Fallback para funcionários
+                func_counts = db.session.execute(
+                    text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+                ).fetchone()
+                if func_counts and func_counts[0]:
+                    return func_counts[0]
+                return current_user.id
+            elif current_user.admin_id:
                 return current_user.admin_id
+            else:
+                # Funcionário sem admin_id definido - buscar dinamicamente
+                pass
         
         # 2. Sistema de bypass - detectar admin_id baseado nos dados disponíveis
         from sqlalchemy import text
@@ -8072,12 +8092,42 @@ def funcionario_rdo_consolidado():
         page = request.args.get('page', 1, type=int)
         per_page = 20
         
+        # Obter parâmetros de filtro
+        filtro_obra_id = request.args.get('obra_id', type=int)
+        filtro_status = request.args.get('status')
+        filtro_funcionario_id = request.args.get('funcionario_id', type=int)
+        filtro_data_inicio = request.args.get('data_inicio')
+        filtro_data_fim = request.args.get('data_fim')
+        
         # Buscar RDOs com joins otimizados
         rdos_query = db.session.query(RDO, Obra).join(
             Obra, RDO.obra_id == Obra.id
         ).filter(
             Obra.admin_id == admin_id_correto
-        ).order_by(RDO.data_relatorio.desc())
+        )
+        
+        # Aplicar filtros
+        if filtro_obra_id:
+            rdos_query = rdos_query.filter(RDO.obra_id == filtro_obra_id)
+        
+        if filtro_status:
+            rdos_query = rdos_query.filter(RDO.status == filtro_status)
+        
+        if filtro_data_inicio:
+            try:
+                data_inicio = datetime.strptime(filtro_data_inicio, '%Y-%m-%d').date()
+                rdos_query = rdos_query.filter(RDO.data_relatorio >= data_inicio)
+            except:
+                pass
+        
+        if filtro_data_fim:
+            try:
+                data_fim = datetime.strptime(filtro_data_fim, '%Y-%m-%d').date()
+                rdos_query = rdos_query.filter(RDO.data_relatorio <= data_fim)
+            except:
+                pass
+        
+        rdos_query = rdos_query.order_by(RDO.data_relatorio.desc())
         
         print(f"DEBUG LISTA RDOs: {rdos_query.count()} RDOs encontrados para admin_id={admin_id_correto}")
         
@@ -8157,12 +8207,12 @@ def funcionario_rdo_consolidado():
                              obras=obras,
                              funcionarios=funcionarios,
                              filters={
-                                 'obra_id': request.args.get('obra_id'),
-                                 'status': request.args.get('status'),
-                                 'data_inicio': request.args.get('data_inicio'),
-                                 'data_fim': request.args.get('data_fim'),
-                                 'funcionario_id': request.args.get('funcionario_id'),
-                                 'order_by': 'data_desc'
+                                 'obra_id': filtro_obra_id,
+                                 'status': filtro_status,
+                                 'data_inicio': filtro_data_inicio,
+                                 'data_fim': filtro_data_fim,
+                                 'funcionario_id': filtro_funcionario_id,
+                                 'order_by': request.args.get('order_by', 'data_desc')
                              })
         
     except Exception as e:
