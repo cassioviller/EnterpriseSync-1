@@ -1341,6 +1341,9 @@ function setDateRange(period) {
 }
 </script>
 
+<!-- Select2 JS - DEVE CARREGAR ANTES DA INICIALIZAÇÃO -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <!-- Modal de Lançamento Múltiplo -->
 <div class="modal fade" id="modalLancamentoMultiplo" tabindex="-1" aria-labelledby="modalLancamentoMultiploLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -1832,19 +1835,40 @@ $('#modalLancamentoMultiplo').on('show.bs.modal', function() {
     document.getElementById('periodo_inicio').value = primeiroDiaDoMes.toISOString().split('T')[0];
     document.getElementById('periodo_fim').value = hoje.toISOString().split('T')[0];
     
-    // Inicializar Select2 no dropdown de obras com scroll confiável
-    setTimeout(function() {
-        if ($.fn.select2) {
-            $('#obra_lancamento').select2({
-                theme: 'bootstrap-5',
-                dropdownParent: $('#modalLancamentoMultiplo'),
-                placeholder: 'Selecione uma obra...',
-                allowClear: true,
-                width: '100%'
-            });
-        }
-    }, 100);
+    // Inicializar Select2 com retry robusto
+    initSelect2WithRetry(0);
 });
+
+// Função para inicializar Select2 com retry
+function initSelect2WithRetry(attempt) {
+    const maxAttempts = 10;
+    
+    if ($.fn.select2) {
+        console.log('✅ Select2 disponível - inicializando dropdown de obras...');
+        
+        // Destruir instância anterior se existir
+        if ($('#obra_lancamento').hasClass('select2-hidden-accessible')) {
+            $('#obra_lancamento').select2('destroy');
+        }
+        
+        $('#obra_lancamento').select2({
+            theme: 'bootstrap-5',
+            dropdownParent: $('#modalLancamentoMultiplo'),
+            placeholder: 'Selecione uma obra...',
+            allowClear: true,
+            width: '100%'
+        });
+        
+        console.log('✅ Select2 inicializado com sucesso! Total de obras:', $('#obra_lancamento option').length);
+    } else if (attempt < maxAttempts) {
+        console.log(`⏳ Select2 ainda não carregou. Tentativa ${attempt + 1}/${maxAttempts}...`);
+        setTimeout(function() {
+            initSelect2WithRetry(attempt + 1);
+        }, 200);
+    } else {
+        console.error('❌ Select2 não carregou após 10 tentativas. Usando fallback nativo.');
+    }
+}
 
 // Destruir Select2 ao fechar o modal para evitar bugs
 $('#modalLancamentoMultiplo').on('hidden.bs.modal', function() {
@@ -1982,7 +2006,4 @@ function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
 </script>
-
-<!-- Select2 JS para dropdown com scroll confiável -->
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 {% endblock %}
