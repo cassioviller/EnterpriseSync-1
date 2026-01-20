@@ -1,0 +1,55 @@
+# Prompt de Diagnóstico e Correção: Filtro de Obra em RDOs
+
+## Prompt para o Replit Agent
+
+Cole o texto abaixo diretamente no chat do Replit Agent.
+
+```
+**AÇÃO DE DIAGNÓSTICO E CORREÇÃO: Filtro de Obra na Página de RDOs**
+
+**Contexto:**
+
+-   **O Problema:** Na página de "Relatórios Diários de Obra" (RDOs), o campo de filtro "OBRA" não está funcionando. Ao selecionar uma obra específica e clicar em "Filtrar", a página recarrega, mas a lista de RDOs não é filtrada, continuando a exibir os relatórios de todas as obras.
+
+**Sua Tarefa:**
+
+Você deve investigar o código da rota que exibe a lista de RDOs e o template correspondente para identificar por que o filtro de obra não está sendo aplicado. Depois, deve corrigir o problema.
+
+**Passo 1: Localize a Rota e o Template Relevantes**
+
+-   **Ação:** Investigue o código para encontrar a função de view (provavelmente em `views.py` ou um arquivo similar) que renderiza a página de listagem de RDOs. O URL provavelmente é algo como `/rdos` ou `/relatorios`.
+-   Identifique o arquivo de template HTML que essa rota utiliza.
+
+**Passo 2: Analise a Lógica de Filtragem na View**
+
+-   **Ação:** Dentro da função de view, analise como os filtros são recebidos e processados. Preste atenção em:
+    -   Como o valor do filtro de obra é obtido dos argumentos da requisição (ex: `request.args.get('obra_id')`).
+    -   Como esse valor é usado para filtrar a query do banco de dados (ex: `RDO.query.filter_by(obra_id=...)`).
+    -   Verifique se há alguma condição que possa estar impedindo o filtro de ser aplicado.
+
+**Passo 3: Analise o Formulário de Filtro no Template**
+
+-   **Ação:** No arquivo de template HTML, examine o formulário de filtros. Verifique:
+    -   O atributo `name` do campo `<select>` para o filtro de obra. Ele deve corresponder ao nome que a função de view espera receber (ex: `name="obra_id"`).
+    -   O atributo `value` de cada `<option>` no select. Ele deve conter o ID da obra.
+    -   O método do formulário (`method="GET"`).
+
+**Passo 4: Formule a Hipótese e a Correção**
+
+-   **Ação:** Com base na sua análise, identifique a causa raiz do problema. As causas mais prováveis são:
+    1.  **Nome Incorreto:** O `name` do campo `<select>` no HTML não corresponde ao que a view espera em `request.args.get()`.
+    2.  **Lógica de Query:** A query do SQLAlchemy na view não está aplicando o filtro corretamente, mesmo que o valor seja recebido.
+    3.  **Tipo de Dado:** A view pode estar esperando um inteiro (`int(obra_id)`), mas recebendo uma string vazia ou um valor inválido.
+
+-   **Implemente a correção** necessária, seja no template HTML ou na função de view em Python.
+
+**Passo 5: Validação**
+
+-   **Ação:** Após aplicar a correção, descreva como eu devo testar para confirmar que o problema foi resolvido. O teste deve ser:
+    1.  Acessar a página de RDOs.
+    2.  Selecionar uma obra específica no filtro.
+    3.  Clicar em "Filtrar".
+    4.  Verificar se a lista agora exibe **apenas** os RDOs da obra selecionada.
+
+**Execute a análise e a correção agora.**
+```
