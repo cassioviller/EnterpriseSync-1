@@ -1939,6 +1939,103 @@ def funcionario_perfil(id):
                          funcoes=funcoes,
                          horarios=horarios)
 
+@main_bp.route('/funcionarios/<int:funcionario_id>/horario-padrao')
+@login_required
+def funcionario_horario_padrao(funcionario_id):
+    """
+    Retorna o horário padrão do funcionário para o dia da semana atual.
+    Usado pelo JavaScript para preencher campos de registro de ponto.
+    Busca primeiro em HorarioDia (novo sistema), depois em HorarioTrabalho (legado).
+    """
+    from models import Funcionario, HorarioTrabalho, HorarioDia
+    from flask import jsonify
+    from datetime import datetime, date
+    
+    try:
+        funcionario = Funcionario.query.get(funcionario_id)
+        if not funcionario:
+            return jsonify({'success': False, 'message': 'Funcionário não encontrado'})
+        
+        # Verificar se funcionário tem horário de trabalho associado
+        if not funcionario.horario_trabalho_id:
+            return jsonify({
+                'success': False, 
+                'message': 'Funcionário sem horário de trabalho configurado'
+            })
+        
+        horario_trabalho = HorarioTrabalho.query.get(funcionario.horario_trabalho_id)
+        if not horario_trabalho:
+            return jsonify({
+                'success': False, 
+                'message': 'Horário de trabalho não encontrado'
+            })
+        
+        # Obter dia da semana da data selecionada (ou hoje)
+        data_str = request.args.get('data')
+        if data_str:
+            try:
+                data_selecionada = datetime.strptime(data_str, '%Y-%m-%d').date()
+            except:
+                data_selecionada = date.today()
+        else:
+            data_selecionada = date.today()
+        
+        # weekday() retorna 0=Segunda, 1=Terça, ..., 6=Domingo
+        dia_semana = data_selecionada.weekday()
+        
+        # PRIORIDADE 1: Buscar HorarioDia específico para o dia da semana
+        horario_dia = HorarioDia.query.filter_by(
+            horario_id=horario_trabalho.id,
+            dia_semana=dia_semana
+        ).first()
+        
+        if horario_dia and horario_dia.trabalha:
+            # Calcular horários de almoço baseado na pausa
+            entrada = horario_dia.entrada
+            saida = horario_dia.saida
+            pausa_horas = float(horario_dia.pausa_horas or 1)
+            
+            # Calcular horário de almoço estimado (meio do expediente)
+            if entrada and saida:
+                entrada_dt = datetime.combine(date.today(), entrada)
+                saida_dt = datetime.combine(date.today(), saida)
+                meio_expediente = entrada_dt + (saida_dt - entrada_dt) / 2
+                almoco_saida = meio_expediente - timedelta(hours=pausa_horas/2)
+                almoco_retorno = meio_expediente + timedelta(hours=pausa_horas/2)
+                
+                return jsonify({
+                    'success': True,
+                    'source': 'horario_dia',
+                    'dia_semana': dia_semana,
+                    'hora_entrada': entrada.strftime('%H:%M') if entrada else '08:00',
+                    'hora_saida': saida.strftime('%H:%M') if saida else '17:00',
+                    'hora_almoco_saida': almoco_saida.strftime('%H:%M'),
+                    'hora_almoco_retorno': almoco_retorno.strftime('%H:%M'),
+                    'pausa_horas': pausa_horas
+                })
+        
+        # PRIORIDADE 2: Usar campos legados do HorarioTrabalho
+        if horario_trabalho.entrada:
+            return jsonify({
+                'success': True,
+                'source': 'horario_trabalho_legado',
+                'hora_entrada': horario_trabalho.entrada.strftime('%H:%M') if horario_trabalho.entrada else '08:00',
+                'hora_saida': horario_trabalho.saida.strftime('%H:%M') if horario_trabalho.saida else '17:00',
+                'hora_almoco_saida': horario_trabalho.saida_almoco.strftime('%H:%M') if horario_trabalho.saida_almoco else '12:00',
+                'hora_almoco_retorno': horario_trabalho.retorno_almoco.strftime('%H:%M') if horario_trabalho.retorno_almoco else '13:00'
+            })
+        
+        # Nenhum horário configurado
+        return jsonify({
+            'success': False,
+            'message': f'Dia {dia_semana} não é dia de trabalho ou não tem horário configurado'
+        })
+        
+    except Exception as e:
+        import traceback
+        logger.error(f"Erro ao buscar horário padrão: {e}\n{traceback.format_exc()}")
+        return jsonify({'success': False, 'message': str(e)})
+
 # Rota para exportar PDF do funcionário - COM CIRCUIT BREAKER
 @main_bp.route('/funcionario_perfil/<int:id>/pdf')
 @circuit_breaker(
