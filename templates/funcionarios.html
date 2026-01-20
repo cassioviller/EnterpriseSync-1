@@ -8,23 +8,62 @@
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 
 <style>
-/* ===== SELECT2 CUSTOMIZATION ===== */
-.select2-container--bootstrap-5 .select2-dropdown {
-    max-height: 300px !important;
+/* ===== DROPDOWN CUSTOMIZADO COM SCROLL GARANTIDO ===== */
+.custom-dropdown-container {
+    position: relative;
+    width: 100%;
 }
 
-.select2-container--bootstrap-5 .select2-results__options {
-    max-height: 280px !important;
+.custom-dropdown-selected {
+    cursor: pointer;
+    background-color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.custom-dropdown-selected:hover {
+    border-color: #86b7fe;
+}
+
+.custom-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.175);
+    padding: 8px;
+    margin-top: 2px;
+}
+
+.custom-dropdown-options {
+    max-height: 250px;
     overflow-y: auto !important;
+    overflow-x: hidden;
 }
 
-.select2-container--bootstrap-5 .select2-results__option {
+.custom-dropdown-option {
     padding: 10px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.15s;
 }
 
-/* Garantir que Select2 apareça sobre o modal */
-.select2-container--open {
-    z-index: 9999 !important;
+.custom-dropdown-option:hover {
+    background-color: #e9ecef;
+}
+
+.custom-dropdown-option.selected {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.custom-dropdown-option.hidden {
+    display: none;
 }
 
 /* ===== FIX DROPDOWN OBRAS NO MODAL ===== */
@@ -1400,12 +1439,24 @@ function setDateRange(period) {
                                         </div>
                                         <div class="col-md-3">
                                             <label for="obra_lancamento" class="form-label">Obra*</label>
-                                            <select class="form-select" id="obra_lancamento" name="obra_id" required>
-                                                <option value="">Selecione uma obra...</option>
-                                                {% for obra in obras_ativas %}
-                                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
-                                                {% endfor %}
-                                            </select>
+                                            <!-- Dropdown Customizado com Scroll Garantido -->
+                                            <div class="custom-dropdown-container" id="obraDropdownContainer">
+                                                <input type="hidden" id="obra_lancamento" name="obra_id" required>
+                                                <div class="custom-dropdown-selected form-select" id="obraDropdownSelected" onclick="toggleObraDropdown()">
+                                                    <span id="obraSelectedText">Selecione uma obra...</span>
+                                                    <i class="fas fa-chevron-down float-end mt-1"></i>
+                                                </div>
+                                                <div class="custom-dropdown-menu" id="obraDropdownMenu" style="display: none;">
+                                                    <input type="text" class="form-control mb-2" id="obraBusca" placeholder="🔍 Buscar obra..." oninput="filtrarObras()">
+                                                    <div class="custom-dropdown-options" id="obraOptions">
+                                                        {% for obra in obras_ativas %}
+                                                        <div class="custom-dropdown-option" data-value="{{ obra.id }}" data-text="{{ obra.nome }}" onclick="selecionarObra(this)">
+                                                            {{ obra.nome }}
+                                                        </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1827,7 +1878,7 @@ function processarLancamentoMultiplo() {
     });
 }
 
-// Configurar datas padrão ao abrir o modal e inicializar Select2
+// Configurar datas padrão ao abrir o modal
 $('#modalLancamentoMultiplo').on('show.bs.modal', function() {
     const hoje = new Date();
     const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
@@ -1835,45 +1886,76 @@ $('#modalLancamentoMultiplo').on('show.bs.modal', function() {
     document.getElementById('periodo_inicio').value = primeiroDiaDoMes.toISOString().split('T')[0];
     document.getElementById('periodo_fim').value = hoje.toISOString().split('T')[0];
     
-    // Inicializar Select2 com retry robusto
-    initSelect2WithRetry(0);
+    // Reset do dropdown customizado
+    resetObraDropdown();
 });
 
-// Função para inicializar Select2 com retry
-function initSelect2WithRetry(attempt) {
-    const maxAttempts = 10;
+// ===== FUNÇÕES DO DROPDOWN CUSTOMIZADO DE OBRAS =====
+let obraDropdownAberto = false;
+
+function toggleObraDropdown() {
+    const menu = document.getElementById('obraDropdownMenu');
+    obraDropdownAberto = !obraDropdownAberto;
+    menu.style.display = obraDropdownAberto ? 'block' : 'none';
     
-    if ($.fn.select2) {
-        console.log('✅ Select2 disponível - inicializando dropdown de obras...');
-        
-        // Destruir instância anterior se existir
-        if ($('#obra_lancamento').hasClass('select2-hidden-accessible')) {
-            $('#obra_lancamento').select2('destroy');
-        }
-        
-        $('#obra_lancamento').select2({
-            theme: 'bootstrap-5',
-            dropdownParent: $('#modalLancamentoMultiplo'),
-            placeholder: 'Selecione uma obra...',
-            allowClear: true,
-            width: '100%'
-        });
-        
-        console.log('✅ Select2 inicializado com sucesso! Total de obras:', $('#obra_lancamento option').length);
-    } else if (attempt < maxAttempts) {
-        console.log(`⏳ Select2 ainda não carregou. Tentativa ${attempt + 1}/${maxAttempts}...`);
-        setTimeout(function() {
-            initSelect2WithRetry(attempt + 1);
-        }, 200);
-    } else {
-        console.error('❌ Select2 não carregou após 10 tentativas. Usando fallback nativo.');
+    if (obraDropdownAberto) {
+        document.getElementById('obraBusca').focus();
+        console.log('🔽 Dropdown de obras aberto - Total de opções:', document.querySelectorAll('.custom-dropdown-option').length);
     }
 }
 
-// Destruir Select2 ao fechar o modal para evitar bugs
-$('#modalLancamentoMultiplo').on('hidden.bs.modal', function() {
-    if ($.fn.select2 && $('#obra_lancamento').hasClass('select2-hidden-accessible')) {
-        $('#obra_lancamento').select2('destroy');
+function filtrarObras() {
+    const busca = document.getElementById('obraBusca').value.toLowerCase();
+    const opcoes = document.querySelectorAll('.custom-dropdown-option');
+    
+    opcoes.forEach(opcao => {
+        const texto = opcao.getAttribute('data-text').toLowerCase();
+        if (texto.includes(busca)) {
+            opcao.classList.remove('hidden');
+        } else {
+            opcao.classList.add('hidden');
+        }
+    });
+}
+
+function selecionarObra(elemento) {
+    const valor = elemento.getAttribute('data-value');
+    const texto = elemento.getAttribute('data-text');
+    
+    // Atualizar input hidden
+    document.getElementById('obra_lancamento').value = valor;
+    
+    // Atualizar texto exibido
+    document.getElementById('obraSelectedText').textContent = texto;
+    
+    // Remover seleção anterior e adicionar nova
+    document.querySelectorAll('.custom-dropdown-option').forEach(op => op.classList.remove('selected'));
+    elemento.classList.add('selected');
+    
+    // Fechar dropdown
+    document.getElementById('obraDropdownMenu').style.display = 'none';
+    obraDropdownAberto = false;
+    
+    console.log('✅ Obra selecionada:', texto, '(ID:', valor, ')');
+}
+
+function resetObraDropdown() {
+    document.getElementById('obra_lancamento').value = '';
+    document.getElementById('obraSelectedText').textContent = 'Selecione uma obra...';
+    document.getElementById('obraBusca').value = '';
+    document.querySelectorAll('.custom-dropdown-option').forEach(op => {
+        op.classList.remove('selected', 'hidden');
+    });
+    document.getElementById('obraDropdownMenu').style.display = 'none';
+    obraDropdownAberto = false;
+}
+
+// Fechar dropdown ao clicar fora
+document.addEventListener('click', function(event) {
+    const container = document.getElementById('obraDropdownContainer');
+    if (container && !container.contains(event.target)) {
+        document.getElementById('obraDropdownMenu').style.display = 'none';
+        obraDropdownAberto = false;
     }
 });
 
