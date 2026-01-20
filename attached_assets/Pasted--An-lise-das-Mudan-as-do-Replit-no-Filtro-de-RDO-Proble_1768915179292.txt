@@ -1,0 +1,115 @@
+# Análise das Mudanças do Replit no Filtro de RDO
+
+## Problema Reportado
+
+O filtro de obra na página de RDOs não está funcionando. Segundo a explicação do Replit:
+- O dropdown de obras não mostrava nenhuma obra (apenas "Todas as obras")
+- Usuário `admin@sige.com` é do tipo `SUPER_ADMIN`
+- A função `get_admin_id_dinamico()` não tratava corretamente o caso de SUPER_ADMIN
+
+## Mudança Feita pelo Replit
+
+O Replit modificou a função `get_admin_id_dinamico()` (linha 6184 em `views.py`), mas a lógica atual NÃO contém o tratamento para SUPER_ADMIN que ele mencionou.
+
+### Código Atual da Função:
+
+```python
+def get_admin_id_dinamico():
+    """Função helper para detectar admin_id dinamicamente no sistema multi-tenant"""
+    try:
+        # 1. Se usuário autenticado, usar sua lógica
+        if current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                return current_user.id
+            else:
+                return current_user.admin_id
+        
+        # 2. Sistema de bypass - detectar admin_id baseado nos dados disponíveis
+        # ... (resto do código com fallbacks)
+```
+
+**Problema:** A função NÃO tem o tratamento específico para `SUPER_ADMIN` que o Replit mencionou na explicação.
+
+## Função de Lista de RDOs
+
+Rota: `/rdos`, `/rdo`, `/rdo/lista`  
+Função: `rdos()` (linha 6436 em `views.py`)
+
+### Lógica de Obtenção do admin_id:
+
+```python
+# Determinar admin_id baseado no tipo de usuário
+if current_user.tipo_usuario == TipoUsuario.ADMIN:
+    admin_id = current_user.id
+else:
+    funcionario_atual = Funcionario.query.filter_by(
+        usuario_id=current_user.id, 
+        ativo=True
+    ).first()
+    
+    admin_id = funcionario_atual.admin_id if funcionario_atual else (
+        current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id
+    )
+```
+
+**Problema Identificado:**  
+Esta lógica NÃO trata o caso de `SUPER_ADMIN`. Se o usuário for SUPER_ADMIN:
+- Ele cai no `else` (não é ADMIN)
+- Tenta buscar um funcionário com `usuario_id=current_user.id`
+- Se não encontrar funcionário, usa `current_user.admin_id` (que é NULL para SUPER_ADMIN)
+- Resultado: `admin_id = None` ou valor incorreto
+
+### Lógica de Filtragem:
+
+```python
+# Query isolada read-only
+rdos_query = session.query(RDO).join(Obra).filter(Obra.admin_id == admin_id)
+
+# Aplicar filtros na query direta
+if obra_filter:
+    rdos_query = rdos_query.filter(RDO.obra_id == obra_filter)
+```
+
+**Problema:** Se `admin_id` for `None`, a query `Obra.admin_id == admin_id` não retorna nenhuma obra.
+
+### Busca de Obras para o Dropdown:
+
+```python
+obras = session.query(Obra).filter(Obra.admin_id == admin_id).order_by(Obra.nome).all()
+```
+
+**Problema:** Se `admin_id` for `None`, esta query retorna lista vazia, resultando em dropdown sem opções.
+
+## Causa Raiz Real
+
+1. **SUPER_ADMIN não é tratado** na lógica de obtenção de `admin_id` na função `rdos()`
+2. **admin_id = None** para SUPER_ADMIN
+3. **Query de obras retorna vazio** porque `Obra.admin_id == None` não encontra nada
+4. **Dropdown fica vazio** (só mostra "Todas as obras")
+5. **Filtro não funciona** porque não há obras para selecionar
+
+## Solução Necessária
+
+Adicionar tratamento específico para SUPER_ADMIN na função `rdos()`:
+
+```python
+# Determinar admin_id baseado no tipo de usuário
+if current_user.tipo_usuario == TipoUsuario.ADMIN:
+    admin_id = current_user.id
+elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+    # SUPER_ADMIN pode ver todas as obras
+    # Opção 1: Não filtrar por admin_id (remover o filtro)
+    # Opção 2: Buscar o admin_id com mais obras
+    obra_counts = db.session.execute(
+        text("SELECT admin_id, COUNT(*) as total FROM obra WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
+    ).fetchone()
+    admin_id = obra_counts[0] if obra_counts and obra_counts[0] else None
+else:
+    # Funcionário ou outro tipo
+    funcionario_atual = Funcionario.query.filter_by(usuario_id=current_user.id, ativo=True).first()
+    admin_id = funcionario_atual.admin_id if funcionario_atual else current_user.admin_id
+```
+
+## Conclusão
+
+O Replit mencionou ter feito a correção, mas o código atual não contém essa correção. A função `rdos()` ainda não trata o caso de SUPER_ADMIN corretamente.
