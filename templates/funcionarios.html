@@ -9,11 +9,34 @@
     min-height: 70vh;
     max-height: 80vh;
     overflow-y: auto;
+    overflow-x: visible;
 }
 
-/* Converter select de obras para dropdown com scroll customizado */
+/* Fix para dropdown de obras ter scroll adequado */
+#modalLancamentoMultiplo .modal-content {
+    overflow: visible;
+}
+
+#modalLancamentoMultiplo select.form-select {
+    cursor: pointer;
+}
+
+/* Garantir que o select de obras tenha altura máxima e scroll */
 #obra_lancamento {
     cursor: pointer;
+    max-height: 300px;
+}
+
+/* Estilo para select nativo com muitas opções - força scroll no dropdown */
+#modalLancamentoMultiplo select option {
+    padding: 8px 12px;
+}
+
+/* Fix para Firefox e outros navegadores */
+@supports (-moz-appearance: none) {
+    #obra_lancamento {
+        scrollbar-width: thin;
+    }
 }
 
 /* ===== SISTEMA DE KPIs FUNCIONÁRIOS 4-4-4-4 ===== */
