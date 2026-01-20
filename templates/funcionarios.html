@@ -4,6 +4,18 @@
 
 {% block styles %}
 <style>
+/* ===== FIX DROPDOWN OBRAS NO MODAL ===== */
+#modalLancamentoMultiplo .modal-body {
+    min-height: 70vh;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* Converter select de obras para dropdown com scroll customizado */
+#obra_lancamento {
+    cursor: pointer;
+}
+
 /* ===== SISTEMA DE KPIs FUNCIONÁRIOS 4-4-4-4 ===== */
 .kpis-funcionario-grid {
     display: grid;
@@ -1300,7 +1312,7 @@ function setDateRange(period) {
 
 <!-- Modal de Lançamento Múltiplo -->
 <div class="modal fade" id="modalLancamentoMultiplo" tabindex="-1" aria-labelledby="modalLancamentoMultiploLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="modalLancamentoMultiploLabel">
