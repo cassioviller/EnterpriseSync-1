@@ -1990,27 +1990,29 @@ def funcionario_horario_padrao(funcionario_id):
         ).first()
         
         if horario_dia and horario_dia.trabalha:
-            # Calcular horários de almoço baseado na pausa
             entrada = horario_dia.entrada
             saida = horario_dia.saida
             pausa_horas = float(horario_dia.pausa_horas or 1)
             
-            # Calcular horário de almoço estimado (meio do expediente)
+            # Usar horário de almoço padrão do HorarioTrabalho pai (se existir)
+            # ou usar 12:00-13:00 como padrão universal
+            almoco_saida_str = '12:00'
+            almoco_retorno_str = '13:00'
+            
+            if horario_trabalho.saida_almoco:
+                almoco_saida_str = horario_trabalho.saida_almoco.strftime('%H:%M')
+            if horario_trabalho.retorno_almoco:
+                almoco_retorno_str = horario_trabalho.retorno_almoco.strftime('%H:%M')
+            
             if entrada and saida:
-                entrada_dt = datetime.combine(date.today(), entrada)
-                saida_dt = datetime.combine(date.today(), saida)
-                meio_expediente = entrada_dt + (saida_dt - entrada_dt) / 2
-                almoco_saida = meio_expediente - timedelta(hours=pausa_horas/2)
-                almoco_retorno = meio_expediente + timedelta(hours=pausa_horas/2)
-                
                 return jsonify({
                     'success': True,
                     'source': 'horario_dia',
                     'dia_semana': dia_semana,
-                    'hora_entrada': entrada.strftime('%H:%M') if entrada else '08:00',
-                    'hora_saida': saida.strftime('%H:%M') if saida else '17:00',
-                    'hora_almoco_saida': almoco_saida.strftime('%H:%M'),
-                    'hora_almoco_retorno': almoco_retorno.strftime('%H:%M'),
+                    'hora_entrada': entrada.strftime('%H:%M'),
+                    'hora_saida': saida.strftime('%H:%M'),
+                    'hora_almoco_saida': almoco_saida_str,
+                    'hora_almoco_retorno': almoco_retorno_str,
                     'pausa_horas': pausa_horas
                 })
         
