@@ -1440,17 +1440,17 @@ function setDateRange(period) {
                                         <div class="col-md-3">
                                             <label for="obra_lancamento" class="form-label">Obra*</label>
                                             <!-- Dropdown Customizado com Scroll Garantido -->
-                                            <div class="custom-dropdown-container" id="obraDropdownContainer" onclick="event.stopPropagation()">
+                                            <div class="custom-dropdown-container" id="obraDropdownContainer">
                                                 <input type="hidden" id="obra_lancamento" name="obra_id" required>
-                                                <div class="custom-dropdown-selected form-select" id="obraDropdownSelected" onclick="toggleObraDropdown(event)">
+                                                <div class="custom-dropdown-selected form-select" id="obraDropdownSelected" onmousedown="toggleObraDropdown(event)">
                                                     <span id="obraSelectedText">Selecione uma obra...</span>
                                                     <i class="fas fa-chevron-down float-end mt-1"></i>
                                                 </div>
-                                                <div class="custom-dropdown-menu" id="obraDropdownMenu" style="display: none;" onclick="event.stopPropagation()">
-                                                    <input type="text" class="form-control mb-2" id="obraBusca" placeholder="🔍 Buscar obra..." oninput="filtrarObras(event)" onclick="event.stopPropagation()">
-                                                    <div class="custom-dropdown-options" id="obraOptions">
+                                                <div class="custom-dropdown-menu" id="obraDropdownMenu" style="display: none;" onmousedown="event.stopPropagation()">
+                                                    <input type="text" class="form-control mb-2" id="obraBusca" placeholder="🔍 Buscar obra..." oninput="filtrarObras()" onmousedown="event.stopPropagation()">
+                                                    <div class="custom-dropdown-options" id="obraOptions" onmousedown="event.stopPropagation()">
                                                         {% for obra in obras_ativas %}
-                                                        <div class="custom-dropdown-option" data-value="{{ obra.id }}" data-text="{{ obra.nome }}" onclick="selecionarObra(this, event)">
+                                                        <div class="custom-dropdown-option" data-value="{{ obra.id }}" data-text="{{ obra.nome }}" onmousedown="selecionarObra(this, event)">
                                                             {{ obra.nome }}
                                                         </div>
                                                         {% endfor %}
@@ -1891,51 +1891,34 @@ $('#modalLancamentoMultiplo').on('show.bs.modal', function() {
 });
 
 // ===== FUNÇÕES DO DROPDOWN CUSTOMIZADO DE OBRAS =====
-var obraDropdownOpen = false;
-var obraDropdownIgnoreNextClick = false;
-
-function abrirObraDropdown() {
-    var menu = document.getElementById('obraDropdownMenu');
-    if (!obraDropdownOpen) {
-        menu.style.display = 'block';
-        obraDropdownOpen = true;
-        setTimeout(function() {
-            var busca = document.getElementById('obraBusca');
-            if (busca) busca.focus();
-        }, 100);
-    }
-}
-
-function fecharObraDropdown() {
-    var menu = document.getElementById('obraDropdownMenu');
-    menu.style.display = 'none';
-    obraDropdownOpen = false;
-}
+var obraMenuAberto = false;
 
 function toggleObraDropdown(event) {
     event.preventDefault();
     event.stopPropagation();
     
-    if (obraDropdownOpen) {
-        fecharObraDropdown();
+    var menu = document.getElementById('obraDropdownMenu');
+    
+    if (obraMenuAberto) {
+        menu.style.display = 'none';
+        obraMenuAberto = false;
     } else {
-        abrirObraDropdown();
+        menu.style.display = 'block';
+        obraMenuAberto = true;
+        // Foco no campo de busca após abrir
+        setTimeout(function() {
+            document.getElementById('obraBusca').focus();
+        }, 50);
     }
 }
 
-function filtrarObras(event) {
-    event.stopPropagation();
-    
+function filtrarObras() {
     var busca = document.getElementById('obraBusca').value.toLowerCase();
-    var opcoes = document.querySelectorAll('.custom-dropdown-option');
+    var opcoes = document.querySelectorAll('#obraOptions .custom-dropdown-option');
     
     for (var i = 0; i < opcoes.length; i++) {
         var texto = opcoes[i].getAttribute('data-text').toLowerCase();
-        if (texto.indexOf(busca) !== -1) {
-            opcoes[i].style.display = 'block';
-        } else {
-            opcoes[i].style.display = 'none';
-        }
+        opcoes[i].style.display = texto.indexOf(busca) !== -1 ? 'block' : 'none';
     }
 }
 
@@ -1949,34 +1932,41 @@ function selecionarObra(elemento, event) {
     document.getElementById('obra_lancamento').value = valor;
     document.getElementById('obraSelectedText').textContent = texto;
     
-    var opcoes = document.querySelectorAll('.custom-dropdown-option');
+    // Marcar como selecionado
+    var opcoes = document.querySelectorAll('#obraOptions .custom-dropdown-option');
     for (var i = 0; i < opcoes.length; i++) {
         opcoes[i].classList.remove('selected');
     }
     elemento.classList.add('selected');
     
-    fecharObraDropdown();
+    // Fechar menu
+    document.getElementById('obraDropdownMenu').style.display = 'none';
+    obraMenuAberto = false;
 }
 
 function resetObraDropdown() {
     document.getElementById('obra_lancamento').value = '';
     document.getElementById('obraSelectedText').textContent = 'Selecione uma obra...';
     document.getElementById('obraBusca').value = '';
-    var opcoes = document.querySelectorAll('.custom-dropdown-option');
+    
+    var opcoes = document.querySelectorAll('#obraOptions .custom-dropdown-option');
     for (var i = 0; i < opcoes.length; i++) {
         opcoes[i].classList.remove('selected');
         opcoes[i].style.display = 'block';
     }
-    fecharObraDropdown();
+    
+    document.getElementById('obraDropdownMenu').style.display = 'none';
+    obraMenuAberto = false;
 }
 
-// Fechar ao clicar fora - usando mousedown para ser mais rápido
+// Fechar ao clicar fora
 document.addEventListener('mousedown', function(event) {
     var container = document.getElementById('obraDropdownContainer');
-    if (container && obraDropdownOpen && !container.contains(event.target)) {
-        fecharObraDropdown();
+    if (obraMenuAberto && container && !container.contains(event.target)) {
+        document.getElementById('obraDropdownMenu').style.display = 'none';
+        obraMenuAberto = false;
     }
-}, true);
+}, false);
 
 // ===== FUNÇÕES PARA LANÇAMENTO DE FINAIS DE SEMANA =====
 
