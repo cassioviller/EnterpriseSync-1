@@ -1891,83 +1891,92 @@ $('#modalLancamentoMultiplo').on('show.bs.modal', function() {
 });
 
 // ===== FUNÇÕES DO DROPDOWN CUSTOMIZADO DE OBRAS =====
-function toggleObraDropdown(event) {
-    if (event) {
-        event.stopPropagation();
-    }
-    
-    const menu = document.getElementById('obraDropdownMenu');
-    const isOpen = menu.style.display === 'block';
-    
-    if (isOpen) {
-        menu.style.display = 'none';
-    } else {
+var obraDropdownOpen = false;
+var obraDropdownIgnoreNextClick = false;
+
+function abrirObraDropdown() {
+    var menu = document.getElementById('obraDropdownMenu');
+    if (!obraDropdownOpen) {
         menu.style.display = 'block';
+        obraDropdownOpen = true;
         setTimeout(function() {
-            document.getElementById('obraBusca').focus();
-        }, 50);
+            var busca = document.getElementById('obraBusca');
+            if (busca) busca.focus();
+        }, 100);
+    }
+}
+
+function fecharObraDropdown() {
+    var menu = document.getElementById('obraDropdownMenu');
+    menu.style.display = 'none';
+    obraDropdownOpen = false;
+}
+
+function toggleObraDropdown(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (obraDropdownOpen) {
+        fecharObraDropdown();
+    } else {
+        abrirObraDropdown();
     }
 }
 
 function filtrarObras(event) {
-    if (event) {
-        event.stopPropagation();
-    }
+    event.stopPropagation();
     
-    const busca = document.getElementById('obraBusca').value.toLowerCase();
-    const opcoes = document.querySelectorAll('.custom-dropdown-option');
+    var busca = document.getElementById('obraBusca').value.toLowerCase();
+    var opcoes = document.querySelectorAll('.custom-dropdown-option');
     
-    opcoes.forEach(opcao => {
-        const texto = opcao.getAttribute('data-text').toLowerCase();
-        if (texto.includes(busca)) {
-            opcao.classList.remove('hidden');
+    for (var i = 0; i < opcoes.length; i++) {
+        var texto = opcoes[i].getAttribute('data-text').toLowerCase();
+        if (texto.indexOf(busca) !== -1) {
+            opcoes[i].style.display = 'block';
         } else {
-            opcao.classList.add('hidden');
+            opcoes[i].style.display = 'none';
         }
-    });
+    }
 }
 
 function selecionarObra(elemento, event) {
-    if (event) {
-        event.stopPropagation();
-    }
+    event.preventDefault();
+    event.stopPropagation();
     
-    const valor = elemento.getAttribute('data-value');
-    const texto = elemento.getAttribute('data-text');
+    var valor = elemento.getAttribute('data-value');
+    var texto = elemento.getAttribute('data-text');
     
-    // Atualizar input hidden
     document.getElementById('obra_lancamento').value = valor;
-    
-    // Atualizar texto exibido
     document.getElementById('obraSelectedText').textContent = texto;
     
-    // Remover seleção anterior e adicionar nova
-    document.querySelectorAll('.custom-dropdown-option').forEach(op => op.classList.remove('selected'));
+    var opcoes = document.querySelectorAll('.custom-dropdown-option');
+    for (var i = 0; i < opcoes.length; i++) {
+        opcoes[i].classList.remove('selected');
+    }
     elemento.classList.add('selected');
     
-    // Fechar dropdown
-    document.getElementById('obraDropdownMenu').style.display = 'none';
+    fecharObraDropdown();
 }
 
 function resetObraDropdown() {
     document.getElementById('obra_lancamento').value = '';
     document.getElementById('obraSelectedText').textContent = 'Selecione uma obra...';
     document.getElementById('obraBusca').value = '';
-    document.querySelectorAll('.custom-dropdown-option').forEach(op => {
-        op.classList.remove('selected', 'hidden');
-    });
-    document.getElementById('obraDropdownMenu').style.display = 'none';
+    var opcoes = document.querySelectorAll('.custom-dropdown-option');
+    for (var i = 0; i < opcoes.length; i++) {
+        opcoes[i].classList.remove('selected');
+        opcoes[i].style.display = 'block';
+    }
+    fecharObraDropdown();
 }
 
-// Fechar dropdown ao clicar fora (com delay para evitar conflito)
-document.addEventListener('click', function(event) {
-    const container = document.getElementById('obraDropdownContainer');
-    const menu = document.getElementById('obraDropdownMenu');
-    
-    if (container && menu && !container.contains(event.target)) {
-        menu.style.display = 'none';
+// Fechar ao clicar fora - usando mousedown para ser mais rápido
+document.addEventListener('mousedown', function(event) {
+    var container = document.getElementById('obraDropdownContainer');
+    if (container && obraDropdownOpen && !container.contains(event.target)) {
+        fecharObraDropdown();
     }
-});
+}, true);
 
 // ===== FUNÇÕES PARA LANÇAMENTO DE FINAIS DE SEMANA =====
 
