@@ -1440,17 +1440,17 @@ function setDateRange(period) {
                                         <div class="col-md-3">
                                             <label for="obra_lancamento" class="form-label">Obra*</label>
                                             <!-- Dropdown Customizado com Scroll Garantido -->
-                                            <div class="custom-dropdown-container" id="obraDropdownContainer">
+                                            <div class="custom-dropdown-container" id="obraDropdownContainer" onclick="event.stopPropagation()">
                                                 <input type="hidden" id="obra_lancamento" name="obra_id" required>
-                                                <div class="custom-dropdown-selected form-select" id="obraDropdownSelected" onclick="toggleObraDropdown()">
+                                                <div class="custom-dropdown-selected form-select" id="obraDropdownSelected" onclick="toggleObraDropdown(event)">
                                                     <span id="obraSelectedText">Selecione uma obra...</span>
                                                     <i class="fas fa-chevron-down float-end mt-1"></i>
                                                 </div>
-                                                <div class="custom-dropdown-menu" id="obraDropdownMenu" style="display: none;">
-                                                    <input type="text" class="form-control mb-2" id="obraBusca" placeholder="🔍 Buscar obra..." oninput="filtrarObras()">
+                                                <div class="custom-dropdown-menu" id="obraDropdownMenu" style="display: none;" onclick="event.stopPropagation()">
+                                                    <input type="text" class="form-control mb-2" id="obraBusca" placeholder="🔍 Buscar obra..." oninput="filtrarObras(event)" onclick="event.stopPropagation()">
                                                     <div class="custom-dropdown-options" id="obraOptions">
                                                         {% for obra in obras_ativas %}
-                                                        <div class="custom-dropdown-option" data-value="{{ obra.id }}" data-text="{{ obra.nome }}" onclick="selecionarObra(this)">
+                                                        <div class="custom-dropdown-option" data-value="{{ obra.id }}" data-text="{{ obra.nome }}" onclick="selecionarObra(this, event)">
                                                             {{ obra.nome }}
                                                         </div>
                                                         {% endfor %}
@@ -1891,20 +1891,29 @@ $('#modalLancamentoMultiplo').on('show.bs.modal', function() {
 });
 
 // ===== FUNÇÕES DO DROPDOWN CUSTOMIZADO DE OBRAS =====
-let obraDropdownAberto = false;
-
-function toggleObraDropdown() {
-    const menu = document.getElementById('obraDropdownMenu');
-    obraDropdownAberto = !obraDropdownAberto;
-    menu.style.display = obraDropdownAberto ? 'block' : 'none';
+function toggleObraDropdown(event) {
+    if (event) {
+        event.stopPropagation();
+    }
     
-    if (obraDropdownAberto) {
-        document.getElementById('obraBusca').focus();
-        console.log('🔽 Dropdown de obras aberto - Total de opções:', document.querySelectorAll('.custom-dropdown-option').length);
+    const menu = document.getElementById('obraDropdownMenu');
+    const isOpen = menu.style.display === 'block';
+    
+    if (isOpen) {
+        menu.style.display = 'none';
+    } else {
+        menu.style.display = 'block';
+        setTimeout(function() {
+            document.getElementById('obraBusca').focus();
+        }, 50);
     }
 }
 
-function filtrarObras() {
+function filtrarObras(event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    
     const busca = document.getElementById('obraBusca').value.toLowerCase();
     const opcoes = document.querySelectorAll('.custom-dropdown-option');
     
@@ -1918,7 +1927,11 @@ function filtrarObras() {
     });
 }
 
-function selecionarObra(elemento) {
+function selecionarObra(elemento, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    
     const valor = elemento.getAttribute('data-value');
     const texto = elemento.getAttribute('data-text');
     
@@ -1934,9 +1947,6 @@ function selecionarObra(elemento) {
     
     // Fechar dropdown
     document.getElementById('obraDropdownMenu').style.display = 'none';
-    obraDropdownAberto = false;
-    
-    console.log('✅ Obra selecionada:', texto, '(ID:', valor, ')');
 }
 
 function resetObraDropdown() {
@@ -1947,15 +1957,15 @@ function resetObraDropdown() {
         op.classList.remove('selected', 'hidden');
     });
     document.getElementById('obraDropdownMenu').style.display = 'none';
-    obraDropdownAberto = false;
 }
 
-// Fechar dropdown ao clicar fora
+// Fechar dropdown ao clicar fora (com delay para evitar conflito)
 document.addEventListener('click', function(event) {
     const container = document.getElementById('obraDropdownContainer');
-    if (container && !container.contains(event.target)) {
-        document.getElementById('obraDropdownMenu').style.display = 'none';
-        obraDropdownAberto = false;
+    const menu = document.getElementById('obraDropdownMenu');
+    
+    if (container && menu && !container.contains(event.target)) {
+        menu.style.display = 'none';
     }
 });
 
