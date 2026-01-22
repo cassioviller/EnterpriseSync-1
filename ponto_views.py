@@ -809,13 +809,19 @@ def registrar_ponto_facial_api():
         data = request.get_json()
         funcionario_id = data.get('funcionario_id')
         foto_capturada_base64 = data.get('foto_base64')
-        tipo_ponto = data.get('tipo_ponto', 'entrada')
         obra_id = data.get('obra_id')
         
         if not funcionario_id or not foto_capturada_base64:
             return jsonify({
                 'success': False, 
                 'message': 'Dados incompletos. Funcionário e foto são obrigatórios.'
+            }), 400
+        
+        MAX_BASE64_SIZE = 2 * 1024 * 1024
+        if len(foto_capturada_base64) > MAX_BASE64_SIZE:
+            return jsonify({
+                'success': False, 
+                'message': 'Foto muito grande. Máximo permitido: 2MB'
             }), 400
         
         admin_id = get_tenant_admin_id()
@@ -845,13 +851,20 @@ def registrar_ponto_facial_api():
                 'message': f'Foto inválida: {msg_qualidade}'
             }), 400
         
-        match, distancia = comparar_faces_deepface(
+        match, distancia, erro_facial = comparar_faces_deepface(
             funcionario.foto_base64, 
             foto_capturada_base64,
             modelo='VGG-Face'
         )
         
-        THRESHOLD_DISTANCIA = 0.45
+        if erro_facial:
+            return jsonify({
+                'success': False, 
+                'message': erro_facial,
+                'match': False
+            }), 400
+        
+        THRESHOLD_DISTANCIA = 0.40
         
         if not match or distancia > THRESHOLD_DISTANCIA:
             logger.warning(
@@ -860,7 +873,7 @@ def registrar_ponto_facial_api():
             )
             return jsonify({
                 'success': False, 
-                'message': f'Reconhecimento facial não confirmado. Distância: {distancia:.4f}. Tente novamente.',
+                'message': f'Reconhecimento facial não confirmado. Tente novamente com melhor iluminação.',
                 'match': False,
                 'distancia': round(distancia, 4)
             }), 403
@@ -884,23 +897,25 @@ def registrar_ponto_facial_api():
             db.session.add(registro)
         
         tipo_registrado = None
-        if tipo_ponto == 'entrada' or (not registro.hora_entrada):
+        if not registro.hora_entrada:
             registro.hora_entrada = agora
             tipo_registrado = 'entrada'
-        elif tipo_ponto == 'almoco_saida' or (registro.hora_entrada and not registro.hora_almoco_saida):
+        elif registro.hora_entrada and not registro.hora_almoco_saida:
             registro.hora_almoco_saida = agora
             tipo_registrado = 'saída para almoço'
-        elif tipo_ponto == 'almoco_retorno' or (registro.hora_almoco_saida and not registro.hora_almoco_retorno):
+        elif registro.hora_almoco_saida and not registro.hora_almoco_retorno:
             registro.hora_almoco_retorno = agora
             tipo_registrado = 'retorno do almoço'
-        elif tipo_ponto == 'saida' or (registro.hora_almoco_retorno or registro.hora_entrada):
+        elif not registro.hora_saida:
             registro.hora_saida = agora
             tipo_registrado = 'saída'
         else:
-            registro.hora_entrada = agora
-            tipo_registrado = 'entrada'
+            return jsonify({
+                'success': False, 
+                'message': 'Jornada completa já registrada para hoje. Todos os horários já foram preenchidos.'
+            }), 400
         
-        registro.foto_registro_base64 = foto_capturada_base64
+        registro.foto_registro_base64 = None
         registro.reconhecimento_facial_sucesso = True
         registro.confianca_reconhecimento = distancia
         registro.modelo_utilizado = 'VGG-Face'

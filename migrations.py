@@ -3765,6 +3765,7 @@ def executar_migracoes():
             (63, "Tolerância minutos para horas extras/atrasos", _migration_63_tolerancia_minutos),
             (64, "Tabela folha_processada para dashboard custos obra", _migration_64_folha_processada),
             (65, "Adicionar coluna nome em fornecedor", _migration_65_fornecedor_nome),
+            (66, "Campos reconhecimento facial RegistroPonto", _migration_66_reconhecimento_facial_ponto),
         ]
         
         # Executar cada migração com rastreamento
@@ -6156,6 +6157,65 @@ def _migration_65_fornecedor_nome():
         
     except Exception as e:
         logger.error(f"❌ Erro na migração 65: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
+
+
+def _migration_66_reconhecimento_facial_ponto():
+    """
+    MIGRAÇÃO 66: Adicionar campos para reconhecimento facial no RegistroPonto
+    - foto_registro_base64: Foto capturada no momento do registro
+    - reconhecimento_facial_sucesso: Se o reconhecimento foi bem-sucedido
+    - confianca_reconhecimento: Distância/confiança do reconhecimento
+    - modelo_utilizado: Modelo DeepFace utilizado
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("🔄 MIGRAÇÃO 66: Adicionando campos de reconhecimento facial ao RegistroPonto")
+        
+        campos_a_adicionar = [
+            ("foto_registro_base64", "TEXT", None),
+            ("reconhecimento_facial_sucesso", "BOOLEAN", "FALSE"),
+            ("confianca_reconhecimento", "FLOAT", None),
+            ("modelo_utilizado", "VARCHAR(50)", "'VGG-Face'")
+        ]
+        
+        for nome_campo, tipo_campo, default_value in campos_a_adicionar:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'registro_ponto' AND column_name = %s
+            """, (nome_campo,))
+            
+            coluna_existe = cursor.fetchone()
+            
+            if coluna_existe:
+                logger.info(f"  ✅ Coluna '{nome_campo}' já existe")
+            else:
+                if default_value:
+                    sql = f"ALTER TABLE registro_ponto ADD COLUMN {nome_campo} {tipo_campo} DEFAULT {default_value}"
+                else:
+                    sql = f"ALTER TABLE registro_ponto ADD COLUMN {nome_campo} {tipo_campo}"
+                cursor.execute(sql)
+                logger.info(f"  ✅ Coluna '{nome_campo}' adicionada com sucesso")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("✅ MIGRAÇÃO 66 CONCLUÍDA!")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na migração 66: {e}")
         if 'connection' in locals():
             try:
                 connection.rollback()

@@ -133,15 +133,11 @@
                 
                 <div id="resultado-facial" class="mt-3"></div>
                 
-                <div class="mt-3">
-                    <label for="tipo-ponto-select" class="form-label">Tipo de Registro:</label>
-                    <select id="tipo-ponto-select" class="form-select">
-                        <option value="auto">Automático (próximo na sequência)</option>
-                        <option value="entrada">Entrada</option>
-                        <option value="almoco_saida">Saída para Almoço</option>
-                        <option value="almoco_retorno">Retorno do Almoço</option>
-                        <option value="saida">Saída</option>
-                    </select>
+                <div class="mt-3 text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        O sistema registrará automaticamente o próximo horário na sequência (entrada → almoço → retorno → saída)
+                    </small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -192,7 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const canvas = document.getElementById("canvas-facial");
     const snapBtn = document.getElementById("snap-facial");
     const resultadoDiv = document.getElementById("resultado-facial");
-    const tipoPontoSelect = document.getElementById("tipo-ponto-select");
     const cameraOverlay = document.getElementById("camera-overlay");
     const instrucao = document.getElementById("instrucao-facial");
     
@@ -212,7 +207,6 @@ document.addEventListener("DOMContentLoaded", () => {
         instrucao.textContent = "Posicione seu rosto na câmera e clique em \"Capturar e Registrar\"";
         snapBtn.disabled = false;
         isProcessing = false;
-        tipoPontoSelect.value = "auto";
 
         navigator.mediaDevices.getUserMedia({ 
             video: { 
@@ -266,8 +260,6 @@ document.addEventListener("DOMContentLoaded", () => {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataURL = canvas.toDataURL("image/jpeg", 0.9);
 
-        const tipoPonto = tipoPontoSelect.value === "auto" ? "entrada" : tipoPontoSelect.value;
-
         fetch("/ponto/api/registrar-facial", {
             method: "POST",
             headers: { 
@@ -275,8 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             body: JSON.stringify({
                 funcionario_id: currentFuncionarioId,
-                foto_base64: dataURL,
-                tipo_ponto: tipoPonto
+                foto_base64: dataURL
             })
         })
         .then(response => response.json())

@@ -39,7 +39,7 @@ The system employs a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wit
     -   **Fleet Management System:** Manages vehicles, expenses, TCO dashboards, and critical alerts.
     -   **Food Management System (Alimentação v2.0):** Mobile-first redesigned interface for managing restaurant and food entries with dynamic multi-item launching, searchable employee selection, and automatic cost calculation.
     -   **Warehouse Management:** Manages materials, tools, and PPE with traceability, full CRUD for suppliers, material flow workflows (entrada/saída/devolução), manual batch/lot selection for strategic cost optimization, serialized item status transitions, optimistic locking, and employee consumable tracking.
-    -   **Shared Device Time Clock System (Ponto Eletrônico):** Mobile-first time clock with GPS tracking and advanced Excel import.
+    -   **Shared Device Time Clock System (Ponto Eletrônico):** Mobile-first time clock with GPS tracking, advanced Excel import, and facial recognition verification using DeepFace library (offline, no cloud AI).
 -   **Automated Database Error Diagnostics:** A `DatabaseDiagnostics` system analyzes SQLAlchemy errors, reports missing columns, and generates diagnostic reports.
 -   **Híbrido Data Model Support:** For food management, aggregates data from legacy and new models for seamless coexistence.
 -   **Transaction Isolation for Deletions:** Critical deletion operations use RAW connections with `isolation_level="AUTOCOMMIT"` and incorporate schema introspection for multi-tenant filtering.

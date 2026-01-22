@@ -41,9 +41,10 @@ def comparar_faces_deepface(foto_cadastro_base64, foto_capturada_base64, modelo=
         modelo: Modelo a ser utilizado (VGG-Face, Facenet, OpenFace, DeepFace, ArcFace)
     
     Returns:
-        tuple: (match: bool, distancia: float)
+        tuple: (match: bool, distancia: float, erro: str|None)
                - match: True se as faces são da mesma pessoa
                - distancia: Valor de distância (quanto menor, mais similar)
+               - erro: Mensagem de erro se houver problema na detecção
     """
     try:
         from deepface import DeepFace
@@ -53,14 +54,14 @@ def comparar_faces_deepface(foto_cadastro_base64, foto_capturada_base64, modelo=
         
         if img1 is None or img2 is None:
             logger.error("Falha ao decodificar uma ou ambas as imagens")
-            return False, 1.0
+            return False, 1.0, "Erro ao processar imagem"
         
         resultado = DeepFace.verify(
             img1_path=img1,
             img2_path=img2,
             model_name=modelo,
             detector_backend='opencv',
-            enforce_detection=False
+            enforce_detection=True
         )
         
         match = resultado.get('verified', False)
@@ -68,11 +69,18 @@ def comparar_faces_deepface(foto_cadastro_base64, foto_capturada_base64, modelo=
         
         logger.info(f"Reconhecimento facial: match={match}, distancia={distancia:.4f}")
         
-        return match, distancia
+        return match, distancia, None
         
+    except ValueError as e:
+        error_msg = str(e)
+        if "Face could not be detected" in error_msg or "no face" in error_msg.lower():
+            logger.warning(f"Nenhuma face detectada: {e}")
+            return False, 1.0, "Nenhuma face detectada na imagem. Posicione seu rosto corretamente."
+        logger.error(f"Erro de validação DeepFace: {e}")
+        return False, 1.0, f"Erro na validação facial: {error_msg}"
     except Exception as e:
         logger.error(f"Erro no reconhecimento facial DeepFace: {e}")
-        return False, 1.0
+        return False, 1.0, f"Erro no reconhecimento: {str(e)}"
 
 def detectar_face(foto_base64):
     """
