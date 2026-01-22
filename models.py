@@ -399,6 +399,12 @@ class RegistroPonto(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Campos para reconhecimento facial
+    foto_registro_base64 = db.Column(db.Text)  # Foto em base64 capturada no momento do registro
+    reconhecimento_facial_sucesso = db.Column(db.Boolean, default=False)  # True se reconhecimento foi bem-sucedido
+    confianca_reconhecimento = db.Column(db.Float)  # Distância facial (quanto menor, mais confiável)
+    modelo_utilizado = db.Column(db.String(50), default='VGG-Face')  # Modelo DeepFace utilizado
+    
     # Relacionamentos são definidos via backref nos modelos principais
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     

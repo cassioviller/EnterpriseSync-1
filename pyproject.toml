@@ -36,4 +36,7 @@ dependencies = [
     "matplotlib>=3.10.6",
     "seaborn>=0.13.2",
     "python-dateutil>=2.9.0.post0",
+    "deepface>=0.0.97",
+    "tf-keras>=2.20.1",
+    "opencv-python-headless>=4.13.0.90",
 ]
