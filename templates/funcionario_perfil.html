@@ -331,6 +331,7 @@
                             <span class="badge bg-success ms-2"><i class="fas fa-calendar-times"></i> SÁB. FOLGA</span>
                             <span class="badge bg-info ms-2"><i class="fas fa-home"></i> DOM. FOLGA</span>
                             <span class="badge bg-info ms-2"><i class="fas fa-star"></i> FERIADO TRAB.</span>
+                            <span class="badge bg-warning text-dark ms-2"><i class="fas fa-umbrella-beach"></i> FÉRIAS</span>
                             <span class="badge bg-primary ms-2"><i class="fas fa-check"></i> JUSTIFICADA</span>
                             <span class="badge bg-danger ms-2"><i class="fas fa-times"></i> FALTA</span>
                         </div>
@@ -389,6 +390,8 @@
                                             <span class="badge ms-2" style="background-color: #8b5cf6; color: white;"><i class="fas fa-home"></i> FERIADO</span>
                                         {% elif registro.tipo_registro == 'feriado_folga' %}
                                             <span class="badge ms-2" style="background-color: #8b5cf6; color: white;"><i class="fas fa-home"></i> FERIADO</span>
+                                        {% elif registro.tipo_registro == 'ferias' %}
+                                            <span class="badge bg-warning text-dark ms-2"><i class="fas fa-umbrella-beach"></i> FÉRIAS</span>
                                         {% elif registro.tipo_registro == 'falta_justificada' %}
                                             <span class="badge bg-primary ms-2"><i class="fas fa-check"></i> JUSTIFICADA</span>
                                         {% elif registro.tipo_registro == 'falta' %}
