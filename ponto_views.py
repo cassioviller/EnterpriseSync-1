@@ -11,6 +11,7 @@ from models import Obra, Funcionario, RegistroPonto, ConfiguracaoHorario, Dispos
 from ponto_service import PontoService
 from multitenant_helper import get_admin_id as get_tenant_admin_id
 from decorators import admin_required
+from utils_facial import comparar_faces_deepface, validar_qualidade_foto
 import logging
 
 logger = logging.getLogger(__name__)
@@ -794,3 +795,166 @@ def processar_importacao():
         logger.error(f"Erro ao processar importação: {e}", exc_info=True)
         flash(f'Erro ao processar importação: {str(e)}', 'error')
         return redirect(url_for('ponto.pagina_importar'))
+
+
+# ================================
+# API DE RECONHECIMENTO FACIAL
+# ================================
+
+@ponto_bp.route('/api/registrar-facial', methods=['POST'])
+@login_required
+def registrar_ponto_facial_api():
+    """API para registrar ponto com validação por reconhecimento facial"""
+    try:
+        data = request.get_json()
+        funcionario_id = data.get('funcionario_id')
+        foto_capturada_base64 = data.get('foto_base64')
+        tipo_ponto = data.get('tipo_ponto', 'entrada')
+        obra_id = data.get('obra_id')
+        
+        if not funcionario_id or not foto_capturada_base64:
+            return jsonify({
+                'success': False, 
+                'message': 'Dados incompletos. Funcionário e foto são obrigatórios.'
+            }), 400
+        
+        admin_id = get_tenant_admin_id()
+        
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id,
+            ativo=True
+        ).first()
+        
+        if not funcionario:
+            return jsonify({
+                'success': False, 
+                'message': 'Funcionário não encontrado ou inativo.'
+            }), 404
+        
+        if not funcionario.foto_base64:
+            return jsonify({
+                'success': False, 
+                'message': f'{funcionario.nome} não possui foto cadastrada. Por favor, cadastre uma foto primeiro.'
+            }), 400
+        
+        valido, msg_qualidade = validar_qualidade_foto(foto_capturada_base64)
+        if not valido:
+            return jsonify({
+                'success': False, 
+                'message': f'Foto inválida: {msg_qualidade}'
+            }), 400
+        
+        match, distancia = comparar_faces_deepface(
+            funcionario.foto_base64, 
+            foto_capturada_base64,
+            modelo='VGG-Face'
+        )
+        
+        THRESHOLD_DISTANCIA = 0.45
+        
+        if not match or distancia > THRESHOLD_DISTANCIA:
+            logger.warning(
+                f"Reconhecimento facial falhou para funcionário {funcionario_id}. "
+                f"Match: {match}, Distância: {distancia:.4f}"
+            )
+            return jsonify({
+                'success': False, 
+                'message': f'Reconhecimento facial não confirmado. Distância: {distancia:.4f}. Tente novamente.',
+                'match': False,
+                'distancia': round(distancia, 4)
+            }), 403
+        
+        hoje = date.today()
+        agora = datetime.now().time()
+        
+        registro = RegistroPonto.query.filter_by(
+            funcionario_id=funcionario.id,
+            data=hoje,
+            admin_id=admin_id
+        ).first()
+        
+        if not registro:
+            registro = RegistroPonto(
+                funcionario_id=funcionario.id,
+                data=hoje,
+                admin_id=admin_id,
+                obra_id=obra_id
+            )
+            db.session.add(registro)
+        
+        tipo_registrado = None
+        if tipo_ponto == 'entrada' or (not registro.hora_entrada):
+            registro.hora_entrada = agora
+            tipo_registrado = 'entrada'
+        elif tipo_ponto == 'almoco_saida' or (registro.hora_entrada and not registro.hora_almoco_saida):
+            registro.hora_almoco_saida = agora
+            tipo_registrado = 'saída para almoço'
+        elif tipo_ponto == 'almoco_retorno' or (registro.hora_almoco_saida and not registro.hora_almoco_retorno):
+            registro.hora_almoco_retorno = agora
+            tipo_registrado = 'retorno do almoço'
+        elif tipo_ponto == 'saida' or (registro.hora_almoco_retorno or registro.hora_entrada):
+            registro.hora_saida = agora
+            tipo_registrado = 'saída'
+        else:
+            registro.hora_entrada = agora
+            tipo_registrado = 'entrada'
+        
+        registro.foto_registro_base64 = foto_capturada_base64
+        registro.reconhecimento_facial_sucesso = True
+        registro.confianca_reconhecimento = distancia
+        registro.modelo_utilizado = 'VGG-Face'
+        
+        db.session.commit()
+        
+        logger.info(
+            f"Ponto registrado com reconhecimento facial: "
+            f"Funcionário {funcionario.nome} ({funcionario_id}), "
+            f"Tipo: {tipo_registrado}, Distância: {distancia:.4f}"
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Ponto de {tipo_registrado} registrado com sucesso para {funcionario.nome}!',
+            'tipo_registrado': tipo_registrado,
+            'hora': agora.strftime('%H:%M:%S'),
+            'distancia': round(distancia, 4),
+            'match': True
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao registrar ponto facial: {e}", exc_info=True)
+        return jsonify({
+            'success': False, 
+            'message': f'Erro ao processar reconhecimento: {str(e)}'
+        }), 500
+
+
+@ponto_bp.route('/api/verificar-foto-funcionario/<int:funcionario_id>')
+@login_required
+def verificar_foto_funcionario(funcionario_id):
+    """Verifica se funcionário tem foto cadastrada para reconhecimento facial"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        funcionario = Funcionario.query.filter_by(
+            id=funcionario_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not funcionario:
+            return jsonify({'success': False, 'tem_foto': False, 'message': 'Funcionário não encontrado'})
+        
+        tem_foto = bool(funcionario.foto_base64)
+        
+        return jsonify({
+            'success': True,
+            'tem_foto': tem_foto,
+            'funcionario_nome': funcionario.nome,
+            'message': 'Foto disponível' if tem_foto else f'{funcionario.nome} não possui foto cadastrada'
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro ao verificar foto do funcionário: {e}")
+        return jsonify({'success': False, 'tem_foto': False, 'message': str(e)})
