@@ -1,0 +1,244 @@
+# Prompt de Implementação: Ponto com Reconhecimento Facial
+
+## Prompt para o Replit Agent
+
+Cole o texto abaixo diretamente no chat do Replit Agent.
+
+```
+**AÇÃO DE IMPLEMENTAÇÃO DE FEATURE: Ponto com Reconhecimento Facial**
+
+**Contexto:**
+
+-   **Objetivo:** Transformar o sistema de registro de ponto atual em um sistema com reconhecimento facial para validar a identidade do funcionário no momento do registro.
+-   **Tecnologia Recomendada:** Usaremos a biblioteca `face_recognition` em Python para o backend e a API `getUserMedia` do navegador para o frontend.
+
+**Sua Tarefa:**
+
+Você deve implementar a funcionalidade de reconhecimento facial em 4 fases, modificando o backend e o frontend.
+
+--- 
+
+### **Fase 1: Preparação do Backend**
+
+**Passo 1.1: Instale as Dependências**
+
+-   **Ação:** Adicione as seguintes bibliotecas ao seu `pyproject.toml` ou instale-as diretamente. A instalação do `dlib` pode ser demorada.
+
+```
+face-recognition
+dlib
+opencv-python-headless
+```
+
+**Passo 1.2: Modifique o Modelo `RegistroPonto`**
+
+-   **Ação:** No arquivo `models.py`, adicione os seguintes campos ao modelo `RegistroPonto` para armazenar a foto do registro e o resultado do reconhecimento.
+
+```python
+# Em models.py, dentro da classe RegistroPonto
+
+# ... (campos existentes)
+
+# NOVOS CAMPOS PARA RECONHECIMENTO FACIAL
+foto_registro_base64 = db.Column(db.Text)  # Foto em base64 capturada no momento do registro
+reconhecimento_facial_sucesso = db.Column(db.Boolean, default=False)  # True se o reconhecimento facial foi bem-sucedido
+confianca_reconhecimento = db.Column(db.Float)  # Nível de confiança da correspondência (0.0 a 1.0)
+```
+
+**Passo 1.3: Crie uma Função de Comparação Facial**
+
+-   **Ação:** Crie uma função helper (pode ser em `utils.py`) que compara duas imagens em base64 e retorna se são da mesma pessoa, junto com a distância (confiança).
+
+```python
+# Em um novo arquivo utils_facial.py ou similar
+
+import face_recognition
+import numpy as np
+import base64
+import io
+from PIL import Image
+
+def comparar_faces(base64_imagem1, base64_imagem2):
+    """Compara duas imagens em base64 e retorna se são da mesma pessoa e a distância facial."""
+    try:
+        # Decodificar imagem 1 (foto cadastrada)
+        img1_data = base64.b64decode(base64_imagem1.split(",")[1])
+        img1 = Image.open(io.BytesIO(img1_data))
+        img1_np = np.array(img1)
+        encoding1 = face_recognition.face_encodings(img1_np)[0]
+
+        # Decodificar imagem 2 (foto capturada)
+        img2_data = base64.b64decode(base64_imagem2.split(",")[1])
+        img2 = Image.open(io.BytesIO(img2_data))
+        img2_np = np.array(img2)
+        encoding2 = face_recognition.face_encodings(img2_np)[0]
+
+        # Comparar faces
+        resultados = face_recognition.compare_faces([encoding1], encoding2)
+        distancia = face_recognition.face_distance([encoding1], encoding2)[0]
+
+        match = bool(resultados[0])
+        confianca = (1 - distancia) * 100  # Converte distância em uma % de confiança
+
+        return match, confianca
+    except Exception as e:
+        print(f"Erro na comparação facial: {e}")
+        return False, 0.0
+```
+
+--- 
+
+### **Fase 2: Nova Rota de API para Registro Facial**
+
+-   **Ação:** Crie uma nova rota em `views.py` que receberá a foto capturada, fará o reconhecimento e registrará o ponto.
+
+```python
+# Em views.py
+
+from .utils_facial import comparar_faces # Importe a nova função
+
+@main_bp.route("/api/ponto/registrar-facial", methods=["POST"])
+@login_required
+def registrar_ponto_facial():
+    data = request.get_json()
+    funcionario_id = data.get("funcionario_id")
+    foto_capturada_base64 = data.get("foto_base64")
+
+    if not funcionario_id or not foto_capturada_base64:
+        return jsonify({"success": False, "message": "Dados incompletos."}), 400
+
+    funcionario = Funcionario.query.get(funcionario_id)
+    if not funcionario or not funcionario.foto_base64:
+        return jsonify({"success": False, "message": "Funcionário não encontrado ou sem foto de cadastro."}), 404
+
+    # Comparar faces
+    match, confianca = comparar_faces(funcionario.foto_base64, foto_capturada_base64)
+
+    # Definir um threshold de confiança (ex: 60%)
+    THRESHOLD_CONFIANCA = 60.0
+
+    if not match or confianca < THRESHOLD_CONFIANCA:
+        return jsonify({
+            "success": False, 
+            "message": f"Reconhecimento falhou. Confiança: {confianca:.2f}%",
+            "match": False
+        }), 403
+
+    # Se o reconhecimento for bem-sucedido, registrar o ponto
+    # (Lógica similar à rota /novo_ponto, mas simplificada para o momento)
+    novo_registro = RegistroPonto(
+        funcionario_id=funcionario.id,
+        data=datetime.utcnow().date(),
+        hora_entrada=datetime.utcnow().time(), # Simplificado
+        admin_id=funcionario.admin_id,
+        foto_registro_base64=foto_capturada_base64,
+        reconhecimento_facial_sucesso=True,
+        confianca_reconhecimento=confianca
+    )
+    db.session.add(novo_registro)
+    db.session.commit()
+
+    return jsonify({
+        "success": True, 
+        "message": f"Ponto registrado com sucesso! Confiança: {confianca:.2f}%",
+        "match": True
+    })
+```
+
+--- 
+
+### **Fase 3: Modificação do Frontend**
+
+-   **Ação:** Crie um novo template, `bater_ponto_facial.html`, que terá a interface da câmera.
+
+```html
+<!-- Em templates/ponto/bater_ponto_facial.html -->
+
+{% extends "base_completo.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Bater Ponto com Reconhecimento Facial</h2>
+    <div class="row">
+        <div class="col-md-6">
+            <video id="video" width="100%" autoplay></video>
+            <button id="snap" class="btn btn-primary mt-2">Capturar Foto e Bater Ponto</button>
+        </div>
+        <div class="col-md-6">
+            <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+            <div id="resultado"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const snap = document.getElementById("snap");
+    const resultado = document.getElementById("resultado");
+    const funcionarioId = {{ current_user.funcionario.id if current_user.funcionario else "null" }}; // Assumindo que o usuário logado é o funcionário
+
+    // Acessar a câmera
+    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        .then(stream => {
+            video.srcObject = stream;
+            video.play();
+        })
+        .catch(err => {
+            console.error("Erro ao acessar a câmera: ", err);
+            resultado.innerHTML = `<div class="alert alert-danger">Erro ao acessar a câmera.</div>`;
+        });
+
+    // Capturar foto e enviar para o backend
+    snap.addEventListener("click", () => {
+        resultado.innerHTML = `<div class="alert alert-info">Processando...</div>`;
+        const context = canvas.getContext("2d");
+        context.drawImage(video, 0, 0, 640, 480);
+        const dataURL = canvas.toDataURL("image/jpeg");
+
+        fetch("/api/ponto/registrar-facial", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                funcionario_id: funcionarioId,
+                foto_base64: dataURL
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultado.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+            } else {
+                resultado.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+            }
+        })
+        .catch(err => {
+            console.error("Erro na requisição: ", err);
+            resultado.innerHTML = `<div class="alert alert-danger">Erro na comunicação com o servidor.</div>`;
+        });
+    });
+});
+</script>
+{% endblock %}
+```
+
+--- 
+
+### **Fase 4: Adicionar Rota para a Nova Página**
+
+-   **Ação:** Crie uma rota em `views.py` para renderizar a nova página de ponto facial.
+
+```python
+# Em views.py
+
+@main_bp.route("/ponto/bater-ponto-facial")
+@login_required
+def pagina_bater_ponto_facial():
+    return render_template("ponto/bater_ponto_facial.html")
+```
+
+**Execute a implementação em 4 fases agora.**
+```

@@ -1,0 +1,259 @@
+# Prompt de Implementação Específico: Reconhecimento Facial no Fluxo de Ponto
+
+## Prompt para o Replit Agent
+
+Cole o texto abaixo diretamente no chat do Replit Agent.
+
+```
+**AÇÃO DE IMPLEMENTAÇÃO DE FEATURE: Reconhecimento Facial no Fluxo de Ponto Existente**
+
+**Contexto:**
+
+-   **Objetivo:** Modificar a página de seleção de funcionários (`/ponto`) para que, ao clicar em "Bater Ponto", um modal de reconhecimento facial seja aberto para validar a identidade do funcionário antes de registrar o ponto.
+-   **Tecnologia:** Usaremos **DeepFace** no backend e a API **getUserMedia** no frontend.
+
+**Sua Tarefa:**
+
+Você deve modificar o fluxo existente, integrando o reconhecimento facial de forma não-intrusiva, em 4 fases.
+
+--- 
+
+### **Fase 1: Preparação do Backend (Se ainda não foi feito)**
+
+**Passo 1.1: Instale as Dependências**
+
+-   **Ação:** Verifique se as bibliotecas já estão instaladas. Se não, instale-as.
+
+```bash
+pip install deepface tf-keras
+```
+
+**Passo 1.2: Modifique o Modelo `RegistroPonto`**
+
+-   **Ação:** Verifique se os campos já existem. Se não, adicione-os ao modelo `RegistroPonto` em `models.py` e crie a migração.
+
+```python
+# Em models.py, dentro da classe RegistroPonto
+foto_registro_base64 = db.Column(db.Text)
+reconhecimento_facial_sucesso = db.Column(db.Boolean, default=False)
+confianca_reconhecimento = db.Column(db.Float)
+modelo_utilizado = db.Column(db.String(50), default=\'VGG-Face\')
+```
+
+**Passo 1.3: Crie a Função de Comparação Facial**
+
+-   **Ação:** Verifique se a função `comparar_faces_deepface` já existe. Se não, crie-a em `utils_facial.py`.
+
+--- 
+
+### **Fase 2: Nova Rota de API para Registro Facial**
+
+-   **Ação:** Crie uma nova rota em `ponto_views.py` que receberá a foto capturada, fará o reconhecimento e registrará o ponto. Esta rota será chamada pelo JavaScript do modal.
+
+```python
+# Em ponto_views.py
+
+from utils_facial import comparar_faces_deepface # Importe a função
+
+@ponto_bp.route("/api/registrar-facial", methods=["POST"])
+@login_required
+def registrar_ponto_facial_api():
+    """API para registrar ponto com validação por reconhecimento facial"""
+    try:
+        data = request.get_json()
+        funcionario_id = data.get("funcionario_id")
+        foto_capturada_base64 = data.get("foto_base64")
+        tipo_ponto = data.get("tipo_ponto") # entrada, almoco_saida, etc.
+        obra_id = data.get("obra_id")
+
+        if not all([funcionario_id, foto_capturada_base64, tipo_ponto]):
+            return jsonify({"success": False, "message": "Dados incompletos."}), 400
+
+        admin_id = get_tenant_admin_id()
+        funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
+        if not funcionario or not funcionario.foto_base64:
+            return jsonify({"success": False, "message": "Funcionário não encontrado ou sem foto de cadastro."}), 404
+
+        # Comparar faces
+        match, distancia = comparar_faces_deepface(funcionario.foto_base64, foto_capturada_base64)
+        THRESHOLD_DISTANCIA = 0.4
+
+        if not match or distancia > THRESHOLD_DISTANCIA:
+            return jsonify({"success": False, "message": f"Reconhecimento falhou. Distância: {distancia:.4f}."}), 403
+
+        # Se reconhecido, registrar o ponto
+        resultado = PontoService.registrar_ponto(
+            funcionario_id=funcionario.id,
+            admin_id=admin_id,
+            tipo_ponto=tipo_ponto,
+            obra_id=obra_id,
+            foto_base64=foto_capturada_base64,
+            distancia_facial=distancia
+        )
+
+        if resultado["success"]:
+            return jsonify({
+                "success": True, 
+                "message": f"Ponto ({tipo_ponto}) registrado para {funcionario.nome}!",
+                "registro": resultado["registro"].to_dict() # Supondo que RegistroPonto tenha um método to_dict()
+            })
+        else:
+            return jsonify({"success": False, "message": resultado["message"]}), 500
+
+    except Exception as e:
+        # ... (tratamento de erro)
+```
+
+--- 
+
+### **Fase 3: Modificação do Frontend (`lista_funcionarios.html`)**
+
+-   **Ação:** Modifique o template `templates/ponto/lista_funcionarios.html` para:
+    1.  Adicionar um modal de reconhecimento facial.
+    2.  Alterar o comportamento do botão "Bater Ponto" para abrir este modal.
+
+**Passo 3.1: Adicione o Modal no Final do Arquivo**
+
+```html
+<!-- Adicione este código no final de templates/ponto/lista_funcionarios.html, antes do {% endblock %} -->
+
+<div class="modal fade" id="modal-facial" tabindex="-1" aria-labelledby="modalFacialLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalFacialLabel">Reconhecimento Facial</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Posicione seu rosto na câmera e clique em "Capturar e Registrar"</p>
+        <video id="video-facial" width="100%" autoplay></video>
+        <canvas id="canvas-facial" style="display:none;"></canvas>
+        <div id="resultado-facial" class="mt-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="snap-facial" class="btn btn-primary">Capturar e Registrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+**Passo 3.2: Modifique o Botão "Bater Ponto"**
+
+-   **Ação:** Altere o link do botão para que ele não redirecione, mas sim abra o modal com os dados do funcionário.
+
+```html
+<!-- Em templates/ponto/lista_funcionarios.html, substitua o botão existente -->
+
+<!-- DE: -->
+<a href="{{ url_for(\'ponto.bater_ponto_funcionario\', funcionario_id=item.funcionario.id) }}" class="btn btn-primary">
+    <i class="fas fa-fingerprint me-2"></i> Bater Ponto
+</a>
+
+<!-- PARA: -->
+<button type="button" 
+        class="btn btn-primary btn-bater-ponto" 
+        data-bs-toggle="modal" 
+        data-bs-target="#modal-facial"
+        data-funcionario-id="{{ item.funcionario.id }}"
+        data-funcionario-nome="{{ item.funcionario.nome }}">
+    <i class="fas fa-camera me-2"></i> Bater Ponto
+</button>
+```
+
+**Passo 3.3: Adicione o JavaScript para o Modal**
+
+-   **Ação:** Adicione este script no final do arquivo, dentro do bloco `<script>` ou em um novo.
+
+```javascript
+// Em templates/ponto/lista_funcionarios.html
+
+document.addEventListener("DOMContentLoaded", () => {
+    const modalFacial = document.getElementById("modal-facial");
+    const video = document.getElementById("video-facial");
+    const canvas = document.getElementById("canvas-facial");
+    const snapBtn = document.getElementById("snap-facial");
+    const resultadoDiv = document.getElementById("resultado-facial");
+    let currentStream;
+    let currentFuncionarioId;
+
+    modalFacial.addEventListener("show.bs.modal", event => {
+        const button = event.relatedTarget;
+        currentFuncionarioId = button.getAttribute("data-funcionario-id");
+        const funcionarioNome = button.getAttribute("data-funcionario-nome");
+        document.getElementById("modalFacialLabel").innerText = `Reconhecimento para: ${funcionarioNome}`;
+        resultadoDiv.innerHTML = "<p class=\"text-muted\">Aguardando captura...</p>";
+
+        // Iniciar câmera
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+            .then(stream => {
+                currentStream = stream;
+                video.srcObject = stream;
+                video.play();
+            })
+            .catch(err => {
+                resultadoDiv.innerHTML = `<div class="alert alert-danger">Erro ao acessar câmera.</div>`;
+            });
+    });
+
+    modalFacial.addEventListener("hide.bs.modal", () => {
+        // Parar câmera ao fechar o modal
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+    });
+
+    snapBtn.addEventListener("click", () => {
+        resultadoDiv.innerHTML = `<div class="alert alert-info">Processando...</div>`;
+        snapBtn.disabled = true;
+
+        const context = canvas.getContext("2d");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataURL = canvas.toDataURL("image/jpeg");
+
+        // Determinar tipo de ponto (simplificado)
+        // Você pode adicionar uma lógica mais complexa aqui
+        const tipoPonto = "entrada"; // Exemplo
+
+        fetch("/ponto/api/registrar-facial", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                funcionario_id: currentFuncionarioId,
+                foto_base64: dataURL,
+                tipo_ponto: tipoPonto
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultadoDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                // Opcional: fechar modal e recarregar a página após sucesso
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance(modalFacial).hide();
+                    location.reload();
+                }, 2000);
+            } else {
+                resultadoDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+            }
+            snapBtn.disabled = false;
+        })
+        .catch(err => {
+            resultadoDiv.innerHTML = `<div class="alert alert-danger">Erro de comunicação.</div>`;
+            snapBtn.disabled = false;
+        });
+    });
+});
+```
+
+--- 
+
+### **Fase 4: Remover Rota Antiga (Opcional)**
+
+-   **Ação:** Após confirmar que o novo fluxo está funcionando, você pode remover a rota `bater_ponto_funcionario` e o template `bater_ponto_individual.html`, pois não serão mais usados.
+
+**Execute a implementação em 4 fases agora.**
+```
