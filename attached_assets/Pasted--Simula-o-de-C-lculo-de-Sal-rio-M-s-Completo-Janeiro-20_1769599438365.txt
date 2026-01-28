@@ -1,0 +1,78 @@
+# Simulação de Cálculo de Salário - Mês Completo (Janeiro/2026)
+
+## 📋 Dados do Funcionário
+
+| Parâmetro | Valor |
+| :--- | :--- |
+| **Salário Mensal** | R$ 3.500,00 |
+| **Horário de Trabalho** | 07:12 - 17:00 (Seg-Sex) |
+| **Intervalo de Almoço** | 12:00 - 13:00 (1h) |
+| **Horas Contratuais/Dia** | 8h 48min (8.80h) |
+| **Valor/Hora** | R$ 15,91 (calculado sobre 220h) |
+
+## 📅 Lançamentos Detalhados - Janeiro/2026
+
+| Dia | Tipo | Entrada | Saída | Horas | HE 50% | HE 100% | Falta | Desconto | Observação |
+| :-- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 01 | Feriado | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Ano Novo |
+| 02 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 03 | Trabalhado | 07:12 | 19:00 | 10.80h | **2.00h** | 0.00h | 0.00h | R$ 0,00 | Hora extra |
+| 04 | Sábado HE | 08:00 | 12:00 | 4.00h | **4.00h** | 0.00h | 0.00h | R$ 0,00 | Sábado trabalhado |
+| 05 | Domingo Folga | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Descanso |
+| 06 | **Falta** | --:-- | --:-- | 0.00h | 0.00h | 0.00h | **8.80h** | **R$ 139,99** | Falta injustificada |
+| 07 | Falta Justificada | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Sem desconto |
+| 08 | Atestado | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Sem desconto |
+| 09 | Trabalhado | 07:27 | 17:00 | 8.55h | 0.00h | 0.00h | **0.25h** | **R$ 3,98** | Atraso de 15 min |
+| 10 | Trabalhado | 07:12 | 16:00 | 7.80h | 0.00h | 0.00h | **1.00h** | **R$ 15,91** | Saída antecipada |
+| 11 | Sábado Folga | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Descanso |
+| 12 | Domingo Folga | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Descanso |
+| 13 | **Feriado Trab.** | 07:12 | 17:00 | 8.80h | 0.00h | **8.80h** | 0.00h | R$ 0,00 | HE 100% |
+| 14 | **Domingo Trab.** | 08:00 | 14:00 | 6.00h | 0.00h | **6.00h** | 0.00h | R$ 0,00 | HE 100% |
+| 15 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 16 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 17 | Sábado Folga | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Descanso |
+| 18 | Domingo Folga | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Descanso |
+| 19 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 20 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 21 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 22 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 23 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 24 | Sábado Folga | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Descanso |
+| 25 | Domingo Folga | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Descanso |
+| 26 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 27 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 28 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 29 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 30 | Trabalhado | 07:12 | 17:00 | 8.80h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Dia normal |
+| 31 | Sábado Folga | --:-- | --:-- | 0.00h | 0.00h | 0.00h | 0.00h | R$ 0,00 | Descanso |
+
+## 💰 Cálculo Final do Salário
+
+### 1. **Resumo das Horas**
+
+-   **Horas Trabalhadas:** 127.80h
+-   **Horas Extras 50%:** 6.00h (2h do dia 03 + 4h do dia 04)
+-   **Horas Extras 100%:** 14.80h (8.80h do dia 13 + 6h do dia 14)
+-   **Horas Falta:** 10.05h (8.80h do dia 06 + 0.25h do dia 09 + 1.00h do dia 10)
+
+### 2. **Cálculo dos Valores**
+
+| Descrição | Cálculo | Valor |
+| :--- | :--- | :--- |
+| Salário Base | | R$ 3.500,00 |
+| **(+)** HE 50% | 6.00h × R$ 15,91 × 1.5 | R$ 143,19 |
+| **(+)** HE 100% | 14.80h × R$ 15,91 × 2.0 | R$ 470,91 |
+| **(+)** DSR sobre Extras | (R$ 143,19 + R$ 470,91) / 22 × 4 | R$ 111,66 |
+| **(-)** Desconto DSR por Falta | R$ 3500 / 30 | R$ 116,67 |
+| **(-)** Descontos (Faltas/Atrasos) | 10.05h × R$ 15,91 | R$ 159,88 |
+| **SALÁRIO BRUTO** | | **R$ 3.852,21** |
+| **SALÁRIO LÍQUIDO (antes INSS/IRRF)** | | **R$ 3.692,33** |
+
+## ⚠️ Correção Importante
+
+Na simulação anterior, eu cometi um erro ao calcular as horas extras dos dias normais. A jornada de 8.80h está correta, então dias normais não geram HE. Esta simulação está com os cálculos corrigidos.
+
+## 🚀 Recomendações
+
+1.  **Validar os Cálculos:** Use esta simulação como base para validar se o sistema está calculando os valores de HE, descontos e DSR corretamente.
+2.  **Ajustar o Sistema:** Se os valores do sistema não baterem com esta simulação, será necessário criar um prompt para o Replit Agent corrigir a lógica de cálculo.
