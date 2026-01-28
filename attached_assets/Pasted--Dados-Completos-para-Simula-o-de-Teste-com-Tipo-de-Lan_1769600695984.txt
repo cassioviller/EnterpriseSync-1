@@ -1,0 +1,49 @@
+# Dados Completos para Simulação de Teste (com Tipo de Lançamento)
+
+## 📋 Dados do Funcionário de Teste
+
+| Campo | Valor |
+| :--- | :--- |
+| **Nome** | Funcionário Teste Simulação |
+| **Salário** | R$ 3.500,00 |
+| **Horário de Trabalho** | 07:12 - 12:00 | 13:00 - 17:00 (Seg-Sex) |
+
+## 📅 Lançamentos de Ponto - Janeiro/2026
+
+| Dia | Tipo de Lançamento | Entrada | Saída Almoço | Retorno Almoço | Saída |
+| :-- | :--- | :--- | :--- | :--- | :--- |
+| 01 | **Feriado** | --:-- | --:-- | --:-- | --:-- |
+| 02 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 03 | **Hora Extra** | 07:12 | 12:00 | 13:00 | 19:00 |
+| 04 | **Sábado HE** | 08:00 | --:-- | --:-- | 12:00 |
+| 05 | **Domingo** | --:-- | --:-- | --:-- | --:-- |
+| 06 | **Falta** | --:-- | --:-- | --:-- | --:-- |
+| 07 | **Falta Justificada** | --:-- | --:-- | --:-- | --:-- |
+| 08 | **Atestado** | --:-- | --:-- | --:-- | --:-- |
+| 09 | **Atraso** | 07:27 | 12:00 | 13:00 | 17:00 |
+| 10 | **Saída Antecipada** | 07:12 | 12:00 | 13:00 | 16:00 |
+| 11 | **Sábado** | --:-- | --:-- | --:-- | --:-- |
+| 12 | **Domingo** | --:-- | --:-- | --:-- | --:-- |
+| 13 | **Feriado Trabalhado** | 07:12 | 12:00 | 13:00 | 17:00 |
+| 14 | **Domingo Trabalhado** | 08:00 | --:-- | --:-- | 14:00 |
+| 15 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 16 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 17 | **Sábado** | --:-- | --:-- | --:-- | --:-- |
+| 18 | **Domingo** | --:-- | --:-- | --:-- | --:-- |
+| 19 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 20 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 21 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 22 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 23 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 24 | **Sábado** | --:-- | --:-- | --:-- | --:-- |
+| 25 | **Domingo** | --:-- | --:-- | --:-- | --:-- |
+| 26 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 27 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 28 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 29 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 30 | Trabalhado | 07:12 | 12:00 | 13:00 | 17:00 |
+| 31 | **Sábado** | --:-- | --:-- | --:-- | --:-- |
+
+## 💰 Resultado Esperado
+
+-   **Salário Líquido (antes INSS/IRRF):** **R$ 3.929,30**

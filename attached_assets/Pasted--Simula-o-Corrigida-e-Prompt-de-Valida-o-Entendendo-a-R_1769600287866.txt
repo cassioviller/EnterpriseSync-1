@@ -1,0 +1,88 @@
+# Simulação Corrigida e Prompt de Validação
+
+## 🎯 Entendendo a Regra de Tolerância
+
+Agora com a regra correta, a simulação foi refeita. A lógica é:
+
+-   **Atraso de 9 minutos:** Não desconta nada.
+-   **Atraso de 11 minutos:** Desconta os **11 minutos completos**.
+
+## 💰 Simulação Recalculada (Janeiro/2026)
+
+### Impacto da Nova Regra:
+
+| Dia | Evento | Simulação Anterior | Simulação Corrigida |
+| :-- | :--- | :--- | :--- |
+| 09 | Atraso de 15 min | Desconto de 5 min | Desconto de **15 min** |
+| 10 | Saída 1h antes | Desconto de 50 min | Desconto de **60 min** |
+
+### Resultado Final Corrigido:
+
+| Descrição | Valor |
+| :--- | :--- |
+| Salário Base | R$ 3.500,00 |
+| **(+)** HE 50% | R$ 143,18 |
+| **(+)** HE 100% | R$ 470,91 |
+| **(+)** DSR sobre Extras | R$ 111,65 |
+| **(-)** Desconto DSR por Falta | R$ 116,67 |
+| **(-)** Descontos (Faltas/Atrasos) | **R$ 179,77** |
+| **SALÁRIO LÍQUIDO** | **R$ 3.929,30** |
+
+## 🚀 Prompt de Validação para o Replit Agent
+
+Agora que temos os valores exatos, podemos criar um prompt para o Replit Agent validar se o sistema está calculando corretamente.
+
+### Prompt para o Replit Agent:
+
+```
+**AÇÃO DE VALIDAÇÃO DE CÁLCULO DE SALÁRIO**
+
+**Contexto:**
+
+-   **Objetivo:** Validar se o sistema está calculando corretamente o salário de um funcionário com base em um mês de lançamentos variados, especialmente a regra de tolerância de atraso.
+
+**Sua Tarefa:**
+
+1.  **Analise a Lógica de Tolerância:**
+    -   Verifique no código (provavelmente em `ponto_service.py` ou `folha_service.py`) como a tolerância de atraso é aplicada.
+    -   A regra deve ser: se o atraso (ou saída antecipada) for **maior** que a tolerância (10 minutos), o tempo **total** do atraso deve ser descontado. Se for menor ou igual, nada é descontado.
+
+2.  **Crie um Teste Unitário:**
+    -   Crie um novo arquivo de teste `test_calculo_tolerancia.py`.
+    -   Neste teste, simule os seguintes cenários:
+        -   Atraso de 9 minutos → Desconto = 0
+        -   Atraso de 10 minutos → Desconto = 0
+        -   Atraso de 11 minutos → Desconto = 11 minutos
+        -   Saída antecipada de 9 minutos → Desconto = 0
+        -   Saída antecipada de 11 minutos → Desconto = 11 minutos
+
+3.  **Execute o Teste e Corrija se Necessário:**
+    -   Execute o teste que você criou.
+    -   Se o teste falhar, identifique a falha na lógica de cálculo e corrija-a.
+    -   A correção provavelmente será algo como:
+
+        ```python
+        # Lógica Incorreta (desconta só o excedente):
+        if atraso > tolerancia:
+            minutos_a_descontar = atraso - tolerancia
+        
+        # Lógica Correta (desconta tudo se ultrapassar):
+        if atraso > tolerancia:
+            minutos_a_descontar = atraso
+        else:
+            minutos_a_descontar = 0
+        ```
+
+4.  **Relate o Resultado:**
+    -   Informe se a lógica atual do sistema está correta ou se precisou de correção.
+    -   Mostre o teste unitário que você criou.
+
+**Execute a validação agora.**
+```
+
+## 📋 Como Usar:
+
+1.  **Cole o prompt acima** no Replit Agent.
+2.  **Aguarde a análise** - O Agent vai criar um teste para verificar a regra de tolerância.
+3.  **Se o teste falhar**, o Agent irá corrigir o código.
+4.  **Após a correção**, o cálculo do sistema deve bater exatamente com a simulação de **R$ 3.929,30**.

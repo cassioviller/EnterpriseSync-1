@@ -465,16 +465,24 @@ def _calcular_horas_mes_novo(
             
             delta = horas_reais - horas_contratuais_dia
             
+            # REGRA DE TOLERÂNCIA ATUALIZADA (Jan/2026):
+            # Se a diferença estiver DENTRO da tolerância → NÃO desconta/credita nada
+            # Se a diferença ULTRAPASSAR a tolerância → desconta/credita TODO o valor
+            # Exemplo: tolerância 10min, atraso 11min → desconta 11min (não apenas 1min)
+            
             if abs(delta) <= tolerancia_horas:
+                # Dentro da tolerância - não aplica desconto nem hora extra
                 pass
             elif delta > 0:
-                delta_efetivo = delta - tolerancia_horas if delta > tolerancia_horas else delta
+                # Horas a mais - TODAS contam como extra se ultrapassou tolerância
+                delta_efetivo = delta  # Desconta/credita TUDO, não subtrai tolerância
                 if dia_semana == 6 or eh_feriado:
                     horas_extras_100 += delta_efetivo
                 else:
                     horas_extras_50 += delta_efetivo
             elif delta < 0:
-                delta_efetivo = abs(delta) - tolerancia_horas if abs(delta) > tolerancia_horas else abs(delta)
+                # Horas a menos - TODAS contam como falta se ultrapassou tolerância
+                delta_efetivo = abs(delta)  # Desconta TUDO, não subtrai tolerância
                 horas_falta += delta_efetivo
         
         elif eh_dia_trabalho:
@@ -598,19 +606,16 @@ def calcular_dsr(horas_info: Dict, valor_hora_normal: Decimal) -> Decimal:
     """
     try:
         dias_trabalhados = horas_info.get('dias_trabalhados', 0)
+        dias_uteis_esperados = horas_info.get('dias_uteis_esperados', dias_trabalhados)
         domingos_feriados = horas_info.get('domingos_feriados', 0)
         horas_extras_50 = horas_info.get('extras_50', 0)
         horas_extras_100 = horas_info.get('extras_100', 0)
-        faltas = horas_info.get('faltas', 0)
         
-        # Se tiver faltas injustificadas, perde DSR proporcional
-        # Lei 605/49: Falta injustificada = perde DSR da semana
-        if faltas > 0:
-            # Calcular quantos domingos/sábados perder (1 DSR a cada 6 dias úteis)
-            domingos_perdidos = int(faltas / 6) + (1 if faltas % 6 > 0 else 0)
-            domingos_feriados = max(0, domingos_feriados - domingos_perdidos)
+        # ATUALIZADO Jan/2026: NÃO reduzir DSR aqui por faltas
+        # A perda de DSR por faltas é tratada separadamente como desconto_dsr_faltas
+        # (salário/30 por dia de falta) conforme simulação do usuário
         
-        if dias_trabalhados == 0 or domingos_feriados == 0:
+        if dias_uteis_esperados == 0 or domingos_feriados == 0:
             return Decimal('0')
         
         if horas_extras_50 == 0 and horas_extras_100 == 0:
@@ -621,9 +626,9 @@ def calcular_dsr(horas_info: Dict, valor_hora_normal: Decimal) -> Decimal:
         valor_he_100 = valor_hora_normal * Decimal('2.0') * Decimal(str(horas_extras_100))
         valor_he_total = valor_he_50 + valor_he_100
         
-        # DSR = (Valor HE Total / Dias TRABALHADOS) * Domingos/Feriados
-        # CORREÇÃO: Usa dias_trabalhados, não dias_uteis_esperados
-        dsr_sobre_he = (valor_he_total / Decimal(str(dias_trabalhados))) * Decimal(str(domingos_feriados))
+        # DSR = (Valor HE Total / Dias Úteis Esperados) * Domingos/Feriados
+        # ATUALIZADO: Usa dias_uteis_esperados para cálculo consistente com simulação
+        dsr_sobre_he = (valor_he_total / Decimal(str(dias_uteis_esperados))) * Decimal(str(domingos_feriados))
         
         return dsr_sobre_he.quantize(Decimal('0.01'))
         
@@ -749,6 +754,7 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
         
         valor_dsr = calcular_dsr(horas_info, valor_hora_normal)
         
+        # Desconto de horas (faltas parciais, atrasos, saídas antecipadas)
         horas_falta = horas_info.get('horas_falta', 0)
         if horas_falta > 0:
             valor_desconto_faltas = valor_hora_normal * Decimal(str(horas_falta))
@@ -761,15 +767,25 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
         else:
             valor_desconto_atrasos = Decimal('0')
         
+        # NOVO (Jan/2026): Desconto de DSR por falta injustificada
+        # Regra: Cada dia de falta injustificada = perde 1 DSR (salário/30)
+        # Conforme Lei 605/49 - perda do repouso semanal remunerado
+        faltas_dias = horas_info.get('faltas', 0)
+        if faltas_dias > 0:
+            valor_desconto_dsr_faltas = (salario_base / Decimal('30')) * Decimal(str(faltas_dias))
+        else:
+            valor_desconto_dsr_faltas = Decimal('0')
+        
         salario_bruto = salario_normal + valor_extras + valor_dsr
         
-        total_proventos = salario_bruto - valor_desconto_faltas - valor_desconto_atrasos
+        total_proventos = salario_bruto - valor_desconto_faltas - valor_desconto_atrasos - valor_desconto_dsr_faltas
         
         logger.debug(
             f"[calcular_salario_bruto] Func {funcionario.id}: "
             f"Normal={salario_normal}, HE={valor_extras}, DSR={valor_dsr}, "
             f"Bruto(base impostos)={salario_bruto}, "
             f"DescFaltas={valor_desconto_faltas}, DescAtrasos={valor_desconto_atrasos}, "
+            f"DescDSRFaltas={valor_desconto_dsr_faltas}, "
             f"TotalProventos(líquido)={total_proventos}"
         )
         
@@ -778,6 +794,7 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
             'total_proventos': total_proventos,
             'desconto_faltas': valor_desconto_faltas,
             'desconto_atrasos': valor_desconto_atrasos,
+            'desconto_dsr_faltas': valor_desconto_dsr_faltas,
             'salario_normal': salario_normal,
             'valor_extras': valor_extras,
             'valor_he_50': valor_he_50,
@@ -793,6 +810,7 @@ def calcular_salario_bruto(funcionario: Funcionario, horas_info: Dict, data_inic
             'total_proventos': Decimal('0'),
             'desconto_faltas': Decimal('0'),
             'desconto_atrasos': Decimal('0'),
+            'desconto_dsr_faltas': Decimal('0'),
             'salario_normal': Decimal('0'),
             'valor_extras': Decimal('0'),
             'valor_he_50': Decimal('0'),
