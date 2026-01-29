@@ -854,7 +854,7 @@ def registrar_ponto_facial_api():
         match, distancia, erro_facial = comparar_faces_deepface(
             funcionario.foto_base64, 
             foto_capturada_base64,
-            modelo='VGG-Face'
+            modelo='SFace'
         )
         
         if erro_facial:
@@ -864,7 +864,7 @@ def registrar_ponto_facial_api():
                 'match': False
             }), 400
         
-        THRESHOLD_DISTANCIA = 0.40
+        THRESHOLD_DISTANCIA = 0.60
         
         if not match or distancia > THRESHOLD_DISTANCIA:
             logger.warning(
@@ -918,7 +918,7 @@ def registrar_ponto_facial_api():
         registro.foto_registro_base64 = None
         registro.reconhecimento_facial_sucesso = True
         registro.confianca_reconhecimento = distancia
-        registro.modelo_utilizado = 'VGG-Face'
+        registro.modelo_utilizado = 'SFace'
         
         db.session.commit()
         

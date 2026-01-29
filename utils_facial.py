@@ -31,14 +31,14 @@ def decodificar_base64_para_numpy(base64_string):
         logger.error(f"Erro ao decodificar imagem base64: {e}")
         return None
 
-def comparar_faces_deepface(foto_cadastro_base64, foto_capturada_base64, modelo='VGG-Face'):
+def comparar_faces_deepface(foto_cadastro_base64, foto_capturada_base64, modelo='SFace'):
     """
     Compara duas imagens em base64 usando DeepFace.
     
     Args:
         foto_cadastro_base64: Foto cadastrada do funcionário em base64
         foto_capturada_base64: Foto capturada no momento do registro em base64
-        modelo: Modelo a ser utilizado (VGG-Face, Facenet, OpenFace, DeepFace, ArcFace)
+        modelo: Modelo a ser utilizado (SFace é leve e rápido, VGG-Face é pesado)
     
     Returns:
         tuple: (match: bool, distancia: float, erro: str|None)
@@ -61,7 +61,7 @@ def comparar_faces_deepface(foto_cadastro_base64, foto_capturada_base64, modelo=
             img2_path=img2,
             model_name=modelo,
             detector_backend='opencv',
-            enforce_detection=True
+            enforce_detection=False
         )
         
         match = resultado.get('verified', False)
