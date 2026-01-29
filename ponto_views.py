@@ -860,6 +860,7 @@ def registrar_ponto_facial_api():
         funcionario_id = data.get('funcionario_id')
         foto_capturada_base64 = data.get('foto_base64')
         obra_id = data.get('obra_id')
+        tipo_ponto_manual = data.get('tipo_ponto')  # Tipo selecionado manualmente pelo usuário
         
         if not funcionario_id or not foto_capturada_base64:
             return jsonify({
@@ -947,23 +948,60 @@ def registrar_ponto_facial_api():
             db.session.add(registro)
         
         tipo_registrado = None
-        if not registro.hora_entrada:
-            registro.hora_entrada = agora
-            tipo_registrado = 'entrada'
-        elif registro.hora_entrada and not registro.hora_almoco_saida:
-            registro.hora_almoco_saida = agora
-            tipo_registrado = 'saída para almoço'
-        elif registro.hora_almoco_saida and not registro.hora_almoco_retorno:
-            registro.hora_almoco_retorno = agora
-            tipo_registrado = 'retorno do almoço'
-        elif not registro.hora_saida:
-            registro.hora_saida = agora
-            tipo_registrado = 'saída'
+        
+        # Se tipo foi selecionado manualmente, usar esse
+        if tipo_ponto_manual:
+            if tipo_ponto_manual == 'entrada':
+                if registro.hora_entrada:
+                    return jsonify({
+                        'success': False, 
+                        'message': 'Entrada já foi registrada hoje.'
+                    }), 400
+                registro.hora_entrada = agora
+                tipo_registrado = 'entrada'
+            elif tipo_ponto_manual == 'almoco_saida':
+                if registro.hora_almoco_saida:
+                    return jsonify({
+                        'success': False, 
+                        'message': 'Saída para almoço já foi registrada hoje.'
+                    }), 400
+                registro.hora_almoco_saida = agora
+                tipo_registrado = 'saída para almoço'
+            elif tipo_ponto_manual == 'almoco_retorno':
+                if registro.hora_almoco_retorno:
+                    return jsonify({
+                        'success': False, 
+                        'message': 'Retorno do almoço já foi registrado hoje.'
+                    }), 400
+                registro.hora_almoco_retorno = agora
+                tipo_registrado = 'retorno do almoço'
+            elif tipo_ponto_manual == 'saida':
+                if registro.hora_saida:
+                    return jsonify({
+                        'success': False, 
+                        'message': 'Saída já foi registrada hoje.'
+                    }), 400
+                registro.hora_saida = agora
+                tipo_registrado = 'saída'
         else:
-            return jsonify({
-                'success': False, 
-                'message': 'Jornada completa já registrada para hoje. Todos os horários já foram preenchidos.'
-            }), 400
+            # Modo automático sequencial (fallback)
+            if not registro.hora_entrada:
+                registro.hora_entrada = agora
+                tipo_registrado = 'entrada'
+            elif registro.hora_entrada and not registro.hora_almoco_saida:
+                registro.hora_almoco_saida = agora
+                tipo_registrado = 'saída para almoço'
+            elif registro.hora_almoco_saida and not registro.hora_almoco_retorno:
+                registro.hora_almoco_retorno = agora
+                tipo_registrado = 'retorno do almoço'
+            elif not registro.hora_saida:
+                registro.hora_saida = agora
+                tipo_registrado = 'saída'
+            else:
+                return jsonify({
+                    'success': False, 
+                    'message': 'Jornada completa já registrada para hoje. Todos os horários já foram preenchidos.'
+                }), 400
         
         registro.foto_registro_base64 = None
         registro.reconhecimento_facial_sucesso = True

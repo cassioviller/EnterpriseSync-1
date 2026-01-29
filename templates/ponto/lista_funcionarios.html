@@ -133,11 +133,42 @@
                 
                 <div id="resultado-facial" class="mt-3"></div>
                 
-                <div class="mt-3 text-center">
-                    <small class="text-muted">
-                        <i class="fas fa-info-circle me-1"></i>
-                        O sistema registrará automaticamente o próximo horário na sequência (entrada → almoço → retorno → saída)
-                    </small>
+                <div class="mt-3">
+                    <label class="form-label text-center w-100 mb-2">
+                        <i class="fas fa-clock me-2"></i>
+                        <strong>Tipo de Registro</strong> <small class="text-muted">(pré-selecionado por horário)</small>
+                    </label>
+                    <div class="row g-2" id="tipo-ponto-container">
+                        <div class="col-6">
+                            <button type="button" class="btn btn-tipo-ponto w-100 py-2" data-tipo="entrada" id="btn-entrada">
+                                <i class="fas fa-sign-in-alt me-1"></i>
+                                <span class="fw-bold">Entrada</span>
+                                <br><small class="text-muted">00:00 - 11:30</small>
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="btn btn-tipo-ponto w-100 py-2" data-tipo="almoco_saida" id="btn-almoco">
+                                <i class="fas fa-utensils me-1"></i>
+                                <span class="fw-bold">Almoço</span>
+                                <br><small class="text-muted">11:31 - 12:30</small>
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="btn btn-tipo-ponto w-100 py-2" data-tipo="almoco_retorno" id="btn-retorno">
+                                <i class="fas fa-undo me-1"></i>
+                                <span class="fw-bold">Retorno</span>
+                                <br><small class="text-muted">12:31 - 14:00</small>
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="btn btn-tipo-ponto w-100 py-2" data-tipo="saida" id="btn-saida">
+                                <i class="fas fa-sign-out-alt me-1"></i>
+                                <span class="fw-bold">Saída</span>
+                                <br><small class="text-muted">14:01 - 23:59</small>
+                            </button>
+                        </div>
+                    </div>
+                    <input type="hidden" id="tipo-ponto-selecionado" value="">
                 </div>
             </div>
             <div class="modal-footer">
@@ -179,6 +210,46 @@
     .btn-bater-ponto:hover {
         transform: scale(1.02);
     }
+    
+    /* Estilos para botões de tipo de ponto */
+    .btn-tipo-ponto {
+        transition: all 0.2s ease;
+        border: 2px solid #dee2e6;
+        background: #fff;
+    }
+    
+    .btn-tipo-ponto:hover:not(.disabled):not(:disabled) {
+        transform: scale(1.02);
+    }
+    
+    .btn-tipo-ponto.disabled, .btn-tipo-ponto:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .btn-tipo-ponto.selected[data-tipo="entrada"] {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+    }
+    
+    .btn-tipo-ponto.selected[data-tipo="almoco_saida"] {
+        background: #ffc107;
+        border-color: #ffc107;
+        color: #000;
+    }
+    
+    .btn-tipo-ponto.selected[data-tipo="almoco_retorno"] {
+        background: #198754;
+        border-color: #198754;
+        color: #fff;
+    }
+    
+    .btn-tipo-ponto.selected[data-tipo="saida"] {
+        background: #dc3545;
+        border-color: #dc3545;
+        color: #fff;
+    }
 </style>
 
 <script>
@@ -194,6 +265,46 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentStream = null;
     let currentFuncionarioId = null;
     let isProcessing = false;
+    let tipoSelecionado = null;
+    
+    // Função para determinar tipo sugerido baseado no horário atual
+    function getTipoSugerido() {
+        const agora = new Date();
+        const hora = agora.getHours();
+        const minuto = agora.getMinutes();
+        
+        if (hora < 11 || (hora === 11 && minuto <= 30)) {
+            return 'entrada';
+        } else if (hora === 11 || (hora === 12 && minuto <= 30)) {
+            return 'almoco_saida';
+        } else if (hora === 12 || hora === 13 || (hora === 14 && minuto === 0)) {
+            return 'almoco_retorno';
+        } else {
+            return 'saida';
+        }
+    }
+    
+    // Função para selecionar tipo de ponto
+    function selecionarTipoPonto(tipo) {
+        document.querySelectorAll('.btn-tipo-ponto').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        const btnSelecionado = document.querySelector(`.btn-tipo-ponto[data-tipo="${tipo}"]`);
+        if (btnSelecionado && !btnSelecionado.disabled) {
+            btnSelecionado.classList.add('selected');
+            tipoSelecionado = tipo;
+            document.getElementById('tipo-ponto-selecionado').value = tipo;
+        }
+    }
+    
+    // Adicionar click handlers para botões de tipo
+    document.querySelectorAll('.btn-tipo-ponto').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!this.disabled && !this.classList.contains('disabled')) {
+                selecionarTipoPonto(this.dataset.tipo);
+            }
+        });
+    });
 
     modalFacial.addEventListener("show.bs.modal", event => {
         const button = event.relatedTarget;
@@ -207,6 +318,14 @@ document.addEventListener("DOMContentLoaded", () => {
         instrucao.textContent = "Posicione seu rosto na câmera e clique em \"Capturar e Registrar\"";
         snapBtn.disabled = false;
         isProcessing = false;
+        
+        // Resetar e pré-selecionar tipo baseado no horário
+        document.querySelectorAll('.btn-tipo-ponto').forEach(btn => {
+            btn.classList.remove('selected', 'disabled');
+            btn.disabled = false;
+        });
+        const tipoSugerido = getTipoSugerido();
+        selecionarTipoPonto(tipoSugerido);
 
         navigator.mediaDevices.getUserMedia({ 
             video: { 
@@ -267,7 +386,8 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             body: JSON.stringify({
                 funcionario_id: currentFuncionarioId,
-                foto_base64: dataURL
+                foto_base64: dataURL,
+                tipo_ponto: tipoSelecionado
             })
         })
         .then(response => response.json())
