@@ -9,27 +9,23 @@ ENV FLASK_ENV=production
 ENV PORT=5000
 ENV DIGITAL_MASTERY_MODE=true
 
-# Instalar dependências do sistema (incluindo OpenCV/DeepFace)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Instalar dependências do sistema (mínimas)
+RUN apt-get update && apt-get install -y \
     postgresql-client \
     gcc \
     libpq-dev \
-    libglib2.0-0 \
-    libsm6 \
-    libxrender1 \
-    libxext6 \
-    libgl1 \
-    libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar código da aplicação primeiro
-COPY . .
+# Copiar e instalar dependências Python
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir .
 
-# Instalar dependências Python do pyproject.toml
-RUN pip install --no-cache-dir -e .
+# Copiar código da aplicação
+COPY . .
 
 # Criar diretórios necessários
 RUN mkdir -p \
