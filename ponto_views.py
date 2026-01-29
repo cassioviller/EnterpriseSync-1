@@ -6,7 +6,23 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
 from datetime import date, datetime, timedelta
+import pytz
 from app import db
+
+# Fuso horário do Brasil (Brasília)
+TIMEZONE_BRASIL = pytz.timezone('America/Sao_Paulo')
+
+def get_datetime_brasil():
+    """Retorna o datetime atual no fuso horário de Brasília"""
+    return datetime.now(TIMEZONE_BRASIL)
+
+def get_date_brasil():
+    """Retorna a data atual no fuso horário de Brasília"""
+    return datetime.now(TIMEZONE_BRASIL).date()
+
+def get_time_brasil():
+    """Retorna a hora atual no fuso horário de Brasília"""
+    return datetime.now(TIMEZONE_BRASIL).time()
 from models import Obra, Funcionario, RegistroPonto, ConfiguracaoHorario, DispositivoObra, FuncionarioObrasPonto
 from ponto_service import PontoService
 from multitenant_helper import get_admin_id as get_tenant_admin_id
@@ -101,8 +117,8 @@ def bater_ponto_funcionario(funcionario_id):
                 ativo=True
             ).order_by(Obra.nome).all()
         
-        # Horário atual
-        agora = datetime.now()
+        # Horário atual (Brasil)
+        agora = get_datetime_brasil()
         
         return render_template('ponto/bater_ponto_individual.html',
                              funcionario=funcionario,
@@ -250,7 +266,7 @@ def api_status_obra(obra_id):
         return jsonify({
             'success': True,
             'funcionarios': funcionarios_json,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': get_datetime_brasil().isoformat()
         })
         
     except Exception as e:
@@ -602,8 +618,7 @@ def listar_configuracoes():
 @admin_required
 def pagina_importar():
     """Página de importação de pontos via Excel"""
-    from datetime import datetime
-    return render_template('ponto/importar_ponto.html', now=datetime.now())
+    return render_template('ponto/importar_ponto.html', now=get_datetime_brasil())
 
 
 @ponto_bp.route('/importar/download-modelo')
@@ -878,8 +893,8 @@ def registrar_ponto_facial_api():
                 'distancia': round(distancia, 4)
             }), 403
         
-        hoje = date.today()
-        agora = datetime.now().time()
+        hoje = get_date_brasil()
+        agora = get_time_brasil()
         
         registro = RegistroPonto.query.filter_by(
             funcionario_id=funcionario.id,
