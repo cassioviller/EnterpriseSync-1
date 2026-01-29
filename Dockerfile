@@ -10,7 +10,7 @@ ENV PORT=5000
 ENV DIGITAL_MASTERY_MODE=true
 
 # Instalar dependências do sistema (incluindo OpenCV/DeepFace)
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     gcc \
     libpq-dev \
@@ -18,12 +18,9 @@ RUN apt-get update && apt-get install -y \
     libsm6 \
     libxrender1 \
     libxext6 \
-    libgl1-mesa-glx \
-    libxcb1 \
-    libx11-6 \
+    libgl1 \
     libgomp1 \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
 
 # Definir diretório de trabalho
 WORKDIR /app
