@@ -86,37 +86,67 @@
                         <div class="mb-4">
                             <label class="form-label">
                                 <i class="fas fa-clock me-2"></i>
-                                Tipo de Registro
+                                Tipo de Registro <small class="text-muted">(pré-selecionado por horário)</small>
                             </label>
-                            <div class="btn-group w-100" role="group">
-                                {% if not registro_hoje or not registro_hoje.hora_entrada %}
-                                <button type="button" class="btn btn-outline-primary btn-tipo-ponto active" data-tipo="entrada">
-                                    <i class="fas fa-sign-in-alt me-2"></i>
-                                    Entrada
-                                </button>
-                                {% elif not registro_hoje.hora_almoco_saida %}
-                                <button type="button" class="btn btn-outline-warning btn-tipo-ponto active" data-tipo="almoco_saida">
-                                    <i class="fas fa-utensils me-2"></i>
-                                    Almoço Saída
-                                </button>
-                                {% elif not registro_hoje.hora_almoco_retorno %}
-                                <button type="button" class="btn btn-outline-success btn-tipo-ponto active" data-tipo="almoco_retorno">
-                                    <i class="fas fa-utensils me-2"></i>
-                                    Almoço Retorno
-                                </button>
-                                {% elif not registro_hoje.hora_saida %}
-                                <button type="button" class="btn btn-outline-danger btn-tipo-ponto active" data-tipo="saida">
-                                    <i class="fas fa-sign-out-alt me-2"></i>
-                                    Saída
-                                </button>
-                                {% else %}
-                                <div class="alert alert-success">
-                                    <i class="fas fa-check-circle me-2"></i>
-                                    Jornada completa registrada!
-                                </div>
-                                {% endif %}
+                            
+                            {% if registro_hoje and registro_hoje.hora_entrada and registro_hoje.hora_almoco_saida and registro_hoje.hora_almoco_retorno and registro_hoje.hora_saida %}
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Jornada completa registrada!
                             </div>
-                            <input type="hidden" id="tipo_ponto" name="tipo_ponto" value="{{ 'entrada' if not registro_hoje or not registro_hoje.hora_entrada else ('almoco_saida' if not registro_hoje.hora_almoco_saida else ('almoco_retorno' if not registro_hoje.hora_almoco_retorno else 'saida')) }}">
+                            {% else %}
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <button type="button" class="btn btn-tipo-ponto w-100 py-3 {{ 'btn-primary' if tipo_sugerido == 'entrada' else 'btn-outline-primary' }} {{ 'disabled opacity-50' if registro_hoje and registro_hoje.hora_entrada else '' }}" 
+                                            data-tipo="entrada" 
+                                            {{ 'disabled' if registro_hoje and registro_hoje.hora_entrada else '' }}>
+                                        <i class="fas fa-sign-in-alt d-block mb-1" style="font-size: 1.5rem;"></i>
+                                        <span class="fw-bold">Entrada</span>
+                                        <br><small class="text-muted">00:00 - 11:30</small>
+                                        {% if registro_hoje and registro_hoje.hora_entrada %}
+                                        <br><span class="badge bg-success mt-1">{{ registro_hoje.hora_entrada.strftime('%H:%M') }}</span>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button type="button" class="btn btn-tipo-ponto w-100 py-3 {{ 'btn-warning' if tipo_sugerido == 'almoco_saida' else 'btn-outline-warning' }} {{ 'disabled opacity-50' if registro_hoje and registro_hoje.hora_almoco_saida else '' }}" 
+                                            data-tipo="almoco_saida"
+                                            {{ 'disabled' if registro_hoje and registro_hoje.hora_almoco_saida else '' }}>
+                                        <i class="fas fa-utensils d-block mb-1" style="font-size: 1.5rem;"></i>
+                                        <span class="fw-bold">Almoço</span>
+                                        <br><small class="text-muted">11:31 - 12:30</small>
+                                        {% if registro_hoje and registro_hoje.hora_almoco_saida %}
+                                        <br><span class="badge bg-success mt-1">{{ registro_hoje.hora_almoco_saida.strftime('%H:%M') }}</span>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button type="button" class="btn btn-tipo-ponto w-100 py-3 {{ 'btn-success' if tipo_sugerido == 'almoco_retorno' else 'btn-outline-success' }} {{ 'disabled opacity-50' if registro_hoje and registro_hoje.hora_almoco_retorno else '' }}" 
+                                            data-tipo="almoco_retorno"
+                                            {{ 'disabled' if registro_hoje and registro_hoje.hora_almoco_retorno else '' }}>
+                                        <i class="fas fa-undo d-block mb-1" style="font-size: 1.5rem;"></i>
+                                        <span class="fw-bold">Retorno</span>
+                                        <br><small class="text-muted">12:31 - 14:00</small>
+                                        {% if registro_hoje and registro_hoje.hora_almoco_retorno %}
+                                        <br><span class="badge bg-success mt-1">{{ registro_hoje.hora_almoco_retorno.strftime('%H:%M') }}</span>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button type="button" class="btn btn-tipo-ponto w-100 py-3 {{ 'btn-danger' if tipo_sugerido == 'saida' else 'btn-outline-danger' }} {{ 'disabled opacity-50' if registro_hoje and registro_hoje.hora_saida else '' }}" 
+                                            data-tipo="saida"
+                                            {{ 'disabled' if registro_hoje and registro_hoje.hora_saida else '' }}>
+                                        <i class="fas fa-sign-out-alt d-block mb-1" style="font-size: 1.5rem;"></i>
+                                        <span class="fw-bold">Saída</span>
+                                        <br><small class="text-muted">14:01 - 23:59</small>
+                                        {% if registro_hoje and registro_hoje.hora_saida %}
+                                        <br><span class="badge bg-success mt-1">{{ registro_hoje.hora_saida.strftime('%H:%M') }}</span>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="hidden" id="tipo_ponto" name="tipo_ponto" value="{{ tipo_sugerido }}">
+                            {% endif %}
                         </div>
                         
                         {% if not registro_hoje or not registro_hoje.hora_saida %}
@@ -146,11 +176,26 @@ function atualizarRelogio() {
 
 setInterval(atualizarRelogio, 1000);
 
-// Selecionar tipo de ponto
-document.querySelectorAll('.btn-tipo-ponto').forEach(btn => {
+// Selecionar tipo de ponto (manual)
+document.querySelectorAll('.btn-tipo-ponto:not([disabled])').forEach(btn => {
     btn.addEventListener('click', function() {
-        document.querySelectorAll('.btn-tipo-ponto').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
+        // Remover seleção de todos os botões não desabilitados
+        document.querySelectorAll('.btn-tipo-ponto:not([disabled])').forEach(b => {
+            // Resetar para outline
+            b.classList.remove('btn-primary', 'btn-warning', 'btn-success', 'btn-danger');
+            if (b.dataset.tipo === 'entrada') b.classList.add('btn-outline-primary');
+            if (b.dataset.tipo === 'almoco_saida') b.classList.add('btn-outline-warning');
+            if (b.dataset.tipo === 'almoco_retorno') b.classList.add('btn-outline-success');
+            if (b.dataset.tipo === 'saida') b.classList.add('btn-outline-danger');
+        });
+        
+        // Aplicar seleção ao botão clicado
+        this.classList.remove('btn-outline-primary', 'btn-outline-warning', 'btn-outline-success', 'btn-outline-danger');
+        if (this.dataset.tipo === 'entrada') this.classList.add('btn-primary');
+        if (this.dataset.tipo === 'almoco_saida') this.classList.add('btn-warning');
+        if (this.dataset.tipo === 'almoco_retorno') this.classList.add('btn-success');
+        if (this.dataset.tipo === 'saida') this.classList.add('btn-danger');
+        
         document.getElementById('tipo_ponto').value = this.dataset.tipo;
     });
 });

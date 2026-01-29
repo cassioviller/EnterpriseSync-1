@@ -119,13 +119,48 @@ def bater_ponto_funcionario(funcionario_id):
         
         # Horário atual (Brasil)
         agora = get_datetime_brasil()
+        hora_atual = agora.hour
+        minuto_atual = agora.minute
+        
+        # Determinar tipo sugerido baseado no horário (pré-definido)
+        # entrada: 00:00 - 11:30
+        # almoco_saida: 11:31 - 12:30
+        # almoco_retorno: 12:31 - 14:00
+        # saida: 14:01 - 23:59
+        if hora_atual < 11 or (hora_atual == 11 and minuto_atual <= 30):
+            tipo_sugerido = 'entrada'
+        elif hora_atual == 11 or (hora_atual == 12 and minuto_atual <= 30):
+            tipo_sugerido = 'almoco_saida'
+        elif hora_atual == 12 or (hora_atual <= 14 and minuto_atual <= 0) or hora_atual == 13:
+            tipo_sugerido = 'almoco_retorno'
+        else:
+            tipo_sugerido = 'saida'
+        
+        # Se o tipo sugerido já foi registrado, encontrar o próximo disponível
+        if registro_hoje:
+            if tipo_sugerido == 'entrada' and registro_hoje.hora_entrada:
+                if not registro_hoje.hora_almoco_saida:
+                    tipo_sugerido = 'almoco_saida'
+                elif not registro_hoje.hora_almoco_retorno:
+                    tipo_sugerido = 'almoco_retorno'
+                elif not registro_hoje.hora_saida:
+                    tipo_sugerido = 'saida'
+            elif tipo_sugerido == 'almoco_saida' and registro_hoje.hora_almoco_saida:
+                if not registro_hoje.hora_almoco_retorno:
+                    tipo_sugerido = 'almoco_retorno'
+                elif not registro_hoje.hora_saida:
+                    tipo_sugerido = 'saida'
+            elif tipo_sugerido == 'almoco_retorno' and registro_hoje.hora_almoco_retorno:
+                if not registro_hoje.hora_saida:
+                    tipo_sugerido = 'saida'
         
         return render_template('ponto/bater_ponto_individual.html',
                              funcionario=funcionario,
                              registro_hoje=registro_hoje,
                              obras=obras,
                              agora=agora,
-                             hoje=hoje)
+                             hoje=hoje,
+                             tipo_sugerido=tipo_sugerido)
         
     except Exception as e:
         logger.error(f"Erro ao carregar página de batida de ponto: {e}")
