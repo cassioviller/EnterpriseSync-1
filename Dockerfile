@@ -9,11 +9,18 @@ ENV FLASK_ENV=production
 ENV PORT=5000
 ENV DIGITAL_MASTERY_MODE=true
 
-# Instalar dependências do sistema (mínimas)
+# Instalar dependências do sistema (incluindo libs para OpenCV/DeepFace)
 RUN apt-get update && apt-get install -y \
     postgresql-client \
     gcc \
     libpq-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libxcb1 \
+    libx11-6 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
