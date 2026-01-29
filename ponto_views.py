@@ -35,6 +35,25 @@ logger = logging.getLogger(__name__)
 ponto_bp = Blueprint('ponto', __name__, url_prefix='/ponto')
 
 
+# Rota de debug para verificar se o blueprint está funcionando
+@ponto_bp.route('/debug')
+def ponto_debug():
+    """Rota de debug para verificar se o blueprint está acessível"""
+    import sys
+    return f"""
+    <html>
+    <head><title>Debug Ponto</title></head>
+    <body style="font-family: monospace; padding: 20px;">
+        <h1 style="color: green;">Blueprint Ponto OK!</h1>
+        <p>Python: {sys.version}</p>
+        <p>Hora Brasil: {get_datetime_brasil().strftime('%d/%m/%Y %H:%M:%S')}</p>
+        <p>Blueprints carregados corretamente.</p>
+        <p><a href="/ponto">Ir para /ponto</a></p>
+    </body>
+    </html>
+    """
+
+
 @ponto_bp.route('/')
 @login_required
 def index():
@@ -69,9 +88,23 @@ def index():
                              hoje=hoje)
         
     except Exception as e:
-        logger.error(f"Erro ao listar funcionários: {e}")
-        flash(f'Erro ao carregar funcionários: {str(e)}', 'error')
-        return redirect(url_for('main.dashboard'))
+        import traceback
+        erro_completo = traceback.format_exc()
+        logger.error(f"Erro ao listar funcionários: {e}\n{erro_completo}")
+        # Mostrar erro na tela para debug em produção
+        return f"""
+        <html>
+        <head><title>Erro Ponto</title></head>
+        <body style="font-family: monospace; padding: 20px; background: #f8f9fa;">
+            <h1 style="color: red;">Erro ao carregar página de Ponto</h1>
+            <h3>Mensagem: {str(e)}</h3>
+            <pre style="background: #fff; padding: 15px; border: 1px solid #ccc; overflow-x: auto;">
+{erro_completo}
+            </pre>
+            <p><a href="/dashboard">Voltar ao Dashboard</a></p>
+        </body>
+        </html>
+        """, 500
 
 
 @ponto_bp.route('/funcionario/<int:funcionario_id>')
