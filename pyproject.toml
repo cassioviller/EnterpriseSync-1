@@ -39,4 +39,5 @@ dependencies = [
     "deepface>=0.0.97",
     "tf-keras>=2.20.1",
     "opencv-python-headless>=4.13.0.90",
+    "pytz>=2024.1",
 ]
