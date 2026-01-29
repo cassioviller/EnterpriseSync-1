@@ -1824,9 +1824,13 @@ def funcionario_perfil(id):
     from sqlalchemy import func
     from decimal import Decimal
     
+    # IMPORTANTE: Para almoxarifado, usar o admin_id do funcionário (não do usuário logado)
+    # Isso garante que os itens em posse do funcionário sejam buscados corretamente
+    almox_admin_id = funcionario.admin_id if hasattr(funcionario, 'admin_id') and funcionario.admin_id else admin_id
+    
     # 1. ITENS SERIALIZADOS - via AlmoxarifadoEstoque
     itens_serializados = AlmoxarifadoEstoque.query.filter_by(
-        admin_id=admin_id,
+        admin_id=almox_admin_id,
         funcionario_atual_id=funcionario.id,
         status='EM_USO'
     ).join(AlmoxarifadoItem).order_by(AlmoxarifadoEstoque.updated_at.desc()).all()
@@ -1836,7 +1840,7 @@ def funcionario_perfil(id):
     
     # Buscar todas as SAIDAS para o funcionário
     saidas = AlmoxarifadoMovimento.query.filter_by(
-        admin_id=admin_id,
+        admin_id=almox_admin_id,
         funcionario_id=funcionario.id,
         tipo_movimento='SAIDA'
     ).join(AlmoxarifadoItem).all()
@@ -1860,7 +1864,7 @@ def funcionario_perfil(id):
     
     # Buscar todas as DEVOLUÇÕES
     devolucoes = AlmoxarifadoMovimento.query.filter_by(
-        admin_id=admin_id,
+        admin_id=almox_admin_id,
         funcionario_id=funcionario.id,
         tipo_movimento='DEVOLUCAO'
     ).all()
@@ -1871,7 +1875,7 @@ def funcionario_perfil(id):
     
     # Buscar todas as CONSUMIDOS
     consumidos = AlmoxarifadoMovimento.query.filter_by(
-        admin_id=admin_id,
+        admin_id=almox_admin_id,
         funcionario_id=funcionario.id,
         tipo_movimento='CONSUMIDO'
     ).all()
@@ -1888,7 +1892,7 @@ def funcionario_perfil(id):
             # Buscar valor médio ponderado dos lotes ativos deste item em posse do funcionário
             # Calcular baseado nas saídas registradas para este funcionário
             saidas_func = AlmoxarifadoMovimento.query.filter_by(
-                admin_id=admin_id,
+                admin_id=almox_admin_id,
                 funcionario_id=funcionario.id,
                 item_id=item_id,
                 tipo_movimento='SAIDA'
