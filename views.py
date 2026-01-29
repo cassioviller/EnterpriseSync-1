@@ -1845,8 +1845,11 @@ def funcionario_perfil(id):
         tipo_movimento='SAIDA'
     ).join(AlmoxarifadoItem).all()
     
+    # Tipos não-serializados (controlados por quantidade)
+    tipos_nao_serializados = ['CONSUMIVEL', 'QUANTIDADE', 'individual']
+    
     for saida in saidas:
-        if saida.item.tipo_controle == 'CONSUMIVEL':
+        if saida.item.tipo_controle in tipos_nao_serializados:
             if saida.item_id not in itens_consumiveis_dict:
                 itens_consumiveis_dict[saida.item_id] = {
                     'item': saida.item,
