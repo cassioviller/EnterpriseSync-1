@@ -36,7 +36,7 @@ def calcular_distancia_metros(lat1, lon1, lat2, lon2):
     return distancia
 
 
-def validar_localizacao_na_obra(lat_funcionario, lon_funcionario, obra):
+def validar_localizacao_na_obra(lat_funcionario, lon_funcionario, obra, exigir_localizacao=True):
     """
     Valida se o funcionário está dentro do raio da obra.
     
@@ -44,6 +44,7 @@ def validar_localizacao_na_obra(lat_funcionario, lon_funcionario, obra):
         lat_funcionario: Latitude do funcionário
         lon_funcionario: Longitude do funcionário
         obra: Objeto Obra com latitude, longitude e raio_geofence_metros
+        exigir_localizacao: Se True, rejeita quando obra tem geofence mas coords não fornecidas
     
     Returns:
         tuple: (bool, float, str) - (válido, distância, mensagem)
@@ -51,13 +52,21 @@ def validar_localizacao_na_obra(lat_funcionario, lon_funcionario, obra):
     if not obra:
         return (True, None, "Obra não informada")
     
-    if not obra.latitude or not obra.longitude:
+    # Verificar se obra tem geofencing configurado
+    obra_tem_geofence = obra.latitude is not None and obra.longitude is not None
+    
+    if not obra_tem_geofence:
         logger.info(f"Obra {obra.nome} sem geofencing configurado")
         return (True, None, "Obra sem geofencing configurado")
     
+    # SEGURANÇA: Se obra tem geofence configurado, exigir coordenadas do funcionário
     if lat_funcionario is None or lon_funcionario is None:
-        logger.warning("Coordenadas do funcionário não fornecidas")
-        return (True, None, "Localização não fornecida")
+        if exigir_localizacao:
+            logger.warning(f"Obra {obra.nome} exige geofencing mas coordenadas não fornecidas")
+            return (False, None, "Localização GPS obrigatória para esta obra")
+        else:
+            logger.warning("Coordenadas do funcionário não fornecidas (modo permissivo)")
+            return (True, None, "Localização não fornecida")
     
     raio = obra.raio_geofence_metros or 100
     

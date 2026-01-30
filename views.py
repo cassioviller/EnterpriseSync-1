@@ -2357,6 +2357,11 @@ def nova_obra():
             area_total_m2 = float(area_total_m2) if area_total_m2 else None
             responsavel_id = int(responsavel_id) if responsavel_id else None
             
+            # Campos de Geofencing
+            latitude = float(request.form.get('latitude')) if request.form.get('latitude') else None
+            longitude = float(request.form.get('longitude')) if request.form.get('longitude') else None
+            raio_geofence_metros = int(request.form.get('raio_geofence_metros', 100)) if request.form.get('raio_geofence_metros') else 100
+            
             # Gerar código único se não fornecido
             if not codigo:
                 try:
@@ -2407,7 +2412,10 @@ def nova_obra():
                 cliente_telefone=cliente_telefone,
                 portal_ativo=portal_ativo,
                 token_cliente=token_cliente,
-                admin_id=admin_id
+                admin_id=admin_id,
+                latitude=latitude,
+                longitude=longitude,
+                raio_geofence_metros=raio_geofence_metros
             )
             
             db.session.add(nova_obra)
@@ -2903,6 +2911,11 @@ def editar_obra(id):
             obra.cliente_email = request.form.get('cliente_email', '')
             obra.cliente_telefone = request.form.get('cliente_telefone', '')
             obra.portal_ativo = request.form.get('portal_ativo') == '1'
+            
+            # Campos de Geofencing
+            obra.latitude = float(request.form.get('latitude')) if request.form.get('latitude') else None
+            obra.longitude = float(request.form.get('longitude')) if request.form.get('longitude') else None
+            obra.raio_geofence_metros = int(request.form.get('raio_geofence_metros', 100)) if request.form.get('raio_geofence_metros') else 100
             
             # Gerar token se portal ativado e não existir
             if obra.portal_ativo and obra.cliente_email and not obra.token_cliente:
