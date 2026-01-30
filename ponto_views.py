@@ -28,6 +28,7 @@ from ponto_service import PontoService
 from multitenant_helper import get_admin_id as get_tenant_admin_id
 from decorators import admin_required
 from utils_facial import comparar_faces_deepface, validar_qualidade_foto
+from utils_geofencing import validar_localizacao_na_obra
 import logging
 import numpy as np
 import base64
@@ -1338,6 +1339,10 @@ def identificar_e_registrar():
         obra_id = data.get('obra_id')
         tipo_ponto = data.get('tipo_ponto')  # entrada, almoco_saida, almoco_retorno, saida
         
+        # Campos de geolocalização
+        latitude_func = data.get('latitude')
+        longitude_func = data.get('longitude')
+        
         if not foto_capturada_base64:
             return jsonify({
                 'success': False, 
@@ -1441,6 +1446,24 @@ def identificar_e_registrar():
         funcionario = melhor_match
         logger.info(f"Funcionário identificado: {funcionario.nome} (distância: {menor_distancia:.4f})")
         
+        # GEOFENCING: Validar localização se obra tiver coordenadas
+        distancia_obra = None
+        if obra_id and latitude_func is not None and longitude_func is not None:
+            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+            if obra:
+                valido_geo, distancia_obra, msg_geo = validar_localizacao_na_obra(
+                    latitude_func, longitude_func, obra
+                )
+                logger.info(f"Geofencing para {funcionario.nome}: {msg_geo}")
+                
+                if not valido_geo:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Você está fora da área permitida da obra. {msg_geo}',
+                        'funcionario_nome': funcionario.nome,
+                        'distancia_obra': round(distancia_obra, 1) if distancia_obra else None
+                    }), 403
+        
         # Registrar o ponto
         hoje = get_date_brasil()
         agora = get_time_brasil()
@@ -1456,9 +1479,20 @@ def identificar_e_registrar():
                 funcionario_id=funcionario.id,
                 data=hoje,
                 admin_id=admin_id,
-                obra_id=obra_id
+                obra_id=obra_id,
+                latitude=latitude_func,
+                longitude=longitude_func,
+                distancia_obra_metros=distancia_obra
             )
             db.session.add(registro)
+        else:
+            # Atualizar localização se fornecida
+            if latitude_func is not None:
+                registro.latitude = latitude_func
+            if longitude_func is not None:
+                registro.longitude = longitude_func
+            if distancia_obra is not None:
+                registro.distancia_obra_metros = distancia_obra
         
         tipo_registrado = None
         
