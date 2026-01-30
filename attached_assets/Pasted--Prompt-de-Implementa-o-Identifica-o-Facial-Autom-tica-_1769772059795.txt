@@ -1,0 +1,82 @@
+# Prompt de Implementação: Identificação Facial Automática
+
+## 🎯 Objetivo
+
+Criar uma nova tela de "Ponto por Reconhecimento Facial" onde o sistema identifica automaticamente o funcionário e registra o ponto, sem necessidade de seleção manual.
+
+## 📋 Instruções para o Replit Agent
+
+### Fase 1: Backend - API de Identificação
+
+1.  **Crie uma nova rota:** `/ponto/api/identificar-e-registrar` (POST)
+2.  **Lógica da API:**
+    -   Recebe a foto capturada em base64.
+    -   Busca **todos** os funcionários ativos que possuem foto cadastrada.
+    -   Usa a função `DeepFace.find()` para encontrar o funcionário mais parecido.
+    -   Se a distância for menor que o threshold (ex: 0.4), registra o ponto para o funcionário encontrado.
+    -   Se não encontrar ninguém, retorna erro "Funcionário não identificado".
+
+**Exemplo de Código:**
+```python
+from deepface import DeepFace
+
+@ponto_bp.route('/api/identificar-e-registrar', methods=['POST'])
+def identificar_e_registrar():
+    data = request.get_json()
+    foto_capturada = data['foto_base64']
+
+    # Diretório com as fotos dos funcionários
+    db_path = "/app/static/fotos_funcionarios/"
+
+    try:
+        # Encontra o funcionário mais parecido
+        dfs = DeepFace.find(img_path=foto_capturada, db_path=db_path, model_name='VGG-Face', distance_metric='cosine')
+
+        if not dfs or dfs[0].empty:
+            return jsonify({'success': False, 'message': 'Funcionário não identificado'}), 404
+
+        # Pega o resultado mais provável
+        best_match = dfs[0].iloc[0]
+        distancia = best_match['VGG-Face_cosine']
+
+        if distancia > 0.4: # Threshold
+            return jsonify({'success': False, 'message': 'Funcionário não identificado'}), 404
+
+        # Extrai o ID do funcionário do nome do arquivo
+        # Ex: /app/static/fotos_funcionarios/funcionario_123.jpg -> 123
+        caminho_foto = best_match['identity']
+        funcionario_id = int(caminho_foto.split('_')[-1].split('.')[0])
+
+        # Lógica para registrar o ponto (reaproveitar do outro endpoint)
+        # ...
+
+        return jsonify({'success': True, 'message': 'Ponto registrado com sucesso!'})
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+```
+
+### Fase 2: Frontend - Nova Tela de Ponto
+
+1.  **Crie um novo template:** `ponto_facial_automatico.html`
+2.  **Interface:**
+    -   Preview da câmera em tela cheia.
+    -   Botão "Registrar Ponto".
+    -   Área para exibir o resultado (sucesso/erro).
+3.  **JavaScript:**
+    -   Ao clicar no botão, captura a foto.
+    -   Envia para a nova API `/ponto/api/identificar-e-registrar`.
+    -   Exibe o resultado na tela.
+
+### Fase 3: Rota e Menu
+
+1.  **Crie uma nova rota:** `/ponto/facial` que renderiza o template `ponto_facial_automatico.html`.
+2.  **Adicione um link no menu:** "Ponto por Reconhecimento Facial".
+
+## 🚀 Próximos Passos para o Usuário
+
+1.  **Teste** a nova tela com diferentes funcionários.
+2.  **Ajuste** o threshold de distância se necessário.
+3.  **Verifique** a performance com todos os funcionários cadastrados.
+
+O sistema estará pronto para identificação facial automática! 🎯
