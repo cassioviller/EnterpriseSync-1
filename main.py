@@ -1,5 +1,12 @@
 from app import app
 
+# Registrar comando Flask para migração de geofencing
+try:
+    import migrate_geofencing  # noqa: F401
+    print("✅ Comando migrate-geofencing registrado")
+except Exception as e:
+    print(f"⚠️ Erro ao registrar migrate-geofencing: {e}")
+
 # API RDO Refatorada removida - funcionalidade integrada em salvar_rdo_flexivel
 
 # Registrar sistema de edição de RDO
