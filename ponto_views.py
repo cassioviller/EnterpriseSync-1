@@ -28,6 +28,7 @@ from ponto_service import PontoService
 from multitenant_helper import get_admin_id as get_tenant_admin_id
 from decorators import admin_required
 from utils_facial import comparar_faces_deepface, validar_qualidade_foto
+from utils_geofencing import validar_localizacao_na_obra
 import logging
 import numpy as np
 import base64
@@ -1338,6 +1339,10 @@ def identificar_e_registrar():
         obra_id = data.get('obra_id')
         tipo_ponto = data.get('tipo_ponto')  # entrada, almoco_saida, almoco_retorno, saida
         
+        # GEOFENCING: Receber localização GPS do dispositivo
+        latitude_funcionario = data.get('latitude')
+        longitude_funcionario = data.get('longitude')
+        
         if not foto_capturada_base64:
             return jsonify({
                 'success': False, 
@@ -1441,6 +1446,29 @@ def identificar_e_registrar():
         funcionario = melhor_match
         logger.info(f"Funcionário identificado: {funcionario.nome} (distância: {menor_distancia:.4f})")
         
+        # GEOFENCING: Validar se funcionário está dentro do raio da obra
+        distancia_obra = None
+        obra = None
+        if obra_id:
+            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        
+        if obra:
+            valido, distancia_obra, msg_geo = validar_localizacao_na_obra(
+                latitude_funcionario, longitude_funcionario, obra
+            )
+            
+            if not valido:
+                logger.warning(f"Geofencing bloqueou registro: {funcionario.nome} - {msg_geo}")
+                return jsonify({
+                    'success': False,
+                    'message': f'{funcionario.nome}: {msg_geo}. Você precisa estar na obra para registrar o ponto.',
+                    'funcionario_nome': funcionario.nome,
+                    'geofencing_erro': True,
+                    'distancia_metros': round(distancia_obra, 1) if distancia_obra else None
+                }), 403
+            else:
+                logger.info(f"Geofencing OK: {funcionario.nome} - {msg_geo}")
+        
         # Registrar o ponto
         hoje = get_date_brasil()
         agora = get_time_brasil()
@@ -1456,9 +1484,18 @@ def identificar_e_registrar():
                 funcionario_id=funcionario.id,
                 data=hoje,
                 admin_id=admin_id,
-                obra_id=obra_id
+                obra_id=obra_id,
+                latitude=latitude_funcionario,
+                longitude=longitude_funcionario,
+                distancia_obra_metros=distancia_obra
             )
             db.session.add(registro)
+        else:
+            # Atualizar localização se não foi definida antes
+            if latitude_funcionario and not registro.latitude:
+                registro.latitude = latitude_funcionario
+                registro.longitude = longitude_funcionario
+                registro.distancia_obra_metros = distancia_obra
         
         tipo_registrado = None
         
