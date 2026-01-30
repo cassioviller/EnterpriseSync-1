@@ -228,6 +228,11 @@ class Obra(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # GEOFENCING: Campos para validação de localização
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    raio_geofence_metros = db.Column(db.Integer, default=100)  # Raio padrão de 100 metros
+    
     registros_ponto = db.relationship('RegistroPonto', backref='obra_ref', lazy=True, overlaps="obra_ref")
     custos = db.relationship('CustoObra', backref='obra_ref', lazy=True, overlaps="obra_ref")
     servicos_obra = db.relationship('ServicoObra', backref='obra', cascade='all, delete-orphan', lazy=True)
@@ -404,6 +409,11 @@ class RegistroPonto(db.Model):
     reconhecimento_facial_sucesso = db.Column(db.Boolean, default=False)  # True se reconhecimento foi bem-sucedido
     confianca_reconhecimento = db.Column(db.Float)  # Distância facial (quanto menor, mais confiável)
     modelo_utilizado = db.Column(db.String(50), default='VGG-Face')  # Modelo DeepFace utilizado
+    
+    # GEOFENCING: Campos de localização do registro
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    distancia_obra_metros = db.Column(db.Float, nullable=True)
     
     # Relacionamentos são definidos via backref nos modelos principais
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
