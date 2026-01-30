@@ -1,0 +1,64 @@
+# Prompt de Otimização: Acelerar Identificação Facial com Cache de Embeddings
+
+## 🎯 Objetivo
+
+Acelerar drasticamente a identificação facial, reduzindo o tempo de resposta de 10-15 segundos para menos de 1 segundo.
+
+## 🔍 O Problema
+
+O `DeepFace.find()` processa todas as fotos dos funcionários a cada requisição. Isso é lento e ineficiente.
+
+## 🔧 A Solução: Cache de Embeddings
+
+Vamos pré-calcular os "embeddings" (a representação matemática de cada rosto) e salvá-los em um arquivo. Assim, a cada requisição, só precisamos calcular o embedding da foto capturada e comparar com os que já estão em cache.
+
+## 📋 Instruções para o Replit Agent
+
+### Fase 1: Gerar Cache de Embeddings
+
+1.  **Crie um novo script:** `gerar_cache_facial.py`
+2.  **Lógica do script:**
+    -   Busca todos os funcionários com foto.
+    -   Para cada foto, calcula o embedding usando `DeepFace.represent()`.
+    -   Salva os embeddings em um arquivo `pickle` (ex: `cache_facial.pkl`).
+
+**Exemplo de Código:**
+```python
+import pickle
+from deepface import DeepFace
+from models import Funcionario
+
+def gerar_cache():
+    funcionarios = Funcionario.query.filter(Funcionario.foto_base64.isnot(None)).all()
+    cache = {}
+
+    for func in funcionarios:
+        embedding = DeepFace.represent(img_path=func.foto_base64, model_name=\'VGG-Face\', enforce_detection=False)
+        cache[func.id] = embedding
+
+    with open(\'cache_facial.pkl\', \'wb\') as f:
+        pickle.dump(cache, f)
+
+if __name__ == \'__main__\':
+    gerar_cache()
+```
+
+### Fase 2: Modificar a API de Identificação
+
+1.  **Carregue o cache** no início da aplicação.
+2.  **Modifique a API** `/ponto/api/identificar-e-registrar`:
+    -   Calcule o embedding da foto capturada.
+    -   Compare com os embeddings em cache para encontrar o funcionário.
+
+**Exemplo de Código:**
+```python
+import pickle
+from deepface import DeepFace
+import numpy as np
+
+# Carregar cache na inicialização
+with open(\'cache_facial.pkl\', \'rb\') as f:
+    cache_facial = pickle.load(f)
+
+@ponto_bp.route(\'/api/identificar-e-registrar\', methods=[\'POST
+```

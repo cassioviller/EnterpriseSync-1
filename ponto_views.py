@@ -29,8 +29,121 @@ from multitenant_helper import get_admin_id as get_tenant_admin_id
 from decorators import admin_required
 from utils_facial import comparar_faces_deepface, validar_qualidade_foto
 import logging
+import numpy as np
+import base64
+import tempfile
+import os
 
 logger = logging.getLogger(__name__)
+
+# Cache global de embeddings
+_cache_facial = None
+_cache_loaded = False
+
+def carregar_cache_facial():
+    """Carrega o cache de embeddings do arquivo"""
+    global _cache_facial, _cache_loaded
+    
+    if _cache_loaded:
+        return _cache_facial
+    
+    try:
+        from gerar_cache_facial import carregar_cache, CACHE_PATH
+        _cache_facial = carregar_cache()
+        _cache_loaded = True
+        if _cache_facial:
+            logger.info(f"✅ Cache facial carregado: {_cache_facial.get('total_processados', 0)} embeddings")
+        return _cache_facial
+    except Exception as e:
+        logger.warning(f"⚠️ Erro ao carregar cache facial: {e}")
+        _cache_loaded = True
+        return None
+
+def recarregar_cache_facial():
+    """Força recarga do cache"""
+    global _cache_facial, _cache_loaded
+    _cache_loaded = False
+    _cache_facial = None
+    return carregar_cache_facial()
+
+def identificar_por_cache(foto_base64, admin_id, threshold=0.55):
+    """
+    Identifica funcionário usando cache de embeddings (muito mais rápido).
+    
+    Args:
+        foto_base64: Foto capturada em base64
+        admin_id: ID do tenant
+        threshold: Limiar de distância para match
+    
+    Returns:
+        tuple: (funcionario_id, distancia, erro)
+    """
+    try:
+        from deepface import DeepFace
+    except ImportError:
+        return None, None, "DeepFace não instalado"
+    
+    cache = carregar_cache_facial()
+    if not cache or 'embeddings' not in cache:
+        return None, None, "Cache não disponível"
+    
+    embeddings_cache = cache['embeddings']
+    
+    embeddings_tenant = {
+        fid: data for fid, data in embeddings_cache.items() 
+        if data.get('admin_id') == admin_id
+    }
+    
+    if not embeddings_tenant:
+        return None, None, "Nenhum embedding no cache para este tenant"
+    
+    try:
+        if foto_base64.startswith('data:'):
+            foto_base64 = foto_base64.split(',')[1]
+        
+        foto_bytes = base64.b64decode(foto_base64)
+        
+        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+            tmp.write(foto_bytes)
+            tmp_path = tmp.name
+        
+        try:
+            embedding_result = DeepFace.represent(
+                img_path=tmp_path,
+                model_name='SFace',
+                enforce_detection=False,
+                detector_backend='opencv'
+            )
+            
+            if not embedding_result or len(embedding_result) == 0:
+                return None, None, "Nenhum rosto detectado na foto"
+            
+            embedding_capturado = np.array(embedding_result[0]['embedding'])
+            
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        
+        melhor_match_id = None
+        menor_distancia = float('inf')
+        
+        for func_id, data in embeddings_tenant.items():
+            embedding_cache = np.array(data['embedding'])
+            
+            distancia = np.linalg.norm(embedding_capturado - embedding_cache)
+            
+            if distancia < menor_distancia:
+                menor_distancia = distancia
+                melhor_match_id = func_id
+        
+        if menor_distancia <= threshold:
+            return melhor_match_id, menor_distancia, None
+        else:
+            return None, menor_distancia, f"Distância {menor_distancia:.4f} acima do threshold {threshold}"
+            
+    except Exception as e:
+        logger.error(f"Erro na identificação por cache: {e}")
+        return None, None, str(e)
 
 ponto_bp = Blueprint('ponto', __name__, url_prefix='/ponto')
 
@@ -1131,6 +1244,78 @@ def ponto_facial_automatico():
         return redirect(url_for('ponto.index'))
 
 
+@ponto_bp.route('/api/cache/gerar', methods=['POST'])
+@login_required
+@admin_required
+def gerar_cache_embeddings():
+    """API para gerar/regenerar cache de embeddings faciais"""
+    try:
+        from gerar_cache_facial import gerar_cache
+        admin_id = get_tenant_admin_id()
+        
+        logger.info(f"Iniciando geração de cache facial para admin_id={admin_id}")
+        resultado = gerar_cache(admin_id)
+        
+        if resultado['success']:
+            recarregar_cache_facial()
+            return jsonify({
+                'success': True,
+                'message': f"Cache gerado com sucesso! {resultado['processados']} funcionários processados.",
+                'processados': resultado['processados'],
+                'total': resultado['total'],
+                'erros': len(resultado.get('erros', []))
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': resultado.get('error', 'Erro desconhecido')
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Erro ao gerar cache: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Erro ao gerar cache: {str(e)}'
+        }), 500
+
+
+@ponto_bp.route('/api/cache/status', methods=['GET'])
+@login_required
+def status_cache_embeddings():
+    """API para verificar status do cache de embeddings"""
+    try:
+        admin_id = get_tenant_admin_id()
+        cache = carregar_cache_facial()
+        
+        if not cache:
+            return jsonify({
+                'disponivel': False,
+                'message': 'Cache não encontrado. Gere o cache primeiro.'
+            })
+        
+        embeddings_tenant = {
+            fid: data for fid, data in cache.get('embeddings', {}).items()
+            if data.get('admin_id') == admin_id
+        }
+        
+        return jsonify({
+            'disponivel': True,
+            'gerado_em': cache.get('generated_at'),
+            'modelo': cache.get('model'),
+            'total_embeddings': len(embeddings_tenant),
+            'funcionarios': [
+                {'id': fid, 'nome': data['nome'], 'codigo': data['codigo']}
+                for fid, data in embeddings_tenant.items()
+            ]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'disponivel': False,
+            'message': f'Erro: {str(e)}'
+        }), 500
+
+
 @ponto_bp.route('/api/identificar-e-registrar', methods=['POST'])
 @login_required
 def identificar_e_registrar():
@@ -1197,34 +1382,52 @@ def identificar_e_registrar():
                 'message': f'Foto inválida: {msg_qualidade}'
             }), 400
         
-        # Comparar com cada funcionário e encontrar o melhor match
+        THRESHOLD_DISTANCIA = 0.55
         melhor_match = None
         menor_distancia = float('inf')
-        THRESHOLD_DISTANCIA = 0.55  # Threshold para identificação automática (mais rigoroso)
         
-        logger.info(f"Iniciando identificação facial entre {len(funcionarios)} funcionários...")
+        # OTIMIZAÇÃO: Tentar identificação via cache primeiro (muito mais rápido)
+        logger.info("Tentando identificação via cache de embeddings...")
+        func_id, distancia_cache, erro_cache = identificar_por_cache(
+            foto_capturada_base64, admin_id, THRESHOLD_DISTANCIA
+        )
         
-        for funcionario in funcionarios:
-            try:
-                match, distancia, erro_facial = comparar_faces_deepface(
-                    funcionario.foto_base64, 
-                    foto_capturada_base64,
-                    modelo='SFace'
-                )
-                
-                if erro_facial:
-                    logger.debug(f"Erro ao comparar com {funcionario.nome}: {erro_facial}")
-                    continue
-                
-                logger.debug(f"Comparação com {funcionario.nome}: match={match}, distância={distancia:.4f}")
-                
-                if match and distancia < menor_distancia:
-                    menor_distancia = distancia
-                    melhor_match = funcionario
+        if func_id and not erro_cache:
+            # IMPORTANTE: Validar que o funcionário pertence ao tenant correto
+            melhor_match = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
+            if melhor_match:
+                menor_distancia = distancia_cache
+                logger.info(f"✅ Identificado via cache: {melhor_match.nome} (dist: {distancia_cache:.4f})")
+            else:
+                logger.warning(f"⚠️ Cache retornou func_id={func_id} mas não pertence ao tenant {admin_id}")
+                erro_cache = "Funcionário não encontrado no tenant"
+        
+        # FALLBACK: Método tradicional se cache não disponível ou falhou
+        if erro_cache or not melhor_match:
+            logger.info(f"Cache não disponível ({erro_cache}), usando método tradicional...")
+            logger.info(f"Iniciando identificação facial entre {len(funcionarios)} funcionários...")
+            
+            for funcionario in funcionarios:
+                try:
+                    match, distancia, erro_facial = comparar_faces_deepface(
+                        funcionario.foto_base64, 
+                        foto_capturada_base64,
+                        modelo='SFace'
+                    )
                     
-            except Exception as e:
-                logger.warning(f"Falha ao comparar com funcionário {funcionario.id}: {e}")
-                continue
+                    if erro_facial:
+                        logger.debug(f"Erro ao comparar com {funcionario.nome}: {erro_facial}")
+                        continue
+                    
+                    logger.debug(f"Comparação com {funcionario.nome}: match={match}, distância={distancia:.4f}")
+                    
+                    if match and distancia < menor_distancia:
+                        menor_distancia = distancia
+                        melhor_match = funcionario
+                        
+                except Exception as e:
+                    logger.warning(f"Falha ao comparar com funcionário {funcionario.id}: {e}")
+                    continue
         
         # Verificar se encontrou match válido
         if not melhor_match or menor_distancia > THRESHOLD_DISTANCIA:

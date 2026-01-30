@@ -23,7 +23,11 @@
             <span id="horario-atual" class="time">--:--:--</span>
             <span id="data-atual" class="date">--/--/----</span>
         </div>
-        <span class="badge bg-light text-dark">{{ funcionarios_com_foto }} <i class="fas fa-user"></i></span>
+        <div class="cache-status">
+            <span id="cache-badge" class="badge bg-secondary" title="Clique para gerar cache" onclick="gerarCache()">
+                <i class="fas fa-database"></i> <span id="cache-count">?</span>
+            </span>
+        </div>
     </div>
     
     <div class="main-area">
@@ -118,6 +122,17 @@
 .time-display .date {
     font-size: 0.85rem;
     opacity: 0.8;
+}
+
+.cache-status .badge {
+    cursor: pointer;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+}
+
+.cache-status .badge:hover {
+    transform: scale(1.1);
 }
 
 .main-area {
@@ -301,7 +316,61 @@
 </style>
 
 <script>
+async function verificarCache() {
+    try {
+        const response = await fetch('/ponto/api/cache/status');
+        const data = await response.json();
+        const badge = document.getElementById('cache-badge');
+        const count = document.getElementById('cache-count');
+        
+        if (data.disponivel) {
+            badge.className = 'badge bg-success';
+            badge.title = `Cache OK: ${data.total_embeddings} funcionários. Clique para regenerar.`;
+            count.textContent = data.total_embeddings;
+        } else {
+            badge.className = 'badge bg-warning text-dark';
+            badge.title = 'Cache não disponível. Clique para gerar.';
+            count.textContent = '!';
+        }
+    } catch (err) {
+        console.error('Erro ao verificar cache:', err);
+    }
+}
+
+async function gerarCache() {
+    const badge = document.getElementById('cache-badge');
+    const count = document.getElementById('cache-count');
+    
+    if (!confirm('Gerar cache de embeddings faciais? Isso pode levar alguns minutos.')) {
+        return;
+    }
+    
+    badge.className = 'badge bg-info';
+    count.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
+    try {
+        const response = await fetch('/ponto/api/cache/gerar', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            badge.className = 'badge bg-success';
+            count.textContent = data.processados;
+            alert(`Cache gerado! ${data.processados} funcionários processados.`);
+        } else {
+            badge.className = 'badge bg-danger';
+            count.textContent = '!';
+            alert('Erro: ' + data.message);
+        }
+    } catch (err) {
+        badge.className = 'badge bg-danger';
+        count.textContent = '!';
+        alert('Erro ao gerar cache: ' + err.message);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    verificarCache();
+    
     const video = document.getElementById('video-preview');
     const canvas = document.getElementById('canvas-capture');
     const btnRegistrar = document.getElementById('btn-registrar');
