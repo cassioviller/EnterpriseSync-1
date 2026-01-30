@@ -359,6 +359,71 @@
                                 </div>
                             </div>
 
+                            <!-- Geofencing - Cerca Virtual -->
+                            <h5 class="mb-4 mt-5" style="color: #198754; font-weight: 600;">
+                                <i class="fas fa-map-marked-alt me-2"></i>Geofencing (Cerca Virtual)
+                            </h5>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="latitude" class="form-label">
+                                            <i class="fas fa-location-arrow"></i>Latitude
+                                        </label>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               id="latitude" 
+                                               name="latitude" 
+                                               value="{{ obra.latitude if obra and obra.latitude else '' }}"
+                                               step="0.000001"
+                                               placeholder="-23.550520">
+                                        <small class="text-muted">Coordenada GPS (ex: -23.550520)</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="longitude" class="form-label">
+                                            <i class="fas fa-location-arrow"></i>Longitude
+                                        </label>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               id="longitude" 
+                                               name="longitude" 
+                                               value="{{ obra.longitude if obra and obra.longitude else '' }}"
+                                               step="0.000001"
+                                               placeholder="-46.633308">
+                                        <small class="text-muted">Coordenada GPS (ex: -46.633308)</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="raio_geofence_metros" class="form-label">
+                                            <i class="fas fa-circle"></i>Raio (metros)
+                                        </label>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               id="raio_geofence_metros" 
+                                               name="raio_geofence_metros" 
+                                               value="{{ obra.raio_geofence_metros if obra and obra.raio_geofence_metros else 100 }}"
+                                               min="10"
+                                               max="1000"
+                                               placeholder="100">
+                                        <small class="text-muted">Distância máxima para registro de ponto</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-12">
+                                    <button type="button" class="btn btn-outline-primary" onclick="obterLocalizacaoAtual(this)">
+                                        <i class="fas fa-crosshairs me-2"></i>Usar Minha Localização Atual
+                                    </button>
+                                    <small class="text-muted ms-2">Clique para preencher com sua posição GPS atual</small>
+                                </div>
+                            </div>
+
                             <!-- Informações do Cliente -->
                             <h5 class="mb-4 mt-5" style="color: #198754; font-weight: 600;">
                                 <i class="fas fa-user-tie me-2"></i>Informações do Cliente
@@ -661,5 +726,56 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+function obterLocalizacaoAtual(btnElement) {
+    if (!navigator.geolocation) {
+        alert('Seu navegador não suporta geolocalização');
+        return;
+    }
+    
+    const btn = btnElement || document.querySelector('button[onclick*="obterLocalizacao"]');
+    if (!btn) return;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Obtendo...';
+    btn.disabled = true;
+    
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            document.getElementById('latitude').value = position.coords.latitude.toFixed(6);
+            document.getElementById('longitude').value = position.coords.longitude.toFixed(6);
+            btn.innerHTML = '<i class="fas fa-check me-2"></i>Localização obtida!';
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-success');
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-primary');
+                btn.disabled = false;
+            }, 2000);
+        },
+        function(error) {
+            let mensagem = 'Erro ao obter localização';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    mensagem = 'Permissão de localização negada';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    mensagem = 'Localização indisponível';
+                    break;
+                case error.TIMEOUT:
+                    mensagem = 'Tempo esgotado';
+                    break;
+            }
+            alert(mensagem);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
 </script>
 {% endblock %}
