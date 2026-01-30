@@ -1,0 +1,275 @@
+# Prompt Completo: Implementação de Geofencing no Módulo de Ponto
+
+## 🎯 Objetivo
+
+Implementar um sistema completo de Cerca Virtual (Geofencing) para garantir que os funcionários estejam fisicamente na obra ao registrar o ponto.
+
+---
+
+## 📋 Fase 1: Modificar o Modelo `Obra`
+
+**Tarefa:** Adicione os campos de geolocalização no modelo `Obra` em `models.py`.
+
+**Campos a adicionar:**
+```python
+latitude = db.Column(db.Float, nullable=True)
+longitude = db.Column(db.Float, nullable=True)
+raio_geofence_metros = db.Column(db.Integer, default=100)
+```
+
+**Migração do banco de dados:**
+- Execute a migração para adicionar os novos campos na tabela `obra`.
+
+---
+
+## 📋 Fase 2: Criar Função de Cálculo de Distância
+
+**Tarefa:** Crie uma função utilitária para calcular a distância entre duas coordenadas GPS usando a fórmula de Haversine.
+
+**Arquivo:** `utils_geofencing.py` (novo arquivo)
+
+**Código:**
+```python
+from math import radians, sin, cos, sqrt, atan2
+
+def calcular_distancia_metros(lat1, lon1, lat2, lon2):
+    """
+    Calcula a distância em metros entre duas coordenadas GPS.
+    Usa a fórmula de Haversine.
+    """
+    R = 6371000  # Raio da Terra em metros
+    
+    lat1_rad = radians(lat1)
+    lon1_rad = radians(lon1)
+    lat2_rad = radians(lat2)
+    lon2_rad = radians(lon2)
+    
+    dlon = lon2_rad - lon1_rad
+    dlat = lat2_rad - lat1_rad
+    
+    a = sin(dlat / 2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    
+    distancia = R * c
+    return distancia
+
+def validar_localizacao_na_obra(lat_funcionario, lon_funcionario, obra):
+    """
+    Valida se o funcionário está dentro do raio da obra.
+    Retorna (bool, distancia_metros, mensagem).
+    """
+    if not obra.latitude or not obra.longitude:
+        return (True, None, "Obra sem geofencing configurado")
+    
+    distancia = calcular_distancia_metros(
+        lat_funcionario, lon_funcionario,
+        obra.latitude, obra.longitude
+    )
+    
+    if distancia <= obra.raio_geofence_metros:
+        return (True, distancia, f"Dentro do raio ({distancia:.0f}m)")
+    else:
+        return (False, distancia, f"Fora do raio ({distancia:.0f}m de {obra.raio_geofence_metros}m)")
+```
+
+---
+
+## 📋 Fase 3: Modificar a API de Registro de Ponto
+
+**Tarefa:** Modifique a rota `/ponto/api/identificar-e-registrar` para validar a localização.
+
+**Modificações:**
+
+1. **Receber latitude e longitude** no JSON da requisição:
+```python
+data = request.get_json()
+foto_capturada = data['foto_base64']
+latitude = data.get('latitude')
+longitude = data.get('longitude')
+```
+
+2. **Validar a localização** antes de registrar o ponto:
+```python
+from utils_geofencing import validar_localizacao_na_obra
+
+# Buscar a obra do funcionário (se houver)
+obra = Obra.query.filter_by(id=funcionario.obra_id_atual).first()
+
+if obra:
+    valido, distancia, mensagem = validar_localizacao_na_obra(latitude, longitude, obra)
+    
+    if not valido:
+        return jsonify({
+            'success': False,
+            'message': f'Você está fora da área da obra. {mensagem}'
+        }), 403
+
+# Continuar com o registro do ponto...
+```
+
+3. **Salvar a localização** no registro de ponto:
+```python
+novo_registro = RegistroPonto(
+    funcionario_id=funcionario.id,
+    # ... outros campos ...
+    latitude=latitude,
+    longitude=longitude,
+    distancia_obra_metros=distancia
+)
+```
+
+---
+
+## 📋 Fase 4: Modificar o Frontend - Captura de GPS
+
+**Tarefa:** Modifique o JavaScript da tela de ponto para capturar a localização do usuário.
+
+**Arquivo:** `ponto_facial_automatico.html` (ou similar)
+
+**Código JavaScript:**
+```javascript
+function registrarPontoComGPS() {
+    // Verificar se o navegador suporta geolocalização
+    if (!navigator.geolocation) {
+        alert('Seu navegador não suporta geolocalização');
+        return;
+    }
+
+    // Capturar localização
+    navigator.geolocation.getCurrentPosition(
+        position => {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+
+            // Capturar foto e enviar para a API
+            capturarFotoEEnviar(latitude, longitude);
+        },
+        error => {
+            let mensagem = 'Erro ao obter localização';
+            
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    mensagem = 'Você precisa permitir o acesso à localização para registrar o ponto';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    mensagem = 'Localização indisponível';
+                    break;
+                case error.TIMEOUT:
+                    mensagem = 'Tempo esgotado ao obter localização';
+                    break;
+            }
+            
+            alert(mensagem);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
+
+function capturarFotoEEnviar(latitude, longitude) {
+    // Capturar foto da câmera
+    const canvas = document.getElementById('canvas');
+    const fotoBase64 = canvas.toDataURL('image/jpeg');
+
+    // Enviar para a API
+    fetch('/ponto/api/identificar-e-registrar', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            foto_base64: fotoBase64,
+            latitude: latitude,
+            longitude: longitude
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Ponto registrado com sucesso!');
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    });
+}
+```
+
+---
+
+## 📋 Fase 5: Modificar o Formulário de Cadastro de Obra
+
+**Tarefa:** Adicione os campos de geolocalização no formulário de cadastro/edição de obra.
+
+**Template:** `obra_form.html`
+
+**Campos a adicionar:**
+```html
+<div class="form-group">
+    <label for="latitude">Latitude</label>
+    <input type="number" step="0.000001" class="form-control" id="latitude" name="latitude" value="{{ obra.latitude or '' }}">
+    <small class="form-text text-muted">Ex: -23.550520</small>
+</div>
+
+<div class="form-group">
+    <label for="longitude">Longitude</label>
+    <input type="number" step="0.000001" class="form-control" id="longitude" name="longitude" value="{{ obra.longitude or '' }}">
+    <small class="form-text text-muted">Ex: -46.633308</small>
+</div>
+
+<div class="form-group">
+    <label for="raio_geofence_metros">Raio de Geofencing (metros)</label>
+    <input type="number" class="form-control" id="raio_geofence_metros" name="raio_geofence_metros" value="{{ obra.raio_geofence_metros or 100 }}">
+    <small class="form-text text-muted">Distância máxima permitida para registrar ponto (padrão: 100m)</small>
+</div>
+```
+
+**Opcional:** Adicione um botão "Obter Localização Atual" para facilitar o cadastro:
+```html
+<button type="button" class="btn btn-secondary" onclick="obterLocalizacaoAtual()">
+    <i class="fas fa-map-marker-alt"></i> Obter Localização Atual
+</button>
+
+<script>
+function obterLocalizacaoAtual() {
+    navigator.geolocation.getCurrentPosition(position => {
+        document.getElementById('latitude').value = position.coords.latitude;
+        document.getElementById('longitude').value = position.coords.longitude;
+    });
+}
+</script>
+```
+
+---
+
+## 📋 Fase 6: Adicionar Campos no Modelo `RegistroPonto`
+
+**Tarefa:** Adicione os campos de localização no modelo `RegistroPonto` para salvar onde o ponto foi registrado.
+
+**Campos a adicionar:**
+```python
+latitude = db.Column(db.Float, nullable=True)
+longitude = db.Column(db.Float, nullable=True)
+distancia_obra_metros = db.Column(db.Float, nullable=True)
+```
+
+---
+
+## 🚀 Próximos Passos para o Usuário
+
+1. **Execute as migrações** do banco de dados.
+2. **Cadastre as coordenadas** das obras existentes.
+3. **Teste** o registro de ponto:
+   - Dentro do raio da obra (deve funcionar)
+   - Fora do raio da obra (deve bloquear)
+4. **Ajuste o raio** conforme necessário para cada obra.
+
+## 💡 Dicas
+
+- Use o Google Maps para obter as coordenadas das obras (clique com botão direito no mapa).
+- Raio recomendado: 50-200 metros (dependendo do tamanho da obra).
+- Em obras muito grandes, aumente o raio para 300-500 metros.
+
+O sistema estará pronto para controle de localização! 🎯
