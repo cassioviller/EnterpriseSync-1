@@ -424,34 +424,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    async function obterLocalizacao() {
-        return new Promise((resolve) => {
-            if (!navigator.geolocation) {
-                console.log('Geolocalização não suportada');
-                resolve({ latitude: null, longitude: null });
-                return;
-            }
-            
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    resolve({
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude
-                    });
-                },
-                (error) => {
-                    console.log('Erro ao obter localização:', error.message);
-                    resolve({ latitude: null, longitude: null });
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 5000,
-                    maximumAge: 0
-                }
-            );
-        });
-    }
-    
     async function registrarPonto() {
         const fotoBase64 = capturarFoto();
         const obraId = document.getElementById('obra_id').value;
@@ -459,11 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         cameraOverlay.classList.add('show');
         btnRegistrar.disabled = true;
-        resultadoContainer.innerHTML = '<div class="text-light small">Obtendo localização...</div>';
-        
-        // GEOFENCING: Obter localização GPS
-        const localizacao = await obterLocalizacao();
-        resultadoContainer.innerHTML = '<div class="text-light small">Identificando...</div>';
+        resultadoContainer.innerHTML = '';
         
         try {
             const response = await fetch('/ponto/api/identificar-e-registrar', {
@@ -472,9 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     foto_base64: fotoBase64,
                     obra_id: obraId || null,
-                    tipo_ponto: tipoPonto,
-                    latitude: localizacao.latitude,
-                    longitude: localizacao.longitude
+                    tipo_ponto: tipoPonto
                 })
             });
             
@@ -492,13 +458,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 setTimeout(() => { resultadoContainer.innerHTML = ''; }, 5000);
             } else {
-                let iconClass = 'fa-times-circle';
-                if (data.geofencing_erro) {
-                    iconClass = 'fa-map-marker-alt';
-                }
                 resultadoContainer.innerHTML = `
                     <div class="alert alert-danger">
-                        <i class="fas ${iconClass} me-2"></i>${data.message}
+                        <i class="fas fa-times-circle me-2"></i>${data.message}
                     </div>
                 `;
             }

@@ -2390,26 +2390,6 @@ def nova_obra():
                 import secrets
                 token_cliente = secrets.token_urlsafe(32)
             
-            # GEOFENCING: Campos de localização
-            latitude = None
-            longitude = None
-            raio_geofence = 100
-            if request.form.get('latitude'):
-                try:
-                    latitude = float(request.form.get('latitude'))
-                except (ValueError, TypeError):
-                    pass
-            if request.form.get('longitude'):
-                try:
-                    longitude = float(request.form.get('longitude'))
-                except (ValueError, TypeError):
-                    pass
-            if request.form.get('raio_geofence_metros'):
-                try:
-                    raio_geofence = int(request.form.get('raio_geofence_metros'))
-                except (ValueError, TypeError):
-                    raio_geofence = 100
-            
             # Criar nova obra
             nova_obra = Obra(
                 nome=nome,
@@ -2427,10 +2407,7 @@ def nova_obra():
                 cliente_telefone=cliente_telefone,
                 portal_ativo=portal_ativo,
                 token_cliente=token_cliente,
-                admin_id=admin_id,
-                latitude=latitude,
-                longitude=longitude,
-                raio_geofence_metros=raio_geofence
+                admin_id=admin_id
             )
             
             db.session.add(nova_obra)
@@ -2931,29 +2908,6 @@ def editar_obra(id):
             if obra.portal_ativo and obra.cliente_email and not obra.token_cliente:
                 import secrets
                 obra.token_cliente = secrets.token_urlsafe(32)
-            
-            # GEOFENCING: Atualizar campos de localização
-            if request.form.get('latitude'):
-                try:
-                    obra.latitude = float(request.form.get('latitude'))
-                except (ValueError, TypeError):
-                    pass
-            else:
-                obra.latitude = None
-            
-            if request.form.get('longitude'):
-                try:
-                    obra.longitude = float(request.form.get('longitude'))
-                except (ValueError, TypeError):
-                    pass
-            else:
-                obra.longitude = None
-            
-            if request.form.get('raio_geofence_metros'):
-                try:
-                    obra.raio_geofence_metros = int(request.form.get('raio_geofence_metros'))
-                except (ValueError, TypeError):
-                    obra.raio_geofence_metros = 100
             
             # ===== SISTEMA REFATORADO DE SERVIÇOS =====
             # Processar serviços selecionados usando nova função
