@@ -1094,3 +1094,258 @@ def verificar_foto_funcionario(funcionario_id):
     except Exception as e:
         logger.error(f"Erro ao verificar foto do funcionário: {e}")
         return jsonify({'success': False, 'tem_foto': False, 'message': str(e)})
+
+
+# ================================
+# IDENTIFICAÇÃO FACIAL AUTOMÁTICA
+# ================================
+
+@ponto_bp.route('/facial')
+@login_required
+def ponto_facial_automatico():
+    """Página de ponto por reconhecimento facial automático"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        # Buscar obras ativas para seleção
+        obras = Obra.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).order_by(Obra.nome).all()
+        
+        # Contar funcionários com foto cadastrada
+        funcionarios_com_foto = Funcionario.query.filter(
+            Funcionario.admin_id == admin_id,
+            Funcionario.ativo == True,
+            Funcionario.foto_base64 != None,
+            Funcionario.foto_base64 != ''
+        ).count()
+        
+        return render_template('ponto/ponto_facial_automatico.html',
+                             obras=obras,
+                             funcionarios_com_foto=funcionarios_com_foto)
+        
+    except Exception as e:
+        logger.error(f"Erro ao carregar página de ponto facial: {e}")
+        flash(f'Erro ao carregar página: {str(e)}', 'error')
+        return redirect(url_for('ponto.index'))
+
+
+@ponto_bp.route('/api/identificar-e-registrar', methods=['POST'])
+@login_required
+def identificar_e_registrar():
+    """API para identificar funcionário automaticamente e registrar ponto"""
+    try:
+        if not request.is_json:
+            return jsonify({
+                'success': False, 
+                'message': 'Requisição inválida. Envie os dados em formato JSON.'
+            }), 400
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False, 
+                'message': 'Dados não recebidos. Por favor, tente novamente.'
+            }), 400
+        
+        foto_capturada_base64 = data.get('foto_base64')
+        obra_id = data.get('obra_id')
+        tipo_ponto = data.get('tipo_ponto')  # entrada, almoco_saida, almoco_retorno, saida
+        
+        if not foto_capturada_base64:
+            return jsonify({
+                'success': False, 
+                'message': 'Foto não recebida. Por favor, tire uma foto.'
+            }), 400
+        
+        # Validar tamanho da foto
+        MAX_BASE64_SIZE = 2 * 1024 * 1024
+        if len(foto_capturada_base64) > MAX_BASE64_SIZE:
+            return jsonify({
+                'success': False, 
+                'message': 'Foto muito grande. Máximo permitido: 2MB'
+            }), 400
+        
+        admin_id = get_tenant_admin_id()
+        
+        # Validar obra_id pertence ao tenant (se fornecido)
+        if obra_id:
+            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+            if not obra:
+                obra_id = None  # Ignorar obra inválida em vez de falhar
+        
+        # Buscar todos os funcionários ativos com foto cadastrada
+        funcionarios = Funcionario.query.filter(
+            Funcionario.admin_id == admin_id,
+            Funcionario.ativo == True,
+            Funcionario.foto_base64 != None,
+            Funcionario.foto_base64 != ''
+        ).all()
+        
+        if not funcionarios:
+            return jsonify({
+                'success': False, 
+                'message': 'Nenhum funcionário com foto cadastrada. Cadastre fotos dos funcionários primeiro.'
+            }), 404
+        
+        # Validar qualidade da foto capturada
+        valido, msg_qualidade = validar_qualidade_foto(foto_capturada_base64)
+        if not valido:
+            return jsonify({
+                'success': False, 
+                'message': f'Foto inválida: {msg_qualidade}'
+            }), 400
+        
+        # Comparar com cada funcionário e encontrar o melhor match
+        melhor_match = None
+        menor_distancia = float('inf')
+        THRESHOLD_DISTANCIA = 0.55  # Threshold para identificação automática (mais rigoroso)
+        
+        logger.info(f"Iniciando identificação facial entre {len(funcionarios)} funcionários...")
+        
+        for funcionario in funcionarios:
+            try:
+                match, distancia, erro_facial = comparar_faces_deepface(
+                    funcionario.foto_base64, 
+                    foto_capturada_base64,
+                    modelo='SFace'
+                )
+                
+                if erro_facial:
+                    logger.debug(f"Erro ao comparar com {funcionario.nome}: {erro_facial}")
+                    continue
+                
+                logger.debug(f"Comparação com {funcionario.nome}: match={match}, distância={distancia:.4f}")
+                
+                if match and distancia < menor_distancia:
+                    menor_distancia = distancia
+                    melhor_match = funcionario
+                    
+            except Exception as e:
+                logger.warning(f"Falha ao comparar com funcionário {funcionario.id}: {e}")
+                continue
+        
+        # Verificar se encontrou match válido
+        if not melhor_match or menor_distancia > THRESHOLD_DISTANCIA:
+            logger.warning(f"Identificação falhou. Melhor distância: {menor_distancia:.4f}")
+            return jsonify({
+                'success': False, 
+                'message': 'Funcionário não identificado. Tente novamente com melhor iluminação ou registre manualmente.',
+                'distancia': round(menor_distancia, 4) if menor_distancia != float('inf') else None
+            }), 404
+        
+        funcionario = melhor_match
+        logger.info(f"Funcionário identificado: {funcionario.nome} (distância: {menor_distancia:.4f})")
+        
+        # Registrar o ponto
+        hoje = get_date_brasil()
+        agora = get_time_brasil()
+        
+        registro = RegistroPonto.query.filter_by(
+            funcionario_id=funcionario.id,
+            data=hoje,
+            admin_id=admin_id
+        ).first()
+        
+        if not registro:
+            registro = RegistroPonto(
+                funcionario_id=funcionario.id,
+                data=hoje,
+                admin_id=admin_id,
+                obra_id=obra_id
+            )
+            db.session.add(registro)
+        
+        tipo_registrado = None
+        
+        # Se tipo foi selecionado manualmente, usar esse
+        if tipo_ponto:
+            if tipo_ponto == 'entrada':
+                if registro.hora_entrada:
+                    return jsonify({
+                        'success': False, 
+                        'message': f'{funcionario.nome}: Entrada já foi registrada hoje.',
+                        'funcionario_nome': funcionario.nome
+                    }), 400
+                registro.hora_entrada = agora
+                tipo_registrado = 'entrada'
+            elif tipo_ponto == 'almoco_saida':
+                if registro.hora_almoco_saida:
+                    return jsonify({
+                        'success': False, 
+                        'message': f'{funcionario.nome}: Saída para almoço já foi registrada hoje.',
+                        'funcionario_nome': funcionario.nome
+                    }), 400
+                registro.hora_almoco_saida = agora
+                tipo_registrado = 'saída para almoço'
+            elif tipo_ponto == 'almoco_retorno':
+                if registro.hora_almoco_retorno:
+                    return jsonify({
+                        'success': False, 
+                        'message': f'{funcionario.nome}: Retorno do almoço já foi registrado hoje.',
+                        'funcionario_nome': funcionario.nome
+                    }), 400
+                registro.hora_almoco_retorno = agora
+                tipo_registrado = 'retorno do almoço'
+            elif tipo_ponto == 'saida':
+                if registro.hora_saida:
+                    return jsonify({
+                        'success': False, 
+                        'message': f'{funcionario.nome}: Saída já foi registrada hoje.',
+                        'funcionario_nome': funcionario.nome
+                    }), 400
+                registro.hora_saida = agora
+                tipo_registrado = 'saída'
+        else:
+            # Modo automático sequencial
+            if not registro.hora_entrada:
+                registro.hora_entrada = agora
+                tipo_registrado = 'entrada'
+            elif registro.hora_entrada and not registro.hora_almoco_saida:
+                registro.hora_almoco_saida = agora
+                tipo_registrado = 'saída para almoço'
+            elif registro.hora_almoco_saida and not registro.hora_almoco_retorno:
+                registro.hora_almoco_retorno = agora
+                tipo_registrado = 'retorno do almoço'
+            elif not registro.hora_saida:
+                registro.hora_saida = agora
+                tipo_registrado = 'saída'
+            else:
+                return jsonify({
+                    'success': False, 
+                    'message': f'{funcionario.nome}: Jornada completa já registrada hoje.',
+                    'funcionario_nome': funcionario.nome
+                }), 400
+        
+        # Salvar metadados do reconhecimento
+        registro.reconhecimento_facial_sucesso = True
+        registro.confianca_reconhecimento = menor_distancia
+        registro.modelo_utilizado = 'SFace'
+        
+        db.session.commit()
+        
+        logger.info(
+            f"Ponto registrado via identificação automática: "
+            f"Funcionário {funcionario.nome} ({funcionario.id}), "
+            f"Tipo: {tipo_registrado}, Distância: {menor_distancia:.4f}"
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'{funcionario.nome}: {tipo_registrado} registrado(a) com sucesso!',
+            'funcionario_id': funcionario.id,
+            'funcionario_nome': funcionario.nome,
+            'funcionario_codigo': funcionario.codigo,
+            'tipo_registrado': tipo_registrado,
+            'hora': agora.strftime('%H:%M:%S'),
+            'distancia': round(menor_distancia, 4)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro na identificação facial automática: {e}", exc_info=True)
+        return jsonify({
+            'success': False, 
+            'message': f'Erro ao processar identificação: {str(e)}'
+        }), 500
