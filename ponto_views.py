@@ -1576,7 +1576,8 @@ def identificar_e_registrar():
             'funcionario_codigo': funcionario.codigo,
             'tipo_registrado': tipo_registrado,
             'hora': agora.strftime('%H:%M:%S'),
-            'distancia': round(menor_distancia, 4)
+            'distancia': round(menor_distancia, 4),
+            'distancia_obra': round(distancia_obra, 1) if distancia_obra else None
         })
         
     except Exception as e:

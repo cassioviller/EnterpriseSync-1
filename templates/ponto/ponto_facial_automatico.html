@@ -424,6 +424,34 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    async function obterLocalizacao() {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) {
+                console.log('Geolocalização não suportada');
+                resolve({ latitude: null, longitude: null });
+                return;
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    resolve({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    });
+                },
+                (error) => {
+                    console.log('Erro ao obter localização:', error.message);
+                    resolve({ latitude: null, longitude: null });
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                }
+            );
+        });
+    }
+    
     async function registrarPonto() {
         const fotoBase64 = capturarFoto();
         const obraId = document.getElementById('obra_id').value;
@@ -431,7 +459,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         cameraOverlay.classList.add('show');
         btnRegistrar.disabled = true;
-        resultadoContainer.innerHTML = '';
+        resultadoContainer.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin me-2"></i>Obtendo localização...</div>';
+        
+        // Capturar localização GPS
+        const { latitude, longitude } = await obterLocalizacao();
+        
+        resultadoContainer.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin me-2"></i>Identificando...</div>';
         
         try {
             const response = await fetch('/ponto/api/identificar-e-registrar', {
@@ -440,19 +473,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     foto_base64: fotoBase64,
                     obra_id: obraId || null,
-                    tipo_ponto: tipoPonto
+                    tipo_ponto: tipoPonto,
+                    latitude: latitude,
+                    longitude: longitude
                 })
             });
             
             const data = await response.json();
             
             if (data.success) {
+                let distanciaInfo = '';
+                if (data.distancia_obra !== undefined && data.distancia_obra !== null) {
+                    distanciaInfo = ` (${Math.round(data.distancia_obra)}m da obra)`;
+                }
                 resultadoContainer.innerHTML = `
                     <div class="alert alert-success d-flex align-items-center">
                         <i class="fas fa-check-circle fa-2x me-3"></i>
                         <div>
                             <strong>${data.funcionario_nome}</strong>
-                            <div>${data.tipo_registrado} - ${data.hora}</div>
+                            <div>${data.tipo_registrado} - ${data.hora}${distanciaInfo}</div>
                         </div>
                     </div>
                 `;
