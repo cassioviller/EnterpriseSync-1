@@ -3,278 +3,299 @@
 {% block title %}Ponto Facial{% endblock %}
 
 {% block content %}
-<div class="ponto-facial-container">
+<div class="ponto-facial-page">
     {% if funcionarios_com_foto == 0 %}
-    <div class="d-flex align-items-center justify-content-center h-100">
-        <div class="text-center p-4">
-            <i class="fas fa-exclamation-triangle fa-3x mb-3 text-warning"></i>
-            <h4>Nenhum funcionário com foto</h4>
-            <p class="mb-3">Cadastre fotos dos funcionários para usar o reconhecimento facial.</p>
-            <a href="{{ url_for('funcionario.lista') }}" class="btn btn-primary">
-                <i class="fas fa-users me-2"></i>Cadastrar Fotos
-            </a>
-        </div>
+    <div class="empty-state">
+        <i class="fas fa-exclamation-triangle fa-3x mb-3 text-warning"></i>
+        <h4>Nenhum funcionário com foto</h4>
+        <p class="mb-3">Cadastre fotos dos funcionários para usar o reconhecimento facial.</p>
+        <a href="{{ url_for('funcionario.lista') }}" class="btn btn-primary">
+            <i class="fas fa-users me-2"></i>Cadastrar Fotos
+        </a>
     </div>
     {% else %}
     
-    <div class="row g-3 h-100">
-        <div class="col-lg-7 d-flex flex-column">
-            <div class="camera-section flex-grow-1 d-flex flex-column">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <a href="{{ url_for('ponto.index') }}" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i>
-                    </a>
-                    <div class="text-center">
-                        <span id="horario-atual" class="fs-3 fw-bold text-primary">--:--:--</span>
-                        <small id="data-atual" class="d-block text-muted">--/--/----</small>
-                    </div>
-                    <span class="badge bg-info">{{ funcionarios_com_foto }} <i class="fas fa-user"></i></span>
-                </div>
-                
-                <div class="video-container flex-grow-1 position-relative bg-dark rounded-3 overflow-hidden mb-2">
-                    <video id="video-preview" autoplay playsinline muted></video>
-                    <div id="camera-overlay" class="camera-overlay">
-                        <div class="text-center text-white">
-                            <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
-                            <p class="mb-0 small">Identificando...</p>
-                        </div>
-                    </div>
-                    <canvas id="canvas-capture" style="display: none;"></canvas>
-                </div>
-                
-                <div id="resultado-container"></div>
+    <div class="header-bar">
+        <a href="{{ url_for('ponto.index') }}" class="btn btn-sm btn-outline-light">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <div class="time-display">
+            <span id="horario-atual" class="time">--:--:--</span>
+            <span id="data-atual" class="date">--/--/----</span>
+        </div>
+        <span class="badge bg-light text-dark">{{ funcionarios_com_foto }} <i class="fas fa-user"></i></span>
+    </div>
+    
+    <div class="main-area">
+        <div class="camera-wrapper">
+            <video id="video-preview" autoplay playsinline muted></video>
+            <div id="camera-overlay" class="overlay-loading">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <span>Identificando...</span>
             </div>
+            <canvas id="canvas-capture"></canvas>
         </div>
         
-        <div class="col-lg-5 d-flex flex-column">
-            <div class="controls-section flex-grow-1 d-flex flex-column">
-                <div class="mb-2">
-                    <select class="form-select form-select-sm" id="obra_id">
-                        <option value="">Obra (opcional)</option>
-                        {% for obra in obras %}
-                        <option value="{{ obra.id }}">{{ obra.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="tipo-ponto-grid mb-2">
-                    <button type="button" class="btn-tipo entrada active" data-tipo="entrada">
-                        <i class="fas fa-sign-in-alt"></i>
-                        <span>Entrada</span>
-                    </button>
-                    <button type="button" class="btn-tipo almoco" data-tipo="almoco_saida">
-                        <i class="fas fa-utensils"></i>
-                        <span>Almoço</span>
-                    </button>
-                    <button type="button" class="btn-tipo retorno" data-tipo="almoco_retorno">
-                        <i class="fas fa-undo"></i>
-                        <span>Retorno</span>
-                    </button>
-                    <button type="button" class="btn-tipo saida" data-tipo="saida">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>Saída</span>
-                    </button>
-                </div>
-                <input type="hidden" id="tipo_ponto" value="entrada">
-                
-                <button id="btn-registrar" class="btn btn-success btn-lg w-100 py-3 mb-2">
-                    <i class="fas fa-camera me-2"></i>
-                    Tirar Foto e Registrar
-                </button>
-                
-                <div class="historico-section flex-grow-1 overflow-auto">
-                    <div class="small text-muted mb-1">
-                        <i class="fas fa-history me-1"></i>Últimos registros
-                    </div>
-                    <div id="lista-registros" class="registros-lista">
-                        <div class="text-center text-muted py-3 small">
-                            <i class="fas fa-clock d-block mb-1"></i>
-                            Nenhum registro
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div id="resultado-container" class="resultado-area"></div>
     </div>
+    
+    <div class="controls-area">
+        <select class="form-select form-select-sm mb-2" id="obra_id">
+            <option value="">Obra (opcional)</option>
+            {% for obra in obras %}
+            <option value="{{ obra.id }}">{{ obra.nome }}</option>
+            {% endfor %}
+        </select>
+        
+        <div class="tipo-buttons">
+            <button type="button" class="tipo-btn entrada active" data-tipo="entrada">
+                <i class="fas fa-sign-in-alt"></i> Entrada
+            </button>
+            <button type="button" class="tipo-btn almoco" data-tipo="almoco_saida">
+                <i class="fas fa-utensils"></i> Almoço
+            </button>
+            <button type="button" class="tipo-btn retorno" data-tipo="almoco_retorno">
+                <i class="fas fa-undo"></i> Retorno
+            </button>
+            <button type="button" class="tipo-btn saida" data-tipo="saida">
+                <i class="fas fa-sign-out-alt"></i> Saída
+            </button>
+        </div>
+        <input type="hidden" id="tipo_ponto" value="entrada">
+        
+        <button id="btn-registrar" class="btn-registrar">
+            <i class="fas fa-camera"></i> REGISTRAR PONTO
+        </button>
+    </div>
+    
     {% endif %}
 </div>
 
 <style>
-html, body {
-    overflow: hidden !important;
-    height: 100vh !important;
-}
-
-.main-content, .container-fluid, main {
-    height: calc(100vh - 56px) !important;
-    overflow: hidden !important;
-    padding-bottom: 0 !important;
-}
-
-.ponto-facial-container {
-    height: 100%;
-    max-height: calc(100vh - 60px);
-    padding: 0.5rem;
+.ponto-facial-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    z-index: 9999;
 }
 
-.ponto-facial-container > .row {
+.empty-state {
     flex: 1;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.video-container {
-    min-height: 150px;
-    max-height: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    color: white;
+    text-align: center;
+    padding: 20px;
 }
 
-.video-container video {
+.header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    background: rgba(0,0,0,0.3);
+}
+
+.time-display {
+    text-align: center;
+    color: white;
+}
+
+.time-display .time {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.time-display .date {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    min-height: 0;
+}
+
+.camera-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    aspect-ratio: 4/3;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.camera-wrapper video {
     width: 100%;
     height: 100%;
     object-fit: cover;
     transform: scaleX(-1);
 }
 
-.camera-overlay {
+.camera-wrapper canvas {
+    display: none;
+}
+
+.overlay-loading {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.8);
     display: none;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    color: white;
+    gap: 10px;
 }
 
-.camera-overlay.show {
-    display: flex !important;
+.overlay-loading.show {
+    display: flex;
 }
 
-.tipo-ponto-grid {
+.resultado-area {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 10px;
+}
+
+.resultado-area .alert {
+    margin: 0;
+    border-radius: 8px;
+}
+
+.controls-area {
+    padding: 15px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px 20px 0 0;
+}
+
+.tipo-buttons {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
 }
 
-.btn-tipo {
+.tipo-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0.75rem 0.5rem;
-    border: 2px solid #dee2e6;
-    border-radius: 0.5rem;
+    padding: 10px 5px;
+    border: 2px solid #ddd;
+    border-radius: 10px;
     background: white;
     cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-tipo i {
-    font-size: 1.25rem;
-    margin-bottom: 0.25rem;
-}
-
-.btn-tipo span {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
+    transition: all 0.2s;
+    gap: 3px;
 }
 
-.btn-tipo.entrada { border-color: #0d6efd; color: #0d6efd; }
-.btn-tipo.almoco { border-color: #fd7e14; color: #fd7e14; }
-.btn-tipo.retorno { border-color: #198754; color: #198754; }
-.btn-tipo.saida { border-color: #dc3545; color: #dc3545; }
-
-.btn-tipo.active.entrada { background: #0d6efd; color: white; }
-.btn-tipo.active.almoco { background: #fd7e14; color: white; }
-.btn-tipo.active.retorno { background: #198754; color: white; }
-.btn-tipo.active.saida { background: #dc3545; color: white; }
-
-.btn-tipo:hover:not(.active) {
-    transform: scale(1.02);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.registros-lista {
-    background: #f8f9fa;
-    border-radius: 0.5rem;
-    padding: 0.5rem;
-    max-height: 100%;
-    overflow-y: auto;
-}
-
-.registro-item {
-    background: white;
-    border-radius: 0.375rem;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.375rem;
-    font-size: 0.8rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-    from { opacity: 0; transform: translateX(-10px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-#resultado-container .alert {
-    margin-bottom: 0.5rem;
-    padding: 0.75rem;
-    font-size: 0.9rem;
-}
-
-#btn-registrar {
+.tipo-btn i {
     font-size: 1.1rem;
-    box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
 }
 
-#btn-registrar:hover {
+.tipo-btn.entrada { border-color: #0d6efd; color: #0d6efd; }
+.tipo-btn.almoco { border-color: #fd7e14; color: #fd7e14; }
+.tipo-btn.retorno { border-color: #198754; color: #198754; }
+.tipo-btn.saida { border-color: #dc3545; color: #dc3545; }
+
+.tipo-btn.active.entrada { background: #0d6efd; color: white; }
+.tipo-btn.active.almoco { background: #fd7e14; color: white; }
+.tipo-btn.active.retorno { background: #198754; color: white; }
+.tipo-btn.active.saida { background: #dc3545; color: white; }
+
+.btn-registrar {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #198754, #157347);
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 15px rgba(25, 135, 84, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-registrar:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(25, 135, 84, 0.4);
+    box-shadow: 0 6px 20px rgba(25, 135, 84, 0.5);
 }
 
-@media (max-width: 991.98px) {
-    html, body {
-        overflow: auto !important;
-        height: auto !important;
+.btn-registrar:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+@media (min-width: 768px) {
+    .controls-area {
+        max-width: 500px;
+        margin: 0 auto;
+        border-radius: 20px;
+        margin-bottom: 20px;
     }
     
-    .main-content, .container-fluid, main {
-        height: auto !important;
-        overflow: auto !important;
+    .camera-wrapper {
+        max-width: 400px;
     }
     
-    .ponto-facial-container {
-        height: auto;
-        min-height: calc(100vh - 70px);
+    .tipo-btn {
+        padding: 12px 8px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-height: 600px) {
+    .camera-wrapper {
+        max-width: 320px;
     }
     
-    .video-container {
-        height: 40vh;
-        min-height: 250px;
+    .header-bar {
+        padding: 5px 10px;
     }
     
-    .tipo-ponto-grid {
-        grid-template-columns: repeat(4, 1fr);
+    .time-display .time {
+        font-size: 1.3rem;
     }
     
-    .btn-tipo {
-        padding: 0.5rem 0.25rem;
+    .controls-area {
+        padding: 10px;
     }
     
-    .btn-tipo i {
+    .tipo-btn {
+        padding: 6px 3px;
+    }
+    
+    .btn-registrar {
+        padding: 12px;
         font-size: 1rem;
-    }
-    
-    .btn-tipo span {
-        font-size: 0.65rem;
     }
 }
 </style>
@@ -286,13 +307,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnRegistrar = document.getElementById('btn-registrar');
     const cameraOverlay = document.getElementById('camera-overlay');
     const resultadoContainer = document.getElementById('resultado-container');
-    const listaRegistros = document.getElementById('lista-registros');
     const horarioAtual = document.getElementById('horario-atual');
     const dataAtual = document.getElementById('data-atual');
     const tipoPontoInput = document.getElementById('tipo_ponto');
-    
-    let stream = null;
-    let registrosRealizados = [];
     
     function atualizarHorario() {
         const agora = new Date();
@@ -304,17 +321,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     async function iniciarCamera() {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({
+            const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
                 audio: false
             });
             video.srcObject = stream;
         } catch (err) {
-            console.error('Erro ao acessar câmera:', err);
+            console.error('Erro câmera:', err);
             resultadoContainer.innerHTML = `
-                <div class="alert alert-danger py-2">
+                <div class="alert alert-danger">
                     <i class="fas fa-exclamation-circle me-2"></i>
-                    <strong>Câmera:</strong> ${err.message}
+                    Câmera não disponível: ${err.message}
                 </div>
             `;
         }
@@ -330,9 +347,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return canvas.toDataURL('image/jpeg', 0.8);
     }
     
-    document.querySelectorAll('.btn-tipo').forEach(btn => {
+    document.querySelectorAll('.tipo-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
             tipoPontoInput.value = this.dataset.tipo;
         });
@@ -362,75 +379,31 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (data.success) {
                 resultadoContainer.innerHTML = `
-                    <div class="alert alert-success d-flex align-items-center py-2">
-                        <i class="fas fa-check-circle fa-2x me-3 text-success"></i>
+                    <div class="alert alert-success d-flex align-items-center">
+                        <i class="fas fa-check-circle fa-2x me-3"></i>
                         <div>
                             <strong>${data.funcionario_nome}</strong>
-                            <small class="d-block">${data.tipo_registrado} - ${data.hora}</small>
+                            <div>${data.tipo_registrado} - ${data.hora}</div>
                         </div>
                     </div>
                 `;
-                
-                adicionarRegistro({
-                    nome: data.funcionario_nome,
-                    codigo: data.funcionario_codigo,
-                    tipo: data.tipo_registrado,
-                    hora: data.hora
-                });
-                
-                setTimeout(() => { resultadoContainer.innerHTML = ''; }, 4000);
+                setTimeout(() => { resultadoContainer.innerHTML = ''; }, 5000);
             } else {
                 resultadoContainer.innerHTML = `
-                    <div class="alert alert-danger py-2">
+                    <div class="alert alert-danger">
                         <i class="fas fa-times-circle me-2"></i>${data.message}
                     </div>
                 `;
             }
         } catch (err) {
             resultadoContainer.innerHTML = `
-                <div class="alert alert-danger py-2">
+                <div class="alert alert-danger">
                     <i class="fas fa-exclamation-triangle me-2"></i>Erro: ${err.message}
                 </div>
             `;
         } finally {
             cameraOverlay.classList.remove('show');
             btnRegistrar.disabled = false;
-        }
-    }
-    
-    function adicionarRegistro(registro) {
-        registrosRealizados.unshift(registro);
-        
-        if (registrosRealizados.length === 1) {
-            listaRegistros.innerHTML = '';
-        }
-        
-        const tipoClass = {
-            'entrada': 'text-primary',
-            'saída para almoço': 'text-warning',
-            'retorno do almoço': 'text-success',
-            'saída': 'text-danger'
-        };
-        
-        const cls = tipoClass[registro.tipo] || 'text-secondary';
-        
-        const item = document.createElement('div');
-        item.className = 'registro-item d-flex justify-content-between align-items-center';
-        item.innerHTML = `
-            <div>
-                <strong class="${cls}">${registro.nome}</strong>
-                <small class="text-muted d-block">${registro.codigo}</small>
-            </div>
-            <div class="text-end">
-                <span class="badge bg-light text-dark">${registro.tipo}</span>
-                <small class="text-muted d-block">${registro.hora}</small>
-            </div>
-        `;
-        
-        listaRegistros.insertBefore(item, listaRegistros.firstChild);
-        
-        if (registrosRealizados.length > 5) {
-            listaRegistros.removeChild(listaRegistros.lastChild);
         }
     }
     
