@@ -1,0 +1,473 @@
+# 🎯 Implementação Completa de Geofencing com Migração
+
+Implemente um sistema de Cerca Virtual (Geofencing) para validar que os funcionários estejam fisicamente na obra ao registrar o ponto.
+
+---
+
+## 📋 FASE 1: Criar Script de Migração do Banco de Dados
+
+**⚠️ IMPORTANTE: Execute esta fase PRIMEIRO antes de modificar os modelos!**
+
+Crie um arquivo `migration_add_geofencing.py` na raiz do projeto:
+
+```python
+"""
+Migração: Adicionar campos de geofencing na tabela obra
+"""
+from app import app, db
+
+def upgrade():
+    """Adiciona os campos de geofencing"""
+    with app.app_context():
+        try:
+            # Verificar se as colunas já existem
+            inspector = db.inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('obra')]
+            
+            if 'latitude' not in columns:
+                print("Adicionando coluna latitude...")
+                db.engine.execute('ALTER TABLE obra ADD COLUMN latitude DOUBLE PRECISION')
+            
+            if 'longitude' not in columns:
+                print("Adicionando coluna longitude...")
+                db.engine.execute('ALTER TABLE obra ADD COLUMN longitude DOUBLE PRECISION')
+            
+            if 'raio_geofence_metros' not in columns:
+                print("Adicionando coluna raio_geofence_metros...")
+                db.engine.execute('ALTER TABLE obra ADD COLUMN raio_geofence_metros INTEGER DEFAULT 100')
+            
+            db.session.commit()
+            print("✅ Migração de Obra concluída!")
+            
+        except Exception as e:
+            print(f"❌ Erro na migração de Obra: {e}")
+            db.session.rollback()
+
+def upgrade_registro_ponto():
+    """Adiciona campos de localização no registro de ponto"""
+    with app.app_context():
+        try:
+            inspector = db.inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('registro_ponto')]
+            
+            if 'latitude' not in columns:
+                print("Adicionando coluna latitude em registro_ponto...")
+                db.engine.execute('ALTER TABLE registro_ponto ADD COLUMN latitude DOUBLE PRECISION')
+            
+            if 'longitude' not in columns:
+                print("Adicionando coluna longitude em registro_ponto...")
+                db.engine.execute('ALTER TABLE registro_ponto ADD COLUMN longitude DOUBLE PRECISION')
+            
+            if 'distancia_obra_metros' not in columns:
+                print("Adicionando coluna distancia_obra_metros em registro_ponto...")
+                db.engine.execute('ALTER TABLE registro_ponto ADD COLUMN distancia_obra_metros DOUBLE PRECISION')
+            
+            db.session.commit()
+            print("✅ Migração de RegistroPonto concluída!")
+            
+        except Exception as e:
+            print(f"❌ Erro na migração de RegistroPonto: {e}")
+            db.session.rollback()
+
+if __name__ == '__main__':
+    print("Iniciando migrações de geofencing...")
+    upgrade()
+    upgrade_registro_ponto()
+    print("✅ Todas as migrações concluídas!")
+```
+
+**Execute a migração:**
+```bash
+python migration_add_geofencing.py
+```
+
+---
+
+## 📋 FASE 2: Modificar o Modelo `Obra`
+
+No arquivo `models.py`, adicione os campos de geolocalização na classe `Obra`:
+
+```python
+class Obra(db.Model):
+    # ... campos existentes ...
+    
+    # Campos de Geofencing
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    raio_geofence_metros = db.Column(db.Integer, default=100)
+```
+
+---
+
+## 📋 FASE 3: Modificar o Modelo `RegistroPonto`
+
+No arquivo `models.py`, adicione os campos de localização na classe `RegistroPonto`:
+
+```python
+class RegistroPonto(db.Model):
+    # ... campos existentes ...
+    
+    # Campos de Localização
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    distancia_obra_metros = db.Column(db.Float, nullable=True)
+```
+
+---
+
+## 📋 FASE 4: Criar Funções de Geofencing
+
+Crie um arquivo `utils_geofencing.py` na raiz do projeto:
+
+```python
+"""
+Utilitários para validação de geolocalização (Geofencing)
+"""
+from math import radians, sin, cos, sqrt, atan2
+
+def calcular_distancia_metros(lat1, lon1, lat2, lon2):
+    """
+    Calcula a distância em metros entre duas coordenadas GPS.
+    Usa a fórmula de Haversine.
+    
+    Args:
+        lat1, lon1: Coordenadas do ponto 1 (latitude, longitude)
+        lat2, lon2: Coordenadas do ponto 2 (latitude, longitude)
+    
+    Returns:
+        float: Distância em metros
+    """
+    R = 6371000  # Raio da Terra em metros
+    
+    lat1_rad = radians(lat1)
+    lon1_rad = radians(lon1)
+    lat2_rad = radians(lat2)
+    lon2_rad = radians(lon2)
+    
+    dlon = lon2_rad - lon1_rad
+    dlat = lat2_rad - lat1_rad
+    
+    a = sin(dlat / 2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    
+    distancia = R * c
+    return distancia
+
+def validar_localizacao_na_obra(lat_funcionario, lon_funcionario, obra):
+    """
+    Valida se o funcionário está dentro do raio da obra.
+    
+    Args:
+        lat_funcionario: Latitude do funcionário
+        lon_funcionario: Longitude do funcionário
+        obra: Objeto Obra com latitude, longitude e raio_geofence_metros
+    
+    Returns:
+        tuple: (bool, float, str) - (válido, distância, mensagem)
+    """
+    # Se a obra não tem geofencing configurado, permite o registro
+    if not obra.latitude or not obra.longitude:
+        return (True, None, "Obra sem geofencing configurado")
+    
+    # Calcular distância
+    distancia = calcular_distancia_metros(
+        lat_funcionario, lon_funcionario,
+        obra.latitude, obra.longitude
+    )
+    
+    # Validar se está dentro do raio
+    if distancia <= obra.raio_geofence_metros:
+        return (True, distancia, f"Dentro do raio ({distancia:.0f}m de {obra.raio_geofence_metros}m)")
+    else:
+        return (False, distancia, f"Fora do raio ({distancia:.0f}m de {obra.raio_geofence_metros}m)")
+```
+
+---
+
+## 📋 FASE 5: Modificar a API de Registro de Ponto
+
+No arquivo `views.py`, modifique a rota `/ponto/api/identificar-e-registrar`:
+
+**Localize a função e adicione:**
+
+```python
+from utils_geofencing import validar_localizacao_na_obra
+
+@app.route('/ponto/api/identificar-e-registrar', methods=['POST'])
+@login_required
+def api_identificar_e_registrar_ponto():
+    try:
+        data = request.get_json()
+        foto_base64 = data.get('foto_base64')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        
+        if not foto_base64:
+            return jsonify({'success': False, 'message': 'Foto não fornecida'}), 400
+        
+        # ... código de identificação facial existente ...
+        
+        # Após identificar o funcionário, validar localização
+        if funcionario.obra_id_atual:
+            obra = Obra.query.get(funcionario.obra_id_atual)
+            
+            if obra and latitude and longitude:
+                valido, distancia, mensagem = validar_localizacao_na_obra(
+                    latitude, longitude, obra
+                )
+                
+                if not valido:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Você está fora da área da obra. {mensagem}'
+                    }), 403
+        
+        # Registrar o ponto com localização
+        novo_registro = RegistroPonto(
+            funcionario_id=funcionario.id,
+            # ... outros campos existentes ...
+            latitude=latitude,
+            longitude=longitude,
+            distancia_obra_metros=distancia if 'distancia' in locals() else None
+        )
+        
+        db.session.add(novo_registro)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Ponto registrado com sucesso!',
+            'funcionario': funcionario.nome,
+            'distancia': f'{distancia:.0f}m' if distancia else 'N/A'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+```
+
+---
+
+## 📋 FASE 6: Modificar o Frontend - Captura de GPS
+
+No template `ponto_facial_automatico.html` (ou similar), adicione o JavaScript para capturar GPS:
+
+```html
+<script>
+// Função para capturar foto e registrar ponto com GPS
+function registrarPontoComGPS() {
+    // Verificar suporte a geolocalização
+    if (!navigator.geolocation) {
+        alert('Seu navegador não suporta geolocalização');
+        return;
+    }
+
+    // Mostrar loading
+    document.getElementById('btnRegistrar').disabled = true;
+    document.getElementById('btnRegistrar').innerText = 'Obtendo localização...';
+
+    // Capturar localização
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            
+            // Capturar foto e enviar
+            capturarFotoEEnviar(latitude, longitude);
+        },
+        function(error) {
+            let mensagem = 'Erro ao obter localização';
+            
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    mensagem = 'Você precisa permitir o acesso à localização para registrar o ponto';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    mensagem = 'Localização indisponível. Verifique se o GPS está ativado.';
+                    break;
+                case error.TIMEOUT:
+                    mensagem = 'Tempo esgotado ao obter localização';
+                    break;
+            }
+            
+            alert(mensagem);
+            document.getElementById('btnRegistrar').disabled = false;
+            document.getElementById('btnRegistrar').innerText = 'Registrar Ponto';
+        },
+        {
+            enableHighAccuracy: true,  // Usar GPS de alta precisão
+            timeout: 10000,            // Timeout de 10 segundos
+            maximumAge: 0              // Não usar cache
+        }
+    );
+}
+
+function capturarFotoEEnviar(latitude, longitude) {
+    // Capturar foto da câmera
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0);
+    
+    const fotoBase64 = canvas.toDataURL('image/jpeg');
+
+    // Enviar para a API
+    fetch('/ponto/api/identificar-e-registrar', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            foto_base64: fotoBase64,
+            latitude: latitude,
+            longitude: longitude
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ Ponto registrado com sucesso!\n\nFuncionário: ${data.funcionario}\nDistância: ${data.distancia}`);
+            location.reload();
+        } else {
+            alert('❌ Erro: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('❌ Erro ao registrar ponto: ' + error);
+    })
+    .finally(() => {
+        document.getElementById('btnRegistrar').disabled = false;
+        document.getElementById('btnRegistrar').innerText = 'Registrar Ponto';
+    });
+}
+
+// Modificar o botão de registro
+document.getElementById('btnRegistrar').onclick = registrarPontoComGPS;
+</script>
+```
+
+---
+
+## 📋 FASE 7: Adicionar Campos no Formulário de Obra
+
+No template `obra_form.html`, adicione os campos de geolocalização:
+
+```html
+<div class="card mt-3">
+    <div class="card-header">
+        <h5>📍 Geofencing (Cerca Virtual)</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label for="latitude">Latitude</label>
+                    <input type="number" step="0.000001" class="form-control" 
+                           id="latitude" name="latitude" 
+                           value="{{ obra.latitude or '' }}">
+                    <small class="form-text text-muted">Ex: -23.550520</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label for="longitude">Longitude</label>
+                    <input type="number" step="0.000001" class="form-control" 
+                           id="longitude" name="longitude" 
+                           value="{{ obra.longitude or '' }}">
+                    <small class="form-text text-muted">Ex: -46.633308</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label for="raio_geofence_metros">Raio (metros)</label>
+                    <input type="number" class="form-control" 
+                           id="raio_geofence_metros" name="raio_geofence_metros" 
+                           value="{{ obra.raio_geofence_metros or 100 }}">
+                    <small class="form-text text-muted">Distância máxima permitida</small>
+                </div>
+            </div>
+        </div>
+        
+        <button type="button" class="btn btn-secondary" onclick="obterLocalizacaoAtual()">
+            <i class="fas fa-map-marker-alt"></i> Obter Localização Atual
+        </button>
+        
+        <small class="form-text text-muted mt-2">
+            💡 Use o Google Maps para obter as coordenadas: clique com botão direito no mapa e copie as coordenadas.
+        </small>
+    </div>
+</div>
+
+<script>
+function obterLocalizacaoAtual() {
+    if (!navigator.geolocation) {
+        alert('Seu navegador não suporta geolocalização');
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            document.getElementById('latitude').value = position.coords.latitude.toFixed(6);
+            document.getElementById('longitude').value = position.coords.longitude.toFixed(6);
+            alert('✅ Localização obtida com sucesso!');
+        },
+        function(error) {
+            alert('❌ Erro ao obter localização: ' + error.message);
+        }
+    );
+}
+</script>
+```
+
+---
+
+## 📋 FASE 8: Atualizar a Rota de Salvar Obra
+
+No arquivo `views.py`, modifique a rota de salvar obra para incluir os novos campos:
+
+```python
+@app.route('/obra/salvar', methods=['POST'])
+@login_required
+def salvar_obra():
+    # ... código existente ...
+    
+    # Adicionar campos de geofencing
+    obra.latitude = request.form.get('latitude', type=float)
+    obra.longitude = request.form.get('longitude', type=float)
+    obra.raio_geofence_metros = request.form.get('raio_geofence_metros', type=int, default=100)
+    
+    # ... resto do código ...
+```
+
+---
+
+## 🚀 Ordem de Execução
+
+1. ✅ **PRIMEIRO**: Execute o script de migração
+2. ✅ Modifique os modelos
+3. ✅ Crie o arquivo de utilitários
+4. ✅ Modifique a API de ponto
+5. ✅ Modifique o frontend
+6. ✅ Adicione campos no formulário de obra
+7. ✅ Atualize a rota de salvar obra
+8. ✅ Reinicie o servidor Flask
+
+---
+
+## 📝 Próximos Passos para o Usuário
+
+1. Cadastre as coordenadas das obras existentes
+2. Teste o registro de ponto dentro e fora do raio
+3. Ajuste o raio conforme necessário (recomendado: 50-200m)
+
+---
+
+## 💡 Dicas
+
+- Use o Google Maps para obter coordenadas: clique com botão direito → copiar coordenadas
+- Raio recomendado: 100m para obras pequenas, 200-500m para obras grandes
+- Se a obra não tiver coordenadas cadastradas, o sistema permite o registro normalmente
+
+🎯 Sistema de Geofencing completo e funcional!
