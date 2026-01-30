@@ -1,138 +1,95 @@
 {% extends "base_completo.html" %}
 
-{% block title %}Ponto por Reconhecimento Facial{% endblock %}
+{% block title %}Ponto Facial{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="row mb-4">
-        <div class="col-12">
-            <a href="{{ url_for('ponto.index') }}" class="btn btn-outline-secondary mb-3">
-                <i class="fas fa-arrow-left me-2"></i>
-                Voltar
-            </a>
-            <h2 class="mb-0">
-                <i class="fas fa-camera me-2 text-primary"></i>
-                Ponto por Reconhecimento Facial
-            </h2>
-            <p class="text-muted mb-0">O sistema identifica automaticamente o funcionário pela foto</p>
-        </div>
-    </div>
-
+<div class="ponto-facial-container">
     {% if funcionarios_com_foto == 0 %}
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="alert alert-warning text-center py-5">
-                <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
-                <h4>Nenhum funcionário com foto cadastrada</h4>
-                <p class="mb-3">Para usar o reconhecimento facial automático, cadastre fotos dos funcionários primeiro.</p>
-                <a href="{{ url_for('funcionario.lista') }}" class="btn btn-primary">
-                    <i class="fas fa-users me-2"></i>
-                    Cadastrar Fotos
-                </a>
-            </div>
+    <div class="d-flex align-items-center justify-content-center h-100">
+        <div class="text-center p-4">
+            <i class="fas fa-exclamation-triangle fa-3x mb-3 text-warning"></i>
+            <h4>Nenhum funcionário com foto</h4>
+            <p class="mb-3">Cadastre fotos dos funcionários para usar o reconhecimento facial.</p>
+            <a href="{{ url_for('funcionario.lista') }}" class="btn btn-primary">
+                <i class="fas fa-users me-2"></i>Cadastrar Fotos
+            </a>
         </div>
     </div>
     {% else %}
-
-    <div class="row justify-content-center">
-        <div class="col-lg-8 col-xl-6">
-            <div class="card shadow-lg">
-                <div class="card-header bg-primary text-white text-center py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-user-check me-2"></i>
-                        Identificação Automática
-                    </h5>
-                    <small>{{ funcionarios_com_foto }} funcionário(s) com foto cadastrada</small>
+    
+    <div class="row g-3 h-100">
+        <div class="col-lg-7 d-flex flex-column">
+            <div class="camera-section flex-grow-1 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <a href="{{ url_for('ponto.index') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <div class="text-center">
+                        <span id="horario-atual" class="fs-3 fw-bold text-primary">--:--:--</span>
+                        <small id="data-atual" class="d-block text-muted">--/--/----</small>
+                    </div>
+                    <span class="badge bg-info">{{ funcionarios_com_foto }} <i class="fas fa-user"></i></span>
                 </div>
                 
-                <div class="card-body p-4">
-                    <div class="alert alert-info text-center mb-4">
-                        <h4 id="horario-atual" class="mb-0">--:--:--</h4>
-                        <small id="data-atual">--/--/----</small>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label for="obra_id" class="form-label fw-bold">
-                            <i class="fas fa-building me-2"></i>
-                            Obra (opcional)
-                        </label>
-                        <select class="form-select form-select-lg" id="obra_id">
-                            <option value="">Sem obra específica</option>
-                            {% for obra in obras %}
-                            <option value="{{ obra.id }}">{{ obra.nome }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">
-                            <i class="fas fa-clock me-2"></i>
-                            Tipo de Registro
-                        </label>
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <button type="button" class="btn btn-tipo-ponto w-100 py-3 btn-primary" data-tipo="entrada">
-                                    <i class="fas fa-sign-in-alt d-block mb-1" style="font-size: 1.5rem;"></i>
-                                    <span class="fw-bold">Entrada</span>
-                                </button>
-                            </div>
-                            <div class="col-6">
-                                <button type="button" class="btn btn-tipo-ponto w-100 py-3 btn-outline-warning" data-tipo="almoco_saida">
-                                    <i class="fas fa-utensils d-block mb-1" style="font-size: 1.5rem;"></i>
-                                    <span class="fw-bold">Almoço</span>
-                                </button>
-                            </div>
-                            <div class="col-6">
-                                <button type="button" class="btn btn-tipo-ponto w-100 py-3 btn-outline-success" data-tipo="almoco_retorno">
-                                    <i class="fas fa-undo d-block mb-1" style="font-size: 1.5rem;"></i>
-                                    <span class="fw-bold">Retorno</span>
-                                </button>
-                            </div>
-                            <div class="col-6">
-                                <button type="button" class="btn btn-tipo-ponto w-100 py-3 btn-outline-danger" data-tipo="saida">
-                                    <i class="fas fa-sign-out-alt d-block mb-1" style="font-size: 1.5rem;"></i>
-                                    <span class="fw-bold">Saída</span>
-                                </button>
-                            </div>
+                <div class="video-container flex-grow-1 position-relative bg-dark rounded-3 overflow-hidden mb-2">
+                    <video id="video-preview" autoplay playsinline muted></video>
+                    <div id="camera-overlay" class="camera-overlay">
+                        <div class="text-center text-white">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+                            <p class="mb-0 small">Identificando...</p>
                         </div>
-                        <input type="hidden" id="tipo_ponto" value="entrada">
                     </div>
-                    
-                    <div class="position-relative mb-4">
-                        <div class="ratio ratio-4x3 bg-dark rounded overflow-hidden">
-                            <video id="video-preview" autoplay playsinline muted class="w-100 h-100" style="object-fit: cover;"></video>
-                        </div>
-                        <div id="camera-overlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-75" style="display: none !important;">
-                            <div class="text-center text-white">
-                                <i class="fas fa-spinner fa-spin fa-3x mb-3"></i>
-                                <p>Processando identificação...</p>
-                            </div>
-                        </div>
-                        <canvas id="canvas-capture" style="display: none;"></canvas>
-                    </div>
-                    
-                    <button id="btn-registrar" class="btn btn-success btn-lg w-100 py-3">
-                        <i class="fas fa-camera me-2"></i>
-                        Tirar Foto e Registrar Ponto
-                    </button>
-                    
-                    <div id="resultado-container" class="mt-4" style="display: none;">
-                    </div>
+                    <canvas id="canvas-capture" style="display: none;"></canvas>
                 </div>
+                
+                <div id="resultado-container"></div>
             </div>
-            
-            <div id="historico-registros" class="card shadow mt-4">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0">
-                        <i class="fas fa-history me-2"></i>
-                        Últimos Registros
-                    </h6>
+        </div>
+        
+        <div class="col-lg-5 d-flex flex-column">
+            <div class="controls-section flex-grow-1 d-flex flex-column">
+                <div class="mb-2">
+                    <select class="form-select form-select-sm" id="obra_id">
+                        <option value="">Obra (opcional)</option>
+                        {% for obra in obras %}
+                        <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="card-body p-0">
-                    <div id="lista-registros" class="list-group list-group-flush">
-                        <div class="list-group-item text-center text-muted py-4">
-                            <i class="fas fa-clock fa-2x mb-2 d-block"></i>
-                            Nenhum registro ainda
+                
+                <div class="tipo-ponto-grid mb-2">
+                    <button type="button" class="btn-tipo entrada active" data-tipo="entrada">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>Entrada</span>
+                    </button>
+                    <button type="button" class="btn-tipo almoco" data-tipo="almoco_saida">
+                        <i class="fas fa-utensils"></i>
+                        <span>Almoço</span>
+                    </button>
+                    <button type="button" class="btn-tipo retorno" data-tipo="almoco_retorno">
+                        <i class="fas fa-undo"></i>
+                        <span>Retorno</span>
+                    </button>
+                    <button type="button" class="btn-tipo saida" data-tipo="saida">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Saída</span>
+                    </button>
+                </div>
+                <input type="hidden" id="tipo_ponto" value="entrada">
+                
+                <button id="btn-registrar" class="btn btn-success btn-lg w-100 py-3 mb-2">
+                    <i class="fas fa-camera me-2"></i>
+                    Tirar Foto e Registrar
+                </button>
+                
+                <div class="historico-section flex-grow-1 overflow-auto">
+                    <div class="small text-muted mb-1">
+                        <i class="fas fa-history me-1"></i>Últimos registros
+                    </div>
+                    <div id="lista-registros" class="registros-lista">
+                        <div class="text-center text-muted py-3 small">
+                            <i class="fas fa-clock d-block mb-1"></i>
+                            Nenhum registro
                         </div>
                     </div>
                 </div>
@@ -143,28 +100,182 @@
 </div>
 
 <style>
-.btn-tipo-ponto {
-    transition: all 0.2s ease;
-    border-width: 2px;
+html, body {
+    overflow: hidden !important;
+    height: 100vh !important;
 }
-.btn-tipo-ponto:not(.btn-primary):not(.btn-warning):not(.btn-success):not(.btn-danger):hover {
-    transform: scale(1.02);
+
+.main-content, .container-fluid, main {
+    height: calc(100vh - 56px) !important;
+    overflow: hidden !important;
+    padding-bottom: 0 !important;
 }
-.btn-tipo-ponto.btn-primary,
-.btn-tipo-ponto.btn-warning,
-.btn-tipo-ponto.btn-success,
-.btn-tipo-ponto.btn-danger {
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+
+.ponto-facial-container {
+    height: 100%;
+    max-height: calc(100vh - 60px);
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
-#video-preview {
+
+.ponto-facial-container > .row {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.video-container {
+    min-height: 150px;
+    max-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     transform: scaleX(-1);
 }
-.resultado-sucesso {
-    animation: fadeIn 0.3s ease;
+
+.camera-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
 }
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+
+.camera-overlay.show {
+    display: flex !important;
+}
+
+.tipo-ponto-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.btn-tipo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 0.5rem;
+    border: 2px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-tipo i {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.btn-tipo span {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.btn-tipo.entrada { border-color: #0d6efd; color: #0d6efd; }
+.btn-tipo.almoco { border-color: #fd7e14; color: #fd7e14; }
+.btn-tipo.retorno { border-color: #198754; color: #198754; }
+.btn-tipo.saida { border-color: #dc3545; color: #dc3545; }
+
+.btn-tipo.active.entrada { background: #0d6efd; color: white; }
+.btn-tipo.active.almoco { background: #fd7e14; color: white; }
+.btn-tipo.active.retorno { background: #198754; color: white; }
+.btn-tipo.active.saida { background: #dc3545; color: white; }
+
+.btn-tipo:hover:not(.active) {
+    transform: scale(1.02);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.registros-lista {
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    max-height: 100%;
+    overflow-y: auto;
+}
+
+.registro-item {
+    background: white;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.375rem;
+    font-size: 0.8rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+#resultado-container .alert {
+    margin-bottom: 0.5rem;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+}
+
+#btn-registrar {
+    font-size: 1.1rem;
+    box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
+}
+
+#btn-registrar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(25, 135, 84, 0.4);
+}
+
+@media (max-width: 991.98px) {
+    html, body {
+        overflow: auto !important;
+        height: auto !important;
+    }
+    
+    .main-content, .container-fluid, main {
+        height: auto !important;
+        overflow: auto !important;
+    }
+    
+    .ponto-facial-container {
+        height: auto;
+        min-height: calc(100vh - 70px);
+    }
+    
+    .video-container {
+        height: 40vh;
+        min-height: 250px;
+    }
+    
+    .tipo-ponto-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .btn-tipo {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .btn-tipo i {
+        font-size: 1rem;
+    }
+    
+    .btn-tipo span {
+        font-size: 0.65rem;
+    }
 }
 </style>
 
@@ -194,22 +305,16 @@ document.addEventListener('DOMContentLoaded', function() {
     async function iniciarCamera() {
         try {
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: 'user',
-                    width: { ideal: 640 },
-                    height: { ideal: 480 }
-                },
+                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
                 audio: false
             });
             video.srcObject = stream;
         } catch (err) {
             console.error('Erro ao acessar câmera:', err);
-            resultadoContainer.style.display = 'block';
             resultadoContainer.innerHTML = `
-                <div class="alert alert-danger">
+                <div class="alert alert-danger py-2">
                     <i class="fas fa-exclamation-circle me-2"></i>
-                    <strong>Erro ao acessar câmera:</strong> ${err.message}
-                    <br><small>Verifique as permissões do navegador.</small>
+                    <strong>Câmera:</strong> ${err.message}
                 </div>
             `;
         }
@@ -219,31 +324,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const ctx = canvas.getContext('2d');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
+        ctx.setTransform(-1, 0, 0, 1, canvas.width, 0);
         ctx.drawImage(video, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         return canvas.toDataURL('image/jpeg', 0.8);
     }
     
-    document.querySelectorAll('.btn-tipo-ponto').forEach(btn => {
+    document.querySelectorAll('.btn-tipo').forEach(btn => {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.btn-tipo-ponto').forEach(b => {
-                const tipo = b.dataset.tipo;
-                b.classList.remove('btn-primary', 'btn-warning', 'btn-success', 'btn-danger');
-                if (tipo === 'entrada') b.classList.add('btn-outline-primary');
-                if (tipo === 'almoco_saida') b.classList.add('btn-outline-warning');
-                if (tipo === 'almoco_retorno') b.classList.add('btn-outline-success');
-                if (tipo === 'saida') b.classList.add('btn-outline-danger');
-            });
-            
-            this.classList.remove('btn-outline-primary', 'btn-outline-warning', 'btn-outline-success', 'btn-outline-danger');
-            const tipo = this.dataset.tipo;
-            if (tipo === 'entrada') this.classList.add('btn-primary');
-            if (tipo === 'almoco_saida') this.classList.add('btn-warning');
-            if (tipo === 'almoco_retorno') this.classList.add('btn-success');
-            if (tipo === 'saida') this.classList.add('btn-danger');
-            
-            tipoPontoInput.value = tipo;
+            document.querySelectorAll('.btn-tipo').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            tipoPontoInput.value = this.dataset.tipo;
         });
     });
     
@@ -252,17 +343,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const obraId = document.getElementById('obra_id').value;
         const tipoPonto = tipoPontoInput.value;
         
-        cameraOverlay.style.display = 'flex';
-        cameraOverlay.style.cssText = 'display: flex !important;';
+        cameraOverlay.classList.add('show');
         btnRegistrar.disabled = true;
-        resultadoContainer.style.display = 'none';
+        resultadoContainer.innerHTML = '';
         
         try {
             const response = await fetch('/ponto/api/identificar-e-registrar', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     foto_base64: fotoBase64,
                     obra_id: obraId || null,
@@ -272,18 +360,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             
-            resultadoContainer.style.display = 'block';
-            
             if (data.success) {
                 resultadoContainer.innerHTML = `
-                    <div class="alert alert-success resultado-sucesso">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-check-circle fa-3x me-3 text-success"></i>
-                            <div>
-                                <h5 class="mb-1">${data.funcionario_nome}</h5>
-                                <p class="mb-0">${data.message}</p>
-                                <small class="text-muted">Horário: ${data.hora}</small>
-                            </div>
+                    <div class="alert alert-success d-flex align-items-center py-2">
+                        <i class="fas fa-check-circle fa-2x me-3 text-success"></i>
+                        <div>
+                            <strong>${data.funcionario_nome}</strong>
+                            <small class="d-block">${data.tipo_registrado} - ${data.hora}</small>
                         </div>
                     </div>
                 `;
@@ -295,33 +378,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     hora: data.hora
                 });
                 
-                setTimeout(() => {
-                    resultadoContainer.innerHTML = '';
-                    resultadoContainer.style.display = 'none';
-                }, 5000);
-                
+                setTimeout(() => { resultadoContainer.innerHTML = ''; }, 4000);
             } else {
                 resultadoContainer.innerHTML = `
-                    <div class="alert alert-danger resultado-sucesso">
-                        <i class="fas fa-times-circle me-2"></i>
-                        <strong>Erro:</strong> ${data.message}
-                        ${data.funcionario_nome ? `<br><small>Funcionário: ${data.funcionario_nome}</small>` : ''}
+                    <div class="alert alert-danger py-2">
+                        <i class="fas fa-times-circle me-2"></i>${data.message}
                     </div>
                 `;
             }
-            
         } catch (err) {
-            console.error('Erro na requisição:', err);
-            resultadoContainer.style.display = 'block';
             resultadoContainer.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>Erro de conexão:</strong> ${err.message}
+                <div class="alert alert-danger py-2">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Erro: ${err.message}
                 </div>
             `;
         } finally {
-            cameraOverlay.style.display = 'none';
-            cameraOverlay.style.cssText = 'display: none !important;';
+            cameraOverlay.classList.remove('show');
             btnRegistrar.disabled = false;
         }
     }
@@ -333,40 +405,36 @@ document.addEventListener('DOMContentLoaded', function() {
             listaRegistros.innerHTML = '';
         }
         
-        const tipoIcon = {
-            'entrada': 'fa-sign-in-alt text-primary',
-            'saída para almoço': 'fa-utensils text-warning',
-            'retorno do almoço': 'fa-undo text-success',
-            'saída': 'fa-sign-out-alt text-danger'
+        const tipoClass = {
+            'entrada': 'text-primary',
+            'saída para almoço': 'text-warning',
+            'retorno do almoço': 'text-success',
+            'saída': 'text-danger'
         };
         
-        const icon = tipoIcon[registro.tipo] || 'fa-clock text-secondary';
+        const cls = tipoClass[registro.tipo] || 'text-secondary';
         
         const item = document.createElement('div');
-        item.className = 'list-group-item';
+        item.className = 'registro-item d-flex justify-content-between align-items-center';
         item.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <i class="fas ${icon} me-2"></i>
-                    <strong>${registro.nome}</strong>
-                    <span class="text-muted ms-2">(${registro.codigo})</span>
-                </div>
-                <div class="text-end">
-                    <span class="badge bg-secondary">${registro.tipo}</span>
-                    <br><small class="text-muted">${registro.hora}</small>
-                </div>
+            <div>
+                <strong class="${cls}">${registro.nome}</strong>
+                <small class="text-muted d-block">${registro.codigo}</small>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-light text-dark">${registro.tipo}</span>
+                <small class="text-muted d-block">${registro.hora}</small>
             </div>
         `;
         
         listaRegistros.insertBefore(item, listaRegistros.firstChild);
         
-        if (registrosRealizados.length > 10) {
+        if (registrosRealizados.length > 5) {
             listaRegistros.removeChild(listaRegistros.lastChild);
         }
     }
     
     btnRegistrar.addEventListener('click', registrarPonto);
-    
     iniciarCamera();
 });
 </script>
