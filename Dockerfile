@@ -10,12 +10,17 @@ ENV PORT=5000
 ENV DIGITAL_MASTERY_MODE=true
 
 # Instalar dependências do sistema (mínimas)
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     gcc \
     libpq-dev \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libfontconfig1 \
+    libice6 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
