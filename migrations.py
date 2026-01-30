@@ -3766,6 +3766,7 @@ def executar_migracoes():
             (64, "Tabela folha_processada para dashboard custos obra", _migration_64_folha_processada),
             (65, "Adicionar coluna nome em fornecedor", _migration_65_fornecedor_nome),
             (66, "Campos reconhecimento facial RegistroPonto", _migration_66_reconhecimento_facial_ponto),
+            (67, "Sistema de Geofencing (Cerca Virtual)", _migration_67_geofencing),
         ]
         
         # Executar cada migração com rastreamento
@@ -6216,6 +6217,91 @@ def _migration_66_reconhecimento_facial_ponto():
         
     except Exception as e:
         logger.error(f"❌ Erro na migração 66: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
+
+
+def _migration_67_geofencing():
+    """
+    MIGRAÇÃO 67: Adicionar campos de geofencing para validação de localização
+    - obra: latitude, longitude, raio_geofence_metros
+    - registro_ponto: latitude, longitude, distancia_obra_metros
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("🔄 MIGRAÇÃO 67: Adicionando campos de geofencing (cerca virtual)")
+        
+        # Campos para tabela obra
+        campos_obra = [
+            ("latitude", "FLOAT", None),
+            ("longitude", "FLOAT", None),
+            ("raio_geofence_metros", "INTEGER", "100")
+        ]
+        
+        logger.info("  📍 Verificando campos de geofencing na tabela obra...")
+        for nome_campo, tipo_campo, default_value in campos_obra:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'obra' AND column_name = %s
+            """, (nome_campo,))
+            
+            coluna_existe = cursor.fetchone()
+            
+            if coluna_existe:
+                logger.info(f"    ✅ Coluna '{nome_campo}' já existe em obra")
+            else:
+                if default_value:
+                    sql = f"ALTER TABLE obra ADD COLUMN {nome_campo} {tipo_campo} DEFAULT {default_value}"
+                else:
+                    sql = f"ALTER TABLE obra ADD COLUMN {nome_campo} {tipo_campo}"
+                cursor.execute(sql)
+                logger.info(f"    ✅ Coluna '{nome_campo}' adicionada à tabela obra")
+        
+        # Campos para tabela registro_ponto
+        campos_ponto = [
+            ("latitude", "FLOAT", None),
+            ("longitude", "FLOAT", None),
+            ("distancia_obra_metros", "FLOAT", None)
+        ]
+        
+        logger.info("  📍 Verificando campos de geofencing na tabela registro_ponto...")
+        for nome_campo, tipo_campo, default_value in campos_ponto:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'registro_ponto' AND column_name = %s
+            """, (nome_campo,))
+            
+            coluna_existe = cursor.fetchone()
+            
+            if coluna_existe:
+                logger.info(f"    ✅ Coluna '{nome_campo}' já existe em registro_ponto")
+            else:
+                if default_value:
+                    sql = f"ALTER TABLE registro_ponto ADD COLUMN {nome_campo} {tipo_campo} DEFAULT {default_value}"
+                else:
+                    sql = f"ALTER TABLE registro_ponto ADD COLUMN {nome_campo} {tipo_campo}"
+                cursor.execute(sql)
+                logger.info(f"    ✅ Coluna '{nome_campo}' adicionada à tabela registro_ponto")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("✅ MIGRAÇÃO 67 CONCLUÍDA - Sistema de Geofencing ativo!")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na migração 67: {e}")
         if 'connection' in locals():
             try:
                 connection.rollback()
