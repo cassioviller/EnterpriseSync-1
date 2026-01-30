@@ -1,0 +1,80 @@
+ERRO: (psycopg2.errors.UndefinedColumn) column obra.latitude does not exist
+LINE 1: ...bra_admin_id, obra.created_at AS obra_created_at, obra.latit...
+                                                             ^
+
+[SQL: SELECT obra.id AS obra_id, obra.nome AS obra_nome, obra.codigo AS obra_codigo, obra.endereco AS obra_endereco, obra.data_inicio AS obra_data_inicio, obra.data_previsao_fim AS obra_data_previsao_fim, obra.orcamento AS obra_orcamento, obra.valor_contrato AS obra_valor_contrato, obra.area_total_m2 AS obra_area_total_m2, obra.status AS obra_status, obra.responsavel_id AS obra_responsavel_id, obra.token_cliente AS obra_token_cliente, obra.cliente_nome AS obra_cliente_nome, obra.cliente_email AS obra_cliente_email, obra.cliente_telefone AS obra_cliente_telefone, obra.cliente AS obra_cliente, obra.proposta_origem_id AS obra_proposta_origem_id, obra.portal_ativo AS obra_portal_ativo, obra.ultima_visualizacao_cliente AS obra_ultima_visualizacao_cliente, obra.ativo AS obra_ativo, obra.admin_id AS obra_admin_id, obra.created_at AS obra_created_at, obra.latitude AS obra_latitude, obra.longitude AS obra_longitude, obra.raio_geofence_metros AS obra_raio_geofence_metros 
+FROM obra 
+WHERE obra.admin_id = %(admin_id_1)s AND obra.status = %(status_1)s ORDER BY obra.nome]
+[parameters: {&#39;admin_id_1&#39;: 2, &#39;status_1&#39;: &#39;Em andamento&#39;}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column obra.latitude does not exist
+LINE 1: ...bra_admin_id, obra.created_at AS obra_created_at, obra.latit...
+                                                             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/utils/database_diagnostics.py&#34;, line 300, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/views.py&#34;, line 1495, in funcionarios
+    ).order_by(Obra.nome).all()
+                          ^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/context.py&#34;, line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1419, in execute
+    return meth(
+           ^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py&#34;, line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column obra.latitude does not exist
+LINE 1: ...bra_admin_id, obra.created_at AS obra_created_at, obra.latit...
+                                                             ^
+
+[SQL: SELECT obra.id AS obra_id, obra.nome AS obra_nome, obra.codigo AS obra_codigo, obra.endereco AS obra_endereco, obra.data_inicio AS obra_data_inicio, obra.data_previsao_fim AS obra_data_previsao_fim, obra.orcamento AS obra_orcamento, obra.valor_contrato AS obra_valor_contrato, obra.area_total_m2 AS obra_area_total_m2, obra.status AS obra_status, obra.responsavel_id AS obra_responsavel_id, obra.token_cliente AS obra_token_cliente, obra.cliente_nome AS obra_cliente_nome, obra.cliente_email AS obra_cliente_email, obra.cliente_telefone AS obra_cliente_telefone, obra.cliente AS obra_cliente, obra.proposta_origem_id AS obra_proposta_origem_id, obra.portal_ativo AS obra_portal_ativo, obra.ultima_visualizacao_cliente AS obra_ultima_visualizacao_cliente, obra.ativo AS obra_ativo, obra.admin_id AS obra_admin_id, obra.created_at AS obra_created_at, obra.latitude AS obra_latitude, obra.longitude AS obra_longitude, obra.raio_geofence_metros AS obra_raio_geofence_metros 
+FROM obra 
+WHERE obra.admin_id = %(admin_id_1)s AND obra.status = %(status_1)s ORDER BY obra.nome]
+[parameters: {&#39;admin_id_1&#39;: 2, &#39;status_1&#39;: &#39;Em andamento&#39;}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
