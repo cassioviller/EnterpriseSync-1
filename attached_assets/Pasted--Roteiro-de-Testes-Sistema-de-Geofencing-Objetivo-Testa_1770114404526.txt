@@ -1,0 +1,226 @@
+# 🧪 Roteiro de Testes - Sistema de Geofencing
+
+## 🎯 Objetivo
+Testar o sistema de Cerca Virtual (Geofencing) diretamente no aplicativo para garantir que está funcionando corretamente.
+
+---
+
+## 📋 TESTE 1: Configurar Geofencing em uma Obra
+
+### Passos:
+1. Acesse o menu **Obras**
+2. Clique em **Editar** em uma obra existente (ou crie uma nova)
+3. Role até a seção **"Geofencing (Cerca Virtual)"**
+4. Clique no botão **"Obter Localização Atual"**
+5. Verifique se os campos foram preenchidos:
+   - **Latitude**: deve ter um número (ex: -23.550520)
+   - **Longitude**: deve ter um número (ex: -46.633308)
+   - **Raio**: deixe 100 metros (padrão)
+6. Clique em **Salvar**
+
+### ✅ Resultado Esperado:
+- Obra salva com sucesso
+- Coordenadas GPS armazenadas no banco de dados
+- Mensagem de confirmação exibida
+
+---
+
+## 📋 TESTE 2: Registrar Ponto DENTRO do Raio (Deve Funcionar)
+
+### Cenário:
+Simular que o funcionário está na mesma localização da obra (distância = 0m)
+
+### Passos:
+1. Acesse o menu **Ponto Eletrônico Facial Automático**
+2. Permita acesso à câmera e à localização quando solicitado
+3. Tire uma foto do rosto do funcionário
+4. Aguarde o sistema processar
+
+### ✅ Resultado Esperado:
+- ✅ Reconhecimento facial bem-sucedido
+- ✅ Validação de localização aprovada
+- ✅ Ponto registrado com sucesso
+- ✅ Mensagem: "Ponto registrado com sucesso! Distância: 0m" (ou próximo de 0)
+
+---
+
+## 📋 TESTE 3: Registrar Ponto SEM Enviar GPS (Deve Falhar)
+
+### Cenário:
+Simular tentativa de burlar o sistema não enviando localização
+
+### Passos:
+1. Acesse o **Ponto Eletrônico Facial Automático**
+2. **BLOQUEIE** o acesso à localização no navegador quando solicitado
+3. Tente tirar a foto
+
+### ✅ Resultado Esperado:
+- ❌ Sistema deve recusar o registro
+- ❌ Mensagem de erro: "Você precisa permitir o acesso à localização para registrar o ponto"
+- ❌ Ponto NÃO deve ser registrado
+
+---
+
+## 📋 TESTE 4: Modificar Coordenadas Manualmente (Simular Fora do Raio)
+
+### Cenário:
+Testar validação quando funcionário está longe da obra
+
+### Passos:
+1. Acesse o menu **Obras**
+2. Edite a obra que tem geofencing configurado
+3. **Modifique** as coordenadas para um local distante:
+   - **Latitude**: -22.906847 (Rio de Janeiro)
+   - **Longitude**: -43.172896 (Rio de Janeiro)
+   - **Raio**: 100 metros
+4. Salve a obra
+5. Tente registrar o ponto novamente (você ainda está em São Paulo)
+
+### ✅ Resultado Esperado:
+- ❌ Sistema deve recusar o registro
+- ❌ Mensagem de erro: "Você está fora da área da obra. Fora do raio (XXXkm de 100m)"
+- ❌ Ponto NÃO deve ser registrado
+
+---
+
+## 📋 TESTE 5: Obra SEM Geofencing (Compatibilidade Retroativa)
+
+### Cenário:
+Garantir que obras antigas sem geofencing continuam funcionando
+
+### Passos:
+1. Acesse o menu **Obras**
+2. Edite uma obra
+3. **APAGUE** os valores de Latitude e Longitude (deixe em branco)
+4. Salve a obra
+5. Tente registrar o ponto nesta obra
+
+### ✅ Resultado Esperado:
+- ✅ Ponto deve ser registrado normalmente
+- ✅ Sistema NÃO deve exigir localização
+- ✅ Mensagem: "Ponto registrado com sucesso!"
+- ✅ Funciona como antes (compatibilidade retroativa)
+
+---
+
+## 📋 TESTE 6: Raio Grande (500m)
+
+### Cenário:
+Testar com raio maior para obras grandes
+
+### Passos:
+1. Edite a obra
+2. Configure:
+   - **Latitude/Longitude**: Use "Obter Localização Atual"
+   - **Raio**: 500 metros
+3. Salve
+4. Registre o ponto
+
+### ✅ Resultado Esperado:
+- ✅ Ponto registrado com sucesso
+- ✅ Aceita funcionários até 500m de distância
+
+---
+
+## 📋 TESTE 7: Raio Pequeno (10m)
+
+### Cenário:
+Testar com raio muito restrito
+
+### Passos:
+1. Edite a obra
+2. Configure:
+   - **Latitude/Longitude**: Use "Obter Localização Atual"
+   - **Raio**: 10 metros
+3. Salve
+4. Registre o ponto
+
+### ✅ Resultado Esperado:
+- Se estiver exatamente no local: ✅ Aceita
+- Se estiver a mais de 10m: ❌ Recusa
+
+---
+
+## 📋 TESTE 8: Verificar Auditoria no Banco de Dados
+
+### Passos:
+1. Após registrar alguns pontos com geofencing
+2. Acesse o banco de dados PostgreSQL
+3. Execute a query:
+```sql
+SELECT 
+    funcionario_id,
+    data,
+    hora_entrada,
+    latitude,
+    longitude,
+    distancia_obra_metros
+FROM registro_ponto
+WHERE latitude IS NOT NULL
+ORDER BY created_at DESC
+LIMIT 10;
+```
+
+### ✅ Resultado Esperado:
+- Deve mostrar os registros com:
+  - **latitude**: coordenadas do funcionário
+  - **longitude**: coordenadas do funcionário
+  - **distancia_obra_metros**: distância calculada (ex: 0, 50, 100)
+
+---
+
+## 📊 Checklist de Validação
+
+Marque cada teste conforme for executando:
+
+- [ ] **TESTE 1**: Configurar geofencing em obra
+- [ ] **TESTE 2**: Registrar ponto dentro do raio (ACEITO)
+- [ ] **TESTE 3**: Tentar registrar sem GPS (RECUSADO)
+- [ ] **TESTE 4**: Registrar fora do raio (RECUSADO)
+- [ ] **TESTE 5**: Obra sem geofencing (ACEITO - retroativo)
+- [ ] **TESTE 6**: Raio grande 500m (ACEITO)
+- [ ] **TESTE 7**: Raio pequeno 10m (RESTRITO)
+- [ ] **TESTE 8**: Verificar auditoria no banco
+
+---
+
+## 🎯 Resultado Final Esperado
+
+Se todos os 8 testes passarem:
+
+✅ **Sistema de Geofencing está funcionando perfeitamente!**
+
+Funcionalidades validadas:
+- ✅ Captura de GPS automática
+- ✅ Validação de distância correta
+- ✅ Bloqueio de registros fora do raio
+- ✅ Obrigatoriedade de GPS quando obra tem cerca virtual
+- ✅ Compatibilidade retroativa (obras sem geofencing)
+- ✅ Auditoria completa no banco de dados
+- ✅ Segurança contra burla (não pode omitir GPS)
+
+---
+
+## 💡 Dicas para o Teste
+
+1. **Use o Chrome ou Edge** (melhor suporte a geolocalização)
+2. **Permita acesso à localização** quando o navegador solicitar
+3. **Teste em dispositivo móvel** para GPS mais preciso
+4. **Anote as distâncias** mostradas nas mensagens para validar cálculos
+
+---
+
+## 🐛 Problemas Comuns
+
+### "Navegador não suporta geolocalização"
+**Solução**: Use Chrome, Edge ou Firefox atualizado
+
+### "Permissão negada"
+**Solução**: Vá em Configurações do navegador → Permissões → Localização → Permitir
+
+### "Erro ao obter localização"
+**Solução**: Ative o GPS do dispositivo ou use Wi-Fi (melhor precisão)
+
+---
+
+🚀 **Pronto para testar! Execute os 8 testes na ordem e valide o sistema completo!**
