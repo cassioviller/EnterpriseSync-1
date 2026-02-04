@@ -486,12 +486,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.distancia_obra !== undefined && data.distancia_obra !== null) {
                     distanciaInfo = ` (${Math.round(data.distancia_obra)}m da obra)`;
                 }
+                let tempoInfo = data.tempo_processamento ? ` em ${data.tempo_processamento}s` : '';
                 resultadoContainer.innerHTML = `
                     <div class="alert alert-success d-flex align-items-center">
                         <i class="fas fa-check-circle fa-2x me-3"></i>
                         <div>
                             <strong>${data.funcionario_nome}</strong>
                             <div>${data.tipo_registrado} - ${data.hora}${distanciaInfo}</div>
+                            <small class="text-muted">Identificado${tempoInfo}</small>
                         </div>
                     </div>
                 `;

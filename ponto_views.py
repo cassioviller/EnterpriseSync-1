@@ -1664,10 +1664,12 @@ def identificar_e_registrar():
         
         db.session.commit()
         
+        tempo_total = time.time() - start_total
+        
         logger.info(
             f"Ponto registrado via identificação automática: "
             f"Funcionário {funcionario.nome} ({funcionario.id}), "
-            f"Tipo: {tipo_registrado}, Distância: {menor_distancia:.4f}"
+            f"Tipo: {tipo_registrado}, Distância: {menor_distancia:.4f}, Tempo: {tempo_total:.2f}s"
         )
         
         return jsonify({
@@ -1679,7 +1681,8 @@ def identificar_e_registrar():
             'tipo_registrado': tipo_registrado,
             'hora': agora.strftime('%H:%M:%S'),
             'distancia': round(menor_distancia, 4),
-            'distancia_obra': round(distancia_obra, 1) if distancia_obra else None
+            'distancia_obra': round(distancia_obra, 1) if distancia_obra else None,
+            'tempo_processamento': round(tempo_total, 2)
         })
         
     except Exception as e:
