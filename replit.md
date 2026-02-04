@@ -39,7 +39,13 @@ The system employs a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wit
     -   **Fleet Management System:** Manages vehicles, expenses, TCO dashboards, and critical alerts.
     -   **Food Management System (Alimentação v2.0):** Mobile-first redesigned interface for managing restaurant and food entries with dynamic multi-item launching, searchable employee selection, and automatic cost calculation.
     -   **Warehouse Management:** Manages materials, tools, and PPE with traceability, full CRUD for suppliers, material flow workflows (entrada/saída/devolução), manual batch/lot selection for strategic cost optimization, serialized item status transitions, optimistic locking, and employee consumable tracking.
-    -   **Shared Device Time Clock System (Ponto Eletrônico):** Mobile-first time clock with GPS tracking, advanced Excel import, and facial recognition verification using DeepFace library (offline, no cloud AI).
+    -   **Shared Device Time Clock System (Ponto Eletrônico):** Mobile-first time clock with GPS tracking, advanced Excel import, and enhanced facial recognition verification using DeepFace library (offline, no cloud AI). Features include:
+        - **Multiple Photos per Employee:** Employees can register multiple facial photos (with/without glasses, different angles, lighting) to improve recognition accuracy (model: `FotoFacialFuncionario`, migration 68)
+        - **Stricter Recognition Threshold:** Reduced from 0.55 to 0.40 for more rigorous matching (fewer false positives)
+        - **60% Minimum Confidence:** Requires at least 60% confidence for positive identification
+        - **Geofencing:** GPS-based location validation when works (obras) have coordinates configured (100m default radius)
+        - **Photo Quality Validation:** Validates brightness (30-230), minimum size (150x150px) before accepting photos
+        - **UI for Photo Management:** `/ponto/funcionario/<id>/fotos-faciais` for managing employee facial photos
 -   **Automated Database Error Diagnostics:** A `DatabaseDiagnostics` system analyzes SQLAlchemy errors, reports missing columns, and generates diagnostic reports.
 -   **Híbrido Data Model Support:** For food management, aggregates data from legacy and new models for seamless coexistence.
 -   **Transaction Isolation for Deletions:** Critical deletion operations use RAW connections with `isolation_level="AUTOCOMMIT"` and incorporate schema introspection for multi-tenant filtering.
