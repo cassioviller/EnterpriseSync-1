@@ -155,14 +155,14 @@ def recarregar_cache_facial():
     _cache_facial = None
     return carregar_cache_facial()
 
-def identificar_por_cache(foto_base64, admin_id, threshold=0.55):
+def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
     """
     Identifica funcionário usando cache de embeddings (muito mais rápido).
     
     Args:
         foto_base64: Foto capturada em base64
         admin_id: ID do tenant
-        threshold: Limiar de distância para match
+        threshold: Limiar de distância para match (0.40 = mais rigoroso)
     
     Returns:
         tuple: (funcionario_id, distancia, erro)
@@ -177,14 +177,18 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.55):
     
     cache = carregar_cache_facial()
     if not cache or 'embeddings' not in cache:
+        logger.warning("⚠️ Cache não disponível para reconhecimento")
         return None, None, "Cache não disponível"
     
     embeddings_cache = cache['embeddings']
+    admin_id_int = int(admin_id) if admin_id else None
     
-    embeddings_tenant = {
-        fid: data for fid, data in embeddings_cache.items() 
-        if data.get('admin_id') == admin_id
-    }
+    embeddings_tenant = {}
+    for fid, data in embeddings_cache.items():
+        cache_admin_id = data.get('admin_id')
+        cache_admin_id_int = int(cache_admin_id) if cache_admin_id is not None else None
+        if cache_admin_id_int == admin_id_int:
+            embeddings_tenant[fid] = data
     
     if not embeddings_tenant:
         return None, None, "Nenhum embedding no cache para este tenant"
@@ -1406,20 +1410,36 @@ def status_cache_embeddings():
     """API para verificar status do cache de embeddings"""
     try:
         admin_id = get_tenant_admin_id()
+        admin_id_int = int(admin_id) if admin_id else None
+        
+        logger.debug(f"🔍 Status cache - admin_id: {admin_id} (type: {type(admin_id).__name__})")
+        
         cache = carregar_cache_facial()
         
         if not cache:
+            logger.warning("⚠️ Cache não encontrado no arquivo")
             return jsonify({
                 'disponivel': False,
                 'message': 'Cache não encontrado. Gere o cache primeiro.'
             })
         
-        embeddings_tenant = {
-            fid: data for fid, data in cache.get('embeddings', {}).items()
-            if data.get('admin_id') == admin_id
-        }
+        all_embeddings = cache.get('embeddings', {})
+        logger.debug(f"📊 Cache total: {len(all_embeddings)} funcionários")
+        
+        embeddings_tenant = {}
+        for fid, data in all_embeddings.items():
+            cache_admin_id = data.get('admin_id')
+            cache_admin_id_int = int(cache_admin_id) if cache_admin_id is not None else None
+            
+            if cache_admin_id_int == admin_id_int:
+                embeddings_tenant[fid] = data
+                logger.debug(f"  ✅ Match: Func {fid} ({data.get('nome')}) - admin_id={cache_admin_id}")
+            else:
+                logger.debug(f"  ❌ Skip: Func {fid} - admin_id={cache_admin_id} != {admin_id_int}")
         
         total_fotos = sum(len(data.get('embeddings', [])) for data in embeddings_tenant.values())
+        
+        logger.info(f"📊 Cache status: {len(embeddings_tenant)} funcionários, {total_fotos} fotos para admin_id={admin_id_int}")
         
         return jsonify({
             'disponivel': True,
@@ -1435,10 +1455,17 @@ def status_cache_embeddings():
                     'fotos': len(data.get('embeddings', []))
                 }
                 for fid, data in embeddings_tenant.items()
-            ]
+            ],
+            'debug': {
+                'admin_id_logado': admin_id_int,
+                'total_cache': len(all_embeddings)
+            }
         })
         
     except Exception as e:
+        logger.error(f"❌ Erro no status cache: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({
             'disponivel': False,
             'message': f'Erro: {str(e)}'
