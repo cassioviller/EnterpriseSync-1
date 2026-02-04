@@ -1619,6 +1619,32 @@ def identificar_e_registrar():
 # GERENCIAMENTO DE FOTOS FACIAIS
 # ================================
 
+@ponto_bp.route('/gerenciar-fotos-faciais')
+@login_required
+def listar_funcionarios_fotos_faciais():
+    """Lista todos os funcionários para gerenciar fotos faciais"""
+    admin_id = get_tenant_admin_id()
+    
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=admin_id,
+        ativo=True
+    ).order_by(Funcionario.nome).all()
+    
+    # Contagem de fotos para cada funcionário
+    for func in funcionarios:
+        func.qtd_fotos = FotoFacialFuncionario.query.filter_by(
+            funcionario_id=func.id,
+            admin_id=admin_id,
+            ativa=True
+        ).count()
+    
+    return render_template(
+        'ponto/gerenciar_fotos_lista.html',
+        funcionarios=funcionarios,
+        titulo='Gerenciar Fotos Faciais'
+    )
+
+
 @ponto_bp.route('/funcionario/<int:funcionario_id>/fotos-faciais')
 @login_required
 def gerenciar_fotos_faciais(funcionario_id):

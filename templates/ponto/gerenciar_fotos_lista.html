@@ -1,0 +1,183 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ titulo }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-images text-primary me-2"></i>{{ titulo }}
+                    </h2>
+                    <p class="text-muted mb-0">Selecione um funcionário para gerenciar suas fotos de reconhecimento facial</p>
+                </div>
+                <a href="{{ url_for('ponto.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if funcionarios %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users me-2"></i>Funcionários Ativos
+                        <span class="badge bg-light text-primary ms-2">{{ funcionarios|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 70px;">Foto</th>
+                                    <th>Nome</th>
+                                    <th>CPF</th>
+                                    <th>Função</th>
+                                    <th class="text-center">Fotos Cadastradas</th>
+                                    <th class="text-center" style="width: 160px;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for funcionario in funcionarios %}
+                                <tr>
+                                    <td>
+                                        {% if funcionario.foto_base64 %}
+                                            <img src="data:image/jpeg;base64,{{ funcionario.foto_base64[:100] }}..." 
+                                                 alt="{{ funcionario.nome }}" 
+                                                 style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;"
+                                                 onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 100 100&quot;><rect fill=&quot;%23ddd&quot; width=&quot;100&quot; height=&quot;100&quot;/><text x=&quot;50&quot; y=&quot;60&quot; font-size=&quot;40&quot; text-anchor=&quot;middle&quot; fill=&quot;%23999&quot;>?</text></svg>';">
+                                        {% else %}
+                                            <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #e0e0e0, #bdbdbd); display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas fa-user text-white fs-5"></i>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ funcionario.nome }}</strong>
+                                        {% if funcionario.codigo %}
+                                        <br><small class="text-muted">{{ funcionario.codigo }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ funcionario.cpf or '-' }}</td>
+                                    <td>{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else '-' }}</td>
+                                    <td class="text-center">
+                                        {% if funcionario.qtd_fotos >= 3 %}
+                                            <span class="badge bg-success fs-6">
+                                                <i class="fas fa-check-circle me-1"></i>{{ funcionario.qtd_fotos }} foto(s)
+                                            </span>
+                                        {% elif funcionario.qtd_fotos > 0 %}
+                                            <span class="badge bg-warning text-dark fs-6">
+                                                <i class="fas fa-exclamation-triangle me-1"></i>{{ funcionario.qtd_fotos }} foto(s)
+                                            </span>
+                                            <br><small class="text-muted">Recomendado: 3-5</small>
+                                        {% else %}
+                                            <span class="badge bg-danger fs-6">
+                                                <i class="fas fa-times-circle me-1"></i>0 fotos
+                                            </span>
+                                            <br><small class="text-muted">Sem reconhecimento</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="{{ url_for('ponto.gerenciar_fotos_faciais', funcionario_id=funcionario.id) }}" 
+                                           class="btn btn-primary btn-sm">
+                                            <i class="fas fa-camera me-1"></i>Gerenciar Fotos
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Nenhum funcionário ativo cadastrado.</strong>
+                <br>Cadastre funcionários primeiro para gerenciar suas fotos faciais.
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Dicas para Fotos de Qualidade
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-check-circle text-success me-2"></i>Faça:</h6>
+                            <ul class="mb-3">
+                                <li>Use local bem iluminado (luz natural é melhor)</li>
+                                <li>Rosto centralizado e olhando para a câmera</li>
+                                <li>Cadastre 3-5 fotos por funcionário</li>
+                                <li>Inclua variações: com/sem óculos, diferentes ângulos</li>
+                                <li>Expressões variadas (sorrindo e sério)</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-times-circle text-danger me-2"></i>Evite:</h6>
+                            <ul class="mb-3">
+                                <li>Fotos muito escuras ou muito claras</li>
+                                <li>Sombras no rosto</li>
+                                <li>Chapéu, boné ou acessórios que cubram o rosto</li>
+                                <li>Fotos desfocadas ou tremidas</li>
+                                <li>Fotos muito pequenas (mínimo 150x150px)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-primary mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Dica:</strong> Funcionários com óculos devem ter pelo menos 2 fotos: uma com óculos e outra sem. Isso melhora significativamente a precisão do reconhecimento!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded">
+                                <span class="badge bg-danger fs-5 mb-2">0</span>
+                                <p class="mb-0 text-muted">Sem reconhecimento facial</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded">
+                                <span class="badge bg-warning text-dark fs-5 mb-2">1-2</span>
+                                <p class="mb-0 text-muted">Reconhecimento básico</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded">
+                                <span class="badge bg-success fs-5 mb-2">3+</span>
+                                <p class="mb-0 text-muted">Reconhecimento ideal</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
