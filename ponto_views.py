@@ -1613,3 +1613,159 @@ def identificar_e_registrar():
             'success': False, 
             'message': f'Erro ao processar identificação: {str(e)}'
         }), 500
+
+
+# ================================
+# GERENCIAMENTO DE FOTOS FACIAIS
+# ================================
+
+@ponto_bp.route('/funcionario/<int:funcionario_id>/fotos-faciais')
+@login_required
+def gerenciar_fotos_faciais(funcionario_id):
+    """Página para gerenciar múltiplas fotos faciais de um funcionário"""
+    admin_id = get_tenant_admin_id()
+    
+    funcionario = Funcionario.query.filter_by(
+        id=funcionario_id,
+        admin_id=admin_id
+    ).first_or_404()
+    
+    fotos = FotoFacialFuncionario.query.filter_by(
+        funcionario_id=funcionario_id,
+        admin_id=admin_id
+    ).order_by(FotoFacialFuncionario.ordem, FotoFacialFuncionario.created_at).all()
+    
+    return render_template(
+        'ponto/gerenciar_fotos_faciais.html',
+        funcionario=funcionario,
+        fotos=fotos
+    )
+
+
+@ponto_bp.route('/api/funcionario/<int:funcionario_id>/foto-facial', methods=['POST'])
+@login_required
+def adicionar_foto_facial(funcionario_id):
+    """Adiciona uma nova foto facial para o funcionário"""
+    admin_id = get_tenant_admin_id()
+    
+    funcionario = Funcionario.query.filter_by(
+        id=funcionario_id,
+        admin_id=admin_id
+    ).first()
+    
+    if not funcionario:
+        return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 404
+    
+    try:
+        data = request.get_json()
+        foto_base64 = data.get('foto_base64')
+        descricao = data.get('descricao', '').strip()
+        
+        if not foto_base64:
+            return jsonify({'success': False, 'message': 'Foto não fornecida'}), 400
+        
+        qualidade = validar_qualidade_foto_avancada(foto_base64)
+        if not qualidade.get('valida', False):
+            return jsonify({
+                'success': False, 
+                'message': qualidade.get('mensagem', 'Foto com qualidade insuficiente'),
+                'detalhes': qualidade
+            }), 400
+        
+        ultima_ordem = db.session.query(db.func.max(FotoFacialFuncionario.ordem)).filter_by(
+            funcionario_id=funcionario_id,
+            admin_id=admin_id
+        ).scalar() or 0
+        
+        nova_foto = FotoFacialFuncionario(
+            funcionario_id=funcionario_id,
+            foto_base64=foto_base64,
+            descricao=descricao or f'Foto {ultima_ordem + 1}',
+            ordem=ultima_ordem + 1,
+            ativa=True,
+            admin_id=admin_id
+        )
+        
+        db.session.add(nova_foto)
+        db.session.commit()
+        
+        recarregar_cache_facial()
+        
+        logger.info(f"Nova foto facial adicionada para funcionário {funcionario.nome} (ID: {funcionario_id})")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Foto adicionada com sucesso',
+            'foto_id': nova_foto.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao adicionar foto facial: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': f'Erro ao salvar foto: {str(e)}'}), 500
+
+
+@ponto_bp.route('/api/foto-facial/<int:foto_id>', methods=['DELETE'])
+@login_required
+def excluir_foto_facial(foto_id):
+    """Exclui uma foto facial"""
+    admin_id = get_tenant_admin_id()
+    
+    foto = FotoFacialFuncionario.query.filter_by(
+        id=foto_id,
+        admin_id=admin_id
+    ).first()
+    
+    if not foto:
+        return jsonify({'success': False, 'message': 'Foto não encontrada'}), 404
+    
+    try:
+        funcionario_id = foto.funcionario_id
+        db.session.delete(foto)
+        db.session.commit()
+        
+        recarregar_cache_facial()
+        
+        logger.info(f"Foto facial {foto_id} excluída do funcionário {funcionario_id}")
+        
+        return jsonify({'success': True, 'message': 'Foto excluída com sucesso'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao excluir foto facial: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': f'Erro ao excluir foto: {str(e)}'}), 500
+
+
+@ponto_bp.route('/api/foto-facial/<int:foto_id>/ativar', methods=['POST'])
+@login_required
+def ativar_foto_facial(foto_id):
+    """Ativa ou desativa uma foto facial"""
+    admin_id = get_tenant_admin_id()
+    
+    foto = FotoFacialFuncionario.query.filter_by(
+        id=foto_id,
+        admin_id=admin_id
+    ).first()
+    
+    if not foto:
+        return jsonify({'success': False, 'message': 'Foto não encontrada'}), 404
+    
+    try:
+        foto.ativa = not foto.ativa
+        db.session.commit()
+        
+        recarregar_cache_facial()
+        
+        status = 'ativada' if foto.ativa else 'desativada'
+        logger.info(f"Foto facial {foto_id} {status}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Foto {status} com sucesso',
+            'ativa': foto.ativa
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao ativar/desativar foto facial: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': f'Erro ao atualizar foto: {str(e)}'}), 500

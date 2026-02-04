@@ -1,0 +1,465 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Fotos Faciais - {{ funcionario.nome }} - SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <img src="{{ funcionario.foto_base64 if funcionario.foto_base64 else url_for('static', filename='images/default-avatar.png') }}" 
+                         class="rounded-circle" 
+                         width="60" 
+                         height="60" 
+                         style="object-fit: cover;"
+                         alt="{{ funcionario.nome }}">
+                    <div>
+                        <h1 class="h4 mb-0">Fotos Faciais</h1>
+                        <p class="text-muted mb-0">{{ funcionario.nome }}</p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAdicionarFoto">
+                        <i class="fas fa-camera me-2"></i>Nova Foto
+                    </button>
+                    <a href="{{ url_for('main.funcionario_perfil', funcionario_id=funcionario.id) }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info d-flex align-items-start">
+                <i class="fas fa-info-circle me-2 mt-1"></i>
+                <div>
+                    <strong>Dica:</strong> Cadastre múltiplas fotos do funcionário (com/sem óculos, diferentes ângulos, iluminações) 
+                    para melhorar a precisão do reconhecimento facial no ponto eletrônico.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row" id="gridFotos">
+        {% if fotos %}
+            {% for foto in fotos %}
+            <div class="col-6 col-md-4 col-lg-3 mb-4" id="foto-card-{{ foto.id }}">
+                <div class="card h-100 {{ 'border-secondary opacity-50' if not foto.ativa else '' }}">
+                    <div class="position-relative">
+                        <img src="{{ foto.foto_base64 }}" 
+                             class="card-img-top" 
+                             alt="{{ foto.descricao }}"
+                             style="height: 180px; object-fit: cover;">
+                        <span class="position-absolute top-0 end-0 m-2 badge {{ 'bg-success' if foto.ativa else 'bg-secondary' }}">
+                            {{ 'Ativa' if foto.ativa else 'Inativa' }}
+                        </span>
+                        {% if loop.index == 1 %}
+                        <span class="position-absolute top-0 start-0 m-2 badge bg-primary">
+                            Principal
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-3">
+                        <p class="card-text small mb-2 text-truncate" title="{{ foto.descricao }}">
+                            {{ foto.descricao or 'Sem descrição' }}
+                        </p>
+                        <small class="text-muted d-block mb-2">
+                            <i class="fas fa-calendar me-1"></i>{{ foto.created_at.strftime('%d/%m/%Y') if foto.created_at else '-' }}
+                        </small>
+                        <div class="btn-group w-100" role="group">
+                            <button type="button" 
+                                    class="btn btn-sm {{ 'btn-outline-warning' if foto.ativa else 'btn-outline-success' }}"
+                                    onclick="toggleFoto({{ foto.id }})"
+                                    title="{{ 'Desativar' if foto.ativa else 'Ativar' }}">
+                                <i class="fas {{ 'fa-eye-slash' if foto.ativa else 'fa-eye' }}"></i>
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-danger"
+                                    onclick="excluirFoto({{ foto.id }})"
+                                    title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-camera fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhuma foto facial cadastrada</h5>
+                        <p class="text-muted mb-3">Clique no botão acima para adicionar a primeira foto.</p>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAdicionarFoto">
+                            <i class="fas fa-camera me-2"></i>Adicionar Primeira Foto
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="modalAdicionarFoto" tabindex="-1" aria-labelledby="modalAdicionarFotoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalAdicionarFotoLabel">
+                    <i class="fas fa-camera me-2"></i>Adicionar Foto Facial
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-12 col-md-8 mb-3 mb-md-0">
+                        <div class="camera-container position-relative bg-dark rounded overflow-hidden" style="aspect-ratio: 4/3;">
+                            <video id="cameraPreview" autoplay playsinline muted class="w-100 h-100" style="object-fit: cover; transform: scaleX(-1);"></video>
+                            <canvas id="canvasCaptura" style="display: none;"></canvas>
+                            <img id="fotoCapturada" class="w-100 h-100" style="object-fit: cover; display: none;">
+                            
+                            <div id="cameraLoading" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-dark">
+                                <div class="text-center text-white">
+                                    <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+                                    <p class="mb-0">Iniciando câmera...</p>
+                                </div>
+                            </div>
+                            
+                            <div id="cameraError" class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center bg-dark">
+                                <div class="text-center text-danger p-3">
+                                    <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                                    <p class="mb-0" id="cameraErrorMsg">Erro ao acessar câmera</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2 mt-3 justify-content-center">
+                            <button type="button" id="btnCapturar" class="btn btn-primary btn-lg" onclick="capturarFoto()">
+                                <i class="fas fa-camera me-2"></i>Capturar
+                            </button>
+                            <button type="button" id="btnRecapturar" class="btn btn-secondary d-none" onclick="recapturar()">
+                                <i class="fas fa-redo me-2"></i>Recapturar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-md-4">
+                        <div class="mb-3">
+                            <label for="descricaoFoto" class="form-label">Descrição</label>
+                            <input type="text" class="form-control" id="descricaoFoto" 
+                                   placeholder="Ex: Com óculos, Sem óculos, Perfil">
+                            <small class="text-muted">Opcional: ajuda a identificar a variação</small>
+                        </div>
+                        
+                        <div id="qualidadeContainer" class="d-none">
+                            <h6 class="mb-2">Qualidade da Foto</h6>
+                            <div class="list-group list-group-flush small">
+                                <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                                    <span><i class="fas fa-sun me-2"></i>Iluminação</span>
+                                    <span id="qualidadeBrilho" class="badge bg-secondary">-</span>
+                                </div>
+                                <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                                    <span><i class="fas fa-expand me-2"></i>Resolução</span>
+                                    <span id="qualidadeResolucao" class="badge bg-secondary">-</span>
+                                </div>
+                                <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                                    <span><i class="fas fa-user me-2"></i>Face detectada</span>
+                                    <span id="qualidadeFace" class="badge bg-secondary">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="alertQualidade" class="alert alert-warning d-none mt-3">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span id="alertQualidadeMsg"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="btnSalvarFoto" class="btn btn-primary" onclick="salvarFoto()" disabled>
+                    <i class="fas fa-save me-2"></i>Salvar Foto
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const funcionarioId = {{ funcionario.id }};
+let stream = null;
+let fotoBase64 = null;
+
+document.getElementById('modalAdicionarFoto').addEventListener('shown.bs.modal', iniciarCamera);
+document.getElementById('modalAdicionarFoto').addEventListener('hidden.bs.modal', pararCamera);
+
+async function iniciarCamera() {
+    const video = document.getElementById('cameraPreview');
+    const loading = document.getElementById('cameraLoading');
+    const errorDiv = document.getElementById('cameraError');
+    
+    loading.classList.remove('d-none');
+    errorDiv.classList.add('d-none');
+    
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'user',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        });
+        video.srcObject = stream;
+        await video.play();
+        loading.classList.add('d-none');
+    } catch (err) {
+        console.error('Erro ao acessar câmera:', err);
+        loading.classList.add('d-none');
+        errorDiv.classList.remove('d-none');
+        errorDiv.classList.add('d-flex');
+        document.getElementById('cameraErrorMsg').textContent = 
+            err.name === 'NotAllowedError' 
+                ? 'Permissão de câmera negada. Habilite nas configurações do navegador.'
+                : 'Não foi possível acessar a câmera: ' + err.message;
+    }
+}
+
+function pararCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    resetarModal();
+}
+
+function resetarModal() {
+    const video = document.getElementById('cameraPreview');
+    const foto = document.getElementById('fotoCapturada');
+    const btnCapturar = document.getElementById('btnCapturar');
+    const btnRecapturar = document.getElementById('btnRecapturar');
+    const btnSalvar = document.getElementById('btnSalvarFoto');
+    
+    video.style.display = 'block';
+    foto.style.display = 'none';
+    btnCapturar.classList.remove('d-none');
+    btnRecapturar.classList.add('d-none');
+    btnSalvar.disabled = true;
+    fotoBase64 = null;
+    
+    document.getElementById('descricaoFoto').value = '';
+    document.getElementById('qualidadeContainer').classList.add('d-none');
+    document.getElementById('alertQualidade').classList.add('d-none');
+}
+
+function capturarFoto() {
+    const video = document.getElementById('cameraPreview');
+    const canvas = document.getElementById('canvasCaptura');
+    const foto = document.getElementById('fotoCapturada');
+    const btnCapturar = document.getElementById('btnCapturar');
+    const btnRecapturar = document.getElementById('btnRecapturar');
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    
+    fotoBase64 = canvas.toDataURL('image/jpeg', 0.9);
+    foto.src = fotoBase64;
+    
+    video.style.display = 'none';
+    foto.style.display = 'block';
+    btnCapturar.classList.add('d-none');
+    btnRecapturar.classList.remove('d-none');
+    
+    validarQualidade();
+}
+
+function recapturar() {
+    const video = document.getElementById('cameraPreview');
+    const foto = document.getElementById('fotoCapturada');
+    const btnCapturar = document.getElementById('btnCapturar');
+    const btnRecapturar = document.getElementById('btnRecapturar');
+    const btnSalvar = document.getElementById('btnSalvarFoto');
+    
+    video.style.display = 'block';
+    foto.style.display = 'none';
+    btnCapturar.classList.remove('d-none');
+    btnRecapturar.classList.add('d-none');
+    btnSalvar.disabled = true;
+    fotoBase64 = null;
+    
+    document.getElementById('qualidadeContainer').classList.add('d-none');
+    document.getElementById('alertQualidade').classList.add('d-none');
+}
+
+function validarQualidade() {
+    const qualidadeContainer = document.getElementById('qualidadeContainer');
+    const alertQualidade = document.getElementById('alertQualidade');
+    const btnSalvar = document.getElementById('btnSalvarFoto');
+    
+    qualidadeContainer.classList.remove('d-none');
+    
+    const canvas = document.getElementById('canvasCaptura');
+    const width = canvas.width;
+    const height = canvas.height;
+    
+    let resolucaoOk = width >= 400 && height >= 300;
+    document.getElementById('qualidadeResolucao').textContent = `${width}x${height}`;
+    document.getElementById('qualidadeResolucao').className = 
+        `badge ${resolucaoOk ? 'bg-success' : 'bg-warning'}`;
+    
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    let totalBrilho = 0;
+    const totalPixels = width * height;
+    
+    for (let i = 0; i < data.length; i += 4) {
+        totalBrilho += (data[i] + data[i + 1] + data[i + 2]) / 3;
+    }
+    
+    const brilhoMedio = totalBrilho / totalPixels;
+    let brilhoStatus = 'Adequado';
+    let brilhoOk = true;
+    
+    if (brilhoMedio < 50) {
+        brilhoStatus = 'Escuro';
+        brilhoOk = false;
+    } else if (brilhoMedio > 220) {
+        brilhoStatus = 'Claro demais';
+        brilhoOk = false;
+    }
+    
+    document.getElementById('qualidadeBrilho').textContent = brilhoStatus;
+    document.getElementById('qualidadeBrilho').className = 
+        `badge ${brilhoOk ? 'bg-success' : 'bg-warning'}`;
+    
+    document.getElementById('qualidadeFace').textContent = 'Verificando...';
+    document.getElementById('qualidadeFace').className = 'badge bg-secondary';
+    
+    if (!resolucaoOk) {
+        alertQualidade.classList.remove('d-none');
+        document.getElementById('alertQualidadeMsg').textContent = 
+            'Resolução baixa. A foto pode não funcionar bem para reconhecimento.';
+    } else if (!brilhoOk) {
+        alertQualidade.classList.remove('d-none');
+        document.getElementById('alertQualidadeMsg').textContent = 
+            'Iluminação inadequada. Procure um local com melhor luz.';
+    } else {
+        alertQualidade.classList.add('d-none');
+    }
+    
+    btnSalvar.disabled = false;
+    document.getElementById('qualidadeFace').textContent = 'OK';
+    document.getElementById('qualidadeFace').className = 'badge bg-success';
+}
+
+async function salvarFoto() {
+    if (!fotoBase64) {
+        alert('Capture uma foto primeiro');
+        return;
+    }
+    
+    const btnSalvar = document.getElementById('btnSalvarFoto');
+    const descricao = document.getElementById('descricaoFoto').value.trim();
+    
+    btnSalvar.disabled = true;
+    btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+    
+    try {
+        const response = await fetch(`/ponto/api/funcionario/${funcionarioId}/foto-facial`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                foto_base64: fotoBase64,
+                descricao: descricao
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalAdicionarFoto')).hide();
+            location.reload();
+        } else {
+            alert(data.message || 'Erro ao salvar foto');
+            btnSalvar.disabled = false;
+            btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Foto';
+        }
+    } catch (err) {
+        console.error('Erro ao salvar foto:', err);
+        alert('Erro ao salvar foto. Tente novamente.');
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Foto';
+    }
+}
+
+async function toggleFoto(fotoId) {
+    try {
+        const response = await fetch(`/ponto/api/foto-facial/${fotoId}/ativar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.message || 'Erro ao atualizar foto');
+        }
+    } catch (err) {
+        console.error('Erro:', err);
+        alert('Erro ao atualizar foto. Tente novamente.');
+    }
+}
+
+async function excluirFoto(fotoId) {
+    if (!confirm('Tem certeza que deseja excluir esta foto?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/ponto/api/foto-facial/${fotoId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const card = document.getElementById(`foto-card-${fotoId}`);
+            if (card) {
+                card.remove();
+            }
+            
+            const gridFotos = document.getElementById('gridFotos');
+            if (gridFotos.children.length === 0) {
+                location.reload();
+            }
+        } else {
+            alert(data.message || 'Erro ao excluir foto');
+        }
+    } catch (err) {
+        console.error('Erro:', err);
+        alert('Erro ao excluir foto. Tente novamente.');
+    }
+}
+</script>
+{% endblock %}

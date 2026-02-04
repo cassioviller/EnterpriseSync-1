@@ -45,6 +45,10 @@
                 {% else %}
                     <span class="badge bg-secondary">Inativo</span>
                 {% endif %}
+                <a href="{{ url_for('ponto.gerenciar_fotos_faciais', funcionario_id=funcionario.id) }}" 
+                   class="btn btn-sm btn-outline-info mt-2 d-block">
+                    <i class="fas fa-camera"></i> Fotos Faciais
+                </a>
             </div>
         </div>
     </div>
