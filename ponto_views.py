@@ -23,11 +23,19 @@ def get_date_brasil():
 def get_time_brasil():
     """Retorna a hora atual no fuso horário de Brasília"""
     return datetime.now(TIMEZONE_BRASIL).time()
-from models import Obra, Funcionario, RegistroPonto, ConfiguracaoHorario, DispositivoObra, FuncionarioObrasPonto
+from models import Obra, Funcionario, RegistroPonto, ConfiguracaoHorario, DispositivoObra, FuncionarioObrasPonto, FotoFacialFuncionario
 from ponto_service import PontoService
 from multitenant_helper import get_admin_id as get_tenant_admin_id
 from decorators import admin_required
-from utils_facial import comparar_faces_deepface, validar_qualidade_foto
+from utils_facial import (
+    comparar_faces_deepface, 
+    validar_qualidade_foto,
+    validar_qualidade_foto_avancada,
+    reconhecer_com_multiplas_fotos,
+    identificar_funcionario_multiplas_fotos,
+    THRESHOLD_CONFIANCA,
+    MIN_CONFIANCA_PERCENTUAL
+)
 from utils_geofencing import validar_localizacao_na_obra
 import logging
 import numpy as np
@@ -1365,13 +1373,31 @@ def identificar_e_registrar():
             if not obra:
                 obra_id = None  # Ignorar obra inválida em vez de falhar
         
-        # Buscar todos os funcionários ativos com foto cadastrada
-        funcionarios = Funcionario.query.filter(
+        # Buscar todos os funcionários ativos (com foto na tabela principal OU na tabela de múltiplas fotos)
+        funcionarios_com_foto_principal = Funcionario.query.filter(
             Funcionario.admin_id == admin_id,
             Funcionario.ativo == True,
             Funcionario.foto_base64 != None,
             Funcionario.foto_base64 != ''
         ).all()
+        
+        # Também buscar funcionários que têm fotos na nova tabela de múltiplas fotos
+        funcionarios_com_multiplas_fotos = db.session.query(Funcionario).join(
+            FotoFacialFuncionario,
+            Funcionario.id == FotoFacialFuncionario.funcionario_id
+        ).filter(
+            Funcionario.admin_id == admin_id,
+            Funcionario.ativo == True,
+            FotoFacialFuncionario.ativa == True
+        ).distinct().all()
+        
+        # Combinar listas sem duplicatas
+        funcionarios_ids = set()
+        funcionarios = []
+        for f in funcionarios_com_foto_principal + funcionarios_com_multiplas_fotos:
+            if f.id not in funcionarios_ids:
+                funcionarios_ids.add(f.id)
+                funcionarios.append(f)
         
         if not funcionarios:
             return jsonify({
@@ -1379,15 +1405,17 @@ def identificar_e_registrar():
                 'message': 'Nenhum funcionário com foto cadastrada. Cadastre fotos dos funcionários primeiro.'
             }), 404
         
-        # Validar qualidade da foto capturada
-        valido, msg_qualidade = validar_qualidade_foto(foto_capturada_base64)
+        # Validar qualidade da foto capturada (versão avançada)
+        valido, msg_qualidade, detalhes = validar_qualidade_foto_avancada(foto_capturada_base64)
         if not valido:
             return jsonify({
                 'success': False, 
-                'message': f'Foto inválida: {msg_qualidade}'
+                'message': f'Foto inválida: {msg_qualidade}',
+                'detalhes': detalhes
             }), 400
         
-        THRESHOLD_DISTANCIA = 0.55
+        # Usar threshold mais rigoroso para evitar falsos positivos (era 0.55)
+        THRESHOLD_DISTANCIA = THRESHOLD_CONFIANCA  # 0.40
         melhor_match = None
         menor_distancia = float('inf')
         
@@ -1407,28 +1435,26 @@ def identificar_e_registrar():
                 logger.warning(f"⚠️ Cache retornou func_id={func_id} mas não pertence ao tenant {admin_id}")
                 erro_cache = "Funcionário não encontrado no tenant"
         
-        # FALLBACK: Método tradicional se cache não disponível ou falhou
+        # FALLBACK: Método com múltiplas fotos se cache não disponível ou falhou
         if erro_cache or not melhor_match:
-            logger.info(f"Cache não disponível ({erro_cache}), usando método tradicional...")
-            logger.info(f"Iniciando identificação facial entre {len(funcionarios)} funcionários...")
+            logger.info(f"Cache não disponível ({erro_cache}), usando método com múltiplas fotos...")
+            logger.info(f"Iniciando identificação facial entre {len(funcionarios)} funcionários (múltiplas fotos)...")
             
             for funcionario in funcionarios:
                 try:
-                    match, distancia, erro_facial = comparar_faces_deepface(
-                        funcionario.foto_base64, 
+                    # Usar nova função que compara com TODAS as fotos do funcionário
+                    match, distancia, foto_desc = reconhecer_com_multiplas_fotos(
                         foto_capturada_base64,
-                        modelo='SFace'
+                        funcionario,
+                        threshold=THRESHOLD_DISTANCIA
                     )
                     
-                    if erro_facial:
-                        logger.debug(f"Erro ao comparar com {funcionario.nome}: {erro_facial}")
-                        continue
-                    
-                    logger.debug(f"Comparação com {funcionario.nome}: match={match}, distância={distancia:.4f}")
+                    logger.debug(f"Comparação com {funcionario.nome}: match={match}, distância={distancia:.4f}, foto={foto_desc}")
                     
                     if match and distancia < menor_distancia:
                         menor_distancia = distancia
                         melhor_match = funcionario
+                        logger.info(f"Novo melhor match: {funcionario.nome} via '{foto_desc}' (dist: {distancia:.4f})")
                         
                 except Exception as e:
                     logger.warning(f"Falha ao comparar com funcionário {funcionario.id}: {e}")
