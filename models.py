@@ -188,7 +188,7 @@ class Funcionario(db.Model):
     jornada_semanal = db.Column(db.Integer, default=44)
     ativo = db.Column(db.Boolean, default=True)
     foto = db.Column(db.String(255))  # Caminho para o arquivo de foto
-    foto_base64 = db.Column(db.Text)  # Foto em base64 para persistência completa
+    foto_base64 = db.Column(db.Text)  # Foto em base64 para persistência completa (mantido por compatibilidade)
     departamento_id = db.Column(db.Integer, db.ForeignKey('departamento.id'))
     funcao_id = db.Column(db.Integer, db.ForeignKey('funcao.id'))
     horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
@@ -198,6 +198,28 @@ class Funcionario(db.Model):
     # Relacionamentos
     horario_trabalho = db.relationship('HorarioTrabalho', backref=db.backref('funcionarios', overlaps="horario_trabalho"), overlaps="funcionarios")
     registros_ponto = db.relationship('RegistroPonto', backref='funcionario_ref', lazy=True, overlaps="funcionario_ref")
+    fotos_faciais = db.relationship('FotoFacialFuncionario', backref='funcionario', lazy=True, cascade='all, delete-orphan')
+
+
+class FotoFacialFuncionario(db.Model):
+    """
+    Modelo para armazenar múltiplas fotos faciais de cada funcionário.
+    Permite cadastrar fotos com/sem óculos, diferentes ângulos, etc.
+    Melhora significativamente a precisão do reconhecimento facial.
+    """
+    __tablename__ = 'foto_facial_funcionario'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id', ondelete='CASCADE'), nullable=False)
+    foto_base64 = db.Column(db.Text, nullable=False)
+    descricao = db.Column(db.String(100))  # Ex: "Com óculos", "Sem óculos", "Perfil esquerdo"
+    ordem = db.Column(db.Integer, default=1)  # Ordem de prioridade (menor = principal)
+    ativa = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    def __repr__(self):
+        return f'<FotoFacial {self.funcionario_id} - {self.descricao}>'
 
 class Obra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
