@@ -3767,6 +3767,7 @@ def executar_migracoes():
             (65, "Adicionar coluna nome em fornecedor", _migration_65_fornecedor_nome),
             (66, "Campos reconhecimento facial RegistroPonto", _migration_66_reconhecimento_facial_ponto),
             (67, "Sistema de Geofencing (Cerca Virtual)", _migration_67_geofencing),
+            (68, "Sistema de Múltiplas Fotos Faciais", _migration_68_multiplas_fotos_faciais),
         ]
         
         # Executar cada migração com rastreamento
@@ -6302,6 +6303,93 @@ def _migration_67_geofencing():
         
     except Exception as e:
         logger.error(f"❌ Erro na migração 67: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
+
+
+def _migration_68_multiplas_fotos_faciais():
+    """
+    MIGRAÇÃO 68: Criar tabela para múltiplas fotos faciais por funcionário
+    Melhora significativamente a precisão do reconhecimento facial permitindo
+    cadastrar fotos com/sem óculos, diferentes ângulos, etc.
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        logger.info("🔄 MIGRAÇÃO 68: Criando sistema de múltiplas fotos faciais")
+        
+        # Verificar se a tabela já existe
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'foto_facial_funcionario'
+            )
+        """)
+        
+        tabela_existe = cursor.fetchone()[0]
+        
+        if not tabela_existe:
+            logger.info("  📸 Criando tabela foto_facial_funcionario...")
+            
+            cursor.execute("""
+                CREATE TABLE foto_facial_funcionario (
+                    id SERIAL PRIMARY KEY,
+                    funcionario_id INTEGER NOT NULL REFERENCES funcionario(id) ON DELETE CASCADE,
+                    foto_base64 TEXT NOT NULL,
+                    descricao VARCHAR(100),
+                    ordem INTEGER DEFAULT 1,
+                    ativa BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id)
+                )
+            """)
+            
+            logger.info("  ✅ Tabela foto_facial_funcionario criada com sucesso!")
+            
+            # Criar índices para performance
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_foto_facial_funcionario_id 
+                ON foto_facial_funcionario(funcionario_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_foto_facial_admin_id 
+                ON foto_facial_funcionario(admin_id)
+            """)
+            logger.info("  ✅ Índices criados para performance")
+            
+            # Migrar fotos existentes da coluna foto_base64 do funcionario
+            logger.info("  📤 Migrando fotos existentes...")
+            cursor.execute("""
+                INSERT INTO foto_facial_funcionario (funcionario_id, foto_base64, descricao, ordem, admin_id)
+                SELECT id, foto_base64, 'Foto principal (migrada)', 1, admin_id
+                FROM funcionario
+                WHERE foto_base64 IS NOT NULL 
+                AND foto_base64 != ''
+                AND admin_id IS NOT NULL
+            """)
+            
+            rows_migrated = cursor.rowcount
+            logger.info(f"  ✅ {rows_migrated} fotos migradas com sucesso!")
+            
+        else:
+            logger.info("  ⏭️ Tabela foto_facial_funcionario já existe")
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        logger.info("✅ MIGRAÇÃO 68 CONCLUÍDA - Sistema de múltiplas fotos faciais ativo!")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na migração 68: {e}")
         if 'connection' in locals():
             try:
                 connection.rollback()
