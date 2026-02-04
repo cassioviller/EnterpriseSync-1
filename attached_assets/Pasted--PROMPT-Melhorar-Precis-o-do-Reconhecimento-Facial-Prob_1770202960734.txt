@@ -1,0 +1,550 @@
+# 🎯 PROMPT: Melhorar Precisão do Reconhecimento Facial
+
+## ❌ Problema Atual
+
+O sistema está confundindo pessoas diferentes, especialmente quem usa óculos. Pessoas distintas estão sendo identificadas como a mesma pessoa.
+
+## ✅ Solução
+
+Implementar melhorias no sistema de reconhecimento facial:
+1. Ajustar threshold de confiança (mais rigoroso)
+2. Melhorar qualidade das fotos de cadastro
+3. Permitir múltiplas fotos por funcionário
+4. Validar contra todas as fotos cadastradas
+
+---
+
+## 📋 FASE 1: Modificar o Modelo para Múltiplas Fotos
+
+No arquivo `models.py`, modifique a classe `Funcionario`:
+
+```python
+class Funcionario(db.Model):
+    # ... campos existentes ...
+    
+    # MODIFICAR: Tornar foto_facial_base64 opcional (será substituído por múltiplas fotos)
+    foto_facial_base64 = db.Column(db.Text, nullable=True)  # Manter por compatibilidade
+    
+    # ADICIONAR: Relacionamento com múltiplas fotos
+    fotos_faciais = db.relationship('FotoFacialFuncionario', backref='funcionario', lazy=True, cascade='all, delete-orphan')
+```
+
+**Criar novo modelo para múltiplas fotos:**
+
+```python
+class FotoFacialFuncionario(db.Model):
+    """Modelo para armazenar múltiplas fotos faciais de cada funcionário"""
+    __tablename__ = 'foto_facial_funcionario'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    foto_base64 = db.Column(db.Text, nullable=False)
+    descricao = db.Column(db.String(100))  # Ex: "Com óculos", "Sem óculos", "Perfil esquerdo"
+    ordem = db.Column(db.Integer, default=1)  # Ordem de prioridade
+    ativa = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    admin_id = db.Column(db.Integer, db.ForeignKey('admin.id'), nullable=False)
+    
+    def __repr__(self):
+        return f'<FotoFacial {self.funcionario_id} - {self.descricao}>'
+```
+
+---
+
+## 📋 FASE 2: Criar Migração para Nova Tabela
+
+Crie um arquivo `migrate_multiplas_fotos.py`:
+
+```python
+"""
+Migração: Criar tabela para múltiplas fotos faciais
+"""
+from app import app, db
+
+@app.cli.command('migrate-multiplas-fotos')
+def migrate_multiplas_fotos():
+    """Cria a tabela foto_facial_funcionario"""
+    
+    print("=" * 60)
+    print("CRIANDO TABELA DE MÚLTIPLAS FOTOS FACIAIS")
+    print("=" * 60)
+    
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        
+        # Verificar se a tabela já existe
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'foto_facial_funcionario'
+            )
+        """)
+        
+        exists = cursor.fetchone()[0]
+        
+        if not exists:
+            print("\n→ Criando tabela foto_facial_funcionario...")
+            
+            cursor.execute("""
+                CREATE TABLE foto_facial_funcionario (
+                    id SERIAL PRIMARY KEY,
+                    funcionario_id INTEGER NOT NULL REFERENCES funcionario(id) ON DELETE CASCADE,
+                    foto_base64 TEXT NOT NULL,
+                    descricao VARCHAR(100),
+                    ordem INTEGER DEFAULT 1,
+                    ativa BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    admin_id INTEGER NOT NULL REFERENCES admin(id)
+                )
+            """)
+            
+            print("✅ Tabela criada com sucesso!")
+            
+            # Migrar fotos existentes
+            print("\n→ Migrando fotos existentes...")
+            cursor.execute("""
+                INSERT INTO foto_facial_funcionario (funcionario_id, foto_base64, descricao, ordem, admin_id)
+                SELECT id, foto_facial_base64, 'Foto principal', 1, admin_id
+                FROM funcionario
+                WHERE foto_facial_base64 IS NOT NULL
+            """)
+            
+            rows_migrated = cursor.rowcount
+            print(f"✅ {rows_migrated} fotos migradas com sucesso!")
+            
+        else:
+            print("⚠️  Tabela foto_facial_funcionario já existe, pulando...")
+        
+        connection.commit()
+        
+        print("\n" + "=" * 60)
+        print("✅ MIGRAÇÃO CONCLUÍDA!")
+        print("=" * 60)
+        
+    except Exception as e:
+        connection.rollback()
+        print(f"\n❌ ERRO: {e}")
+        raise
+    
+    finally:
+        cursor.close()
+        connection.close()
+
+if __name__ == '__main__':
+    with app.app_context():
+        migrate_multiplas_fotos()
+```
+
+---
+
+## 📋 FASE 3: Ajustar Threshold e Melhorar Validação
+
+Modifique o arquivo que faz o reconhecimento facial (provavelmente em `views.py` ou arquivo específico):
+
+**Localize a função de reconhecimento e ajuste:**
+
+```python
+from deepface import DeepFace
+import numpy as np
+
+# CONFIGURAÇÕES DE RECONHECIMENTO FACIAL
+THRESHOLD_CONFIANCA = 0.40  # AJUSTAR: Era 0.60, agora mais rigoroso (menor = mais rigoroso)
+MODELO_RECONHECIMENTO = 'VGG-Face'  # Ou 'Facenet512' para mais precisão
+QUALIDADE_MINIMA_FOTO = 100  # Largura/altura mínima em pixels
+
+def validar_qualidade_foto(foto_base64):
+    """Valida se a foto tem qualidade mínima"""
+    try:
+        import base64
+        from PIL import Image
+        from io import BytesIO
+        
+        # Remover prefixo data:image
+        if ',' in foto_base64:
+            foto_base64 = foto_base64.split(',')[1]
+        
+        # Decodificar
+        img_data = base64.b64decode(foto_base64)
+        img = Image.open(BytesIO(img_data))
+        
+        largura, altura = img.size
+        
+        # Validações
+        if largura < QUALIDADE_MINIMA_FOTO or altura < QUALIDADE_MINIMA_FOTO:
+            return False, f"Foto muito pequena ({largura}x{altura}px). Mínimo: {QUALIDADE_MINIMA_FOTO}x{QUALIDADE_MINIMA_FOTO}px"
+        
+        # Verificar se não está muito escura
+        img_array = np.array(img.convert('L'))  # Converter para escala de cinza
+        brilho_medio = np.mean(img_array)
+        
+        if brilho_medio < 30:
+            return False, "Foto muito escura. Use melhor iluminação"
+        
+        if brilho_medio > 225:
+            return False, "Foto muito clara. Reduza a iluminação"
+        
+        return True, "Foto com qualidade adequada"
+        
+    except Exception as e:
+        return False, f"Erro ao validar foto: {str(e)}"
+
+def reconhecer_funcionario_multiplas_fotos(foto_capturada_base64):
+    """
+    Reconhece funcionário comparando com TODAS as fotos cadastradas
+    Retorna o funcionário com MAIOR confiança (menor distância)
+    """
+    
+    # Validar qualidade da foto capturada
+    valido, mensagem = validar_qualidade_foto(foto_capturada_base64)
+    if not valido:
+        return None, 0, mensagem
+    
+    # Salvar foto temporariamente
+    import tempfile
+    import base64
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_captura:
+        if ',' in foto_capturada_base64:
+            foto_capturada_base64 = foto_capturada_base64.split(',')[1]
+        temp_captura.write(base64.b64decode(foto_capturada_base64))
+        caminho_captura = temp_captura.name
+    
+    melhor_match = None
+    melhor_confianca = 0
+    melhor_distancia = float('inf')
+    
+    try:
+        # Buscar todos os funcionários ativos
+        funcionarios = Funcionario.query.filter_by(ativo=True, admin_id=current_user.id).all()
+        
+        for funcionario in funcionarios:
+            # Buscar todas as fotos ativas deste funcionário
+            fotos = FotoFacialFuncionario.query.filter_by(
+                funcionario_id=funcionario.id,
+                ativa=True
+            ).order_by(FotoFacialFuncionario.ordem).all()
+            
+            # Se não tem fotos na nova tabela, usar foto antiga
+            if not fotos and funcionario.foto_facial_base64:
+                fotos = [type('obj', (object,), {
+                    'foto_base64': funcionario.foto_facial_base64,
+                    'descricao': 'Foto principal'
+                })]
+            
+            # Comparar com cada foto do funcionário
+            for foto in fotos:
+                try:
+                    # Salvar foto cadastrada temporariamente
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_cadastro:
+                        foto_base64_limpa = foto.foto_base64
+                        if ',' in foto_base64_limpa:
+                            foto_base64_limpa = foto_base64_limpa.split(',')[1]
+                        temp_cadastro.write(base64.b64decode(foto_base64_limpa))
+                        caminho_cadastro = temp_cadastro.name
+                    
+                    # Realizar comparação
+                    resultado = DeepFace.verify(
+                        img1_path=caminho_captura,
+                        img2_path=caminho_cadastro,
+                        model_name=MODELO_RECONHECIMENTO,
+                        enforce_detection=False
+                    )
+                    
+                    distancia = resultado['distance']
+                    confianca = 1 - distancia  # Converter distância em confiança
+                    
+                    # Se esta foto tem melhor match que as anteriores
+                    if distancia < melhor_distancia and distancia < THRESHOLD_CONFIANCA:
+                        melhor_distancia = distancia
+                        melhor_confianca = confianca
+                        melhor_match = funcionario
+                    
+                    # Limpar arquivo temporário
+                    import os
+                    os.unlink(caminho_cadastro)
+                    
+                except Exception as e:
+                    print(f"Erro ao comparar com foto de {funcionario.nome}: {e}")
+                    continue
+        
+        # Limpar arquivo temporário da captura
+        import os
+        os.unlink(caminho_captura)
+        
+        if melhor_match:
+            return melhor_match, melhor_confianca, f"Reconhecido com {melhor_confianca*100:.1f}% de confiança"
+        else:
+            return None, 0, f"Nenhum funcionário reconhecido (confiança abaixo de {(1-THRESHOLD_CONFIANCA)*100:.0f}%)"
+    
+    except Exception as e:
+        return None, 0, f"Erro no reconhecimento: {str(e)}"
+```
+
+---
+
+## 📋 FASE 4: Criar Interface para Cadastrar Múltiplas Fotos
+
+Modifique o formulário de cadastro/edição de funcionário:
+
+**No template `funcionario_form.html`:**
+
+```html
+<div class="card mt-3">
+    <div class="card-header">
+        <h5>📸 Fotos para Reconhecimento Facial</h5>
+        <small class="text-muted">Cadastre múltiplas fotos para melhorar a precisão (recomendado: 3 a 5 fotos)</small>
+    </div>
+    <div class="card-body">
+        <!-- Fotos existentes -->
+        <div id="fotos-existentes" class="row mb-3">
+            {% for foto in funcionario.fotos_faciais %}
+            <div class="col-md-3 mb-2">
+                <div class="card">
+                    <img src="{{ foto.foto_base64 }}" class="card-img-top" alt="Foto {{ foto.descricao }}">
+                    <div class="card-body p-2">
+                        <small>{{ foto.descricao }}</small>
+                        <button type="button" class="btn btn-sm btn-danger btn-block" onclick="removerFoto({{ foto.id }})">
+                            <i class="fas fa-trash"></i> Remover
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Adicionar nova foto -->
+        <div class="form-group">
+            <label>Adicionar Nova Foto</label>
+            <div class="row">
+                <div class="col-md-6">
+                    <video id="video-cadastro" width="100%" autoplay></video>
+                    <button type="button" class="btn btn-primary btn-block mt-2" onclick="iniciarCamera()">
+                        <i class="fas fa-camera"></i> Iniciar Câmera
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <canvas id="canvas-cadastro" width="640" height="480" style="display:none;"></canvas>
+                    <img id="preview-foto" style="width:100%; display:none;">
+                    <button type="button" class="btn btn-success btn-block mt-2" onclick="capturarFoto()" disabled id="btn-capturar">
+                        <i class="fas fa-camera"></i> Capturar Foto
+                    </button>
+                </div>
+            </div>
+            
+            <div class="form-group mt-3">
+                <label for="descricao-foto">Descrição da Foto</label>
+                <select class="form-control" id="descricao-foto">
+                    <option value="Frente sem óculos">Frente sem óculos</option>
+                    <option value="Frente com óculos">Frente com óculos</option>
+                    <option value="Perfil esquerdo">Perfil esquerdo</option>
+                    <option value="Perfil direito">Perfil direito</option>
+                    <option value="Sorrindo">Sorrindo</option>
+                    <option value="Sério">Sério</option>
+                </select>
+            </div>
+            
+            <button type="button" class="btn btn-info btn-block" onclick="salvarFoto()" disabled id="btn-salvar-foto">
+                <i class="fas fa-save"></i> Salvar Foto
+            </button>
+        </div>
+        
+        <!-- Orientações -->
+        <div class="alert alert-info mt-3">
+            <strong>📋 Dicas para Fotos de Qualidade:</strong>
+            <ul class="mb-0">
+                <li>✅ Tire fotos em local bem iluminado (luz natural é melhor)</li>
+                <li>✅ Rosto centralizado e olhando para a câmera</li>
+                <li>✅ Cadastre pelo menos 3 fotos: sem óculos, com óculos, e de perfil</li>
+                <li>✅ Evite sombras no rosto</li>
+                <li>✅ Não use chapéu, boné ou acessórios que cubram o rosto</li>
+                <li>✅ Expressões variadas ajudam (sorrindo e sério)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+let stream = null;
+let fotoCapturada = null;
+
+async function iniciarCamera() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                width: 640, 
+                height: 480,
+                facingMode: 'user'
+            } 
+        });
+        document.getElementById('video-cadastro').srcObject = stream;
+        document.getElementById('btn-capturar').disabled = false;
+    } catch (error) {
+        alert('Erro ao acessar câmera: ' + error.message);
+    }
+}
+
+function capturarFoto() {
+    const video = document.getElementById('video-cadastro');
+    const canvas = document.getElementById('canvas-cadastro');
+    const context = canvas.getContext('2d');
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0);
+    
+    fotoCapturada = canvas.toDataURL('image/jpeg', 0.9);
+    
+    // Mostrar preview
+    document.getElementById('preview-foto').src = fotoCapturada;
+    document.getElementById('preview-foto').style.display = 'block';
+    document.getElementById('btn-salvar-foto').disabled = false;
+}
+
+function salvarFoto() {
+    if (!fotoCapturada) {
+        alert('Capture uma foto primeiro!');
+        return;
+    }
+    
+    const descricao = document.getElementById('descricao-foto').value;
+    const funcionarioId = {{ funcionario.id if funcionario else 'null' }};
+    
+    // Enviar para o servidor
+    fetch('/funcionario/adicionar-foto', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            funcionario_id: funcionarioId,
+            foto_base64: fotoCapturada,
+            descricao: descricao
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Foto adicionada com sucesso!');
+            location.reload();
+        } else {
+            alert('❌ Erro: ' + data.message);
+        }
+    });
+}
+
+function removerFoto(fotoId) {
+    if (!confirm('Tem certeza que deseja remover esta foto?')) return;
+    
+    fetch(`/funcionario/remover-foto/${fotoId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Foto removida!');
+            location.reload();
+        } else {
+            alert('❌ Erro: ' + data.message);
+        }
+    });
+}
+</script>
+```
+
+---
+
+## 📋 FASE 5: Criar Rotas para Gerenciar Fotos
+
+No arquivo `views.py`, adicione as rotas:
+
+```python
+@app.route('/funcionario/adicionar-foto', methods=['POST'])
+@login_required
+def adicionar_foto_funcionario():
+    """Adiciona uma nova foto facial ao funcionário"""
+    try:
+        data = request.get_json()
+        funcionario_id = data.get('funcionario_id')
+        foto_base64 = data.get('foto_base64')
+        descricao = data.get('descricao', 'Foto adicional')
+        
+        # Validar qualidade da foto
+        valido, mensagem = validar_qualidade_foto(foto_base64)
+        if not valido:
+            return jsonify({'success': False, 'message': mensagem}), 400
+        
+        # Contar fotos existentes para definir ordem
+        ordem = FotoFacialFuncionario.query.filter_by(funcionario_id=funcionario_id).count() + 1
+        
+        # Criar nova foto
+        nova_foto = FotoFacialFuncionario(
+            funcionario_id=funcionario_id,
+            foto_base64=foto_base64,
+            descricao=descricao,
+            ordem=ordem,
+            admin_id=current_user.id
+        )
+        
+        db.session.add(nova_foto)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Foto adicionada com sucesso!'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/funcionario/remover-foto/<int:foto_id>', methods=['DELETE'])
+@login_required
+def remover_foto_funcionario(foto_id):
+    """Remove uma foto facial do funcionário"""
+    try:
+        foto = FotoFacialFuncionario.query.get_or_404(foto_id)
+        
+        # Verificar permissão
+        if foto.admin_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Sem permissão'}), 403
+        
+        db.session.delete(foto)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Foto removida com sucesso!'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+```
+
+---
+
+## 🎯 Resumo das Melhorias
+
+1. ✅ **Threshold ajustado**: De 0.60 para 0.40 (mais rigoroso)
+2. ✅ **Validação de qualidade**: Verifica tamanho, brilho e nitidez
+3. ✅ **Múltiplas fotos**: 3 a 5 fotos por funcionário
+4. ✅ **Comparação completa**: Valida contra TODAS as fotos cadastradas
+5. ✅ **Orientações claras**: Dicas de como tirar boas fotos
+6. ✅ **Melhor modelo**: VGG-Face ou Facenet512 (mais preciso)
+
+---
+
+## 📋 Ordem de Execução
+
+1. Criar modelo `FotoFacialFuncionario`
+2. Executar migração: `flask migrate-multiplas-fotos`
+3. Modificar função de reconhecimento
+4. Atualizar interface de cadastro
+5. Criar rotas de gerenciamento de fotos
+6. Testar com funcionários reais
+
+---
+
+## ✅ Resultado Esperado
+
+Após implementar:
+- ❌ Pessoas com óculos NÃO serão mais confundidas
+- ✅ Reconhecimento mais preciso (threshold rigoroso)
+- ✅ Fotos de melhor qualidade (validação automática)
+- ✅ Múltiplas variações (com/sem óculos, perfis)
+- ✅ Confiança maior no sistema
+
+🚀 Sistema de reconhecimento facial profissional e preciso!
