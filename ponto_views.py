@@ -1690,12 +1690,12 @@ def adicionar_foto_facial(funcionario_id):
         if not foto_base64:
             return jsonify({'success': False, 'message': 'Foto não fornecida'}), 400
         
-        qualidade = validar_qualidade_foto_avancada(foto_base64)
-        if not qualidade.get('valida', False):
+        valida, mensagem, detalhes = validar_qualidade_foto_avancada(foto_base64)
+        if not valida:
             return jsonify({
                 'success': False, 
-                'message': qualidade.get('mensagem', 'Foto com qualidade insuficiente'),
-                'detalhes': qualidade
+                'message': mensagem,
+                'detalhes': detalhes
             }), 400
         
         ultima_ordem = db.session.query(db.func.max(FotoFacialFuncionario.ordem)).filter_by(
