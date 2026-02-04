@@ -169,17 +169,24 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
     """
     import time
     start_func = time.time()
+    timings = {}
     
     try:
+        t0 = time.time()
         from deepface import DeepFace
+        timings['import'] = time.time() - t0
     except ImportError:
         return None, None, "DeepFace não instalado"
     
+    t0 = time.time()
     cache = carregar_cache_facial()
+    timings['load_cache'] = time.time() - t0
+    
     if not cache or 'embeddings' not in cache:
         logger.warning("⚠️ Cache não disponível para reconhecimento")
         return None, None, "Cache não disponível"
     
+    t0 = time.time()
     embeddings_cache = cache['embeddings']
     admin_id_int = int(admin_id) if admin_id else None
     
@@ -189,11 +196,12 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
         cache_admin_id_int = int(cache_admin_id) if cache_admin_id is not None else None
         if cache_admin_id_int == admin_id_int:
             embeddings_tenant[fid] = data
+    timings['filter_tenant'] = time.time() - t0
     
     if not embeddings_tenant:
         return None, None, "Nenhum embedding no cache para este tenant"
     
-    logger.info(f"⏱️ Cache preparado: {time.time() - start_func:.2f}s - {len(embeddings_tenant)} funcionários")
+    logger.info(f"⏱️ Cache: import={timings['import']:.2f}s, load={timings['load_cache']:.2f}s, filter={timings['filter_tenant']:.3f}s - {len(embeddings_tenant)} func.")
     
     try:
         if foto_base64.startswith('data:'):
@@ -257,10 +265,13 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
                     melhor_match_id = func_id
                     melhor_foto_desc = descricao
         
+        total_time = time.time() - start_func
+        
         if menor_distancia <= threshold:
-            logger.info(f"✅ Match encontrado: func_id={melhor_match_id}, distancia={menor_distancia:.4f}, foto={melhor_foto_desc}")
+            logger.info(f"✅ Match: func={melhor_match_id}, dist={menor_distancia:.4f} | TOTAL={total_time:.2f}s (represent={time.time()-start_represent:.2f}s)")
             return melhor_match_id, menor_distancia, None
         else:
+            logger.info(f"❌ Sem match: dist={menor_distancia:.4f} > {threshold} | TOTAL={total_time:.2f}s")
             return None, menor_distancia, f"Distância {menor_distancia:.4f} acima do threshold {threshold}"
             
     except Exception as e:
@@ -269,6 +280,19 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
 
 ponto_bp = Blueprint('ponto', __name__, url_prefix='/ponto')
 
+# Pré-carregar modelo DeepFace no import do módulo
+try:
+    import threading
+    def _async_preload():
+        try:
+            preload_deepface_model()
+        except Exception as e:
+            logger.warning(f"⚠️ Preload async falhou: {e}")
+    
+    threading.Thread(target=_async_preload, daemon=True).start()
+    logger.info("🚀 Iniciando pré-carregamento assíncrono do modelo DeepFace")
+except Exception as e:
+    logger.warning(f"⚠️ Não foi possível iniciar preload: {e}")
 
 # Rota de debug para verificar se o blueprint está funcionando
 @ponto_bp.route('/debug')
