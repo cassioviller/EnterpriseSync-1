@@ -48,6 +48,39 @@ logger = logging.getLogger(__name__)
 # Cache global de embeddings
 _cache_facial = None
 _cache_loaded = False
+_deepface_model_loaded = False
+
+def preload_deepface_model():
+    """Pré-carrega o modelo DeepFace para evitar delay na primeira requisição"""
+    global _deepface_model_loaded
+    if _deepface_model_loaded:
+        return True
+    try:
+        from deepface import DeepFace
+        import numpy as np
+        dummy_img = np.zeros((100, 100, 3), dtype=np.uint8)
+        import tempfile
+        import os
+        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+            from PIL import Image
+            Image.fromarray(dummy_img).save(tmp.name)
+            tmp_path = tmp.name
+        try:
+            DeepFace.represent(
+                img_path=tmp_path,
+                model_name='SFace',
+                enforce_detection=False,
+                detector_backend='opencv'
+            )
+            _deepface_model_loaded = True
+            logger.info("✅ Modelo DeepFace SFace pré-carregado com sucesso")
+            return True
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+    except Exception as e:
+        logger.warning(f"⚠️ Erro ao pré-carregar modelo DeepFace: {e}")
+        return False
 
 def carregar_cache_facial():
     """Carrega o cache de embeddings do arquivo"""
@@ -1244,6 +1277,9 @@ def verificar_foto_funcionario(funcionario_id):
 def ponto_facial_automatico():
     """Página de ponto por reconhecimento facial automático"""
     try:
+        preload_deepface_model()
+        carregar_cache_facial()
+        
         admin_id = get_tenant_admin_id()
         
         # Buscar obras ativas para seleção
