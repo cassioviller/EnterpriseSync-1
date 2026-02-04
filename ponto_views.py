@@ -1367,13 +1367,21 @@ def status_cache_embeddings():
             if data.get('admin_id') == admin_id
         }
         
+        total_fotos = sum(len(data.get('embeddings', [])) for data in embeddings_tenant.values())
+        
         return jsonify({
             'disponivel': True,
-            'gerado_em': cache.get('generated_at'),
-            'modelo': cache.get('model'),
+            'versao': cache.get('versao', '1.0'),
+            'gerado_em': cache.get('gerado_em', cache.get('generated_at')),
+            'modelo': cache.get('modelo', cache.get('model', 'SFace')),
             'total_embeddings': len(embeddings_tenant),
+            'total_fotos': total_fotos,
             'funcionarios': [
-                {'id': fid, 'nome': data['nome'], 'codigo': data['codigo']}
+                {
+                    'id': fid, 
+                    'nome': data.get('nome', 'N/A'), 
+                    'fotos': len(data.get('embeddings', []))
+                }
                 for fid, data in embeddings_tenant.items()
             ]
         })
