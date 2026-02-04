@@ -120,6 +120,9 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.55):
     Returns:
         tuple: (funcionario_id, distancia, erro)
     """
+    import time
+    start_func = time.time()
+    
     try:
         from deepface import DeepFace
     except ImportError:
@@ -139,6 +142,8 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.55):
     if not embeddings_tenant:
         return None, None, "Nenhum embedding no cache para este tenant"
     
+    logger.info(f"⏱️ Cache preparado: {time.time() - start_func:.2f}s - {len(embeddings_tenant)} funcionários")
+    
     try:
         if foto_base64.startswith('data:'):
             foto_base64 = foto_base64.split(',')[1]
@@ -150,12 +155,14 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.55):
             tmp_path = tmp.name
         
         try:
+            start_represent = time.time()
             embedding_result = DeepFace.represent(
                 img_path=tmp_path,
                 model_name='SFace',
                 enforce_detection=False,
                 detector_backend='opencv'
             )
+            logger.info(f"⏱️ DeepFace.represent: {time.time() - start_represent:.2f}s")
             
             if not embedding_result or len(embedding_result) == 0:
                 return None, None, "Nenhum rosto detectado na foto"
@@ -1382,7 +1389,13 @@ def status_cache_embeddings():
 @login_required
 def identificar_e_registrar():
     """API para identificar funcionário automaticamente e registrar ponto"""
+    import time
+    start_total = time.time()
+    
     try:
+        preload_deepface_model()
+        logger.info(f"⏱️ Preload DeepFace: {time.time() - start_total:.2f}s")
+        
         if not request.is_json:
             return jsonify({
                 'success': False, 
@@ -1473,10 +1486,12 @@ def identificar_e_registrar():
         menor_distancia = float('inf')
         
         # OTIMIZAÇÃO: Tentar identificação via cache primeiro (muito mais rápido)
-        logger.info("Tentando identificação via cache de embeddings...")
+        start_cache = time.time()
+        logger.info("⏱️ Tentando identificação via cache de embeddings...")
         func_id, distancia_cache, erro_cache = identificar_por_cache(
             foto_capturada_base64, admin_id, THRESHOLD_DISTANCIA
         )
+        logger.info(f"⏱️ Cache lookup: {time.time() - start_cache:.2f}s (erro: {erro_cache})")
         
         if func_id and not erro_cache:
             # IMPORTANTE: Validar que o funcionário pertence ao tenant correto
