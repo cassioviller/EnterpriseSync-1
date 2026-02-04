@@ -1,0 +1,230 @@
+# 🔧 PROMPT: Adicionar Menu de Fotos Faciais no Cabeçalho
+
+## 🎯 Objetivo
+
+Adicionar a opção **"Gerenciar Fotos Faciais"** no menu dropdown de **Ponto** no cabeçalho da aplicação.
+
+---
+
+## 📋 TAREFA: Modificar o Template do Cabeçalho
+
+Localize o arquivo de template que contém o menu de navegação (provavelmente `base.html`, `navbar.html`, ou similar).
+
+**Encontre o dropdown do menu "Ponto"** que atualmente tem:
+- Registrar Ponto
+- Ponto Facial Automático
+- Importar Pontos
+
+**Adicione a nova opção** após "Ponto Facial Automático":
+
+```html
+<!-- Menu Ponto (Dropdown) -->
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" id="navbarPonto" role="button" 
+       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <i class="fas fa-clock"></i> Ponto
+    </a>
+    <div class="dropdown-menu" aria-labelledby="navbarPonto">
+        <!-- Opções existentes -->
+        <a class="dropdown-item" href="/ponto/registrar">
+            <i class="fas fa-fingerprint"></i> Registrar Ponto
+        </a>
+        
+        <a class="dropdown-item" href="/ponto/facial-automatico">
+            <i class="fas fa-camera"></i> Ponto Facial Automático
+        </a>
+        
+        <!-- ADICIONAR ESTA NOVA OPÇÃO -->
+        <a class="dropdown-item" href="/ponto/gerenciar-fotos-faciais">
+            <i class="fas fa-images"></i> Gerenciar Fotos Faciais
+        </a>
+        
+        <div class="dropdown-divider"></div>
+        
+        <a class="dropdown-item" href="/ponto/importar">
+            <i class="fas fa-file-upload"></i> Importar Pontos
+        </a>
+    </div>
+</li>
+```
+
+---
+
+## 📋 TAREFA 2: Criar Rota de Listagem de Funcionários
+
+No arquivo `views.py`, adicione uma rota que lista os funcionários para escolher qual terá as fotos gerenciadas:
+
+```python
+@app.route('/ponto/gerenciar-fotos-faciais')
+@login_required
+def gerenciar_fotos_faciais_lista():
+    """Lista funcionários para gerenciar fotos faciais"""
+    
+    # Buscar funcionários ativos
+    funcionarios = Funcionario.query.filter_by(
+        admin_id=current_user.id,
+        ativo=True
+    ).order_by(Funcionario.nome).all()
+    
+    return render_template('ponto_gerenciar_fotos_lista.html', 
+                         funcionarios=funcionarios,
+                         titulo='Gerenciar Fotos Faciais')
+```
+
+---
+
+## 📋 TAREFA 3: Criar Template de Listagem
+
+Crie um arquivo `templates/ponto_gerenciar_fotos_lista.html`:
+
+```html
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-images"></i> Gerenciar Fotos Faciais
+                    </h4>
+                    <small>Selecione um funcionário para gerenciar suas fotos de reconhecimento facial</small>
+                </div>
+                <div class="card-body">
+                    
+                    {% if funcionarios %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Foto Atual</th>
+                                    <th>Nome</th>
+                                    <th>CPF</th>
+                                    <th>Cargo</th>
+                                    <th>Fotos Cadastradas</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for funcionario in funcionarios %}
+                                <tr>
+                                    <td>
+                                        {% if funcionario.fotos_faciais %}
+                                            <img src="{{ funcionario.fotos_faciais[0].foto_base64 }}" 
+                                                 alt="{{ funcionario.nome }}" 
+                                                 style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                                        {% else %}
+                                            <div style="width: 50px; height: 50px; border-radius: 50%; background: #ddd; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas fa-user text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ funcionario.nome }}</td>
+                                    <td>{{ funcionario.cpf }}</td>
+                                    <td>{{ funcionario.cargo or '-' }}</td>
+                                    <td>
+                                        <span class="badge badge-{{ 'success' if funcionario.fotos_faciais|length >= 3 else 'warning' if funcionario.fotos_faciais|length > 0 else 'danger' }}">
+                                            {{ funcionario.fotos_faciais|length }} foto(s)
+                                        </span>
+                                        {% if funcionario.fotos_faciais|length < 3 %}
+                                            <small class="text-muted d-block">Recomendado: 3-5 fotos</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="/ponto/funcionario/{{ funcionario.id }}/fotos-faciais" 
+                                           class="btn btn-sm btn-primary">
+                                            <i class="fas fa-camera"></i> Gerenciar Fotos
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Nenhum funcionário ativo cadastrado.
+                    </div>
+                    {% endif %}
+                    
+                </div>
+            </div>
+            
+            <!-- Card de Orientações -->
+            <div class="card mt-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Dicas para Fotos de Qualidade</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-check-circle text-success"></i> Faça:</h6>
+                            <ul>
+                                <li>✅ Use local bem iluminado (luz natural é melhor)</li>
+                                <li>✅ Rosto centralizado e olhando para a câmera</li>
+                                <li>✅ Cadastre 3-5 fotos por funcionário</li>
+                                <li>✅ Inclua variações: com/sem óculos, diferentes ângulos</li>
+                                <li>✅ Expressões variadas (sorrindo e sério)</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-times-circle text-danger"></i> Evite:</h6>
+                            <ul>
+                                <li>❌ Fotos muito escuras ou muito claras</li>
+                                <li>❌ Sombras no rosto</li>
+                                <li>❌ Chapéu, boné ou acessórios que cubram o rosto</li>
+                                <li>❌ Fotos desfocadas ou tremidas</li>
+                                <li>❌ Fotos muito pequenas (mínimo 150x150px)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-primary mt-3 mb-0">
+                        <strong><i class="fas fa-lightbulb"></i> Dica:</strong>
+                        Funcionários com óculos devem ter pelo menos 2 fotos: uma com óculos e outra sem.
+                        Isso melhora significativamente a precisão do reconhecimento!
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+---
+
+## 🎯 Resultado Esperado
+
+Após implementar, o menu ficará assim:
+
+```
+Ponto ▼
+  ├─ Registrar Ponto
+  ├─ Ponto Facial Automático
+  ├─ Gerenciar Fotos Faciais  ← NOVO
+  ├─ ─────────────────────
+  └─ Importar Pontos
+```
+
+Ao clicar em **"Gerenciar Fotos Faciais"**:
+1. Abre página com lista de funcionários
+2. Mostra quantas fotos cada um tem cadastradas
+3. Badge colorido indica status:
+   - 🔴 Vermelho: 0 fotos (sem reconhecimento)
+   - 🟡 Amarelo: 1-2 fotos (reconhecimento básico)
+   - 🟢 Verde: 3+ fotos (reconhecimento ideal)
+4. Botão "Gerenciar Fotos" leva para a página específica do funcionário
+
+---
+
+## 💡 Observações
+
+- A rota `/ponto/funcionario/<id>/fotos-faciais` já existe (criada anteriormente)
+- Estamos apenas criando um ponto de entrada mais acessível no menu
+- A listagem facilita o gerenciamento de múltiplos funcionários
+
+✅ Menu de navegação completo e intuitivo!
