@@ -56,9 +56,14 @@ def preload_deepface_model():
     if _deepface_model_loaded:
         return True
     try:
+        import time
+        start = time.time()
         from deepface import DeepFace
         import numpy as np
-        dummy_img = np.zeros((100, 100, 3), dtype=np.uint8)
+        
+        logger.info("🔄 Pré-carregando modelo DeepFace SFace...")
+        
+        dummy_img = np.zeros((112, 112, 3), dtype=np.uint8)
         import tempfile
         import os
         with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
@@ -70,10 +75,11 @@ def preload_deepface_model():
                 img_path=tmp_path,
                 model_name='SFace',
                 enforce_detection=False,
-                detector_backend='opencv'
+                detector_backend='skip',
+                align=False
             )
             _deepface_model_loaded = True
-            logger.info("✅ Modelo DeepFace SFace pré-carregado com sucesso")
+            logger.info(f"✅ Modelo DeepFace SFace pré-carregado em {time.time() - start:.2f}s")
             return True
         finally:
             if os.path.exists(tmp_path):
@@ -81,6 +87,47 @@ def preload_deepface_model():
     except Exception as e:
         logger.warning(f"⚠️ Erro ao pré-carregar modelo DeepFace: {e}")
         return False
+
+def redimensionar_imagem_para_reconhecimento(foto_base64, max_width=640, max_height=480):
+    """
+    Redimensiona imagem para resolução ideal para reconhecimento facial.
+    Imagens menores = processamento mais rápido, sem perda de precisão.
+    """
+    try:
+        import io
+        from PIL import Image
+        
+        if ',' in foto_base64:
+            foto_base64 = foto_base64.split(',')[1]
+        
+        img_data = base64.b64decode(foto_base64)
+        img = Image.open(io.BytesIO(img_data))
+        
+        width, height = img.size
+        
+        if width <= max_width and height <= max_height:
+            return foto_base64
+        
+        ratio = min(max_width / width, max_height / height)
+        new_width = int(width * ratio)
+        new_height = int(height * ratio)
+        
+        img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        if img_resized.mode != 'RGB':
+            img_resized = img_resized.convert('RGB')
+        
+        buffer = io.BytesIO()
+        img_resized.save(buffer, format='JPEG', quality=85, optimize=True)
+        img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        logger.debug(f"📐 Imagem redimensionada: {width}x{height} → {new_width}x{new_height}")
+        
+        return img_base64
+        
+    except Exception as e:
+        logger.error(f"Erro ao redimensionar imagem: {e}")
+        return foto_base64
 
 def carregar_cache_facial():
     """Carrega o cache de embeddings do arquivo"""
@@ -148,6 +195,10 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.55):
         if foto_base64.startswith('data:'):
             foto_base64 = foto_base64.split(',')[1]
         
+        start_resize = time.time()
+        foto_base64 = redimensionar_imagem_para_reconhecimento(foto_base64, max_width=640, max_height=480)
+        logger.debug(f"⏱️ Redimensionamento: {time.time() - start_resize:.3f}s")
+        
         foto_bytes = base64.b64decode(foto_base64)
         
         with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
@@ -160,7 +211,8 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.55):
                 img_path=tmp_path,
                 model_name='SFace',
                 enforce_detection=False,
-                detector_backend='opencv'
+                detector_backend='skip',
+                align=False
             )
             logger.info(f"⏱️ DeepFace.represent: {time.time() - start_represent:.2f}s")
             

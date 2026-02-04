@@ -659,6 +659,25 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.setTransform(-1, 0, 0, 1, canvas.width, 0);
         ctx.drawImage(video, 0, 0);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        // OTIMIZAÇÃO: Redimensionar para 640x480 para processamento mais rápido
+        const maxWidth = 640;
+        const maxHeight = 480;
+        const ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
+        
+        if (ratio < 1) {
+            const newWidth = Math.floor(canvas.width * ratio);
+            const newHeight = Math.floor(canvas.height * ratio);
+            
+            const canvasResized = document.createElement('canvas');
+            canvasResized.width = newWidth;
+            canvasResized.height = newHeight;
+            const ctxResized = canvasResized.getContext('2d');
+            ctxResized.drawImage(canvas, 0, 0, newWidth, newHeight);
+            
+            return canvasResized.toDataURL('image/jpeg', 0.8);
+        }
+        
         return canvas.toDataURL('image/jpeg', 0.8);
     }
     
