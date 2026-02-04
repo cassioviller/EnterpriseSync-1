@@ -135,17 +135,34 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.55):
         
         melhor_match_id = None
         menor_distancia = float('inf')
+        melhor_foto_desc = None
         
         for func_id, data in embeddings_tenant.items():
-            embedding_cache = np.array(data['embedding'])
+            embeddings_list = data.get('embeddings', [])
             
-            distancia = np.linalg.norm(embedding_capturado - embedding_cache)
+            if not embeddings_list:
+                if 'embedding' in data:
+                    embeddings_list = [{'embedding': data['embedding'], 'descricao': 'Foto principal'}]
+                else:
+                    continue
             
-            if distancia < menor_distancia:
-                menor_distancia = distancia
-                melhor_match_id = func_id
+            for emb_info in embeddings_list:
+                if isinstance(emb_info, dict):
+                    embedding_cache = np.array(emb_info['embedding'])
+                    descricao = emb_info.get('descricao', 'Foto')
+                else:
+                    embedding_cache = np.array(emb_info)
+                    descricao = 'Foto'
+                
+                distancia = np.linalg.norm(embedding_capturado - embedding_cache)
+                
+                if distancia < menor_distancia:
+                    menor_distancia = distancia
+                    melhor_match_id = func_id
+                    melhor_foto_desc = descricao
         
         if menor_distancia <= threshold:
+            logger.info(f"✅ Match encontrado: func_id={melhor_match_id}, distancia={menor_distancia:.4f}, foto={melhor_foto_desc}")
             return melhor_match_id, menor_distancia, None
         else:
             return None, menor_distancia, f"Distância {menor_distancia:.4f} acima do threshold {threshold}"
