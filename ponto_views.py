@@ -1375,29 +1375,53 @@ def ponto_facial_automatico():
 def gerar_cache_embeddings():
     """API para gerar/regenerar cache de embeddings faciais"""
     try:
-        from gerar_cache_facial import gerar_cache
+        from gerar_cache_facial import gerar_cache, CACHE_PATH
         admin_id = get_tenant_admin_id()
         
-        logger.info(f"Iniciando geração de cache facial para admin_id={admin_id}")
+        logger.info(f"🔄 INICIANDO geração de cache facial para admin_id={admin_id}")
+        logger.info(f"📁 Cache será salvo em: {CACHE_PATH}")
+        
         resultado = gerar_cache(admin_id)
         
+        logger.info(f"📊 Resultado: {resultado}")
+        
         if resultado['success']:
+            import os
+            if os.path.exists(CACHE_PATH):
+                size = os.path.getsize(CACHE_PATH)
+                mtime = os.path.getmtime(CACHE_PATH)
+                import datetime
+                mod_time = datetime.datetime.fromtimestamp(mtime)
+                logger.info(f"✅ Cache salvo: {size} bytes, modificado em {mod_time}")
+            else:
+                logger.error(f"❌ ERRO: Arquivo de cache não foi criado em {CACHE_PATH}")
+            
             recarregar_cache_facial()
+            
+            cache_reload = carregar_cache_facial()
+            if cache_reload:
+                total_in_memory = len(cache_reload.get('embeddings', {}))
+                logger.info(f"✅ Cache recarregado na memória: {total_in_memory} funcionários")
+            
             return jsonify({
                 'success': True,
                 'message': f"Cache gerado com sucesso! {resultado['processados']} funcionários processados.",
                 'processados': resultado['processados'],
                 'total': resultado['total'],
-                'erros': len(resultado.get('erros', []))
+                'erros': len(resultado.get('erros', [])),
+                'cache_path': str(CACHE_PATH)
             })
         else:
+            logger.error(f"❌ Erro na geração: {resultado.get('error')}")
             return jsonify({
                 'success': False,
                 'message': resultado.get('error', 'Erro desconhecido')
             }), 500
             
     except Exception as e:
-        logger.error(f"Erro ao gerar cache: {e}")
+        logger.error(f"❌ EXCEÇÃO ao gerar cache: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'message': f'Erro ao gerar cache: {str(e)}'

@@ -149,10 +149,24 @@ def gerar_cache(admin_id=None):
             'versao': '2.0'
         }
         
-        with open(CACHE_PATH, 'wb') as f:
-            pickle.dump(cache_data, f)
+        logger.info(f"💾 Salvando cache em: {CACHE_PATH}")
+        logger.info(f"📊 Embeddings a salvar: {len(cache)} funcionários")
         
-        logger.info(f"💾 Cache salvo em {CACHE_PATH}")
+        try:
+            with open(CACHE_PATH, 'wb') as f:
+                pickle.dump(cache_data, f)
+                f.flush()
+                os.fsync(f.fileno())
+            
+            if os.path.exists(CACHE_PATH):
+                size = os.path.getsize(CACHE_PATH)
+                logger.info(f"✅ Cache salvo com sucesso! Tamanho: {size} bytes")
+            else:
+                logger.error(f"❌ ERRO: Arquivo não foi criado após pickle.dump!")
+        except Exception as save_error:
+            logger.error(f"❌ ERRO ao salvar cache: {save_error}")
+            return {'success': False, 'error': f'Erro ao salvar: {save_error}'}
+        
         logger.info(f"📊 Processados: {processados}/{len(funcionarios)}")
         
         return {
