@@ -141,3 +141,210 @@ def validar_qualidade_foto(foto_base64, min_width=200, min_height=200):
     except Exception as e:
         logger.error(f"Erro ao validar qualidade da foto: {e}")
         return False, f"Erro ao processar imagem: {str(e)}"
+
+
+# ============================================================
+# SISTEMA DE RECONHECIMENTO FACIAL COM MÚLTIPLAS FOTOS v2.0
+# ============================================================
+
+# Configurações de reconhecimento facial
+THRESHOLD_CONFIANCA = 0.40  # Mais rigoroso (era 0.55) - menor = mais rigoroso
+MODELO_RECONHECIMENTO = 'SFace'  # Modelo rápido e preciso
+MIN_CONFIANCA_PERCENTUAL = 60  # Mínimo 60% de confiança para aceitar
+
+def validar_qualidade_foto_avancada(foto_base64, min_width=150, min_height=150):
+    """
+    Valida qualidade da foto com verificações avançadas:
+    - Tamanho mínimo
+    - Brilho adequado (não muito escuro/claro)
+    - Presença de face
+    
+    Args:
+        foto_base64: Imagem em base64
+        min_width: Largura mínima em pixels
+        min_height: Altura mínima em pixels
+    
+    Returns:
+        tuple: (valida: bool, mensagem: str, detalhes: dict)
+    """
+    try:
+        if ',' in foto_base64:
+            foto_base64 = foto_base64.split(',')[1]
+        
+        img_data = base64.b64decode(foto_base64)
+        img = Image.open(io.BytesIO(img_data))
+        
+        width, height = img.size
+        detalhes = {'width': width, 'height': height}
+        
+        # Verificar tamanho
+        if width < min_width or height < min_height:
+            return False, f"Imagem muito pequena ({width}x{height}px). Mínimo: {min_width}x{min_height}px", detalhes
+        
+        # Verificar brilho
+        img_gray = img.convert('L')
+        img_array = np.array(img_gray)
+        brilho_medio = np.mean(img_array)
+        detalhes['brilho'] = round(brilho_medio, 2)
+        
+        if brilho_medio < 30:
+            return False, "Foto muito escura. Use melhor iluminação", detalhes
+        
+        if brilho_medio > 230:
+            return False, "Foto muito clara. Reduza a iluminação", detalhes
+        
+        # Foto passou em todas as validações
+        return True, "Foto com qualidade adequada", detalhes
+        
+    except Exception as e:
+        logger.error(f"Erro ao validar qualidade avançada: {e}")
+        return False, f"Erro ao processar imagem: {str(e)}", {}
+
+
+def obter_todas_fotos_funcionario(funcionario):
+    """
+    Obtém todas as fotos ativas de um funcionário, incluindo foto principal.
+    
+    Args:
+        funcionario: Objeto Funcionario do SQLAlchemy
+    
+    Returns:
+        list: Lista de dicts com foto_base64 e descricao
+    """
+    fotos = []
+    
+    # Primeiro, tentar obter fotos da tabela FotoFacialFuncionario
+    try:
+        from models import FotoFacialFuncionario
+        fotos_cadastradas = FotoFacialFuncionario.query.filter_by(
+            funcionario_id=funcionario.id,
+            ativa=True
+        ).order_by(FotoFacialFuncionario.ordem).all()
+        
+        for foto in fotos_cadastradas:
+            fotos.append({
+                'foto_base64': foto.foto_base64,
+                'descricao': foto.descricao or 'Foto cadastrada',
+                'id': foto.id
+            })
+    except Exception as e:
+        logger.warning(f"Erro ao buscar fotos múltiplas: {e}")
+    
+    # Se não houver fotos na nova tabela, usar foto principal do funcionário
+    if not fotos and funcionario.foto_base64:
+        fotos.append({
+            'foto_base64': funcionario.foto_base64,
+            'descricao': 'Foto principal',
+            'id': None
+        })
+    
+    return fotos
+
+
+def reconhecer_com_multiplas_fotos(foto_capturada_base64, funcionario, threshold=None):
+    """
+    Compara foto capturada com TODAS as fotos cadastradas do funcionário.
+    Retorna o melhor match encontrado.
+    
+    Args:
+        foto_capturada_base64: Foto capturada em base64
+        funcionario: Objeto Funcionario do SQLAlchemy
+        threshold: Threshold de distância (padrão: THRESHOLD_CONFIANCA)
+    
+    Returns:
+        tuple: (match: bool, melhor_distancia: float, melhor_foto_desc: str)
+    """
+    if threshold is None:
+        threshold = THRESHOLD_CONFIANCA
+    
+    fotos = obter_todas_fotos_funcionario(funcionario)
+    
+    if not fotos:
+        logger.warning(f"Funcionário {funcionario.nome} não tem fotos cadastradas")
+        return False, 1.0, "Sem fotos cadastradas"
+    
+    melhor_distancia = float('inf')
+    melhor_foto_desc = None
+    
+    for foto_info in fotos:
+        try:
+            match, distancia, erro = comparar_faces_deepface(
+                foto_info['foto_base64'],
+                foto_capturada_base64,
+                modelo=MODELO_RECONHECIMENTO
+            )
+            
+            if erro:
+                logger.warning(f"Erro ao comparar com foto '{foto_info['descricao']}': {erro}")
+                continue
+            
+            logger.debug(f"Comparação com '{foto_info['descricao']}': distancia={distancia:.4f}")
+            
+            # Guardar a melhor (menor distância)
+            if distancia < melhor_distancia:
+                melhor_distancia = distancia
+                melhor_foto_desc = foto_info['descricao']
+                
+        except Exception as e:
+            logger.error(f"Erro ao comparar foto '{foto_info['descricao']}': {e}")
+            continue
+    
+    # Verificar se encontrou match válido
+    if melhor_distancia < threshold:
+        confianca_percentual = round((1 - melhor_distancia) * 100, 1)
+        logger.info(f"Match encontrado com '{melhor_foto_desc}': {confianca_percentual}% confiança")
+        return True, melhor_distancia, melhor_foto_desc
+    else:
+        logger.info(f"Sem match válido. Melhor distância: {melhor_distancia:.4f} (threshold: {threshold})")
+        return False, melhor_distancia, melhor_foto_desc
+
+
+def identificar_funcionario_multiplas_fotos(foto_capturada_base64, funcionarios_list, threshold=None):
+    """
+    Identifica um funcionário comparando foto capturada com TODAS as fotos
+    de TODOS os funcionários da lista. Retorna o melhor match global.
+    
+    Args:
+        foto_capturada_base64: Foto capturada em base64
+        funcionarios_list: Lista de funcionários para comparar
+        threshold: Threshold de distância (padrão: THRESHOLD_CONFIANCA)
+    
+    Returns:
+        tuple: (funcionario: Funcionario|None, confianca: float, mensagem: str)
+    """
+    if threshold is None:
+        threshold = THRESHOLD_CONFIANCA
+    
+    # Validar qualidade da foto capturada
+    valida, msg_qualidade, _ = validar_qualidade_foto_avancada(foto_capturada_base64)
+    if not valida:
+        return None, 0, msg_qualidade
+    
+    melhor_funcionario = None
+    melhor_distancia = float('inf')
+    melhor_foto_desc = None
+    
+    for funcionario in funcionarios_list:
+        match, distancia, foto_desc = reconhecer_com_multiplas_fotos(
+            foto_capturada_base64,
+            funcionario,
+            threshold=threshold
+        )
+        
+        if distancia < melhor_distancia:
+            melhor_distancia = distancia
+            melhor_funcionario = funcionario
+            melhor_foto_desc = foto_desc
+    
+    # Verificar se encontrou match válido
+    if melhor_distancia < threshold:
+        confianca = (1 - melhor_distancia)
+        confianca_percentual = round(confianca * 100, 1)
+        
+        # Verificar confiança mínima
+        if confianca_percentual < MIN_CONFIANCA_PERCENTUAL:
+            return None, confianca, f"Confiança baixa ({confianca_percentual}%). Mínimo: {MIN_CONFIANCA_PERCENTUAL}%"
+        
+        return melhor_funcionario, confianca, f"Reconhecido via '{melhor_foto_desc}' ({confianca_percentual}%)"
+    else:
+        return None, 0, f"Nenhum funcionário reconhecido (threshold: {threshold})"
