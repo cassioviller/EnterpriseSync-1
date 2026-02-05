@@ -1528,8 +1528,8 @@ def identificar_e_registrar():
     start_total = time.time()
     
     try:
-        preload_deepface_model()
-        logger.info(f"⏱️ Preload DeepFace: {time.time() - start_total:.2f}s")
+        # NOTA: preload_deepface_model() removido - já é executado no startup!
+        # O modelo está pré-carregado em memória desde a inicialização do servidor
         
         if not request.is_json:
             return jsonify({
@@ -1793,9 +1793,16 @@ def identificar_e_registrar():
         
         tempo_total = time.time() - start_total
         
+        # Log de performance com indicador visual
+        if tempo_total < 2.0:
+            logger.info(f"⚡ RECONHECIMENTO RÁPIDO: {tempo_total:.2f}s - {funcionario.nome}")
+        elif tempo_total < 5.0:
+            logger.warning(f"⚠️ RECONHECIMENTO MÉDIO: {tempo_total:.2f}s - {funcionario.nome}")
+        else:
+            logger.warning(f"🐌 RECONHECIMENTO LENTO: {tempo_total:.2f}s - {funcionario.nome} - Investigar!")
+        
         logger.info(
-            f"Ponto registrado via identificação automática: "
-            f"Funcionário {funcionario.nome} ({funcionario.id}), "
+            f"Ponto registrado: {funcionario.nome} ({funcionario.id}), "
             f"Tipo: {tipo_registrado}, Distância: {menor_distancia:.4f}, Tempo: {tempo_total:.2f}s"
         )
         
