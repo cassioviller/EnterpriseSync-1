@@ -95,11 +95,14 @@ def gerar_cache(admin_id=None):
                             tmp_path = tmp.name
                         
                         try:
+                            # IMPORTANTE: usar skip para consistência com runtime otimizado
+                            # As fotos cadastradas já são focadas no rosto
                             embedding_result = DeepFace.represent(
                                 img_path=tmp_path,
                                 model_name='SFace',
                                 enforce_detection=False,
-                                detector_backend='opencv'
+                                detector_backend='skip',
+                                align=False
                             )
                             
                             if embedding_result and len(embedding_result) > 0:
@@ -286,11 +289,13 @@ def atualizar_embedding_funcionario(funcionario_id):
                     tmp_path = tmp.name
                 
                 try:
+                    # IMPORTANTE: usar skip para consistência com runtime otimizado
                     embedding_result = DeepFace.represent(
                         img_path=tmp_path,
                         model_name='SFace',
                         enforce_detection=False,
-                        detector_backend='opencv'
+                        detector_backend='skip',
+                        align=False
                     )
                     
                     if embedding_result and len(embedding_result) > 0:
