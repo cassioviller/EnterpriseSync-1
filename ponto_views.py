@@ -49,19 +49,48 @@ logger = logging.getLogger(__name__)
 _cache_facial = None
 _cache_loaded = False
 _deepface_model_loaded = False
+_sface_model = None  # Cache do modelo TensorFlow em memória
 
-def preload_deepface_model():
-    """Pré-carrega o modelo DeepFace para evitar delay na primeira requisição"""
-    global _deepface_model_loaded
-    if _deepface_model_loaded:
-        return True
+def get_sface_model():
+    """Retorna o modelo SFace cacheado em memória usando DeepFace.build_model"""
+    global _sface_model
+    if _sface_model is not None:
+        return _sface_model
+    
     try:
         import time
         start = time.time()
         from deepface import DeepFace
+        _sface_model = DeepFace.build_model('SFace')
+        logger.info(f"✅ Modelo SFace carregado via build_model em {time.time()-start:.2f}s")
+        return _sface_model
+    except Exception as e:
+        logger.warning(f"⚠️ Erro ao carregar SFace: {e}")
+        return None
+
+def preload_deepface_model():
+    """Pré-carrega o modelo DeepFace para evitar delay na primeira requisição"""
+    global _deepface_model_loaded, _sface_model
+    if _deepface_model_loaded and _sface_model is not None:
+        return True
+    try:
+        import time
+        start = time.time()
+        
+        logger.info("🔄 Pré-carregando modelo SFace diretamente...")
+        
+        # Tentar carregar modelo diretamente (mais rápido)
+        model = get_sface_model()
+        if model is not None:
+            _deepface_model_loaded = True
+            logger.info(f"✅ Modelo SFace pré-carregado em {time.time() - start:.2f}s")
+            return True
+        
+        # Fallback: carregar via DeepFace.represent
+        from deepface import DeepFace
         import numpy as np
         
-        logger.info("🔄 Pré-carregando modelo DeepFace SFace...")
+        logger.info("🔄 Fallback: pré-carregando via DeepFace.represent...")
         
         dummy_img = np.zeros((112, 112, 3), dtype=np.uint8)
         import tempfile
@@ -87,6 +116,68 @@ def preload_deepface_model():
     except Exception as e:
         logger.warning(f"⚠️ Erro ao pré-carregar modelo DeepFace: {e}")
         return False
+
+def gerar_embedding_otimizado(img_path):
+    """
+    Gera embedding usando modelo SFace cacheado em memória.
+    Usa model.forward() que é muito mais rápido que DeepFace.represent().
+    """
+    import time
+    start = time.time()
+    
+    # Tentar usar modelo cacheado primeiro
+    model = get_sface_model()
+    if model is not None:
+        try:
+            import cv2
+            import numpy as np
+            
+            # Ler imagem
+            img = cv2.imread(img_path)
+            if img is None:
+                raise ValueError("Não foi possível ler a imagem")
+            
+            # Converter BGR para RGB
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            
+            # Redimensionar para input_shape do modelo (112x112)
+            input_shape = model.input_shape
+            if input_shape and len(input_shape) >= 2:
+                target_size = (input_shape[1], input_shape[0])  # (width, height)
+            else:
+                target_size = (112, 112)
+            
+            img_resized = cv2.resize(img_rgb, target_size)
+            
+            # Usar model.forward() que já faz o preprocessing correto
+            embedding = model.forward(img_resized)
+            
+            elapsed = time.time() - start
+            logger.info(f"⚡ Embedding via modelo cacheado: {elapsed:.3f}s")
+            
+            # Converter para lista se necessário
+            if hasattr(embedding, 'tolist'):
+                return embedding.tolist()
+            return list(embedding)
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Fallback para DeepFace.represent: {e}")
+    
+    # Fallback para DeepFace.represent
+    from deepface import DeepFace
+    result = DeepFace.represent(
+        img_path=img_path,
+        model_name='SFace',
+        enforce_detection=False,
+        detector_backend='skip',
+        align=False
+    )
+    elapsed = time.time() - start
+    logger.info(f"🔄 Embedding via DeepFace: {elapsed:.2f}s")
+    
+    if result and len(result) > 0:
+        return result[0]['embedding']
+    return None
 
 def redimensionar_imagem_para_reconhecimento(foto_base64, max_width=640, max_height=480):
     """
@@ -219,19 +310,14 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
         
         try:
             start_represent = time.time()
-            embedding_result = DeepFace.represent(
-                img_path=tmp_path,
-                model_name='SFace',
-                enforce_detection=False,
-                detector_backend='skip',
-                align=False
-            )
-            logger.info(f"⏱️ DeepFace.represent: {time.time() - start_represent:.2f}s")
+            # Usar função otimizada com modelo cacheado
+            embedding_list = gerar_embedding_otimizado(tmp_path)
             
-            if not embedding_result or len(embedding_result) == 0:
+            if embedding_list is None:
                 return None, None, "Nenhum rosto detectado na foto"
             
-            embedding_capturado = np.array(embedding_result[0]['embedding'])
+            embedding_capturado = np.array(embedding_list)
+            logger.info(f"⏱️ Embedding total: {time.time() - start_represent:.2f}s")
             
         finally:
             if os.path.exists(tmp_path):
