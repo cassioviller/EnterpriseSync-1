@@ -55,14 +55,22 @@ def get_sface_model():
     """Retorna o modelo SFace cacheado em memória usando DeepFace.build_model"""
     global _sface_model
     if _sface_model is not None:
+        logger.debug("✅ Usando modelo SFace já cacheado em memória")
         return _sface_model
     
     try:
         import time
         start = time.time()
         from deepface import DeepFace
+        
+        logger.info("🔄 Carregando modelo SFace pela primeira vez...")
         _sface_model = DeepFace.build_model('SFace')
-        logger.info(f"✅ Modelo SFace carregado via build_model em {time.time()-start:.2f}s")
+        
+        elapsed = time.time() - start
+        logger.info(f"✅ Modelo SFace carregado e cacheado em {elapsed:.2f}s")
+        logger.info(f"✅ Tipo do modelo: {type(_sface_model)}")
+        logger.info(f"✅ Input shape: {_sface_model.input_shape if hasattr(_sface_model, 'input_shape') else 'N/A'}")
+        
         return _sface_model
     except Exception as e:
         logger.warning(f"⚠️ Erro ao carregar SFace: {e}")
@@ -120,63 +128,74 @@ def preload_deepface_model():
 def gerar_embedding_otimizado(img_path):
     """
     Gera embedding usando modelo SFace cacheado em memória.
-    Usa model.forward() que é muito mais rápido que DeepFace.represent().
+    Usa model.forward() do SFaceClient que é MUITO mais rápido que DeepFace.represent().
+    
+    IMPORTANTE: SFace usa OpenCV DNN, não Keras!
+    - Entrada: BGR normalizado para [0, 1]
+    - Shape: (batch, 112, 112, 3)
     """
     import time
+    import cv2
+    import numpy as np
+    
     start = time.time()
     
     # Tentar usar modelo cacheado primeiro
     model = get_sface_model()
     if model is not None:
         try:
-            import cv2
-            import numpy as np
-            
-            # Ler imagem
+            # 1. Ler imagem (OpenCV lê em BGR)
             img = cv2.imread(img_path)
             if img is None:
                 raise ValueError("Não foi possível ler a imagem")
             
-            # Converter BGR para RGB
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # 2. Redimensionar para 112x112 (input do SFace)
+            img_resized = cv2.resize(img, (112, 112))
             
-            # Redimensionar para input_shape do modelo (112x112)
-            input_shape = model.input_shape
-            if input_shape and len(input_shape) >= 2:
-                target_size = (input_shape[1], input_shape[0])  # (width, height)
-            else:
-                target_size = (112, 112)
+            # 3. Normalizar para [0, 1] - SFace espera esse formato
+            # O forward() internamente faz: (img * 255).astype(np.uint8)
+            img_normalized = img_resized.astype(np.float32) / 255.0
             
-            img_resized = cv2.resize(img_rgb, target_size)
+            # 4. Adicionar dimensão de batch [1, 112, 112, 3]
+            img_batch = np.expand_dims(img_normalized, axis=0)
             
-            # Usar model.forward() que já faz o preprocessing correto
-            embedding = model.forward(img_resized)
+            # 5. Gerar embedding usando forward() (OpenCV DNN)
+            embedding = model.forward(img_batch)
             
             elapsed = time.time() - start
-            logger.info(f"⚡ Embedding via modelo cacheado: {elapsed:.3f}s")
+            logger.info(f"⚡ Embedding via model.forward(): {elapsed:.3f}s")
             
             # Converter para lista se necessário
-            if hasattr(embedding, 'tolist'):
-                return embedding.tolist()
+            if isinstance(embedding, (list, np.ndarray)):
+                if isinstance(embedding, np.ndarray):
+                    return embedding.tolist()
+                return embedding
             return list(embedding)
             
         except Exception as e:
-            logger.warning(f"⚠️ Fallback para DeepFace.represent: {e}")
+            logger.warning(f"⚠️ Erro ao usar modelo cacheado: {e}")
+            logger.warning(f"⚠️ Caindo no fallback DeepFace.represent...")
+    else:
+        logger.warning("⚠️ Modelo não está cacheado, usando fallback...")
     
-    # Fallback para DeepFace.represent
-    from deepface import DeepFace
-    result = DeepFace.represent(
-        img_path=img_path,
-        model_name='SFace',
-        enforce_detection=False,
-        detector_backend='skip',
-        align=False
-    )
-    elapsed = time.time() - start
-    logger.info(f"🔄 Embedding via DeepFace: {elapsed:.2f}s")
+    # Fallback para DeepFace.represent (lento mas funciona)
+    try:
+        from deepface import DeepFace
+        result = DeepFace.represent(
+            img_path=img_path,
+            model_name='SFace',
+            enforce_detection=False,
+            detector_backend='skip',
+            align=False
+        )
+        elapsed = time.time() - start
+        logger.info(f"🔄 Embedding via DeepFace.represent (fallback): {elapsed:.2f}s")
+        
+        if result and len(result) > 0:
+            return result[0]['embedding']
+    except Exception as e:
+        logger.error(f"❌ Erro no fallback: {e}")
     
-    if result and len(result) > 0:
-        return result[0]['embedding']
     return None
 
 def redimensionar_imagem_para_reconhecimento(foto_base64, max_width=640, max_height=480):
