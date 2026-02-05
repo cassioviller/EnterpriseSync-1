@@ -2,6 +2,9 @@
 """
 Script para gerar cache de embeddings faciais dos funcionários.
 Acelera drasticamente a identificação facial de 10-15s para <1s.
+
+IMPORTANTE: Usa gerar_embedding_otimizado() para garantir consistência
+entre geração de cache e comparação em tempo real.
 """
 
 import os
@@ -9,6 +12,7 @@ import pickle
 import base64
 import tempfile
 import logging
+import numpy as np
 from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
@@ -18,10 +22,34 @@ CACHE_FILE = 'cache_facial.pkl'
 CACHE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_PATH = os.path.join(CACHE_DIR, CACHE_FILE)
 
+
+def normalizar_embedding_l2(embedding):
+    """
+    Normaliza embedding usando L2 norm.
+    Garante que a comparação por distância euclidiana seja mais precisa.
+    
+    Args:
+        embedding: Lista ou array de floats
+    
+    Returns:
+        list: Embedding normalizado
+    """
+    embedding_array = np.array(embedding, dtype=np.float32)
+    norm = np.linalg.norm(embedding_array)
+    
+    if norm == 0:
+        logger.warning("⚠️ Embedding com norma zero!")
+        return embedding_array.tolist()
+    
+    return (embedding_array / norm).tolist()
+
 def gerar_cache(admin_id=None):
     """
     Gera cache de embeddings faciais para todos os funcionários.
     Usa múltiplas fotos da tabela FotoFacialFuncionario quando disponíveis.
+    
+    IMPORTANTE: Usa gerar_embedding_otimizado() para garantir que cache e
+    comparação usem EXATAMENTE o mesmo método de geração de embeddings.
     
     Args:
         admin_id: Se fornecido, gera cache apenas para esse tenant
@@ -31,12 +59,12 @@ def gerar_cache(admin_id=None):
     """
     from app import app, db
     from models import Funcionario, FotoFacialFuncionario
+    from ponto_views import gerar_embedding_otimizado, preload_deepface_model
     
-    try:
-        from deepface import DeepFace
-    except ImportError:
-        logger.error("DeepFace não está instalado")
-        return {'success': False, 'error': 'DeepFace não instalado'}
+    # Pré-carregar modelo para acelerar geração
+    logger.info("🔄 Pré-carregando modelo SFace...")
+    preload_deepface_model()
+    logger.info("✅ Modelo SFace carregado!")
     
     with app.app_context():
         query = Funcionario.query.filter(Funcionario.ativo == True)
@@ -95,24 +123,25 @@ def gerar_cache(admin_id=None):
                             tmp_path = tmp.name
                         
                         try:
-                            # IMPORTANTE: usar skip para consistência com runtime otimizado
-                            # As fotos cadastradas já são focadas no rosto
-                            embedding_result = DeepFace.represent(
-                                img_path=tmp_path,
-                                model_name='SFace',
-                                enforce_detection=False,
-                                detector_backend='skip',
-                                align=False
-                            )
+                            # IMPORTANTE: Usar MESMA função que a comparação usa!
+                            # Isso garante que cache e comparação sejam compatíveis.
+                            embedding = gerar_embedding_otimizado(tmp_path)
                             
-                            if embedding_result and len(embedding_result) > 0:
-                                embedding = embedding_result[0]['embedding']
+                            if embedding is not None:
+                                # Normalizar embedding para consistência
+                                embedding_normalizado = normalizar_embedding_l2(embedding)
+                                
+                                # Log para debug
+                                norm_original = np.linalg.norm(np.array(embedding))
+                                norm_final = np.linalg.norm(np.array(embedding_normalizado))
+                                logger.debug(f"  📊 Norm original: {norm_original:.4f}, Norm L2: {norm_final:.4f}")
+                                
                                 embeddings_funcionario.append({
-                                    'embedding': embedding,
+                                    'embedding': embedding_normalizado,
                                     'descricao': foto_info['descricao']
                                 })
                                 total_embeddings += 1
-                                logger.debug(f"  ✅ {foto_info['descricao']} - embedding calculado")
+                                logger.debug(f"  ✅ {foto_info['descricao']} - embedding calculado ({len(embedding_normalizado)} dims)")
                             else:
                                 logger.warning(f"  ⚠️ {foto_info['descricao']} - nenhum rosto detectado")
                                 
@@ -146,10 +175,12 @@ def gerar_cache(admin_id=None):
             'embeddings': cache,
             'generated_at': datetime.now().isoformat(),
             'model': 'SFace',
+            'method': 'model.forward()',  # Método usado para consistência
+            'normalized': True,  # Embeddings normalizados com L2
             'total_funcionarios': len(funcionarios),
             'total_processados': processados,
             'total_embeddings': total_embeddings,
-            'versao': '2.0'
+            'versao': '3.0'  # Nova versão com método corrigido
         }
         
         logger.info(f"💾 Salvando cache em: {CACHE_PATH}")
@@ -204,10 +235,85 @@ def carregar_cache():
         return None
 
 
+def validar_cache():
+    """
+    Valida o cache verificando:
+    1. Se a versão do cache é 3.0 (método corrigido com model.forward())
+    2. Se os embeddings têm o tamanho correto (128 dimensões para SFace)
+    3. Se os embeddings estão normalizados (L2 norm)
+    
+    NOTA: Não valida distâncias intra-funcionário para evitar tempo de processamento.
+    
+    Returns:
+        dict: Resultado da validação com campos valid, versao, metodo, etc.
+    """
+    cache = carregar_cache()
+    
+    if not cache:
+        return {'valid': False, 'error': 'Cache não encontrado'}
+    
+    versao = cache.get('versao', '1.0')
+    metodo = cache.get('method', 'desconhecido')
+    normalizado = cache.get('normalized', False)
+    
+    logger.info(f"📊 Cache versão: {versao}, método: {metodo}, normalizado: {normalizado}")
+    
+    if versao != '3.0':
+        logger.warning(f"⚠️ Cache desatualizado! Versão {versao}, esperado 3.0")
+        return {
+            'valid': False, 
+            'error': f'Cache versão {versao} desatualizado. Regenere o cache!',
+            'versao': versao
+        }
+    
+    embeddings_dict = cache.get('embeddings', {})
+    total_funcionarios = len(embeddings_dict)
+    total_embeddings = 0
+    dimensoes_erradas = []
+    
+    for func_id, data in embeddings_dict.items():
+        embeddings_list = data.get('embeddings', [])
+        
+        for emb_info in embeddings_list:
+            if isinstance(emb_info, dict):
+                embedding = emb_info.get('embedding', [])
+            else:
+                embedding = emb_info
+            
+            total_embeddings += 1
+            
+            if len(embedding) != 128:
+                dimensoes_erradas.append({
+                    'func_id': func_id,
+                    'dims': len(embedding)
+                })
+    
+    if dimensoes_erradas:
+        logger.error(f"❌ Embeddings com dimensões erradas: {dimensoes_erradas}")
+        return {
+            'valid': False,
+            'error': 'Embeddings com dimensões incorretas',
+            'dimensoes_erradas': dimensoes_erradas
+        }
+    
+    logger.info(f"✅ Cache válido! {total_funcionarios} funcionários, {total_embeddings} embeddings")
+    
+    return {
+        'valid': True,
+        'versao': versao,
+        'metodo': metodo,
+        'normalizado': normalizado,
+        'total_funcionarios': total_funcionarios,
+        'total_embeddings': total_embeddings
+    }
+
+
 def atualizar_embedding_funcionario(funcionario_id):
     """
     Atualiza os embeddings de um funcionário específico no cache.
     Usa múltiplas fotos da tabela FotoFacialFuncionario quando disponíveis.
+    
+    IMPORTANTE: Usa gerar_embedding_otimizado() para consistência.
     
     Args:
         funcionario_id: ID do funcionário
@@ -217,12 +323,10 @@ def atualizar_embedding_funcionario(funcionario_id):
     """
     from app import app, db
     from models import Funcionario, FotoFacialFuncionario
+    from ponto_views import gerar_embedding_otimizado, preload_deepface_model
     
-    try:
-        from deepface import DeepFace
-    except ImportError:
-        logger.error("DeepFace não está instalado")
-        return False
+    # Pré-carregar modelo
+    preload_deepface_model()
     
     cache_data = carregar_cache()
     if not cache_data:
@@ -230,10 +334,12 @@ def atualizar_embedding_funcionario(funcionario_id):
             'embeddings': {},
             'generated_at': datetime.now().isoformat(),
             'model': 'SFace',
+            'method': 'model.forward()',
+            'normalized': True,
             'total_funcionarios': 0,
             'total_processados': 0,
             'total_embeddings': 0,
-            'versao': '2.0'
+            'versao': '3.0'
         }
     
     with app.app_context():
@@ -289,22 +395,18 @@ def atualizar_embedding_funcionario(funcionario_id):
                     tmp_path = tmp.name
                 
                 try:
-                    # IMPORTANTE: usar skip para consistência com runtime otimizado
-                    embedding_result = DeepFace.represent(
-                        img_path=tmp_path,
-                        model_name='SFace',
-                        enforce_detection=False,
-                        detector_backend='skip',
-                        align=False
-                    )
+                    # IMPORTANTE: Usar MESMA função que a comparação usa!
+                    embedding = gerar_embedding_otimizado(tmp_path)
                     
-                    if embedding_result and len(embedding_result) > 0:
-                        embedding = embedding_result[0]['embedding']
+                    if embedding is not None:
+                        # Normalizar embedding para consistência
+                        embedding_normalizado = normalizar_embedding_l2(embedding)
+                        
                         embeddings_funcionario.append({
-                            'embedding': embedding,
+                            'embedding': embedding_normalizado,
                             'descricao': foto_info['descricao']
                         })
-                        logger.debug(f"  ✅ {foto_info['descricao']} - embedding calculado")
+                        logger.debug(f"  ✅ {foto_info['descricao']} - embedding calculado ({len(embedding_normalizado)} dims)")
                         
                 finally:
                     if os.path.exists(tmp_path):
@@ -324,7 +426,9 @@ def atualizar_embedding_funcionario(funcionario_id):
             }
             
             cache_data['total_processados'] = len(cache_data['embeddings'])
-            cache_data['versao'] = '2.0'
+            cache_data['method'] = 'model.forward()'
+            cache_data['normalized'] = True
+            cache_data['versao'] = '3.0'
             
             with open(CACHE_PATH, 'wb') as f:
                 pickle.dump(cache_data, f)

@@ -354,8 +354,15 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
             if embedding_list is None:
                 return None, None, "Nenhum rosto detectado na foto"
             
-            embedding_capturado = np.array(embedding_list)
-            logger.info(f"⏱️ Embedding total: {elapsed_represent:.3f}s")
+            # Normalizar embedding L2 para consistência com cache
+            embedding_array = np.array(embedding_list, dtype=np.float32)
+            norm = np.linalg.norm(embedding_array)
+            if norm > 0:
+                embedding_capturado = embedding_array / norm
+            else:
+                embedding_capturado = embedding_array
+            
+            logger.info(f"⏱️ Embedding total: {elapsed_represent:.3f}s (norm L2: {np.linalg.norm(embedding_capturado):.4f})")
             
         finally:
             if os.path.exists(tmp_path):
@@ -364,6 +371,10 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
         melhor_match_id = None
         menor_distancia = float('inf')
         melhor_foto_desc = None
+        total_comparacoes = 0
+        
+        # Log do embedding capturado (primeiros 5 valores)
+        logger.info(f"📊 Embedding capturado: dims={len(embedding_capturado)}, primeiros 5={embedding_capturado[:5].tolist()}")
         
         for func_id, data in embeddings_tenant.items():
             embeddings_list = data.get('embeddings', [])
@@ -376,13 +387,18 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
             
             for emb_info in embeddings_list:
                 if isinstance(emb_info, dict):
-                    embedding_cache = np.array(emb_info['embedding'])
+                    embedding_cache = np.array(emb_info['embedding'], dtype=np.float32)
                     descricao = emb_info.get('descricao', 'Foto')
                 else:
-                    embedding_cache = np.array(emb_info)
+                    embedding_cache = np.array(emb_info, dtype=np.float32)
                     descricao = 'Foto'
                 
                 distancia = np.linalg.norm(embedding_capturado - embedding_cache)
+                total_comparacoes += 1
+                
+                # Log detalhado para debug (apenas primeiras comparações)
+                if total_comparacoes <= 3:
+                    logger.debug(f"📊 Comparação #{total_comparacoes}: func={func_id}, dist={distancia:.4f}, cache_dims={len(embedding_cache)}")
                 
                 if distancia < menor_distancia:
                     menor_distancia = distancia
@@ -1640,6 +1656,36 @@ def status_cache_embeddings():
         logger.error(traceback.format_exc())
         return jsonify({
             'disponivel': False,
+            'message': f'Erro: {str(e)}'
+        }), 500
+
+
+@ponto_bp.route('/api/cache/validar', methods=['GET'])
+@login_required
+def validar_cache_embeddings():
+    """API para validar o cache de embeddings faciais"""
+    try:
+        from gerar_cache_facial import validar_cache
+        
+        resultado = validar_cache()
+        
+        if resultado.get('valid'):
+            return jsonify({
+                'success': True,
+                'message': 'Cache válido!',
+                **resultado
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': resultado.get('error', 'Cache inválido'),
+                **resultado
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"❌ Erro ao validar cache: {str(e)}")
+        return jsonify({
+            'success': False,
             'message': f'Erro: {str(e)}'
         }), 500
 
