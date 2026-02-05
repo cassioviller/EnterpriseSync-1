@@ -314,16 +314,31 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
     embeddings_cache = cache['embeddings']
     admin_id_int = int(admin_id) if admin_id else None
     
+    # Log detalhado para debug multi-tenant
+    logger.info(f"🔍 Buscando embeddings para admin_id={admin_id_int} (type: {type(admin_id_int).__name__})")
+    logger.info(f"📊 Cache total: {len(embeddings_cache)} funcionários")
+    
     embeddings_tenant = {}
+    admin_ids_no_cache = set()
+    
     for fid, data in embeddings_cache.items():
         cache_admin_id = data.get('admin_id')
         cache_admin_id_int = int(cache_admin_id) if cache_admin_id is not None else None
+        admin_ids_no_cache.add(cache_admin_id_int)
+        
         if cache_admin_id_int == admin_id_int:
             embeddings_tenant[fid] = data
+    
     timings['filter_tenant'] = time.time() - t0
     
+    # Log dos admin_ids encontrados no cache
+    logger.info(f"📊 Admin IDs no cache: {sorted(list(admin_ids_no_cache))}")
+    logger.info(f"📊 Match para admin_id={admin_id_int}: {len(embeddings_tenant)} funcionários")
+    
     if not embeddings_tenant:
-        return None, None, "Nenhum embedding no cache para este tenant"
+        logger.error(f"❌ NENHUM embedding encontrado para admin_id={admin_id_int}!")
+        logger.error(f"   Admin IDs disponíveis: {sorted(list(admin_ids_no_cache))}")
+        return None, None, f"Nenhum embedding no cache para admin_id={admin_id_int}. Disponíveis: {sorted(list(admin_ids_no_cache))}"
     
     logger.info(f"⏱️ Cache: import={timings['import']:.2f}s, load={timings['load_cache']:.2f}s, filter={timings['filter_tenant']:.3f}s - {len(embeddings_tenant)} func.")
     
@@ -1687,6 +1702,63 @@ def validar_cache_embeddings():
         return jsonify({
             'success': False,
             'message': f'Erro: {str(e)}'
+        }), 500
+
+
+@ponto_bp.route('/api/cache/debug', methods=['GET'])
+@login_required
+@admin_required
+def debug_cache_embeddings():
+    """API de debug para mostrar estrutura completa do cache"""
+    try:
+        admin_id = get_tenant_admin_id()
+        admin_id_int = int(admin_id) if admin_id else None
+        
+        cache = carregar_cache_facial()
+        
+        if not cache:
+            return jsonify({
+                'error': 'Cache não encontrado',
+                'admin_id_logado': admin_id_int
+            }), 404
+        
+        all_embeddings = cache.get('embeddings', {})
+        
+        # Coletar todos os admin_ids únicos no cache
+        admin_ids_no_cache = {}
+        for fid, data in all_embeddings.items():
+            aid = data.get('admin_id')
+            aid_int = int(aid) if aid is not None else None
+            if aid_int not in admin_ids_no_cache:
+                admin_ids_no_cache[aid_int] = []
+            admin_ids_no_cache[aid_int].append({
+                'id': fid,
+                'nome': data.get('nome', 'N/A'),
+                'fotos': len(data.get('embeddings', []))
+            })
+        
+        return jsonify({
+            'admin_id_logado': admin_id_int,
+            'versao': cache.get('versao', '1.0'),
+            'metodo': cache.get('method', 'desconhecido'),
+            'normalizado': cache.get('normalized', False),
+            'generated_at': cache.get('generated_at'),
+            'total_funcionarios_cache': len(all_embeddings),
+            'admin_ids_no_cache': {
+                str(k): {
+                    'total': len(v),
+                    'funcionarios': v
+                } for k, v in admin_ids_no_cache.items()
+            },
+            'match_atual': admin_id_int in admin_ids_no_cache
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Erro debug cache: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'error': str(e)
         }), 500
 
 

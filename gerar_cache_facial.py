@@ -52,7 +52,8 @@ def gerar_cache(admin_id=None):
     comparação usem EXATAMENTE o mesmo método de geração de embeddings.
     
     Args:
-        admin_id: Se fornecido, gera cache apenas para esse tenant
+        admin_id: Se fornecido, gera cache apenas para esse tenant.
+                  Se None, gera para TODOS os tenants (usado em scripts).
     
     Returns:
         dict: Estatísticas da geração do cache
@@ -66,11 +67,19 @@ def gerar_cache(admin_id=None):
     preload_deepface_model()
     logger.info("✅ Modelo SFace carregado!")
     
+    # Converter admin_id para int se necessário
+    admin_id_int = int(admin_id) if admin_id is not None else None
+    logger.info(f"🎯 admin_id recebido: {admin_id} (tipo: {type(admin_id).__name__})")
+    logger.info(f"🎯 admin_id_int: {admin_id_int}")
+    
     with app.app_context():
         query = Funcionario.query.filter(Funcionario.ativo == True)
         
-        if admin_id:
-            query = query.filter(Funcionario.admin_id == admin_id)
+        if admin_id_int is not None:
+            query = query.filter(Funcionario.admin_id == admin_id_int)
+            logger.info(f"🔍 Filtrando funcionários para admin_id={admin_id_int}")
+        else:
+            logger.info("🔍 Gerando cache para TODOS os tenants")
         
         funcionarios = query.all()
         
@@ -153,16 +162,19 @@ def gerar_cache(admin_id=None):
                         logger.warning(f"  ❌ {foto_info['descricao']} - erro: {e}")
                 
                 if embeddings_funcionario:
+                    # Garantir que admin_id seja salvo como inteiro
+                    admin_id_salvar = int(func.admin_id) if func.admin_id is not None else None
+                    
                     cache[func.id] = {
                         'embeddings': embeddings_funcionario,
-                        'admin_id': func.admin_id,
+                        'admin_id': admin_id_salvar,  # SEMPRE int para consistência
                         'nome': func.nome,
                         'codigo': func.codigo,
                         'total_fotos': len(embeddings_funcionario),
                         'updated_at': datetime.now().isoformat()
                     }
                     processados += 1
-                    logger.info(f"✅ [{processados}] {func.nome} - {len(embeddings_funcionario)} embedding(s) calculado(s)")
+                    logger.info(f"✅ [{processados}] {func.nome} (admin_id={admin_id_salvar}) - {len(embeddings_funcionario)} embedding(s)")
                 else:
                     erros.append({'id': func.id, 'nome': func.nome, 'erro': 'Nenhum embedding gerado'})
                     logger.warning(f"⚠️ {func.nome} - nenhum embedding gerado")

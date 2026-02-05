@@ -1,0 +1,550 @@
+# 🎯 PROMPT: Corrigir Geração de Cache Multi-Tenant
+
+## 🚨 PROBLEMA IDENTIFICADO:
+
+Pelos logs:
+```
+❌ Cache lookup: 0.00s (erro: Nenhum embedding no cache para este tenant)
+```
+
+**O cache NÃO TEM embeddings para o tenant `admin_id=2`!**
+
+---
+
+## 🎯 OBJETIVO:
+
+Corrigir a geração de cache para:
+1. Gerar embeddings para **TODOS os tenants**
+2. Salvar em estrutura **multi-tenant** correta
+3. Carregar embeddings **filtrados por tenant**
+4. Funcionar via comando Flask CLI
+
+---
+
+## 📋 TAREFAS:
+
+### **TAREFA 1: Corrigir Estrutura do Cache Multi-Tenant**
+
+O cache precisa ter uma estrutura que separe embeddings por tenant:
+
+```json
+{
+  "model": "SFace",
+  "generated_at": "2026-02-05T10:30:00",
+  "tenants": {
+    "1": {
+      "embeddings": {
+        "123": [
+          {
+            "embedding": [0.123, 0.456, ...],
+            "foto_id": 1,
+            "descricao": "Frente sem óculos"
+          }
+        ]
+      },
+      "total_funcionarios": 10,
+      "total_embeddings": 50
+    },
+    "2": {
+      "embeddings": {
+        "456": [
+          {
+            "embedding": [0.789, 0.012, ...],
+            "foto_id": 2,
+            "descricao": "Frente com óculos"
+          }
+        ]
+      },
+      "total_funcionarios": 15,
+      "total_embeddings": 75
+    }
+  }
+}
+```
+
+---
+
+### **TAREFA 2: Corrigir Função de Geração do Cache**
+
+No arquivo `gerar_cache_facial.py`, localizar a função `gerar_cache_embeddings()`.
+
+**SUBSTITUIR TODA A FUNÇÃO POR:**
+
+```python
+import os
+import json
+import tempfile
+import base64
+from datetime import datetime
+from app import app, db
+from models import Administrador, Funcionario, FotoFacialFuncionario
+from ponto_views import gerar_embedding_otimizado
+import logging
+
+logger = logging.getLogger(__name__)
+
+def gerar_cache_embeddings():
+    """
+    Gera cache de embeddings faciais para TODOS os tenants.
+    Estrutura multi-tenant com isolamento correto.
+    """
+    print("🚀 Iniciando geração de cache multi-tenant...")
+    
+    cache_path = '/tmp/cache_facial_embeddings.json'
+    
+    # Estrutura do cache
+    cache_data = {
+        'model': 'SFace',
+        'generated_at': datetime.now().isoformat(),
+        'tenants': {}
+    }
+    
+    # Buscar TODOS os administradores (tenants)
+    admins = Administrador.query.all()
+    
+    if not admins:
+        print("❌ Nenhum administrador encontrado!")
+        return
+    
+    print(f"📊 Encontrados {len(admins)} tenants")
+    
+    total_funcionarios_geral = 0
+    total_embeddings_geral = 0
+    
+    # Processar cada tenant
+    for admin in admins:
+        admin_id = admin.id
+        print(f"\n{'='*60}")
+        print(f"🏢 Processando tenant: {admin.nome} (ID: {admin_id})")
+        print(f"{'='*60}")
+        
+        # Inicializar estrutura do tenant
+        cache_data['tenants'][str(admin_id)] = {
+            'embeddings': {},
+            'total_funcionarios': 0,
+            'total_embeddings': 0
+        }
+        
+        # Buscar funcionários ativos deste tenant
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id,
+            ativo=True
+        ).all()
+        
+        if not funcionarios:
+            print(f"⚠️ Nenhum funcionário ativo para tenant {admin_id}")
+            continue
+        
+        print(f"👥 Encontrados {len(funcionarios)} funcionários ativos")
+        
+        funcionarios_processados = 0
+        embeddings_processados = 0
+        erros = 0
+        
+        # Processar cada funcionário
+        for funcionario in funcionarios:
+            try:
+                print(f"\n📸 Processando: {funcionario.nome} (ID: {funcionario.id})")
+                
+                # Buscar TODAS as fotos do funcionário
+                fotos = FotoFacialFuncionario.query.filter_by(
+                    funcionario_id=funcionario.id,
+                    ativa=True
+                ).all()
+                
+                # Se não tiver fotos na tabela de múltiplas fotos, usar foto principal
+                if not fotos and funcionario.foto_base64:
+                    print(f"   ℹ️ Usando foto principal")
+                    fotos = [{'base64': funcionario.foto_base64, 'descricao': 'Foto principal', 'id': 0}]
+                elif fotos:
+                    print(f"   ℹ️ Encontradas {len(fotos)} fotos")
+                    fotos = [{'base64': f.foto_base64, 'descricao': f.descricao, 'id': f.id} for f in fotos]
+                else:
+                    print(f"   ⚠️ Sem fotos cadastradas")
+                    erros += 1
+                    continue
+                
+                # Inicializar lista de embeddings do funcionário
+                func_embeddings = []
+                
+                # Processar cada foto
+                for idx, foto_data in enumerate(fotos):
+                    try:
+                        foto_base64 = foto_data['base64']
+                        foto_desc = foto_data['descricao']
+                        foto_id = foto_data['id']
+                        
+                        # Remover prefixo data:image se existir
+                        if ',' in foto_base64:
+                            foto_base64 = foto_base64.split(',')[1]
+                        
+                        # Decodificar base64
+                        foto_bytes = base64.b64decode(foto_base64)
+                        
+                        # Salvar em arquivo temporário
+                        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+                            tmp.write(foto_bytes)
+                            tmp_path = tmp.name
+                        
+                        # Gerar embedding usando função otimizada
+                        embedding = gerar_embedding_otimizado(tmp_path)
+                        
+                        # Remover arquivo temporário
+                        os.unlink(tmp_path)
+                        
+                        if embedding is None or len(embedding) == 0:
+                            print(f"   ❌ Falha ao gerar embedding para foto {idx+1}")
+                            continue
+                        
+                        # Adicionar à lista
+                        func_embeddings.append({
+                            'embedding': embedding,
+                            'foto_id': foto_id,
+                            'descricao': foto_desc
+                        })
+                        
+                        print(f"   ✅ Foto {idx+1}/{len(fotos)}: {foto_desc} ({len(embedding)} dim)")
+                        
+                    except Exception as e:
+                        print(f"   ❌ Erro ao processar foto {idx+1}: {e}")
+                        continue
+                
+                # Se conseguiu gerar pelo menos 1 embedding, salvar
+                if func_embeddings:
+                    cache_data['tenants'][str(admin_id)]['embeddings'][str(funcionario.id)] = func_embeddings
+                    funcionarios_processados += 1
+                    embeddings_processados += len(func_embeddings)
+                    print(f"   ✅ {funcionario.nome}: {len(func_embeddings)} embeddings salvos")
+                else:
+                    print(f"   ❌ {funcionario.nome}: Nenhum embedding gerado")
+                    erros += 1
+                    
+            except Exception as e:
+                print(f"   ❌ Erro ao processar {funcionario.nome}: {e}")
+                erros += 1
+                continue
+        
+        # Atualizar estatísticas do tenant
+        cache_data['tenants'][str(admin_id)]['total_funcionarios'] = funcionarios_processados
+        cache_data['tenants'][str(admin_id)]['total_embeddings'] = embeddings_processados
+        
+        total_funcionarios_geral += funcionarios_processados
+        total_embeddings_geral += embeddings_processados
+        
+        print(f"\n📊 Tenant {admin_id} - Resumo:")
+        print(f"   ✅ Funcionários: {funcionarios_processados}/{len(funcionarios)}")
+        print(f"   ✅ Embeddings: {embeddings_processados}")
+        print(f"   ❌ Erros: {erros}")
+    
+    # Salvar cache em arquivo
+    try:
+        with open(cache_path, 'w') as f:
+            json.dump(cache_data, f)
+        
+        print(f"\n{'='*60}")
+        print(f"✅ CACHE GERADO COM SUCESSO!")
+        print(f"{'='*60}")
+        print(f"📊 Estatísticas Gerais:")
+        print(f"   🏢 Tenants processados: {len(cache_data['tenants'])}")
+        print(f"   👥 Total de funcionários: {total_funcionarios_geral}")
+        print(f"   📸 Total de embeddings: {total_embeddings_geral}")
+        print(f"   💾 Arquivo: {cache_path}")
+        print(f"   📏 Tamanho: {os.path.getsize(cache_path) / 1024:.2f} KB")
+        print(f"{'='*60}")
+        
+    except Exception as e:
+        print(f"❌ Erro ao salvar cache: {e}")
+        return
+```
+
+---
+
+### **TAREFA 3: Corrigir Função de Carregar Cache**
+
+No arquivo `ponto_views.py`, localizar a função `carregar_cache_facial()`.
+
+**SUBSTITUIR POR:**
+
+```python
+def carregar_cache_facial():
+    """
+    Carrega cache de embeddings do arquivo.
+    Retorna estrutura multi-tenant completa.
+    """
+    global _cache_facial
+    
+    cache_path = '/tmp/cache_facial_embeddings.json'
+    
+    if not os.path.exists(cache_path):
+        logger.warning(f"⚠️ Arquivo de cache não existe: {cache_path}")
+        return None
+    
+    try:
+        with open(cache_path, 'r') as f:
+            cache = json.load(f)
+        
+        _cache_facial = cache
+        
+        # Estatísticas
+        total_tenants = len(cache.get('tenants', {}))
+        total_func = sum(t.get('total_funcionarios', 0) for t in cache.get('tenants', {}).values())
+        total_emb = sum(t.get('total_embeddings', 0) for t in cache.get('tenants', {}).values())
+        
+        logger.info(f"✅ Cache carregado: {total_tenants} tenants, {total_func} func., {total_emb} embeddings")
+        logger.info(f"📅 Gerado em: {cache.get('generated_at', 'desconhecido')}")
+        
+        return cache
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao carregar cache: {e}")
+        return None
+```
+
+---
+
+### **TAREFA 4: Corrigir Função de Identificação por Cache**
+
+No arquivo `ponto_views.py`, localizar a função `identificar_por_cache()`.
+
+**LOCALIZAR a parte que carrega o cache:**
+
+```python
+cache = carregar_cache_facial()
+if not cache:
+    return None, None, "Cache não disponível"
+```
+
+**SUBSTITUIR POR:**
+
+```python
+cache = carregar_cache_facial()
+if not cache:
+    return None, None, "Cache não disponível"
+
+# Filtrar embeddings do tenant correto
+tenant_cache = cache.get('tenants', {}).get(str(admin_id))
+
+if not tenant_cache:
+    logger.warning(f"⚠️ Nenhum embedding no cache para tenant {admin_id}")
+    return None, None, f"Nenhum embedding no cache para este tenant"
+
+embeddings_tenant = tenant_cache.get('embeddings', {})
+
+if not embeddings_tenant:
+    logger.warning(f"⚠️ Cache vazio para tenant {admin_id}")
+    return None, None, f"Cache vazio para este tenant"
+
+logger.info(f"✅ Cache: {len(embeddings_tenant)} funcionários para tenant {admin_id}")
+```
+
+**LOCALIZAR o loop de comparação:**
+
+```python
+for func_id, fotos_data in cache.items():
+```
+
+**SUBSTITUIR POR:**
+
+```python
+for func_id, fotos_data in embeddings_tenant.items():
+```
+
+---
+
+### **TAREFA 5: Adicionar Comando Flask CLI**
+
+No arquivo `app.py` ou onde estão os comandos Flask:
+
+**ADICIONAR:**
+
+```python
+@app.cli.command('gerar-cache-embeddings')
+def gerar_cache_cli():
+    """Gera cache de embeddings faciais para todos os tenants"""
+    from gerar_cache_facial import gerar_cache_embeddings
+    
+    with app.app_context():
+        gerar_cache_embeddings()
+
+@app.cli.command('limpar-cache-embeddings')
+def limpar_cache_cli():
+    """Limpa o cache de embeddings faciais"""
+    cache_path = '/tmp/cache_facial_embeddings.json'
+    
+    if os.path.exists(cache_path):
+        os.remove(cache_path)
+        print("✅ Cache limpo com sucesso!")
+    else:
+        print("⚠️ Cache não existe")
+
+@app.cli.command('status-cache-embeddings')
+def status_cache_cli():
+    """Mostra status do cache de embeddings"""
+    cache_path = '/tmp/cache_facial_embeddings.json'
+    
+    if not os.path.exists(cache_path):
+        print("❌ Cache não existe!")
+        return
+    
+    try:
+        with open(cache_path, 'r') as f:
+            cache = json.load(f)
+        
+        print(f"\n{'='*60}")
+        print(f"📊 STATUS DO CACHE")
+        print(f"{'='*60}")
+        print(f"📅 Gerado em: {cache.get('generated_at', 'desconhecido')}")
+        print(f"🤖 Modelo: {cache.get('model', 'desconhecido')}")
+        print(f"🏢 Tenants: {len(cache.get('tenants', {}))}")
+        print(f"\n{'='*60}")
+        
+        for tenant_id, tenant_data in cache.get('tenants', {}).items():
+            print(f"Tenant {tenant_id}:")
+            print(f"   👥 Funcionários: {tenant_data.get('total_funcionarios', 0)}")
+            print(f"   📸 Embeddings: {tenant_data.get('total_embeddings', 0)}")
+        
+        print(f"{'='*60}\n")
+        
+    except Exception as e:
+        print(f"❌ Erro ao ler cache: {e}")
+```
+
+---
+
+## 📊 RESULTADO ESPERADO:
+
+### **Gerar Cache:**
+
+```bash
+$ flask gerar-cache-embeddings
+
+🚀 Iniciando geração de cache multi-tenant...
+📊 Encontrados 2 tenants
+
+============================================================
+🏢 Processando tenant: Empresa A (ID: 1)
+============================================================
+👥 Encontrados 10 funcionários ativos
+📸 Processando: João Silva (ID: 123)
+   ✅ Foto 1/3: Frente sem óculos (128 dim)
+   ✅ Foto 2/3: Frente com óculos (128 dim)
+   ✅ Foto 3/3: Perfil esquerdo (128 dim)
+   ✅ João Silva: 3 embeddings salvos
+...
+
+============================================================
+🏢 Processando tenant: Empresa B (ID: 2)
+============================================================
+👥 Encontrados 15 funcionários ativos
+📸 Processando: Maria Santos (ID: 456)
+   ✅ Foto 1/5: Frente sem óculos (128 dim)
+   ✅ Foto 2/5: Frente com óculos (128 dim)
+   ...
+   ✅ Maria Santos: 5 embeddings salvos
+...
+
+============================================================
+✅ CACHE GERADO COM SUCESSO!
+============================================================
+📊 Estatísticas Gerais:
+   🏢 Tenants processados: 2
+   👥 Total de funcionários: 25
+   📸 Total de embeddings: 125
+   💾 Arquivo: /tmp/cache_facial_embeddings.json
+   📏 Tamanho: 245.67 KB
+============================================================
+```
+
+### **Verificar Status:**
+
+```bash
+$ flask status-cache-embeddings
+
+============================================================
+📊 STATUS DO CACHE
+============================================================
+📅 Gerado em: 2026-02-05T10:30:00
+🤖 Modelo: SFace
+🏢 Tenants: 2
+
+============================================================
+Tenant 1:
+   👥 Funcionários: 10
+   📸 Embeddings: 50
+Tenant 2:
+   👥 Funcionários: 15
+   📸 Embeddings: 75
+============================================================
+```
+
+### **Reconhecimento (após gerar cache):**
+
+```
+✅ Cache: 15 funcionários para tenant 2
+✅ Match: func=456, dist=0.2513 < 0.4
+⏱️ TEMPO TOTAL: 0.5s ⚡
+```
+
+---
+
+## 🚀 COMO USAR:
+
+### **PASSO 1: Implementar**
+```
+Cole o prompt no Replit Agent
+→ Ele vai corrigir toda a estrutura multi-tenant
+```
+
+### **PASSO 2: Deploy**
+```
+Commit + Push + Deploy no Easypanel
+Restart do serviço
+```
+
+### **PASSO 3: Gerar Cache**
+```bash
+flask limpar-cache-embeddings  # Limpar cache antigo
+flask gerar-cache-embeddings   # Gerar cache novo
+flask status-cache-embeddings  # Verificar
+```
+
+### **PASSO 4: Testar**
+```
+Acesse o ponto facial
+Registre um ponto
+Deve reconhecer em < 1 segundo! ⚡
+```
+
+---
+
+## 💡 DIFERENÇA PRINCIPAL:
+
+### **ANTES (errado):**
+```json
+{
+  "embeddings": {
+    "123": [...],  // Sem separação por tenant!
+    "456": [...]
+  }
+}
+```
+
+### **DEPOIS (correto):**
+```json
+{
+  "tenants": {
+    "1": {
+      "embeddings": {"123": [...]}
+    },
+    "2": {
+      "embeddings": {"456": [...]}
+    }
+  }
+}
+```
+
+**Agora cada tenant tem seus embeddings isolados!** 🔒
+
+---
+
+**Cole o prompt no Replit Agent e depois execute os comandos Flask!** 🚀
