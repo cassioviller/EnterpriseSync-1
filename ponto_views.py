@@ -125,6 +125,39 @@ def preload_deepface_model():
         logger.warning(f"⚠️ Erro ao pré-carregar modelo DeepFace: {e}")
         return False
 
+
+def validar_formato_embedding(embedding):
+    """
+    Valida se o embedding está no formato correto.
+    
+    Formato correto:
+    - Tipo: list
+    - Tamanho: 128 elementos
+    - Elementos: float
+    - NÃO deve ser lista aninhada
+    
+    Returns:
+        tuple: (valido: bool, mensagem: str)
+    """
+    # 1. Verificar tipo
+    if not isinstance(embedding, list):
+        return False, f"Tipo inválido: {type(embedding)} (esperado: list)"
+    
+    # 2. Verificar se não é lista aninhada
+    if len(embedding) > 0 and isinstance(embedding[0], list):
+        return False, f"Lista aninhada detectada! Primeiro elemento: {type(embedding[0])}"
+    
+    # 3. Verificar tamanho
+    if len(embedding) != 128:
+        return False, f"Tamanho inválido: {len(embedding)} (esperado: 128)"
+    
+    # 4. Verificar elementos
+    if not all(isinstance(x, (int, float)) for x in embedding):
+        return False, "Elementos devem ser números (int ou float)"
+    
+    return True, "Embedding válido"
+
+
 def gerar_embedding_otimizado(img_path):
     """
     Gera embedding usando modelo SFace cacheado em memória.
@@ -172,12 +205,36 @@ def gerar_embedding_otimizado(img_path):
             elapsed_total = time.time() - start_total
             logger.info(f"⚡ model.forward(): {elapsed_forward:.3f}s | TOTAL: {elapsed_total:.3f}s")
             
-            # Converter para lista se necessário
-            if isinstance(embedding, (list, np.ndarray)):
-                if isinstance(embedding, np.ndarray):
+            # IMPORTANTE: Remover dimensão do batch
+            # model.forward() retorna shape (1, 128), precisamos de (128,)
+            if isinstance(embedding, np.ndarray):
+                logger.info(f"📊 Embedding shape ANTES: {embedding.shape}")
+                
+                # Remover dimensão do batch se existir
+                if len(embedding.shape) > 1 and embedding.shape[0] == 1:
+                    embedding = embedding[0]  # De (1, 128) para (128,)
+                    logger.info(f"📊 Embedding shape DEPOIS: {embedding.shape}")
+                
+                # Converter para lista simples
+                embedding_list = embedding.tolist()
+                
+                # Validar formato
+                if isinstance(embedding_list, list) and len(embedding_list) == 128:
+                    logger.info(f"✅ Embedding formato correto: lista de {len(embedding_list)} elementos")
                     logger.info(f"✅ gerar_embedding_otimizado - SUCESSO em {elapsed_total:.3f}s")
-                    return embedding.tolist()
+                    return embedding_list
+                else:
+                    logger.error(f"❌ Embedding formato inválido: {type(embedding_list)}, len={len(embedding_list) if isinstance(embedding_list, list) else 'N/A'}")
+                    raise ValueError(f"Embedding com formato inválido")
+            
+            # Se não for numpy array, tentar converter
+            if isinstance(embedding, list):
+                # Se for lista aninhada, pegar primeiro elemento
+                if len(embedding) > 0 and isinstance(embedding[0], list):
+                    logger.warning(f"⚠️ Embedding é lista aninhada, corrigindo...")
+                    embedding = embedding[0]
                 return embedding
+            
             return list(embedding)
             
         except Exception as e:
