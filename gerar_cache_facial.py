@@ -43,7 +43,7 @@ def normalizar_embedding_l2(embedding):
     
     return (embedding_array / norm).tolist()
 
-def gerar_cache(admin_id=None):
+def gerar_cache(admin_id=None, incluir_inativas=False):
     """
     Gera cache de embeddings faciais para todos os funcionários.
     Usa múltiplas fotos da tabela FotoFacialFuncionario quando disponíveis.
@@ -54,6 +54,7 @@ def gerar_cache(admin_id=None):
     Args:
         admin_id: Se fornecido, gera cache apenas para esse tenant.
                   Se None, gera para TODOS os tenants (usado em scripts).
+        incluir_inativas: Se True, processa também fotos marcadas como inativas.
     
     Returns:
         dict: Estatísticas da geração do cache
@@ -94,11 +95,17 @@ def gerar_cache(admin_id=None):
             try:
                 fotos_para_processar = []
                 
-                fotos_multiplas = FotoFacialFuncionario.query.filter_by(
+                # Buscar fotos múltiplas
+                query_fotos = FotoFacialFuncionario.query.filter_by(
                     funcionario_id=func.id,
-                    admin_id=func.admin_id,
-                    ativa=True
-                ).order_by(FotoFacialFuncionario.ordem).all()
+                    admin_id=func.admin_id
+                )
+                
+                # Filtrar por ativas apenas se não incluir inativas
+                if not incluir_inativas:
+                    query_fotos = query_fotos.filter_by(ativa=True)
+                
+                fotos_multiplas = query_fotos.order_by(FotoFacialFuncionario.ordem).all()
                 
                 if fotos_multiplas:
                     for foto in fotos_multiplas:
@@ -106,7 +113,10 @@ def gerar_cache(admin_id=None):
                             'foto_base64': foto.foto_base64,
                             'descricao': foto.descricao or f'Foto {foto.ordem}'
                         })
-                    logger.info(f"📷 {func.nome}: {len(fotos_multiplas)} fotos múltiplas encontradas")
+                    # Log detalhado
+                    fotos_ativas_count = sum(1 for f in fotos_multiplas if f.ativa)
+                    fotos_inativas_count = len(fotos_multiplas) - fotos_ativas_count
+                    logger.info(f"📷 {func.nome}: {fotos_ativas_count} ativas, {fotos_inativas_count} inativas")
                 elif func.foto_base64:
                     fotos_para_processar.append({
                         'foto_base64': func.foto_base64,

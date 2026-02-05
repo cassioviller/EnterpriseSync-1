@@ -1,0 +1,413 @@
+# 🎯 PROMPT: Diagnosticar e Resolver Problema de Poucas Fotos no Cache
+
+## 🔍 PROBLEMA IDENTIFICADO:
+
+O cache está gerando apenas **27 embeddings para 15 funcionários** (média de 1.8 fotos por funcionário).
+
+**Esperado:** ~75 embeddings (5 fotos por funcionário)
+
+**Causa provável:** Funcionários têm poucas fotos cadastradas ou fotos estão inativas.
+
+---
+
+## 📋 TAREFAS:
+
+### **TAREFA 1: Adicionar Comando Flask CLI para Diagnóstico**
+
+Criar comando `flask diagnosticar-fotos-faciais` que mostra estatísticas detalhadas.
+
+**Criar arquivo:** `diagnosticar_fotos_cli.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Comando Flask CLI para diagnosticar fotos faciais cadastradas.
+Mostra estatísticas detalhadas por funcionário.
+"""
+
+import click
+from flask.cli import with_appcontext
+from app import db
+from models import Funcionario, FotoFacialFuncionario
+from sqlalchemy import func
+
+@click.command('diagnosticar-fotos-faciais')
+@click.option('--admin-id', default=None, type=int, help='ID do tenant (opcional)')
+@with_appcontext
+def diagnosticar_fotos_faciais(admin_id):
+    """
+    Diagnóstico completo de fotos faciais cadastradas.
+    Mostra quantas fotos cada funcionário tem e se estão ativas.
+    """
+    click.echo("🔍 DIAGNÓSTICO DE FOTOS FACIAIS")
+    click.echo("=" * 80)
+    
+    # Filtrar por tenant se fornecido
+    query = Funcionario.query.filter(Funcionario.ativo == True)
+    if admin_id:
+        query = query.filter(Funcionario.admin_id == admin_id)
+        click.echo(f"📊 Tenant: admin_id={admin_id}")
+    else:
+        click.echo(f"📊 Todos os tenants")
+    
+    funcionarios = query.all()
+    click.echo(f"👥 Total de funcionários ativos: {len(funcionarios)}")
+    click.echo()
+    
+    # Estatísticas globais
+    total_fotos_multiplas = 0
+    total_fotos_ativas = 0
+    total_fotos_inativas = 0
+    total_com_foto_principal = 0
+    total_sem_fotos = 0
+    
+    # Detalhes por funcionário
+    click.echo("📋 DETALHES POR FUNCIONÁRIO:")
+    click.echo("-" * 80)
+    
+    for func in funcionarios:
+        # Contar fotos múltiplas
+        fotos_multiplas = FotoFacialFuncionario.query.filter_by(
+            funcionario_id=func.id,
+            admin_id=func.admin_id
+        ).all()
+        
+        fotos_ativas = sum(1 for f in fotos_multiplas if f.ativa)
+        fotos_inativas = len(fotos_multiplas) - fotos_ativas
+        
+        # Verificar foto principal
+        tem_foto_principal = func.foto_base64 is not None
+        
+        # Atualizar estatísticas
+        total_fotos_multiplas += len(fotos_multiplas)
+        total_fotos_ativas += fotos_ativas
+        total_fotos_inativas += fotos_inativas
+        if tem_foto_principal:
+            total_com_foto_principal += 1
+        
+        # Status
+        if fotos_ativas == 0 and not tem_foto_principal:
+            status = "❌ SEM FOTOS"
+            total_sem_fotos += 1
+        elif fotos_ativas == 0:
+            status = "⚠️ SÓ FOTO PRINCIPAL"
+        elif fotos_ativas < 3:
+            status = "⚠️ POUCAS FOTOS"
+        else:
+            status = "✅ OK"
+        
+        # Exibir
+        click.echo(f"{status} | {func.nome[:40]:40} | "
+                   f"Múltiplas: {fotos_ativas:2} ativas, {fotos_inativas:2} inativas | "
+                   f"Principal: {'✓' if tem_foto_principal else '✗'}")
+    
+    # Resumo
+    click.echo()
+    click.echo("=" * 80)
+    click.echo("📊 RESUMO:")
+    click.echo(f"  👥 Total de funcionários: {len(funcionarios)}")
+    click.echo(f"  📸 Total de fotos múltiplas: {total_fotos_multiplas}")
+    click.echo(f"    ✅ Ativas: {total_fotos_ativas}")
+    click.echo(f"    ❌ Inativas: {total_fotos_inativas}")
+    click.echo(f"  📷 Funcionários com foto principal: {total_com_foto_principal}")
+    click.echo(f"  ❌ Funcionários sem fotos: {total_sem_fotos}")
+    click.echo()
+    
+    # Média
+    if len(funcionarios) > 0:
+        media_fotos = total_fotos_ativas / len(funcionarios)
+        click.echo(f"📊 MÉDIA: {media_fotos:.1f} fotos ativas por funcionário")
+        
+        if media_fotos < 3:
+            click.echo()
+            click.echo("⚠️ RECOMENDAÇÃO:")
+            click.echo("  Cadastre pelo menos 3-5 fotos por funcionário para melhor precisão!")
+            click.echo("  Acesse: /ponto/gerenciar-fotos-faciais")
+        elif media_fotos >= 3:
+            click.echo("✅ Quantidade de fotos adequada!")
+    
+    click.echo("=" * 80)
+```
+
+**Registrar comando em `app.py`:**
+
+```python
+from diagnosticar_fotos_cli import diagnosticar_fotos_faciais
+
+app.cli.add_command(diagnosticar_fotos_faciais)
+```
+
+---
+
+### **TAREFA 2: Adicionar Logs Detalhados na Geração do Cache**
+
+Modificar `gerar_cache_facial.py` para mostrar mais informações.
+
+**LOCALIZAR (linha ~109):**
+
+```python
+if fotos_multiplas:
+    for foto in fotos_multiplas:
+        fotos_para_processar.append({
+            'foto_base64': foto.foto_base64,
+            'descricao': foto.descricao or f'Foto {foto.ordem}'
+        })
+    logger.info(f"📷 {func.nome}: {len(fotos_multiplas)} fotos múltiplas encontradas")
+```
+
+**SUBSTITUIR POR:**
+
+```python
+if fotos_multiplas:
+    for foto in fotos_multiplas:
+        fotos_para_processar.append({
+            'foto_base64': foto.foto_base64,
+            'descricao': foto.descricao or f'Foto {foto.ordem}'
+        })
+    # Log detalhado
+    fotos_ativas_count = sum(1 for f in fotos_multiplas if f.ativa)
+    fotos_inativas_count = len(fotos_multiplas) - fotos_ativas_count
+    logger.info(f"📷 {func.nome}: {fotos_ativas_count} fotos ativas, {fotos_inativas_count} inativas")
+```
+
+---
+
+### **TAREFA 3: Adicionar Opção para Processar Fotos Inativas**
+
+Permitir processar fotos inativas temporariamente para testes.
+
+**MODIFICAR função `gerar_cache()` em `gerar_cache_facial.py`:**
+
+**LOCALIZAR assinatura da função (linha ~46):**
+
+```python
+def gerar_cache(admin_id=None):
+```
+
+**SUBSTITUIR POR:**
+
+```python
+def gerar_cache(admin_id=None, incluir_inativas=False):
+    """
+    Gera cache de embeddings faciais para todos os funcionários.
+    
+    Args:
+        admin_id: Se fornecido, gera cache apenas para esse tenant.
+        incluir_inativas: Se True, processa também fotos marcadas como inativas.
+    
+    Returns:
+        dict: Estatísticas da geração do cache
+    """
+```
+
+**LOCALIZAR query de fotos (linha ~97):**
+
+```python
+fotos_multiplas = FotoFacialFuncionario.query.filter_by(
+    funcionario_id=func.id,
+    admin_id=func.admin_id,
+    ativa=True
+).order_by(FotoFacialFuncionario.ordem).all()
+```
+
+**SUBSTITUIR POR:**
+
+```python
+# Buscar fotos múltiplas
+query_fotos = FotoFacialFuncionario.query.filter_by(
+    funcionario_id=func.id,
+    admin_id=func.admin_id
+)
+
+# Filtrar por ativas apenas se não incluir inativas
+if not incluir_inativas:
+    query_fotos = query_fotos.filter_by(ativa=True)
+
+fotos_multiplas = query_fotos.order_by(FotoFacialFuncionario.ordem).all()
+```
+
+**MODIFICAR rota de API (ponto_views.py, linha ~1620):**
+
+```python
+@ponto_bp.route('/api/cache/gerar', methods=['POST'])
+@login_required
+@admin_required
+def gerar_cache_embeddings():
+    """API para gerar/regenerar cache de embeddings faciais"""
+    try:
+        from gerar_cache_facial import gerar_cache, CACHE_PATH
+        admin_id = get_tenant_admin_id()
+        
+        # Opção para incluir fotos inativas (via query parameter)
+        incluir_inativas = request.args.get('incluir_inativas', 'false').lower() == 'true'
+        
+        logger.info(f"🔄 INICIANDO geração de cache facial para admin_id={admin_id}")
+        logger.info(f"📁 Cache será salvo em: {CACHE_PATH}")
+        logger.info(f"📸 Incluir fotos inativas: {incluir_inativas}")
+        
+        resultado = gerar_cache(admin_id, incluir_inativas=incluir_inativas)
+        
+        # ... resto do código
+```
+
+---
+
+### **TAREFA 4: Adicionar Botão no Modal de Cache**
+
+Adicionar opção para incluir fotos inativas no modal.
+
+**MODIFICAR template que tem o modal de cache:**
+
+**ADICIONAR checkbox:**
+
+```html
+<div class="form-check mb-3">
+    <input class="form-check-input" type="checkbox" id="incluirInativas" value="true">
+    <label class="form-check-label" for="incluirInativas">
+        Incluir fotos inativas (para teste)
+    </label>
+    <small class="form-text text-muted d-block">
+        Use esta opção se alguns funcionários têm fotos marcadas como inativas.
+    </small>
+</div>
+```
+
+**MODIFICAR JavaScript da geração:**
+
+```javascript
+function gerarCache() {
+    const incluirInativas = document.getElementById('incluirInativas').checked;
+    const url = incluirInativas 
+        ? '/ponto/api/cache/gerar?incluir_inativas=true'
+        : '/ponto/api/cache/gerar';
+    
+    fetch(url, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            // ... resto do código
+        });
+}
+```
+
+---
+
+### **TAREFA 5: Adicionar Alerta se Poucas Fotos**
+
+Mostrar aviso no modal se funcionários têm poucas fotos.
+
+**MODIFICAR rota de status (ponto_views.py, linha ~1700):**
+
+```python
+# Calcular média de fotos
+total_fotos = sum(len(data.get('embeddings', [])) for data in embeddings_tenant.values())
+media_fotos = total_fotos / len(embeddings_tenant) if len(embeddings_tenant) > 0 else 0
+
+# Adicionar aviso se média baixa
+aviso = None
+if media_fotos < 3:
+    aviso = {
+        'tipo': 'warning',
+        'mensagem': f'Média de {media_fotos:.1f} fotos por funcionário. Recomendado: 3-5 fotos para melhor precisão.'
+    }
+
+return jsonify({
+    'disponivel': True,
+    # ... outros campos
+    'media_fotos': round(media_fotos, 1),
+    'aviso': aviso
+})
+```
+
+**ADICIONAR no template:**
+
+```html
+<div id="avisoFotos" class="alert alert-warning" style="display: none;">
+    <i class="fas fa-exclamation-triangle"></i>
+    <span id="avisoFotosTexto"></span>
+</div>
+```
+
+**ADICIONAR no JavaScript:**
+
+```javascript
+if (data.aviso) {
+    document.getElementById('avisoFotos').style.display = 'block';
+    document.getElementById('avisoFotosTexto').textContent = data.aviso.mensagem;
+}
+```
+
+---
+
+## 🚀 COMO USAR:
+
+### **PASSO 1: Implementar**
+```
+Cole o prompt no Replit Agent
+→ Ele vai criar o comando de diagnóstico
+→ Adicionar logs detalhados
+→ Adicionar opção de incluir inativas
+```
+
+### **PASSO 2: Deploy**
+```
+Commit + Push + Deploy no Easypanel
+Restart do serviço
+```
+
+### **PASSO 3: Diagnosticar**
+```bash
+# No terminal do Easypanel:
+flask diagnosticar-fotos-faciais --admin-id=2
+```
+
+### **PASSO 4: Analisar Resultado**
+
+**Se mostrar:**
+```
+⚠️ POUCAS FOTOS | João Silva | Múltiplas: 1 ativas, 0 inativas | Principal: ✓
+⚠️ POUCAS FOTOS | Maria Santos | Múltiplas: 2 ativas, 0 inativas | Principal: ✓
+📊 MÉDIA: 1.8 fotos ativas por funcionário
+⚠️ RECOMENDAÇÃO: Cadastre pelo menos 3-5 fotos por funcionário
+```
+
+**Ação:** Cadastrar mais fotos via `/ponto/gerenciar-fotos-faciais`
+
+---
+
+**Se mostrar:**
+```
+⚠️ SÓ FOTO PRINCIPAL | João Silva | Múltiplas: 0 ativas, 3 inativas | Principal: ✓
+```
+
+**Ação:** Ativar as fotos ou usar opção "Incluir fotos inativas"
+
+---
+
+## 📊 RESULTADO ESPERADO:
+
+Após diagnosticar e corrigir:
+
+```
+✅ OK | João Silva | Múltiplas: 5 ativas, 0 inativas | Principal: ✓
+✅ OK | Maria Santos | Múltiplas: 4 ativas, 0 inativas | Principal: ✓
+...
+📊 MÉDIA: 4.5 fotos ativas por funcionário
+✅ Quantidade de fotos adequada!
+```
+
+**Cache gerado:**
+```
+✅ 15 funcionários processados
+✅ 68 embeddings gerados
+⏱️ Tempo: ~3 segundos
+```
+
+**Reconhecimento:**
+```
+✅ Match encontrado: dist=0.2513
+⏱️ TEMPO TOTAL: 0.5s ⚡
+```
+
+---
+
+**Cole o prompt no Replit Agent e depois execute o diagnóstico!** 🚀

@@ -1614,10 +1614,14 @@ def gerar_cache_embeddings():
         from gerar_cache_facial import gerar_cache, CACHE_PATH
         admin_id = get_tenant_admin_id()
         
+        # Opção para incluir fotos inativas (via query parameter)
+        incluir_inativas = request.args.get('incluir_inativas', 'false').lower() == 'true'
+        
         logger.info(f"🔄 INICIANDO geração de cache facial para admin_id={admin_id}")
         logger.info(f"📁 Cache será salvo em: {CACHE_PATH}")
+        logger.info(f"📸 Incluir fotos inativas: {incluir_inativas}")
         
-        resultado = gerar_cache(admin_id)
+        resultado = gerar_cache(admin_id, incluir_inativas=incluir_inativas)
         
         logger.info(f"📊 Resultado: {resultado}")
         
@@ -1699,7 +1703,18 @@ def status_cache_embeddings():
         
         total_fotos = sum(len(data.get('embeddings', [])) for data in embeddings_tenant.values())
         
-        logger.info(f"📊 Cache status: {len(embeddings_tenant)} funcionários, {total_fotos} fotos para admin_id={admin_id_int}")
+        # Calcular média de fotos por funcionário
+        media_fotos = total_fotos / len(embeddings_tenant) if len(embeddings_tenant) > 0 else 0
+        
+        # Adicionar aviso se média baixa
+        aviso = None
+        if len(embeddings_tenant) > 0 and media_fotos < 3:
+            aviso = {
+                'tipo': 'warning',
+                'mensagem': f'Média de {media_fotos:.1f} fotos por funcionário. Recomendado: 3-5 fotos para melhor precisão.'
+            }
+        
+        logger.info(f"📊 Cache status: {len(embeddings_tenant)} funcionários, {total_fotos} fotos (média: {media_fotos:.1f}) para admin_id={admin_id_int}")
         
         return jsonify({
             'disponivel': True,
@@ -1708,6 +1723,8 @@ def status_cache_embeddings():
             'modelo': cache.get('modelo', cache.get('model', 'SFace')),
             'total_embeddings': len(embeddings_tenant),
             'total_fotos': total_fotos,
+            'media_fotos': round(media_fotos, 1),
+            'aviso': aviso,
             'funcionarios': [
                 {
                     'id': fid, 

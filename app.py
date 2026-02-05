@@ -494,5 +494,13 @@ with app.app_context():
     
     logging.info("🔒 Sistema de bypass PERMANENTEMENTE desabilitado - admin_id consistente")
 
+# Registrar comandos Flask CLI
+try:
+    from diagnosticar_fotos_cli import diagnosticar_fotos_faciais
+    app.cli.add_command(diagnosticar_fotos_faciais)
+    logging.info("✅ Comando CLI diagnosticar-fotos-faciais registrado")
+except ImportError as e:
+    logging.warning(f"⚠️ Comando CLI de diagnóstico não disponível: {e}")
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
