@@ -138,47 +138,60 @@ def gerar_embedding_otimizado(img_path):
     import cv2
     import numpy as np
     
-    start = time.time()
+    start_total = time.time()
+    logger.info(f"🔍 gerar_embedding_otimizado - INÍCIO (img: {img_path})")
     
     # Tentar usar modelo cacheado primeiro
     model = get_sface_model()
     if model is not None:
         try:
+            logger.info(f"🔍 gerar_embedding_otimizado - Usando modelo cacheado")
+            
             # 1. Ler imagem (OpenCV lê em BGR)
+            t0 = time.time()
             img = cv2.imread(img_path)
             if img is None:
                 raise ValueError("Não foi possível ler a imagem")
+            logger.info(f"⏱️ cv2.imread: {time.time()-t0:.3f}s (shape: {img.shape})")
             
             # 2. Redimensionar para 112x112 (input do SFace)
+            t0 = time.time()
             img_resized = cv2.resize(img, (112, 112))
+            logger.info(f"⏱️ cv2.resize: {time.time()-t0:.3f}s")
             
             # 3. Normalizar para [0, 1] - SFace espera esse formato
-            # O forward() internamente faz: (img * 255).astype(np.uint8)
+            t0 = time.time()
             img_normalized = img_resized.astype(np.float32) / 255.0
-            
-            # 4. Adicionar dimensão de batch [1, 112, 112, 3]
             img_batch = np.expand_dims(img_normalized, axis=0)
+            logger.info(f"⏱️ normalize+batch: {time.time()-t0:.3f}s")
             
-            # 5. Gerar embedding usando forward() (OpenCV DNN)
+            # 4. Gerar embedding usando forward() (OpenCV DNN)
+            t0 = time.time()
             embedding = model.forward(img_batch)
-            
-            elapsed = time.time() - start
-            logger.info(f"⚡ Embedding via model.forward(): {elapsed:.3f}s")
+            elapsed_forward = time.time() - t0
+            elapsed_total = time.time() - start_total
+            logger.info(f"⚡ model.forward(): {elapsed_forward:.3f}s | TOTAL: {elapsed_total:.3f}s")
             
             # Converter para lista se necessário
             if isinstance(embedding, (list, np.ndarray)):
                 if isinstance(embedding, np.ndarray):
+                    logger.info(f"✅ gerar_embedding_otimizado - SUCESSO em {elapsed_total:.3f}s")
                     return embedding.tolist()
                 return embedding
             return list(embedding)
             
         except Exception as e:
-            logger.warning(f"⚠️ Erro ao usar modelo cacheado: {e}")
-            logger.warning(f"⚠️ Caindo no fallback DeepFace.represent...")
+            elapsed = time.time() - start_total
+            logger.warning(f"⚠️ Erro ao usar modelo cacheado após {elapsed:.3f}s: {e}")
+            logger.warning(f"⚠️ Tipo do erro: {type(e).__name__}")
+            import traceback
+            logger.warning(f"⚠️ Traceback: {traceback.format_exc()}")
     else:
-        logger.warning("⚠️ Modelo não está cacheado, usando fallback...")
+        logger.warning("⚠️ Modelo NÃO está em cache! Usando fallback...")
     
     # Fallback para DeepFace.represent (lento mas funciona)
+    logger.warning(f"🔄 gerar_embedding_otimizado - Usando FALLBACK (DeepFace.represent)")
+    start_fallback = time.time()
     try:
         from deepface import DeepFace
         result = DeepFace.represent(
@@ -188,10 +201,11 @@ def gerar_embedding_otimizado(img_path):
             detector_backend='skip',
             align=False
         )
-        elapsed = time.time() - start
-        logger.info(f"🔄 Embedding via DeepFace.represent (fallback): {elapsed:.2f}s")
         
         if result and len(result) > 0:
+            elapsed_fallback = time.time() - start_fallback
+            elapsed_total = time.time() - start_total
+            logger.warning(f"🔄 DeepFace.represent: {elapsed_fallback:.2f}s | TOTAL: {elapsed_total:.2f}s")
             return result[0]['embedding']
     except Exception as e:
         logger.error(f"❌ Erro no fallback: {e}")
@@ -319,7 +333,8 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
         
         start_resize = time.time()
         foto_base64 = redimensionar_imagem_para_reconhecimento(foto_base64, max_width=640, max_height=480)
-        logger.debug(f"⏱️ Redimensionamento: {time.time() - start_resize:.3f}s")
+        elapsed_resize = time.time() - start_resize
+        logger.info(f"⏱️ Redimensionamento: {elapsed_resize:.3f}s")
         
         foto_bytes = base64.b64decode(foto_base64)
         
@@ -327,16 +342,20 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
             tmp.write(foto_bytes)
             tmp_path = tmp.name
         
+        logger.info(f"📁 Arquivo temporário: {tmp_path} ({len(foto_bytes)} bytes)")
+        
         try:
             start_represent = time.time()
             # Usar função otimizada com modelo cacheado
             embedding_list = gerar_embedding_otimizado(tmp_path)
+            elapsed_represent = time.time() - start_represent
+            logger.info(f"⏱️ gerar_embedding_otimizado retornou em: {elapsed_represent:.3f}s")
             
             if embedding_list is None:
                 return None, None, "Nenhum rosto detectado na foto"
             
             embedding_capturado = np.array(embedding_list)
-            logger.info(f"⏱️ Embedding total: {time.time() - start_represent:.2f}s")
+            logger.info(f"⏱️ Embedding total: {elapsed_represent:.3f}s")
             
         finally:
             if os.path.exists(tmp_path):
@@ -1631,6 +1650,7 @@ def identificar_e_registrar():
     """API para identificar funcionário automaticamente e registrar ponto"""
     import time
     start_total = time.time()
+    logger.info(f"🚀 ========== INÍCIO identificar-e-registrar ==========")
     
     try:
         # NOTA: preload_deepface_model() removido - já é executado no startup!
@@ -1712,7 +1732,11 @@ def identificar_e_registrar():
             }), 404
         
         # Validar qualidade da foto capturada (versão avançada)
+        logger.info(f"⏱️ Iniciando validação de qualidade da foto...")
+        start_validacao = time.time()
         valido, msg_qualidade, detalhes = validar_qualidade_foto_avancada(foto_capturada_base64)
+        elapsed_validacao = time.time() - start_validacao
+        logger.info(f"⏱️ Validação de qualidade: {elapsed_validacao:.3f}s (válido: {valido})")
         if not valido:
             return jsonify({
                 'success': False, 
@@ -1911,6 +1935,8 @@ def identificar_e_registrar():
             f"Tipo: {tipo_registrado}, Distância: {menor_distancia:.4f}, Tempo: {tempo_total:.2f}s"
         )
         
+        logger.info(f"✅ ========== FIM identificar-e-registrar (SUCESSO) em {tempo_total:.2f}s ==========")
+        
         return jsonify({
             'success': True,
             'message': f'{funcionario.nome}: {tipo_registrado} registrado(a) com sucesso!',
@@ -1925,8 +1951,10 @@ def identificar_e_registrar():
         })
         
     except Exception as e:
+        elapsed = time.time() - start_total
         db.session.rollback()
         logger.error(f"Erro na identificação facial automática: {e}", exc_info=True)
+        logger.error(f"❌ ========== FIM identificar-e-registrar (ERRO) em {elapsed:.2f}s ==========")
         return jsonify({
             'success': False, 
             'message': f'Erro ao processar identificação: {str(e)}'
