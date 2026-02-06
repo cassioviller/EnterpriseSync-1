@@ -1498,7 +1498,7 @@ def registrar_ponto_facial_api():
                 'success': False, 
                 'message': f'Reconhecimento facial não confirmado. Tente novamente com melhor iluminação.',
                 'match': False,
-                'distancia': round(distancia, 4)
+                'distancia': float(round(distancia, 4))
             }), 403
         
         hoje = get_date_brasil()
@@ -1593,7 +1593,7 @@ def registrar_ponto_facial_api():
             'message': f'Ponto de {tipo_registrado} registrado com sucesso para {funcionario.nome}!',
             'tipo_registrado': tipo_registrado,
             'hora': agora.strftime('%H:%M:%S'),
-            'distancia': round(distancia, 4),
+            'distancia': float(round(distancia, 4)),
             'match': True
         })
         
@@ -2174,7 +2174,7 @@ def identificar_e_registrar():
             return jsonify({
                 'success': False, 
                 'message': 'Funcionário não identificado. Tente novamente com melhor iluminação ou registre manualmente.',
-                'distancia': round(menor_distancia, 4) if menor_distancia != float('inf') else None
+                'distancia': float(round(menor_distancia, 4)) if menor_distancia != float('inf') else None
             }), 404
         
         funcionario = melhor_match
@@ -2321,9 +2321,9 @@ def identificar_e_registrar():
             'funcionario_codigo': funcionario.codigo,
             'tipo_registrado': tipo_registrado,
             'hora': agora.strftime('%H:%M:%S'),
-            'distancia': round(menor_distancia, 4),
-            'distancia_obra': round(distancia_obra, 1) if distancia_obra else None,
-            'tempo_processamento': round(tempo_total, 2)
+            'distancia': float(round(menor_distancia, 4)),
+            'distancia_obra': float(round(distancia_obra, 1)) if distancia_obra else None,
+            'tempo_processamento': float(round(tempo_total, 2))
         })
         
     except Exception as e:
