@@ -397,14 +397,14 @@ def recarregar_cache_facial():
     _cache_mtime = 0
     return carregar_cache_facial()
 
-def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
+def identificar_por_cache(foto_base64, admin_id, threshold=0.58):
     """
     Identifica funcionário usando cache de embeddings (muito mais rápido).
     
     Args:
         foto_base64: Foto capturada em base64
         admin_id: ID do tenant
-        threshold: Limiar de distância para match (0.40 = mais rigoroso)
+        threshold: Limiar de distância para match (0.58 = balanceado)
     
     Returns:
         tuple: (funcionario_id, distancia, erro)

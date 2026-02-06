@@ -148,7 +148,7 @@ def validar_qualidade_foto(foto_base64, min_width=200, min_height=200):
 # ============================================================
 
 # Configurações de reconhecimento facial
-THRESHOLD_CONFIANCA = 0.40  # Mais rigoroso (era 0.55) - menor = mais rigoroso
+THRESHOLD_CONFIANCA = 0.58  # Ajustado (era 0.40) - balanceado entre precisão e recall
 MODELO_RECONHECIMENTO = 'SFace'  # Modelo rápido e preciso
 MIN_CONFIANCA_PERCENTUAL = 60  # Mínimo 60% de confiança para aceitar
 
