@@ -1577,7 +1577,7 @@ def registrar_ponto_facial_api():
         
         registro.foto_registro_base64 = None
         registro.reconhecimento_facial_sucesso = True
-        registro.confianca_reconhecimento = distancia
+        registro.confianca_reconhecimento = float(distancia) if distancia is not None else None
         registro.modelo_utilizado = 'SFace'
         
         db.session.commit()
@@ -2291,7 +2291,7 @@ def identificar_e_registrar():
         
         # Salvar metadados do reconhecimento
         registro.reconhecimento_facial_sucesso = True
-        registro.confianca_reconhecimento = menor_distancia
+        registro.confianca_reconhecimento = float(menor_distancia) if menor_distancia is not None else None
         registro.modelo_utilizado = 'SFace'
         
         db.session.commit()
