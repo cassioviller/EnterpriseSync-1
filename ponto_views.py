@@ -51,6 +51,19 @@ _cache_loaded = False
 _cache_mtime = 0  # Timestamp de modificação do arquivo quando carregado
 _deepface_model_loaded = False
 _sface_model = None  # Cache do modelo TensorFlow em memória
+_face_cascade = None  # Cache do classificador Haar para detecção facial
+
+PIPELINE_VERSION = "4.0-face-detection"
+
+def get_face_cascade():
+    """Retorna o classificador Haar cacheado para detecção facial"""
+    global _face_cascade
+    if _face_cascade is not None:
+        return _face_cascade
+    import cv2
+    _face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    logger.info("✅ Haar cascade carregado e cacheado")
+    return _face_cascade
 
 def get_sface_model():
     """Retorna o modelo SFace cacheado em memória usando DeepFace.build_model"""
@@ -188,18 +201,43 @@ def gerar_embedding_otimizado(img_path):
                 raise ValueError("Não foi possível ler a imagem")
             logger.info(f"⏱️ cv2.imread: {time.time()-t0:.3f}s (shape: {img.shape})")
             
-            # 2. Redimensionar para 112x112 (input do SFace)
+            # 2. Detectar rosto usando Haar cascade (CRITICAL FIX)
             t0 = time.time()
-            img_resized = cv2.resize(img, (112, 112))
-            logger.info(f"⏱️ cv2.resize: {time.time()-t0:.3f}s")
+            face_cascade = get_face_cascade()
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+            elapsed_detection = time.time() - t0
+            logger.info(f"⏱️ Face detection: {elapsed_detection:.3f}s ({len(faces)} face(s) found)")
             
-            # 3. Normalizar para [0, 1] - SFace espera esse formato
+            # 3. Crop face region or fallback to full image (use largest face)
+            t0 = time.time()
+            if len(faces) > 0:
+                if len(faces) > 1:
+                    faces_sorted = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+                    x, y, w, h = faces_sorted[0]
+                else:
+                    x, y, w, h = faces[0]
+                margin = 0.2
+                img_h, img_w = img.shape[:2]
+                x1 = max(0, int(x - w * margin))
+                y1 = max(0, int(y - h * margin))
+                x2 = min(img_w, int(x + w + w * margin))
+                y2 = min(img_h, int(y + h + h * margin))
+                face_crop = img[y1:y2, x1:x2]
+                img_resized = cv2.resize(face_crop, (112, 112))
+                logger.info(f"✅ Face cropped: ({x},{y},{w},{h}) -> margin crop ({x1},{y1})-({x2},{y2})")
+            else:
+                logger.warning(f"⚠️ No face detected in {img_path}, using full image resize (fallback)")
+                img_resized = cv2.resize(img, (112, 112))
+            logger.info(f"⏱️ crop+resize: {time.time()-t0:.3f}s")
+            
+            # 4. Normalizar para [0, 1] - SFace espera esse formato
             t0 = time.time()
             img_normalized = img_resized.astype(np.float32) / 255.0
             img_batch = np.expand_dims(img_normalized, axis=0)
             logger.info(f"⏱️ normalize+batch: {time.time()-t0:.3f}s")
             
-            # 4. Gerar embedding usando forward() (OpenCV DNN)
+            # 5. Gerar embedding usando forward() (OpenCV DNN)
             t0 = time.time()
             embedding = model.forward(img_batch)
             elapsed_forward = time.time() - t0
@@ -337,8 +375,11 @@ def carregar_cache_facial():
         _cache_mtime = file_mtime
         
         if _cache_facial:
+            cache_version = _cache_facial.get('pipeline_version', 'unknown')
+            if cache_version != PIPELINE_VERSION:
+                logger.warning(f"⚠️ [CACHE OBSOLETO] Cache pipeline={cache_version}, atual={PIPELINE_VERSION}. Regenere o cache via /ponto/api/cache/gerar!")
             total = len(_cache_facial.get('embeddings', {}))
-            logger.info(f"✅ Cache facial carregado: {total} funcionários (mtime={file_mtime})")
+            logger.info(f"✅ Cache facial carregado: {total} funcionários (mtime={file_mtime}, pipeline={cache_version})")
         else:
             logger.warning("⚠️ Cache facial vazio ou não encontrado")
         return _cache_facial
@@ -488,9 +529,9 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
                 distancia = np.linalg.norm(embedding_capturado - embedding_cache)
                 total_comparacoes += 1
                 
-                # Log detalhado para debug (apenas primeiras comparações)
                 if total_comparacoes <= 3:
-                    logger.debug(f"📊 Comparação #{total_comparacoes}: func={func_id}, dist={distancia:.4f}, cache_dims={len(embedding_cache)}")
+                    cache_norm = np.linalg.norm(embedding_cache)
+                    logger.info(f"📊 Comparação #{total_comparacoes}: func={func_id} ({data.get('nome', '?')}), dist={distancia:.4f}, cache_norm={cache_norm:.4f}, primeiros3_cache={embedding_cache[:3].tolist()}")
                 
                 if distancia < menor_distancia:
                     menor_distancia = distancia
@@ -1774,6 +1815,120 @@ def status_cache_embeddings():
             'disponivel': False,
             'message': f'Erro: {str(e)}'
         }), 500
+
+
+@ponto_bp.route('/api/cache/verificar')
+@login_required
+def verificar_cache():
+    """Verifica compatibilidade do cache comparando embedding ao vivo vs cacheado"""
+    import time
+    
+    admin_id = get_tenant_admin_id()
+    cache = carregar_cache_facial()
+    
+    if not cache or 'embeddings' not in cache:
+        return jsonify({'status': 'error', 'message': 'Cache não disponível'}), 404
+    
+    cache_version = cache.get('pipeline_version', cache.get('versao', 'unknown'))
+    results = {
+        'cache_version': cache_version,
+        'current_pipeline': PIPELINE_VERSION,
+        'compatible': cache_version == PIPELINE_VERSION,
+        'generated_at': cache.get('generated_at', 'unknown'),
+        'total_funcionarios': len(cache.get('embeddings', {})),
+        'verificacoes': []
+    }
+    
+    embeddings_cache = cache['embeddings']
+    admin_id_int = int(admin_id) if admin_id else None
+    
+    tested = 0
+    for func_id, data in embeddings_cache.items():
+        cache_admin_id = int(data.get('admin_id', 0)) if data.get('admin_id') is not None else None
+        if cache_admin_id != admin_id_int:
+            continue
+        if tested >= 2:
+            break
+            
+        embs = data.get('embeddings', [])
+        if not embs:
+            continue
+        
+        first_emb = embs[0]
+        cached_emb = np.array(first_emb['embedding'] if isinstance(first_emb, dict) else first_emb, dtype=np.float32)
+        cached_norm = float(np.linalg.norm(cached_emb))
+        
+        func = Funcionario.query.get(func_id)
+        if not func:
+            continue
+        
+        fotos = FotoFacialFuncionario.query.filter_by(
+            funcionario_id=func_id, admin_id=admin_id_int, ativa=True
+        ).order_by(FotoFacialFuncionario.ordem).first()
+        
+        if not fotos:
+            continue
+        
+        try:
+            foto_b64 = fotos.foto_base64
+            if foto_b64.startswith('data:'):
+                foto_b64 = foto_b64.split(',')[1]
+            
+            foto_bytes = base64.b64decode(foto_b64)
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+                tmp.write(foto_bytes)
+                tmp_path = tmp.name
+            
+            try:
+                start = time.time()
+                fresh_emb_list = gerar_embedding_otimizado(tmp_path)
+                elapsed = time.time() - start
+                
+                if fresh_emb_list:
+                    fresh_emb = np.array(fresh_emb_list, dtype=np.float32)
+                    fresh_norm = float(np.linalg.norm(fresh_emb))
+                    
+                    if cached_norm > 0:
+                        cached_normalized = cached_emb / cached_norm
+                    else:
+                        cached_normalized = cached_emb
+                    if fresh_norm > 0:
+                        fresh_normalized = fresh_emb / fresh_norm
+                    else:
+                        fresh_normalized = fresh_emb
+                    
+                    dist = float(np.linalg.norm(fresh_normalized - cached_normalized))
+                    
+                    results['verificacoes'].append({
+                        'func_id': func_id,
+                        'nome': data.get('nome', '?'),
+                        'distancia_cache_vs_live': round(dist, 4),
+                        'cached_norm': round(cached_norm, 4),
+                        'fresh_norm': round(fresh_norm, 4),
+                        'tempo_embedding': round(elapsed, 3),
+                        'compativel': dist < 0.3,
+                        'cached_first3': cached_emb[:3].tolist(),
+                        'fresh_first3': fresh_emb[:3].tolist()
+                    })
+                    tested += 1
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+        except Exception as e:
+            results['verificacoes'].append({
+                'func_id': func_id,
+                'nome': data.get('nome', '?'),
+                'erro': str(e)
+            })
+            tested += 1
+    
+    if results['verificacoes']:
+        all_compatible = all(v.get('compativel', False) for v in results['verificacoes'] if 'erro' not in v)
+        results['status'] = 'compatible' if all_compatible else 'INCOMPATIBLE - regenerate cache!'
+    else:
+        results['status'] = 'no_data_to_verify'
+    
+    return jsonify(results)
 
 
 @ponto_bp.route('/api/cache/validar', methods=['GET'])

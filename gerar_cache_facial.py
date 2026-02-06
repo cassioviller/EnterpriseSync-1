@@ -202,7 +202,8 @@ def gerar_cache(admin_id=None, incluir_inativas=False):
             'total_funcionarios': len(funcionarios),
             'total_processados': processados,
             'total_embeddings': total_embeddings,
-            'versao': '3.0'  # Nova versão com método corrigido
+            'pipeline_version': '4.0-face-detection',
+            'versao': '4.0'
         }
         
         logger.info(f"💾 Salvando cache em: {CACHE_PATH}")
@@ -280,8 +281,9 @@ def validar_cache():
     
     logger.info(f"📊 Cache versão: {versao}, método: {metodo}, normalizado: {normalizado}")
     
-    if versao != '3.0':
-        logger.warning(f"⚠️ Cache desatualizado! Versão {versao}, esperado 3.0")
+    versoes_validas = ['3.0', '4.0']
+    if versao not in versoes_validas:
+        logger.warning(f"⚠️ Cache desatualizado! Versão {versao}, esperado {versoes_validas}")
         return {
             'valid': False, 
             'error': f'Cache versão {versao} desatualizado. Regenere o cache!',
