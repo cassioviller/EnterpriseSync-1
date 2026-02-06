@@ -512,17 +512,24 @@ def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
 
 ponto_bp = Blueprint('ponto', __name__, url_prefix='/ponto')
 
-# Pré-carregar modelo DeepFace no import do módulo
+# Pré-carregar modelo DeepFace e cache facial no import do módulo
 try:
     import threading
     def _async_preload():
         try:
             preload_deepface_model()
+            # Também pré-carregar o cache facial para cada worker
+            cache = carregar_cache_facial()
+            if cache:
+                total = len(cache.get('embeddings', {}))
+                logger.info(f"✅ Cache facial pré-carregado no worker: {total} funcionários")
+            else:
+                logger.info("ℹ️ Nenhum cache facial disponível no startup (gere via /ponto/api/cache/gerar)")
         except Exception as e:
             logger.warning(f"⚠️ Preload async falhou: {e}")
     
     threading.Thread(target=_async_preload, daemon=True).start()
-    logger.info("🚀 Iniciando pré-carregamento assíncrono do modelo DeepFace")
+    logger.info("🚀 Iniciando pré-carregamento assíncrono do modelo DeepFace + cache facial")
 except Exception as e:
     logger.warning(f"⚠️ Não foi possível iniciar preload: {e}")
 
@@ -1963,26 +1970,28 @@ def identificar_e_registrar():
         
         # OTIMIZAÇÃO: Tentar identificação via cache primeiro (muito mais rápido)
         start_cache = time.time()
-        logger.info("⏱️ Tentando identificação via cache de embeddings...")
+        logger.info("⏱️ [CACHE] Tentando identificação via cache de embeddings...")
         func_id, distancia_cache, erro_cache = identificar_por_cache(
             foto_capturada_base64, admin_id, THRESHOLD_DISTANCIA
         )
-        logger.info(f"⏱️ Cache lookup: {time.time() - start_cache:.2f}s (erro: {erro_cache})")
+        cache_elapsed = time.time() - start_cache
         
         if func_id and not erro_cache:
             # IMPORTANTE: Validar que o funcionário pertence ao tenant correto
             melhor_match = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
             if melhor_match:
                 menor_distancia = distancia_cache
-                logger.info(f"✅ Identificado via cache: {melhor_match.nome} (dist: {distancia_cache:.4f})")
+                logger.info(f"✅ [CACHE HIT] Identificado via cache em {cache_elapsed:.2f}s: {melhor_match.nome} (dist: {distancia_cache:.4f})")
             else:
-                logger.warning(f"⚠️ Cache retornou func_id={func_id} mas não pertence ao tenant {admin_id}")
+                logger.warning(f"⚠️ [CACHE] func_id={func_id} não pertence ao tenant {admin_id}")
                 erro_cache = "Funcionário não encontrado no tenant"
+        else:
+            logger.warning(f"⚠️ [CACHE MISS] Cache falhou em {cache_elapsed:.2f}s - motivo: {erro_cache}")
         
         # FALLBACK: Método com múltiplas fotos se cache não disponível ou falhou
         if erro_cache or not melhor_match:
-            logger.info(f"Cache não disponível ({erro_cache}), usando método com múltiplas fotos...")
-            logger.info(f"Iniciando identificação facial entre {len(funcionarios)} funcionários (múltiplas fotos)...")
+            logger.warning(f"🐌 [FALLBACK] Usando método LENTO com múltiplas fotos (cache indisponível: {erro_cache})")
+            logger.info(f"🐌 [FALLBACK] Comparando com {len(funcionarios)} funcionários um a um...")
             
             for funcionario in funcionarios:
                 try:
