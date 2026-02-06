@@ -45,9 +45,10 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Cache global de embeddings
+# Cache global de embeddings com auto-reload baseado em mtime
 _cache_facial = None
 _cache_loaded = False
+_cache_mtime = 0  # Timestamp de modificação do arquivo quando carregado
 _deepface_model_loaded = False
 _sface_model = None  # Cache do modelo TensorFlow em memória
 
@@ -311,29 +312,48 @@ def redimensionar_imagem_para_reconhecimento(foto_base64, max_width=640, max_hei
         return foto_base64
 
 def carregar_cache_facial():
-    """Carrega o cache de embeddings do arquivo"""
-    global _cache_facial, _cache_loaded
-    
-    if _cache_loaded:
-        return _cache_facial
+    """
+    Carrega o cache de embeddings do arquivo.
+    Verifica automaticamente se o arquivo no disco foi atualizado (mtime)
+    para recarregar entre workers do Gunicorn.
+    """
+    global _cache_facial, _cache_loaded, _cache_mtime
     
     try:
         from gerar_cache_facial import carregar_cache, CACHE_PATH
+        
+        file_mtime = 0
+        if os.path.exists(CACHE_PATH):
+            file_mtime = os.path.getmtime(CACHE_PATH)
+        
+        if _cache_loaded and file_mtime <= _cache_mtime:
+            return _cache_facial
+        
+        if _cache_loaded and file_mtime > _cache_mtime:
+            logger.info(f"🔄 Cache atualizado no disco detectado (mtime: {file_mtime} > {_cache_mtime}), recarregando...")
+        
         _cache_facial = carregar_cache()
         _cache_loaded = True
+        _cache_mtime = file_mtime
+        
         if _cache_facial:
-            logger.info(f"✅ Cache facial carregado: {_cache_facial.get('total_processados', 0)} embeddings")
+            total = len(_cache_facial.get('embeddings', {}))
+            logger.info(f"✅ Cache facial carregado: {total} funcionários (mtime={file_mtime})")
+        else:
+            logger.warning("⚠️ Cache facial vazio ou não encontrado")
         return _cache_facial
     except Exception as e:
         logger.warning(f"⚠️ Erro ao carregar cache facial: {e}")
         _cache_loaded = True
+        _cache_mtime = 0
         return None
 
 def recarregar_cache_facial():
     """Força recarga do cache"""
-    global _cache_facial, _cache_loaded
+    global _cache_facial, _cache_loaded, _cache_mtime
     _cache_loaded = False
     _cache_facial = None
+    _cache_mtime = 0
     return carregar_cache_facial()
 
 def identificar_por_cache(foto_base64, admin_id, threshold=0.40):
