@@ -2194,8 +2194,6 @@ function mostrarSucesso(mensagem) {
 
 function excluirPonto(id) {
     if (confirm('Tem certeza que deseja excluir este registro de ponto?\\n\\nEsta ação não pode ser desfeita.')) {
-        console.log('Excluindo registro:', id);
-        
         fetch(`/ponto/excluir/${id}`, {
             method: 'POST',
             headers: {
@@ -2204,6 +2202,10 @@ function excluirPonto(id) {
             }
         })
         .then(response => {
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Sessão expirada. Por favor, recarregue a página.');
+            }
             if (!response.ok) throw new Error('Erro na requisição');
             return response.json();
         })

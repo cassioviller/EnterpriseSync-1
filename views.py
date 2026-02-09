@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
@@ -5807,6 +5807,54 @@ def api_ponto_lancamento_multiplo():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
+
+# ===== API PARA SERVIR FOTO DO FUNCIONÁRIO =====
+@main_bp.route('/api/funcionario/<int:id>/foto')
+@login_required
+def get_funcionario_foto(id):
+    try:
+        admin_id = get_tenant_admin_id()
+        funcionario = Funcionario.query.filter_by(id=id, admin_id=admin_id).first()
+        if not funcionario:
+            return _foto_placeholder_svg("?"), 200
+
+        if funcionario.foto_base64 and funcionario.foto_base64.startswith("data:"):
+            import base64
+            header, b64data = funcionario.foto_base64.split(",", 1)
+            mime_type = header.split(":")[1].split(";")[0]
+            image_data = base64.b64decode(b64data)
+            return Response(image_data, content_type=mime_type)
+
+        if funcionario.foto:
+            import os
+            for base_dir in ['static', '']:
+                filepath = os.path.join(base_dir, funcionario.foto) if base_dir else funcionario.foto
+                if os.path.isfile(filepath):
+                    return send_file(filepath)
+
+        return _foto_placeholder_svg(funcionario.nome if funcionario.nome else "?"), 200
+    except Exception as e:
+        logger.error(f"Erro ao servir foto do funcionário {id}: {e}")
+        return _foto_placeholder_svg("?"), 200
+
+
+def _foto_placeholder_svg(nome):
+    initials = ""
+    if nome and nome != "?":
+        parts = nome.strip().split()
+        if len(parts) >= 2:
+            initials = (parts[0][0] + parts[-1][0]).upper()
+        elif parts:
+            initials = parts[0][0].upper()
+    else:
+        initials = "?"
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+<rect width="120" height="120" rx="60" fill="#6c757d"/>
+<text x="60" y="60" text-anchor="middle" dominant-baseline="central" fill="white" font-size="40" font-family="Arial,sans-serif" font-weight="bold">{initials}</text>
+</svg>'''
+    from flask import Response
+    return Response(svg, content_type="image/svg+xml")
+
 
 # ===== API PARA BUSCAR FUNCIONÁRIO INDIVIDUAL =====
 @main_bp.route('/api/funcionario/<int:funcionario_id>', methods=['GET'])

@@ -497,6 +497,7 @@ function excluirRegistro(id) {
         $.ajax({
             url: `/ponto/excluir/${id}`,
             type: 'POST',
+            dataType: 'json',
             success: function(data) {
                 if (data.success) {
                     location.reload();
@@ -504,8 +505,13 @@ function excluirRegistro(id) {
                     alert('Erro ao excluir registro: ' + (data.message || ''));
                 }
             },
-            error: function() {
-                alert('Erro ao excluir registro');
+            error: function(xhr) {
+                var contentType = xhr.getResponseHeader('content-type');
+                if (contentType && contentType.indexOf('text/html') !== -1) {
+                    alert('Sessão expirada. Por favor, recarregue a página.');
+                } else {
+                    alert('Erro ao excluir registro');
+                }
             }
         });
     }

@@ -1117,7 +1117,7 @@ async function editarFuncionario(id) {
         const fotoPreview = document.getElementById('foto-preview');
         const fotoImg = document.getElementById('foto-img');
         if (func.foto) {
-            fotoImg.src = `/static/fotos_funcionarios/${func.foto}`;
+            fotoImg.src = '/api/funcionario/' + func.id + '/foto';
             fotoPreview.style.display = 'block';
         } else {
             fotoPreview.style.display = 'none';
@@ -1548,9 +1548,9 @@ function setDateRange(period) {
                                                         <label class="form-check-label w-100" for="func_{{ funcionario.id }}">
                                                             <div class="d-flex align-items-center">
                                                                 <div class="me-2">
-                                                                    {% if funcionario.foto %}
-                                                                    <img src="{{ funcionario.foto }}" class="rounded-circle" width="30" height="30">
-                                                                    {% else %}
+                                                                    {% if funcionario.foto or funcionario.foto_base64 %}
+                                                                    <img src="/api/funcionario/{{ funcionario.id }}/foto" class="rounded-circle" width="30" height="30" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                                                                    {% endif %}
                                                                     <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
                                                                          style="width: 30px; height: 30px; font-size: 12px;">
                                                                         {{ funcionario.nome.split()[0][0] }}{{ funcionario.nome.split()[-1][0] if funcionario.nome.split()|length > 1 else '' }}
