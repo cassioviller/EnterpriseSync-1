@@ -836,6 +836,33 @@ def excluir_registro_ponto(registro_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@ponto_bp.route('/excluir/<int:registro_id>', methods=['POST'])
+@login_required
+def excluir_registro_ponto_post(registro_id):
+    """Exclui um registro de ponto via POST (usado pelo template ponto.html)"""
+    try:
+        admin_id = get_tenant_admin_id()
+        
+        registro = RegistroPonto.query.filter_by(
+            id=registro_id,
+            admin_id=admin_id
+        ).first()
+        
+        if not registro:
+            return jsonify({'success': False, 'message': 'Registro não encontrado'}), 404
+        
+        db.session.delete(registro)
+        db.session.commit()
+        
+        logger.info(f"Registro de ponto {registro_id} excluído com sucesso via POST")
+        return jsonify({'success': True, 'message': 'Registro excluído com sucesso'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao excluir registro de ponto {registro_id}: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @ponto_bp.route('/api/status-obra/<int:obra_id>')
 @login_required
 def api_status_obra(obra_id):
