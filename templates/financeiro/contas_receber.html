@@ -258,7 +258,7 @@
                         <select name="banco_id" class="form-select">
                             <option value="">Sem vínculo bancário</option>
                             {% for banco in bancos %}
-                            <option value="{{ banco.id }}">{{ banco.nome }} - {{ banco.agencia }}/{{ banco.conta }}</option>
+                            <option value="{{ banco.id }}">{{ banco.nome_banco }} - {{ banco.agencia }}/{{ banco.conta }}</option>
                             {% endfor %}
                         </select>
                     </div>

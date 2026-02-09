@@ -9,7 +9,7 @@ from decimal import Decimal
 from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, Fornecedor, 
-    PlanoContas, Obra
+    PlanoContas, Obra, CentroCusto
 )
 from financeiro_service import FinanceiroService
 from multitenant_helper import get_admin_id
@@ -29,6 +29,20 @@ def dashboard():
     try:
         admin_id = get_admin_id()
         
+        hoje = date.today()
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+        else:
+            data_inicio = date(hoje.year, hoje.month, 1)
+        
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+        else:
+            data_fim = hoje
+        
         # KPIs principais
         kpis = FinanceiroService.obter_kpis_financeiros(admin_id)
         
@@ -39,12 +53,28 @@ def dashboard():
         vencidas_pagar = FinanceiroService.listar_contas_pagar(admin_id, vencidas=True)
         vencidas_receber = FinanceiroService.listar_contas_receber(admin_id, vencidas=True)
         
+        # Receitas recentes (últimas 10 contas a receber)
+        receitas_recentes = ContaReceber.query.filter_by(admin_id=admin_id).order_by(
+            ContaReceber.data_vencimento.desc()
+        ).limit(10).all()
+        
+        # Centros de custo
+        centros_custo = []
+        try:
+            centros_custo = CentroCusto.query.filter_by(admin_id=admin_id).all()
+        except Exception:
+            pass
+        
         return render_template(
             'financeiro/dashboard.html',
             kpis=kpis,
             alertas_pagar=alertas_pagar,
             vencidas_pagar=vencidas_pagar,
-            vencidas_receber=vencidas_receber
+            vencidas_receber=vencidas_receber,
+            receitas_recentes=receitas_recentes,
+            centros_custo=centros_custo,
+            data_inicio=data_inicio.strftime('%Y-%m-%d'),
+            data_fim=data_fim.strftime('%Y-%m-%d')
         )
     except Exception as e:
         logger.error(f"Erro no dashboard financeiro: {str(e)}")
@@ -611,34 +641,28 @@ def criar_banco():
     try:
         admin_id = get_admin_id()
         
-        nome = request.form.get('nome')
-        tipo_conta = request.form.get('tipo_conta')
-        codigo_banco = request.form.get('codigo_banco')
         nome_banco = request.form.get('nome_banco')
+        tipo_conta = request.form.get('tipo_conta')
         agencia = request.form.get('agencia')
         conta = request.form.get('conta')
         saldo_inicial = Decimal(request.form.get('saldo_inicial', '0'))
         ativo = request.form.get('ativo', '1') == '1'
-        observacoes = request.form.get('observacoes') or None
         
         banco = BancoEmpresa(
             admin_id=admin_id,
-            nome=nome,
-            tipo_conta=tipo_conta,
-            codigo_banco=codigo_banco,
             nome_banco=nome_banco,
+            tipo_conta=tipo_conta,
             agencia=agencia,
             conta=conta,
             saldo_inicial=saldo_inicial,
             saldo_atual=saldo_inicial,
-            ativo=ativo,
-            observacoes=observacoes
+            ativo=ativo
         )
         
         db.session.add(banco)
         db.session.commit()
         
-        flash(f'Banco {nome} cadastrado com sucesso!', 'success')
+        flash(f'Banco {nome_banco} cadastrado com sucesso!', 'success')
         return redirect(url_for('financeiro.listar_bancos'))
         
     except Exception as e:

@@ -147,11 +147,11 @@
                                 <tbody>
                                     {% for receita in receitas_recentes %}
                                     <tr>
-                                        <td>{{ receita.data_receita.strftime('%d/%m/%Y') }}</td>
+                                        <td>{{ receita.data_vencimento.strftime('%d/%m/%Y') }}</td>
                                         <td>{{ receita.descricao }}</td>
-                                        <td>R$ {{ "%.2f"|format(receita.valor) }}</td>
+                                        <td>R$ {{ "%.2f"|format(receita.valor_original) }}</td>
                                         <td>
-                                            <span class="badge bg-{% if receita.status == 'Recebido' %}success{% elif receita.status == 'Pendente' %}warning{% else %}danger{% endif %}">
+                                            <span class="badge bg-{% if receita.status == 'RECEBIDO' %}success{% elif receita.status == 'PENDENTE' %}warning{% else %}danger{% endif %}">
                                                 {{ receita.status }}
                                             </span>
                                         </td>
@@ -233,9 +233,15 @@ function aplicarFiltros() {
 document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('fluxoCaixaChart').getContext('2d');
     
+    {% if kpis.resumo_categorias %}
     const categorias = {{ kpis.resumo_categorias.keys()|list|tojson }};
     const entradas = {{ kpis.resumo_categorias.values()|list|map(attribute='entradas')|list|tojson }};
     const saidas = {{ kpis.resumo_categorias.values()|list|map(attribute='saidas')|list|tojson }};
+    {% else %}
+    const categorias = [];
+    const entradas = [];
+    const saidas = [];
+    {% endif %}
     
     new Chart(ctx, {
         type: 'bar',

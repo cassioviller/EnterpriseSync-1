@@ -108,7 +108,7 @@
                         {% for conta in contas %}
                         <tr class="{% if conta.status == 'VENCIDO' %}table-danger{% endif %}">
                             <td>{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
-                            <td>{{ conta.fornecedor_nome }}</td>
+                            <td>{{ conta.fornecedor.razao_social if conta.fornecedor else '-' }}</td>
                             <td>{{ conta.descricao }}</td>
                             <td>
                                 {% if conta.obra %}
@@ -258,7 +258,7 @@
                         <select name="banco_id" class="form-select">
                             <option value="">Sem vínculo bancário</option>
                             {% for banco in bancos %}
-                            <option value="{{ banco.id }}">{{ banco.nome }} - {{ banco.agencia }}/{{ banco.conta }}</option>
+                            <option value="{{ banco.id }}">{{ banco.nome_banco }} - {{ banco.agencia }}/{{ banco.conta }}</option>
                             {% endfor %}
                         </select>
                     </div>
