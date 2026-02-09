@@ -2196,10 +2196,11 @@ function excluirPonto(id) {
     if (confirm('Tem certeza que deseja excluir este registro de ponto?\\n\\nEsta ação não pode ser desfeita.')) {
         console.log('Excluindo registro:', id);
         
-        fetch(`/ponto/registro/${id}`, {
-            method: 'DELETE',
+        fetch(`/ponto/excluir/${id}`, {
+            method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             }
         })
         .then(response => {
@@ -2209,9 +2210,9 @@ function excluirPonto(id) {
         .then(data => {
             if (data.success) {
                 alert('Registro excluído com sucesso!');
-                location.reload(); // Recarregar a página para atualizar a tabela
+                location.reload();
             } else {
-                throw new Error(data.error || 'Erro desconhecido');
+                throw new Error(data.message || 'Erro desconhecido');
             }
         })
         .catch(error => {

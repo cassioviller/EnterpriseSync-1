@@ -495,10 +495,14 @@ function editarRegistro(id) {
 function excluirRegistro(id) {
     if (confirm('Tem certeza que deseja excluir este registro?')) {
         $.ajax({
-            url: `/ponto/registro/${id}`,
-            type: 'DELETE',
-            success: function() {
-                location.reload();
+            url: `/ponto/excluir/${id}`,
+            type: 'POST',
+            success: function(data) {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Erro ao excluir registro: ' + (data.message || ''));
+                }
             },
             error: function() {
                 alert('Erro ao excluir registro');
