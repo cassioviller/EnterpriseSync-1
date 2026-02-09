@@ -577,6 +577,7 @@ def novo_custo(veiculo_id):
             # Criar novo custo da frota
             novo_custo = FrotaDespesa(
                 veiculo_id=veiculo_id,
+                obra_id=int(dados['obra_id']) if dados.get('obra_id') else None,
                 data_custo=datetime.strptime(dados['data_custo'], '%Y-%m-%d').date(),
                 tipo_custo=dados['tipo'],
                 valor=float(dados['valor']),

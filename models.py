@@ -3604,6 +3604,7 @@ class CustoVeiculo(db.Model):
     
     # Relacionamento principal
     veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
     
     # Dados do custo
     data_custo = db.Column(db.Date, nullable=False)

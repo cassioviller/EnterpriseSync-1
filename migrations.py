@@ -3768,6 +3768,7 @@ def executar_migracoes():
             (66, "Campos reconhecimento facial RegistroPonto", _migration_66_reconhecimento_facial_ponto),
             (67, "Sistema de Geofencing (Cerca Virtual)", _migration_67_geofencing),
             (68, "Sistema de Múltiplas Fotos Faciais", _migration_68_multiplas_fotos_faciais),
+            (69, "custo_veiculo.obra_id nullable", _migration_69_custo_veiculo_obra_nullable),
         ]
         
         # Executar cada migração com rastreamento
@@ -6390,6 +6391,50 @@ def _migration_68_multiplas_fotos_faciais():
         
     except Exception as e:
         logger.error(f"❌ Erro na migração 68: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
+
+
+def _migration_69_custo_veiculo_obra_nullable():
+    """
+    MIGRAÇÃO 69: Tornar obra_id nullable na tabela custo_veiculo.
+    Custos de veículo nem sempre estão associados a uma obra específica.
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        logger.info("🔄 MIGRAÇÃO 69: custo_veiculo.obra_id → nullable")
+
+        cursor.execute("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_name = 'custo_veiculo' AND column_name = 'obra_id'
+        """)
+        row = cursor.fetchone()
+
+        if row is None:
+            logger.info("  ⏭️ Coluna obra_id não existe em custo_veiculo, nada a fazer")
+        elif row[0] == 'NO':
+            cursor.execute("ALTER TABLE custo_veiculo ALTER COLUMN obra_id DROP NOT NULL")
+            logger.info("  ✅ custo_veiculo.obra_id agora é nullable")
+        else:
+            logger.info("  ⏭️ custo_veiculo.obra_id já é nullable")
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+
+        logger.info("✅ MIGRAÇÃO 69 CONCLUÍDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Erro na migração 69: {e}")
         if 'connection' in locals():
             try:
                 connection.rollback()
