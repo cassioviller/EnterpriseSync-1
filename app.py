@@ -126,6 +126,16 @@ allow_headers=["Content-Type", "Authorization", "X-CSRFToken"])
 
 csrf = CSRFProtect(app)
 
+from flask_wtf.csrf import CSRFError
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    from flask import request, redirect, url_for, flash, jsonify
+    logging.warning(f"[WARN] CSRF error on {request.method} {request.path}: {e.description}")
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({"error": "CSRF token missing or invalid. Please refresh the page."}), 400
+    flash('Sessão expirada. Por favor, tente novamente.', 'warning')
+    return redirect(request.referrer or url_for('main.index'))
+
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -521,8 +531,18 @@ try:
 except ImportError as e:
     logging.warning(f"[WARN] Comando CLI de diagnóstico não disponível: {e}")
 
-api_blueprints = ['api_organizer', 'api_funcionarios', 'api_buscar_funcionarios', 'api_servicos_obra_limpa', 'health', 'ponto', 'landing']
-for bp_name in api_blueprints:
+csrf_exempt_blueprints = [
+    'api_organizer', 'api_funcionarios', 'api_buscar_funcionarios',
+    'api_servicos_obra_limpa', 'health', 'ponto', 'landing',
+    'rdo_editar', 'rdo_crud', 'servicos_crud', 'cadastrar_servico',
+    'analytics_preditivos', 'dashboards_especificos',
+    'exportacao_relatorios', 'relatorios_financeiros',
+    'servico_obra_real', 'production', 'relatorios',
+    'almoxarifado', 'alimentacao', 'folha', 'contabilidade',
+    'financeiro', 'custos', 'propostas', 'configuracoes',
+    'categorias_servicos', 'equipe', 'frota', 'templates',
+]
+for bp_name in csrf_exempt_blueprints:
     bp = app.blueprints.get(bp_name)
     if bp:
         csrf.exempt(bp)

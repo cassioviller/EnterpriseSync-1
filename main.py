@@ -164,5 +164,18 @@ except Exception as e:
 
     logger.info("[READY] SISTEMA INICIADO - Todos os blueprints críticos foram carregados")
 
+from app import csrf
+main_py_exempt_blueprints = [
+    'rdo_editar', 'rdo_crud', 'servicos_crud', 'cadastrar_servico',
+    'analytics_preditivos', 'dashboards_especificos',
+    'exportacao_relatorios', 'relatorios_financeiros',
+    'api_funcionarios', 'api_buscar_funcionarios', 'health',
+]
+for bp_name in main_py_exempt_blueprints:
+    bp = app.blueprints.get(bp_name)
+    if bp:
+        csrf.exempt(bp)
+        logger.info(f"[OK] CSRF exempt: {bp_name}")
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
