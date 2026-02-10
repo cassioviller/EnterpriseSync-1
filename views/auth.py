@@ -11,7 +11,7 @@ from views import main_bp
 logger = logging.getLogger(__name__)
 
 @main_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("30 per minute")
 def login():
     if request.method == 'POST':
         login_field = request.form.get('email') or request.form.get('username')
