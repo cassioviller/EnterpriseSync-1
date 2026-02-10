@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SIGE - O ERP mais completo para construtoras. 18 módulos integrados para gestão de obras, financeiro, RH e muito mais.">
+    <title>SIGE - ERP para Construtoras | Gestão Completa de Obras</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green-primary: #198754;
+            --green-dark: #157347;
+            --green-darker: #0f5132;
+            --green-light: #d1e7dd;
+            --green-lighter: #e8f5e8;
+            --dark-text: #1a1a2e;
+            --body-text: #4a4a5a;
+            --light-bg: #f8f9fa;
+            --white: #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: var(--dark-text);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        .navbar-landing {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            padding: 0.75rem 0;
+            transition: all 0.3s ease;
+            z-index: 1050;
+        }
+
+        .navbar-landing .navbar-brand {
+            font-weight: 700;
+            font-size: 1.75rem;
+            color: var(--dark-text);
+            letter-spacing: -0.5px;
+        }
+
+        .navbar-landing .navbar-brand span {
+            color: var(--green-primary);
+        }
+
+        .navbar-landing .nav-link {
+            color: var(--body-text);
+            font-weight: 500;
+            font-size: 0.95rem;
+            padding: 0.5rem 1rem;
+            transition: color 0.3s ease;
+        }
+
+        .navbar-landing .nav-link:hover {
+            color: var(--green-primary);
+        }
+
+        .btn-cta {
+            background: var(--green-primary);
+            color: white;
+            border: none;
+            padding: 0.625rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-cta:hover {
+            background: var(--green-dark);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(25, 135, 84, 0.3);
+        }
+
+        .btn-cta-lg {
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            border-radius: 10px;
+        }
+
+        .btn-outline-cta {
+            background: transparent;
+            color: white;
+            border: 2px solid rgba(255,255,255,0.6);
+            padding: 0.9375rem 2.375rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-outline-cta:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: white;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .hero-section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            position: relative;
+            background: linear-gradient(135deg, #0a1628 0%, #1a1a2e 30%, #0f5132 70%, #198754 100%);
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                linear-gradient(30deg, transparent 12%, rgba(25, 135, 84, 0.05) 12.5%, rgba(25, 135, 84, 0.05) 87.5%, transparent 88%),
+                linear-gradient(150deg, transparent 12%, rgba(25, 135, 84, 0.05) 12.5%, rgba(25, 135, 84, 0.05) 87.5%, transparent 88%),
+                linear-gradient(30deg, transparent 12%, rgba(255, 255, 255, 0.02) 12.5%, rgba(255, 255, 255, 0.02) 87.5%, transparent 88%),
+                linear-gradient(150deg, transparent 12%, rgba(255, 255, 255, 0.02) 12.5%, rgba(255, 255, 255, 0.02) 87.5%, transparent 88%);
+            background-size: 80px 140px;
+            opacity: 0.6;
+        }
+
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 80%;
+            height: 200%;
+            background: radial-gradient(ellipse, rgba(25, 135, 84, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            line-height: 1.1;
+            color: white;
+            margin-bottom: 1.5rem;
+            letter-spacing: -1px;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 2.5rem;
+            max-width: 600px;
+            line-height: 1.7;
+            font-weight: 400;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 3rem;
+        }
+
+        .trust-indicators {
+            display: flex;
+            gap: 2.5rem;
+            flex-wrap: wrap;
+        }
+
+        .trust-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: rgba(255,255,255,0.7);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .trust-item i {
+            color: var(--green-primary);
+            font-size: 1.2rem;
+        }
+
+        .trust-item strong {
+            color: white;
+        }
+
+        .section-padding {
+            padding: 5rem 0;
+        }
+
+        .section-padding-lg {
+            padding: 6rem 0;
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--dark-text);
+            margin-bottom: 1rem;
+            letter-spacing: -0.5px;
+        }
+
+        .section-subtitle {
+            font-size: 1.125rem;
+            color: var(--body-text);
+            max-width: 600px;
+            margin: 0 auto 3rem;
+            line-height: 1.7;
+        }
+
+        .module-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.75rem;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0,0,0,0.06);
+            height: 100%;
+        }
+
+        .module-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+            border-color: rgba(25, 135, 84, 0.2);
+        }
+
+        .module-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            background: var(--green-lighter);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .module-icon i {
+            font-size: 1.5rem;
+            color: var(--green-primary);
+        }
+
+        .module-card:hover .module-icon {
+            background: var(--green-primary);
+        }
+
+        .module-card:hover .module-icon i {
+            color: white;
+        }
+
+        .module-card h5 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark-text);
+            margin-bottom: 0.5rem;
+        }
+
+        .module-card p {
+            font-size: 0.9rem;
+            color: var(--body-text);
+            margin-bottom: 0;
+            line-height: 1.5;
+        }
+
+        .highlight-section {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .highlight-visual {
+            width: 100%;
+            height: 360px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .highlight-visual.facial {
+            background: linear-gradient(135deg, #0a1628 0%, #1a1a2e 50%, #0f5132 100%);
+        }
+
+        .highlight-visual.financial {
+            background: linear-gradient(135deg, #0f5132 0%, #198754 50%, #1a1a2e 100%);
+        }
+
+        .highlight-visual i {
+            font-size: 6rem;
+            color: rgba(255,255,255,0.15);
+            position: absolute;
+        }
+
+        .highlight-visual .main-icon {
+            font-size: 5rem;
+            color: white;
+            position: relative;
+            z-index: 2;
+            filter: drop-shadow(0 4px 20px rgba(0,0,0,0.3));
+        }
+
+        .highlight-visual::before {
+            content: '';
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: rgba(25, 135, 84, 0.2);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .highlight-visual::after {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.1);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .highlight-content h3 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark-text);
+            margin-bottom: 1rem;
+        }
+
+        .highlight-content p {
+            font-size: 1.05rem;
+            color: var(--body-text);
+            margin-bottom: 1.5rem;
+            line-height: 1.7;
+        }
+
+        .highlight-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .highlight-list li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            font-size: 1rem;
+            color: var(--body-text);
+        }
+
+        .highlight-list li i {
+            color: var(--green-primary);
+            font-size: 1.2rem;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .pricing-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 3rem;
+        }
+
+        .pricing-toggle span {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--body-text);
+        }
+
+        .pricing-toggle .form-check-input {
+            width: 3rem;
+            height: 1.5rem;
+            cursor: pointer;
+        }
+
+        .pricing-toggle .form-check-input:checked {
+            background-color: var(--green-primary);
+            border-color: var(--green-primary);
+        }
+
+        .pricing-toggle .badge {
+            background: var(--green-lighter);
+            color: var(--green-primary);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+        }
+
+        .pricing-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+        }
+
+        .pricing-card.featured {
+            border: 2px solid var(--green-primary);
+            box-shadow: 0 8px 40px rgba(25, 135, 84, 0.15);
+            position: relative;
+        }
+
+        .pricing-card.featured .popular-badge {
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--green-primary);
+            color: white;
+            padding: 0.35rem 1.25rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .pricing-card .plan-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--body-text);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.75rem;
+        }
+
+        .pricing-card .plan-price {
+            margin-bottom: 1.5rem;
+        }
+
+        .pricing-card .plan-price .currency {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark-text);
+            vertical-align: super;
+        }
+
+        .pricing-card .plan-price .amount {
+            font-size: 2.75rem;
+            font-weight: 700;
+            color: var(--dark-text);
+            line-height: 1;
+        }
+
+        .pricing-card .plan-price .period {
+            font-size: 0.95rem;
+            color: var(--body-text);
+            font-weight: 400;
+        }
+
+        .pricing-card .plan-price .consult {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--dark-text);
+        }
+
+        .pricing-features {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 2rem;
+            flex-grow: 1;
+        }
+
+        .pricing-features li {
+            padding: 0.4rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            font-size: 0.9rem;
+            color: var(--body-text);
+        }
+
+        .pricing-features li i {
+            color: var(--green-primary);
+            font-size: 0.85rem;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .pricing-features .section-label {
+            font-weight: 600;
+            color: var(--dark-text);
+            margin-top: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+
+        .btn-pricing {
+            width: 100%;
+            padding: 0.8rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-pricing-primary {
+            background: var(--green-primary);
+            color: white;
+            border: none;
+        }
+
+        .btn-pricing-primary:hover {
+            background: var(--green-dark);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(25, 135, 84, 0.3);
+        }
+
+        .btn-pricing-outline {
+            background: transparent;
+            color: var(--green-primary);
+            border: 2px solid var(--green-primary);
+        }
+
+        .btn-pricing-outline:hover {
+            background: var(--green-primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .differential-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2.5rem;
+            text-align: center;
+            border: 1px solid rgba(0,0,0,0.06);
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+
+        .differential-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+        }
+
+        .differential-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            background: var(--green-lighter);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+        }
+
+        .differential-icon i {
+            font-size: 2rem;
+            color: var(--green-primary);
+        }
+
+        .differential-card h4 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--dark-text);
+            margin-bottom: 0.75rem;
+        }
+
+        .differential-card p {
+            font-size: 1rem;
+            color: var(--body-text);
+            line-height: 1.7;
+        }
+
+        .cta-section {
+            background: linear-gradient(135deg, #198754 0%, #0f5132 50%, #1a1a2e 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(255,255,255,0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(255,255,255,0.05) 0%, transparent 50%);
+        }
+
+        .cta-section h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 1rem;
+        }
+
+        .cta-section p {
+            font-size: 1.15rem;
+            color: rgba(255,255,255,0.85);
+            margin-bottom: 2rem;
+        }
+
+        .btn-cta-white {
+            background: white;
+            color: var(--green-primary);
+            border: none;
+            padding: 1rem 2.5rem;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-cta-white:hover {
+            background: #f0f0f0;
+            color: var(--green-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        }
+
+        .footer-section {
+            background: #0a0a14;
+            color: rgba(255,255,255,0.7);
+            padding: 4rem 0 2rem;
+        }
+
+        .footer-section h6 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 1.25rem;
+        }
+
+        .footer-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .footer-section ul li {
+            margin-bottom: 0.6rem;
+        }
+
+        .footer-section ul li a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-section ul li a:hover {
+            color: var(--green-primary);
+        }
+
+        .footer-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 0.75rem;
+        }
+
+        .footer-brand span {
+            color: var(--green-primary);
+        }
+
+        .footer-bottom {
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-top: 1.5rem;
+            margin-top: 3rem;
+        }
+
+        .footer-bottom p {
+            font-size: 0.875rem;
+            color: rgba(255,255,255,0.4);
+            margin: 0;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .animate-on-scroll.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (max-width: 991px) {
+            .hero-title { font-size: 2.5rem; }
+            .hero-subtitle { font-size: 1.1rem; }
+            .section-title { font-size: 2rem; }
+            .section-padding { padding: 3.5rem 0; }
+            .section-padding-lg { padding: 4rem 0; }
+            .highlight-visual { height: 280px; margin-bottom: 2rem; }
+            .cta-section h2 { font-size: 2rem; }
+        }
+
+        @media (max-width: 767px) {
+            .hero-title { font-size: 2rem; }
+            .hero-subtitle { font-size: 1rem; }
+            .hero-buttons { flex-direction: column; }
+            .hero-buttons a { text-align: center; }
+            .trust-indicators { gap: 1.5rem; }
+            .section-title { font-size: 1.75rem; }
+            .section-padding { padding: 3rem 0; }
+            .pricing-card { margin-bottom: 1.5rem; }
+            .highlight-visual { height: 220px; }
+            .highlight-visual .main-icon { font-size: 3.5rem; }
+            .cta-section h2 { font-size: 1.75rem; }
+        }
+
+        @media (max-width: 575px) {
+            .hero-section { padding-top: 5rem; }
+            .trust-indicators { flex-direction: column; gap: 0.75rem; }
+            .pricing-toggle { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-landing fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="/site"><span>SIGE</span></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarLanding" aria-controls="navbarLanding" aria-expanded="false" aria-label="Menu de navegação">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarLanding">
+                <ul class="navbar-nav ms-auto me-3">
+                    <li class="nav-item"><a class="nav-link" href="#funcionalidades">Funcionalidades</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#planos">Planos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#diferenciais">Diferenciais</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#contato">Contato</a></li>
+                </ul>
+                <a href="/login" class="btn-cta">Teste Grátis 14 Dias</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero-section">
+        <div class="container hero-content">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <h1 class="hero-title">O ERP mais completo para construtoras que querem crescer com tecnologia</h1>
+                    <p class="hero-subtitle">18 módulos integrados. Gestão completa de obras, financeiro, RH e muito mais. Tudo em um único sistema.</p>
+                    <div class="hero-buttons">
+                        <a href="/login" class="btn-cta btn-cta-lg">Começar Teste Grátis</a>
+                        <a href="#funcionalidades" class="btn-outline-cta">Ver Demonstração</a>
+                    </div>
+                    <div class="trust-indicators">
+                        <div class="trust-item">
+                            <i class="bi bi-building-check"></i>
+                            <span><strong>500+</strong> construtoras</span>
+                        </div>
+                        <div class="trust-item">
+                            <i class="bi bi-grid-3x3-gap-fill"></i>
+                            <span><strong>18</strong> módulos</span>
+                        </div>
+                        <div class="trust-item">
+                            <i class="bi bi-shield-check"></i>
+                            <span><strong>99.9%</strong> uptime</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="funcionalidades" class="section-padding-lg" style="background: var(--light-bg);">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h2 class="section-title animate-on-scroll">18 Módulos Integrados</h2>
+                <p class="section-subtitle animate-on-scroll">Tudo o que sua construtora precisa em um único sistema. Da gestão de obras ao financeiro, do RH ao controle de frota.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-people"></i></div>
+                        <h5>Gestão de Funcionários</h5>
+                        <p>Cadastro completo, documentação, histórico e controle de todos os colaboradores.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-camera"></i></div>
+                        <h5>Controle de Ponto com Reconhecimento Facial</h5>
+                        <p>Registro de ponto biométrico com IA e validação por geolocalização.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-calculator"></i></div>
+                        <h5>Folha de Pagamento Automatizada</h5>
+                        <p>Cálculo automático de salários, horas extras, descontos e encargos.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-clipboard-data"></i></div>
+                        <h5>RDO - Relatório Diário de Obra</h5>
+                        <p>Registros diários digitais com fotos, clima, equipes e avanço físico.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-file-earmark-text"></i></div>
+                        <h5>Propostas Comerciais</h5>
+                        <p>Criação profissional de propostas com templates customizáveis.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-cash-coin"></i></div>
+                        <h5>Gestão Financeira</h5>
+                        <p>Contas a pagar e receber, fluxo de caixa e conciliação bancária.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-journal-text"></i></div>
+                        <h5>Contabilidade Integrada</h5>
+                        <p>DRE, balancete, plano de contas e relatórios contábeis completos.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-graph-up"></i></div>
+                        <h5>Orçamentos e Custos</h5>
+                        <p>Orçamento por obra, centro de custos e controle orçamentário em tempo real.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-box-seam"></i></div>
+                        <h5>Almoxarifado e Estoque</h5>
+                        <p>Controle de materiais, entradas, saídas, transferências e inventário.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-truck"></i></div>
+                        <h5>Gestão de Frota</h5>
+                        <p>Controle de veículos, abastecimento, manutenções e custos por veículo.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-people-fill"></i></div>
+                        <h5>Alocação de Equipes</h5>
+                        <p>Distribuição inteligente de equipes entre obras com visão consolidada.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-cup-hot"></i></div>
+                        <h5>Alimentação / Restaurante</h5>
+                        <p>Gestão de refeições, cardápios e controle de custos por funcionário.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-globe"></i></div>
+                        <h5>Portal do Cliente</h5>
+                        <p>Acesso exclusivo para clientes acompanharem suas obras em tempo real.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-bar-chart"></i></div>
+                        <h5>Analytics e Relatórios</h5>
+                        <p>Dashboards interativos com KPIs, gráficos e relatórios gerenciais.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-building"></i></div>
+                        <h5>Gestão de Obras</h5>
+                        <p>Controle completo de obras, cronograma, medições e avanço físico.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-geo-alt"></i></div>
+                        <h5>Geofencing / Cerca Virtual</h5>
+                        <p>Validação de presença por GPS com cercas virtuais configuráveis.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-diagram-3"></i></div>
+                        <h5>Multi-Empresa</h5>
+                        <p>Gerencie múltiplas empresas e filiais em uma única plataforma.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="module-card animate-on-scroll">
+                        <div class="module-icon"><i class="bi bi-shield-lock"></i></div>
+                        <h5>Controle de Acesso</h5>
+                        <p>Permissões granulares por usuário, perfil e módulo do sistema.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section-padding-lg highlight-section">
+        <div class="container">
+            <div class="row align-items-center g-5">
+                <div class="col-lg-6 animate-on-scroll">
+                    <div class="highlight-visual facial">
+                        <i class="bi bi-fingerprint" style="top: 15%; left: 10%;"></i>
+                        <i class="bi bi-geo-alt-fill" style="bottom: 20%; right: 15%;"></i>
+                        <i class="bi bi-person-bounding-box main-icon"></i>
+                    </div>
+                </div>
+                <div class="col-lg-6 highlight-content animate-on-scroll">
+                    <h3>Reconhecimento Facial com Inteligência Artificial</h3>
+                    <p>Elimine fraudes de ponto e tenha controle total da presença dos seus colaboradores em cada obra, com tecnologia de ponta.</p>
+                    <ul class="highlight-list">
+                        <li><i class="bi bi-check-circle-fill"></i>Reconhecimento facial com IA para controle de ponto</li>
+                        <li><i class="bi bi-check-circle-fill"></i>Geofencing com validação GPS</li>
+                        <li><i class="bi bi-check-circle-fill"></i>Múltiplas fotos por funcionário para maior precisão</li>
+                        <li><i class="bi bi-check-circle-fill"></i>Eliminação de fraudes de ponto</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section-padding-lg highlight-section" style="background: var(--light-bg);">
+        <div class="container">
+            <div class="row align-items-center g-5">
+                <div class="col-lg-6 order-lg-2 animate-on-scroll">
+                    <div class="highlight-visual financial">
+                        <i class="bi bi-graph-up-arrow" style="top: 15%; right: 10%;"></i>
+                        <i class="bi bi-wallet2" style="bottom: 20%; left: 15%;"></i>
+                        <i class="bi bi-cash-stack main-icon"></i>
+                    </div>
+                </div>
+                <div class="col-lg-6 order-lg-1 highlight-content animate-on-scroll">
+                    <h3>Gestão Financeira Completa</h3>
+                    <p>Tenha visão 360° das finanças da sua construtora. De contas a pagar até relatórios contábeis, tudo integrado e automatizado.</p>
+                    <ul class="highlight-list">
+                        <li><i class="bi bi-check-circle-fill"></i>DRE, Balancete e relatórios contábeis</li>
+                        <li><i class="bi bi-check-circle-fill"></i>Contas a pagar e receber automatizadas</li>
+                        <li><i class="bi bi-check-circle-fill"></i>Centro de custos por obra</li>
+                        <li><i class="bi bi-check-circle-fill"></i>Integração com folha de pagamento</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="planos" class="section-padding-lg">
+        <div class="container">
+            <div class="text-center mb-4">
+                <h2 class="section-title animate-on-scroll">Planos para Cada Fase da Sua Construtora</h2>
+                <p class="section-subtitle animate-on-scroll">Comece pequeno e escale conforme sua empresa cresce. Todos os planos incluem suporte e atualizações.</p>
+            </div>
+            <div class="pricing-toggle animate-on-scroll">
+                <span>Mensal</span>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="pricingToggle" onchange="togglePricing()">
+                </div>
+                <span>Anual</span>
+                <span class="badge">Economize 10%</span>
+            </div>
+            <div class="row g-4">
+                <div class="col-lg-3 col-md-6 animate-on-scroll">
+                    <div class="pricing-card">
+                        <div class="plan-name">Starter</div>
+                        <div class="plan-price">
+                            <span class="currency">R$</span>
+                            <span class="amount" data-monthly="499" data-annual="449">499</span>
+                            <span class="period">/mês</span>
+                        </div>
+                        <ul class="pricing-features">
+                            <li><i class="bi bi-check2"></i>Até 3 obras ativas</li>
+                            <li><i class="bi bi-check2"></i>Até 3 usuários</li>
+                            <li><i class="bi bi-check2"></i>15 funcionários</li>
+                            <li><i class="bi bi-check2"></i>5GB de storage</li>
+                            <li><i class="bi bi-check2"></i>Suporte por email</li>
+                            <li class="section-label">Módulos inclusos:</li>
+                            <li><i class="bi bi-check2"></i>Funcionários</li>
+                            <li><i class="bi bi-check2"></i>Ponto Básico</li>
+                            <li><i class="bi bi-check2"></i>RDO</li>
+                            <li><i class="bi bi-check2"></i>Orçamentos</li>
+                            <li><i class="bi bi-check2"></i>Financeiro Básico</li>
+                            <li><i class="bi bi-check2"></i>Almoxarifado</li>
+                        </ul>
+                        <a href="/login" class="btn-pricing btn-pricing-outline">Começar Agora</a>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 animate-on-scroll">
+                    <div class="pricing-card featured">
+                        <span class="popular-badge">Mais Popular</span>
+                        <div class="plan-name">Professional</div>
+                        <div class="plan-price">
+                            <span class="currency">R$</span>
+                            <span class="amount" data-monthly="899" data-annual="809">899</span>
+                            <span class="period">/mês</span>
+                        </div>
+                        <ul class="pricing-features">
+                            <li><i class="bi bi-check2"></i>Até 10 obras ativas</li>
+                            <li><i class="bi bi-check2"></i>Até 8 usuários</li>
+                            <li><i class="bi bi-check2"></i>50 funcionários</li>
+                            <li><i class="bi bi-check2"></i>25GB de storage</li>
+                            <li><i class="bi bi-check2"></i>Suporte por chat 24h</li>
+                            <li class="section-label">Tudo do Starter +</li>
+                            <li><i class="bi bi-check2"></i>Reconhecimento Facial</li>
+                            <li><i class="bi bi-check2"></i>Folha de Pagamento</li>
+                            <li><i class="bi bi-check2"></i>Propostas Comerciais</li>
+                            <li><i class="bi bi-check2"></i>Alocação de Equipes</li>
+                            <li><i class="bi bi-check2"></i>Frota Básica</li>
+                            <li><i class="bi bi-check2"></i>Almoxarifado Avançado</li>
+                            <li><i class="bi bi-check2"></i>Portal do Cliente</li>
+                        </ul>
+                        <a href="/login" class="btn-pricing btn-pricing-primary">Começar Agora</a>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 animate-on-scroll">
+                    <div class="pricing-card">
+                        <div class="plan-name">Enterprise</div>
+                        <div class="plan-price">
+                            <span class="currency">R$</span>
+                            <span class="amount" data-monthly="1.599" data-annual="1.439">1.599</span>
+                            <span class="period">/mês</span>
+                        </div>
+                        <ul class="pricing-features">
+                            <li><i class="bi bi-check2"></i>Obras ilimitadas</li>
+                            <li><i class="bi bi-check2"></i>Usuários ilimitados</li>
+                            <li><i class="bi bi-check2"></i>Funcionários ilimitados</li>
+                            <li><i class="bi bi-check2"></i>100GB de storage</li>
+                            <li><i class="bi bi-check2"></i>Suporte prioritário 4h</li>
+                            <li class="section-label">Tudo do Professional +</li>
+                            <li><i class="bi bi-check2"></i>Contabilidade Integrada</li>
+                            <li><i class="bi bi-check2"></i>Analytics com IA</li>
+                            <li><i class="bi bi-check2"></i>Multi-Empresa (5 filiais)</li>
+                            <li><i class="bi bi-check2"></i>Frota Completa</li>
+                            <li><i class="bi bi-check2"></i>Alimentação/Restaurante</li>
+                        </ul>
+                        <a href="/login" class="btn-pricing btn-pricing-outline">Começar Agora</a>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 animate-on-scroll">
+                    <div class="pricing-card">
+                        <div class="plan-name">Corporate</div>
+                        <div class="plan-price">
+                            <span class="consult">Sob consulta</span>
+                        </div>
+                        <ul class="pricing-features">
+                            <li><i class="bi bi-check2"></i>Tudo ilimitado</li>
+                            <li><i class="bi bi-check2"></i>SLA 99.9%</li>
+                            <li><i class="bi bi-check2"></i>Suporte 24/7 + CSM dedicado</li>
+                            <li class="section-label">Tudo do Enterprise +</li>
+                            <li><i class="bi bi-check2"></i>API Access</li>
+                            <li><i class="bi bi-check2"></i>Multi-Empresa ilimitado</li>
+                            <li><i class="bi bi-check2"></i>White Label</li>
+                            <li><i class="bi bi-check2"></i>Customizações</li>
+                            <li><i class="bi bi-check2"></i>Integrações sob demanda</li>
+                        </ul>
+                        <a href="mailto:contato@cassioviller.tech" class="btn-pricing btn-pricing-outline">Fale Conosco</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="diferenciais" class="section-padding-lg" style="background: var(--light-bg);">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h2 class="section-title animate-on-scroll">Por Que Escolher o SIGE?</h2>
+                <p class="section-subtitle animate-on-scroll">Mais do que um ERP, somos parceiros da sua construtora na jornada de transformação digital.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-lg-4 animate-on-scroll">
+                    <div class="differential-card">
+                        <div class="differential-icon"><i class="bi bi-cpu"></i></div>
+                        <h4>Tecnologia de Ponta</h4>
+                        <p>Inteligência artificial, reconhecimento facial e analytics preditivos. Sua construtora com a tecnologia mais avançada do mercado.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 animate-on-scroll">
+                    <div class="differential-card">
+                        <div class="differential-icon"><i class="bi bi-buildings"></i></div>
+                        <h4>100% Construção Civil</h4>
+                        <p>Desenvolvido exclusivamente para o setor. Não é um sistema genérico adaptado — foi criado para resolver os problemas reais das construtoras.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 animate-on-scroll">
+                    <div class="differential-card">
+                        <div class="differential-icon"><i class="bi bi-headset"></i></div>
+                        <h4>Suporte Brasileiro</h4>
+                        <p>Equipe 100% local, dados armazenados no Brasil e total conformidade com a LGPD. Suporte que entende o seu negócio.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section section-padding-lg">
+        <div class="container text-center position-relative" style="z-index: 2;">
+            <h2 class="animate-on-scroll">Comece sua transformação digital hoje</h2>
+            <p class="animate-on-scroll">14 dias grátis. Sem cartão de crédito. Sem compromisso.</p>
+            <a href="/login" class="btn-cta-white animate-on-scroll">Começar Teste Grátis</a>
+        </div>
+    </section>
+
+    <footer id="contato" class="footer-section">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <div class="footer-brand"><span>SIGE</span></div>
+                    <p style="font-size: 0.95rem; margin-bottom: 1.5rem;">O ERP mais completo para construtoras. Gestão integrada de obras, financeiro, RH e muito mais.</p>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <h6>Produto</h6>
+                    <ul>
+                        <li><a href="#funcionalidades">Funcionalidades</a></li>
+                        <li><a href="#planos">Planos e Preços</a></li>
+                        <li><a href="#diferenciais">Diferenciais</a></li>
+                        <li><a href="/login">Acessar Sistema</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <h6>Recursos</h6>
+                    <ul>
+                        <li><a href="#funcionalidades">Módulos do Sistema</a></li>
+                        <li><a href="#planos">Comparar Planos</a></li>
+                        <li><a href="mailto:contato@cassioviller.tech">Solicitar Demo</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <h6>Contato</h6>
+                    <ul>
+                        <li><a href="mailto:contato@cassioviller.tech"><i class="bi bi-envelope me-2"></i>contato@cassioviller.tech</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p class="text-center">&copy; 2026 SIGE - Estruturas do Vale. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function togglePricing() {
+            var isAnnual = document.getElementById('pricingToggle').checked;
+            var amounts = document.querySelectorAll('.plan-price .amount');
+            amounts.forEach(function(el) {
+                if (isAnnual) {
+                    el.textContent = el.getAttribute('data-annual');
+                } else {
+                    el.textContent = el.getAttribute('data-monthly');
+                }
+            });
+        }
+
+        var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.animate-on-scroll').forEach(function(el) {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

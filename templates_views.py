@@ -96,9 +96,9 @@ def dashboard():
         logger.warning(f"Erro ao buscar serviços: {e}")
         total_servicos = 0
     
-    logger.debug(f"Total templates: {total_templates}, Ativos: {templates_ativos}")
-    logger.debug(f"Templates recentes: {len(templates_recentes)}")
-    logger.debug(f"Categorias: {len(categorias_stats)}")
+        logger.debug(f"Total templates: {total_templates}, Ativos: {templates_ativos}")
+        logger.debug(f"Templates recentes: {len(templates_recentes)}")
+        logger.debug(f"Categorias: {len(categorias_stats)}")
     
     return render_template('templates/dashboard.html',
                          total_templates=total_templates,

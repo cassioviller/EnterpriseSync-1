@@ -11,6 +11,8 @@ from flask import flash
 from models import db, Veiculo, UsoVeiculo, CustoVeiculo, Funcionario, Obra, Usuario
 from utils.circuit_breaker import circuit_breaker
 from decimal import Decimal
+import logging
+logger = logging.getLogger(__name__)
 
 
 class VeiculoService:
@@ -59,7 +61,7 @@ class VeiculoService:
             }
             
         except Exception as e:
-            print(f"❌ Erro ao listar veículos: {str(e)}")
+            logger.error(f"[ERROR] Erro ao listar veículos: {str(e)}")
             return {
                 'veiculos': [],
                 'pagination': None,
@@ -132,7 +134,7 @@ class VeiculoService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Erro ao criar veículo: {str(e)}")
+            logger.error(f"[ERROR] Erro ao criar veículo: {str(e)}")
             return False, None, f"Erro ao cadastrar veículo: {str(e)}"
     
     @staticmethod
@@ -181,7 +183,7 @@ class VeiculoService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Erro ao atualizar veículo: {str(e)}")
+            logger.error(f"[ERROR] Erro ao atualizar veículo: {str(e)}")
             return False, None, f"Erro ao atualizar veículo: {str(e)}"
 
 
@@ -245,7 +247,7 @@ class UsoVeiculoService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Erro ao criar uso de veículo: {str(e)}")
+            logger.error(f"[ERROR] Erro ao criar uso de veículo: {str(e)}")
             return False, None, f"Erro ao registrar uso: {str(e)}"
     
     @staticmethod
@@ -290,7 +292,7 @@ class UsoVeiculoService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Erro ao finalizar uso: {str(e)}")
+            logger.error(f"[ERROR] Erro ao finalizar uso: {str(e)}")
             return False, None, f"Erro ao finalizar uso: {str(e)}"
     
     @staticmethod
@@ -345,7 +347,7 @@ class UsoVeiculoService:
             }
             
         except Exception as e:
-            print(f"❌ Erro ao listar usos do veículo: {str(e)}")
+            logger.error(f"[ERROR] Erro ao listar usos do veículo: {str(e)}")
             return {'error': str(e)}
     
     @staticmethod
@@ -431,7 +433,7 @@ class CustoVeiculoService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Erro ao criar custo: {str(e)}")
+            logger.error(f"[ERROR] Erro ao criar custo: {str(e)}")
             return False, None, f"Erro ao registrar custo: {str(e)}"
     
     @staticmethod
@@ -485,7 +487,7 @@ class CustoVeiculoService:
             }
             
         except Exception as e:
-            print(f"❌ Erro ao listar custos: {str(e)}")
+            logger.error(f"[ERROR] Erro ao listar custos: {str(e)}")
             return {'error': str(e)}
     
     @staticmethod

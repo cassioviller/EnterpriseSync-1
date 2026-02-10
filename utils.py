@@ -8,6 +8,8 @@ import os
 import re
 from werkzeug.utils import secure_filename
 from flask import current_app
+import logging
+logger = logging.getLogger(__name__)
 
 def _round2(x: float) -> float:
     """Arredondar para 2 casas decimais (meio para cima)"""
@@ -449,7 +451,7 @@ def salvar_foto_funcionario(foto, codigo):
         return f"uploads/funcionarios/{nome_arquivo}", foto_base64_completo
         
     except Exception as e:
-        print(f"Erro ao processar foto: {e}")
+        logger.error(f"Erro ao processar foto: {e}")
         return None, None
 
 def obter_foto_funcionario(funcionario):

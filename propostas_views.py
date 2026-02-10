@@ -11,6 +11,8 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 import uuid
 import mimetypes
+import logging
+logger = logging.getLogger(__name__)
 
 from app import db
 from models import Proposta, PropostaItem, PropostaArquivo, PropostaTemplate, ConfiguracaoEmpresa
@@ -85,7 +87,7 @@ def get_template_data(template_id):
     from multitenant_helper import get_admin_id
     admin_id = get_admin_id()
     
-    print(f"DEBUG API TEMPLATE: Buscando template {template_id} para admin_id={admin_id}")
+    logger.debug(f"DEBUG API TEMPLATE: Buscando template {template_id} para admin_id={admin_id}")
     
     # Buscar apenas template do próprio admin (multitenant)
     template = PropostaTemplate.query.filter_by(
@@ -133,22 +135,22 @@ def debug_templates():
     """Rota de debug para verificar templates sem autenticação"""
     from models import PropostaTemplate
     
-    print("DEBUG: Iniciando debug de templates...")
+    logger.debug("DEBUG: Iniciando debug de templates...")
     
     # Verificar todos os templates ativos
     todos_templates = PropostaTemplate.query.filter_by(ativo=True).all()
-    print(f"DEBUG: Total de templates ativos no banco: {len(todos_templates)}")
+    logger.debug(f"DEBUG: Total de templates ativos no banco: {len(todos_templates)}")
     
     for t in todos_templates:
-        print(f"DEBUG: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
+        logger.debug(f"DEBUG: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
     
     # Verificar templates para admin_id=10 (Vale Verde)
     templates_vale_verde = PropostaTemplate.query.filter_by(admin_id=10, ativo=True).all()
-    print(f"DEBUG: Templates para admin_id=10: {len(templates_vale_verde)}")
+    logger.debug(f"DEBUG: Templates para admin_id=10: {len(templates_vale_verde)}")
     
     # Verificar templates públicos
     templates_publicos = PropostaTemplate.query.filter_by(publico=True, ativo=True).all()
-    print(f"DEBUG: Templates públicos: {len(templates_publicos)}")
+    logger.debug(f"DEBUG: Templates públicos: {len(templates_publicos)}")
     
     # Retornar resultado simples
     resultado = {
@@ -174,12 +176,12 @@ def test_nova_proposta():
         PropostaTemplate.ativo == True
     ).all()
     
-    print(f"DEBUG TEST: Admin ID {admin_id} - encontrou {len(templates)} templates (incluindo públicos)")
+    logger.debug(f"DEBUG TEST: Admin ID {admin_id} - encontrou {len(templates)} templates (incluindo públicos)")
     
     for t in templates:
-        print(f"DEBUG TEST: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
+        logger.debug(f"DEBUG TEST: Template {t.id}: {t.nome} (admin_id={t.admin_id}, publico={t.publico})")
     
-    print(f"DEBUG TEST: Enviando {len(templates)} templates para o template HTML")
+        logger.debug(f"DEBUG TEST: Enviando {len(templates)} templates para o template HTML")
     return render_template('propostas/nova_proposta.html', templates=templates)
 
 @propostas_bp.route('/nova')
@@ -190,7 +192,7 @@ def nova_proposta():
     # Admin_id dinâmico que funciona em dev e produção  
     from multitenant_helper import get_admin_id
     admin_id = get_admin_id()
-    print(f"DEBUG TEMPLATES NOVA: Buscando templates para admin_id={admin_id}")
+    logger.debug(f"DEBUG TEMPLATES NOVA: Buscando templates para admin_id={admin_id}")
     
     # Buscar configuração da empresa
     config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
@@ -201,20 +203,20 @@ def nova_proposta():
         ativo=True
     ).order_by(PropostaTemplate.categoria, PropostaTemplate.nome).all()
     
-    print(f"DEBUG TEMPLATES NOVA: Encontrou {len(templates)} templates para admin_id={admin_id}")
+    logger.debug(f"DEBUG TEMPLATES NOVA: Encontrou {len(templates)} templates para admin_id={admin_id}")
     for t in templates:
-        print(f"DEBUG TEMPLATE NOVA: {t.id}: {t.nome} (admin_id={t.admin_id})")
+        logger.debug(f"DEBUG TEMPLATE NOVA: {t.id}: {t.nome} (admin_id={t.admin_id})")
     
     # Debug adicional - verificar se templates estão sendo passados para o template
-    print(f"DEBUG RENDER NOVA: Passando {len(templates)} templates para template")
-    print(f"DEBUG RENDER NOVA: Config empresa: {config_empresa.nome_empresa if config_empresa else 'None'}")
+        logger.debug(f"DEBUG RENDER NOVA: Passando {len(templates)} templates para template")
+        logger.debug(f"DEBUG RENDER NOVA: Config empresa: {config_empresa.nome_empresa if config_empresa else 'None'}")
     
     # Se não encontrou templates para esse admin_id, mostrar todos disponíveis para debug
     if len(templates) == 0:
         todos_templates = PropostaTemplate.query.filter_by(ativo=True).all()
-        print(f"DEBUG NOVA: Nenhum template para admin_id={admin_id}. Templates disponíveis:")
+        logger.debug(f"DEBUG NOVA: Nenhum template para admin_id={admin_id}. Templates disponíveis:")
         for t in todos_templates:
-            print(f"  Template {t.id}: {t.nome} (admin_id={t.admin_id})")
+            logger.debug(f" Template {t.id}: {t.nome} (admin_id={t.admin_id})")
     
     # Definir valores padrão da empresa ou usar padrões do sistema
     padrao_itens_inclusos = "Mão de obra para execução dos serviços; Todos os equipamentos de segurança necessários; Transporte e alimentação da equipe; Container para guarda de ferramentas; Movimentação de carga (Munck); Transporte dos materiais"
@@ -296,10 +298,10 @@ def nova_proposta_funcionando():
         PropostaTemplate.ativo == True
     ).all()
     
-    print(f"DEBUG NOVA: Admin ID {admin_id} - encontrou {len(templates)} templates disponíveis")
+    logger.debug(f"DEBUG NOVA: Admin ID {admin_id} - encontrou {len(templates)} templates disponíveis")
     
     for t in templates:
-        print(f"DEBUG NOVA: Template {t.id}: {t.nome} (categoria: {t.categoria})")
+        logger.debug(f"DEBUG NOVA: Template {t.id}: {t.nome} (categoria: {t.categoria})")
     
     return render_template('propostas/nova_proposta.html', templates=templates)
 
@@ -368,15 +370,15 @@ def criar_teste_template(template_id):
             'url_visualizar': f'/propostas/{proposta.id}'
         }
         
-        print(f"DEBUG TESTE: Proposta criada - ID {proposta.id}, Cliente: {proposta.cliente_nome}")
-        print(f"DEBUG TESTE: Template usado: {template.nome} ({len(template.itens_padrao or [])} itens)")
-        print(f"DEBUG TESTE: Valor total: R$ {total_valor:,.2f}")
+        logger.debug(f"DEBUG TESTE: Proposta criada - ID {proposta.id}, Cliente: {proposta.cliente_nome}")
+        logger.debug(f"DEBUG TESTE: Template usado: {template.nome} ({len(template.itens_padrao or [])} itens)")
+        logger.debug(f"DEBUG TESTE: Valor total: R$ {total_valor:,.2f}")
         
         return jsonify(result)
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO TESTE: {str(e)}")
+        logger.error(f"ERRO TESTE: {str(e)}")
         return jsonify({'error': f'Erro ao criar proposta de teste: {str(e)}'}), 500
 
 
@@ -441,7 +443,7 @@ def criar_proposta():
         db.session.flush()  # Para obter o ID da proposta
         
         # Debug dos dados recebidos
-        print(f"DEBUG ITENS: Form data keys: {list(request.form.keys())}")
+        logger.debug(f"DEBUG ITENS: Form data keys: {list(request.form.keys())}")
         
         valor_total_proposta = 0
         
@@ -451,7 +453,7 @@ def criar_proposta():
             import json
             try:
                 templates_organizados = json.loads(templates_data)
-                print(f"DEBUG TEMPLATES: {len(templates_organizados)} categorias encontradas")
+                logger.debug(f"DEBUG TEMPLATES: {len(templates_organizados)} categorias encontradas")
                 
                 for categoria in templates_organizados:
                     categoria_titulo = categoria.get('categoria_titulo', '')
@@ -477,11 +479,11 @@ def criar_proposta():
                         valor_item = item.quantidade * item.preco_unitario
                         valor_total_proposta += valor_item
                         
-                        print(f"DEBUG TEMPLATE ITEM: {item.descricao} - {item.quantidade} x R$ {item.preco_unitario} = R$ {valor_item}")
+                        logger.debug(f"DEBUG TEMPLATE ITEM: {item.descricao} - {item.quantidade} x R$ {item.preco_unitario} = R$ {valor_item}")
                         db.session.add(item)
                         
             except json.JSONDecodeError as e:
-                print(f"DEBUG: Erro ao processar templates organizados: {e}")
+                logger.error(f"DEBUG: Erro ao processar templates organizados: {e}")
                 # Fallback para processamento simples
         
         # Fallback: Processar itens simples se não houver templates organizados
@@ -491,7 +493,7 @@ def criar_proposta():
             unidades = request.form.getlist('item_unidade')
             precos = request.form.getlist('item_preco')
             
-            print(f"DEBUG ITENS SIMPLES: {len(descricoes)} itens encontrados")
+            logger.debug(f"DEBUG ITENS SIMPLES: {len(descricoes)} itens encontrados")
             
             for i, descricao in enumerate(descricoes):
                 if descricao and descricao.strip():
@@ -507,12 +509,12 @@ def criar_proposta():
                     valor_item = item.quantidade * item.preco_unitario
                     valor_total_proposta += valor_item
                     
-                    print(f"DEBUG ITEM SIMPLES {i+1}: {item.descricao} - R$ {valor_item}")
+                    logger.debug(f"DEBUG ITEM SIMPLES {i+1}: {item.descricao} - R$ {valor_item}")
                     db.session.add(item)
         
         # Atualizar valor total da proposta
         proposta.valor_total = valor_total_proposta
-        print(f"DEBUG PROPOSTA: Valor total calculado: R$ {valor_total_proposta}")
+        logger.debug(f"DEBUG PROPOSTA: Valor total calculado: R$ {valor_total_proposta}")
         
         db.session.commit()
         flash('Proposta criada com sucesso!', 'success')
@@ -710,8 +712,8 @@ def obter_template_test(template_id):
         'template': template_data
     }
     
-    print(f"DEBUG API: Template {template_id} carregado: {template.nome}")
-    print(f"DEBUG API: Itens padrão: {len(template.itens_padrao) if template.itens_padrao else 0}")
+    logger.debug(f"DEBUG API: Template {template_id} carregado: {template.nome}")
+    logger.debug(f"DEBUG API: Itens padrão: {len(template.itens_padrao) if template.itens_padrao else 0}")
     return jsonify(result)
 
 @propostas_bp.route('/api/template/<int:template_id>')
@@ -735,10 +737,10 @@ def gerar_pdf(id):
         proposta = Proposta.query.get_or_404(id)
         
         # Debug da proposta
-        print(f"DEBUG PDF: Proposta {proposta.numero}")
-        print(f"DEBUG PDF: Cliente: {proposta.cliente_nome}")
-        print(f"DEBUG PDF: Valor total: {proposta.valor_total}")
-        print(f"DEBUG PDF: Número de itens: {len(proposta.itens) if proposta.itens else 0}")
+        logger.debug(f"DEBUG PDF: Proposta {proposta.numero}")
+        logger.debug(f"DEBUG PDF: Cliente: {proposta.cliente_nome}")
+        logger.debug(f"DEBUG PDF: Valor total: {proposta.valor_total}")
+        logger.debug(f"DEBUG PDF: Número de itens: {len(proposta.itens) if proposta.itens else 0}")
         
         # Buscar configurações da empresa - admin_id dinâmico (com fallback para desenvolvimento)
         if hasattr(current_user, 'is_authenticated') and current_user.is_authenticated:
@@ -783,12 +785,12 @@ def gerar_pdf(id):
         
         # Debug da configuração
         if config_empresa:
-            print(f"DEBUG PDF: Config empresa: {config_empresa.nome_empresa}")
-            print(f"DEBUG PDF: Header PDF presente: {'SIM' if config_empresa.header_pdf_base64 else 'NÃO'}")
+            logger.debug(f"DEBUG PDF: Config empresa: {config_empresa.nome_empresa}")
+            logger.debug(f"DEBUG PDF: Header PDF presente: {'SIM' if config_empresa.header_pdf_base64 else 'NÃO'}")
             if config_empresa.header_pdf_base64:
-                print(f"DEBUG PDF: Tamanho header: {len(config_empresa.header_pdf_base64)} chars")
+                logger.debug(f"DEBUG PDF: Tamanho header: {len(config_empresa.header_pdf_base64)} chars")
         else:
-            print("DEBUG PDF: Nenhuma configuração encontrada")
+            logger.debug("DEBUG PDF: Nenhuma configuração encontrada")
         
         # Verificar se deve usar formato Estruturas do Vale (padrão)
         formato = request.args.get('formato', 'estruturas_vale')
@@ -798,7 +800,7 @@ def gerar_pdf(id):
         else:
             template_name = 'propostas/pdf.html'
         
-        print(f"DEBUG PDF: Usando template: {template_name}")
+            logger.debug(f"DEBUG PDF: Usando template: {template_name}")
         
         # Buscar template da proposta se existe
         template_proposta = None
@@ -821,10 +823,10 @@ def gerar_pdf(id):
                 itens_organizados.append((categoria, itens_categoria))
             
             proposta.itens_organizados = itens_organizados
-            print(f"DEBUG PDF: {len(proposta.itens)} itens organizados em {len(itens_organizados)} categorias")
+            logger.debug(f"DEBUG PDF: {len(proposta.itens)} itens organizados em {len(itens_organizados)} categorias")
         else:
             proposta.itens_organizados = []
-            print("DEBUG PDF: Nenhum item encontrado na proposta")
+            logger.debug("DEBUG PDF: Nenhum item encontrado na proposta")
         
         # Calcular total geral
         total_geral = 0
@@ -835,9 +837,9 @@ def gerar_pdf(id):
         if proposta.valor_total and proposta.valor_total > total_geral:
             total_geral = proposta.valor_total
         
-        print(f"DEBUG PDF: Total calculado dos itens: {total_geral}")
-        print(f"DEBUG PDF: Valor total da proposta: {proposta.valor_total}")
-        print(f"DEBUG PDF: Total geral final: {total_geral}")
+            logger.debug(f"DEBUG PDF: Total calculado dos itens: {total_geral}")
+            logger.debug(f"DEBUG PDF: Valor total da proposta: {proposta.valor_total}")
+            logger.debug(f"DEBUG PDF: Total geral final: {total_geral}")
         
         # Renderizar HTML da proposta
         html_content = render_template(template_name, 
@@ -847,11 +849,11 @@ def gerar_pdf(id):
                                      config_empresa=config_empresa,
                                      total_geral=total_geral)
         
-        print("DEBUG PDF: Template renderizado com sucesso")
+        logger.debug("DEBUG PDF: Template renderizado com sucesso")
         return html_content
         
     except Exception as e:
-        print(f"ERRO PDF: {str(e)}")
+        logger.error(f"ERRO PDF: {str(e)}")
         import traceback
         traceback.print_exc()
         return f"Erro ao gerar PDF: {str(e)}", 500

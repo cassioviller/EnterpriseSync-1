@@ -44,7 +44,7 @@ def buscar_funcionarios():
         # 
         # admin_id = usuario.admin_id
         
-        logger.info(f"🔍 Buscando funcionários com termo '{termo}' para admin_id={admin_id}")
+        logger.info(f"[DEBUG] Buscando funcionários com termo '{termo}' para admin_id={admin_id}")
         
         # Buscar funcionários que correspondem ao termo
         funcionarios = Funcionario.query.filter(
@@ -65,7 +65,7 @@ def buscar_funcionarios():
                 'email': func.email
             })
         
-        logger.info(f"✅ Encontrados {len(funcionarios_data)} funcionários")
+            logger.info(f"[OK] Encontrados {len(funcionarios_data)} funcionários")
         
         return jsonify({
             'success': True,
@@ -74,11 +74,11 @@ def buscar_funcionarios():
         })
         
     except Exception as e:
-        logger.error(f"❌ Erro na busca de funcionários: {str(e)}")
+        logger.error(f"[ERROR] Erro na busca de funcionários: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'Erro interno do servidor'
         }), 500
 
 if __name__ == '__main__':
-    print("API de busca de funcionários carregada")
+    logger.info("API de busca de funcionários carregada")

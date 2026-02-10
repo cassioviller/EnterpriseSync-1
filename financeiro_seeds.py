@@ -116,10 +116,10 @@ def criar_plano_contas_padrao(admin_id):
         # Verificar se já existe plano de contas para este admin
         contas_existentes = PlanoContas.query.filter_by(admin_id=admin_id).count()
         if contas_existentes > 0:
-            logger.info(f"⚠️ Admin {admin_id} já possui {contas_existentes} contas no plano")
+            logger.info(f"[WARN] Admin {admin_id} já possui {contas_existentes} contas no plano")
             return 0
         
-        logger.info(f"📊 Criando plano de contas padrão para admin_id={admin_id}")
+            logger.info(f"[STATS] Criando plano de contas padrão para admin_id={admin_id}")
         
         # Criar contas na ordem hierárquica
         for conta_data in PLANO_CONTAS_CONSTRUCAO:
@@ -149,12 +149,12 @@ def criar_plano_contas_padrao(admin_id):
         # Invalidar cache após criação do plano de contas
         PlanoContas.invalidar_cache()
         
-        logger.info(f"✅ {contas_criadas} contas criadas com sucesso!")
+        logger.info(f"[OK] {contas_criadas} contas criadas com sucesso!")
         return contas_criadas
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Erro ao criar plano de contas: {str(e)}")
+        logger.error(f"[ERROR] Erro ao criar plano de contas: {str(e)}")
         raise
 
 
@@ -162,16 +162,16 @@ def listar_plano_contas(admin_id):
     """Lista plano de contas de um admin"""
     contas = PlanoContas.query.filter_by(admin_id=admin_id).order_by(PlanoContas.codigo).all()
     
-    print(f"\n📊 PLANO DE CONTAS - Admin {admin_id}")
-    print("=" * 80)
+    logger.info(f"\n[STATS] PLANO DE CONTAS - Admin {admin_id}")
+    logger.info("=" * 80)
     
     for conta in contas:
         indent = "  " * (conta.nivel - 1)
-        tipo_icon = "💰" if conta.aceita_lancamento else "📂"
-        print(f"{tipo_icon} {indent}{conta.codigo} - {conta.nome} ({conta.tipo_conta})")
+        tipo_icon = "[MONEY]" if conta.aceita_lancamento else "[DIR]"
+        logger.debug(f"{tipo_icon} {indent}{conta.codigo} - {conta.nome} ({conta.tipo_conta})")
     
-    print("=" * 80)
-    print(f"Total: {len(contas)} contas")
+        logger.info("=" * 80)
+        logger.debug(f"Total: {len(contas)} contas")
 
 
 if __name__ == "__main__":
@@ -180,7 +180,7 @@ if __name__ == "__main__":
         # Criar para admin_id=10 (exemplo)
         admin_id = 10
         contas = criar_plano_contas_padrao(admin_id)
-        print(f"✅ {contas} contas criadas!")
+        logger.info(f"[OK] {contas} contas criadas!")
         
         # Listar
         listar_plano_contas(admin_id)

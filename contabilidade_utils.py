@@ -5,6 +5,8 @@ import calendar
 from datetime import date, timedelta
 from decimal import Decimal
 from sqlalchemy import func, case
+import logging
+logger = logging.getLogger(__name__)
 from models import (
     db, PlanoContas, CentroCustoContabil, LancamentoContabil, PartidaContabil, 
     BalanceteMensal, DREMensal, BalancoPatrimonial, FluxoCaixaContabil, 
@@ -683,11 +685,11 @@ def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
             }
         }
         
-        print(f"✅ DRE {mes}/{ano} calculada: Receita Líquida={receita_liquida}, Lucro Líquido={lucro_liquido}")
+        logger.info(f"[OK] DRE {mes}/{ano} calculada: Receita Líquida={receita_liquida}, Lucro Líquido={lucro_liquido}")
         return dre_data
         
     except Exception as e:
-        print(f"❌ Erro ao calcular DRE: {e}")
+        logger.error(f"[ERROR] Erro ao calcular DRE: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -925,7 +927,7 @@ def gerar_balancete_pdf(admin_id, mes, ano):
         return buffer
         
     except Exception as e:
-        print(f"❌ Erro ao gerar PDF do balancete: {e}")
+        logger.error(f"[ERROR] Erro ao gerar PDF do balancete: {e}")
         import traceback
         traceback.print_exc()
         raise
@@ -1056,7 +1058,7 @@ def gerar_balancete_excel(admin_id, mes, ano):
         return buffer
         
     except Exception as e:
-        print(f"❌ Erro ao gerar Excel do balancete: {e}")
+        logger.error(f"[ERROR] Erro ao gerar Excel do balancete: {e}")
         import traceback
         traceback.print_exc()
         raise
@@ -1242,7 +1244,7 @@ def gerar_dre_pdf(admin_id, mes, ano):
         return buffer
         
     except Exception as e:
-        print(f"❌ Erro ao gerar PDF da DRE: {e}")
+        logger.error(f"[ERROR] Erro ao gerar PDF da DRE: {e}")
         import traceback
         traceback.print_exc()
         raise
@@ -1433,7 +1435,7 @@ def gerar_dre_excel(admin_id, mes, ano):
         return buffer
         
     except Exception as e:
-        print(f"❌ Erro ao gerar Excel da DRE: {e}")
+        logger.error(f"[ERROR] Erro ao gerar Excel da DRE: {e}")
         import traceback
         traceback.print_exc()
         raise

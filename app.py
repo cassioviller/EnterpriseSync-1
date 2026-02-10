@@ -3,8 +3,10 @@ import logging
 from flask import Flask, url_for
 from flask_login import LoginManager
 from flask_migrate import Migrate
-# CSRFProtect removido - causa conflito 405 quando WTF_CSRF_ENABLED=False
+from flask_wtf.csrf import CSRFProtect
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configure logging for production
@@ -20,16 +22,17 @@ app = Flask(__name__)
 # REPL_ID existe apenas no ambiente Replit (desenvolvimento)
 # Em produção (EasyPanel/Docker), esta variável não existe
 IS_PRODUCTION = "REPL_ID" not in os.environ
-logger.info(f"🌍 Ambiente detectado: {'PRODUÇÃO' if IS_PRODUCTION else 'DESENVOLVIMENTO (Replit)'}")
+logger.info(f"[ENV] Ambiente detectado: {'PRODUÇÃO' if IS_PRODUCTION else 'DESENVOLVIMENTO (Replit)'}")
 
 # ======================================================================
-# == 🔒 CHAVE SECRETA ESTÁTICA PARA PRODUÇÃO ==
+# == [LOCK] CHAVE SECRETA VIA VARIAVEL DE AMBIENTE ==
 # ======================================================================
-# Chave fixa compartilhada por todos os workers do Gunicorn
-# Isso garante que a sessão persista entre requisições em múltiplos workers
-app.secret_key = "RIRoo4VE6wBEkt9trAMsXzveGEM2kouxIb_rxvnxBM7wnhm4wlTm5n8_n7jPHTSlDkxjDYySbjEcCPcvsCOxOg"
+app.secret_key = os.environ.get("SESSION_SECRET")
+if not app.secret_key:
+    logger.error("[ERROR] SESSION_SECRET not set! Using fallback for development only.")
+    app.secret_key = "dev-only-fallback-key-not-for-production"
 app.config["SECRET_KEY"] = app.secret_key
-logger.info(f"✅ Secret key estática configurada (length: {len(app.secret_key)})")
+logger.info(f"[OK] Secret key configurada (length: {len(app.secret_key)})")
 
 # ======================================================================
 # == CONFIGURAÇÃO DE COOKIES PARA PRODUÇÃO ==
@@ -45,9 +48,9 @@ if IS_PRODUCTION:
         # SESSION_COOKIE_SAMESITE: Mitiga ataques CSRF
         SESSION_COOKIE_SAMESITE="Lax"
     )
-    logger.info("✅ [PROD] Configurações de cookie seguras aplicadas (SECURE=True, HTTPONLY=True, SAMESITE=Lax)")
+    logger.info("[OK] [PROD] Configurações de cookie seguras aplicadas (SECURE=True, HTTPONLY=True, SAMESITE=Lax)")
 else:
-    logger.info("ℹ️ [DEV] Configurações de cookie padrão para desenvolvimento")
+    logger.info("[INFO] [DEV] Configurações de cookie padrão para desenvolvimento")
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
@@ -66,10 +69,10 @@ def mask_database_url(url):
 
 if "neon" in database_url or "localhost" in database_url:
     # DESENVOLVIMENTO
-    logger.info(f"🔧 DESENVOLVIMENTO DATABASE: {mask_database_url(database_url)}")
+    logger.info(f"[CONFIG] DESENVOLVIMENTO DATABASE: {mask_database_url(database_url)}")
 else:
     # PRODUÇÃO - EasyPanel
-    logger.info(f"🔧 PRODUÇÃO DATABASE: {mask_database_url(database_url)}")
+    logger.info(f"[CONFIG] PRODUÇÃO DATABASE: {mask_database_url(database_url)}")
 
 # Convert postgres:// to postgresql:// for SQLAlchemy compatibility
 if database_url and database_url.startswith("postgres://"):
@@ -84,19 +87,18 @@ app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
-    "pool_size": 20,        # ✅ OTIMIZAÇÃO: Dobrado de 10→20 para suportar mais concorrência
-    "max_overflow": 40,     # ✅ OTIMIZAÇÃO: Dobrado de 20→40 (total 60 conexões vs 30 anterior)
-    "pool_timeout": 30,     # ✅ OTIMIZAÇÃO: Timeout explícito para evitar deadlocks
+    "pool_size": 20,        # [OK] OTIMIZAÇÃO: Dobrado de 10→20 para suportar mais concorrência
+    "max_overflow": 40,     # [OK] OTIMIZAÇÃO: Dobrado de 20→40 (total 60 conexões vs 30 anterior)
+    "pool_timeout": 30,     # [OK] OTIMIZAÇÃO: Timeout explícito para evitar deadlocks
     "echo": False  # Desabilitar logs SQL em produção
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config['WTF_CSRF_ENABLED'] = False
 
 # Configurações v10.0 Digital Mastery
 app.config['DIGITAL_MASTERY_MODE'] = True
 app.config['OBSERVABILITY_ENABLED'] = True
 
-# ✅ CONFIGURAÇÃO STORAGE PERSISTENTE (v9.0.3)
+# [OK] CONFIGURAÇÃO STORAGE PERSISTENTE (v9.0.3)
 # Rota para servir uploads do volume persistente
 @app.route('/persistent-uploads/<path:filename>')
 def persistent_uploads(filename):
@@ -112,8 +114,24 @@ app.config['SERVER_NAME'] = None  # Permite qualquer host
 app.config['APPLICATION_ROOT'] = '/'  # Raiz da aplicação  
 app.config['PREFERRED_URL_SCHEME'] = 'http'  # Esquema padrão
 
-# Configure CORS for AJAX requests
-CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+# Configure CORS for AJAX requests (restricted origins)
+CORS(app, resources={r"/*": {"origins": [
+    r"https://sige\.cassioviller\.tech",
+    r"https://.*\.replit\.dev",
+    r"https://.*\.repl\.co",
+    r"http://localhost:5000",
+    r"http://0\.0\.0\.0:5000"
+]}}, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+allow_headers=["Content-Type", "Authorization", "X-CSRFToken"])
+
+csrf = CSRFProtect(app)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
 
 # Initialize extensions
 from models import db  # Import the db instance from models
@@ -169,43 +187,36 @@ def inject_company_config():
             }
         }
 
-# CORREÇÃO CRÍTICA: CSRF removido completamente para evitar conflito 405
-# CSRFProtect estava sendo inicializado mesmo com WTF_CSRF_ENABLED = False
-# Esta é a causa principal dos erros 405 Method Not Allowed
-
-# Configurar CORS para requisições AJAX das APIs
-CORS(app, origins="*", methods=["GET", "POST", "PUT", "DELETE"], 
-     allow_headers=["Content-Type", "Authorization"])
 
 # Import all models (now consolidated)
 from models import *
-logging.info("✅ Todos os modelos importados do arquivo consolidado")
+logging.info("[OK] Todos os modelos importados do arquivo consolidado")
 
 # Import Event Manager to register integration handlers
 try:
     import event_manager
-    logging.info(f"✅ Event Manager inicializado - {len(event_manager.EventManager.list_events())} eventos registrados")
+    logging.info(f"[OK] Event Manager inicializado - {len(event_manager.EventManager.list_events())} eventos registrados")
 except Exception as e:
-    logging.warning(f"⚠️ Event Manager não carregado: {e}")
+    logging.warning(f"[WARN] Event Manager não carregado: {e}")
 
 # Import event handlers to auto-register
 try:
     import handlers.folha_handlers
-    logging.info("✅ Handler de folha de pagamento registrado")
+    logging.info("[OK] Handler de folha de pagamento registrado")
 except Exception as e:
-    logging.warning(f"⚠️ Handler de folha não carregado: {e}")
+    logging.warning(f"[WARN] Handler de folha não carregado: {e}")
 
 try:
     import handlers.propostas_handlers
-    logging.info("✅ Handler de propostas comerciais registrado")
+    logging.info("[OK] Handler de propostas comerciais registrado")
 except Exception as e:
-    logging.warning(f"⚠️ Handler de propostas não carregado: {e}")
+    logging.warning(f"[WARN] Handler de propostas não carregado: {e}")
 
 try:
     import handlers.financeiro_handlers
-    logging.info("✅ Handler de financeiro registrado")
+    logging.info("[OK] Handler de financeiro registrado")
 except Exception as e:
-    logging.warning(f"⚠️ Handler de financeiro não carregado: {e}")
+    logging.warning(f"[WARN] Handler de financeiro não carregado: {e}")
 
 # Import views
 from views import main_bp
@@ -220,7 +231,7 @@ except ImportError:
 try:
     from almoxarifado_views import almoxarifado_bp
     app.register_blueprint(almoxarifado_bp)
-    logging.info("✅ Blueprint almoxarifado registrado")
+    logging.info("[OK] Blueprint almoxarifado registrado")
 except ImportError:
     logging.warning("Almoxarifado views não disponível")
 
@@ -228,11 +239,11 @@ ponto_import_error = None
 try:
     from ponto_views import ponto_bp
     app.register_blueprint(ponto_bp)
-    logging.info("✅ Blueprint ponto eletrônico registrado")
+    logging.info("[OK] Blueprint ponto eletrônico registrado")
 except Exception as e:
     import traceback
     ponto_import_error = traceback.format_exc()
-    logging.error(f"❌ Erro ao importar ponto_views: {e}\n{ponto_import_error}")
+    logging.error(f"[ERROR] Erro ao importar ponto_views: {e}\n{ponto_import_error}")
 
 # Rota de diagnóstico do ponto (sempre disponível)
 @app.route('/ponto-diagnostico')
@@ -272,7 +283,7 @@ app.register_blueprint(production_bp, url_prefix='/prod')
 try:
     from crud_servico_obra_real import servico_obra_real_bp
     app.register_blueprint(servico_obra_real_bp)
-    logging.info("✅ Blueprint ServicoObraReal registrado")
+    logging.info("[OK] Blueprint ServicoObraReal registrado")
 except ImportError as e:
     logging.warning(f"ServicosObraReal não disponível: {e}")
 
@@ -315,78 +326,78 @@ with app.app_context():
     db.create_all()
     logging.info("Database tables created/verified")
     
-    # ✅ MIGRAÇÕES AUTOMÁTICAS SEMPRE ATIVAS - SIMPLICIDADE MÁXIMA
-    logger.info("🔄 Executando migrações automáticas do banco de dados...")
+    # [OK] MIGRAÇÕES AUTOMÁTICAS SEMPRE ATIVAS - SIMPLICIDADE MÁXIMA
+    logger.info("[SYNC] Executando migrações automáticas do banco de dados...")
     try:
         from migrations import executar_migracoes
         executar_migracoes()
-        logger.info("✅ Migrações executadas com sucesso!")
+        logger.info("[OK] Migrações executadas com sucesso!")
     except Exception as e:
-        logger.error(f"❌ Erro ao executar migrações: {e}")
-        logger.warning("⚠️ Aplicação continuará mesmo com erro nas migrações")
+        logger.error(f"[ERROR] Erro ao executar migrações: {e}")
+        logger.warning("[WARN] Aplicação continuará mesmo com erro nas migrações")
     
-    # 🔧 AUTO-FIX UNIVERSAL - Correção automática de admin_id em TODAS as tabelas
+    # [CONFIG] AUTO-FIX UNIVERSAL - Correção automática de admin_id em TODAS as tabelas
     # Executa SEMPRE no startup para garantir que TODAS as tabelas tenham admin_id
     try:
         from fix_all_admin_id_universal import auto_fix_all_admin_id
         auto_fix_all_admin_id()
     except Exception as e:
-        logger.error(f"❌ Erro no auto-fix universal: {e}")
+        logger.error(f"[ERROR] Erro no auto-fix universal: {e}")
     
-    # 🗑️ SISTEMA DE LIMPEZA DE VEÍCULOS - CRITICAL INTEGRATION
+    # [DEL] SISTEMA DE LIMPEZA DE VEÍCULOS - CRITICAL INTEGRATION
     # Executa limpeza de tabelas obsoletas de veículos quando RUN_CLEANUP_VEICULOS=1
     try:
         from migration_cleanup_veiculos_production import run_migration_if_needed
         cleanup_success = run_migration_if_needed()
         if cleanup_success:
-            logger.info("✅ Migration de limpeza de veículos processada com sucesso")
+            logger.info("[OK] Migration de limpeza de veículos processada com sucesso")
         else:
-            logger.warning("⚠️ Migration de limpeza de veículos falhou ou não foi necessária")
+            logger.warning("[WARN] Migration de limpeza de veículos falhou ou não foi necessária")
     except ImportError:
-        logger.warning("⚠️ Migration de limpeza de veículos não disponível")
+        logger.warning("[WARN] Migration de limpeza de veículos não disponível")
     except Exception as e:
-        logger.error(f"❌ Erro na migration de limpeza de veículos: {e}")
+        logger.error(f"[ERROR] Erro na migration de limpeza de veículos: {e}")
         # Não interromper o app, apenas logar erro
-        logger.info("📝 Para executar migrações: RUN_MIGRATIONS=1 gunicorn --bind 0.0.0.0:5000 main:app")
+        logger.info("[INFO] Para executar migrações: RUN_MIGRATIONS=1 gunicorn --bind 0.0.0.0:5000 main:app")
     
     # Register additional blueprints
     try:
         from folha_pagamento_views import folha_bp
         app.register_blueprint(folha_bp, url_prefix='/folha')
-        logging.info("✅ Blueprint folha de pagamento registrado")
+        logging.info("[OK] Blueprint folha de pagamento registrado")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint folha de pagamento: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint folha de pagamento: {e}")
     
     try:
         from contabilidade_views import contabilidade_bp
         app.register_blueprint(contabilidade_bp, url_prefix='/contabilidade')
-        logging.info("✅ Blueprint contabilidade registrado")
+        logging.info("[OK] Blueprint contabilidade registrado")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint contabilidade: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint contabilidade: {e}")
     
     # Blueprint financeiro v9.0
     try:
         from financeiro_views import financeiro_bp
         app.register_blueprint(financeiro_bp)
-        logging.info("✅ Blueprint financeiro v9.0 registrado")
+        logging.info("[OK] Blueprint financeiro v9.0 registrado")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint financeiro: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint financeiro: {e}")
     
     # Blueprint custos v9.0
     try:
         from custos_views import custos_bp
         app.register_blueprint(custos_bp)
-        logging.info("✅ Blueprint custos v9.0 registrado")
+        logging.info("[OK] Blueprint custos v9.0 registrado")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint custos: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint custos: {e}")
     
     # Blueprint templates de propostas
     try:
         from templates_views import templates_bp
         app.register_blueprint(templates_bp, url_prefix='/templates')
-        logging.info("✅ Blueprint templates registrado")
+        logging.info("[OK] Blueprint templates registrado")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint templates: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint templates: {e}")
     
     # Blueprint de serviços será registrado em main.py para evitar conflitos
     
@@ -394,90 +405,98 @@ with app.app_context():
     try:
         from alimentacao_views import alimentacao_bp
         app.register_blueprint(alimentacao_bp)
-        logging.info("✅ Blueprint alimentação registrado")
+        logging.info("[OK] Blueprint alimentação registrado")
     except ImportError as e:
-        logging.warning(f"⚠️ Blueprint alimentação não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint alimentação não encontrado: {e}")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint alimentação: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint alimentação: {e}")
     
     # Modelos de propostas já estão consolidados em models.py
-    logging.info("✅ Modelos de propostas importados do arquivo consolidado")
+        logging.info("[OK] Modelos de propostas importados do arquivo consolidado")
     
     # Registrar blueprint de propostas consolidado
     try:
         from propostas_consolidated import propostas_bp
         app.register_blueprint(propostas_bp, url_prefix='/propostas')
-        logging.info("✅ Blueprint propostas consolidado registrado")
+        logging.info("[OK] Blueprint propostas consolidado registrado")
     except ImportError as e:
         # Fallback para blueprint antigo
         try:
             from propostas_views import propostas_bp
             app.register_blueprint(propostas_bp, url_prefix='/propostas')
-            logging.info("✅ Blueprint propostas (fallback) registrado")
+            logging.info("[OK] Blueprint propostas (fallback) registrado")
         except ImportError as e2:
-            logging.warning(f"⚠️ Blueprint propostas não encontrado: {e} | {e2}")
+            logging.warning(f"[WARN] Blueprint propostas não encontrado: {e} | {e2}")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint propostas: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint propostas: {e}")
     
     # Registrar API de organização
     try:
         from api_organizer import api_organizer
         app.register_blueprint(api_organizer)
-        logging.info("✅ Blueprint API organizer registrado")
+        logging.info("[OK] Blueprint API organizer registrado")
     except ImportError as e:
-        logging.warning(f"⚠️ Blueprint API organizer não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint API organizer não encontrado: {e}")
     
     # Registrar blueprint de categorias de serviços
     try:
         from categoria_servicos import categorias_bp
         app.register_blueprint(categorias_bp)
-        logging.info("✅ Blueprint categorias de serviços registrado")
+        logging.info("[OK] Blueprint categorias de serviços registrado")
     except ImportError as e:
-        logging.warning(f"⚠️ Blueprint categorias de serviços não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint categorias de serviços não encontrado: {e}")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint categorias de serviços: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint categorias de serviços: {e}")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint API organizer: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint API organizer: {e}")
     
     # Registrar blueprint de configurações
     try:
         from configuracoes_views import configuracoes_bp
         app.register_blueprint(configuracoes_bp)
-        logging.info("✅ Blueprint configurações registrado")
+        logging.info("[OK] Blueprint configurações registrado")
     except ImportError as e:
-        logging.warning(f"⚠️ Blueprint configurações não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint configurações não encontrado: {e}")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint configurações: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint configurações: {e}")
     
     # Registrar API limpa de serviços da obra
     try:
         from api_servicos_obra_limpa import api_servicos_obra_bp
         app.register_blueprint(api_servicos_obra_bp)
-        logging.info("✅ Blueprint API serviços obra LIMPA registrado")
+        logging.info("[OK] Blueprint API serviços obra LIMPA registrado")
     except ImportError as e:
-        logging.warning(f"⚠️ Blueprint API serviços obra limpa não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint API serviços obra limpa não encontrado: {e}")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint API serviços obra limpa: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint API serviços obra limpa: {e}")
     
     # Registrar blueprint EQUIPE - Sistema de Gestão Lean
     try:
         from equipe_views import equipe_bp
         app.register_blueprint(equipe_bp)
-        logging.info("✅ Blueprint EQUIPE (gestão lean) registrado")
+        logging.info("[OK] Blueprint EQUIPE (gestão lean) registrado")
     except ImportError as e:
-        logging.warning(f"⚠️ Blueprint EQUIPE não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint EQUIPE não encontrado: {e}")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint EQUIPE: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint EQUIPE: {e}")
     
     # Registrar blueprint FROTA - Novo sistema de gestão de veículos
     try:
         from frota_views import frota_bp
         app.register_blueprint(frota_bp)
-        logging.info("✅ Blueprint FROTA registrado")
+        logging.info("[OK] Blueprint FROTA registrado")
     except ImportError as e:
-        logging.warning(f"⚠️ Blueprint FROTA não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint FROTA não encontrado: {e}")
     except Exception as e:
-        logging.error(f"❌ Erro ao registrar blueprint FROTA: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint FROTA: {e}")
+    
+    # Registrar blueprint landing page
+    try:
+        from landing_views import landing_bp
+        app.register_blueprint(landing_bp)
+        logging.info("[OK] Blueprint landing page registrado")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint landing: {e}")
     
     # Sistema avançado de veículos removido (código obsoleto limpo)
     
@@ -488,19 +507,26 @@ with app.app_context():
     # if os.environ.get('FLASK_ENV') != 'production':
     #     try:
     #         bypass_auth removido
-    #         logging.info("🔓 Sistema de bypass de autenticação carregado")
+    #         logging.info("[UNLOCK] Sistema de bypass de autenticação carregado")
     #     except Exception as e:
     #         logging.error(f"Erro ao carregar bypass: {e}")
     
-    logging.info("🔒 Sistema de bypass PERMANENTEMENTE desabilitado - admin_id consistente")
+    logging.info("[LOCK] Sistema de bypass PERMANENTEMENTE desabilitado - admin_id consistente")
 
 # Registrar comandos Flask CLI
 try:
     from diagnosticar_fotos_cli import diagnosticar_fotos_faciais
     app.cli.add_command(diagnosticar_fotos_faciais)
-    logging.info("✅ Comando CLI diagnosticar-fotos-faciais registrado")
+    logging.info("[OK] Comando CLI diagnosticar-fotos-faciais registrado")
 except ImportError as e:
-    logging.warning(f"⚠️ Comando CLI de diagnóstico não disponível: {e}")
+    logging.warning(f"[WARN] Comando CLI de diagnóstico não disponível: {e}")
+
+api_blueprints = ['api_organizer', 'api_funcionarios', 'api_buscar_funcionarios', 'api_servicos_obra_limpa', 'health', 'ponto', 'landing']
+for bp_name in api_blueprints:
+    bp = app.blueprints.get(bp_name)
+    if bp:
+        csrf.exempt(bp)
+        logging.info(f"[OK] CSRF exempt: {bp_name}")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

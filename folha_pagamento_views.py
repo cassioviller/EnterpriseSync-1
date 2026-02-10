@@ -9,13 +9,15 @@ from models import (FolhaPagamento, ParametrosLegais, Funcionario, BeneficioFunc
                     Adiantamento, CalculoHorasMensal)
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
-from dateutil.relativedelta import relativedelta  # ✅ OTIMIZAÇÃO: Movido do inline (linha 41)
-from functools import wraps  # ✅ OTIMIZAÇÃO: Movido do inline (linha 20)
+from dateutil.relativedelta import relativedelta  # [OK] OTIMIZAÇÃO: Movido do inline (linha 41)
+from functools import wraps  # [OK] OTIMIZAÇÃO: Movido do inline (linha 20)
 from io import BytesIO
 import calendar
-from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
-from services.folha_service import processar_folha_funcionario  # ✅ OTIMIZAÇÃO: Movido do inline (linha 143)
-from event_manager import EventManager  # ✅ OTIMIZAÇÃO: Movido do inline (linha 144)
+import logging
+logger = logging.getLogger(__name__)
+from sqlalchemy.orm import joinedload  # [OK] OTIMIZAÇÃO: Eager loading para evitar N+1
+from services.folha_service import processar_folha_funcionario  # [OK] OTIMIZAÇÃO: Movido do inline (linha 143)
+from event_manager import EventManager  # [OK] OTIMIZAÇÃO: Movido do inline (linha 144)
 
 folha_bp = Blueprint('folha', __name__)
 
@@ -208,7 +210,7 @@ def processar_folha_mes(ano, mes):
                         'folha_id': folha.id
                     }, admin_id=current_user.id)
                 except Exception as e:
-                    logger.error(f"❌ Erro ao emitir evento folha_processada: {e}")
+                    logger.error(f"[ERROR] Erro ao emitir evento folha_processada: {e}")
             else:
                 erros += 1
         
@@ -225,7 +227,7 @@ def processar_folha_mes(ano, mes):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO AO PROCESSAR FOLHA: {e}")
+        logger.error(f"ERRO AO PROCESSAR FOLHA: {e}")
         flash(f'Erro ao processar folha: {str(e)}', 'danger')
         return redirect(url_for('folha.dashboard'))
 
@@ -1071,7 +1073,7 @@ def api_funcionarios_folha(ano, mes):
     try:
         mes_referencia = date(ano, mes, 1)
         
-        # Buscar folhas do mês com eager loading (✅ OTIMIZAÇÃO: evita N+1)
+        # Buscar folhas do mês com eager loading ([OK] OTIMIZAÇÃO: evita N+1)
         folhas = FolhaPagamento.query.filter_by(
             admin_id=current_user.id,
             mes_referencia=mes_referencia
@@ -1112,7 +1114,7 @@ def relatorio_excel(ano, mes):
         
         mes_referencia = date(ano, mes, 1)
         
-        # Buscar folhas do mês e validar admin_id (✅ OTIMIZAÇÃO: eager loading evita N+1)
+        # Buscar folhas do mês e validar admin_id ([OK] OTIMIZAÇÃO: eager loading evita N+1)
         folhas = FolhaPagamento.query.filter_by(
             admin_id=current_user.id,
             mes_referencia=mes_referencia

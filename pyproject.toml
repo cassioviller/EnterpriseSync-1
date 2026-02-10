@@ -40,4 +40,6 @@ dependencies = [
     "tf-keras>=2.20.1",
     "opencv-python-headless>=4.13.0.90",
     "pytz>=2024.1",
+    "flask-limiter>=4.1.1",
+    "click>=8.2.1",
 ]

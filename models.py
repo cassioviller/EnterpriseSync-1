@@ -588,7 +588,7 @@ class CustoObra(db.Model):
     veiculo = db.relationship('Vehicle', foreign_keys=[veiculo_id])
     admin = db.relationship('Usuario', foreign_keys=[admin_id])
     
-    # ✅ OTIMIZAÇÃO: Índices compostos para queries frequentes
+    # [OK] OTIMIZAÇÃO: Índices compostos para queries frequentes
     __table_args__ = (
         db.Index('idx_custo_admin_data', 'admin_id', 'data'),  # Filtros por período
         db.Index('idx_custo_obra_tipo', 'obra_id', 'tipo'),     # Filtros por obra e tipo
@@ -859,7 +859,7 @@ class RDOFoto(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False, index=True)
     
-    # ✅ CORREÇÃO CRÍTICA: Campos legados são NOT NULL no banco de dados
+    # [OK] CORREÇÃO CRÍTICA: Campos legados são NOT NULL no banco de dados
     nome_arquivo = db.Column(db.String(255), nullable=False)
     caminho_arquivo = db.Column(db.String(500), nullable=False)
     legenda = db.Column(db.Text)
@@ -873,7 +873,7 @@ class RDOFoto(db.Model):
     tamanho_bytes = db.Column(db.BigInteger)
     ordem = db.Column(db.Integer, default=0)
     
-    # 🔥 ARMAZENAMENTO PERSISTENTE (v9.0.4) - Fotos em Base64 no banco de dados
+    # [READY] ARMAZENAMENTO PERSISTENTE (v9.0.4) - Fotos em Base64 no banco de dados
     # Solução: Igual aos funcionários - fotos NUNCA são perdidas em deploy/restart
     imagem_original_base64 = db.Column(db.Text)  # Backup completo da imagem original
     imagem_otimizada_base64 = db.Column(db.Text)  # Versão otimizada (1200px) para visualização
@@ -1901,7 +1901,7 @@ class FolhaPagamento(db.Model):
         db.Index('idx_folha_funcionario_mes', 'funcionario_id', 'mes_referencia'),
         db.Index('idx_folha_admin_status', 'admin_id', 'status'),
         db.Index('idx_folha_mes_referencia', 'mes_referencia'),
-        db.Index('idx_folha_admin_mes_status', 'admin_id', 'mes_referencia', 'status'),  # ✅ OTIMIZAÇÃO: Índice composto para filtros combinados
+        db.Index('idx_folha_admin_mes_status', 'admin_id', 'mes_referencia', 'status'),  # [OK] OTIMIZAÇÃO: Índice composto para filtros combinados
         db.UniqueConstraint('funcionario_id', 'mes_referencia', name='uk_folha_funcionario_mes'),
     )
 
@@ -2091,7 +2091,7 @@ class ParametrosLegais(db.Model):
     def invalidar_cache():
         """Limpa cache de parâmetros legais (usar ao criar/editar)"""
         ParametrosLegais.get_parametros_cached.cache_clear()
-        logger.info("🔄 Cache de ParametrosLegais invalidado")
+        logger.info("[SYNC] Cache de ParametrosLegais invalidado")
 
 
 # ================================
@@ -2178,7 +2178,7 @@ class PlanoContas(db.Model):
     def invalidar_cache():
         """Limpa cache do plano de contas (usar ao criar/editar)"""
         PlanoContas.get_conta_cached.cache_clear()
-        logger.info("🔄 Cache de PlanoContas invalidado")
+        logger.info("[SYNC] Cache de PlanoContas invalidado")
 
 class CentroCustoContabil(db.Model):
     """Centros de Custo para rateio contábil (Obras, Departamentos)."""
@@ -2214,7 +2214,7 @@ class LancamentoContabil(db.Model):
     partidas = db.relationship('PartidaContabil', backref='lancamento', cascade="all, delete-orphan")
     usuario = db.relationship('Usuario', foreign_keys=[usuario_id])
     
-    # ✅ OTIMIZAÇÃO: Índices compostos para queries frequentes
+    # [OK] OTIMIZAÇÃO: Índices compostos para queries frequentes
     __table_args__ = (
         db.Index('idx_lancamento_admin_data_origem', 'admin_id', 'data_lancamento', 'origem'),  # Relatórios contábeis
     )
@@ -2733,7 +2733,7 @@ class PropostaArquivo(db.Model):
     caminho_arquivo = db.Column(db.String(500), nullable=False)
     categoria = db.Column(db.String(50))  # 'dwg', 'pdf', 'imagem', 'documento', 'outros'
     
-    # 🔥 ARMAZENAMENTO PERSISTENTE (v9.4.0) - Base64 no banco de dados
+    # [READY] ARMAZENAMENTO PERSISTENTE (v9.4.0) - Base64 no banco de dados
     # Solução: Arquivos persistem mesmo após deploys/restarts do container
     # - Imagens: 3 versões otimizadas (original, 1200px, 300px thumbnail)
     # - Outros arquivos (<5MB): base64 direto
@@ -3210,7 +3210,7 @@ class AllocationEmployee(db.Model):
             return True
         except Exception as e:
             db.session.rollback()
-            print(f"Erro ao sincronizar ponto: {e}")
+            logger.error(f"Erro ao sincronizar ponto: {e}")
             return False
 
     def _calcular_horas_trabalhadas(self):
@@ -3358,7 +3358,7 @@ def processar_lancamentos_automaticos(data_processamento=None, admin_id=None):
         return True
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao processar lançamentos automáticos: {e}")
+        logger.error(f"Erro ao processar lançamentos automáticos: {e}")
         return False
 
 def _determinar_tipo_falta(data):
@@ -3415,7 +3415,7 @@ def sincronizar_alocacao_com_horario_funcionario(allocation_employee_id, admin_i
             return True
         except Exception as e:
             db.session.rollback()
-            print(f"Erro ao sincronizar horário: {e}")
+            logger.error(f"Erro ao sincronizar horário: {e}")
             return False
     
     return False
@@ -3699,7 +3699,7 @@ class Vehicle(db.Model):
     data_proxima_manutencao = db.Column(db.Date)
     km_proxima_manutencao = db.Column(db.Integer)
     
-    # Campos de alertas/vencimentos (✅ TAREFA 6)
+    # Campos de alertas/vencimentos ([OK] TAREFA 6)
     data_vencimento_ipva = db.Column(db.Date)
     data_vencimento_seguro = db.Column(db.Date)
     

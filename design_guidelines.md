@@ -1,113 +1,104 @@
-# SIGE Fleet Dashboard - Design Guidelines
+# EnterpriseSync/SIGE Landing Page - Design Guidelines
 
 ## Design Approach
-**System**: Bootstrap 5 Material-influenced dashboard design, drawing patterns from Linear's clarity, Notion's data density, and modern SaaS dashboards (Stripe, HubSpot). Focus on information hierarchy and data visualization excellence for enterprise fleet management.
+**Reference-Based**: Drawing from modern B2B SaaS leaders (Linear, Stripe, HubSpot, Notion marketing pages) combined with Bootstrap 5. Focus on trust-building, information clarity, and premium positioning for construction industry decision-makers. Brazilian Portuguese throughout.
 
 ## Typography System
-
-**Font Stack**: 
-- Primary: Inter via Google Fonts CDN (weights: 400, 500, 600, 700)
-- Monospace: 'Roboto Mono' for numerical data
+**Font Stack**: Inter via Google Fonts (weights: 400, 500, 600, 700)
 
 **Hierarchy**:
-- Page Title: 2rem (32px), weight 700, tracking tight
-- Section Headers: 1.5rem (24px), weight 600
-- Card Titles: 1.125rem (18px), weight 600
-- KPI Labels: 0.75rem (12px), weight 500, uppercase, tracking wide
-- KPI Values: 1.75rem (28px), weight 700, tabular-nums
-- Body Text: 1rem (16px), weight 400
-- Helper Text: 0.875rem (14px), weight 400
+- Hero Headline: 3.5rem (56px) desktop / 2.5rem (40px) mobile, weight 700, line-height 1.1
+- Section Headers: 2.5rem (40px) desktop / 2rem (32px) mobile, weight 700
+- Subsection Titles: 1.5rem (24px), weight 600
+- Feature Card Titles: 1.25rem (20px), weight 600
+- Pricing Plan Names: 1.75rem (28px), weight 700
+- Body Text: 1.125rem (18px), weight 400, line-height 1.7
+- Helper/Caption: 0.875rem (14px), weight 500
 
 ## Layout System
+**Spacing Primitives**: Tailwind units of 4, 6, 8, 12, 16, 20
+- Section padding: py-20 desktop, py-12 mobile
+- Container: max-w-7xl with px-4
+- Grid gaps: gap-6 (cards), gap-8 (sections)
 
-**Spacing Primitives**: Tailwind units of 2, 3, 4, 6, 8 (p-2, mb-4, gap-6, py-8)
-- Card padding: p-4 (mobile), p-6 (desktop)
-- Section spacing: mb-6 between major sections
-- Grid gaps: gap-4 (mobile), gap-6 (desktop)
-
-**Dashboard Structure**:
-- Main content area: max-width container with px-3 (mobile), px-4 (desktop)
-- Grid system: 12-column responsive grid
-- KPI Cards Row: 4 columns desktop (col-lg-3), 2 columns tablet (col-md-6), stack mobile
+**Page Structure**:
+- Hero: Full viewport height (min-h-screen), centered content over background image
+- Content sections: Alternating full-width and contained layouts
+- Feature grid: 3 columns desktop (grid-cols-3), 2 tablet (md:grid-cols-2), 1 mobile
+- Pricing cards: 4 columns desktop, 2 tablet, 1 mobile
 
 ## Component Library
 
-**KPI Cards** (4 cards in top row):
-- Each card: rounded corners (8px), subtle shadow (Bootstrap shadow-sm)
-- Icon area: 48x48px circle with gradient background, positioned top-left
-- Value: Large bold numerals, right-aligned
-- Label: Uppercase small text below icon
-- Trend indicator: Small badge with arrow icon (↑/↓) and percentage
-- Optional: Mini sparkline chart (20px height) at card bottom
+**Hero Section**:
+- Full-width background: High-quality construction site image with 40% dark overlay
+- Content: Centered, max-w-4xl
+- Headline + subheadline (max-w-2xl)
+- CTA group: Primary button (large, px-8 py-4) + Secondary button (transparent with backdrop-blur-md background)
+- Trust indicators: Small logo strip below CTAs (5-6 client logos, grayscale with opacity-70)
 
-**Filter Bar** (below KPI cards):
-- Horizontal layout with inline form controls
-- Elements: Date range picker, vehicle type dropdown, status dropdown, search input, export button
-- Responsive: Stack vertically on mobile with mb-3 spacing
-- Height: 56px on desktop for visual consistency
+**Feature Module Grid** (18 modules total):
+- Card design: White background, rounded-xl, p-6, hover:shadow-lg transition
+- Layout per card: Icon (56x56px, green circle background) + Title + 2-line description
+- 6 rows × 3 columns on desktop, responsive stack
+- Each module: One Bootstrap Icon, concise title, brief benefit statement
 
-**Chart Sections** (2 columns on desktop):
-- Left Column (col-lg-8): Primary TCO trend line chart, height 400px
-- Right Column (col-lg-4): Two stacked cards - pie chart (200px) and bar chart (200px)
-- Chart container: White card with p-4, mb-4
-- Chart header: Flex layout with title left, action dropdown right
+**Pricing Section**:
+- 4-card horizontal layout, equal width
+- Featured plan (Professional): Elevated with shadow-xl, border-2 border-green, scale-105
+- Card structure: Header (plan name + price), feature list (8-10 items with checkmarks), CTA button
+- Price display: R$ prefix small, number large (2.5rem), /mês suffix small
+- Annual toggle above cards: "Mensal / Anual (20% desconto)" switch
 
-**Data Table Section**:
-- Full-width responsive table with Bootstrap classes
-- Sticky header on scroll
-- Row hover states
-- Column headers: Sort indicators, align with data
-- Action column: Compact icon buttons (view, edit, delete)
-- Pagination: Bootstrap pagination component, centered below table
+**Testimonial Section**:
+- 3-column grid of testimonial cards
+- Card content: Quote text (1.125rem italic) + Author photo (64x64 rounded-full) + Name + Company + Role
+- Subtle quotation mark icon (large, opacity-10) as background element
 
-**Empty States**:
-- Centered content with illustration placeholder (200x200px)
-- Message text and CTA button below
+**Feature Highlight Sections** (2-3 between main sections):
+- Alternating image-left / image-right layouts
+- Two-column: Image (55% width) + Content (45%)
+- Content: Subheading + headline + description + bullet points + CTA link
+- Image: Rounded-lg with subtle shadow
 
-## Icons & Assets
+**Final CTA Section**:
+- Full-width with gradient green background (from #198754 to darker shade)
+- Centered content: Large headline + description + email input + button combo
+- Social proof: "Junte-se a 500+ empresas de construção" subtext
 
-**Icon Library**: Bootstrap Icons via CDN
-- Dashboard: speedometer2, truck, fuel-pump, tools, cash-stack
-- Actions: filter, download, search, three-dots-vertical
-- Trends: arrow-up-circle, arrow-down-circle
+**Footer**:
+- Four-column layout: Company info + Products + Resources + Contact
+- Newsletter signup integrated
+- Bottom bar: Copyright + Privacy links + Social icons (LinkedIn, Instagram, YouTube)
 
-**Chart.js Configuration**:
-- Line charts: Curved lines (tension: 0.4), gradient fills
-- Grid: Subtle, dashed lines
-- Tooltips: Custom styled with shadow
-- Legend: Positioned top-right, horizontal layout
-
-**Images**: No hero images required - this is a data dashboard interface
+## Icons & Visual Assets
+**Icons**: Bootstrap Icons via CDN (boxes, people, graph-up, shield-check, gear, calendar, etc.)
+**Images Required**:
+- Hero: Modern construction site/blueprint workspace (professional, aspirational)
+- Feature highlights: 2-3 dashboard screenshots or construction workers using tablets
+- Testimonial photos: Professional headshots (can use placeholder services)
+- Logo: EnterpriseSync/SIGE logo in header
 
 ## Interaction Patterns
-
-**Loading States**: 
-- Skeleton screens for KPI cards and charts
-- Pulse animation on data refresh
+**Animations**: Minimal, purposeful only
+- Scroll reveal: Fade-up on sections (intersection observer)
+- Card hover: Subtle lift on feature/pricing cards
+- Button states: Standard Bootstrap transitions
 
 **Responsive Behavior**:
-- Sidebar: Collapsible on mobile with hamburger toggle
-- KPI cards: 4→2→1 column progression
-- Charts: Full width stack on mobile
-- Table: Horizontal scroll on mobile with sticky first column
-
-**Micro-interactions**:
-- Card hover: Subtle lift (transform translateY(-2px))
-- Button states: Standard Bootstrap active/hover
-- Filter changes: 300ms data transition
+- Hero: Reduce padding, stack CTA buttons vertically on mobile
+- Feature grid: 3→2→1 column progression
+- Pricing: Horizontal scroll on mobile (snap scroll) or vertical stack
+- Navigation: Collapse to hamburger menu on mobile
 
 ## Accessibility
+- High contrast text on all backgrounds
+- Alt text for all images describing construction/business context
+- ARIA labels for icon-only buttons
+- Focus states on all interactive elements
+- Skip navigation link
 
-- ARIA labels for all interactive elements
-- Keyboard navigation for filters and tables
-- Focus indicators on all focusable elements
-- Chart data accessible via tables (sr-only)
-- Minimum touch target: 44x44px
-
-## Dashboard-Specific Guidelines
-
-**Information Density**: High - maximize data visibility while maintaining clarity
-**Update Frequency**: Real-time indicator badge for live data sections
-**Export Functions**: Clear download options for reports (PDF, Excel, CSV)
-**Drill-down Pattern**: KPI cards clickable to filtered table view
-**Multi-tenant UX**: Tenant selector in navbar, persistent across sessions
+## Brazilian Portuguese Content Notes
+- Formal "você" form throughout
+- Industry terminology: "gestão de obras," "controle financeiro," "cronograma"
+- Social proof numbers in Brazilian format (500+ empresas, R$ 2M economizados)
+- Trust signals: "Suporte em português," "Dados no Brasil," "LGPD compliant"

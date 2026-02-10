@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
+from app import limiter
 from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
 from auth import super_admin_required, admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
@@ -28,20 +29,20 @@ def verificar_modulo_detalhado(nome_modulo, descricao=""):
     try:
         spec = importlib.util.find_spec(nome_modulo)
         if spec is None:
-            print(f"❌ MÓDULO NÃO ENCONTRADO: {nome_modulo} ({descricao})")
-            print(f"   📍 Localização esperada: {nome_modulo.replace('.', '/')}.py")
-            print(f"   📂 Python path: {sys.path}")
+            logger.error(f"[ERROR] MÓDULO NÃO ENCONTRADO: {nome_modulo} ({descricao})")
+            logger.debug(f" [LOC] Localização esperada: {nome_modulo.replace('.', '/')}.py")
+            logger.debug(f" [DIR] Python path: {sys.path}")
             return False
         else:
-            print(f"✅ MÓDULO ENCONTRADO: {nome_modulo} ({descricao})")
-            print(f"   📍 Localização: {spec.origin}")
+            logger.info(f"[OK] MÓDULO ENCONTRADO: {nome_modulo} ({descricao})")
+            logger.debug(f" [LOC] Localização: {spec.origin}")
             return True
     except Exception as e:
-        print(f"🚨 ERRO AO VERIFICAR MÓDULO {nome_modulo}: {e}")
+        logger.error(f"[ALERT] ERRO AO VERIFICAR MÓDULO {nome_modulo}: {e}")
         return False
 
-print("🔍 VERIFICAÇÃO DETALHADA DE MÓDULOS - INÍCIO")
-print("=" * 60)
+        logger.debug("[DEBUG] VERIFICAÇÃO DETALHADA DE MÓDULOS - INÍCIO")
+        logger.info("=" * 60)
 
 # Verificar módulos específicos que estão falhando
 modulos_verificar = [
@@ -62,25 +63,25 @@ for modulo, desc in modulos_verificar:
     else:
         modulos_faltando.append(modulo)
 
-print("\n📊 RESUMO DA VERIFICAÇÃO:")
-print(f"   ✅ Módulos encontrados: {len(modulos_encontrados)}")
-print(f"   ❌ Módulos faltando: {len(modulos_faltando)}")
+        logger.info("\n[STATS] RESUMO DA VERIFICAÇÃO:")
+        logger.info(f" [OK] Módulos encontrados: {len(modulos_encontrados)}")
+        logger.error(f" [ERROR] Módulos faltando: {len(modulos_faltando)}")
 
 if modulos_faltando:
-    print(f"\n🚨 MÓDULOS FALTANDO: {', '.join(modulos_faltando)}")
-    print("   💡 Ação recomendada: Verificar se arquivos existem e caminhos estão corretos")
+    logger.debug(f"\n[ALERT] MÓDULOS FALTANDO: {', '.join(modulos_faltando)}")
+    logger.info(" [TIP] Ação recomendada: Verificar se arquivos existem e caminhos estão corretos")
 
-print("=" * 60)
+    logger.info("=" * 60)
 
 # Importar utilitários de resiliência
 try:
     # Idempotência removida conforme solicitação do usuário
     from utils.circuit_breaker import circuit_breaker, pdf_generation_fallback, database_query_fallback
     from utils.saga import RDOSaga, FuncionarioSaga
-    print("✅ Utilitários de resiliência importados com sucesso")
+    logger.info("[OK] Utilitários de resiliência importados com sucesso")
 except ImportError as e:
-    print(f"⚠️ MODULO UTILS FALTANDO: {e}")
-    print("   📝 Criando fallbacks para manter compatibilidade...")
+    logger.warning(f"[WARN] MODULO UTILS FALTANDO: {e}")
+    logger.info(" [INFO] Criando fallbacks para manter compatibilidade...")
     # Fallbacks para manter compatibilidade
     def idempotent(*args, **kwargs):
         def decorator(func):
@@ -91,7 +92,7 @@ except ImportError as e:
         def decorator(func):
             return func
         return decorator
-    print("   ✅ Fallbacks criados com sucesso")
+        logger.info(" [OK] Fallbacks criados com sucesso")
 
 main_bp = Blueprint('main', __name__)
 
@@ -140,7 +141,7 @@ def _calcular_funcionarios_departamento(admin_id):
             
         return funcionarios_por_departamento
     except Exception as e:
-        print(f"Erro funcionários por departamento: {e}")
+        logger.error(f"Erro funcionários por departamento: {e}")
         db.session.rollback()
         return {}
 
@@ -171,7 +172,7 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim):
             
             # Somar custos de veículos da obra
             try:
-                # ✅ CORREÇÃO: Verificar se VehicleExpense tem o atributo obra_id
+                # [OK] CORREÇÃO: Verificar se VehicleExpense tem o atributo obra_id
                 if hasattr(VehicleExpense, 'obra_id'):
                     veiculos_obra = VehicleExpense.query.filter(
                         VehicleExpense.obra_id == obra.id,
@@ -190,7 +191,7 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim):
                 
         return custos_por_obra
     except Exception as e:
-        print(f"Erro custos por obra: {e}")
+        logger.error(f"Erro custos por obra: {e}")
         db.session.rollback()
         return {}
 
@@ -361,6 +362,7 @@ def health_check_veiculos():
 
 # ===== ROTAS DE AUTENTICAÇÃO =====
 @main_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def login():
     if request.method == 'POST':
         login_field = request.form.get('email') or request.form.get('username')
@@ -397,7 +399,7 @@ def logout():
 def index():
     if current_user.is_authenticated:
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            print(f"DEBUG INDEX: Funcionário {current_user.email} redirecionado para RDO consolidado")
+            logger.debug(f"DEBUG INDEX: Funcionário {current_user.email} redirecionado para RDO consolidado")
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
             return redirect(url_for('main.super_admin_dashboard'))
@@ -434,7 +436,7 @@ def dashboard():
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
         # FUNCIONÁRIO - SEMPRE vai para dashboard específico (SEGURANÇA CRÍTICA)
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            print(f"DEBUG DASHBOARD: Funcionário {current_user.email} BLOQUEADO do dashboard admin - redirecionado")
+            logger.debug(f"DEBUG DASHBOARD: Funcionário {current_user.email} BLOQUEADO do dashboard admin - redirecionado")
             return redirect(url_for('main.funcionario_rdo_consolidado'))
             
         # SUPER ADMIN - vai para dashboard específico
@@ -443,7 +445,7 @@ def dashboard():
     
     # Sistema robusto de detecção de admin_id para produção (MESMA LÓGICA DA PÁGINA FUNCIONÁRIOS)
     try:
-        print("DEBUG: Iniciando cálculos do dashboard...")
+        logger.debug("DEBUG: Iniciando cálculos do dashboard...")
         # Determinar admin_id - usar mesma lógica que funciona na página funcionários
         admin_id = None  # Vamos detectar dinamicamente
         
@@ -453,50 +455,50 @@ def dashboard():
         if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
             if current_user.tipo_usuario == TipoUsuario.ADMIN:
                 admin_id = current_user.id
-                print(f"✅ DEBUG DASHBOARD PROD: Admin direto - admin_id={admin_id}")
+                logger.debug(f"[OK] DEBUG DASHBOARD PROD: Admin direto - admin_id={admin_id}")
             elif hasattr(current_user, 'admin_id') and current_user.admin_id:
                 admin_id = current_user.admin_id
-                print(f"✅ DEBUG DASHBOARD PROD: Via admin_id do usuário - admin_id={admin_id}")
+                logger.debug(f"[OK] DEBUG DASHBOARD PROD: Via admin_id do usuário - admin_id={admin_id}")
             else:
                 # Buscar pelo email na tabela usuarios
                 try:
                     usuario_db = Usuario.query.filter_by(email=current_user.email).first()
                     if usuario_db and usuario_db.admin_id:
                         admin_id = usuario_db.admin_id
-                        print(f"✅ DEBUG DASHBOARD PROD: Via busca na tabela usuarios - admin_id={admin_id}")
+                        logger.debug(f"[OK] DEBUG DASHBOARD PROD: Via busca na tabela usuarios - admin_id={admin_id}")
                     else:
-                        print(f"⚠️ DASHBOARD PROD: Usuário não encontrado na tabela usuarios ou sem admin_id")
+                        logger.warning(f"[WARN] DASHBOARD PROD: Usuário não encontrado na tabela usuarios ou sem admin_id")
                 except Exception as e:
-                    print(f"❌ DEBUG DASHBOARD PROD: Erro ao buscar na tabela usuarios: {e}")
+                    logger.error(f"[ERROR] DEBUG DASHBOARD PROD: Erro ao buscar na tabela usuarios: {e}")
         
         # Se ainda não encontrou admin_id, detectar automaticamente
         if admin_id is None:
             try:
                 # Buscar admin_id com mais funcionários ativos (desenvolvimento e produção)
                 admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC")).fetchall()
-                print(f"📊 DADOS DISPONÍVEIS POR ADMIN_ID: {[(row[0], row[1]) for row in admin_counts]}")
+                logger.info(f"[STATS] DADOS DISPONÍVEIS POR ADMIN_ID: {[(row[0], row[1]) for row in admin_counts]}")
                 
                 if admin_counts and len(admin_counts) > 0:
                     admin_id = admin_counts[0][0]
-                    print(f"🔄 DETECÇÃO AUTOMÁTICA: Usando admin_id={admin_id} (tem {admin_counts[0][1]} funcionários)")
+                    logger.debug(f"[SYNC] DETECÇÃO AUTOMÁTICA: Usando admin_id={admin_id} (tem {admin_counts[0][1]} funcionários)")
                 else:
                     # Buscar qualquer admin_id existente na tabela usuarios
                     try:
                         primeiro_admin = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).first()
                         if primeiro_admin:
                             admin_id = primeiro_admin.id
-                            print(f"🔍 ADMIN ENCONTRADO NA TABELA USUARIOS: admin_id={admin_id}")
+                            logger.debug(f"[DEBUG] ADMIN ENCONTRADO NA TABELA USUARIOS: admin_id={admin_id}")
                         else:
                             admin_id = 1  # Fallback absoluto
-                            print(f"🆘 FALLBACK FINAL: admin_id={admin_id}")
+                            logger.debug(f"🆘 FALLBACK FINAL: admin_id={admin_id}")
                     except Exception as e2:
-                        print(f"❌ Erro ao buscar admin na tabela usuarios: {e2}")
+                        logger.error(f"[ERROR] Erro ao buscar admin na tabela usuarios: {e2}")
                         admin_id = 1  # Fallback absoluto
             except Exception as e:
-                print(f"❌ Erro ao detectar admin_id automaticamente: {e}")
+                logger.error(f"[ERROR] Erro ao detectar admin_id automaticamente: {e}")
                 admin_id = 1  # Fallback absoluto
         
-        # ✅ CORREÇÃO: Determinar período com dados APÓS admin_id estar definido
+        # [OK] CORREÇÃO: Determinar período com dados APÓS admin_id estar definido
         if not data_inicio_param:
             try:
                 # Buscar último registro de ponto DO ADMIN específico (multi-tenant seguro)
@@ -508,40 +510,40 @@ def dashboard():
                 if ultimo_registro:
                     # Usar o mês do último registro
                     data_inicio = date(ultimo_registro.year, ultimo_registro.month, 1)
-                    print(f"✅ PERÍODO DINÂMICO (TENANT {admin_id}): {data_inicio} (último registro: {ultimo_registro})")
+                    logger.info(f"[OK] PERÍODO DINÂMICO (TENANT {admin_id}): {data_inicio} (último registro: {ultimo_registro})")
                 else:
                     # Fallback para período conhecido com dados
                     data_inicio = date(2024, 7, 1)
-                    print(f"✅ PERÍODO FALLBACK: Julho/2024 (sem registros para admin_id={admin_id})")
+                    logger.info(f"[OK] PERÍODO FALLBACK: Julho/2024 (sem registros para admin_id={admin_id})")
             except Exception as e:
-                print(f"⚠️ Erro ao buscar período dinâmico: {e}")
+                logger.error(f"[WARN] Erro ao buscar período dinâmico: {e}")
                 data_inicio = date(2024, 7, 1)
                 
         if not data_fim_param:
             ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
             data_fim = date(data_inicio.year, data_inicio.month, ultimo_dia)
-            print(f"✅ PERÍODO FIM: {data_fim}")
+            logger.info(f"[OK] PERÍODO FIM: {data_fim}")
         
         # Estatísticas básicas
-        print("DEBUG: Buscando funcionários...")
+            logger.debug("DEBUG: Buscando funcionários...")
         total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
-        print(f"DEBUG: {total_funcionarios} funcionários encontrados")
+        logger.debug(f"DEBUG: {total_funcionarios} funcionários encontrados")
         
-        print("DEBUG: Buscando obras...")
+        logger.debug("DEBUG: Buscando obras...")
         total_obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).count()
-        print(f"DEBUG: {total_obras} obras ativas encontradas")
+        logger.debug(f"DEBUG: {total_obras} obras ativas encontradas")
         
-        # ✅ CORREÇÃO 4: Calcular veículos ANTES dos custos
-        print("DEBUG: Buscando veículos...")
+        # [OK] CORREÇÃO 4: Calcular veículos ANTES dos custos
+        logger.debug("DEBUG: Buscando veículos...")
         try:
             from models import Veiculo
             total_veiculos = Veiculo.query.filter_by(
                 admin_id=admin_id, 
                 ativo=True
             ).count()
-            print(f"DEBUG: {total_veiculos} veículos ativos para admin_id={admin_id}")
+            logger.debug(f"DEBUG: {total_veiculos} veículos ativos para admin_id={admin_id}")
         except Exception as e:
-            print(f"Erro ao contar veículos: {e}")
+            logger.error(f"Erro ao contar veículos: {e}")
             total_veiculos = 0
         
         # ========== MÉTRICAS DE PROPOSTAS DINÂMICAS ==========
@@ -549,8 +551,8 @@ def dashboard():
         # datetime já importado no topo do arquivo
         
         try:
-            # 1. PROPOSTAS POR STATUS (✅ CORREÇÃO 6: Adicionado filtro de período)
-            print("DEBUG: Calculando métricas de propostas...")
+            # 1. PROPOSTAS POR STATUS ([OK] CORREÇÃO 6: Adicionado filtro de período)
+            logger.debug("DEBUG: Calculando métricas de propostas...")
             from datetime import timedelta  # Import necessário para cálculos de validade
             propostas_aprovadas = Proposta.query.filter(
                 Proposta.admin_id == admin_id,
@@ -586,20 +588,20 @@ def dashboard():
             ).all()
             propostas_expiradas = len([p for p in propostas_expiradas if p.data_proposta and (p.data_proposta + timedelta(days=p.validade_dias or 7)) < hoje])
             
-            # ✅ CORREÇÃO 6 COMPLETA: Total de propostas também com filtro de período
+            # [OK] CORREÇÃO 6 COMPLETA: Total de propostas também com filtro de período
             total_propostas = Proposta.query.filter(
                 Proposta.admin_id == admin_id,
                 Proposta.data_proposta >= data_inicio,
                 Proposta.data_proposta <= data_fim
             ).count()
-            print(f"DEBUG: Propostas - Total: {total_propostas}, Aprovadas: {propostas_aprovadas}, Enviadas: {propostas_enviadas}")
+            logger.debug(f"DEBUG: Propostas - Total: {total_propostas}, Aprovadas: {propostas_aprovadas}, Enviadas: {propostas_enviadas}")
             
             # 2. PERFORMANCE COMERCIAL
             # Taxa de conversão: (aprovadas / total enviadas+aprovadas) * 100
             total_enviadas_ou_aprovadas = propostas_enviadas + propostas_aprovadas + propostas_rejeitadas
             taxa_conversao = round((propostas_aprovadas / total_enviadas_ou_aprovadas * 100), 1) if total_enviadas_ou_aprovadas > 0 else 0
             
-            # Valor médio das propostas aprovadas (✅ CORREÇÃO 7: Filtrar apenas propostas com valor válido)
+            # Valor médio das propostas aprovadas ([OK] CORREÇÃO 7: Filtrar apenas propostas com valor válido)
             from sqlalchemy import func as sql_func
             valor_medio_result = db.session.query(sql_func.avg(Proposta.valor_total)).filter(
                 Proposta.admin_id == admin_id,
@@ -640,10 +642,10 @@ def dashboard():
             feedbacks_positivos = 0
             downloads_pdf = 0
             
-            print(f"DEBUG: Taxa Conversão: {taxa_conversao}%, Valor Médio: R$ {valor_medio:.2f}")
+            logger.debug(f"DEBUG: Taxa Conversão: {taxa_conversao}%, Valor Médio: R$ {valor_medio:.2f}")
             
         except Exception as e:
-            print(f"ERRO ao calcular métricas de propostas: {e}")
+            logger.error(f"ERRO ao calcular métricas de propostas: {e}")
             # Valores padrão em caso de erro
             propostas_aprovadas = 0
             propostas_enviadas = 0
@@ -663,20 +665,20 @@ def dashboard():
         # ====================================================
         
         # Funcionários recentes
-        print("DEBUG: Buscando funcionários recentes...")
+            logger.debug("DEBUG: Buscando funcionários recentes...")
         funcionarios_recentes = Funcionario.query.filter_by(
             admin_id=admin_id, ativo=True
         ).order_by(Funcionario.created_at.desc()).limit(5).all()
-        print(f"DEBUG: {len(funcionarios_recentes)} funcionários recentes")
+        logger.debug(f"DEBUG: {len(funcionarios_recentes)} funcionários recentes")
         
         # Obras ativas com progresso baseado em RDOs
-        print("DEBUG: Buscando obras ativas...")
+        logger.debug("DEBUG: Buscando obras ativas...")
         obras_ativas = Obra.query.filter_by(
             admin_id=admin_id
         ).filter(
             Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
         ).order_by(Obra.created_at.desc()).limit(5).all()
-        print(f"DEBUG: {len(obras_ativas)} obras ativas encontradas - Status: {[o.status for o in obras_ativas]}")
+        logger.debug(f"DEBUG: {len(obras_ativas)} obras ativas encontradas - Status: {[o.status for o in obras_ativas]}")
         
         # Calcular progresso de cada obra baseado no RDO mais recente
         for obra in obras_ativas:
@@ -694,7 +696,7 @@ def dashboard():
                     total_sub = len(rdo_mais_recente.servico_subatividades)
                     progresso = round(total_percentual / total_sub, 1) if total_sub > 0 else 0
                     obra.progresso_atual = min(progresso, 100)  # Max 100%
-                    print(f"🎯 DASHBOARD PROGRESSO: {total_percentual}÷{total_sub} = {progresso}%")
+                    logger.debug(f"[TARGET] DASHBOARD PROGRESSO: {total_percentual}÷{total_sub} = {progresso}%")
                     obra.data_ultimo_rdo = rdo_mais_recente.data_relatorio
                     obra.total_subatividades = len(rdo_mais_recente.servico_subatividades)
                 else:
@@ -703,17 +705,17 @@ def dashboard():
                     obra.total_subatividades = 0
                     
             except Exception as e:
-                print(f"Erro ao calcular progresso da obra {obra.id}: {e}")
+                logger.error(f"Erro ao calcular progresso da obra {obra.id}: {e}")
                 obra.progresso_atual = 0
                 obra.data_ultimo_rdo = None
                 obra.total_subatividades = 0
     except Exception as e:
         # Log do erro para debug
-        print(f"ERRO NO DASHBOARD: {str(e)}")
+        logger.error(f"ERRO NO DASHBOARD: {str(e)}")
         import traceback
         traceback.print_exc()
         
-        # ✅ CORREÇÃO 3: Só inicializar variáveis se não existirem (não resetar valores já calculados)
+        # [OK] CORREÇÃO 3: Só inicializar variáveis se não existirem (não resetar valores já calculados)
         if 'total_funcionarios' not in locals():
             total_funcionarios = 0
         if 'total_obras' not in locals():
@@ -743,26 +745,26 @@ def dashboard():
                 ).fetchone()
                 admin_id = funcionarios_admin[0] if funcionarios_admin else 1
             
-        print(f"✅ DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
-        print(f"📅 PERÍODO SELECIONADO: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
-        print(f"📊 PERÍODO EM DIAS: {(data_fim - data_inicio).days + 1} dias")
+                logger.debug(f"[OK] DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
+                logger.debug(f"[DATE] PERÍODO SELECIONADO: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
+                logger.info(f"[STATS] PERÍODO EM DIAS: {(data_fim - data_inicio).days + 1} dias")
         
         # Verificar estrutura completa do banco para diagnóstico
         try:
             # Diagnóstico completo do banco de dados
-            print(f"🔍 DIAGNÓSTICO COMPLETO DO BANCO DE DADOS:")
+            logger.debug(f"[DEBUG] DIAGNÓSTICO COMPLETO DO BANCO DE DADOS:")
             
             # Total de funcionários por admin_id
             funcionarios_por_admin = db.session.execute(
                 text("SELECT admin_id, COUNT(*) as total, COUNT(CASE WHEN ativo = true THEN 1 END) as ativos FROM funcionario GROUP BY admin_id ORDER BY admin_id")
             ).fetchall()
-            print(f"  📊 FUNCIONÁRIOS POR ADMIN: {[(row[0], row[1], row[2]) for row in funcionarios_por_admin]}")
+            logger.info(f" [STATS] FUNCIONÁRIOS POR ADMIN: {[(row[0], row[1], row[2]) for row in funcionarios_por_admin]}")
             
             # Total de obras por admin_id
             obras_por_admin = db.session.execute(
                 text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY admin_id")
             ).fetchall()
-            print(f"  🏗️ OBRAS POR ADMIN: {[(row[0], row[1]) for row in obras_por_admin]}")
+            logger.debug(f" [BUILD] OBRAS POR ADMIN: {[(row[0], row[1]) for row in obras_por_admin]}")
             
             # Verificar estrutura da tabela registro_ponto primeiro
             try:
@@ -770,7 +772,7 @@ def dashboard():
                     text("SELECT column_name FROM information_schema.columns WHERE table_name = 'registro_ponto' ORDER BY ordinal_position")
                 ).fetchall()
                 colunas_str = [col[0] for col in colunas_ponto]
-                print(f"  🔍 COLUNAS REGISTRO_PONTO: {colunas_str}")
+                logger.debug(f" [DEBUG] COLUNAS REGISTRO_PONTO: {colunas_str}")
                 
                 # Usar coluna correta baseada na estrutura real
                 coluna_data = 'data' if 'data' in colunas_str else 'data_registro'
@@ -778,9 +780,9 @@ def dashboard():
                     text(f"SELECT COUNT(*) FROM registro_ponto WHERE {coluna_data} >= :data_inicio AND {coluna_data} <= :data_fim"),
                     {"data_inicio": data_inicio, "data_fim": data_fim}
                 ).fetchone()
-                print(f"  ⏰ REGISTROS DE PONTO ({data_inicio.strftime('%b/%Y')}): {registros_ponto[0] if registros_ponto else 0}")
+                logger.debug(f" [TIME] REGISTROS DE PONTO ({data_inicio.strftime('%b/%Y')}): {registros_ponto[0] if registros_ponto else 0}")
             except Exception as e:
-                print(f"  ❌ ERRO registros ponto: {e}")
+                logger.error(f" [ERROR] ERRO registros ponto: {e}")
             
             # Total de custos de veículos - verificar se tabela existe
             try:
@@ -794,11 +796,11 @@ def dashboard():
                         text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM custo_veiculo WHERE data_custo >= :data_inicio AND data_custo <= :data_fim"),
                         {"data_inicio": data_inicio, "data_fim": data_fim}
                     ).fetchone()
-                    print(f"  🚗 CUSTOS VEÍCULOS ({data_inicio.strftime('%b/%Y')}): {custos_veiculo[0] if custos_veiculo else 0} registros, R$ {custos_veiculo[1] if custos_veiculo else 0}")
+                    logger.debug(f" [CAR] CUSTOS VEÍCULOS ({data_inicio.strftime('%b/%Y')}): {custos_veiculo[0] if custos_veiculo else 0} registros, R$ {custos_veiculo[1] if custos_veiculo else 0}")
                 else:
-                    print(f"  🚗 TABELA custo_veiculo NÃO EXISTE")
+                    logger.debug(f" [CAR] TABELA custo_veiculo NÃO EXISTE")
             except Exception as e:
-                print(f"  ❌ ERRO custos veículo: {e}")
+                logger.error(f" [ERROR] ERRO custos veículo: {e}")
             
             # Total de alimentação - verificar se tabela existe
             try:
@@ -807,33 +809,33 @@ def dashboard():
                         text("SELECT COUNT(*), COALESCE(SUM(valor), 0) FROM registro_alimentacao WHERE data >= :data_inicio AND data <= :data_fim"),
                         {"data_inicio": data_inicio, "data_fim": data_fim}
                     ).fetchone()
-                    print(f"  🍽️ ALIMENTAÇÃO ({data_inicio.strftime('%b/%Y')}): {alimentacao[0] if alimentacao else 0} registros, R$ {alimentacao[1] if alimentacao else 0}")
+                    logger.debug(f" [FOOD] ALIMENTAÇÃO ({data_inicio.strftime('%b/%Y')}): {alimentacao[0] if alimentacao else 0} registros, R$ {alimentacao[1] if alimentacao else 0}")
                 else:
-                    print(f"  🍽️ TABELA registro_alimentacao NÃO EXISTE")
+                    logger.debug(f" [FOOD] TABELA registro_alimentacao NÃO EXISTE")
             except Exception as e:
-                print(f"  ❌ ERRO alimentação: {e}")
+                logger.error(f" [ERROR] ERRO alimentação: {e}")
             
         except Exception as e:
-            print(f"❌ ERRO no diagnóstico do banco: {e}")
+            logger.error(f"[ERROR] ERRO no diagnóstico do banco: {e}")
         
         # Buscar todos os funcionários ativos para o admin_id detectado
         funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-        print(f"✅ DEBUG DASHBOARD KPIs: Encontrados {len(funcionarios_dashboard)} funcionários para admin_id={admin_id}")
+        logger.debug(f"[OK] DEBUG DASHBOARD KPIs: Encontrados {len(funcionarios_dashboard)} funcionários para admin_id={admin_id}")
         
         # Se não encontrou funcionários, buscar o admin_id com mais dados
         if len(funcionarios_dashboard) == 0:
-            print(f"⚠️ AVISO PRODUÇÃO: Nenhum funcionário encontrado para admin_id={admin_id}")
+            logger.warning(f"[WARN] AVISO PRODUÇÃO: Nenhum funcionário encontrado para admin_id={admin_id}")
             try:
                 todos_admins = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC")).fetchall()
-                print(f"📊 TODOS OS ADMINS DISPONÍVEIS: {[(row[0], row[1]) for row in todos_admins]}")
+                logger.info(f"[STATS] TODOS OS ADMINS DISPONÍVEIS: {[(row[0], row[1]) for row in todos_admins]}")
                 if todos_admins and len(todos_admins) > 0:
                     admin_correto = todos_admins[0][0]
-                    print(f"🔄 CORREÇÃO AUTOMÁTICA: Mudando de admin_id={admin_id} para admin_id={admin_correto} (tem {todos_admins[0][1]} funcionários)")
+                    logger.debug(f"[SYNC] CORREÇÃO AUTOMÁTICA: Mudando de admin_id={admin_id} para admin_id={admin_correto} (tem {todos_admins[0][1]} funcionários)")
                     admin_id = admin_correto
                     funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-                    print(f"✅ APÓS CORREÇÃO: {len(funcionarios_dashboard)} funcionários encontrados")
+                    logger.info(f"[OK] APÓS CORREÇÃO: {len(funcionarios_dashboard)} funcionários encontrados")
             except Exception as e:
-                print(f"❌ ERRO ao detectar admin_id correto: {e}")
+                logger.error(f"[ERROR] ERRO ao detectar admin_id correto: {e}")
         
         # Calcular KPIs reais com proteção de transação
         total_custo_real = 0
@@ -848,7 +850,7 @@ def dashboard():
             
             # Refazer busca de funcionários
             funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-            print(f"✅ APÓS ROLLBACK: {len(funcionarios_dashboard)} funcionários encontrados")
+            logger.info(f"[OK] APÓS ROLLBACK: {len(funcionarios_dashboard)} funcionários encontrados")
             
             for func in funcionarios_dashboard:
                 try:
@@ -864,7 +866,7 @@ def dashboard():
                     extras_func = sum(r.horas_extras or 0 for r in registros)
                     faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
                     
-                    # ✅ CORREÇÃO CRÍTICA: Sem registros = Sem custo (não usar fallback)
+                    # [OK] CORREÇÃO CRÍTICA: Sem registros = Sem custo (não usar fallback)
                     # Fallback removido - se não há registros de ponto, custo = R$ 0.00
                     # Isso evita estimativas incorretas quando período está vazio
                     if len(registros) == 0:
@@ -883,11 +885,11 @@ def dashboard():
                     total_faltas_real += faltas_func
                     
                 except Exception as func_error:
-                    print(f"❌ ERRO ao processar funcionário {func.nome}: {func_error}")
+                    logger.error(f"[ERROR] ERRO ao processar funcionário {func.nome}: {func_error}")
                     continue
                     
         except Exception as kpi_error:
-            print(f"❌ ERRO GERAL nos cálculos KPI: {kpi_error}")
+            logger.error(f"[ERROR] ERRO GERAL nos cálculos KPI: {kpi_error}")
             db.session.rollback()
         
         # Buscar custos de alimentação TOTAL para o período (não por funcionário para evitar duplicação)
@@ -925,18 +927,18 @@ def dashboard():
             total_outros = sum(o.valor or 0 for o in outros_alimentacao)
             custo_alimentacao_real += total_outros
             
-            print(f"DEBUG ALIMENTAÇÃO DASHBOARD: Lançamentos Novos ({len(lancamentos_novos)})=R${total_lancamentos_novos:.2f}, Registros Antigos ({len(alimentacao_registros)})=R${total_registros_antigos:.2f}, Outros ({len(outros_alimentacao)})=R${total_outros:.2f}, Total=R${custo_alimentacao_real:.2f}")
+            logger.debug(f"DEBUG ALIMENTAÇÃO DASHBOARD: Lançamentos Novos ({len(lancamentos_novos)})=R${total_lancamentos_novos:.2f}, Registros Antigos ({len(alimentacao_registros)})=R${total_registros_antigos:.2f}, Outros ({len(outros_alimentacao)})=R${total_outros:.2f}, Total=R${custo_alimentacao_real:.2f}")
         except Exception as e:
-            print(f"Erro cálculo alimentação: {e}")
+            logger.error(f"Erro cálculo alimentação: {e}")
             import traceback
             traceback.print_exc()
             custo_alimentacao_real = 0
         
         # Debug dos valores calculados
-        print(f"DEBUG DASHBOARD: {len(funcionarios_dashboard)} funcionários")
-        print(f"DEBUG DASHBOARD: Custo total calculado: R$ {total_custo_real:.2f}")
-        print(f"DEBUG DASHBOARD: Horas totais: {total_horas_real}")
-        print(f"DEBUG DASHBOARD: Extras totais: {total_extras_real}")
+            logger.debug(f"DEBUG DASHBOARD: {len(funcionarios_dashboard)} funcionários")
+            logger.debug(f"DEBUG DASHBOARD: Custo total calculado: R$ {total_custo_real:.2f}")
+            logger.debug(f"DEBUG DASHBOARD: Horas totais: {total_horas_real}")
+            logger.debug(f"DEBUG DASHBOARD: Extras totais: {total_extras_real}")
         
         # Calcular KPIs específicos corretamente
         # 1. Custos de Transporte (veículos) - usar safe_db_operation para evitar transaction abort
@@ -961,11 +963,11 @@ def dashboard():
             total_custo_obra = sum(float(c.valor or 0) for c in custos_obra_transporte)
             
             total = total_vehicle_expense + total_custo_obra
-            print(f"  DEBUG TRANSPORTE: VehicleExpense ({len(custos_veiculo)})=R${total_vehicle_expense:.2f}, CustoObra ({len(custos_obra_transporte)})=R${total_custo_obra:.2f}, Total=R${total:.2f}")
+            logger.debug(f" DEBUG TRANSPORTE: VehicleExpense ({len(custos_veiculo)})=R${total_vehicle_expense:.2f}, CustoObra ({len(custos_obra_transporte)})=R${total_custo_obra:.2f}, Total=R${total:.2f}")
             return total
         
         custo_transporte_real = safe_db_operation(calcular_custos_veiculo, 0)
-        print(f"DEBUG Custos Transporte FINAL: R$ {custo_transporte_real:.2f}")
+        logger.debug(f"DEBUG Custos Transporte FINAL: R$ {custo_transporte_real:.2f}")
         
         # 2. Faltas Justificadas (quantidade e valor em R$) - usar safe_db_operation
         def calcular_faltas_justificadas():
@@ -995,7 +997,7 @@ def dashboard():
         
         resultado_faltas = safe_db_operation(calcular_faltas_justificadas, (0, 0))
         quantidade_faltas_justificadas, custo_faltas_justificadas = resultado_faltas
-        print(f"DEBUG Faltas Justificadas: {quantidade_faltas_justificadas} faltas, R$ {custo_faltas_justificadas:.2f}")
+        logger.debug(f"DEBUG Faltas Justificadas: {quantidade_faltas_justificadas} faltas, R$ {custo_faltas_justificadas:.2f}")
         
         # 3. Outros Custos (não transporte nem alimentação) - usar safe_db_operation
         def calcular_outros_custos():
@@ -1020,32 +1022,32 @@ def dashboard():
             total_custo_obra = sum(float(c.valor or 0) for c in custos_obra_outros)
             
             total = total_outro_custo + total_custo_obra
-            print(f"  DEBUG OUTROS: OutroCusto ({len(outros_custos)})=R${total_outro_custo:.2f}, CustoObra ({len(custos_obra_outros)})=R${total_custo_obra:.2f}, Total=R${total:.2f}")
+            logger.debug(f" DEBUG OUTROS: OutroCusto ({len(outros_custos)})=R${total_outro_custo:.2f}, CustoObra ({len(custos_obra_outros)})=R${total_custo_obra:.2f}, Total=R${total:.2f}")
             return total
         
         custo_outros_real = safe_db_operation(calcular_outros_custos, 0)
-        print(f"DEBUG Custos Outros FINAL: R$ {custo_outros_real:.2f}")
+        logger.debug(f"DEBUG Custos Outros FINAL: R$ {custo_outros_real:.2f}")
         
         # 4. Funcionários por Departamento - com proteção de transação
         funcionarios_por_departamento = safe_db_operation(
             lambda: _calcular_funcionarios_departamento(admin_id), 
             {}
         )
-        print(f"DEBUG FINAL - Funcionários por dept: {funcionarios_por_departamento}")
+        logger.debug(f"DEBUG FINAL - Funcionários por dept: {funcionarios_por_departamento}")
         
         # 5. Custos por Obra - com proteção de transação
         custos_por_obra = safe_db_operation(
             lambda: _calcular_custos_obra(admin_id, data_inicio, data_fim), 
             {}
         )
-        print(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
+        logger.debug(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
         
         # Dados calculados reais
         # Inicializar admin_id se não definido
         if 'admin_id' not in locals():
             admin_id = 10  # Admin padrão com mais dados
             
-        # ✅ CORREÇÃO 4: Veículos já calculados no início (linha 535) - removido daqui
+        # [OK] CORREÇÃO 4: Veículos já calculados no início (linha 535) - removido daqui
         # Converter todos para float antes de somar (corrige erro float + Decimal)
         custos_mes = float(total_custo_real) + float(custo_alimentacao_real) + float(custo_transporte_real) + float(custo_outros_real)
         custos_detalhados = {
@@ -1059,7 +1061,7 @@ def dashboard():
         }
         
     except Exception as e:
-        print(f"ERRO CÁLCULO DASHBOARD: {str(e)}")
+        logger.error(f"ERRO CÁLCULO DASHBOARD: {str(e)}")
         # Em caso de erro, usar valores padrão
         total_veiculos = 0
         total_custo_real = 0
@@ -1096,9 +1098,9 @@ def dashboard():
             eficiencia_geral = round((total_horas_real / horas_esperadas) * 100, 1)
             # Limitar entre 0 e 100%
             eficiencia_geral = max(0, min(100, eficiencia_geral))
-        print(f"DEBUG EFICIÊNCIA: {total_horas_real}h trabalhadas / {horas_esperadas}h esperadas = {eficiencia_geral}%")
+            logger.debug(f"DEBUG EFICIÊNCIA: {total_horas_real}h trabalhadas / {horas_esperadas}h esperadas = {eficiencia_geral}%")
     except Exception as e:
-        print(f"Erro ao calcular eficiência: {e}")
+        logger.error(f"Erro ao calcular eficiência: {e}")
         eficiencia_geral = 0
     
     # 2. PRODUTIVIDADE OBRA - Calcular baseado no progresso médio das obras
@@ -1107,9 +1109,9 @@ def dashboard():
         if len(obras_ativas) > 0:
             progressos = [getattr(obra, 'progresso_atual', 0) for obra in obras_ativas]
             produtividade_obra = round(sum(progressos) / len(progressos), 1)
-        print(f"DEBUG PRODUTIVIDADE: Média de {produtividade_obra}% em {len(obras_ativas)} obras")
+            logger.debug(f"DEBUG PRODUTIVIDADE: Média de {produtividade_obra}% em {len(obras_ativas)} obras")
     except Exception as e:
-        print(f"Erro ao calcular produtividade: {e}")
+        logger.error(f"Erro ao calcular produtividade: {e}")
         produtividade_obra = 0
     
     # 3. VEÍCULOS DISPONÍVEIS - Buscar do banco de dados
@@ -1120,9 +1122,9 @@ def dashboard():
             admin_id=admin_id, 
             ativo=True
         ).count()
-        print(f"DEBUG VEÍCULOS: {veiculos_disponiveis} ativos para admin_id={admin_id}")
+        logger.debug(f"DEBUG VEÍCULOS: {veiculos_disponiveis} ativos para admin_id={admin_id}")
     except Exception as e:
-        print(f"Erro ao contar veículos disponíveis: {e}")
+        logger.error(f"Erro ao contar veículos disponíveis: {e}")
         veiculos_disponiveis = 0
     
     # 4. MARGEM DE LUCRO - Calcular baseado em valor de contratos vs custos
@@ -1145,9 +1147,9 @@ def dashboard():
                 1
             )
             # Margem pode ser >100% (se custos < 0) ou negativa (se custos > contratos)
-        print(f"DEBUG MARGEM: Contratos=R${valor_contrato_total:.2f}, Custos=R${custos_mes:.2f}, Margem={margem_percentual}%")
+            logger.debug(f"DEBUG MARGEM: Contratos=R${valor_contrato_total:.2f}, Custos=R${custos_mes:.2f}, Margem={margem_percentual}%")
     except Exception as e:
-        print(f"Erro ao calcular margem: {e}")
+        logger.error(f"Erro ao calcular margem: {e}")
         valor_contrato_total = 0
         margem_percentual = 0
     
@@ -1159,22 +1161,22 @@ def dashboard():
         default_value=0
     )
     
-    # ✅ CORREÇÃO 5: Converter dicionários para listas com proteção
+    # [OK] CORREÇÃO 5: Converter dicionários para listas com proteção
     if isinstance(funcionarios_por_departamento, dict) and funcionarios_por_departamento:
         funcionarios_dept = [{'nome': k, 'total': v} for k, v in funcionarios_por_departamento.items()]
     else:
         funcionarios_dept = []
-        print("⚠️ funcionarios_por_departamento vazio ou inválido")
+        logger.warning("[WARN] funcionarios_por_departamento vazio ou inválido")
     
     if isinstance(custos_por_obra, dict) and custos_por_obra:
         custos_recentes = [{'nome': k, 'total_custo': v} for k, v in custos_por_obra.items()]
     else:
         custos_recentes = []
-        print("⚠️ custos_por_obra vazio ou inválido")
+        logger.warning("[WARN] custos_por_obra vazio ou inválido")
     
     # Debug final
-    print(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")
-    print(f"DEBUG FINAL - Custos por obra: {custos_recentes}")
+        logger.debug(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")
+        logger.debug(f"DEBUG FINAL - Custos por obra: {custos_recentes}")
     
     # Buscar obras em andamento para a tabela com tratamento de erro
     obras_andamento = safe_db_operation(
@@ -1246,7 +1248,7 @@ def usuarios():
         )
     ).order_by(Usuario.nome).all()
     
-    print(f"👥 USUÁRIOS: {len(usuarios)} encontrados para admin_id={admin_id}")
+    logger.debug(f"[USERS] USUÁRIOS: {len(usuarios)} encontrados para admin_id={admin_id}")
     
     return render_template('usuarios/listar_usuarios.html', usuarios=usuarios)
 
@@ -1277,13 +1279,13 @@ def novo_usuario():
             db.session.add(usuario)
             db.session.commit()
             
-            flash(f'✅ Usuário {usuario.nome} criado com sucesso!', 'success')
+            flash(f'[OK] Usuário {usuario.nome} criado com sucesso!', 'success')
             return redirect(url_for('main.usuarios'))
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Erro ao criar usuário: {e}")
-            flash('❌ Erro ao criar usuário', 'danger')
+            logger.error(f"[ERROR] Erro ao criar usuário: {e}")
+            flash('[ERROR] Erro ao criar usuário', 'danger')
     
     return render_template('usuarios/novo_usuario.html')
 
@@ -1307,13 +1309,13 @@ def editar_usuario(user_id):
                 usuario.password_hash = generate_password_hash(request.form['password'])
             
             db.session.commit()
-            flash(f'✅ Usuário {usuario.nome} atualizado!', 'success')
+            flash(f'[OK] Usuário {usuario.nome} atualizado!', 'success')
             return redirect(url_for('main.usuarios'))
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Erro ao editar usuário: {e}")
-            flash('❌ Erro ao editar usuário', 'danger')
+            logger.error(f"[ERROR] Erro ao editar usuário: {e}")
+            flash('[ERROR] Erro ao editar usuário', 'danger')
     
     return render_template('usuarios/editar_usuario.html', usuario=usuario)
 
@@ -1331,7 +1333,7 @@ def funcionarios():
     # ===== PROCESSAR POST PARA CRIAR NOVO FUNCIONÁRIO =====
     if request.method == 'POST':
         try:
-            print("🔄 POST recebido para criar novo funcionário")
+            logger.info("[SYNC] POST recebido para criar novo funcionário")
             
             # Obter admin_id para o novo funcionário
             if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
@@ -1349,7 +1351,7 @@ def funcionarios():
             cpf = request.form.get('cpf', '').strip()
             codigo = request.form.get('codigo', '').strip()
             
-            # 🔧 GERAR CÓDIGO AUTOMÁTICO SE VAZIO
+            # [CONFIG] GERAR CÓDIGO AUTOMÁTICO SE VAZIO
             if not codigo:
                 # Buscar último código VV existente
                 ultimo_funcionario = Funcionario.query.filter(
@@ -1367,16 +1369,16 @@ def funcionarios():
                     novo_numero = 1
                 
                 codigo = f"VV{novo_numero:03d}"
-                print(f"✅ Código gerado automaticamente: {codigo}")
+                logger.info(f"[OK] Código gerado automaticamente: {codigo}")
             
             if not nome or not cpf:
-                flash('❌ Nome e CPF são obrigatórios!', 'error')
+                flash('[ERROR] Nome e CPF são obrigatórios!', 'error')
                 return redirect(url_for('main.funcionarios'))
             
             # Verificar se CPF já existe
             funcionario_existente = Funcionario.query.filter_by(cpf=cpf).first()
             if funcionario_existente:
-                flash(f'❌ CPF {cpf} já está cadastrado para {funcionario_existente.nome}!', 'error')
+                flash(f'[ERROR] CPF {cpf} já está cadastrado para {funcionario_existente.nome}!', 'error')
                 return redirect(url_for('main.funcionarios'))
             
             # Criar novo funcionário
@@ -1417,15 +1419,15 @@ def funcionarios():
             db.session.add(novo_funcionario)
             db.session.commit()
             
-            flash(f'✅ Funcionário {nome} cadastrado com sucesso!', 'success')
-            print(f"✅ Funcionário criado: {nome} (ID: {novo_funcionario.id})")
+            flash(f'[OK] Funcionário {nome} cadastrado com sucesso!', 'success')
+            logger.info(f"[OK] Funcionário criado: {nome} (ID: {novo_funcionario.id})")
             
             return redirect(url_for('main.funcionarios'))
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Erro ao criar funcionário: {str(e)}")
-            flash(f'❌ Erro ao criar funcionário: {str(e)}', 'error')
+            logger.error(f"[ERROR] Erro ao criar funcionário: {str(e)}")
+            flash(f'[ERROR] Erro ao criar funcionário: {str(e)}', 'error')
             return redirect(url_for('main.funcionarios'))
     
     # ===== LÓGICA GET (LISTAGEM) =====
@@ -1479,8 +1481,8 @@ def funcionarios():
     ).order_by(Funcionario.nome).all()
     
     # Debug para produção
-    print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}")
-    print(f"DEBUG USER: {current_user.email if hasattr(current_user, 'email') else 'No user'} - {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'No type'}")
+    logger.debug(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}")
+    logger.debug(f"DEBUG USER: {current_user.email if hasattr(current_user, 'email') else 'No user'} - {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'No type'}")
     
     # Buscar funcionários inativos também para exibir na lista
     funcionarios_inativos = Funcionario.query.filter_by(
@@ -1556,11 +1558,11 @@ def funcionarios():
                         else:
                             total_faltas += 1
                 
-                # ✅ CORREÇÃO CRÍTICA: Sem registros = Sem custo (não usar fallback)
+                # [OK] CORREÇÃO CRÍTICA: Sem registros = Sem custo (não usar fallback)
                 # Fallback removido - se não há registros de ponto, custo = R$ 0.00
                 # Isso evita estimativas incorretas quando período está vazio
                 
-                # 🔒 PROTEÇÃO: Acessar funcao_ref com proteção contra erro de schema (Migração 48)
+                # [LOCK] PROTEÇÃO: Acessar funcao_ref com proteção contra erro de schema (Migração 48)
                 try:
                     funcao_nome = func.funcao_ref.nome if hasattr(func, 'funcao_ref') and func.funcao_ref else "N/A"
                 except Exception as e:
@@ -1592,7 +1594,7 @@ def funcionarios():
                         'custo_total': (total_horas + total_extras * 1.5) * (calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0)
                     })
             except Exception as e:
-                print(f"Erro KPI funcionário {func.nome}: {str(e)}")
+                logger.error(f"Erro KPI funcionário {func.nome}: {str(e)}")
                 db.session.rollback()  # CRÍTICO: Fechar transação após erro
                 # Em caso de erro real, retornar zeros
                 funcionarios_kpis.append({
@@ -1632,7 +1634,7 @@ def funcionarios():
         taxa_absenteismo = (total_faltas_todas / total_dias_trabalho_possivel * 100) if total_dias_trabalho_possivel > 0 else 0
         
         # Debug do cálculo
-        print(f"DEBUG ABSENTEÍSMO: {total_faltas_todas} faltas / {total_dias_trabalho_possivel} dias possíveis = {taxa_absenteismo:.2f}%")
+        logger.debug(f"DEBUG ABSENTEÍSMO: {total_faltas_todas} faltas / {total_dias_trabalho_possivel} dias possíveis = {taxa_absenteismo:.2f}%")
         
         kpis_geral = {
             'total_funcionarios': len(funcionarios),
@@ -1649,8 +1651,8 @@ def funcionarios():
     except Exception as e:
         import traceback
         db.session.rollback()  # CRÍTICO: Fechar transação abortada
-        print(f"ERRO CRÍTICO KPIs: {str(e)}")
-        print(f"TRACEBACK DETALHADO: {traceback.format_exc()}")
+        logger.error(f"ERRO CRÍTICO KPIs: {str(e)}")
+        logger.debug(f"TRACEBACK DETALHADO: {traceback.format_exc()}")
         # Em caso de erro, criar dados básicos para não quebrar a página
         funcionarios_kpis = []
         kpis_geral = {
@@ -1667,7 +1669,7 @@ def funcionarios():
         flash(f'Erro no sistema de KPIs: {str(e)}. Dados básicos carregados.', 'warning')
     
     # Debug final antes do template
-    print(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários, {len(funcionarios_kpis)} KPIs")
+        logger.debug(f"DEBUG FUNCIONÁRIOS: {len(funcionarios)} funcionários, {len(funcionarios_kpis)} KPIs")
     
     # Buscar dados para o formulário (com proteção contra transação abortada)
     try:
@@ -1676,7 +1678,7 @@ def funcionarios():
         horarios = HorarioTrabalho.query.filter_by(admin_id=admin_id).all()
     except Exception as e:
         db.session.rollback()  # Fechar transação se houver erro
-        print(f"ERRO ao buscar dados do formulário: {str(e)}")
+        logger.error(f"ERRO ao buscar dados do formulário: {str(e)}")
         departamentos = []
         funcoes = []
         horarios = []
@@ -2142,7 +2144,7 @@ def funcionario_perfil_pdf(id):
         return response
         
     except Exception as e:
-        print(f"ERRO PDF: {str(e)}")
+        logger.error(f"ERRO PDF: {str(e)}")
         import traceback
         traceback.print_exc()
         return f"Erro ao gerar PDF: {str(e)}", 500
@@ -2169,7 +2171,7 @@ def obras():
             obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
             admin_id = obra_counts[0] if obra_counts else 1
         except Exception as e:
-            print(f"Erro ao detectar admin_id: {e}")
+            logger.error(f"Erro ao detectar admin_id: {e}")
             admin_id = 1
     
     # Obter filtros da query string
@@ -2197,24 +2199,24 @@ def obras():
         try:
             data_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d').date()
             query = query.filter(Obra.data_inicio >= data_inicio)
-            print(f"DEBUG: Filtro data_inicio aplicado: {data_inicio}")
+            logger.debug(f"DEBUG: Filtro data_inicio aplicado: {data_inicio}")
         except ValueError as e:
-            print(f"DEBUG: Erro na data_inicio: {e}")
+            logger.error(f"DEBUG: Erro na data_inicio: {e}")
     
     if filtros['data_fim']:
         try:
             data_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d').date()
             query = query.filter(Obra.data_inicio <= data_fim)
-            print(f"DEBUG: Filtro data_fim aplicado: {data_fim}")
+            logger.debug(f"DEBUG: Filtro data_fim aplicado: {data_fim}")
         except ValueError as e:
-            print(f"DEBUG: Erro na data_fim: {e}")
+            logger.error(f"DEBUG: Erro na data_fim: {e}")
     
     # Importar desc localmente para evitar conflitos
     from sqlalchemy import desc
     obras = query.order_by(desc(Obra.data_inicio)).all()
     
-    print(f"DEBUG FILTROS OBRAS: {filtros}")
-    print(f"DEBUG TOTAL OBRAS ENCONTRADAS: {len(obras)}")
+    logger.debug(f"DEBUG FILTROS OBRAS: {filtros}")
+    logger.debug(f"DEBUG TOTAL OBRAS ENCONTRADAS: {len(obras)}")
     
     # Definir período para cálculos de custo
     if filtros['data_inicio']:
@@ -2233,7 +2235,7 @@ def obras():
     else:
         periodo_fim = date.today()
     
-    print(f"DEBUG PERÍODO CUSTOS: {periodo_inicio} até {periodo_fim}")
+        logger.debug(f"DEBUG PERÍODO CUSTOS: {periodo_inicio} até {periodo_fim}")
     
     # Calcular custos reais para cada obra no período
     for obra in obras:
@@ -2280,7 +2282,7 @@ def obras():
             custo_diversos_total = sum(c.valor for c in custos_diversos if c.valor)
             
             # 4. CUSTOS DE VEÍCULOS/TRANSPORTE da obra
-            # ✅ CORREÇÃO: Usar verificação de atributo para obra_id
+            # [OK] CORREÇÃO: Usar verificação de atributo para obra_id
             custos_query = VehicleExpense.query.filter(
                 VehicleExpense.data_custo >= periodo_inicio,
                 VehicleExpense.data_custo <= periodo_fim
@@ -2307,10 +2309,10 @@ def obras():
                 'custo_transporte': custo_transporte_total
             }
             
-            print(f"DEBUG CUSTO OBRA {obra.nome}: Total=R${custo_total_obra:.2f} (Mão=R${custo_mao_obra:.2f} + Alim=R${custo_alimentacao:.2f} + Div=R${custo_diversos_total:.2f} + Trans=R${custo_transporte_total:.2f})")
+            logger.debug(f"DEBUG CUSTO OBRA {obra.nome}: Total=R${custo_total_obra:.2f} (Mão=R${custo_mao_obra:.2f} + Alim=R${custo_alimentacao:.2f} + Div=R${custo_diversos_total:.2f} + Trans=R${custo_transporte_total:.2f})")
             
         except Exception as e:
-            print(f"ERRO ao calcular custos obra {obra.nome}: {e}")
+            logger.error(f"ERRO ao calcular custos obra {obra.nome}: {e}")
             obra.kpis = {
                 'total_rdos': 0,
                 'dias_trabalhados': 0,
@@ -2377,7 +2379,7 @@ def nova_obra():
                     codigo = f"O{novo_numero:04d}"
                     
                 except Exception as e:
-                    print(f"⚠️ Erro na geração de código, usando fallback: {e}")
+                    logger.error(f"[WARN] Erro na geração de código, usando fallback: {e}")
                     # Fallback: gerar código baseado em timestamp
                     timestamp = datetime.now().strftime("%m%d%H%M")
                     codigo = f"O{timestamp}"
@@ -2421,12 +2423,12 @@ def nova_obra():
             db.session.add(nova_obra)
             db.session.flush()  # Para obter o ID da obra
             
-            # ✅ CORREÇÃO CRÍTICA: Processar serviços selecionados usando função refatorada
+            # [OK] CORREÇÃO CRÍTICA: Processar serviços selecionados usando função refatorada
             # SEMPRE chamar processar_servicos_obra(), mesmo com lista vazia (igual à edição)
             servicos_selecionados = request.form.getlist('servicos_obra')
-            print(f"🔧 NOVA OBRA: Processando {len(servicos_selecionados)} serviços selecionados")
+            logger.info(f"[CONFIG] NOVA OBRA: Processando {len(servicos_selecionados)} serviços selecionados")
             servicos_processados = processar_servicos_obra(nova_obra.id, servicos_selecionados)
-            print(f"✅ {servicos_processados} serviços processados para nova obra {nova_obra.id}")
+            logger.info(f"[OK] {servicos_processados} serviços processados para nova obra {nova_obra.id}")
             
             db.session.commit()
             
@@ -2449,10 +2451,10 @@ def nova_obra():
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         servicos_disponiveis = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
         
-        print(f"DEBUG NOVA OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
+        logger.debug(f"DEBUG NOVA OBRA: {len(funcionarios)} funcionários e {len(servicos_disponiveis)} serviços carregados para admin_id={admin_id}")
         
     except Exception as e:
-        print(f"ERRO ao carregar dados: {e}")
+        logger.error(f"ERRO ao carregar dados: {e}")
         funcionarios = []
         servicos_disponiveis = []
     
@@ -2472,37 +2474,37 @@ def get_admin_id_robusta(obra=None, current_user=None):
             from flask_login import current_user as flask_current_user
             current_user = flask_current_user
         
-        # ⚡ PRIORIDADE 1: USUÁRIO LOGADO (SEMPRE PRIMEIRO!)
+        # [FAST] PRIORIDADE 1: USUÁRIO LOGADO (SEMPRE PRIMEIRO!)
         if current_user and current_user.is_authenticated:
             # Se é ADMIN, usar seu próprio ID
             from models import TipoUsuario
             if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                print(f"🔒 ADMIN LOGADO: admin_id={current_user.id}")
+                logger.debug(f"[LOCK] ADMIN LOGADO: admin_id={current_user.id}")
                 return current_user.id
             
             # Se é funcionário, usar admin_id
             elif hasattr(current_user, 'admin_id') and current_user.admin_id:
-                print(f"🔒 FUNCIONÁRIO LOGADO: admin_id={current_user.admin_id}")
+                logger.debug(f"[LOCK] FUNCIONÁRIO LOGADO: admin_id={current_user.admin_id}")
                 return current_user.admin_id
             
             # Fallback para ID do usuário
             elif hasattr(current_user, 'id') and current_user.id:
-                print(f"🔒 USUÁRIO GENÉRICO LOGADO: admin_id={current_user.id}")
+                logger.debug(f"[LOCK] USUÁRIO GENÉRICO LOGADO: admin_id={current_user.id}")
                 return current_user.id
         
-        # ⚡ PRIORIDADE 2: Se obra tem admin_id específico
+        # [FAST] PRIORIDADE 2: Se obra tem admin_id específico
         if obra and hasattr(obra, 'admin_id') and obra.admin_id:
-            print(f"🎯 Admin_ID da obra: {obra.admin_id}")
+            logger.debug(f"[TARGET] Admin_ID da obra: {obra.admin_id}")
             return obra.admin_id
         
-        # ⚠️ SEM USUÁRIO LOGADO: ERRO CRÍTICO DE SEGURANÇA
-        print("❌ ERRO CRÍTICO: Nenhum usuário autenticado encontrado!")
-        print("❌ Sistema multi-tenant requer usuário logado OBRIGATORIAMENTE")
-        print("❌ Não é permitido detecção automática de admin_id")
+        # [WARN] SEM USUÁRIO LOGADO: ERRO CRÍTICO DE SEGURANÇA
+            logger.error("[ERROR] ERRO CRÍTICO: Nenhum usuário autenticado encontrado!")
+            logger.error("[ERROR] Sistema multi-tenant requer usuário logado OBRIGATORIAMENTE")
+            logger.error("[ERROR] Não é permitido detecção automática de admin_id")
         return None
         
     except Exception as e:
-        print(f"ERRO CRÍTICO get_admin_id_robusta: {e}")
+        logger.error(f"ERRO CRÍTICO get_admin_id_robusta: {e}")
         return 1  # Fallback de produção
 
 def verificar_dados_producao(admin_id):
@@ -2530,31 +2532,31 @@ def verificar_dados_producao(admin_id):
             "SELECT COUNT(*) FROM obra WHERE admin_id = :admin_id"
         ), {'admin_id': admin_id}).scalar()
         
-        print(f"📊 VERIFICAÇÃO PRODUÇÃO admin_id {admin_id}: {funcionarios} funcionários, {servicos} serviços, {subatividades} subatividades, {obras} obras")
+        logger.info(f"[STATS] VERIFICAÇÃO PRODUÇÃO admin_id {admin_id}: {funcionarios} funcionários, {servicos} serviços, {subatividades} subatividades, {obras} obras")
         
         # Considerar válido se tem pelo menos serviços OU funcionários OU obras
         is_valid = funcionarios > 0 or servicos > 0 or obras > 0
         
         if not is_valid:
-            print(f"⚠️ ADMIN_ID {admin_id} NÃO TEM DADOS SUFICIENTES")
+            logger.warning(f"[WARN] ADMIN_ID {admin_id} NÃO TEM DADOS SUFICIENTES")
         else:
-            print(f"✅ ADMIN_ID {admin_id} VALIDADO PARA PRODUÇÃO")
+            logger.info(f"[OK] ADMIN_ID {admin_id} VALIDADO PARA PRODUÇÃO")
             
         return is_valid
         
     except Exception as e:
-        print(f"ERRO verificação produção admin_id {admin_id}: {e}")
+        logger.error(f"ERRO verificação produção admin_id {admin_id}: {e}")
         return False
 
 def processar_servicos_obra(obra_id, servicos_selecionados):
     """Processa associação de serviços à obra usando NOVA TABELA servico_obra_real"""
     try:
-        print(f"🔧 PROCESSANDO SERVIÇOS NOVA TABELA: obra_id={obra_id}, {len(servicos_selecionados)} serviços")
+        logger.info(f"[CONFIG] PROCESSANDO SERVIÇOS NOVA TABELA: obra_id={obra_id}, {len(servicos_selecionados)} serviços")
         
         # ===== DEFINIR ADMIN_ID NO INÍCIO =====
         obra = Obra.query.get(obra_id)
         admin_id = obra.admin_id if obra and obra.admin_id else get_admin_id_robusta()
-        print(f"🎯 USANDO ADMIN_ID DA OBRA: {admin_id}")
+        logger.debug(f"[TARGET] USANDO ADMIN_ID DA OBRA: {admin_id}")
         
         # ===== NOVO SISTEMA: USAR TABELA servico_obra_real =====
         
@@ -2571,7 +2573,7 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
         servicos_removidos = 0
         for servico_atual in servicos_atuais:
             if servico_atual.servico_id not in servicos_selecionados_ids:
-                print(f"🗑️ REMOVENDO SERVIÇO DA OBRA: ID {servico_atual.servico_id}")
+                logger.debug(f"[DEL] REMOVENDO SERVIÇO DA OBRA: ID {servico_atual.servico_id}")
                 servico_atual.ativo = False
                 servicos_removidos += 1
                 
@@ -2581,9 +2583,9 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
                     admin_id=admin_id
                 ).delete()
                 
-                print(f"🧹 LIMPEZA AUTOMÁTICA: {rdos_deletados} registros de RDO removidos para serviço {servico_atual.servico_id}")
+                logger.debug(f"[CLEAN] LIMPEZA AUTOMÁTICA: {rdos_deletados} registros de RDO removidos para serviço {servico_atual.servico_id}")
         
-        print(f"✅ EXCLUSÃO INTELIGENTE: {servicos_removidos} serviços desativados automaticamente")
+                logger.info(f"[OK] EXCLUSÃO INTELIGENTE: {servicos_removidos} serviços desativados automaticamente")
         
         # Processar novos serviços usando ServicoObraReal
         servicos_processados = 0
@@ -2603,7 +2605,7 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
                     ).first()
                     
                     if not servico:
-                        print(f"⚠️ Serviço {servico_id_int} não encontrado ou não pertence ao admin {admin_id}")
+                        logger.warning(f"[WARN] Serviço {servico_id_int} não encontrado ou não pertence ao admin {admin_id}")
                         continue
                     
                     # Verificar se serviço já existe na nova tabela (ativo ou inativo)
@@ -2618,11 +2620,11 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
                         if not servico_existente.ativo:
                             servico_existente.ativo = True
                             servico_existente.observacoes = f'Serviço reativado via edição em {data_hoje.strftime("%d/%m/%Y")}'
-                            print(f"🔄 Serviço {servico.nome} reativado na obra")
+                            logger.debug(f"[SYNC] Serviço {servico.nome} reativado na obra")
                             servicos_processados += 1
                             continue
                         else:
-                            print(f"⚠️ Serviço {servico.nome} já está ativo na obra")
+                            logger.warning(f"[WARN] Serviço {servico.nome} já está ativo na obra")
                             continue
                     
                     # Criar novo registro na tabela servico_obra_real
@@ -2644,20 +2646,20 @@ def processar_servicos_obra(obra_id, servicos_selecionados):
                     )
                     
                     db.session.add(novo_servico_obra)
-                    print(f"🆕 Novo serviço {servico.nome} adicionado à nova tabela")
+                    logger.debug(f"🆕 Novo serviço {servico.nome} adicionado à nova tabela")
                     
                     servicos_processados += 1
                     
                 except (ValueError, TypeError) as ve:
-                    print(f"❌ Erro ao processar serviço '{servico_id}': {ve}")
+                    logger.error(f"[ERROR] Erro ao processar serviço '{servico_id}': {ve}")
                 except Exception as se:
-                    print(f"❌ Erro inesperado com serviço {servico_id}: {se}")
+                    logger.error(f"[ERROR] Erro inesperado com serviço {servico_id}: {se}")
         
-        print(f"✅ {servicos_processados} serviços processados com sucesso")
+                    logger.info(f"[OK] {servicos_processados} serviços processados com sucesso")
         return servicos_processados
         
     except Exception as e:
-        print(f"🚨 ERRO CRÍTICO em processar_servicos_obra: {e}")
+        logger.error(f"[ALERT] ERRO CRÍTICO em processar_servicos_obra: {e}")
         import traceback
         traceback.print_exc()
         return 0
@@ -2701,14 +2703,14 @@ def calcular_progresso_real_servico(obra_id, servico_id):
         
         if result and result[0] is not None:
             progresso = float(result[0])
-            print(f"📊 Serviço {servico_id}: Progresso calculado = {progresso:.1f}% (último valor de cada subatividade)")
+            logger.info(f"[STATS] Serviço {servico_id}: Progresso calculado = {progresso:.1f}% (último valor de cada subatividade)")
             return round(progresso, 1)
         else:
-            print(f"ℹ️ Serviço {servico_id}: Sem RDOs registrados")
+            logger.info(f"[INFO] Serviço {servico_id}: Sem RDOs registrados")
             return 0.0
             
     except Exception as e:
-        print(f"❌ Erro ao calcular progresso real do serviço {servico_id}: {e}")
+        logger.error(f"[ERROR] Erro ao calcular progresso real do serviço {servico_id}: {e}")
         return 0.0
 
 def obter_servicos_da_obra(obra_id, admin_id=None):
@@ -2721,7 +2723,7 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
         if not admin_id:
             admin_id = get_admin_id_robusta()
         
-        print(f"🔍 BUSCANDO SERVIÇOS NA NOVA TABELA servico_obra_real para obra {obra_id}, admin_id {admin_id}")
+            logger.debug(f"[DEBUG] BUSCANDO SERVIÇOS NA NOVA TABELA servico_obra_real para obra {obra_id}, admin_id {admin_id}")
         
         # Usar nova tabela ServicoObraReal
         try:
@@ -2758,30 +2760,30 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                     'observacoes': servico_obra_real.observacoes or ''
                 })
             
-            # ✅ CALCULAR PROGRESSO REAL BASEADO EM RDOs
-            print(f"📊 Calculando progresso real dos serviços baseado em RDOs...")
+            # [OK] CALCULAR PROGRESSO REAL BASEADO EM RDOs
+                logger.info(f"[STATS] Calculando progresso real dos serviços baseado em RDOs...")
             for servico in servicos_lista:
                 progresso_real = calcular_progresso_real_servico(obra_id, servico['id'])
                 servico['progresso'] = progresso_real
             
-            print(f"✅ {len(servicos_lista)} serviços encontrados na NOVA TABELA para obra {obra_id}")
+                logger.info(f"[OK] {len(servicos_lista)} serviços encontrados na NOVA TABELA para obra {obra_id}")
             return servicos_lista
             
         except SQLAlchemyError as sql_error:
             # Rollback em caso de erro SQL específico
-            print(f"🔄 ROLLBACK: Erro SQLAlchemy detectado: {sql_error}")
+            logger.error(f"[SYNC] ROLLBACK: Erro SQLAlchemy detectado: {sql_error}")
             db.session.rollback()
             # Tentar fallback após rollback
             raise sql_error
             
     except Exception as e:
-        print(f"❌ Erro ao obter serviços da obra {obra_id}: {e}")
+        logger.error(f"[ERROR] Erro ao obter serviços da obra {obra_id}: {e}")
         # Fazer rollback e tentar fallback
         try:
             db.session.rollback()
-            print("🔄 ROLLBACK executado")
+            logger.info("[SYNC] ROLLBACK executado")
         except:
-            print("⚠️ Rollback falhou")
+            logger.error("[WARN] Rollback falhou")
             
         # Fallback simpler - buscar apenas serviços que têm RDO
         try:
@@ -2810,19 +2812,19 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
                     'ativo': True
                 })
             
-            # ✅ CALCULAR PROGRESSO REAL BASEADO EM RDOs (FALLBACK)
-            print(f"📊 Calculando progresso real dos serviços baseado em RDOs (FALLBACK)...")
+            # [OK] CALCULAR PROGRESSO REAL BASEADO EM RDOs (FALLBACK)
+                logger.info(f"[STATS] Calculando progresso real dos serviços baseado em RDOs (FALLBACK)...")
             for servico in servicos_lista:
                 progresso_real = calcular_progresso_real_servico(obra_id, servico['id'])
                 servico['progresso'] = progresso_real
             
-            print(f"✅ FALLBACK: {len(servicos_lista)} serviços encontrados")
+                logger.info(f"[OK] FALLBACK: {len(servicos_lista)} serviços encontrados")
             return servicos_lista
         except Exception as e2:
             logger.error(f"Erro no fallback de busca de serviços: {e2}")
             try:
                 db.session.rollback()
-                print("🔄 ROLLBACK fallback executado")
+                logger.info("[SYNC] ROLLBACK fallback executado")
             except Exception as rollback_error:
                 logger.warning(f"Falha ao executar rollback no fallback: {rollback_error}")
             return []
@@ -2830,12 +2832,12 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
 def obter_servicos_disponiveis(admin_id):
     """Obtém lista de serviços disponíveis APENAS do admin específico (multi-tenant)"""
     try:
-        # 🔒 ISOLAMENTO MULTI-TENANT: Cada admin vê APENAS seus próprios serviços
+        # [LOCK] ISOLAMENTO MULTI-TENANT: Cada admin vê APENAS seus próprios serviços
         servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
-        print(f"🔒 MULTI-TENANT: Retornando {len(servicos)} serviços para admin_id={admin_id}")
+        logger.debug(f"[LOCK] MULTI-TENANT: Retornando {len(servicos)} serviços para admin_id={admin_id}")
         return servicos
     except Exception as e:
-        print(f"❌ Erro ao obter serviços disponíveis: {e}")
+        logger.error(f"[ERROR] Erro ao obter serviços disponíveis: {e}")
         return []
 
 def obter_funcionarios(admin_id):
@@ -2844,7 +2846,7 @@ def obter_funcionarios(admin_id):
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         return funcionarios
     except Exception as e:
-        print(f"❌ Erro ao obter funcionários: {e}")
+        logger.error(f"[ERROR] Erro ao obter funcionários: {e}")
         return []
 
 # CRUD OBRAS - Editar Obra
@@ -2856,13 +2858,13 @@ def editar_obra(id):
     
     if request.method == 'POST':
         try:
-            # 🔧 ROLLBACK PREVENTIVO: Limpar qualquer sessão corrompida
+            # [CONFIG] ROLLBACK PREVENTIVO: Limpar qualquer sessão corrompida
             try:
                 db.session.rollback()
             except Exception as rollback_error:
                 logger.warning(f"Falha no rollback preventivo ao editar obra: {rollback_error}")
             
-            print(f"🔧 INICIANDO EDIÇÃO DA OBRA {id}: {obra.nome}")
+                logger.info(f"[CONFIG] INICIANDO EDIÇÃO DA OBRA {id}: {obra.nome}")
             
             # Atualizar dados básicos da obra
             obra.nome = request.form.get('nome')
@@ -2883,7 +2885,7 @@ def editar_obra(id):
             obra.area_total_m2 = float(request.form.get('area_total_m2', 0)) if request.form.get('area_total_m2') else None
             obra.responsavel_id = int(request.form.get('responsavel_id')) if request.form.get('responsavel_id') else None
             
-            # 🔧 CÓDIGO DE OBRA: Gerar automático se None/vazio
+            # [CONFIG] CÓDIGO DE OBRA: Gerar automático se None/vazio
             codigo_form = request.form.get('codigo', '').strip()
             if not codigo_form or codigo_form.lower() == 'none':
                 # Gerar código automático: OB001, OB002, etc.
@@ -2902,7 +2904,7 @@ def editar_obra(id):
                     novo_numero = 1
                 
                 obra.codigo = f"OB{novo_numero:03d}"
-                print(f"✅ Código de obra gerado automaticamente: {obra.codigo}")
+                logger.info(f"[OK] Código de obra gerado automaticamente: {obra.codigo}")
             else:
                 obra.codigo = codigo_form
             
@@ -2925,7 +2927,7 @@ def editar_obra(id):
             # ===== SISTEMA REFATORADO DE SERVIÇOS =====
             # Processar serviços selecionados usando nova função
             servicos_selecionados = request.form.getlist('servicos_obra')
-            print(f"📝 SERVIÇOS SELECIONADOS: {servicos_selecionados}")
+            logger.info(f"[INFO] SERVIÇOS SELECIONADOS: {servicos_selecionados}")
             
             # Usar função refatorada para processar serviços
             servicos_processados = processar_servicos_obra(obra.id, servicos_selecionados)
@@ -2934,17 +2936,17 @@ def editar_obra(id):
             # Salvar todas as alterações
             try:
                 db.session.commit()
-                print(f"✅ OBRA {obra.id} ATUALIZADA: {servicos_processados} serviços processados")
+                logger.info(f"[OK] OBRA {obra.id} ATUALIZADA: {servicos_processados} serviços processados")
                 flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
                 return redirect(url_for('main.detalhes_obra', id=obra.id))
                 
             except Exception as commit_error:
-                print(f"🚨 ERRO NO COMMIT: {commit_error}")
+                logger.error(f"[ALERT] ERRO NO COMMIT: {commit_error}")
                 db.session.rollback()
                 flash(f'Erro ao salvar obra: {str(commit_error)}', 'error')
             
         except Exception as e:
-            print(f"🚨 ERRO GERAL NA EDIÇÃO: {str(e)}")
+            logger.error(f"[ALERT] ERRO GERAL NA EDIÇÃO: {str(e)}")
             db.session.rollback()
             flash(f'Erro ao atualizar obra: {str(e)}', 'error')
     
@@ -2953,13 +2955,13 @@ def editar_obra(id):
         # Fazer rollback preventivo para evitar transações abortadas
         try:
             db.session.rollback()
-            print("🔄 ROLLBACK preventivo na edição executado")
+            logger.info("[SYNC] ROLLBACK preventivo na edição executado")
         except:
             pass
         
         # Usar sistema robusto de detecção de admin_id
         admin_id = get_admin_id_robusta(obra, current_user)
-        print(f"🔍 ADMIN_ID DETECTADO PARA EDIÇÃO: {admin_id}")
+        logger.debug(f"[DEBUG] ADMIN_ID DETECTADO PARA EDIÇÃO: {admin_id}")
         
         # Carregar funcionários disponíveis
         funcionarios = obter_funcionarios(admin_id)
@@ -2972,23 +2974,23 @@ def editar_obra(id):
             servicos_obra_lista = obter_servicos_da_obra(obra.id, admin_id)
             servicos_obra = [s['id'] for s in servicos_obra_lista]
         except Exception as servicos_error:
-            print(f"🚨 ERRO ao buscar serviços da obra na edição: {servicos_error}")
+            logger.error(f"[ALERT] ERRO ao buscar serviços da obra na edição: {servicos_error}")
             try:
                 db.session.rollback()
-                print("🔄 ROLLBACK após erro de serviços executado")
+                logger.error("[SYNC] ROLLBACK após erro de serviços executado")
             except:
                 pass
             servicos_obra_lista = []
             servicos_obra = []
         
-        print(f"✅ EDIÇÃO CARREGADA: {len(funcionarios)} funcionários, {len(servicos_disponiveis)} serviços disponíveis")
-        print(f"✅ SERVIÇOS DA OBRA: {len(servicos_obra)} já associados")
+            logger.info(f"[OK] EDIÇÃO CARREGADA: {len(funcionarios)} funcionários, {len(servicos_disponiveis)} serviços disponíveis")
+            logger.info(f"[OK] SERVIÇOS DA OBRA: {len(servicos_obra)} já associados")
         
     except Exception as e:
-        print(f"ERRO ao carregar dados para edição: {e}")
+        logger.error(f"ERRO ao carregar dados para edição: {e}")
         try:
             db.session.rollback()
-            print("🔄 ROLLBACK geral na edição executado")
+            logger.info("[SYNC] ROLLBACK geral na edição executado")
         except:
             pass
         funcionarios = []
@@ -3012,14 +3014,14 @@ def excluir_obra(id):
         flash('Operação de exclusão deve ser feita via POST', 'warning')
         return redirect(url_for('main.obras'))
     try:
-        # 🔄 ROLLBACK PREVENTIVO: Limpar qualquer sessão corrompida
+        # [SYNC] ROLLBACK PREVENTIVO: Limpar qualquer sessão corrompida
         try:
             db.session.rollback()
-            print("🔄 ROLLBACK preventivo na exclusão executado")
+            logger.info("[SYNC] ROLLBACK preventivo na exclusão executado")
         except Exception as rollback_error:
-            print(f"⚠️ Falha no rollback preventivo: {rollback_error}")
+            logger.error(f"[WARN] Falha no rollback preventivo: {rollback_error}")
         
-        # 🔒 SEGURANÇA MULTI-TENANT: Obter admin_id do usuário atual
+        # [LOCK] SEGURANÇA MULTI-TENANT: Obter admin_id do usuário atual
         admin_id = get_tenant_admin_id()
         
         # Buscar obra com verificação de admin_id
@@ -3032,11 +3034,11 @@ def excluir_obra(id):
             flash(f'Não é possível excluir a obra "{nome}" pois possui {rdos_count} RDOs associados', 'warning')
             return redirect(url_for('main.detalhes_obra', id=id))
         
-        # 🧹 EXCLUSÃO COMPLETA VIA SQL DIRETO: Evitar lazy loading e problemas de cache
-        # ⚠️ TODAS as exclusões incluem admin_id para SEGURANÇA MULTI-TENANT
-        # 📋 Ordem de exclusão respeita dependências FK (filhos antes de pais)
+        # [CLEAN] EXCLUSÃO COMPLETA VIA SQL DIRETO: Evitar lazy loading e problemas de cache
+        # [WARN] TODAS as exclusões incluem admin_id para SEGURANÇA MULTI-TENANT
+        # [LIST] Ordem de exclusão respeita dependências FK (filhos antes de pais)
         try:
-            # ⚡ LISTA COMPLETA: TODAS as 38 tabelas com FK para obra.id
+            # [FAST] LISTA COMPLETA: TODAS as 38 tabelas com FK para obra.id
             # Ordem importa - dependências mais profundas primeiro
             tabelas_dependentes = [
                 # Tabelas críticas com admin_id
@@ -3084,9 +3086,9 @@ def excluir_obra(id):
                 'proposta': 'obra_gerada_id',  # Usa obra_gerada_id em vez de obra_id
             }
             
-            # 🔍 INTROSPECT: Detectar quais tabelas têm admin_id ANTES de deletar
+            # [DEBUG] INTROSPECT: Detectar quais tabelas têm admin_id ANTES de deletar
             # Isso evita rollbacks que desfazem exclusões anteriores
-            print("🔍 Introspectando colunas das tabelas dependentes...")
+            logger.debug("[DEBUG] Introspectando colunas das tabelas dependentes...")
             tabelas_com_admin_id = set()
             for tabela in tabelas_dependentes:
                 try:
@@ -3102,11 +3104,11 @@ def excluir_obra(id):
                     if result.fetchone():
                         tabelas_com_admin_id.add(tabela)
                 except Exception as introspect_error:
-                    print(f"⚠️ Erro ao introspeccionar {tabela}: {introspect_error}")
+                    logger.error(f"[WARN] Erro ao introspeccionar {tabela}: {introspect_error}")
             
-            print(f"📊 {len(tabelas_com_admin_id)} tabelas COM admin_id, {len(tabelas_dependentes) - len(tabelas_com_admin_id)} SEM admin_id")
+                    logger.info(f"[STATS] {len(tabelas_com_admin_id)} tabelas COM admin_id, {len(tabelas_dependentes) - len(tabelas_com_admin_id)} SEM admin_id")
             
-            # 🗑️ DELETAR: Usar conexão RAW com autocommit para isolar cada DELETE
+            # [DEL] DELETAR: Usar conexão RAW com autocommit para isolar cada DELETE
             # Isso evita que erros em uma tabela corrompam a sessão principal
             total_deletados = 0
             
@@ -3134,7 +3136,7 @@ def excluir_obra(id):
                             )
                             count = result.rowcount
                             if count > 0:
-                                print(f"🧹 Removidos {count} de {tabela} (COM admin_id={admin_id})")
+                                logger.debug(f"[CLEAN] Removidos {count} de {tabela} (COM admin_id={admin_id})")
                                 total_deletados += count
                         else:
                             # Tabela NÃO tem admin_id - deletar sem verificação
@@ -3145,14 +3147,14 @@ def excluir_obra(id):
                             )
                             count = result.rowcount
                             if count > 0:
-                                print(f"🧹 Removidos {count} de {tabela} (SEM admin_id)")
+                                logger.debug(f"[CLEAN] Removidos {count} de {tabela} (SEM admin_id)")
                                 total_deletados += count
                     
                 except Exception as table_error:
                     # Erro é isolado - não afeta outras tabelas nem a sessão principal
-                    print(f"⚠️ Erro ao deletar de {tabela}: {table_error}")
+                    logger.error(f"[WARN] Erro ao deletar de {tabela}: {table_error}")
             
-            print(f"📊 Total de {total_deletados} registros dependentes removidos")
+                    logger.info(f"[STATS] Total de {total_deletados} registros dependentes removidos")
             
             # Deletar a própria obra via SQL direto (COM VERIFICAÇÃO ADMIN_ID)
             result_obra = db.session.execute(
@@ -3163,12 +3165,12 @@ def excluir_obra(id):
             if result_obra.rowcount == 0:
                 raise Exception("Obra não encontrada ou não pertence ao admin atual")
             
-            print(f"✅ Obra {id} e {total_deletados} registros dependentes deletados (multi-tenant seguro)")
+                logger.info(f"[OK] Obra {id} e {total_deletados} registros dependentes deletados (multi-tenant seguro)")
             
             db.session.commit()
             
         except Exception as delete_error:
-            print(f"❌ Erro na exclusão via SQL: {delete_error}")
+            logger.error(f"[ERROR] Erro na exclusão via SQL: {delete_error}")
             db.session.rollback()
             raise
         
@@ -3224,7 +3226,7 @@ def detalhes_obra(id):
         else:
             data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
         
-        print(f"DEBUG PERÍODO DETALHES: {data_inicio} até {data_fim}")
+            logger.debug(f"DEBUG PERÍODO DETALHES: {data_inicio} até {data_fim}")
         obra_id = id
         
         # Sistema robusto de detecção de admin_id - PRODUÇÃO
@@ -3245,9 +3247,9 @@ def detalhes_obra(id):
                 obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
                 # Em produção, pode não ter filtro de admin_id - usar o que tem mais dados
                 admin_id = obra_counts[0] if obra_counts else None
-                print(f"DEBUG: Admin_id detectado automaticamente: {admin_id}")
+                logger.debug(f"DEBUG: Admin_id detectado automaticamente: {admin_id}")
             except Exception as e:
-                print(f"Erro ao detectar admin_id: {e}")
+                logger.error(f"Erro ao detectar admin_id: {e}")
                 admin_id = None  # Ver todas as obras
         
         # Buscar a obra - usar filtro de admin_id apenas se especificado
@@ -3257,19 +3259,19 @@ def detalhes_obra(id):
             obra = Obra.query.filter_by(id=id).first()
         
         if not obra:
-            print(f"ERRO: Obra {id} não encontrada (admin_id: {admin_id})")
+            logger.debug(f"ERRO: Obra {id} não encontrada (admin_id: {admin_id})")
             # Tentar buscar obra sem filtro de admin_id (para debug)
             obra_debug = Obra.query.filter_by(id=id).first()
             if obra_debug:
-                print(f"DEBUG: Obra {id} existe mas com admin_id {obra_debug.admin_id}")
+                logger.debug(f"DEBUG: Obra {id} existe mas com admin_id {obra_debug.admin_id}")
                 # Se encontrou sem filtro, usar essa obra
                 obra = obra_debug
                 admin_id = obra.admin_id  # Ajustar admin_id para as próximas consultas
             else:
                 return f"Obra não encontrada (ID: {id})", 404
         
-        print(f"DEBUG OBRA ENCONTRADA: {obra.nome} - Admin: {obra.admin_id}")
-        print(f"DEBUG OBRA DADOS: Status={obra.status}, Orçamento={obra.orcamento}")
+                logger.debug(f"DEBUG OBRA ENCONTRADA: {obra.nome} - Admin: {obra.admin_id}")
+                logger.debug(f"DEBUG OBRA DADOS: Status={obra.status}, Orçamento={obra.orcamento}")
         
         # Buscar funcionários que trabalharam na obra (baseado em registros de ponto) - CORRIGIDO
         # Primeiro, buscar registros de ponto para obter IDs dos funcionários
@@ -3280,7 +3282,7 @@ def detalhes_obra(id):
                 RegistroPonto.obra_id == obra_id
             ).all()
             funcionarios_ids_ponto = set([r.funcionario_id for r in registros_obra])
-            print(f"DEBUG: {len(funcionarios_ids_ponto)} funcionários únicos com ponto nesta obra")
+            logger.debug(f"DEBUG: {len(funcionarios_ids_ponto)} funcionários únicos com ponto nesta obra")
         except ImportError:
             funcionarios_ids_ponto = set()
         
@@ -3295,10 +3297,10 @@ def detalhes_obra(id):
                 funcionarios_obra = Funcionario.query.filter(
                     Funcionario.id.in_(funcionarios_ids_ponto)
                 ).all()
-            print(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados (baseado em ponto)")
+                logger.debug(f"DEBUG: {len(funcionarios_obra)} funcionários encontrados (baseado em ponto)")
         else:
             funcionarios_obra = []
-            print(f"DEBUG: Nenhum funcionário com ponto nesta obra")
+            logger.debug(f"DEBUG: Nenhum funcionário com ponto nesta obra")
         
         # Calcular custos de mão de obra para o período
         total_custo_mao_obra = 0.0
@@ -3316,7 +3318,7 @@ def detalhes_obra(id):
         except ImportError:
             registros_periodo = []
         
-        print(f"DEBUG: {len(registros_periodo)} registros de ponto no período para obra {obra_id}")
+            logger.debug(f"DEBUG: {len(registros_periodo)} registros de ponto no período para obra {obra_id}")
         
         # Calcular custo por funcionário usando Python com funções corretas
         from sqlalchemy import text
@@ -3369,7 +3371,7 @@ def detalhes_obra(id):
                 'data_fim': data_fim
             }).fetchall()
         
-        print(f"DEBUG SQL: {len(resultado_custos)} registros encontrados com JOIN")
+            logger.debug(f"DEBUG SQL: {len(resultado_custos)} registros encontrados com JOIN")
         
         # Calcular custos usando Python com função correta
         for row in resultado_custos:
@@ -3396,7 +3398,7 @@ def detalhes_obra(id):
                 'total_dia': custo_dia
             })
         
-        print(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")
+            logger.debug(f"DEBUG KPIs: {total_custo_mao_obra:.2f} em custos, {total_horas_periodo}h trabalhadas")
             
         # Buscar custos da obra para o período
         from models import OutroCusto, VehicleExpense, RegistroAlimentacao
@@ -3416,7 +3418,7 @@ def detalhes_obra(id):
             ).all()
         
         # Custos de transporte/veículos da obra
-        # ✅ USAR TABELA NOVA: frota_despesa (VehicleExpense) ao invés de custo_veiculo
+        # [OK] USAR TABELA NOVA: frota_despesa (VehicleExpense) ao invés de custo_veiculo
         custos_query = VehicleExpense.query.filter(
             VehicleExpense.data_custo >= data_inicio,
             VehicleExpense.data_custo <= data_fim
@@ -3427,7 +3429,7 @@ def detalhes_obra(id):
             
         custos_transporte = custos_query.all()
         
-        # 🔒 PROTEÇÃO: Buscar custos de alimentação com proteção contra erro de schema (Migração 48)
+        # [LOCK] PROTEÇÃO: Buscar custos de alimentação com proteção contra erro de schema (Migração 48)
         try:
             registros_alimentacao = RegistroAlimentacao.query.filter(
                 RegistroAlimentacao.obra_id == obra_id,
@@ -3436,7 +3438,7 @@ def detalhes_obra(id):
             ).order_by(RegistroAlimentacao.data.desc()).all()
         except Exception as e:
             logger.error(f"Erro ao carregar registros de alimentação: {e}. Migração 48 pode não ter sido executada.")
-            flash('⚠️ Erro ao carregar registros de alimentação. Migração 48 pode não ter sido executada em produção.', 'warning')
+            flash('[WARN] Erro ao carregar registros de alimentação. Migração 48 pode não ter sido executada em produção.', 'warning')
             db.session.rollback()  # CRÍTICO: Evitar InFailedSqlTransaction
             registros_alimentacao = []
         
@@ -3476,7 +3478,7 @@ def detalhes_obra(id):
         # Total de alimentação (tabela específica + outros custos)
         custo_alimentacao = custo_alimentacao_tabela + custo_alimentacao_outros
         
-        print(f"DEBUG ALIMENTAÇÃO: Tabela específica={custo_alimentacao_tabela}, Outros custos={custo_alimentacao_outros}, Total={custo_alimentacao}")
+        logger.debug(f"DEBUG ALIMENTAÇÃO: Tabela específica={custo_alimentacao_tabela}, Outros custos={custo_alimentacao_outros}, Total={custo_alimentacao}")
         
         custo_transporte = sum(c.valor for c in custos_obra if any([
             c.kpi_associado == 'custo_transporte',
@@ -3494,7 +3496,7 @@ def detalhes_obra(id):
         
         custos_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
         
-        print(f"DEBUG CUSTOS DETALHADOS: Alimentação={custo_alimentacao} (tabela={custo_alimentacao_tabela}, outros={custo_alimentacao_outros}), Transporte VT={custo_transporte}, Veículos={custos_transporte_total}, Outros={outros_custos}")
+        logger.debug(f"DEBUG CUSTOS DETALHADOS: Alimentação={custo_alimentacao} (tabela={custo_alimentacao_tabela}, outros={custo_alimentacao_outros}), Transporte VT={custo_transporte}, Veículos={custos_transporte_total}, Outros={outros_custos}")
         
         # Calcular progresso geral da obra baseado no último RDO
         progresso_geral = 0.0
@@ -3513,14 +3515,14 @@ def detalhes_obra(id):
                     total_sub = len(subatividades_rdo)
                     # FÓRMULA SIMPLES
                     progresso_geral = round(total_percentuais / total_sub, 1) if total_sub > 0 else 0.0
-                    print(f"🎯 KPI OBRA PROGRESSO: {total_percentuais}÷{total_sub} = {progresso_geral}%")
-                    print(f"DEBUG PROGRESSO OBRA: {len(subatividades_rdo)} subatividades, progresso geral: {progresso_geral:.1f}%")
+                    logger.debug(f"[TARGET] KPI OBRA PROGRESSO: {total_percentuais}÷{total_sub} = {progresso_geral}%")
+                    logger.debug(f"DEBUG PROGRESSO OBRA: {len(subatividades_rdo)} subatividades, progresso geral: {progresso_geral:.1f}%")
                 else:
-                    print("DEBUG PROGRESSO: Último RDO sem subatividades registradas")
+                    logger.debug("DEBUG PROGRESSO: Último RDO sem subatividades registradas")
             else:
-                print("DEBUG PROGRESSO: Nenhum RDO encontrado para esta obra")
+                logger.debug("DEBUG PROGRESSO: Nenhum RDO encontrado para esta obra")
         except Exception as e:
-            print(f"ERRO ao calcular progresso da obra: {e}")
+            logger.error(f"ERRO ao calcular progresso da obra: {e}")
             progresso_geral = 0.0
 
         # Montar KPIs finais da obra
@@ -3552,20 +3554,20 @@ def detalhes_obra(id):
             # Fazer rollback preventivo antes de buscar serviços
             try:
                 db.session.rollback()
-                print("🔄 ROLLBACK preventivo executado")
+                logger.info("[SYNC] ROLLBACK preventivo executado")
             except:
                 pass
             
             admin_id_para_servicos = get_admin_id_robusta(obra)
             servicos_obra = obter_servicos_da_obra(obra_id, admin_id_para_servicos)
-            print(f"🎯 SERVIÇOS DA OBRA: {len(servicos_obra)} serviços encontrados usando sistema refatorado")
+            logger.debug(f"[TARGET] SERVIÇOS DA OBRA: {len(servicos_obra)} serviços encontrados usando sistema refatorado")
             
         except Exception as e:
-            print(f"🚨 ERRO ao buscar serviços da obra: {e}")
+            logger.error(f"[ALERT] ERRO ao buscar serviços da obra: {e}")
             # Fazer rollback em caso de erro e tentar busca simples
             try:
                 db.session.rollback()
-                print("🔄 ROLLBACK após erro executado")
+                logger.error("[SYNC] ROLLBACK após erro executado")
             except:
                 pass
             servicos_obra = []
@@ -3576,8 +3578,8 @@ def detalhes_obra(id):
         rdos_periodo = rdos_obra
         rdos_recentes = rdos_obra
         
-        print(f"DEBUG KPIs FINAIS: Total={kpis_obra['custo_total']:.2f}, Mão Obra={kpis_obra['custo_mao_obra']:.2f}, Horas={kpis_obra['total_horas']:.1f}")
-        print(f"DEBUG FUNCIONÁRIOS: {kpis_obra['funcionarios_periodo']} no período, {kpis_obra['dias_trabalhados']} dias trabalhados")
+        logger.debug(f"DEBUG KPIs FINAIS: Total={kpis_obra['custo_total']:.2f}, Mão Obra={kpis_obra['custo_mao_obra']:.2f}, Horas={kpis_obra['total_horas']:.1f}")
+        logger.debug(f"DEBUG FUNCIONÁRIOS: {kpis_obra['funcionarios_periodo']} no período, {kpis_obra['dias_trabalhados']} dias trabalhados")
         
         # ===== DADOS DE FOLHA PROCESSADA PARA DASHBOARD DE CUSTOS =====
         try:
@@ -3588,9 +3590,9 @@ def detalhes_obra(id):
                 data_fim=data_fim,
                 admin_id=admin_id
             )
-            print(f"DEBUG FOLHA: {dados_folha['totais'].get('total_funcionarios', 0)} funcionários com folha processada")
+            logger.debug(f"DEBUG FOLHA: {dados_folha['totais'].get('total_funcionarios', 0)} funcionários com folha processada")
         except Exception as e:
-            print(f"ERRO ao buscar dados de folha: {e}")
+            logger.error(f"ERRO ao buscar dados de folha: {e}")
             dados_folha = {
                 'funcionarios': [],
                 'totais': {
@@ -3627,8 +3629,8 @@ def detalhes_obra(id):
     except Exception as e:
         import traceback
         error_traceback = traceback.format_exc()
-        print(f"ERRO DETALHES OBRA: {str(e)}")
-        print(f"TRACEBACK COMPLETO:\n{error_traceback}")
+        logger.error(f"ERRO DETALHES OBRA: {str(e)}")
+        logger.error(f"TRACEBACK COMPLETO:\n{error_traceback}")
         # Exibir traceback completo em modo desenvolvimento
         flash(f'Erro ao carregar detalhes da obra: {str(e)}\n\nTraceback:\n{error_traceback}', 'error')
         return redirect(url_for('main.obras'))
@@ -3688,12 +3690,12 @@ def criar_admin():
         db.session.commit()
         
         flash(f'Administrador {nome} criado com sucesso!', 'success')
-        print(f"✅ SUPER ADMIN: Novo admin criado - {nome} ({email})")
+        logger.info(f"[OK] SUPER ADMIN: Novo admin criado - {nome} ({email})")
         
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao criar administrador: {str(e)}', 'danger')
-        print(f"❌ ERRO criar_admin: {e}")
+        logger.error(f"[ERROR] ERRO criar_admin: {e}")
     
     return redirect(url_for('main.super_admin_dashboard'))
 
@@ -3715,9 +3717,9 @@ def funcionario_dashboard():
 def funcionario_dashboard_desktop():
     """Dashboard específico para funcionários"""
     try:
-        print(f"DEBUG DASHBOARD: current_user.email={current_user.email}")
-        print(f"DEBUG DASHBOARD: current_user.admin_id={current_user.admin_id}")
-        print(f"DEBUG DASHBOARD: current_user.id={current_user.id}")
+        logger.debug(f"DEBUG DASHBOARD: current_user.email={current_user.email}")
+        logger.debug(f"DEBUG DASHBOARD: current_user.admin_id={current_user.admin_id}")
+        logger.debug(f"DEBUG DASHBOARD: current_user.id={current_user.id}")
         
         # Para sistema de username/senha, buscar funcionário por nome do usuário
         funcionario_atual = None
@@ -3738,17 +3740,17 @@ def funcionario_dashboard_desktop():
             funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_dinamico, ativo=True).first()
         
         if funcionario_atual:
-            print(f"DEBUG DASHBOARD: Funcionário encontrado: {funcionario_atual.nome} (admin_id={funcionario_atual.admin_id})")
+            logger.debug(f"DEBUG DASHBOARD: Funcionário encontrado: {funcionario_atual.nome} (admin_id={funcionario_atual.admin_id})")
         else:
-            print(f"DEBUG DASHBOARD: NENHUM funcionário encontrado")
+            logger.debug(f"DEBUG DASHBOARD: NENHUM funcionário encontrado")
             # Fallback: primeiro funcionário ativo de qualquer admin
             funcionario_atual = Funcionario.query.filter_by(ativo=True).first()
             if funcionario_atual:
-                print(f"DEBUG DASHBOARD: Usando primeiro funcionário ativo: {funcionario_atual.nome}")
+                logger.debug(f"DEBUG DASHBOARD: Usando primeiro funcionário ativo: {funcionario_atual.nome}")
         
         # Usar admin_id do funcionário encontrado ou detectar dinamicamente
         admin_id_correto = funcionario_atual.admin_id if funcionario_atual else (current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id)
-        print(f"DEBUG DASHBOARD: Usando admin_id={admin_id_correto}")
+        logger.debug(f"DEBUG DASHBOARD: Usando admin_id={admin_id_correto}")
         
         # Buscar obras disponíveis para esse admin
         obras_disponiveis = Obra.query.filter_by(admin_id=admin_id_correto).order_by(Obra.nome).all()
@@ -3764,8 +3766,8 @@ def funcionario_dashboard_desktop():
             RDO.status == 'Rascunho'
         ).order_by(RDO.data_relatorio.desc()).limit(5).all()
         
-        print(f"DEBUG FUNCIONÁRIO DASHBOARD: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}")
-        print(f"DEBUG: {len(obras_disponiveis)} obras disponíveis, {len(rdos_recentes)} RDOs recentes")
+        logger.debug(f"DEBUG FUNCIONÁRIO DASHBOARD: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}")
+        logger.debug(f"DEBUG: {len(obras_disponiveis)} obras disponíveis, {len(rdos_recentes)} RDOs recentes")
         
         return render_template('funcionario_dashboard.html', 
                              funcionario=funcionario_atual,
@@ -3776,9 +3778,9 @@ def funcionario_dashboard_desktop():
                              total_rdos=len(rdos_recentes))
                              
     except Exception as e:
-        print(f"ERRO FUNCIONÁRIO DASHBOARD: {str(e)}")
+        logger.error(f"ERRO FUNCIONÁRIO DASHBOARD: {str(e)}")
         import traceback
-        print(f"TRACEBACK: {traceback.format_exc()}")
+        logger.debug(f"TRACEBACK: {traceback.format_exc()}")
         flash('Erro ao carregar dashboard. Contate o administrador.', 'error')
         return render_template('funcionario_dashboard.html', 
                              funcionario=None,
@@ -3793,8 +3795,8 @@ def funcionario_dashboard_desktop():
 def test():
     return jsonify({'status': 'ok', 'message': 'SIGE v8.0 funcionando!'})
 
-# ⚠️ ROTA /veiculos REMOVIDA - Conflito corrigido!
-# ✅ Conflito de rota resolvido! Agora usa apenas a função veiculos() moderna
+# [WARN] ROTA /veiculos REMOVIDA - Conflito corrigido!
+# [OK] Conflito de rota resolvido! Agora usa apenas a função veiculos() moderna
 
 # ===========================
 # 🆕 NOVA IMPLEMENTAÇÃO: Visualização Robusta de Veículos
@@ -3808,7 +3810,7 @@ def test():
 def ultima_km_veiculo(id):
     """Retorna a última quilometragem registrada do veículo"""
     try:
-        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        # [LOCK] SEGURANÇA MULTITENANT: Usar resolver unificado
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             return jsonify({'error': 'Acesso negado. Usuário não autenticado.'}), 403
@@ -3842,14 +3844,14 @@ def ultima_km_veiculo(id):
                 ultima_km = veiculo.km_atual
                 
         except Exception as e:
-            print(f"Erro ao buscar última KM: {str(e)}")
+            logger.error(f"Erro ao buscar última KM: {str(e)}")
             # Fallback para km_atual do veículo
             ultima_km = veiculo.km_atual or 0
         
         return jsonify({'ultima_km': ultima_km})
         
     except Exception as e:
-        print(f"ERRO ÚLTIMA KM VEÍCULO: {str(e)}")
+        logger.error(f"ERRO ÚLTIMA KM VEÍCULO: {str(e)}")
         return jsonify({'error': 'Erro ao carregar última quilometragem', 'ultima_km': 0}), 500
 
 # Rota para calcular KPIs do veículo por período
@@ -3858,7 +3860,7 @@ def ultima_km_veiculo(id):
 def kpis_veiculo_periodo(id):
     """Retorna KPIs do veículo filtradas por período"""
     try:
-        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        # [LOCK] SEGURANÇA MULTITENANT: Usar resolver unificado
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             return jsonify({'error': 'Acesso negado. Usuário não autenticado.'}), 403
@@ -3922,7 +3924,7 @@ def kpis_veiculo_periodo(id):
                     custos_manutencao += custo.valor
                     
         except Exception as e:
-            print(f"Erro ao calcular KPIs: {str(e)}")
+            logger.error(f"Erro ao calcular KPIs: {str(e)}")
         
         kpis = {
             'quilometragem_total': quilometragem_total,
@@ -3934,7 +3936,7 @@ def kpis_veiculo_periodo(id):
         return jsonify(kpis)
         
     except Exception as e:
-        print(f"ERRO KPIs VEÍCULO PERÍODO: {str(e)}")
+        logger.error(f"ERRO KPIs VEÍCULO PERÍODO: {str(e)}")
         return jsonify({'error': 'Erro ao calcular KPIs do período'}), 500
 
 
@@ -3946,7 +3948,7 @@ def kpis_veiculo_periodo(id):
 @admin_required
 def excluir_veiculo(id):
     """Redireciona para o novo sistema de frota (HTTP 307 preserva POST)"""
-    print(f"🔀 [VEICULOS_EXCLUIR_REDIRECT] Redirecionando para frota.deletar_veiculo({id})")
+    logger.debug(f"[ROUTE] [VEICULOS_EXCLUIR_REDIRECT] Redirecionando para frota.deletar_veiculo({id})")
     return redirect(url_for('frota.deletar_veiculo', id=id), code=307)
 
 
@@ -3991,7 +3993,7 @@ def processar_passageiro_veiculo(passageiro_id, funcionario_id, uso_veiculo_id, 
                     return 1
                 except IntegrityError as e:
                     db.session.rollback()
-                    print(f"ERRO INTEGRIDADE PASSAGEIRO: {str(e)}")
+                    logger.error(f"ERRO INTEGRIDADE PASSAGEIRO: {str(e)}")
                     return -1  # Sinalizar erro de integridade
         
         return 0
@@ -4000,18 +4002,18 @@ def processar_passageiro_veiculo(passageiro_id, funcionario_id, uso_veiculo_id, 
         return 0
     except IntegrityError as e:
         db.session.rollback()
-        print(f"ERRO INTEGRIDADE PASSAGEIRO (Global): {str(e)}")
+        logger.error(f"ERRO INTEGRIDADE PASSAGEIRO (Global): {str(e)}")
         return -1
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO INESPERADO PASSAGEIRO: {str(e)}")
+        logger.error(f"ERRO INESPERADO PASSAGEIRO: {str(e)}")
         return -1
 
 
 # 4. ROTA REGISTRO USO - /veiculos/<id>/uso (GET/POST)
 # ROTA PARA MODAL DE USO (SEM PARÂMETRO ID NA URL)
 @main_bp.route('/veiculos/uso', methods=['POST'])
-@login_required  # 🔒 MUDANÇA: Funcionários podem registrar uso de veículos
+@login_required  # [LOCK] MUDANÇA: Funcionários podem registrar uso de veículos
 def novo_uso_veiculo_lista():
     from forms import UsoVeiculoForm
     from models import Veiculo, UsoVeiculo, Funcionario, Obra
@@ -4022,7 +4024,7 @@ def novo_uso_veiculo_lista():
         flash('Erro: ID do veículo não fornecido.', 'error')
         return redirect(url_for('main.veiculos'))
     
-    # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+    # [LOCK] SEGURANÇA MULTITENANT: Usar resolver unificado
     tenant_admin_id = get_tenant_admin_id()
     if not tenant_admin_id:
         flash('Acesso negado. Faça login novamente.', 'error')
@@ -4146,14 +4148,14 @@ def novo_uso_veiculo_lista():
         
     except IntegrityError as e:
         db.session.rollback()
-        print(f"ERRO INTEGRIDADE USO VEÍCULO: {str(e)}")
+        logger.error(f"ERRO INTEGRIDADE USO VEÍCULO: {str(e)}")
         if 'unique constraint' in str(e).lower():
             flash('Erro: Este funcionário já está registrado como passageiro neste uso de veículo.', 'error')
         else:
             flash('Erro de integridade ao registrar uso. Verifique os dados e tente novamente.', 'error')
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO AO REGISTRAR USO: {str(e)}")
+        logger.error(f"ERRO AO REGISTRAR USO: {str(e)}")
         flash('Erro ao registrar uso do veículo. Tente novamente.', 'error')
     
     return redirect(url_for('main.veiculos'))
@@ -4245,7 +4247,7 @@ def detalhes_uso_veiculo(uso_id):
     from models import UsoVeiculo, Funcionario, Obra, Veiculo, PassageiroVeiculo
     
     try:
-        # 🔒 SEGURANÇA MULTITENANT
+        # [LOCK] SEGURANÇA MULTITENANT
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             return jsonify({'error': 'Acesso negado'}), 403
@@ -4356,7 +4358,7 @@ def detalhes_uso_veiculo(uso_id):
         return html_content
         
     except Exception as e:
-        print(f"ERRO DETALHES USO: {str(e)}")
+        logger.error(f"ERRO DETALHES USO: {str(e)}")
         return f'<div class="alert alert-danger">Erro ao carregar detalhes: {str(e)}</div>', 500
 
 
@@ -4373,7 +4375,7 @@ def editar_uso_veiculo(uso_id):
     from models import UsoVeiculo, Veiculo, Funcionario, Obra
     
     try:
-        # 🔒 SEGURANÇA MULTITENANT
+        # [LOCK] SEGURANÇA MULTITENANT
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado.', 'error')
@@ -4412,7 +4414,7 @@ def editar_uso_veiculo(uso_id):
         return render_template('veiculos/editar_uso.html', form=form, uso=uso)
         
     except Exception as e:
-        print(f"ERRO EDITAR USO: {str(e)}")
+        logger.error(f"ERRO EDITAR USO: {str(e)}")
         flash(f'Erro ao editar uso: {str(e)}', 'error')
         return redirect(url_for('main.veiculos'))
 
@@ -4424,7 +4426,7 @@ def deletar_uso_veiculo(uso_id):
     from models import UsoVeiculo, Veiculo, PassageiroVeiculo
     
     try:
-        # 🔒 SEGURANÇA MULTITENANT
+        # [LOCK] SEGURANÇA MULTITENANT
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado.', 'error')
@@ -4449,7 +4451,7 @@ def deletar_uso_veiculo(uso_id):
         return redirect(url_for('main.detalhes_veiculo', veiculo_id=veiculo_id))
         
     except Exception as e:
-        print(f"ERRO DELETAR USO: {str(e)}")
+        logger.error(f"ERRO DELETAR USO: {str(e)}")
         flash(f'Erro ao excluir uso: {str(e)}', 'error')
         return redirect(url_for('main.veiculos'))
 
@@ -4466,7 +4468,7 @@ def editar_custo_veiculo(custo_id):
     from models import CustoVeiculo, Veiculo
     
     try:
-        # 🔒 SEGURANÇA MULTITENANT
+        # [LOCK] SEGURANÇA MULTITENANT
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado.', 'error')
@@ -4496,7 +4498,7 @@ def editar_custo_veiculo(custo_id):
         return render_template('veiculos/editar_custo.html', form=form, custo=custo)
         
     except Exception as e:
-        print(f"ERRO EDITAR CUSTO: {str(e)}")
+        logger.error(f"ERRO EDITAR CUSTO: {str(e)}")
         flash(f'Erro ao editar custo: {str(e)}', 'error')
         return redirect(url_for('main.veiculos'))
 
@@ -4508,7 +4510,7 @@ def deletar_custo_veiculo(custo_id):
     from models import CustoVeiculo, Veiculo
     
     try:
-        # 🔒 SEGURANÇA MULTITENANT
+        # [LOCK] SEGURANÇA MULTITENANT
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
             flash('Acesso negado.', 'error')
@@ -4530,13 +4532,13 @@ def deletar_custo_veiculo(custo_id):
         return redirect(url_for('main.detalhes_veiculo', veiculo_id=veiculo_id))
         
     except Exception as e:
-        print(f"ERRO DELETAR CUSTO: {str(e)}")
+        logger.error(f"ERRO DELETAR CUSTO: {str(e)}")
         flash(f'Erro ao excluir custo: {str(e)}', 'error')
         return redirect(url_for('main.veiculos'))
 
 # ROTA PARA MODAL DE CUSTO (SEM PARÂMETRO ID NA URL)
 @main_bp.route('/veiculos/custo', methods=['POST'])
-@login_required  # 🔒 MUDANÇA: Funcionários podem registrar custos de veículos
+@login_required  # [LOCK] MUDANÇA: Funcionários podem registrar custos de veículos
 def novo_custo_veiculo_lista():
     from forms import CustoVeiculoForm
     from models import Veiculo, CustoVeiculo
@@ -4547,7 +4549,7 @@ def novo_custo_veiculo_lista():
         flash('Erro: ID do veículo não fornecido.', 'error')
         return redirect(url_for('main.veiculos'))
     
-    # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+    # [LOCK] SEGURANÇA MULTITENANT: Usar resolver unificado
     tenant_admin_id = get_tenant_admin_id()
     if not tenant_admin_id:
         flash('Acesso negado. Faça login novamente.', 'error')
@@ -4587,7 +4589,7 @@ def novo_custo_veiculo_lista():
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO AO REGISTRAR CUSTO: {str(e)}")
+        logger.error(f"ERRO AO REGISTRAR CUSTO: {str(e)}")
         flash('Erro ao registrar custo do veículo. Tente novamente.', 'error')
     
     return redirect(url_for('main.veiculos'))
@@ -4686,7 +4688,7 @@ def novo_custo_veiculo(id):
                 )
                 db.session.add(fluxo)
             except Exception as fluxo_error:
-                print(f"AVISO: Não foi possível integrar com fluxo de caixa: {fluxo_error}")
+                logger.error(f"AVISO: Não foi possível integrar com fluxo de caixa: {fluxo_error}")
             
             db.session.commit()
             
@@ -4695,7 +4697,7 @@ def novo_custo_veiculo(id):
             
         except Exception as e:
             db.session.rollback()
-            print(f"ERRO AO REGISTRAR CUSTO DE VEÍCULO: {str(e)}")
+            logger.error(f"ERRO AO REGISTRAR CUSTO DE VEÍCULO: {str(e)}")
             flash('Erro ao registrar custo do veículo. Tente novamente.', 'error')
     
     return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
@@ -4805,7 +4807,7 @@ def dashboard_veiculo(id):
                              proximas_manutencoes=proximas_manutencoes)
         
     except Exception as e:
-        print(f"ERRO DASHBOARD VEÍCULO: {str(e)}")
+        logger.error(f"ERRO DASHBOARD VEÍCULO: {str(e)}")
         flash('Erro ao carregar dashboard do veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=id))
 
@@ -4854,7 +4856,7 @@ def historico_veiculo(id):
         
         if filtros['obra_id']:
             query_usos = query_usos.filter(UsoVeiculo.obra_id == int(filtros['obra_id']))
-            # ✅ CORREÇÃO: Verificar atributo obra_id antes de usar
+            # [OK] CORREÇÃO: Verificar atributo obra_id antes de usar
             if hasattr(CustoVeiculo, 'obra_id'):
                 query_custos = query_custos.filter(CustoVeiculo.obra_id == int(filtros['obra_id']))
         
@@ -4902,7 +4904,7 @@ def historico_veiculo(id):
                              obras=obras)
         
     except Exception as e:
-        print(f"ERRO HISTÓRICO VEÍCULO: {str(e)}")
+        logger.error(f"ERRO HISTÓRICO VEÍCULO: {str(e)}")
         flash('Erro ao carregar histórico do veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=id))
 
@@ -4963,7 +4965,7 @@ def lista_custos_veiculo(id):
                              custo_mes=custo_mes)
         
     except Exception as e:
-        print(f"ERRO LISTA CUSTOS: {str(e)}")
+        logger.error(f"ERRO LISTA CUSTOS: {str(e)}")
         flash('Erro ao carregar custos do veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=id))
 
@@ -5041,18 +5043,18 @@ def exportar_dados_veiculo(id):
         )
         
     except Exception as e:
-        print(f"ERRO EXPORTAR DADOS: {str(e)}")
+        logger.error(f"ERRO EXPORTAR DADOS: {str(e)}")
         flash('Erro ao exportar dados do veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=id))
 
 # ===== SISTEMA COMPLETO DE HISTÓRICO E LANÇAMENTOS DE VEÍCULOS =====
 
 @main_bp.route('/veiculos/lancamentos')
-@login_required  # 🔒 MUDANÇA: Funcionários podem acessar lançamentos de veículos
+@login_required  # [LOCK] MUDANÇA: Funcionários podem acessar lançamentos de veículos
 def lancamentos_veiculos():
     """Página principal de lançamentos de veículos com filtros avançados"""
     try:
-        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        # [LOCK] SEGURANÇA MULTITENANT: Usar resolver unificado
         from utils.tenant import get_tenant_admin_id
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
@@ -5104,7 +5106,7 @@ def lancamentos_veiculos():
         if filtros['obra_id']:
             obra_id = int(filtros['obra_id'])
             query_usos = query_usos.filter(UsoVeiculo.obra_id == obra_id)
-            # ✅ CORREÇÃO: Usar verificação segura de atributo
+            # [OK] CORREÇÃO: Usar verificação segura de atributo
             if hasattr(CustoVeiculo, 'obra_id'):
                 query_custos = query_custos.filter(CustoVeiculo.obra_id == obra_id)
         
@@ -5193,7 +5195,7 @@ def lancamentos_veiculos():
                              paginacao=paginacao)
         
     except Exception as e:
-        print(f"ERRO LANÇAMENTOS VEÍCULOS: {str(e)}")
+        logger.error(f"ERRO LANÇAMENTOS VEÍCULOS: {str(e)}")
         flash('Erro ao carregar lançamentos de veículos.', 'error')
         return redirect(url_for('main.veiculos'))
 
@@ -5223,18 +5225,18 @@ def aprovar_lancamento_veiculo(tipo, id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO APROVAR LANÇAMENTO: {str(e)}")
+        logger.error(f"ERRO APROVAR LANÇAMENTO: {str(e)}")
         flash('Erro ao aprovar lançamento.', 'error')
     
     return redirect(url_for('main.lancamentos_veiculos'))
 
 
 @main_bp.route('/veiculos/relatorios')
-@login_required  # 🔒 MUDANÇA: Funcionários podem acessar relatórios de veículos
+@login_required  # [LOCK] MUDANÇA: Funcionários podem acessar relatórios de veículos
 def relatorios_veiculos():
     """Página de relatórios consolidados de veículos"""
     try:
-        # 🔒 SEGURANÇA MULTITENANT: Usar resolver unificado
+        # [LOCK] SEGURANÇA MULTITENANT: Usar resolver unificado
         from utils.tenant import get_tenant_admin_id
         tenant_admin_id = get_tenant_admin_id()
         if not tenant_admin_id:
@@ -5332,7 +5334,7 @@ def relatorios_veiculos():
                              data_fim=data_fim)
         
     except Exception as e:
-        print(f"ERRO RELATÓRIOS VEÍCULOS: {str(e)}")
+        logger.error(f"ERRO RELATÓRIOS VEÍCULOS: {str(e)}")
         flash('Erro ao carregar relatórios de veículos.', 'error')
         return redirect(url_for('main.veiculos'))
 
@@ -5436,7 +5438,7 @@ def exportar_relatorio_veiculos():
         )
         
     except Exception as e:
-        print(f"ERRO EXPORTAR RELATÓRIO PDF: {str(e)}")
+        logger.error(f"ERRO EXPORTAR RELATÓRIO PDF: {str(e)}")
         flash('Erro ao exportar relatório. Verifique se o ReportLab está instalado.', 'error')
         return redirect(url_for('main.relatorios_veiculos'))
 
@@ -5485,11 +5487,11 @@ def api_funcionarios_consolidada():
                 admin_id = admin_counts[0] if admin_counts else 10
                 funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
             except Exception as e:
-                print(f"Erro ao detectar admin_id automaticamente: {e}")
+                logger.error(f"Erro ao detectar admin_id automaticamente: {e}")
                 admin_id = 10
                 funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
         
-        print(f"DEBUG API FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}, formato={formato_retorno}")
+                logger.debug(f"DEBUG API FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}, formato={formato_retorno}")
         
         # Converter para JSON baseado no formato solicitado
         funcionarios_json = []
@@ -5543,7 +5545,7 @@ def api_funcionarios_consolidada():
                         'ativo': f.ativo
                     })
             except Exception as e:
-                print(f"⚠️ ERRO ao processar funcionário {f.id}: {e}")
+                logger.error(f"[WARN] ERRO ao processar funcionário {f.id}: {e}")
                 # Adicionar funcionário básico mesmo com erro
                 funcionarios_json.append({
                     'id': f.id,
@@ -5565,7 +5567,7 @@ def api_funcionarios_consolidada():
                 'total': len(funcionarios_json)
             })
         else:
-            # ✅ CORREÇÃO: Frontend espera formato com success
+            # [OK] CORREÇÃO: Frontend espera formato com success
             return jsonify({
                 'success': True,
                 'funcionarios': funcionarios_json,
@@ -5573,7 +5575,7 @@ def api_funcionarios_consolidada():
             })
         
     except Exception as e:
-        print(f"ERRO API FUNCIONÁRIOS CONSOLIDADA: {str(e)}")
+        logger.error(f"ERRO API FUNCIONÁRIOS CONSOLIDADA: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -5584,7 +5586,7 @@ def api_funcionarios_consolidada():
                 'funcionarios': []
             }), 500
         else:
-            # ✅ CORREÇÃO: Retornar erro padronizado também para admin
+            # [OK] CORREÇÃO: Retornar erro padronizado também para admin
             return jsonify({
                 'success': False,
                 'error': str(e),
@@ -5616,7 +5618,7 @@ def api_funcao(funcao_id):
         })
         
     except Exception as e:
-        print(f"ERRO API FUNCAO: {str(e)}")
+        logger.error(f"ERRO API FUNCAO: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -5630,7 +5632,7 @@ def api_ponto_lancamento_multiplo():
     """API para lançamento múltiplo de ponto - processa período de datas para múltiplos funcionários"""
     try:
         data = request.get_json()
-        print(f"🔧 DEBUG LANÇAMENTO MÚLTIPLO: Dados recebidos: {data}")
+        logger.debug(f"[CONFIG] DEBUG LANÇAMENTO MÚLTIPLO: Dados recebidos: {data}")
         
         # Aceitar tanto 'funcionarios' (frontend) quanto 'funcionarios_ids' (legacy)
         funcionarios_ids = data.get('funcionarios', []) or data.get('funcionarios_ids', [])
@@ -5667,7 +5669,7 @@ def api_ponto_lancamento_multiplo():
         if not obra:
             return jsonify({'success': False, 'message': 'Obra não encontrada ou não pertence ao seu cadastro'}), 403
         
-        print(f"🔧 DEBUG: admin_id={admin_id}, obra_id={obra_id}, funcionarios={funcionarios_ids}, periodo={data_inicio} a {data_final}")
+            logger.debug(f"[CONFIG] DEBUG: admin_id={admin_id}, obra_id={obra_id}, funcionarios={funcionarios_ids}, periodo={data_inicio} a {data_final}")
         
         # Extrair horários do request
         hora_entrada = data.get('hora_entrada') or None
@@ -5680,7 +5682,7 @@ def api_ponto_lancamento_multiplo():
         sem_intervalo = sem_intervalo_raw in [True, 'true', 'True', 1, '1']
         observacoes = data.get('observacoes', '')
         
-        print(f"📝 HORÁRIOS RECEBIDOS: entrada={hora_entrada}, saida={hora_saida}, "
+        logger.debug(f"[INFO] HORARIOS RECEBIDOS: entrada={hora_entrada}, saida={hora_saida}, "
               f"almoco_inicio={hora_almoco_inicio}, almoco_fim={hora_almoco_fim}, "
               f"sem_intervalo_raw={sem_intervalo_raw}, sem_intervalo={sem_intervalo}")
         
@@ -5697,7 +5699,7 @@ def api_ponto_lancamento_multiplo():
             datas_periodo.append(data_atual)
             data_atual += timedelta(days=1)
         
-        print(f"📅 Processando {len(datas_periodo)} datas para {len(funcionarios_ids)} funcionários")
+            logger.debug(f"[DATE] Processando {len(datas_periodo)} datas para {len(funcionarios_ids)} funcionários")
         
         for funcionario_id in funcionarios_ids:
             try:
@@ -5773,7 +5775,7 @@ def api_ponto_lancamento_multiplo():
                                     registro.horas_trabalhadas = horas_calc.get('total', 0)
                                     registro.horas_extras = horas_calc.get('extras', 0)
                                 except Exception as calc_e:
-                                    print(f"⚠️ Erro ao calcular horas: {calc_e}")
+                                    logger.error(f"[WARN] Erro ao calcular horas: {calc_e}")
                                     registro.horas_trabalhadas = 8.0
                                     registro.horas_extras = 0.0
                         
@@ -5782,16 +5784,16 @@ def api_ponto_lancamento_multiplo():
                         
                     except Exception as e:
                         erros.append(f"Erro ao processar {funcionario.nome} em {data_obj}: {str(e)}")
-                        print(f"❌ Erro processando {funcionario.nome} em {data_obj}: {e}")
+                        logger.error(f"[ERROR] Erro processando {funcionario.nome} em {data_obj}: {e}")
                 
             except Exception as e:
                 erros.append(f"Erro ao processar funcionário ID {funcionario_id}: {str(e)}")
-                print(f"❌ Erro funcionário {funcionario_id}: {e}")
+                logger.error(f"[ERROR] Erro funcionário {funcionario_id}: {e}")
         
         # Commit se houver registros criados
         if registros_criados > 0:
             db.session.commit()
-            print(f"✅ {registros_criados} registros salvos no banco")
+            logger.info(f"[OK] {registros_criados} registros salvos no banco")
         
         return jsonify({
             'success': True,
@@ -5803,7 +5805,7 @@ def api_ponto_lancamento_multiplo():
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ ERRO CRÍTICO NO LANÇAMENTO MÚLTIPLO: {str(e)}")
+        logger.error(f"[ERROR] ERRO CRÍTICO NO LANÇAMENTO MÚLTIPLO: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
@@ -5894,7 +5896,7 @@ def get_funcionario(funcionario_id):
         })
         
     except Exception as e:
-        print(f"❌ Erro ao buscar funcionário: {str(e)}")
+        logger.error(f"[ERROR] Erro ao buscar funcionário: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ===== ROTA PARA EDITAR FUNCIONÁRIO =====
@@ -5911,7 +5913,7 @@ def editar_funcionario(funcionario_id):
         ).first()
         
         if not funcionario:
-            flash('❌ Funcionário não encontrado', 'error')
+            flash('[ERROR] Funcionário não encontrado', 'error')
             return redirect(url_for('main.funcionarios'))
         
         # Atualizar dados
@@ -5955,13 +5957,13 @@ def editar_funcionario(funcionario_id):
         
         db.session.commit()
         
-        flash(f'✅ Funcionário {funcionario.nome} atualizado com sucesso!', 'success')
+        flash(f'[OK] Funcionário {funcionario.nome} atualizado com sucesso!', 'success')
         return redirect(url_for('main.funcionarios'))
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Erro ao editar funcionário: {str(e)}")
-        flash(f'❌ Erro ao editar funcionário: {str(e)}', 'error')
+        logger.error(f"[ERROR] Erro ao editar funcionário: {str(e)}")
+        flash(f'[ERROR] Erro ao editar funcionário: {str(e)}', 'error')
         return redirect(url_for('main.funcionarios'))
 
 @main_bp.route('/api/funcionario/<int:funcionario_id>/toggle-ativo', methods=['POST'])
@@ -5993,7 +5995,7 @@ def toggle_funcionario_ativo(funcionario_id):
         db.session.commit()
         
         status_texto = "ativado" if funcionario.ativo else "desativado"
-        print(f"✅ Funcionário {funcionario.nome} {status_texto}")
+        logger.info(f"[OK] Funcionário {funcionario.nome} {status_texto}")
         
         return jsonify({
             'success': True,
@@ -6003,13 +6005,13 @@ def toggle_funcionario_ativo(funcionario_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ ERRO AO TOGGLE FUNCIONÁRIO: {str(e)}")
+        logger.error(f"[ERROR] ERRO AO TOGGLE FUNCIONÁRIO: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @main_bp.route('/api/ponto/lancamento-finais-semana', methods=['POST'])
 def lancamento_finais_semana():
     """Lança automaticamente sábados e domingos como folga para todos os funcionários ativos"""
-    print("🚀 INÍCIO da função lancamento_finais_semana")
+    logger.info("[START] INÍCIO da função lancamento_finais_semana")
     
     try:
         # Obter dados da requisição
@@ -6021,22 +6023,22 @@ def lancamento_finais_semana():
         if not competencia:
             return jsonify({'success': False, 'message': 'Competência não fornecida'}), 400
             
-        print(f"📅 Processando competência: {competencia}")
+            logger.debug(f"[DATE] Processando competência: {competencia}")
         
         # Obter admin_id (usar fallback para desenvolvimento)
         from utils.tenant import get_safe_admin_id
         admin_id = get_safe_admin_id()
-        print(f"🏢 Admin ID: {admin_id}")
+        logger.debug(f"[CORP] Admin ID: {admin_id}")
         
         # Se ainda for None, usar fallback direto para desenvolvimento
         if admin_id is None:
-            print("⚠️ Admin ID None - tentando fallback direto...")
+            logger.warning("[WARN] Admin ID None - tentando fallback direto...")
             primeiro_admin = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).first()
             if primeiro_admin:
                 admin_id = primeiro_admin.id
-                print(f"🔧 Fallback aplicado - Admin ID: {admin_id}")
+                logger.info(f"[CONFIG] Fallback aplicado - Admin ID: {admin_id}")
             else:
-                print("❌ Nenhum admin encontrado no sistema!")
+                logger.error("[ERROR] Nenhum admin encontrado no sistema!")
                 return jsonify({'success': False, 'message': 'Nenhum administrador encontrado no sistema'}), 500
         
         # Buscar funcionários ativos  
@@ -6045,7 +6047,7 @@ def lancamento_finais_semana():
             ativo=True
         ).all()
         
-        print(f"👥 Funcionários ativos encontrados: {len(funcionarios_ativos)}")
+        logger.debug(f"[USERS] Funcionários ativos encontrados: {len(funcionarios_ativos)}")
         
         # Parse da competência (ano-mes)
         ano, mes = competencia.split('-')
@@ -6063,7 +6065,7 @@ def lancamento_finais_semana():
             if data_atual.weekday() in [5, 6]:
                 sabados_domingos.append(data_atual)
         
-        print(f"📅 Finais de semana encontrados: {len(sabados_domingos)} dias")
+                logger.debug(f"[DATE] Finais de semana encontrados: {len(sabados_domingos)} dias")
         
         registros_criados = 0
         registros_existentes = 0
@@ -6071,7 +6073,7 @@ def lancamento_finais_semana():
         
         # Processar cada funcionário
         for funcionario in funcionarios_ativos:
-            print(f"👤 Processando: {funcionario.nome} (ID: {funcionario.id})")
+            logger.debug(f"[USER] Processando: {funcionario.nome} (ID: {funcionario.id})")
             
             for data_folga in sabados_domingos:
                 # Determinar tipo de folga
@@ -6085,7 +6087,7 @@ def lancamento_finais_semana():
                 
                 if registro_existente:
                     registros_existentes += 1
-                    print(f"   ✅ Já existe: {data_folga} ({tipo_folga})")
+                    logger.info(f" [OK] Já existe: {data_folga} ({tipo_folga})")
                 else:
                     # Criar novo registro
                     try:
@@ -6100,17 +6102,17 @@ def lancamento_finais_semana():
                         
                         db.session.add(novo_registro)
                         registros_criados += 1
-                        print(f"   ➕ Criado: {data_folga} ({tipo_folga})")
+                        logger.info(f" [+] Criado: {data_folga} ({tipo_folga})")
                         
                     except Exception as e:
                         erro_msg = f"Erro ao criar registro para {funcionario.nome} em {data_folga}: {str(e)}"
                         erros.append(erro_msg)
-                        print(f"   ❌ ERRO: {erro_msg}")
+                        logger.error(f" [ERROR] ERRO: {erro_msg}")
         
         # Salvar todas as alterações
         if registros_criados > 0:
             db.session.commit()
-            print(f"💾 {registros_criados} registros salvos no banco")
+            logger.info(f"[SAVE] {registros_criados} registros salvos no banco")
         
         return jsonify({
             'success': True,
@@ -6127,7 +6129,7 @@ def lancamento_finais_semana():
     except Exception as e:
         db.session.rollback()
         error_msg = f"Erro interno: {str(e)}"
-        print(f"❌ ERRO GERAL: {error_msg}")
+        logger.error(f"[ERROR] ERRO GERAL: {error_msg}")
         return jsonify({
             'success': False,
             'message': 'Erro ao processar lançamento de finais de semana',
@@ -6148,7 +6150,7 @@ def api_obras_ativas():
             ativo=True
         ).order_by(Obra.nome).all()
         
-        print(f"🏗️ DEBUG: Encontradas {len(obras)} obras ativas para admin_id={admin_id}")
+        logger.debug(f"[BUILD] DEBUG: Encontradas {len(obras)} obras ativas para admin_id={admin_id}")
         
         obras_json = []
         for obra in obras:
@@ -6166,7 +6168,7 @@ def api_obras_ativas():
         })
         
     except Exception as e:
-        print(f"❌ ERRO AO LISTAR OBRAS: {str(e)}")
+        logger.error(f"[ERROR] ERRO AO LISTAR OBRAS: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @main_bp.route('/api/obras/servicos-rdo', methods=['POST'])
@@ -6255,7 +6257,7 @@ def api_adicionar_servico_obra():
         db.session.add(novo_servico_obra)
         db.session.commit()
         
-        print(f"✅ Serviço {servico.nome} adicionado à obra {obra.nome}")
+        logger.info(f"[OK] Serviço {servico.nome} adicionado à obra {obra.nome}")
         
         return jsonify({
             'success': True,
@@ -6269,7 +6271,7 @@ def api_adicionar_servico_obra():
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ ERRO AO ADICIONAR SERVIÇO À OBRA: {str(e)}")
+        logger.error(f"[ERROR] ERRO AO ADICIONAR SERVIÇO À OBRA: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -6331,7 +6333,7 @@ def api_remover_servico_obra():
         
         db.session.commit()
         
-        print(f"✅ Serviço ID {servico_id} removido da obra {obra.nome} ({rdos_deletados} registros RDO removidos)")
+        logger.info(f"[OK] Serviço ID {servico_id} removido da obra {obra.nome} ({rdos_deletados} registros RDO removidos)")
         
         return jsonify({
             'success': True,
@@ -6340,7 +6342,7 @@ def api_remover_servico_obra():
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ ERRO AO REMOVER SERVIÇO DA OBRA: {str(e)}")
+        logger.error(f"[ERROR] ERRO AO REMOVER SERVIÇO DA OBRA: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -6363,7 +6365,7 @@ def get_admin_id_dinamico():
                     text("SELECT admin_id, COUNT(*) as total FROM obra WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
                 ).fetchone()
                 if obra_counts and obra_counts[0]:
-                    print(f"✅ SUPER_ADMIN: usando admin_id={obra_counts[0]} ({obra_counts[1]} obras)")
+                    logger.info(f"[OK] SUPER_ADMIN: usando admin_id={obra_counts[0]} ({obra_counts[1]} obras)")
                     return obra_counts[0]
                 # Fallback para funcionários
                 func_counts = db.session.execute(
@@ -6386,13 +6388,13 @@ def get_admin_id_dinamico():
             text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 3")
         ).fetchall()
         
-        print(f"🔍 ADMINS DISPONÍVEIS: {admin_funcionarios}")
+        logger.debug(f"[DEBUG] ADMINS DISPONÍVEIS: {admin_funcionarios}")
         
         # Priorizar admin com mais funcionários (mas pelo menos 1)
         for admin_info in admin_funcionarios:
             admin_id, total = admin_info
             if total >= 1:  # Qualquer admin com pelo menos 1 funcionário
-                print(f"✅ SELECIONADO: admin_id={admin_id} ({total} funcionários)")
+                logger.info(f"[OK] SELECIONADO: admin_id={admin_id} ({total} funcionários)")
                 return admin_id
         
         # Fallback: qualquer admin com serviços
@@ -6401,7 +6403,7 @@ def get_admin_id_dinamico():
         ).fetchone()
         
         if admin_servicos:
-            print(f"✅ FALLBACK SERVIÇOS: admin_id={admin_servicos[0]} ({admin_servicos[1]} serviços)")
+            logger.info(f"[OK] FALLBACK SERVIÇOS: admin_id={admin_servicos[0]} ({admin_servicos[1]} serviços)")
             return admin_servicos[0]
             
         # Último fallback: primeiro admin_id encontrado na tabela funcionario
@@ -6410,15 +6412,15 @@ def get_admin_id_dinamico():
         ).fetchone()
         
         if primeiro_admin:
-            print(f"✅ ÚLTIMO FALLBACK: admin_id={primeiro_admin[0]}")
+            logger.info(f"[OK] ÚLTIMO FALLBACK: admin_id={primeiro_admin[0]}")
             return primeiro_admin[0]
             
         # Se nada funcionar, retornar 1
-        print("⚠️ USANDO DEFAULT: admin_id=1")
+            logger.warning("[WARN] USANDO DEFAULT: admin_id=1")
         return 1
         
     except Exception as e:
-        print(f"❌ ERRO GET_ADMIN_ID_DINAMICO: {str(e)}")
+        logger.error(f"[ERROR] ERRO GET_ADMIN_ID_DINAMICO: {str(e)}")
         # Em caso de erro, tentar um fallback mais simples
         try:
             primeiro_admin = db.session.execute(text("SELECT MIN(admin_id) FROM funcionario")).fetchone()
@@ -6435,38 +6437,38 @@ def api_servicos():
         admin_id = None
         user_status = "Usuário não autenticado"
         
-        print(f"🔍 DEBUG API: current_user exists={current_user is not None}")
-        print(f"🔍 DEBUG API: is_authenticated={getattr(current_user, 'is_authenticated', False)}")
+        logger.debug(f"[DEBUG] DEBUG API: current_user exists={current_user is not None}")
+        logger.debug(f"[DEBUG] DEBUG API: is_authenticated={getattr(current_user, 'is_authenticated', False)}")
         if hasattr(current_user, 'id'):
-            print(f"🔍 DEBUG API: current_user.id={current_user.id}")
+            logger.debug(f"[DEBUG] DEBUG API: current_user.id={current_user.id}")
         if hasattr(current_user, 'admin_id'):
-            print(f"🔍 DEBUG API: current_user.admin_id={current_user.admin_id}")
+            logger.debug(f"[DEBUG] DEBUG API: current_user.admin_id={current_user.admin_id}")
         if hasattr(current_user, 'tipo_usuario'):
-            print(f"🔍 DEBUG API: current_user.tipo_usuario={current_user.tipo_usuario}")
+            logger.debug(f"[DEBUG] DEBUG API: current_user.tipo_usuario={current_user.tipo_usuario}")
         
         if current_user and current_user.is_authenticated:
             # Funcionário sempre tem admin_id
             if hasattr(current_user, 'admin_id') and current_user.admin_id:
                 admin_id = current_user.admin_id
                 user_status = f"Funcionário autenticado (admin_id={admin_id})"
-                print(f"✅ API SERVIÇOS: Admin_id do funcionário - admin_id={admin_id}")
+                logger.info(f"[OK] API SERVIÇOS: Admin_id do funcionário - admin_id={admin_id}")
             # Se não tem admin_id, é um admin
             elif hasattr(current_user, 'id'):
                 admin_id = current_user.id
                 user_status = f"Admin autenticado (id={admin_id})"
-                print(f"✅ API SERVIÇOS: Admin_id do usuário logado - admin_id={admin_id}")
+                logger.info(f"[OK] API SERVIÇOS: Admin_id do usuário logado - admin_id={admin_id}")
             else:
-                print("⚠️ API SERVIÇOS: Usuário autenticado mas sem ID válido")
+                logger.warning("[WARN] API SERVIÇOS: Usuário autenticado mas sem ID válido")
         
         # Se não conseguiu obter do usuário autenticado, usar fallback
         if admin_id is None:
             admin_id = get_admin_id_robusta()
             user_status = f"Fallback sistema robusto (admin_id={admin_id})"
-            print(f"⚠️ API SERVIÇOS FALLBACK: Admin_id via sistema robusto - admin_id={admin_id}")
+            logger.warning(f"[WARN] API SERVIÇOS FALLBACK: Admin_id via sistema robusto - admin_id={admin_id}")
             
             # Se ainda não conseguiu determinar, usar fallback adicional
             if admin_id is None:
-                print("⚠️ DESENVOLVIMENTO: Usando fallback inteligente")
+                logger.warning("[WARN] DESENVOLVIMENTO: Usando fallback inteligente")
                 
                 # Primeiro tenta admin_id=2 (produção simulada)
                 servicos_admin_2 = db.session.execute(
@@ -6476,42 +6478,42 @@ def api_servicos():
                 if servicos_admin_2 and servicos_admin_2[0] > 0:
                     admin_id = 2
                     user_status = f"Fallback admin_id=2 ({servicos_admin_2[0]} serviços)"
-                    print(f"✅ DESENVOLVIMENTO: {user_status}")
+                    logger.info(f"[OK] DESENVOLVIMENTO: {user_status}")
                 else:
                     # Fallback para admin com mais funcionários
                     admin_id = get_admin_id_dinamico()
                     user_status = f"Fallback dinâmico (admin_id={admin_id})"
-                    print(f"✅ DESENVOLVIMENTO: {user_status}")
+                    logger.info(f"[OK] DESENVOLVIMENTO: {user_status}")
         
-        print(f"🎯 API SERVIÇOS FINAL: admin_id={admin_id}")
+                    logger.debug(f"[TARGET] API SERVIÇOS FINAL: admin_id={admin_id}")
         
         # DEBUG DETALHADO DA CONSULTA
-        print(f"🔍 DEBUG CONSULTA: admin_id={admin_id} (tipo: {type(admin_id)})")
+                    logger.debug(f"[DEBUG] DEBUG CONSULTA: admin_id={admin_id} (tipo: {type(admin_id)})")
         
         # Primeiro: verificar se existem serviços para esse admin_id
         total_servicos_admin = Servico.query.filter_by(admin_id=admin_id).count()
-        print(f"📊 Total de serviços para admin_id={admin_id}: {total_servicos_admin}")
+        logger.info(f"[STATS] Total de serviços para admin_id={admin_id}: {total_servicos_admin}")
         
         # Segundo: verificar quantos estão ativos
         servicos_ativos_count = Servico.query.filter_by(admin_id=admin_id, ativo=True).count()
-        print(f"✅ Serviços ativos para admin_id={admin_id}: {servicos_ativos_count}")
+        logger.info(f"[OK] Serviços ativos para admin_id={admin_id}: {servicos_ativos_count}")
         
         # Terceiro: buscar os serviços ativos
         servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
-        print(f"🎯 Query result: {len(servicos)} serviços encontrados")
+        logger.debug(f"[TARGET] Query result: {len(servicos)} serviços encontrados")
         
         # Se ainda não encontrou, fazer debug da consulta raw
         if len(servicos) == 0 and servicos_ativos_count > 0:
-            print("⚠️ INCONSISTÊNCIA: Count diz que há serviços, mas query retorna vazio")
+            logger.warning("[WARN] INCONSISTÊNCIA: Count diz que há serviços, mas query retorna vazio")
             # Tentar consulta alternativa
             servicos_raw = db.session.execute(
                 text("SELECT * FROM servico WHERE admin_id = :admin_id AND ativo = true ORDER BY nome"),
                 {"admin_id": admin_id}
             ).fetchall()
-            print(f"🔧 Query RAW encontrou: {len(servicos_raw)} serviços")
+            logger.info(f"[CONFIG] Query RAW encontrou: {len(servicos_raw)} serviços")
             
             if len(servicos_raw) > 0:
-                print("🚨 PROBLEMA NO ORM - usando consulta raw")
+                logger.info("[ALERT] PROBLEMA NO ORM - usando consulta raw")
                 # Converter resultado raw para objetos Servico
                 servicos = Servico.query.filter(
                     Servico.id.in_([row[0] for row in servicos_raw])
@@ -6532,7 +6534,7 @@ def api_servicos():
             }
             servicos_json.append(servico_data)
         
-        print(f"🚀 RETORNANDO: {len(servicos_json)} serviços em JSON para admin_id={admin_id}")
+            logger.info(f"[START] RETORNANDO: {len(servicos_json)} serviços em JSON para admin_id={admin_id}")
         
         return jsonify({
             'success': True, 
@@ -6544,7 +6546,7 @@ def api_servicos():
         
     except Exception as e:
         error_msg = str(e)
-        print(f"❌ ERRO CRÍTICO API SERVIÇOS: {error_msg}")
+        logger.error(f"[ERROR] ERRO CRÍTICO API SERVIÇOS: {error_msg}")
         return jsonify({
             'success': False, 
             'servicos': [], 
@@ -6563,12 +6565,12 @@ def api_servicos_disponiveis_obra(obra_id):
         else:
             admin_id = current_user.admin_id
             
-        print(f"✅ API SERVIÇOS OBRA: Admin_id={admin_id}, Obra_id={obra_id}")
+            logger.info(f"[OK] API SERVIÇOS OBRA: Admin_id={admin_id}, Obra_id={obra_id}")
         
         # Verificar se a obra pertence ao admin correto
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
-            print(f"❌ Obra {obra_id} não encontrada ou não pertence ao admin_id {admin_id}")
+            logger.error(f"[ERROR] Obra {obra_id} não encontrada ou não pertence ao admin_id {admin_id}")
             return jsonify({
                 'success': False,
                 'error': 'Obra não encontrada ou sem permissão',
@@ -6577,7 +6579,7 @@ def api_servicos_disponiveis_obra(obra_id):
             
         # Buscar serviços disponíveis do admin
         servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
-        print(f"🎯 Encontrados {len(servicos)} serviços para admin_id={admin_id}")
+        logger.debug(f"[TARGET] Encontrados {len(servicos)} serviços para admin_id={admin_id}")
         
         # Processar para JSON
         servicos_json = []
@@ -6594,7 +6596,7 @@ def api_servicos_disponiveis_obra(obra_id):
             }
             servicos_json.append(servico_data)
         
-        print(f"🚀 API OBRA: Retornando {len(servicos_json)} serviços seguros")
+            logger.info(f"[START] API OBRA: Retornando {len(servicos_json)} serviços seguros")
         
         return jsonify({
             'success': True,
@@ -6606,7 +6608,7 @@ def api_servicos_disponiveis_obra(obra_id):
         
     except Exception as e:
         error_msg = str(e)
-        print(f"❌ ERRO API SERVIÇOS OBRA: {error_msg}")
+        logger.error(f"[ERROR] ERRO API SERVIÇOS OBRA: {error_msg}")
         return jsonify({
             'success': False,
             'error': error_msg,
@@ -6624,10 +6626,10 @@ def rdos():
     """Lista RDOs com controle de acesso e design moderno"""
     try:
         # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
-        print("🎯 RDO LISTA VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
-        print("📍 ROTA USADA: /rdos, /rdo, /rdo/lista (rdos)")
-        print("📄 TEMPLATE: rdo_lista_unificada.html (MODERNO)")
-        print("👤 USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
+        logger.info("[TARGET] RDO LISTA VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        logger.info("[LOC] ROTA USADA: /rdos, /rdo, /rdo/lista (rdos)")
+        logger.info("[DOC] TEMPLATE: rdo_lista_unificada.html (MODERNO)")
+        logger.info("[USER] USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
         # Criar sessão isolada para evitar problemas
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
@@ -6644,7 +6646,7 @@ def rdos():
             ).fetchone()
             if obra_counts and obra_counts[0]:
                 admin_id = obra_counts[0]
-                print(f"✅ SUPER_ADMIN rdos(): usando admin_id={admin_id} ({obra_counts[1]} obras)")
+                logger.info(f"[OK] SUPER_ADMIN rdos(): usando admin_id={admin_id} ({obra_counts[1]} obras)")
             else:
                 # Fallback para funcionários
                 func_counts = db.session.execute(
@@ -6713,11 +6715,11 @@ def rdos():
                             # FÓRMULA CORRETA: média simples
                             progresso_real = round(soma_percentuais / total_subatividades, 1) if total_subatividades > 0 else 0
                             
-                            print(f"DEBUG CARD FÓRMULA SIMPLES: RDO {rdo.id} = {soma_percentuais} ÷ {total_subatividades} = {progresso_real}%")
+                            logger.debug(f"DEBUG CARD FÓRMULA SIMPLES: RDO {rdo.id} = {soma_percentuais} ÷ {total_subatividades} = {progresso_real}%")
                         except:
                             # Fallback simples
                             progresso_real = 0.0
-                            print(f"DEBUG CARD FALLBACK: RDO {rdo.id} = {progresso_real}%")
+                            logger.debug(f"DEBUG CARD FALLBACK: RDO {rdo.id} = {progresso_real}%")
                     else:
                         progresso_real = 0
                     
@@ -6746,11 +6748,11 @@ def rdos():
         rdos = SimplePagination(rdos_lista)
         session.close()
         
-        print(f"DEBUG LISTA RDOs: {rdos.total} RDOs encontrados para admin_id={admin_id}")
+        logger.debug(f"DEBUG LISTA RDOs: {rdos.total} RDOs encontrados para admin_id={admin_id}")
         if rdos.items:
-            print(f"DEBUG: Mostrando página {rdos.page} com {len(rdos.items)} RDOs")
+            logger.debug(f"DEBUG: Mostrando página {rdos.page} com {len(rdos.items)} RDOs")
             for rdo in rdos.items[:3]:
-                print(f"DEBUG RDO {rdo.id}: {len(rdo.servico_subatividades)} subatividades, {len(rdo.mao_obra)} funcionários, {rdo.progresso_total}% progresso")
+                logger.debug(f"DEBUG RDO {rdo.id}: {len(rdo.servico_subatividades)} subatividades, {len(rdo.mao_obra)} funcionários, {rdo.progresso_total}% progresso")
         
         return render_template('rdo_lista_unificada.html',
                              rdos=rdos,
@@ -6766,7 +6768,7 @@ def rdos():
                              })
         
     except Exception as e:
-        print(f"ERRO LISTA RDO: {str(e)}")
+        logger.error(f"ERRO LISTA RDO: {str(e)}")
         # Rollback da sessão e tentar novamente
         try:
             db.session.rollback()
@@ -6810,13 +6812,13 @@ def rdos():
                     rdo.servico_subatividades = subatividades
                     rdo.mao_obra = mao_obra
                 except Exception as calc_error:
-                    print(f"Erro cálculo RDO {rdo.id}: {calc_error}")
+                    logger.error(f"Erro cálculo RDO {rdo.id}: {calc_error}")
                     rdo.progresso_total = 0
                     rdo.horas_totais = 0
                     rdo.servico_subatividades = []
                     rdo.mao_obra = []
                 
-            print(f"FALLBACK: Carregados {len(rdos.items)} RDOs básicos")
+                    logger.info(f"FALLBACK: Carregados {len(rdos.items)} RDOs básicos")
             
             return render_template('rdo_lista_unificada.html',
                                  rdos=rdos,
@@ -6831,11 +6833,11 @@ def rdos():
                                      'order_by': 'data_desc'
                                  })
         except Exception as fallback_error:
-            print(f"ERRO FALLBACK: {str(fallback_error)}")
+            logger.error(f"ERRO FALLBACK: {str(fallback_error)}")
             db.session.rollback()
             # Mostrar erro específico para debugging
             error_msg = f"ERRO RDO: {str(e)}"
-            print(f"ERRO DETALHADO RDO: {str(e)}")
+            logger.error(f"ERRO DETALHADO RDO: {str(e)}")
             import traceback
             traceback.print_exc()
             flash(f'Erro detalhado no RDO: {error_msg}', 'error')
@@ -6877,7 +6879,7 @@ def excluir_rdo(rdo_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao excluir RDO {rdo_id}: {str(e)}")
+        logger.error(f"Erro ao excluir RDO {rdo_id}: {str(e)}")
         flash('Erro ao excluir RDO. Tente novamente.', 'error')
         return redirect(url_for('main.rdos'))
 
@@ -6887,10 +6889,10 @@ def novo_rdo():
     """Formulário para criar novo RDO com pré-carregamento de atividades"""
     try:
         # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
-        print("🎯 RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
-        print("📍 ROTA USADA: /rdo/novo (novo_rdo)")
-        print("📄 TEMPLATE: rdo/novo.html (MODERNO)")
-        print("👤 USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
+        logger.info("[TARGET] RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        logger.info("[LOC] ROTA USADA: /rdo/novo (novo_rdo)")
+        logger.info("[DOC] TEMPLATE: rdo/novo.html (MODERNO)")
+        logger.info("[USER] USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
         # Buscar obras disponíveis
@@ -6926,7 +6928,7 @@ def novo_rdo():
                     }
                     for rdo_sub in rdo_subatividades
                 ]
-                print(f"DEBUG: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
+                logger.debug(f"DEBUG: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
             else:
                 # Primeiro RDO da obra - carregar atividades dos serviços cadastrados via servico_obra_real
                 servicos_obra = db.session.query(ServicoObraReal, Servico).join(
@@ -6962,9 +6964,9 @@ def novo_rdo():
                         'subatividades': subatividades_list
                     })
                 
-                print(f"DEBUG: Pré-carregando {len(atividades_anteriores)} serviços da obra como atividades")
+                    logger.debug(f"DEBUG: Pré-carregando {len(atividades_anteriores)} serviços da obra como atividades")
                 for ativ in atividades_anteriores:
-                    print(f"DEBUG SERVIÇO: {ativ['descricao']} - {len(ativ['subatividades'])} subatividades")
+                    logger.debug(f"DEBUG SERVIÇO: {ativ['descricao']} - {len(ativ['subatividades'])} subatividades")
         
         # Adicionar data atual para o template
         data_hoje = date.today().strftime('%Y-%m-%d')
@@ -6977,7 +6979,7 @@ def novo_rdo():
                              data_hoje=data_hoje)
         
     except Exception as e:
-        print(f"ERRO NOVO RDO: {str(e)}")
+        logger.error(f"ERRO NOVO RDO: {str(e)}")
         return redirect(url_for('main.rdos'))
 
 @main_bp.route('/rdo/criar', methods=['POST'])
@@ -7035,12 +7037,12 @@ def criar_rdo():
         
         # Processar atividades (corrigido para funcionar corretamente)
         atividades_json = request.form.get('atividades', '[]')
-        print(f"DEBUG: Atividades JSON recebido: {atividades_json}")
+        logger.debug(f"DEBUG: Atividades JSON recebido: {atividades_json}")
         
         if atividades_json and atividades_json != '[]':
             try:
                 atividades = json.loads(atividades_json)
-                print(f"DEBUG: Processando {len(atividades)} atividades")
+                logger.debug(f"DEBUG: Processando {len(atividades)} atividades")
                 
                 for i, ativ_data in enumerate(atividades):
                     if ativ_data.get('descricao', '').strip():  # Só processar se tiver descrição
@@ -7048,19 +7050,19 @@ def criar_rdo():
                         pass
                         
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar atividades: {e}")
+                logger.error(f"Erro ao processar atividades: {e}")
                 flash(f'Erro ao processar atividades: {e}', 'warning')
         else:
-            print("DEBUG: Nenhuma atividade para processar")
+            logger.debug("DEBUG: Nenhuma atividade para processar")
         
         # Processar mão de obra (corrigido para funcionar corretamente)
         mao_obra_json = request.form.get('mao_obra', '[]')
-        print(f"DEBUG: Mão de obra JSON recebido: {mao_obra_json}")
+        logger.debug(f"DEBUG: Mão de obra JSON recebido: {mao_obra_json}")
         
         if mao_obra_json and mao_obra_json != '[]':
             try:
                 mao_obra_list = json.loads(mao_obra_json)
-                print(f"DEBUG: Processando {len(mao_obra_list)} registros de mão de obra")
+                logger.debug(f"DEBUG: Processando {len(mao_obra_list)} registros de mão de obra")
                 
                 for i, mo_data in enumerate(mao_obra_list):
                     funcionario_id = mo_data.get('funcionario_id')
@@ -7072,22 +7074,22 @@ def criar_rdo():
                         mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
                         mao_obra.admin_id = admin_id
                         db.session.add(mao_obra)
-                        print(f"DEBUG: Mão de obra {i+1} adicionada: Funcionário {funcionario_id} - {mao_obra.horas_trabalhadas}h")
+                        logger.debug(f"DEBUG: Mão de obra {i+1} adicionada: Funcionário {funcionario_id} - {mao_obra.horas_trabalhadas}h")
                         
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar mão de obra: {e}")
+                logger.error(f"Erro ao processar mão de obra: {e}")
                 flash(f'Erro ao processar mão de obra: {e}', 'warning')
         else:
-            print("DEBUG: Nenhuma mão de obra para processar")
+            logger.debug("DEBUG: Nenhuma mão de obra para processar")
             
         # Processar equipamentos
         equipamentos_json = request.form.get('equipamentos', '[]')
-        print(f"DEBUG: Equipamentos JSON recebido: {equipamentos_json}")
+        logger.debug(f"DEBUG: Equipamentos JSON recebido: {equipamentos_json}")
         
         if equipamentos_json and equipamentos_json != '[]':
             try:
                 equipamentos_list = json.loads(equipamentos_json)
-                print(f"DEBUG: Processando {len(equipamentos_list)} equipamentos")
+                logger.debug(f"DEBUG: Processando {len(equipamentos_list)} equipamentos")
                 
                 for i, eq_data in enumerate(equipamentos_list):
                     nome_equipamento = eq_data.get('nome', '').strip()
@@ -7099,22 +7101,22 @@ def criar_rdo():
                         equipamento.horas_uso = float(eq_data.get('horas_uso', 8))
                         equipamento.estado_conservacao = eq_data.get('estado', 'Bom')
                         db.session.add(equipamento)
-                        print(f"DEBUG: Equipamento {i+1} adicionado: {equipamento.nome_equipamento}")
+                        logger.debug(f"DEBUG: Equipamento {i+1} adicionado: {equipamento.nome_equipamento}")
                         
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar equipamentos: {e}")
+                logger.error(f"Erro ao processar equipamentos: {e}")
                 flash(f'Erro ao processar equipamentos: {e}', 'warning')
         else:
-            print("DEBUG: Nenhum equipamento para processar")
+            logger.debug("DEBUG: Nenhum equipamento para processar")
             
         # Processar ocorrências
         ocorrencias_json = request.form.get('ocorrencias', '[]')
-        print(f"DEBUG: Ocorrências JSON recebido: {ocorrencias_json}")
+        logger.debug(f"DEBUG: Ocorrências JSON recebido: {ocorrencias_json}")
         
         if ocorrencias_json and ocorrencias_json != '[]':
             try:
                 ocorrencias_list = json.loads(ocorrencias_json)
-                print(f"DEBUG: Processando {len(ocorrencias_list)} ocorrências")
+                logger.debug(f"DEBUG: Processando {len(ocorrencias_list)} ocorrências")
                 
                 for i, oc_data in enumerate(ocorrencias_list):
                     descricao = oc_data.get('descricao', '').strip()
@@ -7125,41 +7127,41 @@ def criar_rdo():
                         ocorrencia.problemas_identificados = oc_data.get('problemas', '').strip()
                         ocorrencia.acoes_corretivas = oc_data.get('acoes', '').strip()
                         db.session.add(ocorrencia)
-                        print(f"DEBUG: Ocorrência {i+1} adicionada: {ocorrencia.descricao_ocorrencia}")
+                        logger.debug(f"DEBUG: Ocorrência {i+1} adicionada: {ocorrencia.descricao_ocorrencia}")
                         
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar ocorrências: {e}")
+                logger.error(f"Erro ao processar ocorrências: {e}")
                 flash(f'Erro ao processar ocorrências: {e}', 'warning')
         else:
-            print("DEBUG: Nenhuma ocorrência para processar")
+            logger.debug("DEBUG: Nenhuma ocorrência para processar")
         
-        # 📸 PROCESSAR FOTOS (v9.0) - Sistema Completo
+        # [PHOTO] PROCESSAR FOTOS (v9.0) - Sistema Completo
         fotos_files = request.files.getlist('fotos[]')
-        logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) do formulário")
+        logger.info(f"[PHOTO] {len(fotos_files)} foto(s) recebida(s) do formulário")
         
-        # ✅ CORREÇÃO 1: Filtrar arquivos vazios ANTES do processamento
+        # [OK] CORREÇÃO 1: Filtrar arquivos vazios ANTES do processamento
         fotos_validas = [f for f in fotos_files if f and f.filename and f.filename.strip() != '']
-        logger.info(f"✅ {len(fotos_validas)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_validas)} vazios)")
+        logger.info(f"[OK] {len(fotos_validas)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_validas)} vazios)")
         
         if fotos_validas:
             try:
-                # ✅ CORREÇÃO 2: Usar salvar_foto_rdo (função correta que existe)
+                # [OK] CORREÇÃO 2: Usar salvar_foto_rdo (função correta que existe)
                 from services.rdo_foto_service import salvar_foto_rdo
                 
                 fotos_processadas = 0
                 for idx, foto_file in enumerate(fotos_validas, 1):
                     try:
-                        logger.info(f"📸 [FOTO-UPLOAD] Processando foto {idx}/{len(fotos_validas)}: {foto_file.filename}")
+                        logger.info(f"[PHOTO] [FOTO-UPLOAD] Processando foto {idx}/{len(fotos_validas)}: {foto_file.filename}")
                         
                         # Chamar service layer
                         resultado = salvar_foto_rdo(foto_file, admin_id, rdo.id)
-                        logger.info(f"   ✅ Service retornou: {resultado}")
+                        logger.info(f" [OK] Service retornou: {resultado}")
                         
-                        # ✅ CORREÇÃO 3: Criar RDOFoto com CAMPOS LEGADOS preenchidos
+                        # [OK] CORREÇÃO 3: Criar RDOFoto com CAMPOS LEGADOS preenchidos
                         nova_foto = RDOFoto(
                             admin_id=admin_id,
                             rdo_id=rdo.id,
-                            # ✅ CAMPOS LEGADOS OBRIGATÓRIOS (NOT NULL no banco)
+                            # [OK] CAMPOS LEGADOS OBRIGATÓRIOS (NOT NULL no banco)
                             nome_arquivo=resultado['nome_original'],
                             caminho_arquivo=resultado['arquivo_original'],
                             # Novos campos v9.0
@@ -7169,7 +7171,7 @@ def criar_rdo():
                             thumbnail=resultado['thumbnail'],
                             nome_original=resultado['nome_original'],
                             tamanho_bytes=resultado['tamanho_bytes'],
-                            # 🔥 CAMPOS BASE64 (v9.0.4) - Persistência no banco de dados
+                            # [READY] CAMPOS BASE64 (v9.0.4) - Persistência no banco de dados
                             imagem_original_base64=resultado.get('imagem_original_base64'),
                             imagem_otimizada_base64=resultado.get('imagem_otimizada_base64'),
                             thumbnail_base64=resultado.get('thumbnail_base64')
@@ -7177,19 +7179,19 @@ def criar_rdo():
                         
                         db.session.add(nova_foto)
                         fotos_processadas += 1
-                        logger.info(f"   ✅ Foto {idx} adicionada à sessão: {resultado['arquivo_original']}")
+                        logger.info(f" [OK] Foto {idx} adicionada à sessão: {resultado['arquivo_original']}")
                         
                     except ValueError as e:
                         # Erros de validação (tamanho, formato)
-                        logger.warning(f"   ⚠️ Validação falhou para {foto_file.filename}: {e}")
+                        logger.warning(f" [WARN] Validação falhou para {foto_file.filename}: {e}")
                         flash(f'Foto {foto_file.filename}: {str(e)}', 'warning')
                     except Exception as e:
                         # Erros inesperados
-                        logger.error(f"   ❌ Erro ao processar {foto_file.filename}: {e}", exc_info=True)
+                        logger.error(f" [ERROR] Erro ao processar {foto_file.filename}: {e}", exc_info=True)
                         flash(f'Erro ao processar {foto_file.filename}', 'warning')
                 
                 if fotos_processadas > 0:
-                    logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {fotos_processadas} foto(s) adicionadas à sessão")
+                    logger.info(f"[OK] [FOTO-UPLOAD] RESUMO: {fotos_processadas} foto(s) adicionadas à sessão")
                     flash(f'{fotos_processadas} foto(s) anexada(s) ao RDO', 'success')
                         
             except ImportError as e:
@@ -7206,7 +7208,7 @@ def criar_rdo():
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO CRIAR RDO: {str(e)}")
+        logger.error(f"ERRO CRIAR RDO: {str(e)}")
         flash(f'Erro ao criar RDO: {str(e)}', 'error')
         return redirect(url_for('main.novo_rdo'))
 
@@ -7215,10 +7217,10 @@ def visualizar_rdo(id):
     """Visualizar RDO específico - SEM VERIFICAÇÃO DE PERMISSÃO"""
     try:
         # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
-        print("🎯 RDO VISUALIZAR VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
-        print(f"📍 ROTA USADA: /rdo/{id} (visualizar_rdo)")
-        print("📄 TEMPLATE: rdo/visualizar_rdo_moderno.html (MODERNO)")
-        print("👤 USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
+        logger.info("[TARGET] RDO VISUALIZAR VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        logger.debug(f"[LOC] ROTA USADA: /rdo/{id} (visualizar_rdo)")
+        logger.info("[DOC] TEMPLATE: rdo/visualizar_rdo_moderno.html (MODERNO)")
+        logger.info("[USER] USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
         # Buscar RDO diretamente sem verificação de acesso
         rdo = RDO.query.options(
             db.joinedload(RDO.obra),
@@ -7280,13 +7282,13 @@ def visualizar_rdo(id):
                     'subatividades': len(subatividades_servico)
                 })
             
-            print(f"DEBUG SERVIÇOS CADASTRADOS NA OBRA: {len(servicos_da_obra)}")
-            print(f"DEBUG DETALHES SERVIÇOS: {servicos_encontrados}")
-            print(f"DEBUG TOTAL SUBATIVIDADES PLANEJADAS: {total_subatividades_obra}")
+                logger.debug(f"DEBUG SERVIÇOS CADASTRADOS NA OBRA: {len(servicos_da_obra)}")
+                logger.debug(f"DEBUG DETALHES SERVIÇOS: {servicos_encontrados}")
+                logger.debug(f"DEBUG TOTAL SUBATIVIDADES PLANEJADAS: {total_subatividades_obra}")
             
             # Se não há serviços cadastrados, usar fallback das subatividades já executadas
             if total_subatividades_obra == 0:
-                print("FALLBACK: Usando subatividades executadas como base")
+                logger.info("FALLBACK: Usando subatividades executadas como base")
                 # Buscar todas as combinações únicas já executadas
                 subatividades_query = db.session.query(
                     RDOServicoSubatividade.servico_id,
@@ -7298,9 +7300,9 @@ def visualizar_rdo(id):
                     combinacoes_unicas.add(f"{servico_id}_{nome_subatividade}")
                 
                 total_subatividades_obra = len(combinacoes_unicas)
-                print(f"DEBUG FALLBACK TOTAL: {total_subatividades_obra}")
+                logger.debug(f"DEBUG FALLBACK TOTAL: {total_subatividades_obra}")
             
-            print(f"DEBUG TOTAL SUBATIVIDADES PLANEJADAS DA OBRA: {total_subatividades_obra}")
+                logger.debug(f"DEBUG TOTAL SUBATIVIDADES PLANEJADAS DA OBRA: {total_subatividades_obra}")
             
             # Definir combinacoes_unicas para todos os casos
             combinacoes_unicas = set()
@@ -7311,12 +7313,12 @@ def visualizar_rdo(id):
                 # Para quando há serviços cadastrados, criar conjunto vazio para compatibilidade
                 combinacoes_unicas = set()
             
-            print(f"DEBUG COMBINAÇÕES: {len(combinacoes_unicas)} encontradas")
+                logger.debug(f"DEBUG COMBINAÇÕES: {len(combinacoes_unicas)} encontradas")
             
             if total_subatividades_obra > 0:
                 # PASSO 2: Calcular peso de cada subatividade
                 peso_por_subatividade = 100.0 / total_subatividades_obra
-                print(f"DEBUG PESO POR SUBATIVIDADE: {peso_por_subatividade:.2f}%")
+                logger.debug(f"DEBUG PESO POR SUBATIVIDADE: {peso_por_subatividade:.2f}%")
                 
                 # PASSO 3: Buscar progresso das subatividades executadas vs planejadas
                 subatividades_executadas = db.session.query(RDOServicoSubatividade).join(
@@ -7348,20 +7350,20 @@ def visualizar_rdo(id):
                 # 1 subatividade com 100% de 16 total = 100/16 = 6.25%
                 progresso_obra = round(progresso_total_pontos / total_subatividades_obra, 1)
                 
-                print(f"DEBUG PROGRESSO DETALHADO (FÓRMULA CORRETA):")
-                print(f"  - Subatividades TOTAIS: {total_subatividades_obra}")
-                print(f"  - Subatividades EXECUTADAS: {len(progresso_por_subatividade)}")
-                print(f"  - Soma total dos percentuais: {progresso_total_pontos}%")
-                print(f"  - Fórmula: {progresso_total_pontos} ÷ {total_subatividades_obra} = {progresso_obra}%")
-                print(f"  - Progresso final da obra: {progresso_obra}%")
+                logger.debug(f"DEBUG PROGRESSO DETALHADO (FÓRMULA CORRETA):")
+                logger.debug(f" - Subatividades TOTAIS: {total_subatividades_obra}")
+                logger.debug(f" - Subatividades EXECUTADAS: {len(progresso_por_subatividade)}")
+                logger.debug(f" - Soma total dos percentuais: {progresso_total_pontos}%")
+                logger.debug(f" - Fórmula: {progresso_total_pontos} ÷ {total_subatividades_obra} = {progresso_obra}%")
+                logger.debug(f" - Progresso final da obra: {progresso_obra}%")
                 
                 # Mostrar quais subatividades faltam executar
                 subatividades_faltam = total_subatividades_obra - len(progresso_por_subatividade)
                 if subatividades_faltam > 0:
-                    print(f"  - Subatividades ainda não iniciadas: {subatividades_faltam}")
+                    logger.debug(f" - Subatividades ainda não iniciadas: {subatividades_faltam}")
             
         except Exception as e:
-            print(f"ERRO CÁLCULO PROGRESSO OBRA: {str(e)}")
+            logger.error(f"ERRO CÁLCULO PROGRESSO OBRA: {str(e)}")
             # Fallback para cálculo simples baseado no dia atual - LÓGICA CORRIGIDA
             if subatividades:
                 # Buscar todas as subatividades únicas já executadas na obra como total
@@ -7379,9 +7381,9 @@ def visualizar_rdo(id):
         # Calcular total de horas trabalhadas
         total_horas_trabalhadas = sum(func.horas_trabalhadas or 0 for func in funcionarios)
         
-        print(f"DEBUG VISUALIZAR RDO: ID={id}, Número={rdo.numero_rdo}")
-        print(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
-        print(f"DEBUG MÃO DE OBRA: {len(funcionarios)} funcionários")
+        logger.debug(f"DEBUG VISUALIZAR RDO: ID={id}, Número={rdo.numero_rdo}")
+        logger.debug(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
+        logger.debug(f"DEBUG MÃO DE OBRA: {len(funcionarios)} funcionários")
         
         # NOVA LÓGICA: Mostrar TODOS os serviços da obra (executados + não executados)
         subatividades_por_servico = {}
@@ -7392,7 +7394,7 @@ def visualizar_rdo(id):
                 obra_id=rdo.obra_id,
                 ativo=True  # FILTRAR APENAS ATIVOS
             ).all()
-            print(f"🎯 SERVIÇOS ATIVOS ENCONTRADOS: {len(servicos_cadastrados)}")
+            logger.debug(f"[TARGET] SERVIÇOS ATIVOS ENCONTRADOS: {len(servicos_cadastrados)}")
             
             for servico_obra in servicos_cadastrados:
                 servico = Servico.query.get(servico_obra.servico_id)
@@ -7491,8 +7493,8 @@ def visualizar_rdo(id):
                                 subatividades_por_servico[servico.id]['subatividades_nao_executadas'].append(mock_sub)
                     
         except Exception as e:
-            print(f"ERRO AO BUSCAR SERVIÇOS CADASTRADOS: {e}")
-            print(f"DEBUG: Será usado fallback com subatividades executadas apenas")
+            logger.error(f"ERRO AO BUSCAR SERVIÇOS CADASTRADOS: {e}")
+            logger.debug(f"DEBUG: Será usado fallback com subatividades executadas apenas")
         
         # PASSO 2: Adicionar subatividades EXECUTADAS (sem verificação restritiva)
         for sub in subatividades:
@@ -7509,7 +7511,7 @@ def visualizar_rdo(id):
                         'subatividades': [],
                         'subatividades_nao_executadas': []
                     }
-                    print(f"✅ SERVIÇO VISUALIZAÇÃO: {servico.nome} (ID: {servico_id})")
+                    logger.info(f"[OK] SERVIÇO VISUALIZAÇÃO: {servico.nome} (ID: {servico_id})")
                 else:
                     # Fallback para RDO com serviços não encontrados
                     mock_servico = type('MockServico', (), {
@@ -7522,12 +7524,12 @@ def visualizar_rdo(id):
                         'subatividades': [],
                         'subatividades_nao_executadas': []
                     }
-                    print(f"⚠️ SERVIÇO MOCK CRIADO: {mock_servico.nome}")
+                    logger.warning(f"[WARN] SERVIÇO MOCK CRIADO: {mock_servico.nome}")
             
             # Adicionar subatividade sempre (dados salvos são válidos)
             sub.executada = True  # Marcar como executada
             subatividades_por_servico[servico_id]['subatividades'].append(sub)
-            print(f"✅ SUBATIVIDADE ADICIONADA: {sub.nome_subatividade} - {sub.percentual_conclusao}%")
+            logger.info(f"[OK] SUBATIVIDADE ADICIONADA: {sub.nome_subatividade} - {sub.percentual_conclusao}%")
         
         # ORDENAR SUBATIVIDADES POR NÚMERO (1. 2. 3. etc.)
         def extrair_numero_subatividade(sub):
@@ -7544,7 +7546,7 @@ def visualizar_rdo(id):
         for servico_id, dados in subatividades_por_servico.items():
             if dados['subatividades']:
                 dados['subatividades'].sort(key=extrair_numero_subatividade)
-                print(f"🔢 SUBATIVIDADES ORDENADAS PARA SERVIÇO {servico_id}: {len(dados['subatividades'])} itens")
+                logger.debug(f"[NUM] SUBATIVIDADES ORDENADAS PARA SERVIÇO {servico_id}: {len(dados['subatividades'])} itens")
         
         return render_template('rdo/visualizar_rdo_moderno.html', 
                              rdo=rdo, 
@@ -7559,7 +7561,7 @@ def visualizar_rdo(id):
                              total_horas_trabalhadas=total_horas_trabalhadas)
         
     except Exception as e:
-        print(f"ERRO VISUALIZAR RDO: {str(e)}")
+        logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")
         flash('Erro ao carregar RDO.', 'error')
         return redirect('/funcionario/rdo/consolidado')
 
@@ -7585,7 +7587,7 @@ def finalizar_rdo(id):
         rdo.status = 'Finalizado'
         db.session.commit()
         
-        # ✅ NOVO: Emitir evento rdo_finalizado para integração com módulo de custos
+        # [OK] NOVO: Emitir evento rdo_finalizado para integração com módulo de custos
         try:
             from event_manager import EventManager
             EventManager.emit('rdo_finalizado', {
@@ -7593,16 +7595,16 @@ def finalizar_rdo(id):
                 'obra_id': rdo.obra_id,
                 'data_relatorio': str(rdo.data_relatorio)
             }, admin_id)
-            logger.info(f"🔔 Evento rdo_finalizado emitido para RDO {rdo.id}")
+            logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id}")
         except Exception as e:
-            logger.error(f"❌ Erro ao emitir evento rdo_finalizado: {e}")
+            logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {e}")
         
         flash(f'RDO {rdo.numero_rdo} finalizado com sucesso!', 'success')
         return redirect(url_for('main.visualizar_rdo', id=id))
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO FINALIZAR RDO: {str(e)}")
+        logger.error(f"ERRO FINALIZAR RDO: {str(e)}")
         flash('Erro ao finalizar RDO.', 'error')
         return redirect(url_for('main.rdos'))
 
@@ -7654,7 +7656,7 @@ def excluir_rdo_old(id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO EXCLUIR RDO: {str(e)}")
+        logger.error(f"ERRO EXCLUIR RDO: {str(e)}")
         flash('Erro ao excluir RDO.', 'error')
         return redirect(url_for('main.rdos'))
 
@@ -7754,7 +7756,7 @@ def duplicar_rdo(id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO DUPLICAR RDO: {str(e)}")
+        logger.error(f"ERRO DUPLICAR RDO: {str(e)}")
         flash('Erro ao duplicar RDO.', 'error')
         return redirect(url_for('main.rdos'))
 
@@ -7807,7 +7809,7 @@ def atualizar_rdo(id):
         
         db.session.commit()
         
-        # ✅ NOVO: Emitir evento rdo_finalizado se acabou de finalizar
+        # [OK] NOVO: Emitir evento rdo_finalizado se acabou de finalizar
         if foi_finalizado:
             try:
                 from event_manager import EventManager
@@ -7816,9 +7818,9 @@ def atualizar_rdo(id):
                     'obra_id': rdo.obra_id,
                     'data_relatorio': str(rdo.data_relatorio)
                 }, admin_id)
-                logger.info(f"🔔 Evento rdo_finalizado emitido para RDO {rdo.id}")
+                logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id}")
             except Exception as e:
-                logger.error(f"❌ Erro ao emitir evento rdo_finalizado: {e}")
+                logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {e}")
         
         if finalizar:
             flash(f'RDO {rdo.numero_rdo} atualizado e finalizado com sucesso!', 'success')
@@ -7829,7 +7831,7 @@ def atualizar_rdo(id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO ATUALIZAR RDO: {str(e)}")
+        logger.error(f"ERRO ATUALIZAR RDO: {str(e)}")
         flash('Erro ao atualizar RDO.', 'error')
         return redirect(url_for('main.editar_rdo', id=id))
 
@@ -7849,7 +7851,7 @@ def editar_rdo(id):
         return render_template('rdo/editar_rdo.html', rdo=rdo)
         
     except Exception as e:
-        print(f"ERRO EDITAR RDO: {str(e)}")
+        logger.error(f"ERRO EDITAR RDO: {str(e)}")
         flash('Erro ao carregar RDO para edição.', 'error')
         return redirect(url_for('main.rdos'))
 
@@ -7964,7 +7966,7 @@ def api_ultimo_rdo(obra_id):
         })
         
     except Exception as e:
-        print(f"❌ ERRO API ultimo-rdo: {str(e)}")
+        logger.error(f"[ERROR] ERRO API ultimo-rdo: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Erro interno'}), 500
@@ -8072,7 +8074,7 @@ def api_percentuais_ultimo_rdo(obra_id):
         })
         
     except Exception as e:
-        print(f"❌ ERRO API percentuais-ultimo-rdo: {str(e)}")
+        logger.error(f"[ERROR] ERRO API percentuais-ultimo-rdo: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Erro interno'}), 500
@@ -8121,11 +8123,11 @@ def rdo_novo_unificado():
         template = 'rdo/novo.html'  # SEMPRE usar template moderno
         
         # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
-        print("🎯 RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
-        print("📍 ROTA USADA: /rdo/novo (rdo_novo_unificado)")
-        print(f"📄 TEMPLATE: {template} (MODERNO)")
-        print("👤 USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
-        print(f"🔒 TIPO USUÁRIO: {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'N/A'}")
+        logger.info("[TARGET] RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        logger.info("[LOC] ROTA USADA: /rdo/novo (rdo_novo_unificado)")
+        logger.debug(f"[DOC] TEMPLATE: {template} (MODERNO)")
+        logger.info("[USER] USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
+        logger.debug(f"[LOCK] TIPO USUÁRIO: {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'N/A'}")
         
         # Adicionar data atual para o template
         data_hoje = date.today().strftime('%Y-%m-%d')
@@ -8138,7 +8140,7 @@ def rdo_novo_unificado():
                              date=date)
         
     except Exception as e:
-        print(f"ERRO RDO NOVO UNIFICADO: {str(e)}")
+        logger.error(f"ERRO RDO NOVO UNIFICADO: {str(e)}")
         flash('Erro ao carregar interface de RDO.', 'error')
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
             return redirect(url_for('main.funcionario_dashboard'))
@@ -8168,7 +8170,7 @@ def funcionario_rdo_consolidado():
         
         if not funcionario_atual:
             funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
-        print(f"DEBUG RDO CONSOLIDADO: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}, admin_id={admin_id_correto}")
+            logger.debug(f"DEBUG RDO CONSOLIDADO: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}, admin_id={admin_id_correto}")
         
         # MESMA LÓGICA DA FUNÇÃO rdos() QUE ESTÁ FUNCIONANDO
         page = request.args.get('page', 1, type=int)
@@ -8211,7 +8213,7 @@ def funcionario_rdo_consolidado():
         
         rdos_query = rdos_query.order_by(RDO.data_relatorio.desc())
         
-        print(f"DEBUG LISTA RDOs: {rdos_query.count()} RDOs encontrados para admin_id={admin_id_correto}")
+        logger.debug(f"DEBUG LISTA RDOs: {rdos_query.count()} RDOs encontrados para admin_id={admin_id_correto}")
         
         rdos_paginated = rdos_query.paginate(
             page=page, per_page=per_page, error_out=False
@@ -8225,7 +8227,7 @@ def funcionario_rdo_consolidado():
                 total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
                 total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
                 
-                # 🔧 CALCULAR HORAS TRABALHADAS REAIS
+                # [CONFIG] CALCULAR HORAS TRABALHADAS REAIS
                 mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
                 total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
                 
@@ -8233,9 +8235,9 @@ def funcionario_rdo_consolidado():
                 subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
                 progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades) if subatividades else 0
                 
-                print(f"DEBUG RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {total_horas_trabalhadas}h trabalhadas, {progresso_medio}% progresso")
+                logger.debug(f"DEBUG RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {total_horas_trabalhadas}h trabalhadas, {progresso_medio}% progresso")
             except Exception as e:
-                logger.warning(f"⚠️ Erro ao calcular métricas do RDO {rdo.id}: {str(e)}. Migração 48 pode não ter sido executada.")
+                logger.warning(f"[WARN] Erro ao calcular métricas do RDO {rdo.id}: {str(e)}. Migração 48 pode não ter sido executada.")
                 db.session.rollback()
                 # Valores padrão quando há erro de schema
                 total_subatividades = 0
@@ -8257,7 +8259,7 @@ def funcionario_rdo_consolidado():
                 }.get(rdo.status, 'secondary')
             })
         
-        print(f"DEBUG: Mostrando página {page} com {len(rdos_processados)} RDOs")
+            logger.debug(f"DEBUG: Mostrando página {page} com {len(rdos_processados)} RDOs")
         
         # Buscar dados necessários para o template consolidado
         obras = Obra.query.filter_by(admin_id=admin_id_correto, ativo=True).all()
@@ -8298,8 +8300,8 @@ def funcionario_rdo_consolidado():
                              })
         
     except Exception as e:
-        print(f"ERRO RDO CONSOLIDADO: {str(e)}")
-        print(f"📋 FALLBACK ATIVADO - Motivo: {type(e).__name__}: {str(e)}")
+        logger.error(f"ERRO RDO CONSOLIDADO: {str(e)}")
+        logger.debug(f"[LIST] FALLBACK ATIVADO - Motivo: {type(e).__name__}: {str(e)}")
         # Fallback com cálculos reais
         try:
             rdos_basicos = RDO.query.join(Obra).filter(
@@ -8309,7 +8311,7 @@ def funcionario_rdo_consolidado():
             # Dados com cálculos reais para fallback
             rdos_fallback = []
             for rdo in rdos_basicos:
-                # 🔧 CALCULAR VALORES REAIS NO FALLBACK
+                # [CONFIG] CALCULAR VALORES REAIS NO FALLBACK
                 try:
                     # Contar subatividades reais
                     total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
@@ -8325,10 +8327,10 @@ def funcionario_rdo_consolidado():
                     mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
                     total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
                     
-                    print(f"📊 FALLBACK RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {progresso_medio:.1f}% progresso")
+                    logger.info(f"[STATS] FALLBACK RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {progresso_medio:.1f}% progresso")
                     
                 except Exception as calc_error:
-                    print(f"❌ ERRO cálculo RDO {rdo.id}: {calc_error}")
+                    logger.error(f"[ERROR] ERRO cálculo RDO {rdo.id}: {calc_error}")
                     total_subatividades = 0
                     total_funcionarios = 0
                     progresso_medio = 0
@@ -8365,7 +8367,7 @@ def funcionario_rdo_consolidado():
                                      'order_by': 'data_desc'
                                  })
         except Exception as e2:
-            print(f"ERRO FALLBACK: {str(e2)}")
+            logger.error(f"ERRO FALLBACK: {str(e2)}")
             # Fallback extremo - template vazio
             admin_id_fallback = current_user.admin_id if hasattr(current_user, 'admin_id') and current_user.admin_id else (current_user.id if hasattr(current_user, 'id') else 1)
             return render_template('rdo_lista_unificada.html',
@@ -8423,13 +8425,13 @@ def rdo_salvar_unificado():
                 return get_admin_id_dinamico()
                 
             except Exception as e:
-                print(f"❌ ERRO CRÍTICO get_admin_id_robusta: {e}")
+                logger.error(f"[ERROR] ERRO CRÍTICO get_admin_id_robusta: {e}")
                 # Fallback para desenvolvimento
                 return 10
         
         # Aplicar admin_id robusto em TODO o contexto
         admin_id_correto = get_admin_id_robusta()
-        print(f"✅ admin_id determinado de forma robusta: {admin_id_correto}")
+        logger.info(f"[OK] admin_id determinado de forma robusta: {admin_id_correto}")
         
         if rdo_id:
             # EDIÇÃO - Buscar RDO existente usando admin_id robusto
@@ -8452,7 +8454,7 @@ def rdo_salvar_unificado():
             RDOEquipamento.query.filter_by(rdo_id=rdo.id).delete()
             RDOOcorrencia.query.filter_by(rdo_id=rdo.id).delete()
             
-            print(f"DEBUG EDIÇÃO: Editando RDO {rdo.numero_rdo}")
+            logger.debug(f"DEBUG EDIÇÃO: Editando RDO {rdo.numero_rdo}")
             
         else:
             # CRIAÇÃO - Usar admin_id já definido de forma robusta
@@ -8489,16 +8491,16 @@ def rdo_salvar_unificado():
                 
                 if not rdo_existente:
                     numero_rdo = numero_proposto
-                    print(f"✅ NÚMERO RDO ÚNICO GERADO: {numero_rdo}")
+                    logger.info(f"[OK] NÚMERO RDO ÚNICO GERADO: {numero_rdo}")
                     break
                 else:
-                    print(f"⚠️ Número {numero_proposto} já existe, tentando próximo...")
+                    logger.warning(f"[WARN] Número {numero_proposto} já existe, tentando próximo...")
                     contador += 1
                     
                 # Proteção contra loop infinito (máximo 999 RDOs por ano)
                 if contador > 999:
                     numero_rdo = f"RDO-{admin_id_correto}-{ano_atual}-{random.randint(1000, 9999):04d}"
-                    print(f"🚨 FALLBACK: Usando número aleatório {numero_rdo}")
+                    logger.debug(f"[ALERT] FALLBACK: Usando número aleatório {numero_rdo}")
                     break
             
             # Criar RDO com campos padronizados
@@ -8507,32 +8509,32 @@ def rdo_salvar_unificado():
             rdo.obra_id = obra_id
             rdo.data_relatorio = data_relatorio
             # DEBUG: Informações do usuário atual
-            print(f"DEBUG MULTITENANT: current_user.email={current_user.email}")
-            print(f"DEBUG MULTITENANT: current_user.admin_id={current_user.admin_id}")
-            print(f"DEBUG MULTITENANT: current_user.id={current_user.id}")
+            logger.debug(f"DEBUG MULTITENANT: current_user.email={current_user.email}")
+            logger.debug(f"DEBUG MULTITENANT: current_user.admin_id={current_user.admin_id}")
+            logger.debug(f"DEBUG MULTITENANT: current_user.id={current_user.id}")
             
             # SISTEMA FLEXÍVEL: Admin ou Funcionário podem criar RDO
             funcionario = None
             
             # Se é admin, pode criar RDO sem precisar ser funcionário
             if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                print(f"🎯 ADMIN CRIANDO RDO: {current_user.email}")
+                logger.debug(f"[TARGET] ADMIN CRIANDO RDO: {current_user.email}")
                 # Admin pode criar RDO diretamente, criar funcionário virtual se necessário
                 funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
             else:
                 # Se é funcionário, buscar por email
                 funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=admin_id_correto, ativo=True).first()
-                print(f"🎯 FUNCIONÁRIO CRIANDO RDO: {funcionario.nome if funcionario else 'Não encontrado'}")
+                logger.debug(f"[TARGET] FUNCIONÁRIO CRIANDO RDO: {funcionario.nome if funcionario else 'Não encontrado'}")
             
             # Se não encontrou funcionário, criar um funcionário padrão
             if not funcionario:
-                print(f"Buscando funcionário para admin_id={admin_id_correto}")
+                logger.debug(f"Buscando funcionário para admin_id={admin_id_correto}")
                 funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
                 if funcionario:
-                    print(f"✅ Funcionário encontrado: {funcionario.nome} (ID: {funcionario.id})")
+                    logger.info(f"[OK] Funcionário encontrado: {funcionario.nome} (ID: {funcionario.id})")
                 else:
                     # Criar funcionário padrão se não existir nenhum
-                    print(f"Criando funcionário padrão para admin_id={admin_id_correto}")
+                    logger.debug(f"Criando funcionário padrão para admin_id={admin_id_correto}")
                     funcionario = Funcionario(
                         nome="Administrador Sistema",
                         email=f"admin{admin_id_correto}@sistema.com",
@@ -8543,14 +8545,14 @@ def rdo_salvar_unificado():
                     )
                     db.session.add(funcionario)
                     db.session.flush()
-                    print(f"✅ Funcionário criado: {funcionario.nome} (ID: {funcionario.id})")
+                    logger.info(f"[OK] Funcionário criado: {funcionario.nome} (ID: {funcionario.id})")
             
             rdo.criado_por_id = funcionario.id
             rdo.admin_id = admin_id_correto
             
-            print(f"DEBUG: RDO configurado - criado_por_id={rdo.criado_por_id}, admin_id={rdo.admin_id}")
+            logger.debug(f"DEBUG: RDO configurado - criado_por_id={rdo.criado_por_id}, admin_id={rdo.admin_id}")
             
-            print(f"DEBUG CRIAÇÃO: Criando novo RDO {numero_rdo}")
+            logger.debug(f"DEBUG CRIAÇÃO: Criando novo RDO {numero_rdo}")
         
         # Campos climáticos padronizados
         rdo.clima_geral = request.form.get('clima_geral', '').strip()
@@ -8577,35 +8579,35 @@ def rdo_salvar_unificado():
         db.session.add(rdo)
         db.session.flush()  # Para obter o ID
         
-        print(f"DEBUG FUNCIONÁRIO: RDO {rdo.numero_rdo} criado por funcionário ID {current_user.id}")
+        logger.debug(f"DEBUG FUNCIONÁRIO: RDO {rdo.numero_rdo} criado por funcionário ID {current_user.id}")
         
         # CORREÇÃO: Processar subatividades (SISTEMA CORRIGIDO)
-        print("❌ [RDO_SAVE] INICIO_PROCESSAMENTO_SUBATIVIDADES")
-        print(f"❌ [RDO_SAVE] ADMIN_ID_USADO: {admin_id_correto}")
-        print(f"❌ [RDO_SAVE] TOTAL_CAMPOS_FORM: {len(request.form)}")
-        print("❌ [RDO_SAVE] TODOS_CAMPOS_FORM:")
+        logger.error("[ERROR] [RDO_SAVE] INICIO_PROCESSAMENTO_SUBATIVIDADES")
+        logger.error(f"[ERROR] [RDO_SAVE] ADMIN_ID_USADO: {admin_id_correto}")
+        logger.error(f"[ERROR] [RDO_SAVE] TOTAL_CAMPOS_FORM: {len(request.form)}")
+        logger.error("[ERROR] [RDO_SAVE] TODOS_CAMPOS_FORM:")
         
         campos_subatividades = []
         campos_percentual = []
         for key, value in request.form.items():
-            print(f"   {key} = {value}")
+            logger.debug(f" {key} = {value}")
             if key.startswith('nome_subatividade_'):
                 campos_subatividades.append(key)
             elif key.startswith('subatividade_') and 'percentual' in key:
                 campos_percentual.append((key, value))
                 
-        print(f"❌ [RDO_SAVE] CAMPOS_SUBATIVIDADES_NOME: {len(campos_subatividades)} - {campos_subatividades}")
-        print(f"❌ [RDO_SAVE] CAMPOS_SUBATIVIDADES_PERCENTUAL: {len(campos_percentual)} - {campos_percentual}")
+                logger.error(f"[ERROR] [RDO_SAVE] CAMPOS_SUBATIVIDADES_NOME: {len(campos_subatividades)} - {campos_subatividades}")
+                logger.error(f"[ERROR] [RDO_SAVE] CAMPOS_SUBATIVIDADES_PERCENTUAL: {len(campos_percentual)} - {campos_percentual}")
         
         # DEBUG ESPECÍFICO: Verificar se os dados estão sendo processados
         if campos_subatividades:
-            print("✅ CAMPOS SUBATIVIDADE DETECTADOS - Processando...")
+            logger.info("[OK] CAMPOS SUBATIVIDADE DETECTADOS - Processando...")
             for campo in campos_subatividades:
                 valor = request.form.get(campo)
-                print(f"   {campo} = {valor}")
+                logger.debug(f" {campo} = {valor}")
         else:
-            print("❌ NENHUM CAMPO DE SUBATIVIDADE DETECTADO!")
-            print("   Verificar template RDO ou nome dos campos")
+            logger.error("[ERROR] NENHUM CAMPO DE SUBATIVIDADE DETECTADO!")
+            logger.info(" Verificar template RDO ou nome dos campos")
         
         subatividades_processadas = 0
         
@@ -8614,15 +8616,15 @@ def rdo_salvar_unificado():
             """Extração robusta com múltiplas estratégias - Joris Kuypers approach"""
             subatividades = []
             
-            print(f"🔍 EXTRAÇÃO ROBUSTA - Dados recebidos: {len(form_data)} campos")
-            print(f"🎯 AMBIENTE: {'PRODUÇÃO' if admin_id == 2 else 'DESENVOLVIMENTO'} (admin_id={admin_id})")
-            print(f"👤 USUÁRIO ATUAL: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
+            logger.debug(f"[DEBUG] EXTRAÇÃO ROBUSTA - Dados recebidos: {len(form_data)} campos")
+            logger.debug(f"[TARGET] AMBIENTE: {'PRODUÇÃO' if admin_id == 2 else 'DESENVOLVIMENTO'} (admin_id={admin_id})")
+            logger.debug(f"[USER] USUÁRIO ATUAL: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
             
             # Estratégia 1: Buscar padrões conhecidos
             subatividades_map = {}
             
             for chave, valor in form_data.items():
-                print(f"🔍 CAMPO: {chave} = {valor}")
+                logger.debug(f"[DEBUG] CAMPO: {chave} = {valor}")
                 if 'percentual' in chave:
                     try:
                         # CORREÇÃO CRÍTICA: Extrair servico_id REAL da obra, não do campo
@@ -8639,22 +8641,22 @@ def rdo_salvar_unificado():
                                 if admin_id == 50 and 292 <= servico_original_id <= 307:
                                     # FORÇAR COBERTURA METÁLICA (ID: 139) para admin_id=50
                                     servico_id = 139
-                                    print(f"🎯 BYPASS DIRETO ADMIN 50: Subatividade {servico_original_id} -> COBERTURA METÁLICA (139)")
+                                    logger.debug(f"[TARGET] BYPASS DIRETO ADMIN 50: Subatividade {servico_original_id} -> COBERTURA METÁLICA (139)")
                                 elif admin_id == 2:
                                     # CORREÇÃO PRODUÇÃO: Buscar primeiro serviço disponível para admin_id=2
                                     primeiro_servico_producao = Servico.query.filter_by(admin_id=admin_id).first()
                                     if primeiro_servico_producao:
                                         servico_id = primeiro_servico_producao.id
-                                        print(f"🎯 PRODUÇÃO ADMIN 2: Usando primeiro serviço disponível ID={servico_id} ({primeiro_servico_producao.nome})")
+                                        logger.debug(f"[TARGET] PRODUÇÃO ADMIN 2: Usando primeiro serviço disponível ID={servico_id} ({primeiro_servico_producao.nome})")
                                     else:
                                         servico_id = servico_original_id  # Fallback
-                                        print(f"⚠️ PRODUÇÃO: Nenhum serviço encontrado para admin_id={admin_id}, usando original {servico_original_id}")
+                                        logger.warning(f"[WARN] PRODUÇÃO: Nenhum serviço encontrado para admin_id={admin_id}, usando original {servico_original_id}")
                                 else:
                                     # 1. Priorizar campo oculto do JavaScript (se enviado)
                                     servico_id_correto_js = request.form.get('servico_id_correto')
                                     if servico_id_correto_js:
                                         servico_id = int(servico_id_correto_js)
-                                        print(f"🎯 USANDO SERVIÇO_ID DO JAVASCRIPT: {servico_original_id} -> {servico_id}")
+                                        logger.debug(f"[TARGET] USANDO SERVIÇO_ID DO JAVASCRIPT: {servico_original_id} -> {servico_id}")
                                     else:
                                         # 2. Fallback: Buscar da última RDO
                                         ultimo_servico_rdo = db.session.query(RDOServicoSubatividade).join(RDO).filter(
@@ -8672,9 +8674,9 @@ def rdo_salvar_unificado():
                                                     servico_nome = servico_obj.nome
                                             except:
                                                 pass
-                                            print(f"🎯 USANDO SERVIÇO DA ÚLTIMA RDO: {servico_original_id} -> {servico_id} ({servico_nome})")
+                                            logger.debug(f"[TARGET] USANDO SERVIÇO DA ÚLTIMA RDO: {servico_original_id} -> {servico_id} ({servico_nome})")
                                         else:
-                                            print(f"⚠️ NENHUMA RDO ANTERIOR ENCONTRADA - usando serviço original {servico_original_id}")
+                                            logger.warning(f"[WARN] NENHUMA RDO ANTERIOR ENCONTRADA - usando serviço original {servico_original_id}")
                                             servico_id = servico_original_id
                                 
                                 # Buscar nome da subatividade no banco de dados - ESTRATÉGIA MÚLTIPLA
@@ -8688,7 +8690,7 @@ def rdo_salvar_unificado():
                                     
                                     if subatividade_mestre:
                                         nome_sub = subatividade_mestre.nome
-                                        print(f"✅ NOME SUBATIVIDADE (ID): {nome_sub}")
+                                        logger.info(f"[OK] NOME SUBATIVIDADE (ID): {nome_sub}")
                                 except:
                                     pass
                                 
@@ -8724,15 +8726,15 @@ def rdo_salvar_unificado():
                                             }
                                             nome_sub = nome_patterns.get(subatividade_id)
                                             if nome_sub:
-                                                print(f"✅ NOME PATTERN: {nome_sub}")
+                                                logger.info(f"[OK] NOME PATTERN: {nome_sub}")
                                     except Exception as e:
-                                        print(f"⚠️ Erro busca RDO anterior: {e}")
+                                        logger.error(f"[WARN] Erro busca RDO anterior: {e}")
                                 
                                 # ESTRATÉGIA 3: Fallback final
                                 if not nome_sub:
                                     nome_key = f'nome_subatividade_{servico_original_id}_{subatividade_id}'
                                     nome_sub = form_data.get(nome_key, f'Subatividade {subatividade_id}')
-                                    print(f"⚠️ NOME FALLBACK: {nome_sub}")
+                                    logger.warning(f"[WARN] NOME FALLBACK: {nome_sub}")
                             else:
                                 sub_id = parts[0] if parts else chave
                                 servico_id = parts[0] if parts else "1"
@@ -8769,16 +8771,16 @@ def rdo_salvar_unificado():
                             }
                             
                     except (ValueError, IndexError) as e:
-                        print(f"⚠️ Erro ao processar {chave}: {e}")
+                        logger.error(f"[WARN] Erro ao processar {chave}: {e}")
                         continue
             
             # Converter mapa para lista
             for sub_id, dados in subatividades_map.items():
                 subatividades.append(dados)
             
-            print(f"✅ EXTRAÇÃO CONCLUÍDA: {len(subatividades)} subatividades válidas")
+                logger.info(f"[OK] EXTRAÇÃO CONCLUÍDA: {len(subatividades)} subatividades válidas")
             for i, sub in enumerate(subatividades):
-                print(f"   [{i+1}] {sub['nome']}: {sub['percentual']}%")
+                logger.debug(f" [{i+1}] {sub['nome']}: {sub['percentual']}%")
             
             return subatividades
         
@@ -8787,10 +8789,10 @@ def rdo_salvar_unificado():
         
         # Validação robusta COM FALLBACK PARA PRODUÇÃO
         if not subatividades_extraidas:
-            print("❌ NENHUMA SUBATIVIDADE VÁLIDA ENCONTRADA - TENTANDO FALLBACK PRODUÇÃO")
+            logger.error("[ERROR] NENHUMA SUBATIVIDADE VÁLIDA ENCONTRADA - TENTANDO FALLBACK PRODUÇÃO")
             
             # FALLBACK ROBUSTEZ: Criar subatividade para qualquer admin_id sem dados
-            print(f"🚨 EXECUTANDO FALLBACK ROBUSTEZ - admin_id={admin_id_correto}")
+            logger.debug(f"[ALERT] EXECUTANDO FALLBACK ROBUSTEZ - admin_id={admin_id_correto}")
             primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
             if primeiro_servico:
                 subatividades_extraidas = [{
@@ -8801,13 +8803,13 @@ def rdo_salvar_unificado():
                     'percentual': 0.0,
                     'observacoes': 'Subatividade criada automaticamente (fallback robusto)'
                 }]
-                print(f"✅ FALLBACK CRIADO: {primeiro_servico.nome} - Serviços Gerais")
+                logger.info(f"[OK] FALLBACK CRIADO: {primeiro_servico.nome} - Serviços Gerais")
             else:
-                print(f"❌ FALLBACK FALHOU: Nenhum serviço encontrado para admin_id={admin_id_correto}")
+                logger.error(f"[ERROR] FALLBACK FALHOU: Nenhum serviço encontrado para admin_id={admin_id_correto}")
                 flash(f'ERRO: Nenhum serviço cadastrado para admin_id={admin_id_correto}. Cadastre um serviço primeiro.', 'error')
                 return redirect(url_for('main.rdo_novo_unificado'))
         
-        print(f"✅ VALIDAÇÃO PASSOU: {len(subatividades_extraidas)} subatividades válidas")
+                logger.info(f"[OK] VALIDAÇÃO PASSOU: {len(subatividades_extraidas)} subatividades válidas")
         
         # Processar subatividades extraídas
         subatividades_processadas = 0
@@ -8826,9 +8828,9 @@ def rdo_salvar_unificado():
                 servico = Servico.query.filter_by(id=servico_id_correto, admin_id=admin_id_correto).first()
                 if servico:
                     rdo_servico_subativ.servico_id = servico_id_correto
-                    print(f"✅ SERVICO_ID CORRETO: {servico_id_correto} ({servico.nome})")
+                    logger.info(f"[OK] SERVICO_ID CORRETO: {servico_id_correto} ({servico.nome})")
                 else:
-                    print(f"⚠️ Serviço {servico_id_correto} não pertence ao admin {admin_id_correto}")
+                    logger.warning(f"[WARN] Serviço {servico_id_correto} não pertence ao admin {admin_id_correto}")
                     primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
                     rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
             else:
@@ -8838,22 +8840,22 @@ def rdo_salvar_unificado():
             
             db.session.add(rdo_servico_subativ)
             subatividades_processadas += 1
-            print(f"✅ SUBATIVIDADE SALVA: {sub_data['nome']}: {sub_data['percentual']}%")
+            logger.info(f"[OK] SUBATIVIDADE SALVA: {sub_data['nome']}: {sub_data['percentual']}%")
         
-        print(f"✅ TOTAL SALVO: {subatividades_processadas} subatividades")
+            logger.info(f"[OK] TOTAL SALVO: {subatividades_processadas} subatividades")
         
         # TODOS OS SISTEMAS LEGACY REMOVIDOS - Usando apenas o sistema principal
         # Sistema novo (linhas acima) já processa todos os campos corretamente
         
-        print(f"❌ [RDO_SAVE] TOTAL_SUBATIVIDADES_PROCESSADAS: {subatividades_processadas}")
+            logger.error(f"[ERROR] [RDO_SAVE] TOTAL_SUBATIVIDADES_PROCESSADAS: {subatividades_processadas}")
         
         # VALIDAÇÃO ESPECÍFICA PARA PRODUÇÃO
         if subatividades_processadas == 0:
-            print("❌ [RDO_SAVE] ERRO_VALIDACAO_PRODUCAO:")
-            print(f"   - Nenhuma subatividade processada")
-            print(f"   - Campos nome encontrados: {len(campos_subatividades)}")
-            print(f"   - Campos percentual encontrados: {len(campos_percentual)}")
-            print(f"   - Admin_ID: {admin_id_correto}")
+            logger.error("[ERROR] [RDO_SAVE] ERRO_VALIDACAO_PRODUCAO:")
+            logger.debug(f" - Nenhuma subatividade processada")
+            logger.debug(f" - Campos nome encontrados: {len(campos_subatividades)}")
+            logger.debug(f" - Campos percentual encontrados: {len(campos_percentual)}")
+            logger.debug(f" - Admin_ID: {admin_id_correto}")
             flash('Erro de validação: Nenhuma subatividade encontrada no formulário', 'error')
             return redirect(url_for('main.rdo_novo_unificado'))
         
@@ -8876,13 +8878,13 @@ def rdo_salvar_unificado():
                         primeiro_servico = Servico.query.filter_by(admin_id=admin_id_correto).first()
                         rdo_servico_subativ.servico_id = primeiro_servico.id if primeiro_servico else None
                         db.session.add(rdo_servico_subativ)
-                        print(f"DEBUG: Atividade convertida: {descricao} - {ativ_data.get('percentual', 0)}%")
+                        logger.debug(f"DEBUG: Atividade convertida: {descricao} - {ativ_data.get('percentual', 0)}%")
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar atividades JSON: {e}")
+                logger.error(f"Erro ao processar atividades JSON: {e}")
                 flash(f'Erro ao processar atividades: {e}', 'warning')
         
         # Processar mão de obra (sistema novo)
-        print("DEBUG: Processando funcionários do formulário...")
+                logger.debug("DEBUG: Processando funcionários do formulário...")
         
         # Percorrer funcionários enviados no formulário
         for key, value in request.form.items():
@@ -8908,10 +8910,10 @@ def rdo_salvar_unificado():
                             mao_obra.admin_id = admin_id_correto
                             db.session.add(mao_obra)
                             
-                            print(f"DEBUG: Funcionário {nome_funcionario}: {horas}h")
+                            logger.debug(f"DEBUG: Funcionário {nome_funcionario}: {horas}h")
                         
                 except (ValueError, IndexError) as e:
-                    print(f"Erro ao processar funcionário {key}: {e}")
+                    logger.error(f"Erro ao processar funcionário {key}: {e}")
                     continue
         
         # Processar mão de obra antiga (fallback para compatibilidade)
@@ -8929,9 +8931,9 @@ def rdo_salvar_unificado():
                         mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
                         mao_obra.admin_id = admin_id_correto
                         db.session.add(mao_obra)
-                        print(f"DEBUG: Funcionário JSON ID {funcionario_id}: {mo_data.get('horas', 8)}h")
+                        logger.debug(f"DEBUG: Funcionário JSON ID {funcionario_id}: {mo_data.get('horas', 8)}h")
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar mão de obra JSON: {e}")
+                logger.error(f"Erro ao processar mão de obra JSON: {e}")
                 flash(f'Erro ao processar mão de obra: {e}', 'warning')
         
         # Processar equipamentos
@@ -8950,7 +8952,7 @@ def rdo_salvar_unificado():
                         equipamento.estado_conservacao = eq_data.get('estado', 'Bom')
                         db.session.add(equipamento)
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar equipamentos: {e}")
+                logger.error(f"Erro ao processar equipamentos: {e}")
                 flash(f'Erro ao processar equipamentos: {e}', 'warning')
         
         # Processar ocorrências
@@ -8968,13 +8970,13 @@ def rdo_salvar_unificado():
                         ocorrencia.acoes_corretivas = oc_data.get('acoes', '').strip()
                         db.session.add(ocorrencia)
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar ocorrências: {e}")
+                logger.error(f"Erro ao processar ocorrências: {e}")
                 flash(f'Erro ao processar ocorrências: {e}', 'warning')
         
         # Log final antes de commitar
         total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
         total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
-        print(f"DEBUG FINAL: RDO {rdo.numero_rdo} - {total_subatividades} subatividades, {total_funcionarios} funcionários")
+        logger.debug(f"DEBUG FINAL: RDO {rdo.numero_rdo} - {total_subatividades} subatividades, {total_funcionarios} funcionários")
         
         db.session.commit()
         
@@ -8987,13 +8989,13 @@ def rdo_salvar_unificado():
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO RDO SALVAR UNIFICADO: {str(e)}")
-        print(f"DEBUG FORM DATA: {dict(request.form)}")
-        print(f"DEBUG USER DATA: email={current_user.email}, tipo={current_user.tipo_usuario}")
+        logger.error(f"ERRO RDO SALVAR UNIFICADO: {str(e)}")
+        logger.debug(f"DEBUG FORM DATA: {dict(request.form)}")
+        logger.debug(f"DEBUG USER DATA: email={current_user.email}, tipo={current_user.tipo_usuario}")
         
         import traceback
         error_trace = traceback.format_exc()
-        print(f"TRACEBACK COMPLETO:\n{error_trace}")
+        logger.error(f"TRACEBACK COMPLETO:\n{error_trace}")
         
         # Flash com erro detalhado para debugging
         flash(f'ERRO DETALHADO: {str(e)} | USER: {current_user.email} | ADMIN_ID: {current_user.admin_id} | TRACE: {error_trace[:500]}...', 'error')
@@ -9069,7 +9071,7 @@ def rdo_visualizar_unificado(id):
                 'funcao': mao_obra.funcao_exercida or 'Funcionário'
             }
         
-        print(f"DEBUG VISUALIZAR RDO UNIFICADO: RDO {rdo.numero_rdo} - {len(subatividades_salvas)} subatividades, {len(equipe_salva)} funcionários")
+            logger.debug(f"DEBUG VISUALIZAR RDO UNIFICADO: RDO {rdo.numero_rdo} - {len(subatividades_salvas)} subatividades, {len(equipe_salva)} funcionários")
         
         # Template baseado no tipo de usuário
         if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
@@ -9088,7 +9090,7 @@ def rdo_visualizar_unificado(id):
                              date=date)
         
     except Exception as e:
-        print(f"ERRO VISUALIZAR RDO UNIFICADO: {str(e)}")
+        logger.error(f"ERRO VISUALIZAR RDO UNIFICADO: {str(e)}")
         flash('Erro ao carregar RDO.', 'error')
         return redirect('/rdo')
 
@@ -9116,7 +9118,7 @@ def funcionario_obras():
         return render_template('funcionario/lista_obras.html', obras=obras)
         
     except Exception as e:
-        print(f"ERRO FUNCIONÁRIO OBRAS: {str(e)}")
+        logger.error(f"ERRO FUNCIONÁRIO OBRAS: {str(e)}")
         flash('Erro ao carregar obras.', 'error')
         return redirect(url_for('main.funcionario_dashboard'))
 
@@ -9147,7 +9149,7 @@ def api_funcionario_obras():
         })
         
     except Exception as e:
-        print(f"ERRO API FUNCIONÁRIO OBRAS: {str(e)}")
+        logger.error(f"ERRO API FUNCIONÁRIO OBRAS: {str(e)}")
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
 @main_bp.route('/api/funcionario/rdos/<int:obra_id>')
@@ -9184,7 +9186,7 @@ def api_funcionario_rdos_obra(obra_id):
         })
         
     except Exception as e:
-        print(f"ERRO API FUNCIONÁRIO RDOs OBRA: {str(e)}")
+        logger.error(f"ERRO API FUNCIONÁRIO RDOs OBRA: {str(e)}")
         return jsonify({'error': 'Erro interno', 'success': False}), 500
 
 # ===== ALIAS DE COMPATIBILIDADE - API FUNCIONÁRIOS MOBILE =====
@@ -9192,7 +9194,7 @@ def api_funcionario_rdos_obra(obra_id):
 @funcionario_required
 def api_funcionario_funcionarios_alias():
     """ALIAS: Redireciona para API consolidada com formato mobile"""
-    print("🔀 ALIAS: Redirecionando /api/funcionario/funcionarios para API consolidada")
+    logger.info("[ROUTE] ALIAS: Redirecionando /api/funcionario/funcionarios para API consolidada")
     
     # Detectar admin_id do usuário atual para manter compatibilidade
     admin_id = None
@@ -9220,7 +9222,7 @@ def api_funcionario_funcionarios_alias():
             for func in funcionarios
         ]
         
-        print(f"📱 ALIAS API MOBILE: {len(funcionarios_data)} funcionários para admin_id={admin_id}")
+        logger.debug(f"[MOBILE] ALIAS API MOBILE: {len(funcionarios_data)} funcionários para admin_id={admin_id}")
         
         return jsonify({
             'success': True,
@@ -9230,7 +9232,7 @@ def api_funcionario_funcionarios_alias():
         })
         
     except Exception as e:
-        print(f"ERRO ALIAS FUNCIONÁRIOS MOBILE: {str(e)}")
+        logger.error(f"ERRO ALIAS FUNCIONÁRIOS MOBILE: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e),
@@ -9254,7 +9256,7 @@ def api_test_rdo_servicos_obra(obra_id):
             }), 404
         
         admin_id = obra_base.admin_id
-        print(f"🎯 API TEST CORREÇÃO: admin_id detectado pela obra {obra_id} = {admin_id}")
+        logger.debug(f"[TARGET] API TEST CORREÇÃO: admin_id detectado pela obra {obra_id} = {admin_id}")
         
         # Verificar se obra existe e pertence ao admin correto
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
@@ -9307,7 +9309,7 @@ def api_test_rdo_servicos_obra(obra_id):
         })
         
     except Exception as e:
-        print(f"ERRO API TEST RDO SERVIÇOS OBRA: {str(e)}")
+        logger.error(f"ERRO API TEST RDO SERVIÇOS OBRA: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Erro interno', 'success': False}), 500
@@ -9339,10 +9341,10 @@ def api_ultimo_rdo_dados_v2(obra_id):
         # Detecção automática de admin_id com logs estruturados
         admin_id_obra = obra.admin_id
         if admin_id_obra != admin_id_user:
-            print(f"🔄 CROSS-TENANT ACCESS: user={admin_id_user} → obra={admin_id_obra} [PERMITIDO]")
+            logger.debug(f"[SYNC] CROSS-TENANT ACCESS: user={admin_id_user} → obra={admin_id_obra} [PERMITIDO]")
         
         admin_id = admin_id_obra
-        print(f"🎯 API V2 ÚLTIMA RDO: obra_id={obra_id}, admin_id={admin_id}, obra='{obra.nome}'")
+        logger.debug(f"[TARGET] API V2 ÚLTIMA RDO: obra_id={obra_id}, admin_id={admin_id}, obra='{obra.nome}'")
         
         # === FASE 2: BUSCA INTELIGENTE DE RDO ===
         ultimo_rdo = RDO.query.filter_by(
@@ -9350,18 +9352,18 @@ def api_ultimo_rdo_dados_v2(obra_id):
             admin_id=admin_id
         ).order_by(RDO.data_relatorio.desc()).first()
         
-        print(f"🔍 RDO Query: obra_id={obra_id}, admin_id={admin_id} → {'ENCONTRADO' if ultimo_rdo else 'PRIMEIRA_RDO'}")
+        logger.debug(f"[DEBUG] RDO Query: obra_id={obra_id}, admin_id={admin_id} → {'ENCONTRADO' if ultimo_rdo else 'PRIMEIRA_RDO'}")
         
         # === FASE 3: PROCESSAMENTO DE ESTADOS ===
         if not ultimo_rdo:
-            print(f"🆕 PRIMEIRA_RDO: Inicializando obra {obra.nome} com serviços em 0%")
+            logger.debug(f"🆕 PRIMEIRA_RDO: Inicializando obra {obra.nome} com serviços em 0%")
             return _processar_primeira_rdo(obra, admin_id)
         else:
-            print(f"🔄 RDO_EXISTENTE: Carregando dados do RDO #{ultimo_rdo.id} ({ultimo_rdo.data_relatorio})")
+            logger.debug(f"[SYNC] RDO_EXISTENTE: Carregando dados do RDO #{ultimo_rdo.id} ({ultimo_rdo.data_relatorio})")
             return _processar_rdo_existente(ultimo_rdo, admin_id)
             
     except Exception as e:
-        print(f"❌ ERRO CRÍTICO API V2: {str(e)}")
+        logger.error(f"[ERROR] ERRO CRÍTICO API V2: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -9433,7 +9435,7 @@ def _processar_primeira_rdo(obra, admin_id):
         })
         
     except Exception as e:
-        print(f"❌ ERRO _processar_primeira_rdo: {e}")
+        logger.error(f"[ERROR] ERRO _processar_primeira_rdo: {e}")
         return jsonify({
             'success': False,
             'error': 'Falha ao processar primeira RDO',
@@ -9449,7 +9451,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
             ativo=True
         ).all()
         
-        print(f"📊 SUBATIVIDADES: {len(subatividades_rdo)} registros encontrados")
+        logger.info(f"[STATS] SUBATIVIDADES: {len(subatividades_rdo)} registros encontrados")
         
         if not subatividades_rdo:
             return jsonify({
@@ -9482,7 +9484,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
                 ).first()
                 
                 if not servico:
-                    print(f"⚠️ SERVICO_DESATIVADO_IGNORADO: {servico_id} (admin_id={admin_id})")
+                    logger.warning(f"[WARN] SERVICO_DESATIVADO_IGNORADO: {servico_id} (admin_id={admin_id})")
                     continue
                 
                 # VERIFICAR SE SERVIÇO ESTÁ ATIVO NA OBRA ATUAL
@@ -9495,7 +9497,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
                 ).first()
                 
                 if not servico_obra_ativo:
-                    print(f"⚠️ SERVICO_REMOVIDO_DA_OBRA: {servico.nome} (ID: {servico_id}) - PULANDO")
+                    logger.warning(f"[WARN] SERVICO_REMOVIDO_DA_OBRA: {servico.nome} (ID: {servico_id}) - PULANDO")
                     continue
                     
                 servicos_dict[servico_id] = {
@@ -9504,7 +9506,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
                     'categoria': getattr(servico, 'categoria', 'Geral'),
                     'subatividades': []
                 }
-                print(f"✅ SERVICO_CARREGADO: {servico.nome} (ID: {servico_id})")
+                logger.info(f"[OK] SERVICO_CARREGADO: {servico.nome} (ID: {servico_id})")
             
             # Adicionar subatividade ao serviço
             servicos_dict[servico_id]['subatividades'].append({
@@ -9531,12 +9533,12 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
                         'horas_trabalhadas': float(func_rdo.horas_trabalhadas) if func_rdo.horas_trabalhadas else 8.8
                     })
         except Exception as e:
-            print(f"⚠️ ERRO_FUNCIONARIOS: {e}")
+            logger.warning(f"[WARN] ERRO_FUNCIONARIOS: {e}")
             funcionarios_data = []
         
         servicos_data = list(servicos_dict.values())
         
-        print(f"✅ RDO_PROCESSADO: {len(servicos_data)} serviços, {len(funcionarios_data)} funcionários")
+        logger.info(f"[OK] RDO_PROCESSADO: {len(servicos_data)} serviços, {len(funcionarios_data)} funcionários")
         
         return jsonify({
             'success': True,
@@ -9559,7 +9561,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
         })
     
     except Exception as e:
-        print(f"❌ ERRO _processar_rdo_existente: {e}")
+        logger.error(f"[ERROR] ERRO _processar_rdo_existente: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -9584,14 +9586,14 @@ def api_servicos_obra_primeira_rdo(obra_id):
             }), 404
         
         admin_id = obra_base.admin_id
-        print(f"🎯 CORREÇÃO: admin_id detectado pela obra {obra_id} = {admin_id}")
+        logger.debug(f"[TARGET] CORREÇÃO: admin_id detectado pela obra {obra_id} = {admin_id}")
         
-        print(f"🎯 API servicos-obra-primeira-rdo: obra {obra_id}, admin_id {admin_id}")
+        logger.debug(f"[TARGET] API servicos-obra-primeira-rdo: obra {obra_id}, admin_id {admin_id}")
         
         # Verificar se obra existe e pertence ao admin
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
         if not obra:
-            print(f"❌ Obra {obra_id} não encontrada para admin_id {admin_id}")
+            logger.error(f"[ERROR] Obra {obra_id} não encontrada para admin_id {admin_id}")
             return jsonify({
                 'success': False,
                 'error': 'Obra não encontrada ou sem permissão de acesso'
@@ -9601,7 +9603,7 @@ def api_servicos_obra_primeira_rdo(obra_id):
         servicos_obra = _buscar_servicos_obra_resiliente(obra_id, admin_id)
         
         if not servicos_obra:
-            print(f"ℹ️ Nenhum serviço encontrado para obra {obra_id}")
+            logger.debug(f"[INFO] Nenhum serviço encontrado para obra {obra_id}")
             return jsonify({
                 'success': False,
                 'message': 'Nenhum serviço cadastrado para esta obra'
@@ -9613,7 +9615,7 @@ def api_servicos_obra_primeira_rdo(obra_id):
             # Buscar subatividades do serviço
             subatividades = SubatividadeMestre.query.filter_by(
                 servico_id=servico.id,
-                admin_id=admin_id,  # ✅ CORREÇÃO CRÍTICA: usar admin_id ao invés de tenant_admin_id
+                admin_id=admin_id,  # [OK] CORREÇÃO CRÍTICA: usar admin_id ao invés de tenant_admin_id
                 ativo=True
             ).order_by(SubatividadeMestre.ordem_padrao).all()
             
@@ -9644,7 +9646,7 @@ def api_servicos_obra_primeira_rdo(obra_id):
             }
             servicos_data.append(servico_data)
         
-        print(f"✅ API servicos-obra-primeira-rdo: {len(servicos_data)} serviços encontrados")
+            logger.info(f"[OK] API servicos-obra-primeira-rdo: {len(servicos_data)} serviços encontrados")
         
         return jsonify({
             'success': True,
@@ -9657,7 +9659,7 @@ def api_servicos_obra_primeira_rdo(obra_id):
         })
         
     except Exception as e:
-        print(f"❌ ERRO API servicos-obra-primeira-rdo: {e}")
+        logger.error(f"[ERROR] ERRO API servicos-obra-primeira-rdo: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -9672,13 +9674,11 @@ def salvar_rdo_flexivel():
     """
     ARQUITETURA REFATORADA - Joris Kuypers Digital Mastery
     Implementação robusta com separação clara de responsabilidades
-    🔥 VERSÃO COM DEBUG DETALHADO PARA PRODUÇÃO
+    [READY] VERSÃO COM DEBUG DETALHADO PARA PRODUÇÃO
     """
-    import logging
     
-    logger = logging.getLogger(__name__)
     
-    # ✅ VERIFICAÇÃO DE SCHEMA PREVENTIVA
+    # [OK] VERIFICAÇÃO DE SCHEMA PREVENTIVA
     try:
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
@@ -9688,17 +9688,17 @@ def salvar_rdo_flexivel():
         for tabela in tabelas_necessarias:
             if tabela in inspector.get_table_names():
                 colunas = [col['name'] for col in inspector.get_columns(tabela)]
-                logger.info(f"✅ Tabela {tabela}: {len(colunas)} colunas encontradas")
+                logger.info(f"[OK] Tabela {tabela}: {len(colunas)} colunas encontradas")
             else:
-                logger.error(f"❌ Tabela {tabela} NÃO ENCONTRADA!")
+                logger.error(f"[ERROR] Tabela {tabela} NÃO ENCONTRADA!")
                 
     except Exception as schema_check_error:
-        logger.warning(f"⚠️ Não foi possível verificar schema: {schema_check_error}")
+        logger.warning(f"[WARN] Não foi possível verificar schema: {schema_check_error}")
     
     try:
         # IMPLEMENTAÇÃO DA NOVA ARQUITETURA DIRETAMENTE AQUI
-        logger.info("🎯 JORIS KUYPERS ARCHITECTURE: Iniciando salvamento RDO")
-        logger.info("🚀 DEBUG PRODUÇÃO: Logs detalhados ativados")
+        logger.info("[TARGET] JORIS KUYPERS ARCHITECTURE: Iniciando salvamento RDO")
+        logger.info("[START] DEBUG PRODUÇÃO: Logs detalhados ativados")
         
         # Obter dados básicos da sessão e formulário
         funcionario_id = session.get('funcionario_id') or request.form.get('funcionario_id', type=int)
@@ -9711,7 +9711,7 @@ def salvar_rdo_flexivel():
             if funcionario:
                 admin_id = funcionario.admin_id
                 session['admin_id'] = admin_id
-                logger.info(f"🔄 Admin_id recuperado via funcionário: {admin_id}")
+                logger.info(f"[SYNC] Admin_id recuperado via funcionário: {admin_id}")
         
         # Se ainda não tem admin_id, usar detecção automática baseada na obra
         if not admin_id and obra_id:
@@ -9719,7 +9719,7 @@ def salvar_rdo_flexivel():
             if obra:
                 admin_id = obra.admin_id
                 session['admin_id'] = admin_id
-                logger.info(f"🔄 Admin_id recuperado via obra: {admin_id}")
+                logger.info(f"[SYNC] Admin_id recuperado via obra: {admin_id}")
         
         # ÚLTIMO RECURSO: Se não tem funcionario_id, usar o primeiro funcionário do admin
         if not funcionario_id and admin_id:
@@ -9727,15 +9727,15 @@ def salvar_rdo_flexivel():
             if funcionario:
                 funcionario_id = funcionario.id
                 session['funcionario_id'] = funcionario_id
-                logger.info(f"🔄 Funcionario_id recuperado: {funcionario_id}")
+                logger.info(f"[SYNC] Funcionario_id recuperado: {funcionario_id}")
         
         if not all([funcionario_id, admin_id, obra_id]):
-            logger.error(f"❌ Dados inválidos: funcionario_id={funcionario_id}, admin_id={admin_id}, obra_id={obra_id}")
-            logger.error(f"❌ Campos form: {list(request.form.keys())[:10]}")
+            logger.error(f"[ERROR] Dados inválidos: funcionario_id={funcionario_id}, admin_id={admin_id}, obra_id={obra_id}")
+            logger.error(f"[ERROR] Campos form: {list(request.form.keys())[:10]}")
             flash('Dados de sessão inválidos. Faça login novamente.', 'error')
             return redirect(url_for('main.funcionario_rdo_novo'))
             
-        logger.info(f"🎯 Dados da sessão: obra_id={obra_id}, admin_id={admin_id}")
+            logger.info(f"[TARGET] Dados da sessão: obra_id={obra_id}, admin_id={admin_id}")
         
         # FASE 1: DESCOBRIR CONTEXTO DO SERVIÇO (Arquitetura Joris Kuypers INLINE)
         # Buscar último serviço usado nesta obra
@@ -9748,11 +9748,11 @@ def salvar_rdo_flexivel():
             target_service_id = ultimo_servico_rdo.servico_id
             servico_obj = Servico.query.get(target_service_id)
             service_name = servico_obj.nome if servico_obj else f"Serviço {target_service_id}"
-            logger.info(f"🎯 SERVIÇO DO HISTÓRICO: {service_name} (ID: {target_service_id})")
+            logger.info(f"[TARGET] SERVIÇO DO HISTÓRICO: {service_name} (ID: {target_service_id})")
         else:
             # Fallback: primeiro serviço ativo da obra - CORRIGIDO
             try:
-                # ✅ CORREÇÃO CRÍTICA: Usar admin_id ao invés de ativo
+                # [OK] CORREÇÃO CRÍTICA: Usar admin_id ao invés de ativo
                 servico_obra = db.session.query(ServicoObraReal).join(Servico).filter(
                     ServicoObraReal.obra_id == obra_id,
                     ServicoObraReal.admin_id == admin_id,  # CORRIGIDO: usar admin_id
@@ -9763,39 +9763,39 @@ def salvar_rdo_flexivel():
                 if servico_obra and servico_obra.servico:
                     target_service_id = servico_obra.servico.id
                     service_name = servico_obra.servico.nome
-                    logger.info(f"🎯 SERVIÇO DA OBRA: {service_name} (ID: {target_service_id})")
+                    logger.info(f"[TARGET] SERVIÇO DA OBRA: {service_name} (ID: {target_service_id})")
                 else:
                     flash('Não foi possível identificar o serviço para esta obra', 'error')
                     return redirect(url_for('main.funcionario_rdo_novo'))
             except Exception as e:
-                logger.error(f"❌ Erro ao buscar serviço da obra: {e}")
+                logger.error(f"[ERROR] Erro ao buscar serviço da obra: {e}")
                 flash('Erro ao identificar serviço da obra', 'error')
                 return redirect(url_for('main.funcionario_rdo_novo'))
         
         # FASE 2: PROCESSAR DADOS DAS SUBATIVIDADES (Arquitetura Joris Kuypers INLINE)
-        logger.info(f"🔍 DEBUG FORMULÁRIO PRODUÇÃO - TODOS OS CAMPOS:")
-        logger.info(f"📊 Total de campos recebidos: {len(request.form)}")
+                logger.info(f"[DEBUG] DEBUG FORMULÁRIO PRODUÇÃO - TODOS OS CAMPOS:")
+                logger.info(f"[STATS] Total de campos recebidos: {len(request.form)}")
         for key, value in request.form.items():
-            logger.info(f"  📝 {key} = {value}")
+            logger.info(f" [INFO] {key} = {value}")
         
-        logger.info(f"🔍 DEBUG FORMULÁRIO - Campos subatividade:")
+            logger.info(f"[DEBUG] DEBUG FORMULÁRIO - Campos subatividade:")
         for key, value in request.form.items():
             if 'subatividade' in key:
-                logger.info(f"  🎯 {key} = {value}")
+                logger.info(f" [TARGET] {key} = {value}")
         
         subactivities = []
-        logger.error(f"🔍 INICIANDO PROCESSAMENTO - Buscando campos 'subatividade_*_percentual'")
+        logger.error(f"[DEBUG] INICIANDO PROCESSAMENTO - Buscando campos 'subatividade_*_percentual'")
         campos_encontrados = [k for k in request.form.keys() if k.startswith('subatividade_') and k.endswith('_percentual')]
-        logger.error(f"🔍 Campos subatividade_*_percentual encontrados: {len(campos_encontrados)}")
+        logger.error(f"[DEBUG] Campos subatividade_*_percentual encontrados: {len(campos_encontrados)}")
         for campo in campos_encontrados:
-            logger.error(f"  🎯 {campo}")
+            logger.error(f" [TARGET] {campo}")
         
         for field_name, field_value in request.form.items():
             if field_name.startswith('subatividade_') and field_name.endswith('_percentual'):
                 try:
                     # Tentar formato: subatividade_139_292_percentual
                     parts = field_name.replace('subatividade_', '').replace('_percentual', '').split('_')
-                    logger.error(f"🔍 Processando campo {field_name}, parts: {parts}, valor: {field_value}")
+                    logger.error(f"[DEBUG] Processando campo {field_name}, parts: {parts}, valor: {field_value}")
                     
                     if len(parts) >= 2:
                         original_service_id = int(parts[0])
@@ -9816,18 +9816,18 @@ def salvar_rdo_flexivel():
                             
                             if subatividade_mestre:
                                 nome = subatividade_mestre.nome
-                                logger.error(f"✅ Nome DINÂMICO da subatividade {sub_id}: {nome}")
+                                logger.error(f"[OK] Nome DINÂMICO da subatividade {sub_id}: {nome}")
                             else:
-                                logger.error(f"❌ IGNORANDO: Subatividade {sub_id} não encontrada no banco - NÃO será salva")
+                                logger.error(f"[ERROR] IGNORANDO: Subatividade {sub_id} não encontrada no banco - NÃO será salva")
                                 continue  # Pula esta subatividade
                                 
                         except Exception as e:
-                            logger.error(f"❌ Erro ao buscar subatividade {sub_id} no banco: {e}")
+                            logger.error(f"[ERROR] Erro ao buscar subatividade {sub_id} no banco: {e}")
                             continue  # Pula esta subatividade
                         
                         # Só adiciona se tem nome válido
                         if nome and nome.strip():
-                            logger.error(f"📦 Subatividade extraída: {nome} = {percentual}%")
+                            logger.error(f"[PKG] Subatividade extraída: {nome} = {percentual}%")
                             subactivities.append({
                                 'original_service_id': original_service_id,
                                 'sub_id': sub_id,
@@ -9836,23 +9836,23 @@ def salvar_rdo_flexivel():
                                 'observacoes': observacoes
                             })
                         else:
-                            logger.error(f"❌ REJEITANDO subatividade {sub_id}: nome vazio ou inválido")
+                            logger.error(f"[ERROR] REJEITANDO subatividade {sub_id}: nome vazio ou inválido")
                     else:
-                        logger.error(f"❌ Campo {field_name} não tem formato esperado: parts={parts}")
+                        logger.error(f"[ERROR] Campo {field_name} não tem formato esperado: parts={parts}")
                         
                 except (ValueError, IndexError) as e:
-                    logger.error(f"❌ Erro ao processar campo {field_name}: {e}")
+                    logger.error(f"[ERROR] Erro ao processar campo {field_name}: {e}")
                     continue
         
-        logger.error(f"🎯 RESULTADO LOOP 1: {len(subactivities)} subatividades encontradas")
+                    logger.error(f"[TARGET] RESULTADO LOOP 1: {len(subactivities)} subatividades encontradas")
         
         # FALLBACK: Se não encontrou pelo formato padrão, tentar outros formatos
         if not subactivities:
-            logger.error("🔄 FALLBACK ATIVADO - Tentando formatos alternativos de subatividade...")
-            logger.error(f"🔍 Total de campos com 'percentual': {len([k for k in request.form.keys() if 'percentual' in k])}")
+            logger.error("[SYNC] FALLBACK ATIVADO - Tentando formatos alternativos de subatividade...")
+            logger.error(f"[DEBUG] Total de campos com 'percentual': {len([k for k in request.form.keys() if 'percentual' in k])}")
             for field_name, field_value in request.form.items():
                 if 'percentual' in field_name and field_value:
-                    logger.error(f"🔍 Campo percentual encontrado: {field_name} = {field_value}")
+                    logger.error(f"[DEBUG] Campo percentual encontrado: {field_name} = {field_value}")
                     try:
                         # Extrair qualquer número do nome do campo
                         import re
@@ -9872,14 +9872,14 @@ def salvar_rdo_flexivel():
                                 
                                 if subatividade_mestre:
                                     nome = subatividade_mestre.nome
-                                    logger.info(f"✅ FALLBACK DINÂMICO: Nome da subatividade {sub_id}: {nome}")
+                                    logger.info(f"[OK] FALLBACK DINÂMICO: Nome da subatividade {sub_id}: {nome}")
                                 else:
-                                    logger.warning(f"⚠️ IGNORANDO: Subatividade {sub_id} não existe no banco - NÃO será salva")
+                                    logger.warning(f"[WARN] IGNORANDO: Subatividade {sub_id} não existe no banco - NÃO será salva")
                                     continue  # Pula esta subatividade
                                     
                             except Exception as e:
-                                logger.error(f"❌ FALLBACK: Erro ao buscar subatividade {sub_id} no banco: {e}")
-                                logger.error(f"❌ REJEITANDO: Subatividade {sub_id} não será salva")
+                                logger.error(f"[ERROR] FALLBACK: Erro ao buscar subatividade {sub_id} no banco: {e}")
+                                logger.error(f"[ERROR] REJEITANDO: Subatividade {sub_id} não será salva")
                                 continue  # Pula esta subatividade
                             
                             # Só adiciona se encontrou nome válido
@@ -9891,21 +9891,21 @@ def salvar_rdo_flexivel():
                                     'percentual': percentual,
                                     'observacoes': ""
                                 })
-                                logger.info(f"✅ Subatividade alternativa: {nome} = {percentual}%")
+                                logger.info(f"[OK] Subatividade alternativa: {nome} = {percentual}%")
                             else:
-                                logger.error(f"❌ REJEITANDO subatividade {sub_id} no fallback: nome vazio")
+                                logger.error(f"[ERROR] REJEITANDO subatividade {sub_id} no fallback: nome vazio")
                     except:
                         continue
         
         if not subactivities:
-            # ✅ CORREÇÃO: Permitir RDOs sem subatividades (registros simples de presença)
-            logger.warning("⚠️ RDO sem subatividades - será salvo apenas com funcionários")
-            logger.info(f"🔍 Total de campos no formulário: {len(request.form)}")
-            logger.info(f"🔍 Target service ID: {target_service_id}")
-            logger.info(f"🔍 Admin ID: {admin_id}")
-            logger.info(f"🔍 Obra ID: {obra_id}")
+            # [OK] CORREÇÃO: Permitir RDOs sem subatividades (registros simples de presença)
+            logger.warning("[WARN] RDO sem subatividades - será salvo apenas com funcionários")
+            logger.info(f"[DEBUG] Total de campos no formulário: {len(request.form)}")
+            logger.info(f"[DEBUG] Target service ID: {target_service_id}")
+            logger.info(f"[DEBUG] Admin ID: {admin_id}")
+            logger.info(f"[DEBUG] Obra ID: {obra_id}")
             
-        logger.info(f"🎯 SUBATIVIDADES PROCESSADAS: {len(subactivities)} itens")
+            logger.info(f"[TARGET] SUBATIVIDADES PROCESSADAS: {len(subactivities)} itens")
         
         # FASE 3: CRIAR RDO PRINCIPAL
         data_relatorio = request.form.get('data_relatorio')
@@ -9914,8 +9914,8 @@ def salvar_rdo_flexivel():
         else:
             data_relatorio = datetime.now().date()
             
-        # ✅ CORREÇÃO CRÍTICA: Gerar número RDO Único (evita constraint violation)
-        logger.info(f"🔢 GERANDO NÚMERO RDO Único para admin_id={admin_id}, ano={data_relatorio.year}")
+        # [OK] CORREÇÃO CRÍTICA: Gerar número RDO Único (evita constraint violation)
+            logger.info(f"[NUM] GERANDO NÚMERO RDO Único para admin_id={admin_id}, ano={data_relatorio.year}")
         
         # Gerar número único com verificação de duplicata
         contador = 1
@@ -9933,16 +9933,16 @@ def salvar_rdo_flexivel():
             
             if not rdo_existente:
                 numero_rdo = numero_proposto
-                logger.info(f"✅ NÚMERO RDO Único GERADO: {numero_rdo}")
+                logger.info(f"[OK] NÚMERO RDO Único GERADO: {numero_rdo}")
                 break
             else:
-                logger.info(f"⚠️ Número {numero_proposto} já existe, tentando próximo...")
+                logger.info(f"[WARN] Número {numero_proposto} já existe, tentando próximo...")
                 
         # Fallback de segurança
         if not numero_rdo:
             import random
             numero_rdo = f"RDO-{admin_id}-{data_relatorio.year}-{random.randint(1000, 9999):04d}"
-            logger.warning(f"🚑 FALLBACK: Usando número aleatório {numero_rdo}")
+            logger.warning(f"[FALLBACK] FALLBACK: Usando número aleatório {numero_rdo}")
         
         rdo = RDO(
             numero_rdo=numero_rdo,
@@ -9954,39 +9954,39 @@ def salvar_rdo_flexivel():
         )
         
         # FASE 4: PERSISTIR COM TRANSAÇÃO ROBUSTA (Arquitetura Joris Kuypers INLINE)
-        logger.info(f"🚀 INICIANDO TRANSAÇÃO - RDO {numero_rdo}")
+        logger.info(f"[START] INICIANDO TRANSAÇÃO - RDO {numero_rdo}")
         try:
-            # ✅ CORREÇÃO: Verificar schema do RDO antes de salvar
+            # [OK] CORREÇÃO: Verificar schema do RDO antes de salvar
             try:
                 # Teste de schema - verificar se todas as colunas existem
-                logger.info(f"🔍 VERIFICAÇÃO SCHEMA RDO:")
-                logger.info(f"  📋 numero_rdo: {rdo.numero_rdo}")
-                logger.info(f"  🏗️ obra_id: {rdo.obra_id}")
-                logger.info(f"  👤 criado_por_id: {rdo.criado_por_id}")
-                logger.info(f"  📅 data_relatorio: {rdo.data_relatorio}")
-                logger.info(f"  📍 local: {rdo.local}")
-                logger.info(f"  🏢 admin_id: {rdo.admin_id}")
+                logger.info(f"[DEBUG] VERIFICAÇÃO SCHEMA RDO:")
+                logger.info(f" [LIST] numero_rdo: {rdo.numero_rdo}")
+                logger.info(f" [BUILD] obra_id: {rdo.obra_id}")
+                logger.info(f" [USER] criado_por_id: {rdo.criado_por_id}")
+                logger.info(f"  [DATE] data_relatorio: {rdo.data_relatorio}")
+                logger.info(f"  [LOC] local: {rdo.local}")
+                logger.info(f" [CORP] admin_id: {rdo.admin_id}")
             except Exception as schema_error:
-                logger.error(f"❌ ERRO SCHEMA RDO: {schema_error}")
+                logger.error(f"[ERROR] ERRO SCHEMA RDO: {schema_error}")
                 raise Exception(f"Schema RDO inválido: {schema_error}")
             
             # Salvar RDO principal
             db.session.add(rdo)
             db.session.flush()  # Para obter o ID
             
-            logger.info(f"💾 RDO {rdo.numero_rdo} criado com ID {rdo.id}")
+            logger.info(f"[SAVE] RDO {rdo.numero_rdo} criado com ID {rdo.id}")
             
             # Salvar todas as subatividades no serviço correto
-            logger.info(f"💾 SALVANDO {len(subactivities)} SUBATIVIDADES")
+            logger.info(f"[SAVE] SALVANDO {len(subactivities)} SUBATIVIDADES")
             for i, sub_data in enumerate(subactivities):
                 try:
-                    # ✅ CORREÇÃO CRÍTICA: Usar original_service_id de cada subatividade
+                    # [OK] CORREÇÃO CRÍTICA: Usar original_service_id de cada subatividade
                     servico_id_correto = sub_data.get('original_service_id', target_service_id)
-                    logger.info(f"  📋 [{i+1}/{len(subactivities)}] {sub_data['nome']} = {sub_data['percentual']}% (servico_id={servico_id_correto})")
+                    logger.info(f" [LIST] [{i+1}/{len(subactivities)}] {sub_data['nome']} = {sub_data['percentual']}% (servico_id={servico_id_correto})")
                     
                     subatividade = RDOServicoSubatividade(
                         rdo_id=rdo.id,
-                        servico_id=servico_id_correto,  # ✅ CORRIGIDO: Usa o servico_id específico de cada subatividade
+                        servico_id=servico_id_correto,  # [OK] CORRIGIDO: Usa o servico_id específico de cada subatividade
                         nome_subatividade=sub_data['nome'],
                         percentual_conclusao=sub_data['percentual'],
                         observacoes_tecnicas=sub_data['observacoes'],
@@ -9995,17 +9995,17 @@ def salvar_rdo_flexivel():
                     )
                     
                     db.session.add(subatividade)
-                    logger.info(f"  ✅ Subatividade {sub_data['nome']} salva com servico_id={servico_id_correto}")
+                    logger.info(f" [OK] Subatividade {sub_data['nome']} salva com servico_id={servico_id_correto}")
                     
                 except Exception as sub_error:
-                    logger.error(f"  ❌ Erro na subatividade {sub_data['nome']}: {sub_error}")
+                    logger.error(f" [ERROR] Erro na subatividade {sub_data['nome']}: {sub_error}")
                     raise Exception(f"Erro ao criar subatividade {sub_data['nome']}: {sub_error}")
                 # Removido - lógica movida para o bloco anterior
             
             # CORREÇÃO CRÍTICA: PROCESSAR FUNCIONÁRIOS SELECIONADOS
             funcionarios_selecionados = request.form.getlist('funcionarios_selecionados')
-            logger.info(f"👥 PROCESSANDO FUNCIONÁRIOS: {len(funcionarios_selecionados)} selecionados")
-            logger.info(f"👥 Lista de IDs: {funcionarios_selecionados}")
+            logger.info(f"[USERS] PROCESSANDO FUNCIONÁRIOS: {len(funcionarios_selecionados)} selecionados")
+            logger.info(f"[USERS] Lista de IDs: {funcionarios_selecionados}")
             
             for funcionario_id_str in funcionarios_selecionados:
                 try:
@@ -10015,19 +10015,19 @@ def salvar_rdo_flexivel():
                         # Verificar se funcionário existe
                         funcionario = Funcionario.query.get(funcionario_id_sel)
                         if funcionario:
-                            # ✅ CORREÇÃO CRÍTICA: Criar registro seguro de mão de obra
+                            # [OK] CORREÇÃO CRÍTICA: Criar registro seguro de mão de obra
                             funcao_exercida = 'Funcionário'  # Padrão seguro
                             try:
                                 if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref:
                                     funcao_exercida = funcionario.funcao_ref.nome
                                 elif hasattr(funcionario, 'funcao') and funcionario.funcao:
                                     funcao_exercida = funcionario.funcao
-                                logger.info(f"👷 Função determinada para {funcionario.nome}: {funcao_exercida}")
+                                    logger.info(f"[WORKER] Função determinada para {funcionario.nome}: {funcao_exercida}")
                             except Exception as e:
-                                logger.warning(f"⚠️ Erro ao buscar função do funcionário {funcionario.nome}: {e}")
+                                logger.warning(f"[WARN] Erro ao buscar função do funcionário {funcionario.nome}: {e}")
                             
-                            # 🔍 VERIFICAÇÃO SCHEMA RDOMaoObra
-                            logger.info(f"🔍 Criando RDOMaoObra - rdo_id: {rdo.id}, funcionario_id: {funcionario_id_sel}, admin_id: {admin_id}")
+                            # [DEBUG] VERIFICAÇÃO SCHEMA RDOMaoObra
+                                logger.info(f"[DEBUG] Criando RDOMaoObra - rdo_id: {rdo.id}, funcionario_id: {funcionario_id_sel}, admin_id: {admin_id}")
                             try:
                                 mao_obra = RDOMaoObra(
                                     rdo_id=rdo.id,
@@ -10038,40 +10038,40 @@ def salvar_rdo_flexivel():
                                 )
                                 
                                 # Teste de schema antes de adicionar
-                                logger.info(f"  ✅ RDOMaoObra criado: {vars(mao_obra)}")
+                                logger.info(f" [OK] RDOMaoObra criado: {vars(mao_obra)}")
                                 db.session.add(mao_obra)
-                                logger.info(f"👷 Funcionário salvo: {funcionario.nome} (ID: {funcionario_id_sel})")
+                                logger.info(f"[WORKER] Funcionário salvo: {funcionario.nome} (ID: {funcionario_id_sel})")
                             except Exception as mao_obra_error:
-                                logger.error(f"❌ ERRO RDOMaoObra para funcionario {funcionario.nome}: {mao_obra_error}")
+                                logger.error(f"[ERROR] ERRO RDOMaoObra para funcionario {funcionario.nome}: {mao_obra_error}")
                                 raise Exception(f"Erro ao criar RDOMaoObra: {mao_obra_error}")
                         else:
-                            logger.warning(f"⚠️ Funcionário ID {funcionario_id_sel} não encontrado")
+                            logger.warning(f"[WARN] Funcionário ID {funcionario_id_sel} não encontrado")
                 except Exception as e:
-                    logger.error(f"❌ Erro ao processar funcionário {funcionario_id_str}: {e}")
+                    logger.error(f"[ERROR] Erro ao processar funcionário {funcionario_id_str}: {e}")
                     continue
             
-            # 📸 PROCESSAR FOTOS (v9.0) - CORREÇÃO COMPLETA + LEGENDAS v9.0.2
+            # [PHOTO] PROCESSAR FOTOS (v9.0) - CORREÇÃO COMPLETA + LEGENDAS v9.0.2
             if 'fotos[]' in request.files:
                 fotos_files = request.files.getlist('fotos[]')
-                logger.info(f"📸 {len(fotos_files)} foto(s) recebida(s) para processar")
+                logger.info(f"[PHOTO] {len(fotos_files)} foto(s) recebida(s) para processar")
                 
                 # DEBUG: Mostrar todas as fotos recebidas
                 for i, foto in enumerate(fotos_files, 1):
-                    logger.info(f"  📝 Foto {i}: filename='{foto.filename}', content_type='{foto.content_type}'")
+                    logger.info(f" [INFO] Foto {i}: filename='{foto.filename}', content_type='{foto.content_type}'")
                 
-                # ✅ CORREÇÃO 1: FILTRAR ARQUIVOS VAZIOS mantendo índice original (crítico!)
+                # [OK] CORREÇÃO 1: FILTRAR ARQUIVOS VAZIOS mantendo índice original (crítico!)
                 # Rastrear índice original para sincronização correta com legendas
                 fotos_com_indice = [(idx, f) for idx, f in enumerate(fotos_files) if f and f.filename and f.filename.strip() != '']
-                logger.info(f"✅ {len(fotos_com_indice)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_com_indice)} arquivos vazios)")
+                logger.info(f"[OK] {len(fotos_com_indice)} foto(s) válida(s) após filtragem (removidos {len(fotos_files) - len(fotos_com_indice)} arquivos vazios)")
                 
                 if fotos_com_indice:
-                    logger.info(f"🎯 [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_com_indice)} foto(s)")
+                    logger.info(f"[TARGET] [FOTO-UPLOAD] INICIANDO processamento de {len(fotos_com_indice)} foto(s)")
                     
                     try:
-                        # ✅ CORREÇÃO 2: Usar salvar_foto_rdo (que existe)
+                        # [OK] CORREÇÃO 2: Usar salvar_foto_rdo (que existe)
                         from services.rdo_foto_service import salvar_foto_rdo
                         
-                        # 🎯 ESTRATÉGIA ROBUSTA COM FALLBACK (v9.0.2.5 - PRODUÇÃO SAFE)
+                        # [TARGET] ESTRATÉGIA ROBUSTA COM FALLBACK (v9.0.2.5 - PRODUÇÃO SAFE)
                         # Tenta contador sequencial primeiro (mobile com arquivo vazio)
                         # Se não encontrar legenda, tenta índice original (desktop sem vazio)
                         # Isso garante compatibilidade com TODOS os cenários
@@ -10079,13 +10079,13 @@ def salvar_rdo_flexivel():
                         contador_legenda = 0  # Contador sequencial para mobile
                         
                         for original_idx, foto in fotos_com_indice:
-                            logger.info(f"📸 [FOTO-UPLOAD] Processando foto (contador={contador_legenda}, idx_original={original_idx}): {foto.filename}")
+                            logger.info(f"[PHOTO] [FOTO-UPLOAD] Processando foto (contador={contador_legenda}, idx_original={original_idx}): {foto.filename}")
                             
                             # Chamar service layer para processar foto
                             resultado = salvar_foto_rdo(foto, admin_id, rdo.id)
-                            logger.info(f"   ✅ Foto processada: {resultado['arquivo_original']}")
+                            logger.info(f" [OK] Foto processada: {resultado['arquivo_original']}")
                             
-                            # 📝 FALLBACK INTELIGENTE: Tenta contador primeiro, depois índice original
+                            # [INFO] FALLBACK INTELIGENTE: Tenta contador primeiro, depois índice original
                             legenda = ''
                             campo_contador = f"legenda_foto_{contador_legenda}"
                             campo_original = f"legenda_foto_{original_idx}"
@@ -10093,14 +10093,14 @@ def salvar_rdo_flexivel():
                             # Tenta contador sequencial (mobile)
                             legenda = request.form.get(campo_contador, '').strip()
                             if legenda:
-                                logger.info(f"   ✅ Legenda encontrada via contador ({campo_contador}): '{legenda}'")
+                                logger.info(f" [OK] Legenda encontrada via contador ({campo_contador}): '{legenda}'")
                             else:
                                 # Fallback: tenta índice original (desktop)
                                 legenda = request.form.get(campo_original, '').strip()
                                 if legenda:
-                                    logger.info(f"   ✅ Legenda encontrada via índice original ({campo_original}): '{legenda}'")
+                                    logger.info(f" [OK] Legenda encontrada via índice original ({campo_original}): '{legenda}'")
                                 else:
-                                    logger.info(f"   ℹ️ Sem legenda (tentou {campo_contador} e {campo_original})")
+                                    logger.info(f"   [INFO] Sem legenda (tentou {campo_contador} e {campo_original})")
                             
                             # Criar registro no banco
                             nova_foto = RDOFoto(
@@ -10114,64 +10114,64 @@ def salvar_rdo_flexivel():
                                 thumbnail=resultado['thumbnail'],
                                 nome_original=resultado['nome_original'],
                                 tamanho_bytes=resultado['tamanho_bytes'],
-                                # 🔥 CAMPOS BASE64 (v9.0.4) - Persistência no banco de dados
+                                # [READY] CAMPOS BASE64 (v9.0.4) - Persistência no banco de dados
                                 imagem_original_base64=resultado.get('imagem_original_base64'),
                                 imagem_otimizada_base64=resultado.get('imagem_otimizada_base64'),
                                 thumbnail_base64=resultado.get('thumbnail_base64')
                             )
                             
                             db.session.add(nova_foto)
-                            logger.info(f"✅ Foto salva com legenda: '{legenda[:50]}...' " if len(legenda) > 50 else f"✅ Foto salva com legenda: '{legenda}'")
+                            logger.info(f"[OK] Foto salva com legenda: '{legenda[:50]}...' " if len(legenda) > 50 else f"[OK] Foto salva com legenda: '{legenda}'")
                             
                             contador_legenda += 1
                         
-                        logger.info(f"✅ [FOTO-UPLOAD] RESUMO: {contador_legenda} foto(s) adicionadas à sessão")
-                        logger.info(f"   ⏳ Aguardando commit final...")
+                            logger.info(f"[OK] [FOTO-UPLOAD] RESUMO: {contador_legenda} foto(s) adicionadas à sessão")
+                            logger.info(f"   ⏳ Aguardando commit final...")
                     except Exception as e:
-                        logger.error(f"❌ ERRO ao processar fotos: {str(e)}", exc_info=True)
+                        logger.error(f"[ERROR] ERRO ao processar fotos: {str(e)}", exc_info=True)
                         # Não fazer rollback aqui - deixar para o bloco except principal
             
-            # 🚀 COMMIT DA TRANSAÇÃO FINAL
-            logger.info(f"🚀 [COMMIT] EXECUTANDO COMMIT FINAL...")
-            logger.info(f"   📊 Estado da sessão antes do commit:")
-            logger.info(f"      - Novos objetos: {len(db.session.new)}")
-            logger.info(f"      - Objetos modificados: {len(db.session.dirty)}")
-            logger.info(f"      - Objetos deletados: {len(db.session.deleted)}")
+            # [START] COMMIT DA TRANSAÇÃO FINAL
+                        logger.info(f"[START] [COMMIT] EXECUTANDO COMMIT FINAL...")
+                        logger.info(f" [STATS] Estado da sessão antes do commit:")
+                        logger.info(f"      - Novos objetos: {len(db.session.new)}")
+                        logger.info(f"      - Objetos modificados: {len(db.session.dirty)}")
+                        logger.info(f"      - Objetos deletados: {len(db.session.deleted)}")
             
             db.session.commit()
-            logger.info(f"✅ [COMMIT] Commit executado com sucesso!")
+            logger.info(f"[OK] [COMMIT] Commit executado com sucesso!")
             success = True
             
-            # 🔍 VERIFICAÇÃO: Consultar banco para confirmar fotos salvas
-            logger.info(f"🔍 [VERIFICAÇÃO] Consultando banco para confirmar fotos salvas...")
+            # [DEBUG] VERIFICAÇÃO: Consultar banco para confirmar fotos salvas
+            logger.info(f"[DEBUG] [VERIFICAÇÃO] Consultando banco para confirmar fotos salvas...")
             fotos_salvas = RDOFoto.query.filter_by(rdo_id=rdo.id).all()
-            logger.info(f"   📊 {len(fotos_salvas)} foto(s) encontrada(s) no banco para RDO {rdo.id}")
+            logger.info(f" [STATS] {len(fotos_salvas)} foto(s) encontrada(s) no banco para RDO {rdo.id}")
             for foto in fotos_salvas:
-                logger.info(f"   📸 Foto ID {foto.id}: {foto.nome_original} ({foto.tamanho_bytes} bytes)")
+                logger.info(f"   [PHOTO] Foto ID {foto.id}: {foto.nome_original} ({foto.tamanho_bytes} bytes)")
             
-            logger.info(f"✅ SUCESSO TOTAL! RDO {rdo.numero_rdo} salvo:")
-            logger.info(f"  📋 {len(subactivities)} subatividades")
-            logger.info(f"  👥 {len(funcionarios_selecionados)} funcionarios")
-            logger.info(f"  📸 {len(fotos_salvas)} fotos")
-            logger.info(f"  🏗️ Obra ID: {obra_id}")
-            logger.info(f"  🏢 Admin ID: {admin_id}")
-            logger.info(f"  🔢 Número RDO: {numero_rdo} (VERIFICADO Único)")
+                logger.info(f"[OK] SUCESSO TOTAL! RDO {rdo.numero_rdo} salvo:")
+                logger.info(f" [LIST] {len(subactivities)} subatividades")
+                logger.info(f" [USERS] {len(funcionarios_selecionados)} funcionarios")
+                logger.info(f"  [PHOTO] {len(fotos_salvas)} fotos")
+                logger.info(f" [BUILD] Obra ID: {obra_id}")
+                logger.info(f" [CORP] Admin ID: {admin_id}")
+                logger.info(f" [NUM] Número RDO: {numero_rdo} (VERIFICADO Único)")
             
         except Exception as e:
             db.session.rollback()
-            logger.error(f"❌ Erro ao salvar RDO: {e}")
-            # ✅ LOG DETALHADO PARA DEBUG PRODUÇÃO
+            logger.error(f"[ERROR] Erro ao salvar RDO: {e}")
+            # [OK] LOG DETALHADO PARA DEBUG PRODUÇÃO
             import traceback
-            logger.error(f"❌ Stack trace completo: {traceback.format_exc()}")
+            logger.error(f"[ERROR] Stack trace completo: {traceback.format_exc()}")
             error_message = str(e)
             success = False
         
         if success:
             flash(f'RDO {numero_rdo} salvo com sucesso! Serviço: {service_name}', 'success')
-            logger.info(f"✅ RDO {numero_rdo} salvo com {len(subactivities)} subatividades no serviço {target_service_id}")
+            logger.info(f"[OK] RDO {numero_rdo} salvo com {len(subactivities)} subatividades no serviço {target_service_id}")
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         else:
-            # ✅ MENSAGEM DE ERRO DETALHADA
+            # [OK] MENSAGEM DE ERRO DETALHADA
             if 'admin_id' in error_message and 'null' in error_message.lower():
                 flash('Erro: Campo admin_id obrigatório não foi preenchido. Entre em contato com o suporte.', 'error')
             elif 'foreign key' in error_message.lower():
@@ -10186,11 +10186,11 @@ def salvar_rdo_flexivel():
                 flash(f'Erro: O campo "{campo}" é obrigatório e não foi preenchido.', 'error')
             else:
                 flash(f'Erro ao salvar RDO: {error_message[:200]}', 'error')
-            logger.error("❌ FALHA NO SALVAMENTO - Redirecionando para formulário")
+                logger.error("[ERROR] FALHA NO SALVAMENTO - Redirecionando para formulário")
             return redirect(url_for('main.funcionario_rdo_novo'))
         
     except Exception as e:
-        logger.error(f"❌ ERRO CRÍTICO: {str(e)}")
+        logger.error(f"[ERROR] ERRO CRÍTICO: {str(e)}")
         import traceback
         traceback.print_exc()
         flash(f'Erro ao salvar RDO: {str(e)}', 'error')
@@ -10206,7 +10206,7 @@ def api_rdo_ultima_dados(obra_id):
     try:
         admin_id = get_admin_id_robusta()
         
-        print(f"🔍 [RDO-API] Obra {obra_id} | Admin {admin_id}")
+        logger.debug(f"[DEBUG] [RDO-API] Obra {obra_id} | Admin {admin_id}")
         
         # ═══════════════════════════════════════════════════════
         # ETAPA 1: Buscar último RDO
@@ -10230,7 +10230,7 @@ def api_rdo_ultima_dados(obra_id):
             Servico.ativo == True
         ).all()
         
-        print(f"📊 [RDO-API] {len(servicos_obra_atuais)} serviços ativos na obra")
+        logger.info(f"[STATS] [RDO-API] {len(servicos_obra_atuais)} serviços ativos na obra")
         
         # ═══════════════════════════════════════════════════════
         # ETAPA 3: Pré-processar histórico do último RDO
@@ -10238,7 +10238,7 @@ def api_rdo_ultima_dados(obra_id):
         historico_percentuais = {}
         
         if ultimo_rdo:
-            print(f"📄 [RDO-API] Último RDO: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio})")
+            logger.debug(f"[DOC] [RDO-API] Último RDO: {ultimo_rdo.numero_rdo} ({ultimo_rdo.data_relatorio})")
             
             subatividades_antigas = RDOServicoSubatividade.query.filter_by(
                 rdo_id=ultimo_rdo.id
@@ -10256,7 +10256,7 @@ def api_rdo_ultima_dados(obra_id):
                     'observacoes': sub.observacoes_tecnicas or ''
                 }
                 
-            print(f"📊 [RDO-API] Histórico: {len(historico_percentuais)} serviços com dados antigos")
+                logger.info(f"[STATS] [RDO-API] Histórico: {len(historico_percentuais)} serviços com dados antigos")
         
         # ═══════════════════════════════════════════════════════
         # ETAPA 4: Processar TODOS serviços com subatividades ATUAIS
@@ -10288,9 +10288,9 @@ def api_rdo_ultima_dados(obra_id):
                         dados_hist = historico_percentuais[sid][nome_normalizado]
                         percentual = dados_hist['percentual']
                         observacoes = dados_hist['observacoes']
-                        print(f"✅ [RDO-API] Mapeado: {servico.nome} → {sm.nome} = {percentual}%")
+                        logger.info(f"[OK] [RDO-API] Mapeado: {servico.nome} → {sm.nome} = {percentual}%")
                     else:
-                        print(f"🆕 [RDO-API] Novo/Sem histórico: {servico.nome} → {sm.nome} = 0%")
+                        logger.debug(f"🆕 [RDO-API] Novo/Sem histórico: {servico.nome} → {sm.nome} = 0%")
                     
                     subatividades_lista.append({
                         'id': sm.id,
@@ -10365,10 +10365,10 @@ def api_rdo_ultima_dados(obra_id):
         servicos_com_historico = sum(1 for s in servicos_finais.values() if not s['eh_novo'])
         servicos_novos = sum(1 for s in servicos_finais.values() if s['eh_novo'])
         
-        print(f"✅ [RDO-API] Resultado:")
-        print(f"   → Com histórico: {servicos_com_historico} serviços")
-        print(f"   → Novos/Sem histórico: {servicos_novos} serviços")
-        print(f"   → Total: {len(servicos_lista)} serviços")
+        logger.info(f"[OK] [RDO-API] Resultado:")
+        logger.debug(f" → Com histórico: {servicos_com_historico} serviços")
+        logger.debug(f" → Novos/Sem histórico: {servicos_novos} serviços")
+        logger.debug(f" → Total: {len(servicos_lista)} serviços")
         
         # ═══════════════════════════════════════════════════════
         # RETORNO
@@ -10402,7 +10402,7 @@ def api_rdo_ultima_dados(obra_id):
         })
         
     except Exception as e:
-        print(f"❌ [RDO-API] ERRO: {e}")
+        logger.error(f"[ERROR] [RDO-API] ERRO: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -10410,7 +10410,7 @@ def api_rdo_ultima_dados(obra_id):
 def _buscar_servicos_obra_resiliente(obra_id, admin_id):
     """Busca serviços da obra com múltiplas estratégias resilientes"""
     try:
-        print(f"🔍 BUSCA RESILIENTE: obra_id={obra_id}, admin_id={admin_id}")
+        logger.debug(f"[DEBUG] BUSCA RESILIENTE: obra_id={obra_id}, admin_id={admin_id}")
         
         # ESTRATÉGIA 1: Buscar via ServicoObraReal (CORRIGIDA)
         try:
@@ -10418,17 +10418,17 @@ def _buscar_servicos_obra_resiliente(obra_id, admin_id):
                 ServicoObraReal, Servico.id == ServicoObraReal.servico_id
             ).filter(
                 ServicoObraReal.obra_id == obra_id,
-                ServicoObraReal.admin_id == admin_id,  # ✅ CORREÇÃO CRÍTICA: usar admin_id ao invés de ativo
+                ServicoObraReal.admin_id == admin_id,  # [OK] CORREÇÃO CRÍTICA: usar admin_id ao invés de ativo
                 Servico.admin_id == admin_id,
                 Servico.ativo == True
             ).all()
             
             if servicos_obra_query:
-                print(f"✅ ESTRATÉGIA_1: {len(servicos_obra_query)} serviços encontrados via ServicoObraReal")
+                logger.info(f"[OK] ESTRATÉGIA_1: {len(servicos_obra_query)} serviços encontrados via ServicoObraReal")
                 return servicos_obra_query
                 
         except Exception as e:
-            print(f"⚠️ ERRO ESTRATÉGIA_1: {e}")
+            logger.error(f"[WARN] ERRO ESTRATÉGIA_1: {e}")
         
         # ESTRATÉGIA 2: Buscar via ServicoObra (tabela legada)
         try:
@@ -10440,19 +10440,19 @@ def _buscar_servicos_obra_resiliente(obra_id, admin_id):
                     servicos_legado.append(assoc.servico)
             
             if servicos_legado:
-                print(f"✅ ESTRATÉGIA_2: {len(servicos_legado)} serviços encontrados via ServicoObra")
+                logger.info(f"[OK] ESTRATÉGIA_2: {len(servicos_legado)} serviços encontrados via ServicoObra")
                 return servicos_legado
                 
         except Exception as e:
-            print(f"⚠️ ERRO ESTRATÉGIA_2: {e}")
+            logger.error(f"[WARN] ERRO ESTRATÉGIA_2: {e}")
         
         # ESTRATÉGIA 3 REMOVIDA: Estava retornando todos os serviços do admin_id
         # Isso causava exibição de serviços não relacionados à obra
-        print(f"❌ NENHUM SERVIÇO ENCONTRADO para obra_id={obra_id}, admin_id={admin_id}")
+            logger.error(f"[ERROR] NENHUM SERVIÇO ENCONTRADO para obra_id={obra_id}, admin_id={admin_id}")
         return []
         
     except Exception as e:
-        print(f"❌ ERRO CRÍTICO _buscar_servicos_obra_resiliente: {e}")
+        logger.error(f"[ERROR] ERRO CRÍTICO _buscar_servicos_obra_resiliente: {e}")
         return []
 
 def _buscar_subatividades_servico(servico_id):
@@ -10466,7 +10466,7 @@ def _buscar_subatividades_servico(servico_id):
             {'nome': 'Finalização', 'descricao': 'Acabamentos e finalização'}
         ]
     except Exception as e:
-        print(f"❌ ERRO _buscar_subatividades_servico: {e}")
+        logger.error(f"[ERROR] ERRO _buscar_subatividades_servico: {e}")
         return [{'nome': 'Atividade Padrão', 'descricao': 'Execução do serviço'}]
 
 
@@ -10478,25 +10478,25 @@ def novo_ponto():
     """Cria novo registro de ponto"""
     try:
         data = request.form.to_dict()
-        print(f"🔧 DEBUG novo_ponto: Dados recebidos: {data}")
+        logger.debug(f"[CONFIG] DEBUG novo_ponto: Dados recebidos: {data}")
         
         funcionario_id = data.get('funcionario_id')
         if not funcionario_id:
-            print(f"❌ DEBUG novo_ponto: funcionario_id não informado")
+            logger.error(f"[ERROR] DEBUG novo_ponto: funcionario_id não informado")
             return jsonify({'success': False, 'message': 'Funcionário não informado'}), 400
         
         # Obter admin_id para multi-tenancy
         admin_id = get_tenant_admin_id()
         if not admin_id:
-            print(f"❌ DEBUG novo_ponto: admin_id não identificado")
+            logger.error(f"[ERROR] DEBUG novo_ponto: admin_id não identificado")
             return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
         
-        print(f"🔧 DEBUG novo_ponto: admin_id={admin_id}, funcionario_id={funcionario_id}")
+            logger.debug(f"[CONFIG] DEBUG novo_ponto: admin_id={admin_id}, funcionario_id={funcionario_id}")
         
         # Buscar funcionário com validação multi-tenant
         funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
         if not funcionario:
-            print(f"❌ DEBUG novo_ponto: funcionario não encontrado para id={funcionario_id}, admin_id={admin_id}")
+            logger.error(f"[ERROR] DEBUG novo_ponto: funcionario não encontrado para id={funcionario_id}, admin_id={admin_id}")
             return jsonify({'success': False, 'message': 'Funcionário não encontrado'}), 404
         
         # Obter obra_id (opcional) - tratar string vazia
@@ -10517,17 +10517,17 @@ def novo_ponto():
                     return datetime.strptime(time_str, fmt).time()
                 except ValueError:
                     continue
-            print(f"⚠️ DEBUG novo_ponto: Formato de hora inválido: {time_str}")
+                    logger.warning(f"[WARN] DEBUG novo_ponto: Formato de hora inválido: {time_str}")
             return None
         
-        print(f"🔧 DEBUG novo_ponto: Processando horários...")
+            logger.debug(f"[CONFIG] DEBUG novo_ponto: Processando horários...")
         hora_entrada = parse_time(data.get('hora_entrada'))
         hora_saida = parse_time(data.get('hora_saida'))
         hora_almoco_saida = parse_time(data.get('hora_almoco_saida'))
         hora_almoco_retorno = parse_time(data.get('hora_almoco_retorno'))
         
-        print(f"🔧 DEBUG novo_ponto: hora_entrada={hora_entrada}, hora_saida={hora_saida}")
-        print(f"🔧 DEBUG novo_ponto: hora_almoco_saida={hora_almoco_saida}, hora_almoco_retorno={hora_almoco_retorno}")
+        logger.debug(f"[CONFIG] DEBUG novo_ponto: hora_entrada={hora_entrada}, hora_saida={hora_saida}")
+        logger.debug(f"[CONFIG] DEBUG novo_ponto: hora_almoco_saida={hora_almoco_saida}, hora_almoco_retorno={hora_almoco_retorno}")
         
         # Criar registro de ponto
         registro = RegistroPonto(
@@ -10559,7 +10559,7 @@ def novo_ponto():
         db.session.add(registro)
         db.session.commit()
         
-        print(f"✅ DEBUG novo_ponto: Registro criado com sucesso, id={registro.id}")
+        logger.debug(f"[OK] DEBUG novo_ponto: Registro criado com sucesso, id={registro.id}")
         
         return jsonify({
             'success': True,
@@ -10570,14 +10570,14 @@ def novo_ponto():
     except Exception as e:
         db.session.rollback()
         import traceback
-        print(f"❌ DEBUG novo_ponto: ERRO: {str(e)}")
-        print(f"❌ DEBUG novo_ponto: Traceback: {traceback.format_exc()}")
+        logger.error(f"[ERROR] DEBUG novo_ponto: ERRO: {str(e)}")
+        logger.error(f"[ERROR] DEBUG novo_ponto: Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'message': f'Erro: {str(e)}'}), 500
 
 # CONTINUAÇÃO DO SISTEMA ANTIGO (TEMPORÁRIO PARA COMPATIBILITY)
 
 # ========================================
-# 🚗 ROTAS COMPLETAS DE VEÍCULOS V2.0 
+# [CAR] ROTAS COMPLETAS DE VEÍCULOS V2.0 
 # ========================================
 # Implementação completa com design idêntico aos RDOs
 # Formulários unificados, proteção multi-tenant, circuit breakers
@@ -10585,9 +10585,9 @@ def novo_ponto():
 # Importar services de veículos
 try:
     from veiculos_services import VeiculoService, UsoVeiculoService, CustoVeiculoService
-    print("✅ [VEICULOS] Services importados com sucesso")
+    logger.info("[OK] [VEICULOS] Services importados com sucesso")
 except ImportError as e:
-    print(f"⚠️ [VEICULOS] Erro ao importar services: {e}")
+    logger.error(f"[WARN] [VEICULOS] Erro ao importar services: {e}")
     # Criar fallbacks básicos
     class VeiculoService:
         @staticmethod
@@ -10612,7 +10612,7 @@ except ImportError as e:
 @login_required
 def veiculos():
     """Redireciona para o novo sistema de frota"""
-    print("🔀 [VEICULOS_REDIRECT] Redirecionando /veiculos → /frota")
+    logger.info("[ROUTE] [VEICULOS_REDIRECT] Redirecionando /veiculos → /frota")
     # Preservar query params (filtros, paginação)
     return redirect(url_for('frota.lista', **request.args))
 
@@ -10621,7 +10621,7 @@ def veiculos():
 @login_required
 def novo_veiculo():
     """Redireciona para o novo sistema de frota"""
-    print("🔀 [VEICULOS_NOVO_REDIRECT] Redirecionando /veiculos/novo → /frota/novo")
+    logger.info("[ROUTE] [VEICULOS_NOVO_REDIRECT] Redirecionando /veiculos/novo → /frota/novo")
     return redirect(url_for('frota.novo'))
 
 # ===== ROTA ANTIGA DESATIVADA: NOVO VEÍCULO =====
@@ -10630,7 +10630,7 @@ def novo_veiculo():
 def novo_veiculo_OLD():
     """Formulário para cadastrar novo veículo"""
     try:
-        print(f"🚗 [NOVO_VEICULO] Iniciando...")
+        logger.info(f"[CAR] [NOVO_VEICULO] Iniciando...")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -10643,7 +10643,7 @@ def novo_veiculo_OLD():
         
         # POST - Processar cadastro
         dados = request.form.to_dict()
-        print(f"🔍 [NOVO_VEICULO] Dados recebidos: {dados.keys()}")
+        logger.debug(f"[DEBUG] [NOVO_VEICULO] Dados recebidos: {dados.keys()}")
         
         # Validações básicas
         campos_obrigatorios = ['placa', 'marca', 'modelo', 'ano', 'tipo']
@@ -10663,7 +10663,7 @@ def novo_veiculo_OLD():
             return render_template('veiculos_novo.html')
         
     except Exception as e:
-        print(f"❌ [NOVO_VEICULO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [NOVO_VEICULO] Erro: {str(e)}")
         flash('Erro ao cadastrar veículo. Tente novamente.', 'error')
         return render_template('veiculos_novo.html')
 
@@ -10673,7 +10673,7 @@ def novo_veiculo_OLD():
 def detalhes_veiculo(id):
     """Página de detalhes do veículo com abas de uso e custos"""
     try:
-        print(f"🚗 [DETALHES_VEICULO] Iniciando para ID {id}")
+        logger.info(f"[CAR] [DETALHES_VEICULO] Iniciando para ID {id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -10716,7 +10716,7 @@ def detalhes_veiculo(id):
                              stats_custos=custos_resultado.get('stats', {}))
         
     except Exception as e:
-        print(f"❌ [DETALHES_VEICULO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [DETALHES_VEICULO] Erro: {str(e)}")
         flash('Erro ao carregar detalhes do veículo.', 'error')
         return redirect(url_for('main.veiculos'))
 
@@ -10726,7 +10726,7 @@ def detalhes_veiculo(id):
 def novo_uso_veiculo(veiculo_id):
     """Formulário unificado para novo uso de veículo (uso + custos)"""
     try:
-        print(f"🚗 [NOVO_USO] Iniciando para veículo {veiculo_id}")
+        logger.info(f"[CAR] [NOVO_USO] Iniciando para veículo {veiculo_id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -10755,7 +10755,7 @@ def novo_uso_veiculo(veiculo_id):
         dados = request.form.to_dict()
         dados['veiculo_id'] = veiculo_id  # Garantir que o ID está nos dados
         
-        print(f"🔍 [NOVO_USO] Dados recebidos: {dados.keys()}")
+        logger.debug(f"[DEBUG] [NOVO_USO] Dados recebidos: {dados.keys()}")
         
         # Validações básicas
         campos_obrigatorios = ['data_uso', 'hora_saida', 'km_inicial']
@@ -10785,7 +10785,7 @@ def novo_uso_veiculo(veiculo_id):
                                  obras=obras)
         
     except Exception as e:
-        print(f"❌ [NOVO_USO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [NOVO_USO] Erro: {str(e)}")
         flash('Erro ao registrar uso do veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
 
@@ -10795,7 +10795,7 @@ def novo_uso_veiculo(veiculo_id):
 def novo_custo_veiculo_form(veiculo_id):
     """Formulário para registrar novos custos de veículo"""
     try:
-        print(f"💰 [NOVO_CUSTO] Iniciando para veículo {veiculo_id}")
+        logger.info(f"[MONEY] [NOVO_CUSTO] Iniciando para veículo {veiculo_id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -10829,7 +10829,7 @@ def novo_custo_veiculo_form(veiculo_id):
         dados = request.form.to_dict()
         dados['veiculo_id'] = veiculo_id
         
-        print(f"🔍 [NOVO_CUSTO] Dados recebidos: {dados.keys()}")
+        logger.debug(f"[DEBUG] [NOVO_CUSTO] Dados recebidos: {dados.keys()}")
         
         # Validações básicas
         campos_obrigatorios = ['data_custo', 'tipo', 'valor']
@@ -10865,7 +10865,7 @@ def novo_custo_veiculo_form(veiculo_id):
                                  obras=obras)
         
     except Exception as e:
-        print(f"❌ [NOVO_CUSTO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [NOVO_CUSTO] Erro: {str(e)}")
         flash('Erro ao registrar custo do veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=veiculo_id))
 
@@ -10875,7 +10875,7 @@ def novo_custo_veiculo_form(veiculo_id):
 def editar_veiculo(id):
     """Formulário para editar dados do veículo"""
     try:
-        print(f"🚗 [EDITAR_VEICULO] Iniciando para ID {id}")
+        logger.info(f"[CAR] [EDITAR_VEICULO] Iniciando para ID {id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -10895,7 +10895,7 @@ def editar_veiculo(id):
         
         # POST - Processar edição
         dados = request.form.to_dict()
-        print(f"🔍 [EDITAR_VEICULO] Dados recebidos: {dados.keys()}")
+        logger.debug(f"[DEBUG] [EDITAR_VEICULO] Dados recebidos: {dados.keys()}")
         
         # Usar service para atualizar veículo
         sucesso, veiculo_atualizado, mensagem = VeiculoService.atualizar_veiculo(id, dados, tenant_admin_id)
@@ -10908,7 +10908,7 @@ def editar_veiculo(id):
             return render_template('veiculos_editar.html', veiculo=veiculo)
         
     except Exception as e:
-        print(f"❌ [EDITAR_VEICULO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [EDITAR_VEICULO] Erro: {str(e)}")
         flash('Erro ao editar veículo.', 'error')
         return redirect(url_for('main.detalhes_veiculo', id=id))
 
@@ -10946,7 +10946,7 @@ def api_dados_veiculo(id):
         return jsonify(dados)
         
     except Exception as e:
-        print(f"❌ [API_DADOS_VEICULO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [API_DADOS_VEICULO] Erro: {str(e)}")
         return jsonify({'error': 'Erro interno'}), 500
 
 # ===== API: FINALIZAR USO DE VEÍCULO =====
@@ -10971,7 +10971,7 @@ def api_finalizar_uso(uso_id):
             return jsonify({'success': False, 'error': mensagem}), 400
         
     except Exception as e:
-        print(f"❌ [API_FINALIZAR_USO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [API_FINALIZAR_USO] Erro: {str(e)}")
         return jsonify({'success': False, 'error': 'Erro interno'}), 500
 
 

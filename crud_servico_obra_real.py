@@ -43,14 +43,14 @@ def listar_servicos_reais(obra_id):
             ServicoObraReal.ativo == True
         ).all()
         
-        logger.info(f"✅ Encontrados {len(servicos_reais)} serviços reais para obra {obra_id}")
+        logger.info(f"[OK] Encontrados {len(servicos_reais)} serviços reais para obra {obra_id}")
         
         return render_template('obras/servicos_reais.html', 
                              obra=obra, 
                              servicos_reais=servicos_reais)
     
     except Exception as e:
-        logger.error(f"❌ Erro ao listar serviços reais: {e}")
+        logger.error(f"[ERROR] Erro ao listar serviços reais: {e}")
         flash('Erro ao carregar serviços reais.', 'error')
         return redirect(url_for('main.obras'))
 
@@ -120,7 +120,7 @@ def novo_servico_real(obra_id):
             db.session.add(novo_servico)
             db.session.commit()
             
-            logger.info(f"✅ Serviço real {servico_id} adicionado à obra {obra_id}")
+            logger.info(f"[OK] Serviço real {servico_id} adicionado à obra {obra_id}")
             
             if request.is_json:
                 return jsonify({'success': True, 'message': 'Serviço real adicionado com sucesso'})
@@ -130,7 +130,7 @@ def novo_servico_real(obra_id):
     
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Erro ao adicionar serviço real: {e}")
+        logger.error(f"[ERROR] Erro ao adicionar serviço real: {e}")
         if request.is_json:
             return jsonify({'success': False, 'message': f'Erro: {str(e)}'})
         flash('Erro ao adicionar serviço real.', 'error')
@@ -181,7 +181,7 @@ def atualizar_progresso(servico_real_id):
         
         db.session.commit()
         
-        logger.info(f"✅ Progresso atualizado: Serviço {servico_real_id} - {percentual:.1f}%")
+        logger.info(f"[OK] Progresso atualizado: Serviço {servico_real_id} - {percentual:.1f}%")
         
         return jsonify({
             'success': True, 
@@ -192,7 +192,7 @@ def atualizar_progresso(servico_real_id):
     
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Erro ao atualizar progresso: {e}")
+        logger.error(f"[ERROR] Erro ao atualizar progresso: {e}")
         return jsonify({'success': False, 'message': f'Erro: {str(e)}'})
 
 @servico_obra_real_bp.route('/servico-real/<int:servico_real_id>/aprovar', methods=['POST'])
@@ -217,13 +217,13 @@ def aprovar_servico(servico_real_id):
         
         db.session.commit()
         
-        logger.info(f"✅ Serviço {servico_real_id} aprovado por {current_user.nome}")
+        logger.info(f"[OK] Serviço {servico_real_id} aprovado por {current_user.nome}")
         
         return jsonify({'success': True, 'message': 'Serviço aprovado com sucesso'})
     
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Erro ao aprovar serviço: {e}")
+        logger.error(f"[ERROR] Erro ao aprovar serviço: {e}")
         return jsonify({'success': False, 'message': f'Erro: {str(e)}'})
 
 @servico_obra_real_bp.route('/api/obra/<int:obra_id>/servicos-reais')
@@ -268,11 +268,11 @@ def api_servicos_reais(obra_id):
         })
     
     except Exception as e:
-        logger.error(f"❌ Erro na API de serviços reais: {e}")
+        logger.error(f"[ERROR] Erro na API de serviços reais: {e}")
         return jsonify({'success': False, 'message': f'Erro: {str(e)}'})
 
 # Registrar blueprint
 def register_servico_obra_real_bp(app):
     """Registra o blueprint no app principal"""
     app.register_blueprint(servico_obra_real_bp)
-    logger.info("✅ Blueprint ServicoObraReal registrado com sucesso")
+    logger.info("[OK] Blueprint ServicoObraReal registrado com sucesso")

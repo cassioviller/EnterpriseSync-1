@@ -18,6 +18,8 @@ import os
 import json
 import uuid
 import mimetypes
+import logging
+logger = logging.getLogger(__name__)
 import base64
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, desc, or_, and_, text
@@ -31,9 +33,9 @@ try:
         from utils.saga import PropostasSaga
     except ImportError:
         PropostasSaga = None
-    print("✅ Propostas - Utilitários de resiliência importados")
+        logger.info("[OK] Propostas - Utilitários de resiliência importados")
 except ImportError as e:
-    print(f"⚠️ Propostas - Erro ao importar utilitários de resiliência: {e}")
+    logger.error(f"[WARN] Propostas - Erro ao importar utilitários de resiliência: {e}")
     # Fallbacks para manter compatibilidade
     def idempotent(*args, **kwargs):
         def decorator(func):
@@ -152,7 +154,7 @@ def parse_currency(value_str):
     try:
         return float(value_str)
     except ValueError:
-        print(f"ERRO parse_currency: não consegui converter '{value_str}'")
+        logger.error(f"ERRO parse_currency: não consegui converter '{value_str}'")
         return 0.0
 
 def allowed_file(filename):
@@ -174,7 +176,7 @@ def safe_db_operation(operation, default_value=None):
     try:
         return operation()
     except Exception as e:
-        print(f"ERRO PROPOSTAS DB: {str(e)}")
+        logger.error(f"ERRO PROPOSTAS DB: {str(e)}")
         try:
             db.session.rollback()
         except:
@@ -209,7 +211,7 @@ def index():
         status_filter = request.args.get('status', '')
         cliente_filter = request.args.get('cliente', '')
         
-        print(f"DEBUG PROPOSTAS: admin_id={admin_id}, filters=status:{status_filter}, cliente:{cliente_filter}")
+        logger.debug(f"DEBUG PROPOSTAS: admin_id={admin_id}, filters=status:{status_filter}, cliente:{cliente_filter}")
         
         # Query base com filtro por admin
         query = Proposta.query.filter_by(admin_id=admin_id)
@@ -233,7 +235,7 @@ def index():
             'valor_total': db.session.query(func.sum(Proposta.valor_total)).filter_by(admin_id=admin_id).scalar() or 0
         }, {})
         
-        print(f"DEBUG PROPOSTAS: {stats.get('total', 0)} propostas encontradas")
+        logger.debug(f"DEBUG PROPOSTAS: {stats.get('total', 0)} propostas encontradas")
         
         return render_template('propostas/lista_propostas.html', 
                              propostas=propostas, 
@@ -242,7 +244,7 @@ def index():
                              cliente_filter=cliente_filter)
         
     except Exception as e:
-        print(f"ERRO PROPOSTAS INDEX: {str(e)}")
+        logger.error(f"ERRO PROPOSTAS INDEX: {str(e)}")
         flash(f'Erro ao carregar propostas: {str(e)}', 'error')
         return redirect(url_for('main.dashboard'))
 
@@ -273,14 +275,14 @@ def nova():
             None
         )
         
-        print(f"DEBUG NOVA PROPOSTA: {len(templates)} templates disponíveis")
+        logger.debug(f"DEBUG NOVA PROPOSTA: {len(templates)} templates disponíveis")
         
         return render_template('propostas/nova_proposta.html', 
                              templates=templates,
                              config=config)
         
     except Exception as e:
-        print(f"ERRO NOVA PROPOSTA: {str(e)}")
+        logger.error(f"ERRO NOVA PROPOSTA: {str(e)}")
         flash(f'Erro ao carregar formulário: {str(e)}', 'error')
         return redirect(url_for('propostas.index'))
 
@@ -354,10 +356,10 @@ def criar():
                 
                 valor_total_calculado += quantidade * preco_unitario
             except (ValueError, IndexError) as e:
-                print(f"ERRO ao processar item {i}: {e}")
+                logger.error(f"ERRO ao processar item {i}: {e}")
                 continue
         
-        print(f"DEBUG CRIAR: {len(itens_validos)} itens válidos, total: R$ {valor_total_calculado:,.2f}")
+                logger.debug(f"DEBUG CRIAR: {len(itens_validos)} itens válidos, total: R$ {valor_total_calculado:,.2f}")
         
         # Criar proposta (usando apenas campos que existem no modelo)
         proposta = Proposta()
@@ -428,7 +430,7 @@ def criar():
                 categoria_titulo=categoria
             )
             db.session.add(item)
-            print(f"  ✓ Item {idx+1} criado: {item_data['descricao'][:30]}...")
+            logger.info(f" [OK] Item {idx+1} criado: {item_data['descricao'][:30]}...")
         
         # Registrar no histórico
         historico = PropostaHistorico(
@@ -443,14 +445,14 @@ def criar():
         # Commit transacional único
         db.session.commit()
         
-        print(f"DEBUG PROPOSTA CRIADA: {numero_proposta} com {len(itens_validos)} itens - R$ {valor_total_calculado:,.2f}")
+        logger.debug(f"DEBUG PROPOSTA CRIADA: {numero_proposta} com {len(itens_validos)} itens - R$ {valor_total_calculado:,.2f}")
         flash(f'Proposta {numero_proposta} criada com sucesso! {len(itens_validos)} itens salvos.', 'success')
         
         return redirect(url_for('propostas.visualizar', id=proposta.id))
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO CRIAR PROPOSTA: {str(e)}")
+        logger.error(f"ERRO CRIAR PROPOSTA: {str(e)}")
         import traceback
         traceback.print_exc()
         flash(f'Erro ao criar proposta: {str(e)}', 'error')
@@ -495,7 +497,7 @@ def visualizar(id):
         else:
             total_geral = 0
         
-        print(f"DEBUG VISUALIZAR: Proposta {proposta.numero} - {len(itens)} itens")
+            logger.debug(f"DEBUG VISUALIZAR: Proposta {proposta.numero} - {len(itens)} itens")
         
         return render_template('propostas/detalhes_proposta.html',
                              proposta=proposta,
@@ -505,7 +507,7 @@ def visualizar(id):
                              date=date)
         
     except Exception as e:
-        print(f"ERRO VISUALIZAR PROPOSTA: {str(e)}")
+        logger.error(f"ERRO VISUALIZAR PROPOSTA: {str(e)}")
         flash(f'Erro ao carregar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.index'))
 
@@ -567,7 +569,7 @@ def alterar_status(id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO ALTERAR STATUS: {str(e)}")
+        logger.error(f"ERRO ALTERAR STATUS: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Erro ao alterar status: {str(e)}'
@@ -585,10 +587,10 @@ def gerar_pdf(id):
             id=id, admin_id=admin_id
         ).first_or_404()
         
-        print(f"DEBUG PDF: Proposta {proposta.numero}")
-        print(f"DEBUG PDF: Cliente: {proposta.cliente_nome}")
-        print(f"DEBUG PDF: Valor total: {proposta.valor_total}")
-        print(f"DEBUG PDF: Número de itens: {len(proposta.itens) if proposta.itens else 0}")
+        logger.debug(f"DEBUG PDF: Proposta {proposta.numero}")
+        logger.debug(f"DEBUG PDF: Cliente: {proposta.cliente_nome}")
+        logger.debug(f"DEBUG PDF: Valor total: {proposta.valor_total}")
+        logger.debug(f"DEBUG PDF: Número de itens: {len(proposta.itens) if proposta.itens else 0}")
         
         config_empresa = safe_db_operation(
             lambda: ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first(),
@@ -618,12 +620,12 @@ def gerar_pdf(id):
                 proposta.itens_exclusos = '\n'.join(proposta.itens_exclusos)
         
         if config_empresa:
-            print(f"DEBUG PDF: Config empresa: {config_empresa.nome_empresa}")
-            print(f"DEBUG PDF: Header PDF presente: {'SIM' if config_empresa.header_pdf_base64 else 'NÃO'}")
+            logger.debug(f"DEBUG PDF: Config empresa: {config_empresa.nome_empresa}")
+            logger.debug(f"DEBUG PDF: Header PDF presente: {'SIM' if config_empresa.header_pdf_base64 else 'NÃO'}")
             if config_empresa.header_pdf_base64:
-                print(f"DEBUG PDF: Tamanho header: {len(config_empresa.header_pdf_base64)} chars")
+                logger.debug(f"DEBUG PDF: Tamanho header: {len(config_empresa.header_pdf_base64)} chars")
         else:
-            print("DEBUG PDF: Nenhuma configuração encontrada")
+            logger.debug("DEBUG PDF: Nenhuma configuração encontrada")
         
         formato = request.args.get('formato', 'estruturas_vale')
         
@@ -632,7 +634,7 @@ def gerar_pdf(id):
         else:
             template_name = 'propostas/pdf.html'
         
-        print(f"DEBUG PDF: Usando template: {template_name}")
+            logger.debug(f"DEBUG PDF: Usando template: {template_name}")
         
         template_proposta = None
         if hasattr(proposta, 'template_id') and proposta.template_id:
@@ -642,12 +644,12 @@ def gerar_pdf(id):
         if hasattr(proposta, 'itens') and proposta.itens:
             templates_organizados = organizar_itens_por_template(proposta.itens)
             proposta.templates_organizados = templates_organizados
-            print(f"DEBUG PDF: {len(proposta.itens)} itens organizados em {len(templates_organizados)} templates")
+            logger.debug(f"DEBUG PDF: {len(proposta.itens)} itens organizados em {len(templates_organizados)} templates")
             for template_info in templates_organizados:
-                print(f"  - Template: {template_info['template_nome']}, Subtotal: R$ {template_info['subtotal']}")
+                logger.debug(f" - Template: {template_info['template_nome']}, Subtotal: R$ {template_info['subtotal']}")
         else:
             proposta.templates_organizados = []
-            print("DEBUG PDF: Nenhum item encontrado na proposta")
+            logger.debug("DEBUG PDF: Nenhum item encontrado na proposta")
         
         # Calcular total geral: priorizar valor_total da proposta (manual), senão calcular dos itens
         if proposta.valor_total:
@@ -657,9 +659,9 @@ def gerar_pdf(id):
         else:
             total_geral = 0
         
-        print(f"DEBUG PDF: Total calculado dos itens: {total_geral}")
-        print(f"DEBUG PDF: Valor total da proposta: {proposta.valor_total}")
-        print(f"DEBUG PDF: Total geral final: {total_geral}")
+            logger.debug(f"DEBUG PDF: Total calculado dos itens: {total_geral}")
+            logger.debug(f"DEBUG PDF: Valor total da proposta: {proposta.valor_total}")
+            logger.debug(f"DEBUG PDF: Total geral final: {total_geral}")
         
         html_content = render_template(template_name, 
                                      proposta=proposta, 
@@ -668,11 +670,11 @@ def gerar_pdf(id):
                                      config_empresa=config_empresa,
                                      total_geral=total_geral)
         
-        print("DEBUG PDF: Template renderizado com sucesso")
+        logger.debug("DEBUG PDF: Template renderizado com sucesso")
         return html_content
         
     except Exception as e:
-        print(f"ERRO PDF: {str(e)}")
+        logger.error(f"ERRO PDF: {str(e)}")
         import traceback
         traceback.print_exc()
         flash(f'Erro ao gerar PDF: {str(e)}', 'error')
@@ -733,7 +735,7 @@ def get_template_data(template_id):
         })
         
     except Exception as e:
-        print(f"ERRO API TEMPLATE: {str(e)}")
+        logger.error(f"ERRO API TEMPLATE: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 400
 
 # ===== ROTAS DE EDIÇÃO E GESTÃO =====
@@ -747,12 +749,12 @@ def editar(id):
         admin_id = get_admin_id()
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         
-        print(f"DEBUG EDITAR: Proposta {proposta.numero} carregada para edição")
+        logger.debug(f"DEBUG EDITAR: Proposta {proposta.numero} carregada para edição")
         
         return render_template('propostas/editar.html', proposta=proposta)
         
     except Exception as e:
-        print(f"ERRO EDITAR PROPOSTA: {str(e)}")
+        logger.error(f"ERRO EDITAR PROPOSTA: {str(e)}")
         flash(f'Erro ao carregar proposta para edição: {str(e)}', 'error')
         return redirect(url_for('propostas.index'))
 
@@ -797,8 +799,8 @@ def atualizar(id):
         item_unidades = request.form.getlist('item_unidade')
         item_precos = request.form.getlist('item_preco')
         
-        print(f"DEBUG ATUALIZAR: Proposta {proposta.numero}")
-        print(f"DEBUG ITENS: {len(item_descricoes)} itens no formulário")
+        logger.debug(f"DEBUG ATUALIZAR: Proposta {proposta.numero}")
+        logger.debug(f"DEBUG ITENS: {len(item_descricoes)} itens no formulário")
         
         # Deletar itens antigos que foram removidos
         ids_formulario = [int(item_id) for item_id in item_ids if item_id]
@@ -849,7 +851,7 @@ def atualizar(id):
                     item.template_origem_nome = template_nome
                     item.template_origem_id = template_id_int
                     item.categoria_titulo = categoria
-                    print(f"  ✓ Item {i+1} atualizado: {descricao[:30]}...")
+                    logger.debug(f" [OK] Item {i+1} atualizado: {descricao[:30]}...")
             else:
                 # Criar novo item
                 novo_item = PropostaItem(
@@ -866,13 +868,13 @@ def atualizar(id):
                     categoria_titulo=categoria
                 )
                 db.session.add(novo_item)
-                print(f"  ✓ Item {i+1} criado: {descricao[:30]}...")
+                logger.info(f" [OK] Item {i+1} criado: {descricao[:30]}...")
             
             valor_total_calculado += quantidade * preco_unitario
         
         # Atualizar valor_total da proposta
         proposta.valor_total = valor_total_calculado
-        print(f"DEBUG: Valor total calculado: R$ {valor_total_calculado:,.2f}")
+        logger.debug(f"DEBUG: Valor total calculado: R$ {valor_total_calculado:,.2f}")
         
         # Registrar no histórico
         historico = PropostaHistorico(
@@ -887,14 +889,14 @@ def atualizar(id):
         # Commit transacional único (tudo ou nada)
         db.session.commit()
         
-        print(f"DEBUG ATUALIZAR: Proposta {proposta.numero} atualizada com {len(item_descricoes)} itens")
+        logger.debug(f"DEBUG ATUALIZAR: Proposta {proposta.numero} atualizada com {len(item_descricoes)} itens")
         flash(f'Proposta atualizada com sucesso! {len(item_descricoes)} itens salvos.', 'success')
         
         return redirect(url_for('propostas.visualizar', id=proposta.id))
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO ATUALIZAR PROPOSTA: {str(e)}")
+        logger.error(f"ERRO ATUALIZAR PROPOSTA: {str(e)}")
         import traceback
         traceback.print_exc()
         flash(f'Erro ao atualizar proposta: {str(e)}', 'error')
@@ -927,14 +929,14 @@ def deletar(id):
         # Commit transacional único (tudo ou nada)
         db.session.commit()
         
-        print(f"DEBUG DELETAR: Proposta {numero_proposta} excluída com sucesso")
+        logger.debug(f"DEBUG DELETAR: Proposta {numero_proposta} excluída com sucesso")
         flash('Proposta excluída com sucesso!', 'success')
         
         return redirect(url_for('propostas.index'))
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO DELETAR PROPOSTA: {str(e)}")
+        logger.error(f"ERRO DELETAR PROPOSTA: {str(e)}")
         flash(f'Erro ao excluir proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.visualizar', id=id))
 
@@ -962,14 +964,14 @@ def aprovar(id):
         # Commit transacional único (tudo ou nada)
         db.session.commit()
         
-        print(f"DEBUG APROVAR: Proposta {proposta.numero} aprovada")
+        logger.debug(f"DEBUG APROVAR: Proposta {proposta.numero} aprovada")
         flash('Proposta aprovada com sucesso!', 'success')
         
         return redirect(url_for('propostas.visualizar', id=proposta.id))
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO APROVAR PROPOSTA: {str(e)}")
+        logger.error(f"ERRO APROVAR PROPOSTA: {str(e)}")
         flash(f'Erro ao aprovar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.visualizar', id=id))
 
@@ -997,14 +999,14 @@ def rejeitar(id):
         # Commit transacional único (tudo ou nada)
         db.session.commit()
         
-        print(f"DEBUG REJEITAR: Proposta {proposta.numero} rejeitada")
+        logger.debug(f"DEBUG REJEITAR: Proposta {proposta.numero} rejeitada")
         flash('Proposta rejeitada.', 'warning')
         
         return redirect(url_for('propostas.visualizar', id=proposta.id))
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO REJEITAR PROPOSTA: {str(e)}")
+        logger.error(f"ERRO REJEITAR PROPOSTA: {str(e)}")
         flash(f'Erro ao rejeitar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.visualizar', id=id))
 
@@ -1125,7 +1127,7 @@ def api_clientes():
         # Limitar a 20 resultados
         clientes = query.limit(20).all()
         
-        print(f"DEBUG API CLIENTES: {len(clientes)} clientes encontrados para termo '{termo}'")
+        logger.debug(f"DEBUG API CLIENTES: {len(clientes)} clientes encontrados para termo '{termo}'")
         
         # Retornar JSON
         return jsonify([{
@@ -1137,7 +1139,7 @@ def api_clientes():
         } for c in clientes])
         
     except Exception as e:
-        print(f"ERRO API CLIENTES: {str(e)}")
+        logger.error(f"ERRO API CLIENTES: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 # ===== ROTAS DE ARQUIVOS =====
@@ -1172,7 +1174,7 @@ def otimizar_imagem_base64(arquivo_bytes_ou_path):
             background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
             img = background
         
-        # 1️⃣ VERSÃO ORIGINAL COMPLETA (WebP otimizado)
+        # [1] VERSAO ORIGINAL COMPLETA (WebP otimizado)
         buffer_original = BytesIO()
         img.save(buffer_original, format='WEBP', quality=90, optimize=True)
         buffer_original.seek(0)
@@ -1180,7 +1182,7 @@ def otimizar_imagem_base64(arquivo_bytes_ou_path):
         original_base64 = f"data:image/webp;base64,{base64_original}"
         tamanho_original = len(base64_original)
         
-        # 2️⃣ VERSÃO OTIMIZADA 1200px
+        # [2] VERSAO OTIMIZADA 1200px
         img_otimizada = img.copy()
         if img_otimizada.width > 1200:
             ratio = 1200 / img_otimizada.width
@@ -1194,7 +1196,7 @@ def otimizar_imagem_base64(arquivo_bytes_ou_path):
         otimizada_base64 = f"data:image/webp;base64,{base64_otimizada}"
         tamanho_otimizada = len(base64_otimizada)
         
-        # 3️⃣ THUMBNAIL 300px (crop centralizado)
+        # [3] THUMBNAIL 300px (crop centralizado)
         img_thumb = img.copy()
         # Calcular crop centralizado (quadrado)
         width, height = img_thumb.size
@@ -1219,11 +1221,11 @@ def otimizar_imagem_base64(arquivo_bytes_ou_path):
         thumbnail_base64 = f"data:image/webp;base64,{base64_thumb}"
         tamanho_thumbnail = len(base64_thumb)
         
-        print(f"✅ Imagem processada em Base64:")
-        print(f"   📊 Original: {tamanho_original:,} bytes")
-        print(f"   📊 Otimizada (1200px): {tamanho_otimizada:,} bytes")
-        print(f"   📊 Thumbnail (300px): {tamanho_thumbnail:,} bytes")
-        print(f"   📊 Total: {(tamanho_original + tamanho_otimizada + tamanho_thumbnail):,} bytes")
+        logger.info(f"[OK] Imagem processada em Base64:")
+        logger.info(f" [STATS] Original: {tamanho_original:,} bytes")
+        logger.info(f" [STATS] Otimizada (1200px): {tamanho_otimizada:,} bytes")
+        logger.info(f" [STATS] Thumbnail (300px): {tamanho_thumbnail:,} bytes")
+        logger.info(f" [STATS] Total: {(tamanho_original + tamanho_otimizada + tamanho_thumbnail):,} bytes")
         
         return {
             'original_base64': original_base64,
@@ -1235,7 +1237,7 @@ def otimizar_imagem_base64(arquivo_bytes_ou_path):
         }
         
     except Exception as e:
-        print(f"ERRO otimizar_imagem_base64: {str(e)}")
+        logger.error(f"ERRO otimizar_imagem_base64: {str(e)}")
         import traceback
         traceback.print_exc()
         return None
@@ -1294,13 +1296,13 @@ def upload_arquivo(id):
             proposta_arquivo.categoria = categoria
             proposta_arquivo.enviado_por = current_user.id
             
-            # 🖼️ IMAGENS: Processar 3 versões Base64
+            # [IMG] IMAGENS: Processar 3 versões Base64
             if ext in ['jpg', 'jpeg', 'png', 'gif']:
-                print(f"📸 Processando IMAGEM: {nome_original}...")
+                logger.debug(f"[PHOTO] Processando IMAGEM: {nome_original}...")
                 
                 resultado = otimizar_imagem_base64(arquivo_bytes)
                 if not resultado:
-                    print(f"⚠️ Erro ao processar imagem {nome_original}, pulando...")
+                    logger.error(f"[WARN] Erro ao processar imagem {nome_original}, pulando...")
                     continue
                 
                 # Salvar 3 versões Base64 no banco
@@ -1316,15 +1318,15 @@ def upload_arquivo(id):
                 proposta_arquivo.caminho_arquivo = f"base64://{nome_original}"
                 proposta_arquivo.nome_arquivo = f"{uuid.uuid4().hex}.webp"
                 
-                print(f"   ✅ Imagem salva em Base64:")
-                print(f"      Original: {resultado['tamanho_original']:,} bytes")
-                print(f"      Otimizada: {resultado['tamanho_otimizada']:,} bytes")
-                print(f"      Thumbnail: {resultado['tamanho_thumbnail']:,} bytes")
-                print(f"      TOTAL: {tamanho_total:,} bytes")
+                logger.info(f" [OK] Imagem salva em Base64:")
+                logger.debug(f" Original: {resultado['tamanho_original']:,} bytes")
+                logger.debug(f" Otimizada: {resultado['tamanho_otimizada']:,} bytes")
+                logger.debug(f" Thumbnail: {resultado['tamanho_thumbnail']:,} bytes")
+                logger.debug(f" TOTAL: {tamanho_total:,} bytes")
             
-            # 📄 OUTROS ARQUIVOS (PDF, DWG, DOC): Base64 direto
+            # [DOC] OUTROS ARQUIVOS (PDF, DWG, DOC): Base64 direto
             else:
-                print(f"📄 Processando ARQUIVO: {nome_original}...")
+                logger.debug(f"[DOC] Processando ARQUIVO: {nome_original}...")
                 
                 # Converter para Base64
                 arquivo_base64_str = base64.b64encode(arquivo_bytes).decode('utf-8')
@@ -1334,7 +1336,7 @@ def upload_arquivo(id):
                 proposta_arquivo.caminho_arquivo = f"base64://{nome_original}"
                 proposta_arquivo.nome_arquivo = f"{uuid.uuid4().hex}.{ext}"
                 
-                print(f"   ✅ Arquivo salvo em Base64: {len(arquivo_base64_str):,} bytes")
+                logger.info(f" [OK] Arquivo salvo em Base64: {len(arquivo_base64_str):,} bytes")
             
             db.session.add(proposta_arquivo)
             arquivos_salvos.append({
@@ -1346,7 +1348,7 @@ def upload_arquivo(id):
         
         db.session.commit()
         
-        print(f"✅ {len(arquivos_salvos)} arquivo(s) salvos em Base64 para proposta {proposta.numero}")
+        logger.info(f"[OK] {len(arquivos_salvos)} arquivo(s) salvos em Base64 para proposta {proposta.numero}")
         
         return jsonify({
             'success': True,
@@ -1356,7 +1358,7 @@ def upload_arquivo(id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO UPLOAD ARQUIVO: {str(e)}")
+        logger.error(f"ERRO UPLOAD ARQUIVO: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': f'Erro ao fazer upload: {str(e)}'}), 500
@@ -1372,9 +1374,9 @@ def download_arquivo(arquivo_id):
         
         # ===== PRIORIDADE 1: Servir a partir do Base64 (PERSISTENTE) =====
         
-        # 🖼️ IMAGENS: usar versão otimizada Base64
+        # [IMG] IMAGENS: usar versão otimizada Base64
         if arquivo.imagem_otimizada_base64:
-            print(f"📸 Servindo IMAGEM do Base64: {arquivo.nome_original}")
+            logger.debug(f"[PHOTO] Servindo IMAGEM do Base64: {arquivo.nome_original}")
             
             # Extrair Base64 puro (remover prefixo data:image/webp;base64,)
             if ',' in arquivo.imagem_otimizada_base64:
@@ -1389,7 +1391,7 @@ def download_arquivo(arquivo_id):
             buffer = BytesIO(arquivo_bytes)
             buffer.seek(0)
             
-            # 🔧 FIX: Renomear extensão para .webp (imagem foi convertida no upload)
+            # [CONFIG] FIX: Renomear extensão para .webp (imagem foi convertida no upload)
             nome_download = os.path.splitext(arquivo.nome_original)[0] + '.webp'
             
             return send_file(
@@ -1399,9 +1401,9 @@ def download_arquivo(arquivo_id):
                 download_name=nome_download
             )
         
-        # 📄 OUTROS ARQUIVOS: usar arquivo_base64
+        # [DOC] OUTROS ARQUIVOS: usar arquivo_base64
         elif arquivo.arquivo_base64:
-            print(f"📄 Servindo ARQUIVO do Base64: {arquivo.nome_original}")
+            logger.debug(f"[DOC] Servindo ARQUIVO do Base64: {arquivo.nome_original}")
             
             # Extrair Base64 puro
             if ',' in arquivo.arquivo_base64:
@@ -1428,7 +1430,7 @@ def download_arquivo(arquivo_id):
         
         # ===== FALLBACK: Arquivo físico antigo (BACKWARD COMPATIBILITY) =====
         elif arquivo.caminho_arquivo and not arquivo.caminho_arquivo.startswith('base64://'):
-            print(f"⚠️ FALLBACK: Servindo arquivo físico (legado): {arquivo.caminho_arquivo}")
+            logger.warning(f"[WARN] FALLBACK: Servindo arquivo físico (legado): {arquivo.caminho_arquivo}")
             
             if not os.path.exists(arquivo.caminho_arquivo):
                 flash('Arquivo não encontrado no servidor', 'error')
@@ -1450,12 +1452,12 @@ def download_arquivo(arquivo_id):
         
         # ===== ERRO: Nenhuma fonte de dados disponível =====
         else:
-            print(f"❌ ERRO: Arquivo {arquivo.nome_original} sem dados Base64 nem arquivo físico")
+            logger.error(f"[ERROR] ERRO: Arquivo {arquivo.nome_original} sem dados Base64 nem arquivo físico")
             flash('Arquivo não disponível', 'error')
             return redirect(url_for('propostas.index'))
         
     except Exception as e:
-        print(f"ERRO DOWNLOAD ARQUIVO: {str(e)}")
+        logger.error(f"ERRO DOWNLOAD ARQUIVO: {str(e)}")
         import traceback
         traceback.print_exc()
         flash(f'Erro ao baixar arquivo: {str(e)}', 'error')
@@ -1480,7 +1482,7 @@ def deletar_arquivo(arquivo_id):
         db.session.delete(arquivo)
         db.session.commit()
         
-        print(f"✅ Arquivo {nome_original} removido do banco (Base64)")
+        logger.info(f"[OK] Arquivo {nome_original} removido do banco (Base64)")
         
         return jsonify({
             'success': True,
@@ -1489,9 +1491,9 @@ def deletar_arquivo(arquivo_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO DELETAR ARQUIVO: {str(e)}")
+        logger.error(f"ERRO DELETAR ARQUIVO: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': f'Erro ao excluir arquivo: {str(e)}'}), 500
 
-print("✅ Propostas Consolidated Blueprint carregado com padrões de resiliência")
+logger.info("[OK] Propostas Consolidated Blueprint carregado com padrões de resiliência")

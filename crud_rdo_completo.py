@@ -6,6 +6,8 @@ from flask_login import login_required, current_user
 from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre, NotificacaoCliente, RDOFoto
 from datetime import datetime, date
 import json
+import logging
+logger = logging.getLogger(__name__)
 
 # Blueprint para RDO CRUD
 rdo_crud_bp = Blueprint('rdo_crud', __name__, url_prefix='/rdo')
@@ -94,7 +96,7 @@ def listar_rdos():
                 soma_perc = sum(s.percentual_conclusao for s in subatividades)
                 total_sub = len(subatividades)
                 progresso_medio = round(soma_perc / total_sub, 1)
-                print(f"🎯 CRUD PROGRESSO RDO {rdo.id}: {soma_perc}÷{total_sub} = {progresso_medio}%")
+                logger.debug(f"[TARGET] CRUD PROGRESSO RDO {rdo.id}: {soma_perc}÷{total_sub} = {progresso_medio}%")
             else:
                 progresso_medio = 0
             
@@ -133,7 +135,7 @@ def listar_rdos():
                              })
         
     except Exception as e:
-        print(f"ERRO LISTAR RDOs: {str(e)}")
+        logger.error(f"ERRO LISTAR RDOs: {str(e)}")
         flash('Erro ao carregar lista de RDOs.', 'error')
         return redirect(url_for('main.dashboard'))
 
@@ -165,7 +167,7 @@ def novo_rdo():
                              acao='Criar')
         
     except Exception as e:
-        print(f"ERRO NOVO RDO: {str(e)}")
+        logger.error(f"ERRO NOVO RDO: {str(e)}")
         flash('Erro ao carregar formulário de RDO.', 'error')
         return redirect(url_for('rdo_crud.listar_rdos'))
 
@@ -205,7 +207,7 @@ def visualizar_rdo(rdo_id):
             soma_perc = sum(s.percentual_conclusao for s in rdo_subatividades)
             total_sub = len(rdo_subatividades)
             progresso_total = round(soma_perc / total_sub, 1)
-            print(f"🎯 CRUD VISUALIZAR PROGRESSO: {soma_perc}÷{total_sub} = {progresso_total}%")
+            logger.debug(f"[TARGET] CRUD VISUALIZAR PROGRESSO: {soma_perc}÷{total_sub} = {progresso_total}%")
         else:
             progresso_total = 0
         horas_totais = sum(mo.horas_trabalhadas for mo, _ in rdo_funcionarios)
@@ -220,7 +222,7 @@ def visualizar_rdo(rdo_id):
                              horas_totais=horas_totais)
         
     except Exception as e:
-        print(f"ERRO VISUALIZAR RDO: {str(e)}")
+        logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")
         flash('Erro ao carregar RDO.', 'error')
         return redirect(url_for('rdo_crud.listar_rdos'))
 
@@ -253,7 +255,7 @@ def salvar_rdo():
             RDOEquipamento.query.filter_by(rdo_id=rdo.id).delete()
             RDOOcorrencia.query.filter_by(rdo_id=rdo.id).delete()
             
-            print(f"DEBUG: Editando RDO {rdo.numero_rdo}")
+            logger.debug(f"DEBUG: Editando RDO {rdo.numero_rdo}")
             
         else:
             # CRIAR NOVO RDO
@@ -288,7 +290,7 @@ def salvar_rdo():
                 criado_por_id=current_user.id
             )
             
-            print(f"DEBUG: Criando novo RDO {rdo.numero_rdo}")
+            logger.debug(f"DEBUG: Criando novo RDO {rdo.numero_rdo}")
         
         # Atualizar dados básicos do RDO
         rdo.clima_geral = request.form.get('clima_geral', '').strip()
@@ -330,7 +332,7 @@ def salvar_rdo():
                             subatividades_salvas += 1
                             
                 except (ValueError, IndexError) as e:
-                    print(f"Erro ao processar subatividade {key}: {e}")
+                    logger.error(f"Erro ao processar subatividade {key}: {e}")
         
         # Processar funcionários
         funcionarios_salvos = 0
@@ -354,7 +356,7 @@ def salvar_rdo():
                             funcionarios_salvos += 1
                             
                 except (ValueError, IndexError) as e:
-                    print(f"Erro ao processar funcionário {key}: {e}")
+                    logger.error(f"Erro ao processar funcionário {key}: {e}")
         
         # Processar equipamentos
         equipamentos_json = request.form.get('equipamentos', '[]')
@@ -376,7 +378,7 @@ def salvar_rdo():
                         db.session.add(equipamento)
                         equipamentos_salvos += 1
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar equipamentos: {e}")
+                logger.error(f"Erro ao processar equipamentos: {e}")
         
         # Processar ocorrências
         ocorrencias_json = request.form.get('ocorrencias', '[]')
@@ -401,7 +403,7 @@ def salvar_rdo():
                         db.session.add(ocorrencia)
                         ocorrencias_salvas += 1
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Erro ao processar ocorrências: {e}")
+                logger.error(f"Erro ao processar ocorrências: {e}")
         
         db.session.commit()
         
@@ -415,10 +417,10 @@ def salvar_rdo():
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO SALVAR RDO: {str(e)}")
+        logger.error(f"ERRO SALVAR RDO: {str(e)}")
         error_message = str(e)
         
-        # ✅ MENSAGEM DE ERRO DETALHADA
+        # [OK] MENSAGEM DE ERRO DETALHADA
         if 'admin_id' in error_message and 'null' in error_message.lower():
             flash('Erro: Campo admin_id obrigatório não foi preenchido. Entre em contato com o suporte.', 'error')
         elif 'foreign key' in error_message.lower():
@@ -475,7 +477,7 @@ def excluir_rdo(rdo_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO EXCLUIR RDO: {str(e)}")
+        logger.error(f"ERRO EXCLUIR RDO: {str(e)}")
         flash(f'Erro ao excluir RDO: {str(e)}', 'error')
         return redirect(url_for('rdo_crud.listar_rdos'))
 
@@ -518,7 +520,7 @@ def finalizar_rdo(rdo_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO FINALIZAR RDO: {str(e)}")
+        logger.error(f"ERRO FINALIZAR RDO: {str(e)}")
         flash(f'Erro ao finalizar RDO: {str(e)}', 'error')
         return redirect(url_for('rdo_crud.visualizar_rdo', rdo_id=rdo_id))
 
@@ -535,7 +537,7 @@ def api_subatividades_por_servico(servico_id):
             'quantidade_estimada': s.quantidade_estimada
         } for s in subatividades])
     except Exception as e:
-        print(f"ERRO API SUBATIVIDADES: {str(e)}")
+        logger.error(f"ERRO API SUBATIVIDADES: {str(e)}")
         return jsonify({'erro': str(e)}), 500
 
 @rdo_crud_bp.route('/api/funcionarios')
@@ -557,7 +559,7 @@ def api_funcionarios():
             'email': f.email
         } for f in funcionarios])
     except Exception as e:
-        print(f"ERRO API FUNCIONÁRIOS: {str(e)}")
+        logger.error(f"ERRO API FUNCIONÁRIOS: {str(e)}")
         return jsonify({'erro': str(e)}), 500
 
 
@@ -648,7 +650,7 @@ def upload_foto_rdo(rdo_id):
                 erros.append(f"{file.filename}: {str(ve)}")
                 continue
             except Exception as e:
-                print(f"ERRO ao processar foto {file.filename}: {e}")
+                logger.error(f"ERRO ao processar foto {file.filename}: {e}")
                 erros.append(f"{file.filename}: Erro no processamento")
                 continue
         
@@ -669,7 +671,7 @@ def upload_foto_rdo(rdo_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO NO UPLOAD DE FOTOS: {str(e)}")
+        logger.error(f"ERRO NO UPLOAD DE FOTOS: {str(e)}")
         return jsonify({'error': f'Erro no servidor: {str(e)}'}), 500
 
 
@@ -717,7 +719,7 @@ def servir_foto(foto_id, tipo):
         return response
         
     except Exception as e:
-        print(f"ERRO AO SERVIR FOTO: {str(e)}")
+        logger.error(f"ERRO AO SERVIR FOTO: {str(e)}")
         return "Erro interno", 500
 
 
@@ -753,7 +755,7 @@ def listar_fotos_rdo(rdo_id):
         })
         
     except Exception as e:
-        print(f"ERRO AO LISTAR FOTOS: {str(e)}")
+        logger.error(f"ERRO AO LISTAR FOTOS: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -781,7 +783,7 @@ def editar_descricao_foto(foto_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO AO EDITAR DESCRIÇÃO: {str(e)}")
+        logger.error(f"ERRO AO EDITAR DESCRIÇÃO: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -808,7 +810,7 @@ def deletar_foto(foto_id):
                     try:
                         os.remove(caminho_completo)
                     except Exception as e:
-                        print(f"Aviso: Não foi possível deletar {caminho_completo}: {e}")
+                        logger.warning(f"Aviso: Não foi possível deletar {caminho_completo}: {e}")
         
         # Deletar do banco
         db.session.delete(foto)
@@ -818,5 +820,5 @@ def deletar_foto(foto_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO AO DELETAR FOTO: {str(e)}")
+        logger.error(f"ERRO AO DELETAR FOTO: {str(e)}")
         return jsonify({'error': str(e)}), 500

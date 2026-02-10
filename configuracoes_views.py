@@ -7,6 +7,8 @@ from app import db
 from models import ConfiguracaoEmpresa, Departamento, Funcao, HorarioTrabalho, HorarioDia, Funcionario
 from decorators import admin_required
 from datetime import datetime, time
+import logging
+logger = logging.getLogger(__name__)
 
 configuracoes_bp = Blueprint('configuracoes', __name__, url_prefix='/configuracoes')
 
@@ -28,11 +30,11 @@ def empresa():
     from multitenant_helper import get_admin_id
     admin_id = get_admin_id()
     
-    print(f"DEBUG EMPRESA: user.id={current_user.id}, admin_id={admin_id}")
+    logger.debug(f"DEBUG EMPRESA: user.id={current_user.id}, admin_id={admin_id}")
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
-    print(f"DEBUG EMPRESA: config encontrada={config is not None}")
+    logger.debug(f"DEBUG EMPRESA: config encontrada={config is not None}")
     if config:
-        print(f"DEBUG EMPRESA: nome_empresa={config.nome_empresa}")
+        logger.debug(f"DEBUG EMPRESA: nome_empresa={config.nome_empresa}")
     
     return render_template('configuracoes/empresa.html', config=config)
 
@@ -45,10 +47,10 @@ def salvar_empresa():
         from multitenant_helper import get_admin_id
         admin_id = get_admin_id()
             
-        print(f"DEBUG SALVAR: user.id={current_user.id}, admin_id={admin_id}, tipo={getattr(current_user, 'tipo_usuario', 'N/A')}")
+        logger.debug(f"DEBUG SALVAR: user.id={current_user.id}, admin_id={admin_id}, tipo={getattr(current_user, 'tipo_usuario', 'N/A')}")
         
         config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
-        print(f"DEBUG SALVAR: config existente = {config is not None}")
+        logger.debug(f"DEBUG SALVAR: config existente = {config is not None}")
         
         if not config:
             config = ConfiguracaoEmpresa()
@@ -64,34 +66,34 @@ def salvar_empresa():
         logo_base64 = request.form.get('logo_base64')
         if logo_base64 and logo_base64.strip():
             config.logo_base64 = logo_base64
-            print("DEBUG LOGO: Logo base64 salva")
+            logger.debug("DEBUG LOGO: Logo base64 salva")
         elif request.form.get('clear_logo') == 'true':
             config.logo_base64 = None
-            print("DEBUG LOGO: Logo base64 removida")
+            logger.debug("DEBUG LOGO: Logo base64 removida")
             
         logo_pdf_base64 = request.form.get('logo_pdf_base64')
         if logo_pdf_base64 and logo_pdf_base64.strip():
             config.logo_pdf_base64 = logo_pdf_base64
-            print("DEBUG LOGO PDF: Logo PDF base64 salva")
+            logger.debug("DEBUG LOGO PDF: Logo PDF base64 salva")
         elif request.form.get('clear_logo_pdf') == 'true':
             config.logo_pdf_base64 = None
-            print("DEBUG LOGO PDF: Logo PDF base64 removida")
+            logger.debug("DEBUG LOGO PDF: Logo PDF base64 removida")
             
         header_pdf_base64 = request.form.get('header_pdf_base64', '').strip()
         clear_header = request.form.get('clear_header_pdf', '').strip()
         
-        print(f"DEBUG HEADER: Campo header_pdf_base64 = {len(header_pdf_base64) if header_pdf_base64 else 0} chars")
-        print(f"DEBUG HEADER: Campo clear_header_pdf = '{clear_header}'")
-        print(f"DEBUG HEADER: Todos os campos do form: {list(request.form.keys())}")
+        logger.debug(f"DEBUG HEADER: Campo header_pdf_base64 = {len(header_pdf_base64) if header_pdf_base64 else 0} chars")
+        logger.debug(f"DEBUG HEADER: Campo clear_header_pdf = '{clear_header}'")
+        logger.debug(f"DEBUG HEADER: Todos os campos do form: {list(request.form.keys())}")
         
         if clear_header == 'true':
             config.header_pdf_base64 = None
-            print("DEBUG HEADER: ✅ Header PDF removido com sucesso")
+            logger.debug("DEBUG HEADER: [OK] Header PDF removido com sucesso")
         elif header_pdf_base64 and len(header_pdf_base64) > 100:
             config.header_pdf_base64 = header_pdf_base64
-            print(f"DEBUG HEADER: ✅ Header PDF salvo com sucesso ({len(header_pdf_base64)} chars)")
+            logger.debug(f"DEBUG HEADER: [OK] Header PDF salvo com sucesso ({len(header_pdf_base64)} chars)")
         else:
-            print(f"DEBUG HEADER: ⚠️ Nenhuma ação realizada (header vazio ou inválido)")
+            logger.warning(f"DEBUG HEADER: [WARN] Nenhuma ação realizada (header vazio ou inválido)")
         
         cor_primaria = request.form.get('cor_primaria', '#007bff')
         cor_secundaria = request.form.get('cor_secundaria', '#6c757d') 
@@ -103,7 +105,7 @@ def salvar_empresa():
         config.cor_fundo_proposta = cor_fundo
         config.logo_tamanho_portal = logo_tamanho
         
-        print(f"DEBUG CORES: primaria={cor_primaria}, secundaria={cor_secundaria}, fundo={cor_fundo}, logo_tamanho={logo_tamanho}")
+        logger.debug(f"DEBUG CORES: primaria={cor_primaria}, secundaria={cor_secundaria}, fundo={cor_fundo}, logo_tamanho={logo_tamanho}")
         
         config.itens_inclusos_padrao = request.form.get('itens_inclusos_padrao')
         config.itens_exclusos_padrao = request.form.get('itens_exclusos_padrao')
@@ -118,10 +120,10 @@ def salvar_empresa():
         
         config.atualizado_em = datetime.utcnow()
         
-        print(f"DEBUG: Salvando config para admin_id {admin_id}")
+        logger.debug(f"DEBUG: Salvando config para admin_id {admin_id}")
         config = db.session.merge(config)
         db.session.commit()
-        print("DEBUG: Commit realizado com sucesso")
+        logger.debug("DEBUG: Commit realizado com sucesso")
         flash('Configurações da empresa salvas com sucesso!', 'success')
         
     except Exception as e:
@@ -299,9 +301,9 @@ def editar_funcao(id):
                     funcionarios_atualizados += 1
                 
                 # Log da operação
-                print(f"ATUALIZAÇÃO MASSA SALARIAL: Função '{funcao.nome}' (ID {id})")
-                print(f"  Salário base: R$ {salario_base_antigo:.2f} → R$ {novo_salario_base:.2f}")
-                print(f"  Funcionários atualizados: {funcionarios_atualizados}")
+                    logger.debug(f"ATUALIZAÇÃO MASSA SALARIAL: Função '{funcao.nome}' (ID {id})")
+                    logger.debug(f" Salário base: R$ {salario_base_antigo:.2f} → R$ {novo_salario_base:.2f}")
+                    logger.debug(f" Funcionários atualizados: {funcionarios_atualizados}")
             
             # Commit da transação (atômica - tudo ou nada)
             db.session.commit()

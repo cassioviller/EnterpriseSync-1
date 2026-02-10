@@ -22,6 +22,37 @@ SIGE v9.0 (Sistema de Gestão Empresarial) is a production-ready, multi-tenant b
 ## System Architecture
 The system employs a Flask backend, SQLAlchemy ORM, and PostgreSQL database, with Jinja2 for server-side templating and Bootstrap for a responsive frontend. Docker is used for deployment, leveraging a unified `base_completo.html` template for consistent UI/UX.
 
+**Views Package Structure (Refactored 2026-02-10):**
+The monolithic `views.py` (11,042 lines) was refactored into a `views/` Python package with domain-specific modules. All routes remain on the same `main_bp` Blueprint with identical function names. The original file is preserved as `views_old_backup.py`.
+-   `views/__init__.py` - Blueprint definition and module imports
+-   `views/helpers.py` - Shared utilities (safe_db_operation, get_admin_id_robusta, get_admin_id_dinamico, circuit_breaker fallbacks)
+-   `views/auth.py` - Authentication (login, logout, index)
+-   `views/dashboard.py` - Dashboard and health checks
+-   `views/users.py` - User management (CRUD)
+-   `views/employees.py` - Employee management and profiles
+-   `views/obras.py` - Construction project management
+-   `views/vehicles.py` - Vehicle/fleet management
+-   `views/rdo.py` - Daily Work Reports (RDO) system
+-   `views/api.py` - API endpoints for frontend
+-   `views/admin.py` - Super admin, diagnostics, novo_ponto
+
+**Security Hardening (2026-02-10):**
+-   CSRF Protection enabled via Flask-WTF CSRFProtect with auto-injection JS in base templates
+-   CORS restricted to sige.cassioviller.tech + Replit dev domains (no more origins="*")
+-   Rate limiting on login route (5 per minute) via flask-limiter
+-   Secret key moved from hardcoded to SESSION_SECRET environment variable
+-   API blueprints exempted from CSRF: api_organizer, api_servicos_obra_limpa, ponto, landing
+
+**Code Quality (2026-02-10):**
+-   All debug print() statements replaced with structured logging (logging module)
+-   Emojis removed from log messages, replaced with text tags [OK], [ERROR], [WARN], etc.
+
+**Commercial Landing Page (2026-02-10):**
+-   `/site` route serves standalone marketing page (landing_views.py + templates/landing.html)
+-   4 pricing tiers: Starter R$499, Professional R$899, Enterprise R$1.599, Corporate (sob consulta)
+-   18 modules showcased, feature highlights, differentials section
+-   Fully responsive, standalone HTML (not extending base templates)
+
 **Key Architectural Decisions & Features:**
 -   **Multi-tenant Architecture:** Ensures data isolation per `admin_id` and implements robust role-based access control.
 -   **Event-Driven Integration:** Uses an `EventManager` (Observer Pattern) for automated cross-module data flow.

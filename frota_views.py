@@ -4,15 +4,17 @@ from models import Veiculo as FrotaVeiculo, UsoVeiculo as FrotaUtilizacao, Custo
 from app import db
 from utils.tenant import get_tenant_admin_id
 from datetime import datetime
+import logging
+logger = logging.getLogger(__name__)
 
 frota_bp = Blueprint('frota', __name__, url_prefix='/frota')
 
 # Importar services de veículos (adaptados para frota)
 try:
     from veiculos_services import VeiculoService, UsoVeiculoService, CustoVeiculoService
-    print("✅ [FROTA] Services importados com sucesso")
+    logger.info("[OK] [FROTA] Services importados com sucesso")
 except ImportError as e:
-    print(f"⚠️ [FROTA] Erro ao importar services: {e}")
+    logger.error(f"[WARN] [FROTA] Erro ao importar services: {e}")
     # Criar fallbacks básicos
     class VeiculoService:
         @staticmethod
@@ -39,11 +41,11 @@ except ImportError as e:
 def lista():
     """Lista principal de veículos da frota com filtros e estatísticas"""
     try:
-        print(f"🚗 [FROTA_LISTA] Iniciando listagem...")
+        logger.info(f"[CAR] [FROTA_LISTA] Iniciando listagem...")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
-        # DEBUG: print(f"🔍 [FROTA_LISTA] tenant_admin_id = {tenant_admin_id}")
+        # DEBUG: print(f"[DEBUG] [FROTA_LISTA] tenant_admin_id = {tenant_admin_id}")
         if not tenant_admin_id:
             flash('Acesso negado. Faça login novamente.', 'error')
             return redirect(url_for('main.login'))
@@ -64,20 +66,20 @@ def lista():
         
         # Buscar veículos da frota diretamente
         query = FrotaVeiculo.query.filter_by(admin_id=tenant_admin_id)
-        # DEBUG: print(f"🔍 [FROTA_LISTA] Query inicial: admin_id={tenant_admin_id}")
+        # DEBUG: print(f"[DEBUG] [FROTA_LISTA] Query inicial: admin_id={tenant_admin_id}")
         
         # Aplicar filtros
         if filtros.get('status'):
             if filtros['status'] == 'ativo':
                 query = query.filter_by(ativo=True)
-                # DEBUG: print(f"🔍 [FROTA_LISTA] Filtro aplicado: ativo=True")
+                # DEBUG: print(f"[DEBUG] [FROTA_LISTA] Filtro aplicado: ativo=True")
             elif filtros['status'] == 'inativo':
                 query = query.filter_by(ativo=False)
-                # DEBUG: print(f"🔍 [FROTA_LISTA] Filtro aplicado: ativo=False")
+                # DEBUG: print(f"[DEBUG] [FROTA_LISTA] Filtro aplicado: ativo=False")
         else:
-            # ✅ CORREÇÃO: Por padrão, mostrar apenas veículos ativos
+            # [OK] CORREÇÃO: Por padrão, mostrar apenas veículos ativos
             query = query.filter_by(ativo=True)
-            # DEBUG: print(f"🔍 [FROTA_LISTA] Filtro padrão aplicado: ativo=True")
+            # DEBUG: print(f"[DEBUG] [FROTA_LISTA] Filtro padrão aplicado: ativo=True")
         
         if filtros.get('tipo'):
             query = query.filter_by(tipo=filtros['tipo'])
@@ -99,10 +101,10 @@ def lista():
             'inativos': FrotaVeiculo.query.filter_by(admin_id=tenant_admin_id, ativo=False).count()
         }
         
-        print(f"📊 [FROTA_LISTA] Stats: total={stats['total']}, ativos={stats['ativos']}, inativos={stats['inativos']}")
-        print(f"✅ [FROTA_LISTA] Encontrados {len(veiculos)} veículos na query paginada")
+        logger.info(f"[STATS] [FROTA_LISTA] Stats: total={stats['total']}, ativos={stats['ativos']}, inativos={stats['inativos']}")
+        logger.info(f"[OK] [FROTA_LISTA] Encontrados {len(veiculos)} veículos na query paginada")
         if veiculos:
-            print(f"🚗 [FROTA_LISTA] Primeiro veículo: {veiculos[0].placa} (id={veiculos[0].id})")
+            logger.debug(f"[CAR] [FROTA_LISTA] Primeiro veículo: {veiculos[0].placa} (id={veiculos[0].id})")
         
         return render_template('veiculos_lista.html',
                              veiculos=veiculos,
@@ -111,7 +113,7 @@ def lista():
                              filtros_aplicados=filtros)
         
     except Exception as e:
-        print(f"❌ [FROTA_LISTA] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_LISTA] Erro: {str(e)}")
         flash('Erro ao carregar veículos. Tente novamente.', 'error')
         return redirect(url_for('main.dashboard'))
 
@@ -122,7 +124,7 @@ def lista():
 def novo():
     """Formulário para cadastrar novo veículo na frota"""
     try:
-        print(f"🚗 [FROTA_NOVO] Iniciando...")
+        logger.info(f"[CAR] [FROTA_NOVO] Iniciando...")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -135,7 +137,7 @@ def novo():
         
         # POST - Processar cadastro
         dados = request.form.to_dict()
-        # DEBUG: print(f"🔍 [FROTA_NOVO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"[DEBUG] [FROTA_NOVO] Dados recebidos: {dados.keys()}")
         
         # Validações básicas
         campos_obrigatorios = ['placa', 'marca', 'modelo', 'ano', 'tipo']
@@ -168,12 +170,12 @@ def novo():
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ [FROTA_NOVO] Erro ao salvar: {str(e)}")
+            logger.error(f"[ERROR] [FROTA_NOVO] Erro ao salvar: {str(e)}")
             flash(f'Erro ao cadastrar veículo: {str(e)}', 'error')
             return render_template('veiculos_novo.html')
         
     except Exception as e:
-        print(f"❌ [FROTA_NOVO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_NOVO] Erro: {str(e)}")
         flash('Erro ao cadastrar veículo. Tente novamente.', 'error')
         return render_template('veiculos_novo.html')
 
@@ -184,7 +186,7 @@ def novo():
 def detalhes(id):
     """Página de detalhes do veículo da frota com abas de uso e custos"""
     try:
-        print(f"🚗 [FROTA_DETALHES] Iniciando para ID {id}")
+        logger.info(f"[CAR] [FROTA_DETALHES] Iniciando para ID {id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -200,33 +202,33 @@ def detalhes(id):
         
         # Buscar funcionários para exibir nomes nos passageiros
         funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id).all()
-        # DEBUG: print(f"🔍 [FROTA_DETALHES] {len(funcionarios)} funcionários encontrados")
+        # DEBUG: print(f"[DEBUG] [FROTA_DETALHES] {len(funcionarios)} funcionários encontrados")
         
         # Buscar usos recentes (últimos 20) com tratamento de erro
         try:
-            # DEBUG: print(f"🔍 [FROTA_DETALHES] Buscando usos do veículo ID={id}, admin_id={tenant_admin_id}")
+            # DEBUG: print(f"[DEBUG] [FROTA_DETALHES] Buscando usos do veículo ID={id}, admin_id={tenant_admin_id}")
             usos = FrotaUtilizacao.query.filter_by(
                 veiculo_id=id,
                 admin_id=tenant_admin_id
             ).order_by(FrotaUtilizacao.data_uso.desc()).limit(20).all()
-            print(f"✅ [FROTA_DETALHES] {len(usos)} usos encontrados")
+            logger.info(f"[OK] [FROTA_DETALHES] {len(usos)} usos encontrados")
             
             # Debug: mostrar os primeiros usos
             if usos:
                 for uso in usos[:3]:
-                    print(f"   📋 Uso: ID={uso.id}, Data={uso.data_uso}, Veiculo={uso.veiculo_id}, Admin={uso.admin_id}")
+                    logger.debug(f" [LIST] Uso: ID={uso.id}, Data={uso.data_uso}, Veiculo={uso.veiculo_id}, Admin={uso.admin_id}")
             else:
                 # Verificar se existem usos SEM filtro de admin_id
                 total_usos_veiculo = FrotaUtilizacao.query.filter_by(veiculo_id=id).count()
-                print(f"⚠️ [FROTA_DETALHES] Total de usos do veículo (sem filtro admin): {total_usos_veiculo}")
+                logger.warning(f"[WARN] [FROTA_DETALHES] Total de usos do veículo (sem filtro admin): {total_usos_veiculo}")
                 if total_usos_veiculo > 0:
                     # Verificar admin_id dos usos existentes
                     uso_sample = FrotaUtilizacao.query.filter_by(veiculo_id=id).first()
-                    print(f"⚠️ [FROTA_DETALHES] Uso existente tem admin_id={uso_sample.admin_id}, esperado={tenant_admin_id}")
+                    logger.warning(f"[WARN] [FROTA_DETALHES] Uso existente tem admin_id={uso_sample.admin_id}, esperado={tenant_admin_id}")
         except Exception as e_usos:
-            print(f"⚠️ [FROTA_DETALHES] Erro ao buscar usos: {str(e_usos)}")
+            logger.error(f"[WARN] [FROTA_DETALHES] Erro ao buscar usos: {str(e_usos)}")
             import traceback
-            print(traceback.format_exc())
+            logger.info(traceback.format_exc())
             usos = []
         
         # Estatísticas de uso com tratamento de erro
@@ -238,7 +240,7 @@ def detalhes(id):
                 ).scalar() or 0
             }
         except Exception as e_stats:
-            print(f"⚠️ [FROTA_DETALHES] Erro ao calcular stats de uso: {str(e_stats)}")
+            logger.error(f"[WARN] [FROTA_DETALHES] Erro ao calcular stats de uso: {str(e_stats)}")
             stats_uso = {'total': 0, 'km_total': 0}
         
         # Buscar custos recentes com tratamento de erro
@@ -247,9 +249,9 @@ def detalhes(id):
                 veiculo_id=id,
                 admin_id=tenant_admin_id
             ).order_by(FrotaDespesa.data_custo.desc()).limit(20).all()
-            print(f"✅ [FROTA_DETALHES] {len(custos)} custos encontrados")
+            logger.info(f"[OK] [FROTA_DETALHES] {len(custos)} custos encontrados")
         except Exception as e_custos:
-            print(f"⚠️ [FROTA_DETALHES] Erro ao buscar custos: {str(e_custos)}")
+            logger.error(f"[WARN] [FROTA_DETALHES] Erro ao buscar custos: {str(e_custos)}")
             custos = []
         
         # Estatísticas de custos com tratamento de erro
@@ -261,7 +263,7 @@ def detalhes(id):
                 ).scalar() or 0
             }
         except Exception as e_stats_custos:
-            print(f"⚠️ [FROTA_DETALHES] Erro ao calcular stats de custos: {str(e_stats_custos)}")
+            logger.error(f"[WARN] [FROTA_DETALHES] Erro ao calcular stats de custos: {str(e_stats_custos)}")
             stats_custos = {'total': 0, 'valor_total': 0}
         
         return render_template('veiculos_detalhes.html',
@@ -273,7 +275,7 @@ def detalhes(id):
                              stats_custos=stats_custos)
         
     except Exception as e:
-        print(f"❌ [FROTA_DETALHES] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_DETALHES] Erro: {str(e)}")
         flash('Erro ao carregar detalhes do veículo.', 'error')
         return redirect(url_for('frota.lista'))
 
@@ -284,7 +286,7 @@ def detalhes(id):
 def editar(id):
     """Formulário para editar dados do veículo da frota"""
     try:
-        print(f"🚗 [FROTA_EDITAR] Iniciando para ID {id}")
+        logger.info(f"[CAR] [FROTA_EDITAR] Iniciando para ID {id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -303,7 +305,7 @@ def editar(id):
         
         # POST - Processar edição
         dados = request.form.to_dict()
-        # DEBUG: print(f"🔍 [FROTA_EDITAR] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"[DEBUG] [FROTA_EDITAR] Dados recebidos: {dados.keys()}")
         
         try:
             # Atualizar campos
@@ -339,12 +341,12 @@ def editar(id):
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ [FROTA_EDITAR] Erro ao salvar: {str(e)}")
+            logger.error(f"[ERROR] [FROTA_EDITAR] Erro ao salvar: {str(e)}")
             flash(f'Erro ao atualizar veículo: {str(e)}', 'error')
             return render_template('veiculos_editar.html', veiculo=veiculo)
         
     except Exception as e:
-        print(f"❌ [FROTA_EDITAR] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_EDITAR] Erro: {str(e)}")
         flash('Erro ao editar veículo.', 'error')
         return redirect(url_for('frota.detalhes', id=id))
 
@@ -355,7 +357,7 @@ def editar(id):
 def reativar(id):
     """Reativar um veículo inativo"""
     try:
-        print(f"🚗 [FROTA_REATIVAR] Reativando veículo ID {id}")
+        logger.debug(f"[CAR] [FROTA_REATIVAR] Reativando veículo ID {id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -375,13 +377,13 @@ def reativar(id):
         db.session.commit()
         
         flash(f'Veículo {veiculo.placa} reativado com sucesso!', 'success')
-        print(f"✅ [FROTA_REATIVAR] Veículo {veiculo.placa} reativado")
+        logger.info(f"[OK] [FROTA_REATIVAR] Veículo {veiculo.placa} reativado")
         
         return redirect(url_for('frota.lista'))
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ [FROTA_REATIVAR] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_REATIVAR] Erro: {str(e)}")
         flash(f'Erro ao reativar veículo: {str(e)}', 'error')
         return redirect(url_for('frota.lista'))
 
@@ -392,7 +394,7 @@ def reativar(id):
 def novo_uso(veiculo_id):
     """Formulário unificado para novo uso de veículo da frota (uso + custos)"""
     try:
-        print(f"🚗 [FROTA_NOVO_USO] Iniciando para veículo {veiculo_id}")
+        logger.info(f"[CAR] [FROTA_NOVO_USO] Iniciando para veículo {veiculo_id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -420,9 +422,9 @@ def novo_uso(veiculo_id):
         dados = request.form.to_dict()
         dados['veiculo_id'] = veiculo_id  # Garantir que o ID está nos dados
         
-        # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Dados recebidos: {dados.keys()}")
-        # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Passageiros Frente: '{dados.get('passageiros_frente')}'")
-        # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Passageiros Trás: '{dados.get('passageiros_tras')}'")
+        # DEBUG: print(f"[DEBUG] [FROTA_NOVO_USO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"[DEBUG] [FROTA_NOVO_USO] Passageiros Frente: '{dados.get('passageiros_frente')}'")
+        # DEBUG: print(f"[DEBUG] [FROTA_NOVO_USO] Passageiros Trás: '{dados.get('passageiros_tras')}'")
         
         # Validações básicas
         campos_obrigatorios = ['data_uso', 'hora_saida', 'km_inicial']
@@ -437,7 +439,7 @@ def novo_uso(veiculo_id):
                                      obras=obras)
         
         try:
-            # 🔥 RECEBER PASSAGEIROS DE SELECT MULTIPLE (retorna lista de IDs)
+            # [READY] RECEBER PASSAGEIROS DE SELECT MULTIPLE (retorna lista de IDs)
             passageiros_frente_list = request.form.getlist('passageiros_frente')
             passageiros_tras_list = request.form.getlist('passageiros_tras')
             
@@ -468,23 +470,23 @@ def novo_uso(veiculo_id):
             
             db.session.add(novo_uso)
             
-            # 🚗 ATUALIZAR KM ATUAL DO VEÍCULO
+            # [CAR] ATUALIZAR KM ATUAL DO VEÍCULO
             if novo_uso.km_final:
                 veiculo.km_atual = novo_uso.km_final
-                print(f"✅ [FROTA_NOVO_USO] KM Atual do veículo atualizado: {veiculo.km_atual} km")
+                logger.info(f"[OK] [FROTA_NOVO_USO] KM Atual do veículo atualizado: {veiculo.km_atual} km")
             
-            # 🔍 DEBUG: Verificar campos de passageiros antes do commit
-            # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Antes do commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
-            # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Antes do commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
+            # [DEBUG] DEBUG: Verificar campos de passageiros antes do commit
+            # DEBUG: print(f"[DEBUG] [FROTA_NOVO_USO] Antes do commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
+            # DEBUG: print(f"[DEBUG] [FROTA_NOVO_USO] Antes do commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
             
             db.session.commit()
             
-            # 🔍 DEBUG: Verificar campos de passageiros após o commit
+            # [DEBUG] DEBUG: Verificar campos de passageiros após o commit
             db.session.refresh(novo_uso)
-            # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Após o commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
-            # DEBUG: print(f"🔍 [FROTA_NOVO_USO] Após o commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
+            # DEBUG: print(f"[DEBUG] [FROTA_NOVO_USO] Após o commit - Passageiros Frente: '{novo_uso.passageiros_frente}'")
+            # DEBUG: print(f"[DEBUG] [FROTA_NOVO_USO] Após o commit - Passageiros Trás: '{novo_uso.passageiros_tras}'")
             
-            # 🔗 INTEGRAÇÃO AUTOMÁTICA - Emitir evento de veículo usado
+            # [LINK] INTEGRAÇÃO AUTOMÁTICA - Emitir evento de veículo usado
             try:
                 from event_manager import EventManager
                 EventManager.emit('veiculo_usado', {
@@ -495,14 +497,14 @@ def novo_uso(veiculo_id):
                     'funcionario_id': novo_uso.funcionario_id
                 }, tenant_admin_id)
             except Exception as e:
-                print(f'Integração automática falhou (não crítico): {e}')
+                logger.error(f'Integração automática falhou (não crítico): {e}')
             
             flash(f'Uso do veículo registrado com sucesso!', 'success')
             return redirect(url_for('frota.detalhes', id=veiculo_id))
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ [FROTA_NOVO_USO] Erro ao salvar: {str(e)}")
+            logger.error(f"[ERROR] [FROTA_NOVO_USO] Erro ao salvar: {str(e)}")
             flash(f'Erro ao registrar uso: {str(e)}', 'error')
             funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
             obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
@@ -512,7 +514,7 @@ def novo_uso(veiculo_id):
                                  obras=obras)
         
     except Exception as e:
-        print(f"❌ [FROTA_NOVO_USO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_NOVO_USO] Erro: {str(e)}")
         flash('Erro ao registrar uso do veículo.', 'error')
         return redirect(url_for('frota.detalhes', id=veiculo_id))
 
@@ -523,7 +525,7 @@ def novo_uso(veiculo_id):
 def novo_custo(veiculo_id):
     """Formulário para registrar novos custos de veículo da frota"""
     try:
-        print(f"💰 [FROTA_NOVO_CUSTO] Iniciando para veículo {veiculo_id}")
+        logger.info(f"[MONEY] [FROTA_NOVO_CUSTO] Iniciando para veículo {veiculo_id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -556,7 +558,7 @@ def novo_custo(veiculo_id):
         dados = request.form.to_dict()
         dados['veiculo_id'] = veiculo_id
         
-        # DEBUG: print(f"🔍 [FROTA_NOVO_CUSTO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"[DEBUG] [FROTA_NOVO_CUSTO] Dados recebidos: {dados.keys()}")
         
         # Validações básicas
         campos_obrigatorios = ['data_custo', 'tipo', 'valor']
@@ -600,7 +602,7 @@ def novo_custo(veiculo_id):
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ [FROTA_NOVO_CUSTO] Erro ao salvar: {str(e)}")
+            logger.error(f"[ERROR] [FROTA_NOVO_CUSTO] Erro ao salvar: {str(e)}")
             flash(f'Erro ao registrar custo: {str(e)}', 'error')
             usos = FrotaUtilizacao.query.filter_by(
                 veiculo_id=veiculo_id, 
@@ -613,7 +615,7 @@ def novo_custo(veiculo_id):
                                  obras=obras)
         
     except Exception as e:
-        print(f"❌ [FROTA_NOVO_CUSTO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_NOVO_CUSTO] Erro: {str(e)}")
         flash('Erro ao registrar custo do veículo.', 'error')
         return redirect(url_for('frota.detalhes', id=veiculo_id))
 
@@ -624,7 +626,7 @@ def novo_custo(veiculo_id):
 def editar_uso(uso_id):
     """Formulário para editar uso existente de veículo da frota"""
     try:
-        print(f"✏️ [FROTA_EDITAR_USO] Iniciando para uso {uso_id}")
+        logger.info(f"[EDIT] [FROTA_EDITAR_USO] Iniciando para uso {uso_id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -657,7 +659,7 @@ def editar_uso(uso_id):
         
         # POST - Processar edição
         dados = request.form.to_dict()
-        # DEBUG: print(f"🔍 [FROTA_EDITAR_USO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"[DEBUG] [FROTA_EDITAR_USO] Dados recebidos: {dados.keys()}")
         
         try:
             # Atualizar campos
@@ -685,7 +687,7 @@ def editar_uso(uso_id):
             uso.responsavel_veiculo = dados.get('responsavel_veiculo')
             uso.observacoes = dados.get('observacoes')
             
-            # 🚗 ATUALIZAR KM ATUAL DO VEÍCULO (se editou km_final)
+            # [CAR] ATUALIZAR KM ATUAL DO VEÍCULO (se editou km_final)
             if dados.get('km_final'):
                 # Verificar se esse uso é o mais recente
                 ultimo_uso = FrotaUtilizacao.query.filter_by(
@@ -695,7 +697,7 @@ def editar_uso(uso_id):
                 
                 if ultimo_uso and ultimo_uso.id == uso.id and ultimo_uso.km_final:
                     veiculo.km_atual = ultimo_uso.km_final
-                    print(f"✅ [FROTA_EDITAR_USO] KM Atual do veículo atualizado: {veiculo.km_atual} km")
+                    logger.info(f"[OK] [FROTA_EDITAR_USO] KM Atual do veículo atualizado: {veiculo.km_atual} km")
             
             db.session.commit()
             
@@ -704,7 +706,7 @@ def editar_uso(uso_id):
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ [FROTA_EDITAR_USO] Erro ao salvar: {str(e)}")
+            logger.error(f"[ERROR] [FROTA_EDITAR_USO] Erro ao salvar: {str(e)}")
             flash(f'Erro ao atualizar uso: {str(e)}', 'error')
             funcionarios = Funcionario.query.filter_by(admin_id=tenant_admin_id, ativo=True).all()
             obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
@@ -715,7 +717,7 @@ def editar_uso(uso_id):
                                  obras=obras)
         
     except Exception as e:
-        print(f"❌ [FROTA_EDITAR_USO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_EDITAR_USO] Erro: {str(e)}")
         flash('Erro ao editar uso do veículo.', 'error')
         return redirect(url_for('frota.lista'))
 
@@ -726,7 +728,7 @@ def editar_uso(uso_id):
 def deletar_uso(uso_id):
     """Deleta um uso de veículo da frota"""
     try:
-        print(f"🗑️ [FROTA_DELETAR_USO] Iniciando para uso {uso_id}")
+        logger.info(f"[DEL] [FROTA_DELETAR_USO] Iniciando para uso {uso_id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -745,7 +747,7 @@ def deletar_uso(uso_id):
         # Buscar veículo antes de deletar
         veiculo = FrotaVeiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
         
-        # 🗑️ DELETAR REGISTROS DA TABELA LEGADA passageiro_veiculo (CASCADE)
+        # [DEL] DELETAR REGISTROS DA TABELA LEGADA passageiro_veiculo (CASCADE)
         # TODO: Promover para ORM-level cascade relationship quando refatorar modelos
         # Architect recomendou substituir raw SQL por configuração cascade="all, delete-orphan"
         try:
@@ -753,14 +755,14 @@ def deletar_uso(uso_id):
                 db.text("DELETE FROM passageiro_veiculo WHERE uso_veiculo_id = :uso_id"),
                 {"uso_id": uso_id}
             )
-            print(f"✅ [FROTA_DELETAR_USO] Registros de passageiro_veiculo deletados")
+            logger.info(f"[OK] [FROTA_DELETAR_USO] Registros de passageiro_veiculo deletados")
         except Exception as e:
-            print(f"⚠️ [FROTA_DELETAR_USO] Erro ao deletar passageiros (tabela pode não existir): {e}")
+            logger.error(f"[WARN] [FROTA_DELETAR_USO] Erro ao deletar passageiros (tabela pode não existir): {e}")
         
         db.session.delete(uso)
         db.session.flush()
         
-        # 🚗 ATUALIZAR KM ATUAL DO VEÍCULO após deleção
+        # [CAR] ATUALIZAR KM ATUAL DO VEÍCULO após deleção
         if veiculo:
             # Buscar o último uso restante (após a deleção)
             ultimo_uso = FrotaUtilizacao.query.filter_by(
@@ -770,10 +772,10 @@ def deletar_uso(uso_id):
             
             if ultimo_uso and ultimo_uso.km_final:
                 veiculo.km_atual = ultimo_uso.km_final
-                print(f"✅ [FROTA_DELETAR_USO] KM Atual atualizado para último uso: {veiculo.km_atual} km")
+                logger.info(f"[OK] [FROTA_DELETAR_USO] KM Atual atualizado para último uso: {veiculo.km_atual} km")
             else:
                 # Se não houver mais usos, manter o km_atual do veículo
-                print(f"ℹ️ [FROTA_DELETAR_USO] Nenhum uso restante, km_atual mantido")
+                logger.debug(f"[INFO] [FROTA_DELETAR_USO] Nenhum uso restante, km_atual mantido")
         
         db.session.commit()
         
@@ -782,7 +784,7 @@ def deletar_uso(uso_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ [FROTA_DELETAR_USO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_DELETAR_USO] Erro: {str(e)}")
         flash(f'Erro ao deletar uso: {str(e)}', 'error')
         return redirect(url_for('frota.lista'))
 
@@ -793,7 +795,7 @@ def deletar_uso(uso_id):
 def editar_custo(custo_id):
     """Formulário para editar custo existente de veículo da frota"""
     try:
-        print(f"✏️ [FROTA_EDITAR_CUSTO] Iniciando para custo {custo_id}")
+        logger.info(f"[EDIT] [FROTA_EDITAR_CUSTO] Iniciando para custo {custo_id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -824,7 +826,7 @@ def editar_custo(custo_id):
         
         # POST - Processar edição
         dados = request.form.to_dict()
-        # DEBUG: print(f"🔍 [FROTA_EDITAR_CUSTO] Dados recebidos: {dados.keys()}")
+        # DEBUG: print(f"[DEBUG] [FROTA_EDITAR_CUSTO] Dados recebidos: {dados.keys()}")
         
         try:
             # Atualizar campos
@@ -859,7 +861,7 @@ def editar_custo(custo_id):
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ [FROTA_EDITAR_CUSTO] Erro ao salvar: {str(e)}")
+            logger.error(f"[ERROR] [FROTA_EDITAR_CUSTO] Erro ao salvar: {str(e)}")
             flash(f'Erro ao atualizar custo: {str(e)}', 'error')
             obras = Obra.query.filter_by(admin_id=tenant_admin_id).all()
             return render_template('custo_veiculo_editar.html',
@@ -868,7 +870,7 @@ def editar_custo(custo_id):
                                  obras=obras)
         
     except Exception as e:
-        print(f"❌ [FROTA_EDITAR_CUSTO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_EDITAR_CUSTO] Erro: {str(e)}")
         flash('Erro ao editar custo do veículo.', 'error')
         return redirect(url_for('frota.lista'))
 
@@ -879,7 +881,7 @@ def editar_custo(custo_id):
 def deletar_custo(custo_id):
     """Deleta um custo de veículo da frota"""
     try:
-        print(f"🗑️ [FROTA_DELETAR_CUSTO] Iniciando para custo {custo_id}")
+        logger.info(f"[DEL] [FROTA_DELETAR_CUSTO] Iniciando para custo {custo_id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -903,7 +905,7 @@ def deletar_custo(custo_id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ [FROTA_DELETAR_CUSTO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_DELETAR_CUSTO] Erro: {str(e)}")
         flash(f'Erro ao deletar custo: {str(e)}', 'error')
         return redirect(url_for('frota.lista'))
 
@@ -914,7 +916,7 @@ def deletar_custo(custo_id):
 def deletar_veiculo(id):
     """Deleta um veículo da frota (soft delete)"""
     try:
-        print(f"🗑️ [FROTA_DELETAR_VEICULO] Iniciando para veículo {id}")
+        logger.info(f"[DEL] [FROTA_DELETAR_VEICULO] Iniciando para veículo {id}")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -940,7 +942,7 @@ def deletar_veiculo(id):
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ [FROTA_DELETAR_VEICULO] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_DELETAR_VEICULO] Erro: {str(e)}")
         flash(f'Erro ao deletar veículo: {str(e)}', 'error')
         return redirect(url_for('frota.lista'))
 
@@ -956,7 +958,7 @@ def dashboard():
         from datetime import datetime, date
         from dateutil.relativedelta import relativedelta
         
-        print(f"📊 [FROTA_DASHBOARD] Iniciando dashboard TCO...")
+        logger.info(f"[STATS] [FROTA_DASHBOARD] Iniciando dashboard TCO...")
         
         # Proteção multi-tenant
         tenant_admin_id = get_tenant_admin_id()
@@ -1161,7 +1163,7 @@ def dashboard():
         ).distinct().all()
         tipos_disponiveis = [t[0] for t in tipos_disponiveis]
         
-        print(f"✅ [FROTA_DASHBOARD] KPIs calculados: TCO={tco_total}, Custo/km={custo_medio_km}, Veículos={total_veiculos}")
+        logger.info(f"[OK] [FROTA_DASHBOARD] KPIs calculados: TCO={tco_total}, Custo/km={custo_medio_km}, Veículos={total_veiculos}")
         
         return render_template('frota/dashboard.html',
                              tco_total=tco_total,
@@ -1181,7 +1183,7 @@ def dashboard():
                              })
         
     except Exception as e:
-        print(f"❌ [FROTA_DASHBOARD] Erro: {str(e)}")
+        logger.error(f"[ERROR] [FROTA_DASHBOARD] Erro: {str(e)}")
         import traceback
         traceback.print_exc()
         flash('Erro ao carregar dashboard de frota. Tente novamente.', 'error')
@@ -1194,7 +1196,7 @@ def verificar_alertas(admin_id):
     Verifica alertas de manutenção e vencimentos para veículos da frota.
     Retorna lista de veículos que precisam de atenção.
     
-    ✅ TAREFA 6: Sistema de alertas implementado
+    [OK] TAREFA 6: Sistema de alertas implementado
     """
     from datetime import date, timedelta
     

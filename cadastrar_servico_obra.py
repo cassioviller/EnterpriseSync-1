@@ -6,6 +6,8 @@ Rota para cadastrar serviços específicos em uma obra
 from flask import Blueprint, request, redirect, url_for, flash, render_template_string
 from models import db, Obra, Servico
 from sqlalchemy import text
+import logging
+logger = logging.getLogger(__name__)
 
 cadastrar_servico_bp = Blueprint('cadastrar_servico', __name__)
 
@@ -68,7 +70,7 @@ def cadastrar_servico_obra(obra_id):
         """), {'admin_id': obra.admin_id, 'obra_id': obra_id}).fetchall()
         
     except Exception as e:
-        print(f"Erro ao buscar serviços disponíveis: {e}")
+        logger.error(f"Erro ao buscar serviços disponíveis: {e}")
         servicos_disponiveis = []
     
     # Template simples para o modal
