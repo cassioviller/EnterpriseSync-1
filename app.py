@@ -532,7 +532,7 @@ except ImportError as e:
     logging.warning(f"[WARN] Comando CLI de diagnóstico não disponível: {e}")
 
 csrf_exempt_blueprints = [
-    'api_organizer', 'api_funcionarios', 'api_buscar_funcionarios',
+    'main', 'api_organizer', 'api_funcionarios', 'api_buscar_funcionarios',
     'api_servicos_obra_limpa', 'health', 'ponto', 'landing',
     'rdo_editar', 'rdo_crud', 'servicos_crud', 'cadastrar_servico',
     'analytics_preditivos', 'dashboards_especificos',
