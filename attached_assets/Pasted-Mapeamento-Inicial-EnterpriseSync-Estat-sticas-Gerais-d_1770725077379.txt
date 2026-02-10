@@ -1,0 +1,141 @@
+Mapeamento Inicial - EnterpriseSync
+Estatísticas Gerais do Projeto
+Volume de Código
+Python: 93.853 linhas de código
+HTML: 85.843 linhas de código
+Total de arquivos Python: 216 arquivos
+Total de arquivos HTML: 185 arquivos
+Total combinado: ~180.000 linhas de código
+Estrutura do Banco de Dados
+Total de Modelos Identificados: 107 tabelas
+Módulos Principais Identificados
+Gestão de Usuários e Autenticação
+Usuario, TipoUsuario
+Sistema multi-tenant (admin_id)
+Recursos Humanos e Folha de Pagamento
+Funcionario, Departamento, Funcao
+HorarioTrabalho, HorarioDia
+FolhaPagamento, FolhaProcessada
+Adiantamento, BeneficioFuncionario
+ParametrosLegais, ConfiguracaoSalarial
+FeriasDecimo
+Controle de Ponto Eletrônico
+RegistroPonto
+FotoFacialFuncionario (reconhecimento facial)
+FuncionarioObrasPonto
+ConfiguracaoHorario
+DispositivoObra
+CalculoHorasMensal
+Gestão de Obras
+Obra
+OrcamentoObra
+CustoObra
+ServicoObra, ServicoObraReal
+AlocacaoEquipe
+Allocation, AllocationEmployee
+RDO (Relatório Diário de Obra)
+RDO
+RDOEquipamento
+RDOFoto
+RDOMaoObra
+RDOOcorrencia
+RDOServicoSubatividade
+Propostas Comerciais
+Proposta
+PropostaItem
+PropostaArquivo
+PropostaHistorico
+PropostaTemplate
+TabelaComposicao, ItemTabelaComposicao
+Financeiro
+ContaPagar, ContaReceber
+FluxoCaixa, FluxoCaixaContabil
+BancoEmpresa
+ConciliacaoBancaria
+Receita
+CentroCusto, CentroCustoContabil
+Contabilidade
+PlanoContas
+LancamentoContabil
+PartidaContabil
+BalanceteMensal
+BalancoPatrimonial
+DREMensal
+SpedContabil
+AuditoriaContabil
+ProvisaoMensal
+LancamentoRecorrente
+Almoxarifado e Estoque
+AlmoxarifadoItem
+AlmoxarifadoEstoque
+AlmoxarifadoMovimento
+AlmoxarifadoCategoria
+MovimentacaoEstoque
+Gestão de Frota
+Veiculo, Vehicle
+UsoVeiculo, VehicleUsage
+CustoVeiculo, VehicleExpense
+Alimentação/Restaurante
+Restaurante
+RegistroAlimentacao
+AlimentacaoLancamento
+AlimentacaoItem
+AlimentacaoLancamentoItem
+Catálogo de Serviços
+Servico
+ServicoMestre
+SubServico
+SubatividadeMestre
+CategoriaServico
+ServicoTemplate
+HistoricoProdutividadeServico
+Produtos e Fornecedores
+Produto
+CategoriaProduto
+Fornecedor
+Clientes
+Cliente
+NotificacaoCliente
+Documentos Fiscais
+DocumentoFiscal
+NotaFiscal
+Ocorrências
+Ocorrencia
+TipoOcorrencia
+Planejamento Semanal
+WeeklyPlan
+WeeklyPlanItem
+Configurações
+ConfiguracaoEmpresa
+CalendarioUtil
+MigrationHistory
+Arquitetura Técnica
+Stack Tecnológico
+Backend: Flask (Python)
+ORM: SQLAlchemy
+Banco de Dados: PostgreSQL
+Autenticação: Flask-Login
+Migrações: Flask-Migrate
+Frontend: HTML/Jinja2 templates
+CORS: Flask-CORS
+Configurações de Produção
+Ambiente: EasyPanel (Docker)
+Pool de Conexões: 20 conexões base + 40 overflow = 60 total
+Secret Key: Estática para múltiplos workers Gunicorn
+Cookies: Secure, HttpOnly, SameSite=Lax
+SSL: Desabilitado para PostgreSQL interno
+Recursos Avançados Identificados
+Sistema multi-tenant (isolamento por admin_id)
+Reconhecimento facial para ponto eletrônico
+Event Manager para integrações
+Circuit Breaker pattern
+Observabilidade habilitada
+Storage persistente para uploads
+Handlers para eventos (folha, propostas, financeiro)
+Próximos Passos da Análise
+Análise técnica profunda da arquitetura
+Análise de qualidade de código
+Análise de UX/UI
+Análise comercial e de negócio
+Análise de precificação
+Análise de marketing
