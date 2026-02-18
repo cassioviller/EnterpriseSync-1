@@ -1550,7 +1550,11 @@ function setDateRange(period) {
                                                                 <div class="me-2">
                                                                     {% if funcionario.foto or funcionario.foto_base64 %}
                                                                     <img src="/api/funcionario/{{ funcionario.id }}/foto" class="rounded-circle" width="30" height="30" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                                                                    {% endif %}
+                                                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
+                                                                         style="width: 30px; height: 30px; font-size: 12px; display: none;">
+                                                                        {{ funcionario.nome.split()[0][0] }}{{ funcionario.nome.split()[-1][0] if funcionario.nome.split()|length > 1 else '' }}
+                                                                    </div>
+                                                                    {% else %}
                                                                     <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
                                                                          style="width: 30px; height: 30px; font-size: 12px;">
                                                                         {{ funcionario.nome.split()[0][0] }}{{ funcionario.nome.split()[-1][0] if funcionario.nome.split()|length > 1 else '' }}
