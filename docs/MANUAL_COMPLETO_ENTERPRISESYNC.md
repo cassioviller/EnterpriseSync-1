@@ -1,8 +1,8 @@
 <div align="center">
 
-# 📘 Manual de Uso do Sistema EnterpriseSync
+# Manual do Usuário - Sistema SIGE EnterpriseSync
 
-### Guia completo para usuarios e administradores
+### Guia completo de uso do sistema
 
 ---
 
@@ -10,11 +10,10 @@
 
 ---
 
-**Sistema:** SIGE v9.0 — EnterpriseSync
-**Versao:** 1.0
-**Data:** Fevereiro de 2026
-**Empresa:** Estruturas do Vale
-**Classificacao:** Documento Interno — Uso Restrito
+**Versão 1.0 | Fevereiro de 2026**
+
+**Sistema SIGE — EnterpriseSync**
+**Estruturas do Vale**
 
 ---
 
@@ -22,3702 +21,3683 @@
 
 ---
 
-# Indice Geral
+# Índice Geral
 
-- [Capitulo 1 — Configuracao Inicial e Instalacao](#capitulo-1--configuração-inicial-e-instalação)
-  - [1.1. Introducao](#11-introdução)
-  - [1.2. Requisitos do Sistema](#12-requisitos-do-sistema)
-  - [1.3. Instalacao do Sistema](#13-instalação-do-sistema)
-  - [1.4. Primeiro Acesso e Configuracao da Empresa](#14-primeiro-acesso-e-configuração-da-empresa)
-  - [1.5. Configuracoes Globais](#15-configurações-globais)
-  - [1.6. Gestao de Usuarios](#16-gestão-de-usuários)
-  - [1.7. Checklist de Configuracao Inicial](#17-checklist-de-configuração-inicial)
-- [Capitulo 2 — Modulo Dashboard](#capitulo-2--módulo-dashboard)
-  - [2.1. Introducao ao Dashboard](#21-introdução-ao-dashboard)
-  - [2.2. Acessando o Dashboard](#22-acessando-o-dashboard)
-  - [2.3. KPIs Principais](#23-kpis-principais)
-  - [2.4. Graficos e Visualizacoes](#24-gráficos-e-visualizações)
-  - [2.5. Dashboard Executivo por Obra](#25-dashboard-executivo-por-obra)
-  - [2.6. Dashboard do Funcionario](#26-dashboard-do-funcionário)
-  - [2.7. Alertas e Notificacoes](#27-alertas-e-notificações)
-  - [2.8. Personalizacao do Dashboard](#28-personalização-do-dashboard)
-- [Capitulo 3 — Gestao de Funcionarios](#capitulo-3--gestão-de-funcionários)
-  - [3.1. Introducao a Gestao de Funcionarios](#31-introdução-à-gestão-de-funcionários)
-  - [3.2. Tela Principal de Funcionarios](#32-tela-principal-de-funcionários)
-  - [3.3. Cadastrando um Novo Funcionario](#33-cadastrando-um-novo-funcionário)
-  - [3.4. Perfil do Funcionario](#34-perfil-do-funcionário)
-  - [3.5. Reconhecimento Facial](#35-reconhecimento-facial)
-  - [3.6. Controle de Ponto Eletronico](#36-controle-de-ponto-eletrônico)
-  - [3.7. Relatorios de Funcionarios](#37-relatórios-de-funcionários)
-- [Capitulo 4 — Gestao de Obras](#capitulo-4--gestão-de-obras)
-  - [4.1. Introducao a Gestao de Obras](#41-introdução-à-gestão-de-obras)
+- [Capítulo 1 — Primeiro Acesso e Navegação](#capítulo-1--primeiro-acesso-e-navegação)
+  - [1.1. Bem-vindo ao SIGE](#11-bem-vindo-ao-sige)
+  - [1.2. Acessando o Sistema](#12-acessando-o-sistema)
+  - [1.3. Fazendo Login](#13-fazendo-login)
+  - [1.4. Conhecendo a Interface](#14-conhecendo-a-interface)
+  - [1.5. Perfis de Acesso](#15-perfis-de-acesso)
+  - [1.6. Alterando sua Senha](#16-alterando-sua-senha)
+  - [1.7. Saindo do Sistema (Logout)](#17-saindo-do-sistema-logout)
+  - [1.8. Dicas de Navegação](#18-dicas-de-navegação)
+- [Capítulo 2 — Painel de Controle (Dashboard)](#capítulo-2--painel-de-controle-dashboard)
+  - [2.1. O que é o Painel de Controle?](#21-o-que-é-o-painel-de-controle)
+  - [2.2. Como Acessar o Painel de Controle](#22-como-acessar-o-painel-de-controle)
+  - [2.3. Filtro de Período](#23-filtro-de-período--escolhendo-o-intervalo-de-datas)
+  - [2.4. Cartões de KPI](#24-cartões-de-kpi--os-números-que-importam)
+  - [2.5. Custos Detalhados do Período](#25-custos-detalhados-do-período)
+  - [2.6. Propostas Comerciais](#26-propostas-comerciais)
+  - [2.7. Gráfico de Evolução de Propostas](#27-gráfico-de-evolução-de-propostas)
+  - [2.8. Obras e RDO — Acompanhamento Rápido](#28-obras-e-rdo--acompanhamento-rápido)
+  - [2.9. Dashboard Executivo por Obra](#29-dashboard-executivo-por-obra)
+  - [2.10. Painel do Funcionário](#210-painel-do-funcionário)
+  - [2.11. Boas Práticas](#211-boas-práticas--aproveitando-o-painel-ao-máximo)
+  - [2.12. Navegando do Painel para Outros Módulos](#212-navegando-do-painel-para-outros-módulos)
+  - [2.13. Resumo do Capítulo](#213-resumo-do-capítulo)
+- [Capítulo 3 — Gestão de Funcionários](#capítulo-3--gestão-de-funcionários)
+  - [3.1. Introdução](#31-introdução)
+  - [3.2. Tela Principal de Funcionários](#32-tela-principal-de-funcionários)
+  - [3.3. Pesquisando e Filtrando Funcionários](#33-pesquisando-e-filtrando-funcionários)
+  - [3.4. Cadastrando um Novo Funcionário](#34-cadastrando-um-novo-funcionário)
+  - [3.5. Perfil do Funcionário](#35-perfil-do-funcionário)
+  - [3.6. Cadastro de Fotos para Reconhecimento Facial](#36-cadastro-de-fotos-para-reconhecimento-facial)
+  - [3.7. Ponto Eletrônico — Registro de Ponto](#37-ponto-eletrônico--registro-de-ponto)
+  - [3.8. Consultando os Registros de Ponto](#38-consultando-os-registros-de-ponto)
+  - [3.9. Relatórios de Funcionários](#39-relatórios-de-funcionários)
+  - [3.10. Perguntas Frequentes](#310-perguntas-frequentes)
+- [Capítulo 4 — Gestão de Obras](#capítulo-4--gestão-de-obras)
+  - [4.1. Introdução](#41-introdução)
   - [4.2. Tela Principal de Obras](#42-tela-principal-de-obras)
   - [4.3. Cadastrando uma Nova Obra](#43-cadastrando-uma-nova-obra)
-  - [4.4. Planejamento da Obra](#44-planejamento-da-obra)
-  - [4.5. Acompanhamento da Obra](#45-acompanhamento-da-obra)
-  - [4.6. Controle Financeiro da Obra](#46-controle-financeiro-da-obra)
-  - [4.7. Relatorios de Obras](#47-relatórios-de-obras)
-- [Capitulo 5 — Gestao de Frota e Veiculos](#capitulo-5--gestão-de-frota-e-veículos)
-  - [5.1. Introducao a Gestao de Frota](#51-introdução-à-gestão-de-frota)
-  - [5.2. Tela Principal de Veiculos](#52-tela-principal-de-veículos)
-  - [5.3. Cadastrando um Novo Veiculo](#53-cadastrando-um-novo-veículo)
-  - [5.4. Registrando o Uso de Veiculos](#54-registrando-o-uso-de-veículos)
-  - [5.5. Controle de Custos de Veiculos](#55-controle-de-custos-de-veículos)
-  - [5.6. Detalhes do Veiculo](#56-detalhes-do-veículo)
-  - [5.7. Relatorios de Frota](#57-relatórios-de-frota)
-- [Capitulo 6 — Relatorio Diario de Obra (RDO)](#capitulo-6--relatorio-diario-de-obra-rdo)
-  - [6.1. Introducao ao RDO](#61-introducao-ao-rdo)
-  - [6.2. Tela Principal de RDOs](#62-tela-principal-de-rdos)
-  - [6.3. Criando um Novo RDO](#63-criando-um-novo-rdo)
-  - [6.4. Registrando Atividades no RDO](#64-registrando-atividades-no-rdo)
-  - [6.5. Finalizando e Enviando para Aprovacao](#65-finalizando-e-enviando-para-aprovacao)
-  - [6.6. Aprovacao de RDOs](#66-aprovacao-de-rdos)
-  - [6.7. Impacto do RDO no Sistema](#67-impacto-do-rdo-no-sistema)
-  - [6.8. Relatorios de RDO](#68-relatorios-de-rdo)
-- [Capitulo 7 — Modulo Financeiro](#capitulo-7--modulo-financeiro)
-  - [7.1. Introducao ao Modulo Financeiro](#71-introducao-ao-modulo-financeiro)
-  - [7.2. Dashboard Financeiro](#72-dashboard-financeiro)
-  - [7.3. Plano de Contas e Centros de Custo](#73-plano-de-contas-e-centros-de-custo)
-  - [7.4. Contas a Pagar](#74-contas-a-pagar)
-  - [7.5. Contas a Receber](#75-contas-a-receber)
-  - [7.6. Fluxo de Caixa](#76-fluxo-de-caixa)
-  - [7.7. Relatorios Financeiros](#77-relatorios-financeiros)
-- [Capitulo 8 — Modulos Avancados](#capitulo-8--módulos-avançados)
-  - [8.1. Modulo de Propostas Comerciais](#81-módulo-de-propostas-comerciais)
-  - [8.2. Modulo de Alimentacao](#82-módulo-de-alimentação)
-  - [8.3. Modulo de Almoxarifado](#83-módulo-de-almoxarifado)
-  - [8.4. Modulo de API](#84-módulo-de-api)
-  - [8.5. Modulo de Relatorios](#85-módulo-de-relatórios)
-  - [8.6. Modulo de Administracao](#86-módulo-de-administração)
-- [Capitulo 9 — Suporte e Consideracoes Finais](#capitulo-9--suporte-e-considerações-finais)
-  - [9.1. Troubleshooting](#91-troubleshooting)
-  - [9.2. Boas Praticas](#92-boas-práticas)
+  - [4.4. Visualizando os Detalhes da Obra](#44-visualizando-os-detalhes-da-obra)
+  - [4.5. Planejamento de Serviços](#45-planejamento-de-serviços)
+  - [4.6. Lançamento de Custos Diversos](#46-lançamento-de-custos-diversos)
+  - [4.7. Controle Financeiro da Obra](#47-controle-financeiro-da-obra)
+  - [4.8. Criando RDOs a partir da Obra](#48-criando-rdos-a-partir-da-obra)
+  - [4.9. Editando uma Obra](#49-editando-uma-obra)
+  - [4.10. Alterando o Status da Obra](#410-alterando-o-status-da-obra)
+  - [4.11. Equipe da Obra](#411-equipe-da-obra)
+  - [4.12. Excluindo uma Obra](#412-excluindo-uma-obra)
+  - [4.13. Relatórios de Obras](#413-relatórios-de-obras)
+  - [4.14. Dicas e Boas Práticas](#414-dicas-e-boas-práticas)
+- [Capítulo 5 — Gestão de Frota e Veículos](#capítulo-5--gestão-de-frota-e-veículos)
+  - [5.1. Introdução](#51-introdução)
+  - [5.2. Visualizando a Lista de Veículos](#52-visualizando-a-lista-de-veículos)
+  - [5.3. Cadastrando um Novo Veículo](#53-cadastrando-um-novo-veículo)
+  - [5.4. Registrando o Uso do Veículo (Viagens)](#54-registrando-o-uso-do-veículo-viagens)
+  - [5.5. Controlando os Custos dos Veículos](#55-controlando-os-custos-dos-veículos)
+  - [5.6. Painel de Detalhes do Veículo](#56-painel-de-detalhes-do-veículo)
+  - [5.7. Controle de Documentação e Alertas](#57-controle-de-documentação-e-alertas)
+  - [5.8. Relatórios de Frota](#58-relatórios-de-frota)
+  - [5.9. Dicas Práticas](#59-dicas-práticas-para-uma-boa-gestão-de-frota)
+  - [5.10. Perguntas Frequentes](#510-perguntas-frequentes)
+- [Capítulo 6 — Relatório Diário de Obra (RDO)](#capítulo-6--relatório-diário-de-obra-rdo)
+  - [6.1. O que é o RDO?](#61-o-que-é-o-rdo)
+  - [6.2. Visualizando a Lista de RDOs](#62-visualizando-a-lista-de-rdos)
+  - [6.3. Criando um Novo RDO — Passo a Passo](#63-criando-um-novo-rdo--passo-a-passo)
+  - [6.4. Registrando Atividades e Serviços](#64-registrando-atividades-e-serviços)
+  - [6.5. Tirando e Anexando Fotos](#65-tirando-e-anexando-fotos)
+  - [6.6. Salvando e Enviando o RDO](#66-salvando-e-enviando-o-rdo)
+  - [6.7. Aprovação de RDOs (Para Gestores)](#67-aprovação-de-rdos-para-gestores)
+  - [6.8. Como o RDO Atualiza o Progresso da Obra](#68-como-o-rdo-atualiza-o-progresso-da-obra)
+  - [6.9. Relatórios e Exportação](#69-relatórios-e-exportação)
+  - [6.10. Dicas para Escrever Bons RDOs](#610-dicas-para-escrever-bons-rdos)
+- [Capítulo 7 — Módulo Financeiro](#capítulo-7--módulo-financeiro)
+  - [7.1. Introdução ao Módulo Financeiro](#71-introdução-ao-módulo-financeiro)
+  - [7.2. Dashboard Financeiro](#72-dashboard-financeiro--seu-painel-de-controle)
+  - [7.3. Contas a Pagar](#73-contas-a-pagar--controlando-suas-despesas)
+  - [7.4. Contas a Receber](#74-contas-a-receber--controlando-suas-receitas)
+  - [7.5. Fluxo de Caixa](#75-fluxo-de-caixa--o-extrato-da-sua-empresa)
+  - [7.6. De onde vêm os custos automáticos?](#76-de-onde-vêm-os-custos-automáticos)
+  - [7.7. Centros de Custo](#77-centros-de-custo--organizando-seus-gastos)
+  - [7.8. Relatórios Financeiros](#78-relatórios-financeiros--entendendo-os-números-da-empresa)
+  - [7.9. Dicas para Manter suas Finanças Organizadas](#79-dicas-para-manter-suas-finanças-organizadas)
+- [Capítulo 8 — Outros Módulos](#capítulo-8--outros-módulos)
+  - [8.1. Propostas Comerciais](#81-propostas-comerciais)
+  - [8.2. Alimentação](#82-alimentação)
+  - [8.3. Almoxarifado](#83-almoxarifado)
+  - [8.4. Equipe](#84-equipe)
+  - [8.5. Relatórios](#85-relatórios)
+- [Capítulo 9 — Dúvidas Frequentes e Suporte](#capítulo-9--dúvidas-frequentes-e-suporte)
+  - [9.1. Perguntas Frequentes](#91-perguntas-frequentes)
+  - [9.2. Dicas do Dia a Dia](#92-dicas-do-dia-a-dia)
   - [9.3. Contato do Suporte](#93-contato-do-suporte)
-  - [9.4. Glossario](#94-glossário)
+  - [9.4. Glossário](#94-glossário)
 
 ---
 
-# Capitulo 1 — Configuração Inicial e Instalação
+# Capítulo 1 — Primeiro Acesso e Navegação
 
 **SIGE - Estruturas do Vale (EnterpriseSync)**
 Manual do Usuário — Versão 8.0
 
 ---
 
-## 1.1. Introdução
+## 1.1. Bem-vindo ao SIGE
 
-Bem-vindo ao **SIGE (Sistema Integrado de Gestão Empresarial)**, comercializado sob a marca **EnterpriseSync** e operado pela **Estruturas do Vale**. O SIGE é uma plataforma completa desenvolvida especificamente para empresas do setor de construção civil e engenharia, reunindo **97 modelos de dados** e **18 módulos integrados** em uma única solução web multi-tenant.
+Bem-vindo ao **SIGE (Sistema Integrado de Gestão Empresarial)**, a plataforma completa da **Estruturas do Vale** para gerenciar todas as atividades da sua empresa de construção civil e engenharia.
 
-**Objetivos do EnterpriseSync:**
+Com o SIGE, você tem acesso a todas as ferramentas que precisa no dia a dia, reunidas em um único lugar:
 
-1. **Centralizar informações** — Reunir todos os dados operacionais, administrativos e financeiros em um único ambiente acessível de qualquer dispositivo.
-2. **Automatizar processos** — Reduzir trabalho manual por meio de cálculos automáticos de horas trabalhadas, horas extras, custos e produtividade.
-3. **Garantir rastreabilidade** — Manter histórico completo e auditável de todas as operações realizadas no sistema.
-4. **Isolamento multi-tenant** — Permitir que múltiplas empresas operem de forma isolada na mesma instalação, com segregação total de dados via coluna `admin_id`.
-5. **Apoiar a tomada de decisão** — Fornecer dashboards, KPIs e relatórios gerenciais em tempo real.
+- **Gestão de Obras** — Acompanhe o andamento de cada obra, registre atividades diárias e controle prazos.
+- **Funcionários e Equipes** — Cadastre colaboradores, organize equipes de campo e gerencie escalas.
+- **Controle de Ponto** — Registre entradas, saídas e pausas dos funcionários, com cálculo automático de horas trabalhadas e horas extras.
+- **Relatórios Diários de Obra (RDO)** — Documente tudo o que acontece em cada obra, todos os dias.
+- **Financeiro** — Gerencie contas a pagar, contas a receber e acompanhe o fluxo de caixa.
+- **Propostas Comerciais** — Crie e acompanhe orçamentos e propostas para novos projetos.
+- **Frota de Veículos** — Controle veículos, abastecimentos e manutenções.
+- **Alimentação** — Gerencie refeições e vales alimentação dos colaboradores.
+- **Almoxarifado** — Controle o estoque de materiais, requisições e movimentações.
+- **Relatórios Gerenciais** — Visualize indicadores, gráficos e exporte dados para tomada de decisão.
 
-### Módulos Disponíveis
-
-O menu de navegação do SIGE exibe os seguintes módulos na barra superior:
-
-| Nº | Módulo | Tipo de Menu | Descrição |
-|:--:|:-------|:------------|:----------|
-| 1 | Dashboard | Link direto | Painel gerencial com KPIs e indicadores |
-| 2 | RDOs | Link direto | Relatórios Diários de Obra |
-| 3 | Obras | Link direto | Gestão completa de obras e projetos |
-| 4 | Funcionários | Link direto | Cadastro e gestão de colaboradores |
-| 5 | Equipe | Link direto | Alocação e gestão de equipes de campo |
-| 6 | Ponto | Dropdown ▼ | Controle de ponto eletrônico com reconhecimento facial |
-| 7 | Propostas | Dropdown ▼ | Propostas comerciais e orçamentos |
-| 8 | Financeiro | Dropdown ▼ | Contas a pagar, receber e fluxo de caixa |
-| 9 | Veículos | Link direto | Gestão de frota e controle de veículos |
-| 10 | Alimentação | Link direto | Controle de refeições e vales alimentação |
-| 11 | Almoxarifado | Dropdown ▼ | Estoque, requisições e movimentações de materiais |
-| 12 | Relatórios | Link direto | Relatórios consolidados e exportações |
-
-> **URL de acesso em produção:** [https://sige.cassioviller.tech](https://sige.cassioviller.tech)
-
-### O que será coberto neste capítulo
-
-Neste capítulo, você aprenderá a:
-
-1. Verificar os requisitos de hardware e software necessários para o funcionamento do sistema
-2. Instalar e configurar o SIGE em ambiente de produção via Docker e EasyPanel
-3. Realizar o primeiro acesso e configurar os dados da empresa
-4. Cadastrar departamentos, funções e horários de trabalho
-5. Gerenciar usuários e suas permissões de acesso
+O sistema foi projetado para ser simples e intuitivo, permitindo que todos os colaboradores — desde o escritório até o campo — possam utilizá-lo sem dificuldades.
 
 ---
 
-## 1.2. Requisitos do Sistema
+## 1.2. Acessando o Sistema
 
-### 1.2.1. Requisitos de Hardware (Servidor)
+### Como acessar
 
-| Componente | Requisito Mínimo | Requisito Recomendado |
-|:-----------|:-----------------|:---------------------|
-| Processador | 2 vCPUs | 4 vCPUs |
-| Memória RAM | 2 GB | 4 GB ou superior |
-| Armazenamento | 20 GB SSD | 50 GB SSD ou superior |
-| Rede | 10 Mbps | 100 Mbps |
+O SIGE é um sistema online, acessado diretamente pelo navegador de internet do seu computador, tablet ou celular. Não é necessário instalar nenhum programa.
 
-### 1.2.2. Requisitos de Software (Servidor)
+Para acessar, basta:
 
-| Software | Versão Mínima | Observação |
-|:---------|:-------------|:-----------|
-| Sistema Operacional | Ubuntu 20.04 LTS ou similar | Qualquer distribuição Linux com suporte a Docker |
-| Docker | 20.10+ | Motor de contêineres para deploy da aplicação |
-| Docker Compose | 2.0+ | Orquestração de serviços (app + banco de dados) |
-| PostgreSQL | 14+ | Banco de dados relacional (Neon-backed em produção) |
-| Python | 3.11+ | Runtime da aplicação (incluso no contêiner Docker) |
+1. Abra o navegador de internet de sua preferência.
+2. Digite o endereço (URL) do sistema na barra de endereços. O endereço será fornecido pelo administrador da sua empresa.
+3. A tela de login será exibida.
 
-### 1.2.3. Requisitos do Navegador (Cliente)
+[IMAGEM: Barra de endereços do navegador com a URL do SIGE]
 
-| Navegador | Versão Mínima |
-|:----------|:-------------|
-| Google Chrome | 90+ |
-| Mozilla Firefox | 88+ |
-| Microsoft Edge | 90+ |
-| Safari | 14+ |
+### Navegadores compatíveis
 
-> **Nota:** O sistema é totalmente responsivo e pode ser acessado via dispositivos móveis (smartphones e tablets). Para funcionalidades de reconhecimento facial e geolocalização no módulo de Ponto, é necessário que o navegador tenha acesso à câmera e ao GPS do dispositivo.
+O SIGE funciona nos principais navegadores de internet. Recomendamos manter seu navegador sempre atualizado para a melhor experiência:
 
-### 1.2.4. Requisitos de Rede
+| Navegador | Versão Recomendada |
+|:----------|:-------------------|
+| Google Chrome | Versão 90 ou superior |
+| Mozilla Firefox | Versão 88 ou superior |
+| Microsoft Edge | Versão 90 ou superior |
+| Safari (Mac/iPhone) | Versão 14 ou superior |
 
-- Conexão com a internet estável (mínimo 10 Mbps)
-- Porta 443 (HTTPS) liberada para acesso externo
-- Certificado SSL válido (obrigatório para ambiente de produção)
+### Acesso pelo celular e tablet
+
+O SIGE é **totalmente responsivo**, ou seja, se adapta automaticamente ao tamanho da tela do seu dispositivo. Você pode acessar todas as funcionalidades pelo celular ou tablet da mesma forma que acessa pelo computador.
+
+**Dicas para acesso mobile:**
+
+- Use o navegador Chrome ou Safari no seu celular.
+- Para facilitar o acesso, adicione o SIGE como atalho na tela inicial do seu celular.
+- Para funcionalidades como registro de ponto com foto, o navegador precisará de permissão para acessar a câmera do dispositivo.
 
 ---
 
-## 1.3. Instalação do Sistema
+## 1.3. Fazendo Login
 
-O SIGE é distribuído como uma aplicação containerizada via **Docker**, com suporte nativo ao **EasyPanel** para gerenciamento simplificado do deploy.
+O login é o primeiro passo para utilizar o sistema. Você precisará das suas credenciais de acesso (usuário e senha), que são fornecidas pelo administrador da empresa.
 
-### 1.3.1. Pré-requisitos de Instalação
+### Passo a passo para fazer login
 
-Certifique-se de que o Docker e o Docker Compose estão instalados no servidor:
+1. Abra o navegador e acesse o endereço do SIGE.
+2. Na tela de login, você verá dois campos:
+   - **Username / E-mail** — Digite seu nome de usuário ou seu e-mail cadastrado.
+   - **Senha** — Digite sua senha.
+3. Clique no botão **"Entrar"**.
 
-```bash
-# Verificar instalação do Docker
-docker --version
+[IMAGEM: Tela de login do SIGE com os campos Username e Senha destacados]
 
-# Verificar instalação do Docker Compose
-docker compose version
-```
+### O que acontece após o login
 
-### 1.3.2. Clonando o Repositório
+Após fazer login com sucesso, você será direcionado automaticamente para a página inicial do sistema, que varia conforme o seu perfil de acesso:
 
-```bash
-# Clonar o repositório do projeto
-git clone https://github.com/sua-organizacao/enterprisesync.git
+| Seu Perfil | Página Inicial |
+|:-----------|:---------------|
+| Administrador Master | Painel do Super Administrador |
+| Administrador | Dashboard (Painel de Controle) |
+| Gestor de Equipes | RDO Consolidado |
+| Almoxarife | RDO Consolidado |
+| Funcionário | RDO Consolidado |
 
-# Acessar o diretório do projeto
-cd enterprisesync
-```
+### Se o login não funcionar
 
-### 1.3.3. Configuração das Variáveis de Ambiente
+Caso suas credenciais estejam incorretas, o sistema exibirá a mensagem:
 
-Crie o arquivo `.env` na raiz do projeto com as seguintes variáveis obrigatórias:
+> *"Email/Username ou senha inválidos."*
 
-```env
-# === Banco de Dados ===
-DATABASE_URL=postgresql://usuario:senha@host:5432/nome_do_banco
-PGHOST=host_do_banco
-PGPORT=5432
-PGUSER=usuario_do_banco
-PGPASSWORD=senha_do_banco
-PGDATABASE=nome_do_banco
+**O que fazer nesse caso:**
 
-# === Segurança ===
-SESSION_SECRET=sua_chave_secreta_aqui
-```
+1. **Verifique o nome de usuário ou e-mail** — Confira se digitou corretamente, sem espaços extras.
+2. **Verifique a senha** — Lembre-se de que a senha diferencia letras maiúsculas de minúsculas.
+3. **Confira se o Caps Lock está desligado** — Uma causa comum de erro é digitar a senha com o Caps Lock ativado.
+4. **Entre em contato com o administrador** — Se ainda não conseguir acessar, solicite ao administrador da sua empresa que verifique seu cadastro ou redefina sua senha.
 
-**Detalhamento das variáveis:**
+[IMAGEM: Mensagem de erro de login exibida na tela]
 
-| Variável | Descrição | Exemplo |
-|:---------|:----------|:--------|
-| `DATABASE_URL` | URL de conexão completa com o PostgreSQL | `postgresql://sige:s3nh4@db:5432/sige_db` |
-| `SESSION_SECRET` | Chave secreta para criptografia de sessões Flask | Gere com: `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `PGHOST` | Endereço do servidor PostgreSQL | `db` ou `localhost` |
-| `PGPORT` | Porta do PostgreSQL | `5432` |
-| `PGUSER` | Usuário do banco de dados | `sige` |
-| `PGPASSWORD` | Senha do banco de dados | `s3nh4_segura_123` |
-| `PGDATABASE` | Nome do banco de dados | `sige_db` |
-
-> **Segurança:** Nunca compartilhe ou exponha o arquivo `.env` em repositórios públicos. Adicione-o ao `.gitignore`. Utilize senhas fortes com no mínimo 16 caracteres, combinando letras, números e caracteres especiais.
-
-### 1.3.4. Instalação via Docker Compose
-
-```bash
-# Construir e iniciar os containers
-docker compose up -d --build
-
-# Verificar se os containers estão rodando
-docker compose ps
-```
-
-### 1.3.5. Instalação via EasyPanel
-
-Para instalação via **EasyPanel**, siga os passos abaixo:
-
-1. Acesse o painel de controle do EasyPanel no endereço do seu servidor.
-2. Clique em **"Create Service"** → **"App"**.
-3. Selecione a opção **"Docker Image"** ou **"GitHub Repository"** e vincule ao repositório do SIGE.
-4. Configure todas as variáveis de ambiente listadas na seção 1.3.3.
-5. Defina a porta de exposição como **5000**.
-6. Configure o domínio personalizado (ex: `sige.cassioviller.tech`).
-7. Ative o certificado SSL automático (Let's Encrypt).
-8. Clique em **"Deploy"**.
-
-[IMAGEM: Tela de configuração do EasyPanel com variáveis de ambiente]
-
-### 1.3.6. Migrações do Banco de Dados
-
-O sistema executa automaticamente `db.create_all()` na inicialização, criando todas as **97 tabelas** que ainda não existem no banco de dados. Não é necessário executar migrações manuais na maioria dos casos.
-
-Caso necessário, as migrações podem ser executadas manualmente:
-
-```bash
-# Acessar o container da aplicação
-docker exec -it enterprisesync-app bash
-
-# Executar as migrações
-flask db upgrade
-```
-
-### 1.3.7. Iniciando o Servidor
-
-O servidor é iniciado automaticamente pelo Gunicorn com o seguinte comando:
-
-```bash
-gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
-```
-
-Após a inicialização bem-sucedida, o sistema estará acessível em:
-
-- **Produção:** `https://sige.cassioviller.tech`
-- **Desenvolvimento local:** `http://localhost:5000`
-
-### 1.3.8. Verificando a Instalação
-
-Acesse a URL do sistema no navegador. Se a **tela de login** for exibida corretamente com os campos **Username** e **Senha** e o botão **"Entrar"**, a instalação foi concluída com sucesso.
-
-[IMAGEM: Tela de login do SIGE com campos Username e Senha]
+> **Observação:** Por segurança, o sistema limita o número de tentativas de login. Se você errar muitas vezes em um curto intervalo, aguarde alguns minutos antes de tentar novamente.
 
 ---
 
-## 1.4. Primeiro Acesso e Configuração da Empresa
+## 1.4. Conhecendo a Interface
 
-### 1.4.1. Criando o Primeiro Usuário Super Admin
+Após fazer login, você encontrará uma interface organizada e intuitiva. Vamos conhecer cada parte da tela:
 
-O primeiro usuário do sistema deve ser do tipo **SUPER_ADMIN**, que possui acesso irrestrito a todas as funcionalidades e configurações. Este usuário é criado via linha de comando durante a implantação inicial:
+[IMAGEM: Visão geral da interface do SIGE com as áreas numeradas]
 
-```bash
-# Acessar o shell Python dentro do container
-docker exec -it enterprisesync-app flask shell
-```
+### 1.4.1. Barra de Navegação Superior
 
-```python
-from models import db, Usuario, TipoUsuario
-from werkzeug.security import generate_password_hash
+A **barra de navegação** fica no topo da tela e é o principal meio de acessar os diferentes módulos do sistema. Ela contém os seguintes itens:
 
-admin = Usuario(
-    nome="Administrador Principal",
-    username="admin",
-    email="admin@suaempresa.com.br",
-    password_hash=generate_password_hash("SenhaSegura123!"),
-    tipo_usuario=TipoUsuario.SUPER_ADMIN,
-    ativo=True
-)
+| Menu | O que você encontra |
+|:-----|:--------------------|
+| **Dashboard** | Painel de controle com indicadores gerais, gráficos e resumos da empresa. É a visão geral do negócio. |
+| **RDOs** | Relatórios Diários de Obra — lista de todos os relatórios registrados, com opções de criar novos e visualizar os existentes. |
+| **Obras** | Lista de todas as obras cadastradas, com informações de andamento, localização e equipes. |
+| **Funcionários** | Cadastro completo de colaboradores, com dados pessoais, função, departamento e documentos. |
+| **Equipe** | Gestão de equipes de trabalho, permitindo organizar os colaboradores por grupos e obras. |
+| **Ponto** ▼ | Menu com opções para controle de ponto dos funcionários, incluindo registro de entradas e saídas, consultas e relatórios de frequência. |
+| **Propostas** ▼ | Menu para criação e acompanhamento de propostas comerciais e orçamentos de obras. |
+| **Financeiro** ▼ | Menu com opções financeiras, incluindo contas a pagar, contas a receber e fluxo de caixa. |
+| **Veículos** | Gestão da frota de veículos, controle de abastecimentos, manutenções e quilometragem. |
+| **Alimentação** | Controle de refeições fornecidas aos colaboradores e gestão de vales alimentação. |
+| **Almoxarifado** ▼ | Menu para gestão de materiais, controle de estoque, requisições e movimentações de entrada e saída. |
+| **Relatórios** | Relatórios consolidados e ferramentas de exportação de dados para análise gerencial. |
 
-db.session.add(admin)
-db.session.commit()
-print(f"Super Admin criado com ID: {admin.id}")
-```
+> **O símbolo ▼** ao lado de alguns menus indica que eles possuem submenus. Ao clicar ou passar o mouse sobre esses itens, um menu suspenso será exibido com as opções disponíveis.
 
-> **Importante:** Após o primeiro acesso, altere a senha padrão imediatamente por motivos de segurança.
+[IMAGEM: Barra de navegação superior com os menus destacados]
 
-### 1.4.2. Realizando o Primeiro Login
+### 1.4.2. Menu do Usuário
 
-1. Acesse o sistema pela URL configurada: `https://sige.cassioviller.tech`
-2. Na tela de login, preencha os campos:
-   - **Username:** Informe o nome de usuário **ou** o e-mail cadastrado
-   - **Senha:** Informe a senha definida na criação do SUPER_ADMIN
-3. Clique no botão **"Entrar"**
+No canto superior direito da tela, você encontrará o **Menu do Usuário**, identificado pelo seu nome de usuário. Ao clicar sobre ele, um menu suspenso será exibido com as seguintes opções:
 
-[IMAGEM: Tela de login preenchida com credenciais de acesso]
+| Opção | O que faz |
+|:------|:----------|
+| **Perfil** | Acessa seus dados pessoais e permite editar informações como nome e e-mail. |
+| **Configurações** | Acessa as configurações da sua conta, incluindo alteração de senha. |
+| **Sair** | Encerra sua sessão e retorna à tela de login. |
 
-> **Informações sobre o login:**
-> - O campo Username aceita tanto o **nome de usuário** quanto o **e-mail** cadastrado.
-> - Em caso de credenciais inválidas, será exibida a mensagem: *"Email/Username ou senha inválidos."*
-> - O sistema possui **rate limiting de 30 tentativas por minuto** no endpoint de login para proteção contra ataques de força bruta.
+[IMAGEM: Menu do usuário no canto superior direito expandido]
 
-### 1.4.3. Redirecionamento Após Login
+> **Dica:** Sempre que terminar de usar o sistema, clique em **"Sair"** para encerrar sua sessão com segurança, especialmente se estiver usando um computador compartilhado.
 
-Após o login bem-sucedido, o sistema redireciona automaticamente o usuário conforme seu tipo:
+### 1.4.3. Área de Conteúdo Principal
 
-| Tipo de Usuário | Página de Destino | URL |
-|:----------------|:------------------|:----|
-| SUPER_ADMIN | Dashboard Super Admin | `/super_admin_dashboard` |
-| ADMIN | Dashboard Administrativo | `/dashboard` |
-| GESTOR_EQUIPES | RDO Consolidado | `/funcionario/rdo/consolidado` |
-| ALMOXARIFE | RDO Consolidado | `/funcionario/rdo/consolidado` |
-| FUNCIONARIO | RDO Consolidado | `/funcionario/rdo/consolidado` |
+A **área de conteúdo principal** ocupa a maior parte da tela e é onde as informações e formulários de cada módulo são exibidos. O conteúdo dessa área muda conforme o menu que você seleciona na barra de navegação.
 
-[IMAGEM: Dashboard do Super Admin após primeiro login]
+Por exemplo:
+- Ao clicar em **Dashboard**, a área principal exibirá gráficos e indicadores.
+- Ao clicar em **Funcionários**, será exibida a lista de colaboradores cadastrados.
+- Ao clicar em **RDOs**, aparecerão os relatórios diários de obra.
 
-### 1.4.4. Configurando os Dados da Empresa
+A maioria das telas de listagem apresenta:
+- **Botão de ação** (como "Novo", "Cadastrar" ou "Adicionar") para criar novos registros.
+- **Tabela de dados** com os registros existentes.
+- **Ícones de ação** ao lado de cada registro (visualizar, editar, excluir).
+- **Filtros e buscas** para localizar informações específicas.
 
-Após o primeiro login como Super Admin, configure os dados da sua empresa:
-
-1. Acesse o **Painel Administrativo** (Dashboard do Super Admin).
-2. Navegue até **Configurações** → **Dados da Empresa**.
-3. Preencha os seguintes campos:
-
-| Campo | Descrição | Obrigatório |
-|:------|:----------|:-----------:|
-| Nome da Empresa | Razão social ou nome fantasia | Sim |
-| CNPJ | Cadastro Nacional de Pessoa Jurídica | Sim |
-| Endereço | Endereço completo da sede | Sim |
-| Telefone | Telefone principal de contato | Não |
-| E-mail | E-mail corporativo | Não |
-
-4. Clique em **"Salvar"**.
-
-[IMAGEM: Formulário de configuração dos dados da empresa]
-
-### 1.4.5. Configurando o Logo da Empresa
-
-1. Na tela de configurações da empresa, localize a seção **"Logo"**.
-2. Clique em **"Escolher Arquivo"**.
-3. Selecione uma imagem nos formatos **PNG**, **JPG** ou **SVG** (tamanho recomendado: 200×200 pixels).
-4. Clique em **"Salvar"**.
-
-O logo será exibido no cabeçalho do sistema e nos relatórios gerados.
-
-[IMAGEM: Upload do logo da empresa]
-
-> **Multi-tenant:** O SIGE opera com isolamento de dados por empresa. Cada ADMIN gerencia seus próprios funcionários, obras, registros e configurações, sem acesso aos dados de outras empresas. Este isolamento é garantido pelo campo `admin_id` presente em todas as tabelas do sistema.
+[IMAGEM: Exemplo de área de conteúdo mostrando uma lista com botão de ação e filtros]
 
 ---
 
-## 1.5. Configurações Globais
+## 1.5. Perfis de Acesso
 
-As configurações globais definem a estrutura organizacional da empresa dentro do sistema. É **fundamental** configurá-las antes de iniciar o cadastro de funcionários e a operação dos demais módulos.
+O SIGE possui **5 perfis de acesso** diferentes. Cada perfil determina quais menus e funcionalidades o usuário pode acessar. O perfil é definido pelo administrador da empresa no momento do cadastro do usuário.
 
-### 1.5.1. Departamentos
+### Resumo dos perfis
 
-Os **departamentos** representam as divisões organizacionais da empresa. Cada funcionário deve estar vinculado a um departamento para fins de organização e geração de relatórios setoriais.
+| Perfil | Quem é | O que pode fazer |
+|:-------|:-------|:-----------------|
+| **Administrador Master** | Responsável geral pelo sistema | Acesso total a todas as funcionalidades, incluindo gestão de múltiplas empresas |
+| **Administrador** | Gestor principal da empresa | Acesso a todos os módulos da sua empresa: obras, funcionários, financeiro, relatórios, configurações |
+| **Gestor de Equipes** | Líder ou encarregado de campo | Gerencia equipes, cria RDOs, controla ponto, acompanha andamento das obras |
+| **Almoxarife** | Responsável pelo estoque | Acesso ao módulo de almoxarifado, controle de materiais, requisições e movimentações |
+| **Funcionário** | Colaborador da empresa | Acesso restrito ao próprio registro de ponto e visualização dos RDOs consolidados |
 
-**Campos do cadastro de Departamento:**
+### O que cada perfil pode ver
 
-| Campo | Tipo | Obrigatório | Descrição |
-|:------|:-----|:-----------:|:----------|
-| Nome | Texto (até 100 caracteres) | Sim | Nome do departamento |
-| Descrição | Texto livre | Não | Detalhamento das atividades do departamento |
+A tabela abaixo mostra quais módulos estão disponíveis para cada perfil de acesso:
 
-#### Criando um Departamento
+| Módulo | Administrador Master | Administrador | Gestor de Equipes | Almoxarife | Funcionário |
+|:-------|:-------------------:|:-------------:|:-----------------:|:----------:|:-----------:|
+| Dashboard | ✅ | ✅ | ❌ | ❌ | ❌ |
+| RDOs | ✅ | ✅ | ✅ | ❌ | ✅ (somente visualizar) |
+| Obras | ✅ | ✅ | ✅ (visualizar) | ❌ | ❌ |
+| Funcionários | ✅ | ✅ | ✅ (da equipe) | ❌ | ❌ |
+| Equipe | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Ponto | ✅ | ✅ | ✅ | ❌ | ✅ (próprio) |
+| Propostas | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Financeiro | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Veículos | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Alimentação | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Almoxarifado | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Relatórios | ✅ | ✅ | ✅ (parcial) | ❌ | ❌ |
+| Configurações | ✅ | ✅ | ❌ | ❌ | ❌ |
 
-1. Acesse **Configurações** → **Departamentos**.
-2. Clique no botão **"Novo Departamento"**.
-3. Preencha o **Nome** (ex: "Engenharia", "Produção", "Administrativo").
-4. Opcionalmente, adicione uma **Descrição** detalhada.
-5. Clique em **"Salvar"**.
+> **Observação:** Os menus que não fazem parte do seu perfil de acesso não serão exibidos na barra de navegação. Ou seja, cada usuário vê apenas os menus que pode utilizar.
 
-[IMAGEM: Formulário de cadastro de departamento]
-
-#### Exemplos de Departamentos
-
-| Departamento | Descrição |
-|:-------------|:----------|
-| Engenharia | Equipe de engenheiros e projetistas |
-| Produção | Equipe de operários e mestres de obra |
-| Administrativo | Equipe de escritório e gestão |
-| Almoxarifado | Equipe de controle de materiais e estoque |
-| Segurança do Trabalho | Equipe de segurança e prevenção de acidentes |
-
-#### Editando e Excluindo Departamentos
-
-- Para **editar**, clique no ícone de edição ao lado do departamento desejado.
-- Para **excluir**, clique no ícone de exclusão (somente departamentos sem funcionários vinculados podem ser excluídos).
-
-> **Atenção:** A exclusão de um departamento é irreversível. Certifique-se de que não há funcionários vinculados antes de excluir.
-
-### 1.5.2. Funções (Cargos)
-
-As **funções** definem os cargos e posições dos funcionários dentro da empresa. Cada função pode ter um salário base associado, que serve como referência para o cadastro individual dos colaboradores.
-
-**Campos do cadastro de Função:**
-
-| Campo | Tipo | Obrigatório | Descrição |
-|:------|:-----|:-----------:|:----------|
-| Nome | Texto (até 100 caracteres) | Sim | Nome da função/cargo |
-| Descrição | Texto livre | Não | Detalhamento das atribuições do cargo |
-| Salário Base | Numérico (R$) | Não | Valor base mensal de remuneração |
-
-#### Criando uma Função
-
-1. Acesse **Configurações** → **Funções**.
-2. Clique no botão **"Nova Função"**.
-3. Preencha o **Nome** (ex: "Pedreiro", "Engenheiro Civil", "Auxiliar Administrativo").
-4. Adicione a **Descrição** das atribuições do cargo (opcional).
-5. Informe o **Salário Base** em reais (opcional).
-6. Clique em **"Salvar"**.
-
-[IMAGEM: Formulário de cadastro de função]
-
-#### Exemplos de Funções
-
-| Função | Descrição | Salário Base (R$) |
-|:-------|:----------|------------------:|
-| Engenheiro Civil | Responsável técnico por projetos e obras | 12.000,00 |
-| Mestre de Obras | Coordenação de equipes em campo | 6.500,00 |
-| Pedreiro | Execução de alvenaria e acabamentos | 3.200,00 |
-| Eletricista | Instalações elétricas e manutenção | 3.800,00 |
-| Encarregado de Obra | Supervisão direta de equipes operacionais | 5.000,00 |
-| Operador de Máquinas | Operação de equipamentos pesados | 4.200,00 |
-| Auxiliar de Almoxarifado | Apoio no controle de materiais e estoque | 2.500,00 |
-| Ajudante Geral | Apoio geral às atividades de obra | 2.100,00 |
-
-> **Dica:** O salário base definido na função serve como referência. O salário individual de cada funcionário pode ser ajustado diretamente no cadastro do funcionário.
-
-### 1.5.3. Horários de Trabalho
-
-Os **horários de trabalho** definem os padrões de jornada que serão associados aos funcionários para controle de ponto e cálculo automático de horas trabalhadas, horas extras e atrasos.
-
-O SIGE permite configurar horários diferentes para **cada dia da semana**, incluindo intervalos de pausa e identificação de dias não trabalhados.
-
-**Campos do cadastro de Horário de Trabalho:**
-
-| Campo | Tipo | Obrigatório | Descrição |
-|:------|:-----|:-----------:|:----------|
-| Nome | Texto (até 100 caracteres) | Sim | Nome identificador do horário (deve ser único) |
-| Ativo | Booleano | Sim | Se o horário está ativo para uso |
-| Horas Diárias | Numérico | Não | Carga horária padrão por dia (ex: 8.0) |
-| Valor Hora | Numérico (R$) | Não | Valor da hora de trabalho |
-
-**Configuração por dia da semana (HorarioDia):**
-
-Para cada dia (Segunda a Domingo), é possível configurar individualmente:
-
-| Campo | Tipo | Descrição |
-|:------|:-----|:----------|
-| Dia da Semana | Inteiro (0-6) | 0=Segunda, 1=Terça, 2=Quarta, 3=Quinta, 4=Sexta, 5=Sábado, 6=Domingo |
-| Entrada | Hora (HH:MM) | Horário de entrada (ex: 07:00) |
-| Saída | Hora (HH:MM) | Horário de saída (ex: 17:00) |
-| Pausa (horas) | Numérico | Duração do intervalo de almoço em horas (ex: 1.0) |
-| Trabalha | Booleano | Define se é dia útil de trabalho |
-
-#### Criando um Horário de Trabalho
-
-1. Acesse **Configurações** → **Horários de Trabalho**.
-2. Clique no botão **"Novo Horário"**.
-3. Informe o **Nome** do horário (ex: "Comercial Padrão", "Obra - Campo").
-4. Configure os horários para **cada dia da semana**:
-   - Marque os dias em que há trabalho (normalmente segunda a sexta).
-   - Defina entrada, saída e tempo de pausa para cada dia.
-   - Para sábados com meia jornada, configure entrada e saída diferenciadas.
-5. Clique em **"Salvar"**.
-
-[IMAGEM: Formulário de configuração de horário de trabalho com dias da semana]
-
-#### Exemplo: Horário Comercial Padrão (44h semanais)
-
-| Dia | Trabalha | Entrada | Saída | Pausa (h) | Horas Líquidas |
-|:----|:--------:|:-------:|:-----:|:---------:|:--------------:|
-| Segunda-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Terça-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Quarta-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Quinta-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Sexta-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Sábado | Sim | 07:30 | 11:30 | 0,0 | 4,0 |
-| Domingo | Não | — | — | — | 0,0 |
-
-#### Outros Exemplos de Horários
-
-| Nome do Horário | Seg–Sex | Sábado | Carga Semanal |
-|:----------------|:-------:|:------:|:-------------:|
-| Comercial Padrão | 07:30–17:30 | 07:30–11:30 | 44h |
-| Administrativo | 08:00–17:00 | Não trabalha | 40h |
-| Obra Turno Manhã | 06:00–14:00 | 06:00–10:00 | 44h |
-| Obra Turno Tarde | 14:00–22:00 | Não trabalha | 40h |
-
-#### Configuração de Tolerâncias
-
-O sistema suporta configuração de tolerâncias de atraso por obra/local de trabalho:
-
-| Configuração | Valor Padrão | Descrição |
-|:-------------|:------------:|:----------|
-| Tolerância de Atraso | 15 minutos | Registros dentro da tolerância não são contabilizados como atraso |
-| Carga Horária Diária | 8 horas (480 min) | Horas de trabalho esperadas por dia |
-| Pausa para Almoço | 1 hora | Tempo de intervalo para refeição |
-
-> **Importante:** O horário de trabalho é uma peça fundamental do sistema. Ele é utilizado no cálculo automático de horas trabalhadas, horas extras, atrasos e na geração da folha de pagamento.
+[IMAGEM: Comparação das barras de navegação para perfil Administrador e perfil Funcionário]
 
 ---
 
-## 1.6. Gestão de Usuários
+## 1.6. Alterando sua Senha
 
-A gestão de usuários é uma das configurações mais importantes do SIGE. Cada pessoa que acessa o sistema precisa ter um usuário cadastrado com o tipo de permissão adequado. O sistema opera no modelo **multi-tenant**, onde cada administrador (ADMIN) gerencia seus próprios dados de forma isolada.
+Para manter a segurança da sua conta, é recomendável alterar sua senha periodicamente, especialmente após o primeiro acesso.
 
-### 1.6.1. Tipos de Usuário
+### Como alterar sua senha
 
-O SIGE possui **5 tipos de usuário**, cada um com diferentes níveis de permissão:
+1. Clique no seu **nome de usuário** no canto superior direito da tela.
+2. No menu suspenso, selecione **"Configurações"** ou **"Perfil"**.
+3. Localize a seção de **alteração de senha**.
+4. Preencha os campos:
+   - **Senha atual** — Digite sua senha atual.
+   - **Nova senha** — Digite a nova senha desejada.
+   - **Confirmar nova senha** — Repita a nova senha para confirmação.
+5. Clique em **"Salvar"** para confirmar a alteração.
 
-| Tipo | Identificador | Nível | Descrição | Destino Após Login |
-|:-----|:--------------|:-----:|:----------|:-------------------|
-| **Super Administrador** | `SUPER_ADMIN` | Total | Acesso irrestrito a todo o sistema, incluindo gestão de múltiplas empresas/tenants e diagnósticos | `/super_admin_dashboard` |
-| **Administrador** | `ADMIN` | Alto | Gerencia todos os dados da sua empresa (tenant). Cria usuários, departamentos, obras e configurações | `/dashboard` |
-| **Gestor de Equipes** | `GESTOR_EQUIPES` | Médio | Gerencia equipes de campo, cria RDOs, controla ponto e acompanha o andamento das obras | `/funcionario/rdo/consolidado` |
-| **Almoxarife** | `ALMOXARIFE` | Específico | Acesso ao módulo de almoxarifado para controle de materiais, estoque e movimentações | `/funcionario/rdo/consolidado` |
-| **Funcionário** | `FUNCIONARIO` | Básico | Acesso restrito ao próprio perfil, registro de ponto e visualização de RDOs consolidados | `/funcionario/rdo/consolidado` |
+[IMAGEM: Tela de alteração de senha com os campos destacados]
 
-**Hierarquia de permissões:** `SUPER_ADMIN` > `ADMIN` > `GESTOR_EQUIPES` / `ALMOXARIFE` > `FUNCIONARIO`
+### Dicas para criar uma senha segura
 
-[IMAGEM: Diagrama de hierarquia dos tipos de usuário]
+- Use no mínimo **8 caracteres**.
+- Combine **letras maiúsculas e minúsculas**.
+- Inclua **números** e **caracteres especiais** (como @, #, $, !).
+- Evite usar informações pessoais como nome, data de nascimento ou sequências óbvias (123456, abcdef).
+- Não compartilhe sua senha com outras pessoas.
 
-### 1.6.2. Criando Usuários
-
-Somente usuários do tipo **ADMIN** ou **SUPER_ADMIN** podem criar novos usuários.
-
-**Para criar um novo usuário:**
-
-1. Faça login como ADMIN ou SUPER_ADMIN.
-2. Acesse a lista de usuários pela URL `/usuarios`.
-3. Clique no botão **"Novo Usuário"** (URL: `/usuarios/novo`).
-4. Preencha os campos do formulário:
-
-| Campo | Obrigatório | Descrição |
-|:------|:-----------:|:----------|
-| Nome | Sim | Nome completo do usuário |
-| E-mail | Sim | Endereço de e-mail (deve ser único no sistema) |
-| Username | Sim | Nome de usuário para login (deve ser único) |
-| Senha | Sim | Senha de acesso (será armazenada com hash criptográfico) |
-| Tipo de Usuário | Sim | Selecione entre: ADMIN, GESTOR_EQUIPES, ALMOXARIFE ou FUNCIONARIO |
-
-5. Clique em **"Salvar"** para criar o usuário.
-
-[IMAGEM: Formulário de criação de novo usuário]
-
-> **Segurança:** As senhas são armazenadas utilizando hash criptográfico via Werkzeug. O sistema nunca armazena senhas em texto puro. Recomenda-se senhas com no mínimo 8 caracteres, combinando letras maiúsculas, minúsculas, números e caracteres especiais.
-
-> **Multi-tenant:** Quando um ADMIN cria um novo usuário, o campo `admin_id` é preenchido automaticamente, vinculando o novo usuário à empresa do administrador. Isso garante o isolamento dos dados entre empresas.
-
-### 1.6.3. Editando e Desativando Usuários
-
-#### Editando um Usuário
-
-1. Acesse a lista de usuários em `/usuarios`.
-2. Localize o usuário desejado na listagem.
-3. Clique no ícone de **edição** ao lado do nome (URL: `/usuarios/<id>/editar`).
-4. Altere os campos necessários:
-   - **Nome**, **E-mail**, **Username** e **Tipo de Usuário** podem ser atualizados.
-   - A **Senha** só será alterada se um novo valor for informado no campo correspondente. Se o campo for deixado em branco, a senha atual será mantida.
-   - O campo **Ativo** permite ativar ou desativar o acesso do usuário.
-5. Clique em **"Salvar"** para confirmar as alterações.
-
-[IMAGEM: Formulário de edição de usuário com campo Ativo destacado]
-
-#### Desativando um Usuário
-
-1. Acesse a edição do usuário conforme descrito acima.
-2. Desmarque a opção **"Ativo"**.
-3. Clique em **"Salvar"**.
-
-#### Reativando um Usuário
-
-1. Acesse a edição do usuário.
-2. Marque novamente a opção **"Ativo"**.
-3. Clique em **"Salvar"**.
-
-> **Importante:** Desativar um usuário **não exclui** seus dados do sistema. O usuário desativado simplesmente não conseguirá realizar login. Todos os registros históricos (ponto, RDOs, movimentações) são preservados integralmente. Esta abordagem garante a integridade e rastreabilidade dos dados.
+> **Esqueceu sua senha?** Entre em contato com o administrador da sua empresa. Ele poderá redefinir sua senha pelo painel de gestão de usuários.
 
 ---
 
-## 1.7. Checklist de Configuração Inicial
+## 1.7. Saindo do Sistema (Logout)
 
-Utilize a tabela abaixo como guia para garantir que todas as etapas de configuração inicial foram concluídas antes de iniciar a operação do sistema:
+Ao terminar de usar o SIGE, é importante encerrar sua sessão corretamente para proteger seus dados.
 
-| Nº | Etapa | Descrição | Status |
-|:--:|:------|:----------|:------:|
-| 1 | Instalação do servidor | Docker e EasyPanel configurados, deploy realizado com sucesso | ☐ |
-| 2 | Variáveis de ambiente | `DATABASE_URL`, `SESSION_SECRET`, `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` e `PGDATABASE` configuradas | ☐ |
-| 3 | Banco de dados | PostgreSQL acessível e tabelas criadas automaticamente | ☐ |
-| 4 | Certificado SSL | HTTPS configurado e funcionando no domínio de produção | ☐ |
-| 5 | Primeiro login | Usuário SUPER_ADMIN criado e login realizado com sucesso | ☐ |
-| 6 | Dados da empresa | Razão social, CNPJ, endereço e logotipo configurados | ☐ |
-| 7 | Departamentos | Ao menos um departamento cadastrado (ex: Engenharia, Produção) | ☐ |
-| 8 | Funções | Ao menos uma função/cargo cadastrada com salário base | ☐ |
-| 9 | Horários de trabalho | Ao menos um horário de trabalho configurado com dias da semana | ☐ |
-| 10 | Usuário ADMIN | Administrador da empresa criado e testado | ☐ |
-| 11 | Usuários operacionais | Gestores, almoxarifes e funcionários cadastrados conforme necessidade | ☐ |
-| 12 | Teste de acesso | Login testado com cada tipo de usuário, confirmando redirecionamento correto | ☐ |
-| 13 | Backup | Rotina de backup do banco de dados PostgreSQL configurada | ☐ |
+### Como sair do sistema
 
-> **Próximos passos:** Após concluir todas as etapas deste checklist, o sistema estará pronto para uso operacional. Prossiga para o **Capítulo 2 — Dashboard e Painel de Controle** para aprender a utilizar as funcionalidades do dia a dia.
+1. Clique no seu **nome de usuário** no canto superior direito da tela.
+2. No menu suspenso, clique em **"Sair"**.
+3. Você será redirecionado para a tela de login e verá a mensagem:
+
+> *"Você saiu do sistema."*
+
+[IMAGEM: Menu do usuário com a opção Sair destacada]
+
+> **Importante:** Sempre faça logout ao terminar de usar o sistema, especialmente em computadores compartilhados ou públicos. Isso evita que outras pessoas acessem seus dados.
 
 ---
 
-# Capitulo 2 — Módulo Dashboard
+## 1.8. Dicas de Navegação
 
-**SIGE - Estruturas do Vale (EnterpriseSync)**
+Confira algumas dicas para aproveitar melhor o SIGE no seu dia a dia:
+
+### Navegação responsiva no celular
+
+- No celular, a barra de navegação se transforma em um **menu hambúrguer** (ícone com três linhas horizontais ☰). Toque nele para abrir o menu completo.
+- As tabelas e formulários se adaptam automaticamente à tela do celular, podendo ser roladas horizontalmente quando necessário.
+- Para uma melhor experiência, use o celular na posição **horizontal (paisagem)** ao visualizar tabelas com muitas colunas.
+
+### Atalhos úteis do navegador
+
+Embora o SIGE não possua atalhos de teclado próprios, você pode usar os atalhos padrão do seu navegador para agilizar o uso:
+
+| Atalho | O que faz |
+|:-------|:----------|
+| **F5** ou **Ctrl + R** | Atualiza a página atual |
+| **Ctrl + F** | Abre a busca de texto na página |
+| **Ctrl + T** | Abre uma nova aba no navegador |
+| **Alt + ←** | Volta para a página anterior |
+| **Alt + →** | Avança para a próxima página |
+| **Ctrl + +** | Aumenta o zoom da página |
+| **Ctrl + -** | Diminui o zoom da página |
+| **Ctrl + 0** | Restaura o zoom padrão |
+
+### Listas e tabelas
+
+- A maioria das telas de listagem permite **ordenar** os dados clicando no cabeçalho da coluna desejada.
+- Use os **filtros** disponíveis acima das tabelas para localizar registros específicos.
+- Procure pelo **campo de busca** para encontrar rapidamente um funcionário, obra ou outro registro pelo nome.
+
+### Formulários
+
+- Campos marcados com **asterisco (*)** são obrigatórios e devem ser preenchidos.
+- Após preencher um formulário, clique no botão **"Salvar"** para registrar as informações.
+- Se quiser descartar as alterações, clique em **"Cancelar"** ou simplesmente navegue para outra página.
+
+### Conexão com a internet
+
+- O SIGE requer uma conexão estável com a internet para funcionar corretamente.
+- Se a conexão for interrompida durante o preenchimento de um formulário, suas informações poderão ser perdidas. Nesse caso, recarregue a página e preencha novamente.
+
+> **Dica final:** Em caso de dúvidas sobre qualquer funcionalidade, consulte os capítulos específicos deste manual ou entre em contato com o administrador da sua empresa.
+
+---
+
+*SIGE - Estruturas do Vale (EnterpriseSync) — Manual do Usuário v8.0*
+*Versão do documento: 2.0 | Data: Fevereiro de 2026*
+
+---
+
+# Capítulo 2 — Painel de Controle (Dashboard)
+
+**SIGE - Estruturas do Vale**
 Manual do Usuário — Versão 8.0
 
 ---
 
-## 2.1. Introdução ao Dashboard
+## 2.1. O que é o Painel de Controle?
 
-O **Dashboard** é a tela principal do SIGE e funciona como um painel de controle centralizado para a gestão da sua empresa. Ao acessar o sistema, o Dashboard apresenta uma visão consolidada e em tempo real dos principais indicadores operacionais, financeiros e de produtividade.
+O **Painel de Controle** (Dashboard) é a primeira tela que você verá ao entrar no SIGE. Pense nele como o "painel do carro" da sua empresa: em uma única tela, você acompanha os números mais importantes do seu dia a dia — quantos funcionários estão ativos, quantas obras estão em andamento, o tamanho da sua frota e quanto está custando a operação no período.
 
-**Principais funcionalidades do Dashboard:**
+Você não precisa abrir vários módulos para ter uma visão geral. O Painel de Controle reúne tudo em um só lugar, de forma visual e prática.
 
-1. **Visão Geral (KPIs)** — Exibe cartões com indicadores-chave: Funcionários Ativos, Obras Ativas, Veículos e Custos do Período.
-2. **Custos Detalhados do Período** — Apresenta a composição dos custos em categorias: Alimentação, Transporte, Mão de Obra e Total, com valores em R$.
-3. **Propostas Comerciais** — Mostra estatísticas de propostas enviadas, aprovadas, rejeitadas e em rascunho.
-4. **Obras e RDO** — Lista as obras ativas com acesso rápido para criação de novos Relatórios Diários de Obra (RDO).
-5. **Gráficos e Evolução** — Gráfico de evolução de propostas e tendências ao longo do tempo.
+**O que você encontra no Painel de Controle:**
 
-> **Importante:** O Dashboard exibe dados filtrados pelo **admin_id** do usuário logado, garantindo o isolamento multi-tenant. Cada empresa visualiza apenas os seus próprios dados.
+- **Cartões de resumo (KPIs)** — Funcionários Ativos, Obras Ativas, Veículos e Custos do Período
+- **Custos Detalhados** — Quanto está sendo gasto em Alimentação, Transporte e Mão de Obra
+- **Propostas Comerciais** — Quantas propostas foram enviadas, aprovadas ou rejeitadas
+- **Obras e RDO** — Lista das suas obras com botão rápido para criar novos relatórios
+- **Gráfico de Evolução** — Tendência das suas propostas ao longo do tempo
 
-[IMAGEM: Dashboard principal com visão geral dos KPIs e custos]
+[IMAGEM: Visão geral do Painel de Controle com os cartões de KPI e seções principais]
 
 ---
 
-## 2.2. Acessando o Dashboard
+## 2.2. Como Acessar o Painel de Controle
 
-### 2.2.1. Após o Login
+### 2.2.1. Acesso Automático após o Login
 
-Ao realizar o login no SIGE com suas credenciais de administrador, o sistema redireciona automaticamente para o Dashboard principal.
+Ao entrar no SIGE com seu e-mail e senha, você será levado automaticamente para o Painel de Controle. Não é necessário clicar em nada — o sistema já abre na tela certa para você.
 
 **Passo a passo:**
 
-1. Acesse o endereço do sistema no navegador (ex.: `https://sige.cassioviller.tech`)
-2. Informe seu **e-mail** e **senha** na tela de login
+1. Abra o SIGE no seu navegador
+2. Digite seu **e-mail** e **senha**
 3. Clique em **Entrar**
-4. O sistema redirecionará automaticamente para a URL `/dashboard`
+4. Pronto! O Painel de Controle aparecerá na tela
 
-> **Nota:** O comportamento de redirecionamento varia conforme o tipo de usuário:
->
-> | Tipo de Usuário | Redirecionamento | Dashboard Exibido |
-> |:----------------|:-----------------|:------------------|
-> | ADMIN | `/dashboard` | Dashboard Administrativo completo |
-> | FUNCIONÁRIO | `/funcionario/dashboard` | Dashboard do Funcionário (simplificado) |
-> | SUPER_ADMIN | `/super-admin/dashboard` | Dashboard do Super Administrador |
+> **Bom saber:** Se você é um **administrador**, verá o Painel de Controle completo com todos os indicadores da empresa. Se você é um **funcionário**, verá uma versão adaptada com as informações relevantes para o seu trabalho de campo (mais detalhes na seção 2.6).
 
-### 2.2.2. Menu de Navegação
+[IMAGEM: Tela de login do SIGE com campos de e-mail e senha]
 
-O Dashboard é acessível a qualquer momento por meio da barra de navegação superior (navbar). A barra apresenta o logotipo **SIGE - Estruturas do Vale** à esquerda, com fundo verde, e os seguintes itens de menu:
+### 2.2.2. Voltando ao Painel a Qualquer Momento
 
-| Nº | Item do Menu | Descrição |
-|:--:|:-------------|:----------|
-| 1 | Dashboard | Painel principal com KPIs e indicadores |
-| 2 | RDOs | Relatórios Diários de Obra |
-| 3 | Obras | Gestão de obras e projetos |
-| 4 | Funcionários | Cadastro de colaboradores |
-| 5 | Equipe | Alocação de equipes de campo |
-| 6 | Ponto | Controle de ponto eletrônico |
-| 7 | Propostas | Propostas comerciais e orçamentos |
-| 8 | Financeiro | Gestão financeira |
-| 9 | Veículos | Gestão de frota |
-| 10 | Alimentação | Controle de refeições |
-| 11 | Almoxarifado | Estoque e materiais |
-| 12 | Relatórios | Relatórios consolidados |
+Você pode retornar ao Painel de Controle de qualquer tela do sistema. Basta olhar para o menu verde no topo da página e clicar em **Dashboard**.
 
-Para retornar ao Dashboard de qualquer tela, basta clicar no item **Dashboard** no menu superior.
+O menu de navegação superior apresenta os seguintes itens:
 
-[IMAGEM: Barra de navegação verde com os itens de menu do SIGE]
+| Item do Menu | Para que serve |
+|:-------------|:---------------|
+| **Dashboard** | Voltar ao Painel de Controle |
+| **RDOs** | Relatórios Diários de Obra |
+| **Obras** | Ver e gerenciar suas obras |
+| **Funcionários** | Cadastro dos seus colaboradores |
+| **Equipe** | Alocação de equipes nas obras |
+| **Ponto** | Controle de ponto dos funcionários |
+| **Propostas** | Propostas comerciais e orçamentos |
+| **Financeiro** | Gestão financeira da empresa |
+| **Veículos** | Gestão da sua frota |
+| **Alimentação** | Controle de refeições e vales |
+| **Almoxarifado** | Estoque e materiais |
+| **Relatórios** | Relatórios consolidados |
 
-### 2.2.3. Filtro de Período
+> **Dica:** O item **Dashboard** é sempre o primeiro do menu. Se você se perder em qualquer tela, basta clicar nele para voltar à visão geral.
 
-O Dashboard permite filtrar os dados exibidos por período. O sistema detecta automaticamente o mês mais recente com registros de ponto cadastrados e utiliza esse intervalo como padrão. Para alterar o período:
-
-1. Localize os campos **Data Início** e **Data Fim** no topo do Dashboard
-2. Selecione as datas desejadas
-3. Clique em **Filtrar** para atualizar os indicadores
-
-> **Dica:** Se não houver registros para o período selecionado, os cartões de KPI exibirão valores zerados. Verifique se existem dados lançados no período escolhido.
+[IMAGEM: Barra de navegação verde do SIGE com os itens de menu destacados]
 
 ---
 
-## 2.3. KPIs Principais
+## 2.3. Filtro de Período — Escolhendo o Intervalo de Datas
 
-A seção **Visão Geral** do Dashboard apresenta 4 cartões de KPI (Key Performance Indicators) que oferecem uma fotografia instantânea da operação da empresa.
+No topo do Painel de Controle, você verá dois campos de data: **Data Início** e **Data Fim**. Esses campos controlam qual período os números do painel estão mostrando.
 
-[IMAGEM: Seção Visão Geral com os 4 cartões de KPI]
+**Como usar o filtro:**
 
-### 2.3.1. Funcionários Ativos
+1. Clique no campo **Data Início** e selecione a data inicial desejada
+2. Clique no campo **Data Fim** e selecione a data final
+3. Clique no botão **Filtrar**
+4. Todos os números e gráficos serão atualizados para o período escolhido
 
-| Atributo | Detalhe |
-|:---------|:--------|
-| **Indicador** | Quantidade de funcionários com status ativo |
-| **Fonte dos dados** | Tabela `funcionario` filtrada por `admin_id` e `ativo = true` |
-| **Exemplo** | Exibe um número como **10** (dez funcionários ativos) |
-| **Atualização** | Em tempo real, a cada acesso ao Dashboard |
+**Exemplos práticos de uso:**
 
-**Como interpretar:**
+- Quer ver os custos do mês passado? Selecione o primeiro e o último dia do mês
+- Precisa comparar dois meses? Filtre cada mês separadamente e anote os valores
+- Quer analisar o trimestre inteiro? Selecione um período de 3 meses
 
-- O número reflete todos os colaboradores cadastrados e com status **Ativo** no sistema
-- Funcionários desligados ou inativos não são contabilizados
-- Para gerenciar funcionários, acesse o módulo **Funcionários** pelo menu superior
+> **Bom saber:** Quando você acessa o Painel pela primeira vez, o sistema escolhe automaticamente o mês mais recente que possui registros. Assim, você sempre verá dados relevantes sem precisar configurar nada.
 
-### 2.3.2. Obras Ativas
+> **Atenção:** Se os cartões estiverem mostrando valores zerados, pode ser que não existam registros no período selecionado. Tente ampliar o intervalo de datas ou selecionar um mês diferente.
 
-| Atributo | Detalhe |
-|:---------|:--------|
-| **Indicador** | Quantidade de obras com status ativo (em andamento, planejamento) |
-| **Fonte dos dados** | Tabela `obra` filtrada por `admin_id` e status ativo |
-| **Exemplo** | Exibe um número como **8** (oito obras ativas) |
-| **Atualização** | Em tempo real, a cada acesso ao Dashboard |
-
-**Como interpretar:**
-
-- Contabiliza obras nos status: `ATIVO`, `andamento`, `Em andamento`, `ativa` e `planejamento`
-- Obras finalizadas ou canceladas não aparecem neste indicador
-- Clique no cartão ou acesse **Obras** no menu para ver os detalhes de cada obra
-
-### 2.3.3. Veículos
-
-| Atributo | Detalhe |
-|:---------|:--------|
-| **Indicador** | Quantidade de veículos ativos na frota |
-| **Fonte dos dados** | Tabela `veiculo` filtrada por `admin_id` e `ativo = true` |
-| **Exemplo** | Exibe um número como **3** (três veículos na frota) |
-| **Atualização** | Em tempo real, a cada acesso ao Dashboard |
-
-**Como interpretar:**
-
-- Inclui todos os veículos cadastrados com status ativo
-- Veículos baixados ou desativados não são contabilizados
-- Para gerenciar a frota, acesse o módulo **Veículos** pelo menu superior
-
-### 2.3.4. Custos do Período (Financeiro)
-
-| Atributo | Detalhe |
-|:---------|:--------|
-| **Indicador** | Valor total dos custos no período selecionado (em R$) |
-| **Fonte dos dados** | Soma dos custos de mão de obra, alimentação e transporte |
-| **Exemplo** | Exibe um valor como **R$ 45.320,00** |
-| **Atualização** | Conforme o filtro de período aplicado |
-
-**Como interpretar:**
-
-- Representa a soma consolidada de todos os custos operacionais do período
-- O valor é exibido em Reais (R$) com formatação brasileira
-- Para análise detalhada, consulte a seção **Custos Detalhados do Período** (abaixo dos KPIs)
+[IMAGEM: Campos de filtro de período com Data Início, Data Fim e botão Filtrar]
 
 ---
 
-## 2.4. Gráficos e Visualizações
+## 2.4. Cartões de KPI — Os Números que Importam
 
-O Dashboard apresenta seções gráficas e detalhadas que permitem uma análise mais aprofundada da operação.
+Logo abaixo do filtro de período, você verá **4 cartões coloridos** que mostram os indicadores mais importantes da sua empresa. Esses cartões são atualizados sempre que você acessa o Painel ou altera o filtro de período.
 
-### 2.4.1. Custos Detalhados do Período
+[IMAGEM: Os 4 cartões de KPI — Funcionários Ativos, Obras Ativas, Veículos e Custos do Período]
 
-A seção **Custos Detalhados do Período** apresenta cartões individuais com a decomposição dos custos operacionais:
+### 2.4.1. Funcionários Ativos
 
-| Cartão | Descrição | Exemplo |
-|:-------|:----------|:--------|
-| **Alimentação** | Custos com refeições, vales e cestas básicas | R$ 8.500,00 |
-| **Transporte** | Custos com combustível, pedágios e deslocamentos | R$ 5.200,00 |
-| **Mão de Obra** | Custos com salários, horas extras e encargos | R$ 28.600,00 |
-| **Total** | Soma de todas as categorias | R$ 42.300,00 |
+Este cartão mostra **quantos colaboradores estão ativos** na sua empresa neste momento.
 
-[IMAGEM: Cartões de Custos Detalhados do Período mostrando Alimentação, Transporte, Mão de Obra e Total]
+**O que esse número significa na prática:**
 
-**Como utilizar:**
+- Se o cartão mostra **10**, você tem 10 funcionários cadastrados e ativos trabalhando
+- Este número indica a capacidade atual da sua equipe
+- Funcionários que foram desligados ou colocados como inativos **não aparecem** neste número
 
-1. Os valores são calculados automaticamente com base nos lançamentos do período selecionado
-2. Compare os custos entre categorias para identificar onde estão os maiores gastos
-3. Utilize o filtro de período para analisar a evolução mensal dos custos
-4. Para detalhes de cada categoria, acesse os módulos específicos (Alimentação, Veículos, Funcionários)
+**Quando prestar atenção:**
 
-### 2.4.2. Propostas Comerciais
+- Se o número estiver menor do que o esperado, pode ser que algum funcionário tenha sido desativado por engano
+- Se você contratou alguém recentemente e o número não mudou, verifique se o cadastro foi concluído
 
-A seção **Propostas Comerciais** exibe estatísticas consolidadas sobre as propostas da empresa:
+**Para ver mais detalhes:** Clique em **Funcionários** no menu superior para acessar a lista completa dos seus colaboradores.
 
-- **Total de Propostas** — Quantidade total de propostas no período
-- **Taxa de Conversão** — Percentual de propostas aprovadas em relação ao total
-- **Valor Médio** — Valor médio das propostas aprovadas
-- **Propostas por Mês** — Média mensal de propostas criadas nos últimos 6 meses
+### 2.4.2. Obras Ativas
 
-**Status de Propostas:**
+Este cartão mostra **quantas obras estão em andamento ou planejamento** na sua empresa.
 
-| Status | Descrição | Cor |
-|:-------|:----------|:----|
-| Aprovada | Proposta aceita pelo cliente | Verde |
-| Enviada | Proposta enviada aguardando resposta | Azul |
-| Rascunho | Proposta em elaboração | Cinza |
-| Rejeitada | Proposta não aceita pelo cliente | Vermelho |
-| Expirada | Proposta enviada cuja validade expirou | Laranja |
+**O que esse número significa na prática:**
 
-[IMAGEM: Seção de Propostas Comerciais com estatísticas e status]
+- Se o cartão mostra **8**, você tem 8 obras abertas no momento
+- Este número inclui obras em andamento, em planejamento ou com status ativo
+- Obras que já foram finalizadas ou canceladas **não entram** nesta contagem
 
-### 2.4.3. Evolução de Propostas
+**Quando prestar atenção:**
 
-O gráfico **Evolução de Propostas** apresenta visualmente a tendência de criação e aprovação de propostas ao longo do tempo.
+- Um número muito alto pode indicar que a equipe está sobrecarregada
+- Se uma obra foi concluída mas o número não diminuiu, pode ser que o status não tenha sido atualizado no sistema
 
-**Como interpretar o gráfico:**
+**Para ver mais detalhes:** Clique em **Obras** no menu superior para ver a lista de todas as suas obras com seus respectivos status.
 
-1. O eixo horizontal (X) representa os meses
-2. O eixo vertical (Y) representa a quantidade de propostas
-3. As linhas ou barras mostram a evolução por status (aprovadas, enviadas, rejeitadas)
-4. Identifique tendências de crescimento ou queda na atividade comercial
+### 2.4.3. Veículos
 
-[IMAGEM: Gráfico de Evolução de Propostas ao longo do tempo]
+Este cartão mostra **quantos veículos ativos estão na sua frota**.
 
-### 2.4.4. Obras e RDO
+**O que esse número significa na prática:**
 
-A seção **Obras e RDO** lista as obras ativas com informações resumidas e ações rápidas:
+- Se o cartão mostra **3**, você tem 3 veículos cadastrados e disponíveis para uso
+- Veículos que foram baixados ou desativados não aparecem neste número
 
-| Coluna | Descrição |
-|:-------|:----------|
-| Nome da Obra | Identificação da obra |
-| Status | Situação atual (ativo, em andamento, planejamento) |
-| Progresso | Percentual de conclusão baseado nos RDOs |
-| Ação | Botão **+RDO** para criar novo Relatório Diário de Obra |
+**Quando prestar atenção:**
 
-**Como criar um RDO a partir do Dashboard:**
+- Se um veículo quebrou e está fora de operação, considere desativá-lo temporariamente no sistema para manter o número atualizado
+- Use este número para planejar a logística de deslocamento das equipes
 
-1. Localize a obra desejada na lista **Obras e RDO**
-2. Clique no botão **+RDO** ao lado da obra
-3. O sistema abrirá o formulário de criação de RDO já vinculado à obra selecionada
-4. Preencha os dados do relatório e salve
+**Para ver mais detalhes:** Clique em **Veículos** no menu superior para gerenciar a sua frota.
 
-[IMAGEM: Lista de Obras e RDO com botões de ação rápida]
+### 2.4.4. Custos do Período
 
-> **Dica:** O progresso de cada obra é calculado automaticamente com base nas subatividades registradas no RDO mais recente. Mantenha os RDOs atualizados para refletir o andamento real.
+Este cartão mostra o **valor total de custos operacionais** no período selecionado no filtro, exibido em Reais (R$).
+
+**O que esse número significa na prática:**
+
+- Se o cartão mostra **R$ 45.320,00**, este é o total que a operação custou no período filtrado
+- O valor inclui custos com alimentação, transporte e mão de obra somados
+- Compare este valor com meses anteriores para identificar tendências de aumento ou redução
+
+**Quando prestar atenção:**
+
+- Se o valor subiu significativamente em relação ao mês anterior, investigue qual categoria de custo cresceu (veja a seção de Custos Detalhados logo abaixo)
+- Use este número em reuniões gerenciais para apresentar o custo operacional da empresa
+
+**Para análise detalhada:** Role a página para baixo e veja a seção **Custos Detalhados do Período**, que decompõe esse valor total por categoria.
 
 ---
 
-## 2.5. Dashboard Executivo por Obra
+## 2.5. Custos Detalhados do Período
 
-Além do Dashboard principal, o SIGE oferece um **Dashboard Executivo** individual para cada obra. Este painel detalhado permite acompanhar os indicadores específicos de um projeto.
+Logo abaixo dos cartões de KPI, você encontrará a seção **Custos Detalhados do Período**. Aqui, o custo total é dividido em categorias para que você entenda **onde o dinheiro está sendo gasto**.
+
+[IMAGEM: Cartões de Custos Detalhados mostrando Alimentação, Transporte, Mão de Obra e Total]
+
+Você verá 4 cartões:
+
+| Cartão | O que mostra | Exemplo |
+|:-------|:-------------|:--------|
+| **Alimentação** | Custos com refeições, vales-refeição e cestas básicas | R$ 8.500,00 |
+| **Transporte** | Custos com combustível, pedágios e deslocamentos da equipe | R$ 5.200,00 |
+| **Mão de Obra** | Custos com salários, horas extras e encargos trabalhistas | R$ 28.600,00 |
+| **Total** | Soma de todas as categorias acima | R$ 42.300,00 |
+
+**Como usar esses números no seu dia a dia:**
+
+1. **Identifique o maior custo** — Normalmente, a Mão de Obra representa a maior fatia. Se outro item estiver desproporcionalmente alto, vale investigar
+2. **Compare com meses anteriores** — Use o filtro de período para ver mês a mês e identificar se alguma categoria está crescendo fora do normal
+3. **Planeje reduções** — Se os custos com Transporte estão altos, talvez seja o momento de otimizar rotas ou revisar contratos de combustível
+4. **Apresente em reuniões** — Esses cartões são perfeitos para mostrar de forma clara a composição dos custos para sócios ou gestores
+
+> **Dica prática:** Para entender melhor cada categoria de custo, você pode acessar os módulos específicos pelo menu: **Alimentação** para ver os lançamentos de refeições, **Veículos** para ver os gastos com a frota, e **Funcionários** para ver os custos com a equipe.
+
+---
+
+## 2.6. Propostas Comerciais
+
+A seção **Propostas Comerciais** no Painel de Controle oferece uma visão rápida de como está a atividade comercial da sua empresa.
+
+[IMAGEM: Seção de Propostas Comerciais com estatísticas e indicadores]
+
+**O que você encontra aqui:**
+
+- **Total de Propostas** — Quantas propostas foram criadas no período
+- **Taxa de Conversão** — De cada 100 propostas enviadas, quantas foram aprovadas? Esse percentual mostra a eficiência comercial
+- **Valor Médio** — Qual é o valor médio das propostas aprovadas. Útil para entender o ticket médio dos seus contratos
+- **Propostas por Mês** — Média de propostas criadas nos últimos 6 meses, ajuda a entender o ritmo comercial
+
+**Os status das propostas e o que significam:**
+
+| Status | O que significa | Como identificar |
+|:-------|:----------------|:-----------------|
+| **Aprovada** | O cliente aceitou a proposta — ótima notícia! | Aparece em verde |
+| **Enviada** | A proposta foi enviada e aguarda a resposta do cliente | Aparece em azul |
+| **Rascunho** | A proposta está sendo elaborada e ainda não foi enviada | Aparece em cinza |
+| **Rejeitada** | O cliente não aceitou a proposta | Aparece em vermelho |
+| **Expirada** | O prazo de validade da proposta venceu sem resposta | Aparece em laranja |
+
+**Dicas para acompanhar suas propostas:**
+
+- Se você tem muitas propostas com status **Enviada**, entre em contato com os clientes para obter respostas
+- Propostas **Expiradas** podem ser reenviadas com valores atualizados
+- Uma **Taxa de Conversão** baixa pode indicar que os valores estão acima do mercado ou que a apresentação precisa melhorar
+
+**Para gerenciar suas propostas:** Clique em **Propostas** no menu superior para ver a lista completa, criar novas propostas ou editar as existentes.
+
+---
+
+## 2.7. Gráfico de Evolução de Propostas
+
+O gráfico **Evolução de Propostas** mostra visualmente como suas propostas se comportaram ao longo do tempo. É uma forma rápida de identificar se a atividade comercial está crescendo, estável ou diminuindo.
+
+[IMAGEM: Gráfico de Evolução de Propostas com linhas mostrando a tendência ao longo dos meses]
+
+**Como ler o gráfico:**
+
+- O **eixo horizontal** (embaixo) mostra os meses
+- O **eixo vertical** (na lateral) mostra a quantidade de propostas
+- As linhas ou barras mostram como cada status evoluiu ao longo do tempo
+
+**O que observar:**
+
+1. **Tendência de crescimento** — Se as linhas estão subindo, sua equipe comercial está mais ativa
+2. **Queda brusca** — Se houve uma queda repentina, investigue o que aconteceu naquele mês
+3. **Proporção de aprovações** — Idealmente, a linha de propostas aprovadas deve acompanhar o crescimento das propostas enviadas
+
+> **Dica prática:** Use este gráfico em reuniões comerciais para demonstrar a evolução dos resultados e planejar metas futuras.
+
+---
+
+## 2.8. Obras e RDO — Acompanhamento Rápido
+
+A seção **Obras e RDO** é uma das mais úteis do Painel de Controle. Ela lista suas obras ativas com informações resumidas e permite criar Relatórios Diários de Obra (RDOs) com apenas um clique.
+
+[IMAGEM: Lista de Obras e RDO com nomes das obras, status e botão +RDO]
+
+**O que você verá na lista:**
+
+| Coluna | O que mostra |
+|:-------|:-------------|
+| **Nome da Obra** | O nome ou identificação do projeto |
+| **Status** | Se a obra está ativa, em andamento ou em planejamento |
+| **Progresso** | Quanto da obra já foi concluído (em percentual) |
+| **Ação** | Botão **+RDO** para criar um relatório rapidamente |
+
+### Como Criar um RDO Direto do Painel
+
+Esta é uma das funcionalidades mais práticas do Painel de Controle. Em vez de navegar até o módulo de Obras e depois criar o RDO, você pode fazer tudo em poucos cliques:
+
+1. Encontre a obra desejada na lista **Obras e RDO**
+2. Clique no botão **+RDO** ao lado do nome da obra
+3. O sistema abrirá o formulário de criação de RDO já vinculado àquela obra
+4. Preencha as informações do dia (atividades, equipe, condições climáticas, etc.)
+5. Salve o relatório
+
+> **Dica importante:** Mantenha os RDOs atualizados diariamente. O progresso de cada obra é calculado com base nos relatórios registrados. Quanto mais atualizados os RDOs, mais precisa será a visão de andamento das obras no Painel.
+
+**Para ver todas as obras:** Clique em **Obras** no menu superior para acessar a lista completa com todos os detalhes, incluindo obras finalizadas.
+
+---
+
+## 2.9. Dashboard Executivo por Obra
+
+Além do Painel de Controle principal, o SIGE oferece um **painel detalhado individual para cada obra**. Este painel é ideal para gestores de projeto que precisam acompanhar os indicadores de uma obra específica.
 
 **Como acessar:**
 
-1. Acesse o módulo **Obras** pelo menu superior
-2. Clique na obra desejada para abrir seus detalhes
-3. A URL será no formato `/obras/detalhes/<id>` (onde `<id>` é o identificador da obra)
+1. Clique em **Obras** no menu superior
+2. Na lista de obras, clique na obra que deseja acompanhar
+3. Você verá uma tela com todas as informações consolidadas daquela obra
 
-**Informações disponíveis no Dashboard Executivo:**
+**Informações disponíveis:**
 
-| Seção | Descrição |
+| Seção | O que você encontra |
+|:------|:--------------------|
+| **Dados Gerais** | Nome da obra, cliente, endereço, data de início e previsão de término |
+| **Progresso** | Percentual de conclusão geral do projeto |
+| **RDOs** | Lista dos Relatórios Diários registrados para esta obra |
+| **Equipe Alocada** | Quais funcionários estão trabalhando nesta obra |
+| **Custos** | Detalhamento dos custos específicos da obra por categoria |
+| **Serviços** | Serviços contratados e executados no projeto |
+
+[IMAGEM: Painel Executivo de uma obra com dados gerais, progresso e custos]
+
+> **Dica prática:** Use o Painel Executivo por Obra para preparar relatórios para clientes, mostrando o andamento do projeto com dados reais do sistema.
+
+---
+
+## 2.10. Painel do Funcionário
+
+Se você acessa o SIGE como **funcionário** (e não como administrador), verá uma versão do painel adaptada para as suas necessidades de campo. O sistema reconhece automaticamente o seu perfil e mostra apenas as informações relevantes para o seu trabalho.
+
+[IMAGEM: Painel do Funcionário com cartões de resumo e ações rápidas]
+
+### 2.10.1. Seus Cartões de Resumo
+
+Ao entrar no sistema, você verá 3 cartões informativos:
+
+| Cartão | O que mostra | Exemplo |
+|:-------|:-------------|:--------|
+| **Obras Disponíveis** | Quantas obras estão disponíveis para você registrar relatórios | 142 |
+| **RDOs Registrados** | Quantos Relatórios Diários você já criou | 10 |
+| **RDOs Rascunho** | Quantos relatórios você começou mas ainda não finalizou | 5 |
+
+**O que esses números significam para você:**
+
+- **Obras Disponíveis** indica em quantas obras você pode trabalhar e registrar RDOs. Esse número é definido pelo seu administrador
+- **RDOs Registrados** mostra o total de relatórios que você já enviou. Quanto mais RDOs registrados, mais completo estará o acompanhamento das obras
+- **RDOs Rascunho** são relatórios que você começou a preencher mas não finalizou. Lembre-se de completá-los para que as informações sejam contabilizadas
+
+> **Atenção:** Se você tem RDOs em rascunho, finalize-os o quanto antes! Rascunhos não são contabilizados nos relatórios da empresa e podem causar lacunas no acompanhamento das obras.
+
+### 2.10.2. Ações Rápidas
+
+Logo abaixo dos cartões, você encontra botões de **Ações Rápidas** que dão acesso direto às funcionalidades mais usadas:
+
+| Botão | O que faz |
 |:------|:----------|
-| Dados Gerais | Nome, cliente, endereço, datas de início e previsão de término |
-| Progresso | Percentual de conclusão geral da obra |
-| RDOs | Lista de Relatórios Diários vinculados à obra |
-| Equipe Alocada | Funcionários designados para a obra |
-| Custos | Detalhamento dos custos operacionais por categoria |
-| Serviços | Serviços contratados e executados na obra |
+| **Criar RDO** | Abre o formulário para você criar um novo Relatório Diário de Obra |
+| **Ver Todos os RDOs** | Mostra a lista de todos os seus RDOs (enviados e rascunhos) |
+| **Ver Obras** | Exibe as obras disponíveis para você |
+| **Sair** | Encerra sua sessão no sistema |
 
-[IMAGEM: Dashboard Executivo de uma obra com indicadores detalhados]
+**Fluxo típico do dia a dia:**
 
-> **Nota:** O Dashboard Executivo por obra é especialmente útil para gestores de projeto que precisam acompanhar o andamento de obras específicas, com dados consolidados de mão de obra, materiais e progresso físico.
+1. Acesse o sistema no início do dia
+2. Clique em **Criar RDO** para registrar o relatório do dia
+3. Selecione a obra em que está trabalhando
+4. Preencha as informações: atividades realizadas, equipe presente, condições climáticas, fotos
+5. Salve o relatório
 
----
+### 2.10.3. RDOs Recentes e Obras Disponíveis
 
-## 2.6. Dashboard do Funcionário
+Na parte inferior do painel, você encontra duas listas úteis:
 
-Quando um usuário do tipo **FUNCIONÁRIO** acessa o sistema, ele é redirecionado automaticamente para o **Dashboard do Funcionário**, uma versão simplificada e focada nas atividades do colaborador.
+**RDOs Recentes:**
+- Mostra os últimos relatórios que você criou
+- Cada item exibe a data, a obra e o status (enviado ou rascunho)
+- Clique em qualquer RDO para abri-lo e editá-lo (se ainda estiver como rascunho)
 
-**Título da página:** *Dashboard do Funcionário*
+**Obras Disponíveis:**
+- Lista as obras em que você pode registrar relatórios
+- Cada obra mostra seu nome e status atual
+- Clique em uma obra para ver mais detalhes sobre ela
 
-### 2.6.1. Cartões de Resumo
-
-O Dashboard do Funcionário apresenta 4 cartões informativos:
-
-| Cartão | Descrição |
-|:-------|:----------|
-| **Obras Disponíveis** | Quantidade de obras às quais o funcionário está alocado |
-| **RDOs Registrados** | Total de RDOs criados pelo funcionário |
-| **RDOs Rascunho** | Quantidade de RDOs salvos como rascunho (não finalizados) |
-| **Acesso** | Informações sobre o nível de acesso do funcionário |
-
-### 2.6.2. Ações Rápidas
-
-A seção **Ações Rápidas** oferece botões de acesso direto às principais funcionalidades:
-
-| Botão | Ação |
-|:------|:-----|
-| **Criar RDO** | Abre o formulário para criação de um novo Relatório Diário de Obra |
-| **Ver Todos os RDOs** | Lista todos os RDOs do funcionário |
-| **Ver Obras** | Exibe as obras disponíveis para o funcionário |
-| **Sair** | Encerra a sessão do usuário |
-
-### 2.6.3. RDOs Recentes e Obras Disponíveis
-
-Abaixo dos cartões e ações rápidas, o Dashboard do Funcionário exibe:
-
-- **RDOs Recentes** — Lista dos últimos RDOs criados pelo funcionário, com data, obra e status
-- **Obras Disponíveis** — Lista das obras às quais o funcionário está alocado, com nome e status
-
-[IMAGEM: Dashboard do Funcionário com cartões, ações rápidas e listas]
+[IMAGEM: Listas de RDOs Recentes e Obras Disponíveis no Painel do Funcionário]
 
 ---
 
-## 2.7. Alertas e Notificações
+## 2.11. Boas Práticas — Aproveitando o Painel ao Máximo
 
-O Dashboard apresenta alertas e notificações visuais para situações que requerem atenção do administrador:
+O Painel de Controle é mais útil quando você o consulta regularmente. Aqui estão algumas dicas práticas para tirar o máximo proveito dele:
 
-### 2.7.1. Tipos de Alertas
+### Para Administradores e Gestores
 
-| Tipo | Descrição | Indicador Visual |
-|:-----|:----------|:-----------------|
-| **Propostas Expirando** | Propostas enviadas cuja validade está próxima do vencimento | Badge laranja |
-| **Obras sem RDO** | Obras ativas que não tiveram RDO registrado recentemente | Destaque na lista de obras |
-| **Custos Elevados** | Quando os custos do período ultrapassam a média histórica | Cartão com destaque |
-| **Funcionários sem Alocação** | Colaboradores ativos não vinculados a nenhuma obra | Indicador no cartão |
+1. **Comece o dia pelo Painel** — Acesse o Painel de Controle logo no início do expediente para ter uma visão rápida de como está a operação
+2. **Verifique os custos semanalmente** — Compare os custos do período atual com semanas anteriores para identificar tendências antes que se tornem problemas
+3. **Acompanhe as propostas** — Propostas com status "Enviada" há muito tempo podem precisar de um follow-up com o cliente
+4. **Monitore os RDOs** — Obras sem RDOs recentes podem indicar que a equipe de campo não está registrando as atividades
+5. **Use o filtro de período** — Compare diferentes meses para entender a sazonalidade dos custos e da atividade comercial
+6. **Crie RDOs direto do Painel** — Use o botão **+RDO** na seção de Obras para agilizar o registro de relatórios
 
-### 2.7.2. Boas Práticas para Monitoramento
+### Para Funcionários
 
-1. **Acesse o Dashboard diariamente** — Verifique os KPIs e alertas no início do expediente
-2. **Mantenha os RDOs atualizados** — Garanta que cada obra tenha pelo menos um RDO por dia útil
-3. **Monitore os custos** — Compare os custos do período atual com meses anteriores
-4. **Acompanhe as propostas** — Verifique propostas enviadas que aguardam resposta do cliente
-5. **Revise a alocação** — Confirme que todos os funcionários estão designados a obras ativas
+1. **Registre o RDO diariamente** — Mesmo que o dia tenha sido curto, registre o que foi feito
+2. **Finalize os rascunhos** — Não deixe RDOs em rascunho por mais de um dia
+3. **Verifique suas obras** — Confirme que você está registrando RDOs na obra correta
+4. **Use as Ações Rápidas** — Os botões de ação rápida economizam tempo no dia a dia
 
----
+### Perguntas Frequentes sobre o Painel
 
-## 2.8. Personalização do Dashboard
+**Por que os valores estão zerados?**
+Provavelmente o período selecionado no filtro não possui registros. Tente selecionar um período diferente ou verifique se os dados foram lançados no sistema.
 
-O Dashboard do SIGE exibe dados de forma automática com base no perfil do usuário logado. Embora o layout seja padronizado, existem formas de personalizar a experiência:
+**Com que frequência os números são atualizados?**
+Os dados são atualizados toda vez que você acessa o Painel ou clica em Filtrar. Não é necessário atualizar a página manualmente.
 
-### 2.8.1. Filtros de Período
+**Posso ver dados de meses anteriores?**
+Sim! Use o filtro de período no topo do Painel para selecionar qualquer intervalo de datas.
 
-A principal forma de personalização é o **filtro de período**, que permite ajustar o intervalo de datas para todos os indicadores do Dashboard:
-
-| Parâmetro | Descrição | Formato |
-|:----------|:----------|:--------|
-| `data_inicio` | Data de início do período | `AAAA-MM-DD` |
-| `data_fim` | Data de fim do período | `AAAA-MM-DD` |
-
-**Exemplo de URL com filtro:**
-```
-/dashboard?data_inicio=2024-07-01&data_fim=2024-07-31
-```
-
-### 2.8.2. Detecção Automática de Período
-
-Quando nenhum filtro é aplicado manualmente, o sistema executa a seguinte lógica:
-
-1. Busca a data do **registro de ponto mais recente** vinculado ao `admin_id` do usuário
-2. Utiliza o **mês completo** dessa data como período padrão
-3. Caso não existam registros, utiliza **Julho/2024** como período fallback
-
-### 2.8.3. Isolamento Multi-Tenant
-
-Todos os dados exibidos no Dashboard respeitam o isolamento multi-tenant:
-
-- Cada administrador visualiza **apenas os dados da sua empresa**
-- O filtro por `admin_id` é aplicado automaticamente em todas as consultas
-- Não é possível visualizar dados de outras empresas, mesmo conhecendo os IDs
-
-> **Segurança:** O sistema verifica automaticamente o `admin_id` do usuário logado e aplica o filtro em todas as queries de banco de dados. Esse comportamento é transparente para o usuário e não requer configuração.
+**O que acontece se eu não registrar RDOs?**
+O progresso das obras no Painel ficará desatualizado e os gestores não terão visibilidade do andamento real dos projetos.
 
 ---
 
-# Capitulo 3 — Gestão de Funcionários
+## 2.12. Navegando do Painel para Outros Módulos
 
-## 3.1. Introdução à Gestão de Funcionários
+O Painel de Controle funciona como um ponto de partida para acessar os outros módulos do SIGE. Aqui está um guia rápido de como ir do Painel para cada funcionalidade:
 
-O módulo de **Gestão de Funcionários** do SIGE (Sistema Integrado de Gestão Empresarial) centraliza todas as operações relacionadas ao cadastro, acompanhamento e controle da força de trabalho da empresa. Este módulo é acessado pelo menu lateral **Funcionários** na barra de navegação principal do sistema.
+| Você quer... | Faça isso |
+|:-------------|:----------|
+| Ver detalhes de um funcionário | Clique em **Funcionários** no menu superior |
+| Criar um RDO para uma obra | Clique no botão **+RDO** na seção Obras e RDO |
+| Ver todas as suas propostas | Clique em **Propostas** no menu superior |
+| Gerenciar a frota de veículos | Clique em **Veículos** no menu superior |
+| Consultar os custos com alimentação | Clique em **Alimentação** no menu superior |
+| Ver o estoque de materiais | Clique em **Almoxarifado** no menu superior |
+| Gerar relatórios consolidados | Clique em **Relatórios** no menu superior |
+| Ver o controle de ponto | Clique em **Ponto** no menu superior |
+| Gerenciar a alocação da equipe | Clique em **Equipe** no menu superior |
+| Acessar o financeiro da empresa | Clique em **Financeiro** no menu superior |
 
-Principais funcionalidades cobertas neste capítulo:
+> **Lembre-se:** Você pode voltar ao Painel de Controle a qualquer momento clicando em **Dashboard** no menu superior.
 
-| Funcionalidade | Descrição |
-|---|---|
-| Cadastro de funcionários | Registro completo com dados pessoais, contratuais e de acesso |
-| Perfil individual | Visualização detalhada de cada funcionário com KPIs e histórico |
-| Reconhecimento facial | Cadastro de múltiplas fotos para verificação de identidade no ponto |
-| Controle de ponto eletrônico | Registro, visualização e gestão de frequência com validação biométrica |
-| Relatórios | Geração de relatórios individuais e consolidados em PDF |
+---
 
-> **Pré-requisito:** Para utilizar este módulo, o usuário deve possuir permissão de **Administrador** ou **Gestor de Equipes**. Funcionários com perfil básico terão acesso apenas ao seu próprio dashboard em `/funcionario-dashboard`.
+## 2.13. Resumo do Capítulo
+
+Neste capítulo, você aprendeu a:
+
+| Seção | O que você aprendeu |
+|:------|:--------------------|
+| 2.1 | O que é o Painel de Controle e o que ele mostra |
+| 2.2 | Como acessar o Painel e navegar pelo menu |
+| 2.3 | Como usar o filtro de período para ver dados de diferentes datas |
+| 2.4 | O que significam os cartões de KPI (Funcionários, Obras, Veículos, Custos) |
+| 2.5 | Como interpretar os Custos Detalhados por categoria |
+| 2.6 | Como acompanhar as Propostas Comerciais |
+| 2.7 | Como ler o gráfico de Evolução de Propostas |
+| 2.8 | Como usar a seção Obras e RDO para criar relatórios rapidamente |
+| 2.9 | O que é o Painel Executivo por Obra |
+| 2.10 | Como funciona o Painel do Funcionário |
+| 2.11 | Boas práticas para usar o Painel no dia a dia |
+| 2.12 | Como navegar do Painel para outros módulos |
+
+---
+
+# Capítulo 3 — Gestão de Funcionários
+
+## 3.1. Introdução
+
+O módulo de **Gestão de Funcionários** é onde você cadastra, acompanha e gerencia toda a equipe da sua empresa. Aqui você pode:
+
+- Cadastrar novos funcionários com todas as informações necessárias
+- Consultar e editar dados de qualquer funcionário
+- Registrar fotos para o reconhecimento facial no ponto eletrônico
+- Acompanhar horas trabalhadas, faltas e horas extras
+- Registrar e controlar o ponto eletrônico
+- Gerar relatórios e exportar informações em PDF
+
+Este capítulo vai guiar você por cada uma dessas funcionalidades, passo a passo.
+
+> **Quem pode usar:** Para acessar este módulo, você precisa ter permissão de **Administrador** ou **Gestor de Equipes**. Funcionários com acesso básico podem visualizar apenas o próprio painel de informações.
 
 ---
 
 ## 3.2. Tela Principal de Funcionários
 
-### Acessando a Tela
+### Como acessar
 
-1. No menu de navegação superior, clique em **Funcionários**.
-2. O sistema direcionará você para a URL `/funcionarios`.
+1. No menu lateral do sistema, clique em **Funcionários**.
+2. A tela principal será exibida com todos os funcionários cadastrados.
 
-### Visão Geral da Interface
+### O que você vai encontrar nessa tela
 
-A tela principal de funcionários é dividida nas seguintes áreas:
+A tela principal de funcionários é organizada em áreas que facilitam a visualização e o gerenciamento da equipe. Veja cada uma delas:
 
-#### KPIs Resumidos (Topo)
+#### Indicadores no topo da página
 
-No topo da página, são exibidos indicadores-chave de desempenho (KPIs) gerais do período selecionado:
+No topo da tela, você encontra um resumo rápido com os principais números da equipe no período selecionado:
 
-| KPI | Descrição |
-|---|---|
-| Total de Funcionários | Quantidade de funcionários ativos cadastrados |
-| Horas Trabalhadas | Soma total de horas trabalhadas no período |
-| Horas Extras | Total de horas extras acumuladas |
-| Faltas | Quantidade de faltas registradas (justificadas e não justificadas) |
-| Custo Total | Custo estimado com mão de obra no período |
-| Taxa de Absenteísmo | Percentual de ausências em relação aos dias úteis possíveis |
+- **Total de Funcionários** — Quantos funcionários ativos estão cadastrados.
+- **Horas Trabalhadas** — Soma de todas as horas trabalhadas pela equipe no período.
+- **Horas Extras** — Total de horas extras acumuladas no período.
+- **Faltas** — Quantidade de faltas registradas (tanto justificadas quanto não justificadas).
+- **Custo Total** — Estimativa do custo com a mão de obra no período.
+- **Taxa de Absenteísmo** — Percentual de ausências em relação aos dias úteis.
 
-#### Filtros de Período
+> **Dica:** Esses indicadores ajudam você a ter uma visão geral rápida da situação da equipe, sem precisar abrir o perfil de cada funcionário.
 
-Acima dos cards de funcionários, há campos para filtrar os dados por período:
+#### Como filtrar por período
 
-1. **Data Início** — Define o início do período de análise (padrão: primeiro dia do mês atual).
-2. **Data Fim** — Define o final do período de análise (padrão: data atual).
-3. Clique em **Filtrar** para atualizar os KPIs e dados exibidos.
+Você pode ajustar o período dos indicadores e dados exibidos na tela:
 
-#### Cards de Funcionários
+1. Localize os campos de **Data Início** e **Data Fim** no topo da página.
+2. Clique no campo **Data Início** e selecione a data desejada (por padrão, é o primeiro dia do mês atual).
+3. Clique no campo **Data Fim** e selecione a data final (por padrão, é o dia de hoje).
+4. Clique no botão **Filtrar** para atualizar os dados.
 
-Os funcionários são exibidos em formato de **cards** (cartões visuais), cada um contendo:
+Os indicadores e as informações dos funcionários serão recalculados de acordo com o período escolhido.
 
-- **Foto ou avatar com iniciais** — Se o funcionário possui foto cadastrada, ela será exibida. Caso contrário, um avatar com as iniciais do nome é gerado automaticamente.
+#### Cards dos funcionários
+
+Cada funcionário é exibido em um **card** (cartão visual) que mostra:
+
+- **Foto do funcionário** — Se houver uma foto cadastrada, ela aparece no card. Caso contrário, será exibido um ícone com as iniciais do nome.
 - **Nome completo** do funcionário.
-- **Função/Cargo** atribuído ao funcionário.
-- **Checkbox de seleção** — Permite selecionar múltiplos funcionários para operações em lote.
-
-#### Busca e Filtros
-
-A tela oferece recursos de busca e filtragem:
-
-1. **Campo de busca** — Digite o nome, CPF ou código do funcionário para localizar rapidamente.
-2. **Filtro por departamento** — Filtre os funcionários por departamento.
-3. **Filtro por função** — Filtre por cargo/função.
-4. **Filtro por status** — Visualize funcionários ativos, inativos ou todos.
-
-#### Operações em Lote
-
-Após selecionar funcionários via checkbox, é possível realizar operações em lote como:
-
-- Lançamento de ponto para múltiplos funcionários simultaneamente.
-- Alocação em obras.
-- Exportação de dados selecionados.
+- **Cargo ou função** que ele exerce.
+- **Caixa de seleção** — Permite marcar vários funcionários para realizar ações em grupo.
 
 ---
 
-## 3.3. Cadastrando um Novo Funcionário
+## 3.3. Pesquisando e Filtrando Funcionários
 
-O cadastro de novos funcionários é realizado diretamente na tela principal `/funcionarios`, por meio de um formulário modal. Não existe uma página separada para criação.
+A tela de funcionários oferece ferramentas de busca para facilitar a localização de qualquer pessoa da equipe:
 
-### Passo a Passo
+### Busca por nome ou CPF
 
-1. Na tela de funcionários (`/funcionarios`), clique no botão **+ Novo Funcionário**.
-2. Um formulário modal será aberto com os campos organizados em seções.
-3. Preencha os dados conforme descrito nas subseções abaixo.
-4. Clique em **Salvar** para confirmar o cadastro.
+1. Localize o **campo de busca** na parte superior da lista de funcionários.
+2. Digite o **nome**, o **CPF** ou o **código** do funcionário que você procura.
+3. Os resultados serão filtrados automaticamente enquanto você digita.
 
-### 3.3.1. Dados Pessoais
+> **Exemplo:** Se você digitar "João", todos os funcionários que tenham "João" no nome serão exibidos.
+
+### Filtros disponíveis
+
+Além da busca por texto, você pode usar os filtros para refinar a lista:
+
+- **Departamento** — Selecione um departamento específico para ver apenas os funcionários daquele setor.
+- **Função/Cargo** — Filtre por cargo ou função exercida.
+- **Status** — Escolha entre ver funcionários **Ativos**, **Inativos** ou **Todos**.
+
+Para usar os filtros:
+
+1. Clique no filtro desejado (por exemplo, **Departamento**).
+2. Selecione a opção na lista que aparece.
+3. A lista de funcionários será atualizada automaticamente.
+
+> **Dica:** Você pode combinar os filtros. Por exemplo, filtrar por departamento "Obras" e status "Ativo" para ver apenas quem está trabalhando atualmente no setor de obras.
+
+### Operações em grupo
+
+Depois de marcar vários funcionários usando as caixas de seleção nos cards, você pode realizar ações em grupo, como:
+
+- Lançar registros de ponto para vários funcionários ao mesmo tempo.
+- Alocar funcionários em uma obra.
+- Exportar dados dos funcionários selecionados.
+
+---
+
+## 3.4. Cadastrando um Novo Funcionário
+
+Para adicionar um novo funcionário ao sistema, siga o passo a passo abaixo:
+
+### Passo a passo
+
+1. Na tela de funcionários, clique no botão **+ Novo Funcionário**.
+2. Um formulário será aberto na tela.
+3. Preencha os campos conforme explicado nas seções a seguir.
+4. Após preencher todos os dados, clique no botão **Salvar**.
+
+### 3.4.1. Dados Pessoais
 
 Preencha as informações pessoais do funcionário:
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Nome | Texto | Sim | Nome completo do funcionário |
-| CPF | Texto (14 caracteres) | Sim | CPF com formatação (000.000.000-00). Deve ser único no sistema |
-| RG | Texto | Não | Número do documento de identidade |
-| Data de Nascimento | Data | Não | Data de nascimento no formato DD/MM/AAAA |
-| Endereço | Texto longo | Não | Endereço completo (rua, número, bairro, cidade, estado, CEP) |
-| Telefone | Texto | Não | Telefone com DDD. Ex.: (11) 99999-0000 |
-| E-mail | Texto | Não | Endereço de e-mail do funcionário |
-| Foto | Arquivo (imagem) | Não | Foto do funcionário (JPG, PNG). Será exibida no card e no perfil |
+**Nome** *(obrigatório)*
+- Digite o nome completo do funcionário.
+- Exemplo: "João Carlos da Silva".
 
-> **Importante:** O CPF é validado como campo único. Caso um CPF já esteja cadastrado para outro funcionário, o sistema exibirá uma mensagem de erro e impedirá a duplicação.
+**CPF** *(obrigatório)*
+- Digite os 11 números do CPF do funcionário.
+- O sistema formata automaticamente (000.000.000-00).
+- Cada CPF deve ser único — não é possível cadastrar dois funcionários com o mesmo CPF.
 
-### 3.3.2. Dados Contratuais
+**RG**
+- Digite o número do documento de identidade (RG) do funcionário.
+- Este campo é opcional.
 
-Preencha as informações referentes ao vínculo empregatício:
+**Data de Nascimento**
+- Selecione a data de nascimento do funcionário no calendário.
+- Formato: dia/mês/ano (DD/MM/AAAA).
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Código | Texto (10 caracteres) | Não | Código interno do funcionário (ex.: VV001). Se deixado em branco, será gerado automaticamente pelo sistema |
-| Data de Admissão | Data | Sim | Data de início do vínculo empregatício. Padrão: data atual |
-| Salário | Numérico (R$) | Não | Salário mensal bruto do funcionário |
-| Departamento | Seleção | Não | Departamento ao qual o funcionário pertence |
-| Função/Cargo | Seleção | Não | Função ou cargo exercido pelo funcionário |
-| Horário de Trabalho | Seleção | Não | Modelo de horário de trabalho associado (define entrada, saída, pausas e dias da semana) |
+**Endereço**
+- Digite o endereço completo do funcionário: rua, número, bairro, cidade, estado e CEP.
+- Exemplo: "Rua das Flores, 123 - Centro - São Paulo/SP - CEP 01234-567".
 
-> **Código automático:** Quando o campo Código é deixado em branco, o sistema gera automaticamente um código sequencial no formato `VV001`, `VV002`, etc., baseando-se no último código cadastrado.
+**Telefone**
+- Digite o número de telefone com DDD.
+- Exemplo: (11) 99999-0000.
 
-> **Horário de trabalho:** Os modelos de horário de trabalho podem ser configurados em **Configurações > Horários** e definem horários diferenciados para cada dia da semana (ex.: sexta-feira com expediente reduzido, sábado meio período, etc.).
+**E-mail**
+- Digite o endereço de e-mail do funcionário.
+- Este campo é opcional, mas útil para comunicações.
 
-### 3.3.3. Dados de Acesso
+**Foto**
+- Clique em **Escolher arquivo** para enviar uma foto do funcionário.
+- Formatos aceitos: JPG ou PNG.
+- Essa foto será exibida no card do funcionário e no perfil dele.
 
-Após o cadastro, o funcionário poderá ter seu horário padrão configurado individualmente através da rota:
+> **Importante sobre o CPF:** Se você digitar um CPF que já está cadastrado no sistema, uma mensagem de erro será exibida. Verifique se o funcionário já não está registrado antes de criar um novo cadastro.
 
-```
-/funcionarios/<id>/horario-padrao
-```
+### 3.4.2. Dados do Contrato de Trabalho
 
-Esta configuração permite personalizar os horários de trabalho do funcionário caso ele possua uma jornada diferente do modelo padrão atribuído ao seu departamento.
+Preencha as informações sobre o vínculo de trabalho:
+
+**Código do funcionário**
+- Digite um código interno para identificar o funcionário (exemplo: VV001).
+- Se você deixar este campo em branco, o sistema vai gerar um código automaticamente (VV001, VV002, VV003...).
+
+**Data de Admissão** *(obrigatório)*
+- Selecione a data em que o funcionário começou a trabalhar na empresa.
+- Por padrão, o sistema preenche com a data de hoje.
+
+**Salário**
+- Digite o valor do salário mensal bruto do funcionário (em reais).
+- Exemplo: 2.500,00.
+
+**Departamento**
+- Selecione o departamento ao qual o funcionário pertence.
+- Exemplos: Administrativo, Obras, Manutenção, etc.
+
+**Função/Cargo**
+- Selecione a função ou cargo que o funcionário vai exercer.
+- Exemplos: Pedreiro, Eletricista, Engenheiro, Auxiliar Administrativo, etc.
+
+**Horário de Trabalho**
+- Selecione o modelo de horário de trabalho do funcionário.
+- Cada modelo define os horários de entrada, saída, pausas e dias da semana em que o funcionário trabalha.
+- Se o funcionário tem uma jornada diferente, você poderá ajustar o horário individualmente depois (veja a seção 3.5.3).
+
+> **Sobre o código automático:** Quando você não preenche o campo de código, o sistema cria automaticamente um código sequencial (VV001, VV002...). Isso é útil para manter a organização sem precisar se preocupar com a numeração.
+
+> **Sobre os horários de trabalho:** Os modelos de horário de trabalho são configurados pelo administrador na área de **Configurações > Horários**. Eles permitem definir horários diferentes para cada dia da semana — por exemplo, sexta-feira com expediente reduzido ou sábado com meio período.
 
 ---
 
-## 3.4. Perfil do Funcionário
+## 3.5. Perfil do Funcionário
 
-### Acessando o Perfil
+### 3.5.1. Como acessar o perfil
 
-Para acessar o perfil detalhado de um funcionário:
+Para ver todas as informações de um funcionário:
 
-1. Na tela principal de funcionários, clique no **card** ou no **nome** do funcionário desejado.
-2. O sistema direcionará para a URL `/funcionario_perfil/<id>`.
+1. Na tela principal de funcionários, localize o funcionário desejado.
+2. Clique no **card** (cartão) do funcionário ou diretamente no **nome** dele.
+3. A página de perfil será aberta com todas as informações detalhadas.
 
-### Seções do Perfil
+### 3.5.2. O que você encontra no perfil
 
-O perfil do funcionário está organizado nas seguintes seções:
+O perfil do funcionário está dividido em seções para facilitar a consulta:
 
-#### Informações Pessoais
+#### Informações pessoais e contratuais
 
-Exibe todos os dados cadastrais do funcionário:
+Todos os dados cadastrados do funcionário ficam visíveis nessa seção:
 
-- Nome completo, CPF, RG
+- Nome completo, CPF e RG
 - Data de nascimento e endereço
 - Telefone e e-mail
-- Foto (quando cadastrada)
-- Departamento e função
+- Foto do funcionário (quando cadastrada)
+- Departamento e função/cargo
 - Data de admissão e salário
-- Status (ativo/inativo)
+- Status atual (ativo ou inativo)
 
-#### KPIs Individuais
+#### Indicadores de desempenho
 
-Indicadores calculados automaticamente para o período filtrado:
+O perfil exibe automaticamente os indicadores do funcionário para o período selecionado:
 
-| Indicador | Descrição |
-|---|---|
-| Horas Trabalhadas | Total de horas registradas no período |
-| Horas Extras | Total de horas extras acumuladas (calculadas com fator 1,5x) |
-| Faltas | Quantidade de faltas não justificadas |
-| Faltas Justificadas | Quantidade de faltas com justificativa/atestado |
-| Atrasos | Total de horas de atraso acumuladas |
-| Dias Trabalhados | Quantidade de dias com registro de ponto efetivo |
-| Taxa de Absenteísmo | Percentual de faltas em relação aos dias úteis do período |
-| Valor Hora | Valor da hora calculado com base no salário e jornada contratual |
-| Valor Horas Extras | Custo total das horas extras (com fator 1,5x) |
-| DSR sobre HE | Descanso Semanal Remunerado calculado sobre horas extras (Lei 605/49) |
+- **Horas Trabalhadas** — Total de horas que o funcionário trabalhou no período.
+- **Horas Extras** — Total de horas extras realizadas.
+- **Faltas** — Quantidade de faltas sem justificativa.
+- **Faltas Justificadas** — Quantidade de faltas com atestado ou justificativa.
+- **Atrasos** — Total de horas de atraso acumuladas.
+- **Dias Trabalhados** — Quantidade de dias em que houve registro de ponto.
+- **Taxa de Absenteísmo** — Percentual de faltas em relação aos dias úteis do período.
+- **Valor da Hora** — Quanto vale cada hora de trabalho do funcionário, calculado com base no salário.
+- **Valor das Horas Extras** — Custo total das horas extras realizadas.
+- **DSR sobre Horas Extras** — Valor do Descanso Semanal Remunerado calculado sobre as horas extras.
 
-#### Histórico de Ponto
+> **O que é DSR?** O Descanso Semanal Remunerado (DSR) é um valor adicional pago sobre as horas extras, garantido por lei. O sistema calcula esse valor automaticamente para você.
 
-Tabela detalhada com todos os registros de ponto do período, exibindo:
+#### Histórico de ponto
+
+Uma tabela completa mostra todos os registros de ponto do funcionário no período, incluindo:
 
 - Data do registro
-- Hora de entrada e saída
-- Hora de saída e retorno do almoço
-- Horas trabalhadas e horas extras
-- Tipo de registro (trabalhado, falta, feriado, etc.)
+- Horário de entrada
+- Horário de saída para almoço
+- Horário de retorno do almoço
+- Horário de saída
+- Total de horas trabalhadas no dia
+- Horas extras (se houver)
+- Tipo do registro (dia trabalhado, falta, feriado, etc.)
 - Observações
 
-#### Obras Vinculadas
+#### Obras vinculadas
 
-Lista de obras nas quais o funcionário está ou esteve alocado, com informações de:
+Lista todas as obras em que o funcionário está ou já esteve alocado, mostrando:
 
 - Nome da obra
-- Período de alocação
-- Tipo de local (campo ou escritório)
+- Período em que trabalhou na obra
+- Local de trabalho (campo ou escritório)
 
-#### Dashboard Individual
+### 3.5.3. Editando as informações do funcionário
 
-O funcionário possui um dashboard personalizado acessível em `/funcionario-dashboard`, que apresenta um resumo visual de seus indicadores de desempenho.
+Para alterar qualquer dado cadastral do funcionário:
 
-### Exportando o Perfil em PDF
+1. No perfil do funcionário, clique no botão **Editar**.
+2. Os campos ficarão disponíveis para edição.
+3. Faça as alterações necessárias.
+4. Clique em **Salvar** para confirmar.
 
-Para gerar um relatório PDF do perfil do funcionário:
+Você pode editar dados pessoais (nome, endereço, telefone) e dados contratuais (salário, departamento, função, horário de trabalho).
 
-1. No perfil do funcionário, clique no botão **Exportar PDF** ou **Gerar PDF**.
-2. O sistema gerará o documento e iniciará o download automaticamente.
-3. A URL direta para geração do PDF é `/funcionario_perfil/<id>/pdf`.
+#### Configurando um horário personalizado
 
-O PDF inclui dados pessoais, KPIs do período e o histórico detalhado de registros de ponto.
+Se o funcionário tem uma jornada diferente do padrão do departamento:
 
----
+1. No perfil do funcionário, localize a opção **Horário Personalizado** ou **Horário Padrão**.
+2. Clique para abrir a configuração de horário individual.
+3. Defina os horários de entrada, saída e intervalos para cada dia da semana.
+4. Clique em **Salvar**.
 
-## 3.5. Reconhecimento Facial
-
-### 3.5.1. Importância do Reconhecimento Facial
-
-O SIGE utiliza reconhecimento facial como camada de segurança para validar a identidade do funcionário no momento do registro de ponto. Este recurso previne fraudes como o chamado "ponto amigo" (quando um colega registra o ponto no lugar de outro).
-
-**Parâmetros técnicos do reconhecimento:**
-
-| Parâmetro | Valor | Descrição |
-|---|---|---|
-| Limiar de distância | 0.40 | Distância máxima entre a foto capturada e a foto cadastrada para considerar uma correspondência |
-| Confiança mínima | 60% | Percentual mínimo de confiança exigido para validar o reconhecimento |
-| Modelo utilizado | VGG-Face | Rede neural utilizada para extração de características faciais |
-| Brilho aceito | 30 a 230 | Faixa de luminosidade aceita na foto (evita fotos muito escuras ou com flash excessivo) |
-| Tamanho mínimo | 150×150 px | Resolução mínima da foto capturada para garantir qualidade do reconhecimento |
-
-> **Nota:** Quanto menor a distância facial, maior a confiança de que a pessoa na foto é realmente o funcionário cadastrado.
-
-### 3.5.2. Cadastrando Fotos Faciais
-
-O sistema permite cadastrar **múltiplas fotos faciais** por funcionário, o que melhora significativamente a precisão do reconhecimento em diferentes condições.
-
-#### Acessando a Gestão de Fotos Faciais
-
-1. Acesse o perfil do funcionário em `/funcionario_perfil/<id>`.
-2. Clique na opção **Fotos Faciais** ou acesse diretamente a URL:
-   ```
-   /ponto/funcionario/<id>/fotos-faciais
-   ```
-
-#### Cadastrando uma Nova Foto
-
-1. Na tela de fotos faciais, clique em **Adicionar Foto**.
-2. A câmera do dispositivo será ativada (ou selecione um arquivo de imagem).
-3. Posicione o rosto centralizado no enquadramento.
-4. Capture ou selecione a foto.
-5. Adicione uma **descrição** para a foto (ex.: "Frontal sem óculos", "Com óculos", "Perfil esquerdo").
-6. Clique em **Salvar**.
-
-#### Recomendações para Fotos de Qualidade
-
-Para garantir o melhor desempenho do reconhecimento facial, siga estas orientações:
-
-1. **Cadastre pelo menos 3 fotos** com variações:
-   - Uma foto frontal sem acessórios
-   - Uma foto com óculos (se o funcionário usa)
-   - Uma foto em perfil lateral
-
-2. **Iluminação adequada:**
-   - Evite fotos com flash direto ou contraluz
-   - Prefira ambientes com iluminação natural ou difusa
-   - O sistema rejeita fotos com brilho fora da faixa 30-230
-
-3. **Enquadramento correto:**
-   - Rosto centralizado e ocupando a maior parte da imagem
-   - Resolução mínima de 150×150 pixels
-   - Sem obstruções no rosto (mãos, máscaras, bonés)
-
-4. **Expressão neutra:**
-   - Prefira expressões neutras ou levemente sorridente
-   - Evite caretas ou expressões exageradas
-
-| Situação | Recomendação |
-|---|---|
-| Funcionário usa óculos | Cadastrar fotos com e sem óculos |
-| Funcionário usa barba | Atualizar fotos após mudanças significativas no visual |
-| Funcionário trabalha em campo | Cadastrar foto com EPI (capacete) quando aplicável |
-| Baixa taxa de reconhecimento | Adicionar mais fotos em condições variadas de iluminação |
-
-> **Dica:** Fotos faciais podem ser gerenciadas a qualquer momento. Se o sistema apresentar dificuldade em reconhecer um funcionário, adicione novas fotos com condições de iluminação similares às do ambiente de trabalho.
+> **Quando usar o horário personalizado?** Use quando um funcionário específico trabalha em um horário diferente dos demais colegas do mesmo departamento. Por exemplo, se o departamento de obras tem horário das 7h às 17h, mas um engenheiro trabalha das 8h às 18h.
 
 ---
 
-## 3.6. Controle de Ponto Eletrônico
+## 3.6. Cadastro de Fotos para Reconhecimento Facial
 
-O módulo de ponto eletrônico do SIGE permite o registro da jornada de trabalho dos funcionários com validação por reconhecimento facial e geolocalização (geofencing).
+### 3.6.1. Por que cadastrar fotos faciais?
 
-### 3.6.1. Registrando Ponto
+O sistema utiliza reconhecimento facial para garantir que o ponto eletrônico seja registrado pela pessoa certa. Quando o funcionário bate o ponto, o sistema tira uma foto e compara com as fotos cadastradas para confirmar a identidade.
 
-#### Acesso à Tela de Ponto
+**Por que cadastrar mais de uma foto?**
 
-1. No menu de navegação, clique no dropdown **Ponto**.
-2. Selecione **Registrar Ponto** para acessar a URL `/ponto`.
+Cadastrar várias fotos melhora muito a precisão do reconhecimento, porque o sistema consegue identificar o funcionário em diferentes situações do dia a dia:
 
-#### Fluxo de Registro com Reconhecimento Facial
+- Uma foto com óculos e outra sem óculos
+- Uma foto em ambiente claro e outra em ambiente com menos luz
+- Uma foto de frente e outra levemente de lado
 
-O processo de registro de ponto segue as seguintes etapas:
+> **Resultado:** Quanto mais fotos cadastradas em condições variadas, mais rápido e preciso será o reconhecimento na hora de bater o ponto.
 
-1. **Seleção do funcionário** — O funcionário é identificado automaticamente (se logado) ou selecionado manualmente pelo gestor.
+### 3.6.2. Como cadastrar fotos faciais
 
-2. **Captura da foto** — A câmera do dispositivo é ativada para capturar a foto do funcionário no momento do registro.
+#### Acessando a tela de fotos
 
-3. **Validação facial** — O sistema compara a foto capturada com as fotos faciais cadastradas:
-   - Se a distância facial for **≤ 0.40** e a confiança **≥ 60%**: registro aprovado
-   - Caso contrário: registro rejeitado com mensagem de erro
+1. Acesse o perfil do funcionário (clicando no card dele na tela de funcionários).
+2. No perfil, clique na opção **Fotos Faciais** ou **Gerenciar Fotos**.
 
-4. **Validação de geolocalização (Geofencing)** — Se a obra possui coordenadas cadastradas:
-   - O GPS do dispositivo é consultado
-   - A distância entre o funcionário e a obra é calculada
-   - Se a distância for **≤ 100 metros** (raio padrão): localização validada
-   - Caso contrário: alerta de localização fora do perímetro
+#### Adicionando uma nova foto
 
-5. **Registro efetivado** — Após as validações, o ponto é registrado com:
-   - Hora de entrada ou saída
-   - Foto capturada (armazenada em base64)
-   - Resultado do reconhecimento facial (sucesso/falha, confiança, modelo)
-   - Coordenadas GPS e distância da obra
+1. Na tela de fotos faciais, clique no botão **Adicionar Foto**.
+2. A câmera do seu dispositivo (computador, tablet ou celular) será ativada.
+   - Se preferir, você também pode selecionar uma foto já existente no dispositivo.
+3. Posicione o rosto do funcionário no centro da tela, de forma que o rosto fique bem visível.
+4. Clique em **Capturar** (ou selecione o arquivo de imagem).
+5. No campo **Descrição**, escreva uma identificação para a foto. Exemplos:
+   - "Foto frontal sem óculos"
+   - "Com óculos de grau"
+   - "Com capacete de obra"
+   - "Perfil lado esquerdo"
+6. Clique em **Salvar** para concluir.
 
-#### Tipos de Registro
+Repita esse processo para adicionar mais fotos do mesmo funcionário.
 
-O sistema suporta os seguintes tipos de registro de ponto:
+### 3.6.3. Dicas para fotos de qualidade
 
-| Tipo | Descrição |
+Siga estas orientações para garantir que o reconhecimento facial funcione da melhor forma:
+
+#### Quantidade de fotos
+
+- Cadastre **pelo menos 3 fotos** de cada funcionário.
+- Quanto mais fotos, melhor a precisão.
+
+#### Variações recomendadas
+
+| Situação | O que cadastrar |
 |---|---|
-| `trabalhado` | Dia normal de trabalho |
-| `falta` | Falta não justificada |
-| `falta_justificada` | Falta com justificativa ou atestado médico |
-| `feriado` | Dia de feriado (sem trabalho) |
-| `feriado_trabalhado` | Trabalho em dia de feriado |
-| `sabado_horas_extras` | Trabalho em sábado (computado como hora extra) |
-| `domingo_horas_extras` | Trabalho em domingo (computado como hora extra) |
+| Funcionário usa óculos | Uma foto **com** óculos e outra **sem** óculos |
+| Funcionário tem barba | Atualize as fotos se houver mudança significativa (raspou a barba, deixou crescer) |
+| Funcionário trabalha em obra | Uma foto **com** capacete/EPI e outra **sem** |
+| Funcionário trabalha em ambientes variados | Fotos em diferentes condições de luz (escritório, ar livre) |
 
-### 3.6.2. Visualizando Registros de Ponto
+#### Cuidados com a iluminação
 
-#### Controle de Ponto (Gestão)
+- Tire as fotos em um local **bem iluminado**, de preferência com luz natural.
+- **Evite** fotos com flash direto no rosto — a luz forte pode atrapalhar o reconhecimento.
+- **Evite** tirar fotos contra a luz (contraluz) — o rosto ficará escuro e o sistema pode não reconhecer.
 
-1. No menu **Ponto**, selecione **Controle de Ponto** para acessar `/controle_ponto`.
-2. Utilize os filtros disponíveis:
-   - **Funcionário** — Selecione um funcionário específico ou visualize todos.
-   - **Período** — Defina as datas de início e fim.
-   - **Obra** — Filtre por obra específica.
-   - **Tipo de registro** — Filtre por tipo (trabalhado, falta, etc.).
+#### Posicionamento correto
 
-A tabela de registros exibe:
+- O rosto deve estar **centralizado** na foto.
+- O rosto deve ocupar a **maior parte** da imagem — não tire fotos de corpo inteiro.
+- **Não cubra o rosto** com as mãos, máscara, boné ou outros objetos.
 
-| Coluna | Descrição |
+#### Expressão facial
+
+- Prefira uma expressão **natural**, com o rosto relaxado.
+- Evite caretas ou expressões muito exageradas.
+
+> **O reconhecimento não está funcionando bem?** Se o sistema tem dificuldade em reconhecer um funcionário, tente cadastrar novas fotos em condições parecidas com o ambiente onde ele bate o ponto (mesma iluminação, com ou sem EPI, etc.).
+
+---
+
+## 3.7. Ponto Eletrônico — Registro de Ponto
+
+O ponto eletrônico permite registrar os horários de entrada e saída dos funcionários. O sistema pode usar reconhecimento facial e localização para validar cada registro.
+
+### 3.7.1. Como registrar o ponto
+
+#### Passo a passo
+
+1. No menu do sistema, clique em **Ponto**.
+2. Selecione a opção **Registrar Ponto**.
+
+3. **Selecione o funcionário:**
+   - Se você é um gestor, selecione o nome do funcionário na lista.
+   - Se o funcionário está logado no sistema, o nome dele já estará preenchido.
+
+4. **Tire a foto para reconhecimento facial:**
+   - A câmera do dispositivo será ativada automaticamente.
+   - Posicione o rosto do funcionário de forma centralizada.
+   - Clique em **Capturar**.
+
+5. **Aguarde a validação:**
+   - O sistema vai comparar a foto tirada com as fotos cadastradas do funcionário.
+   - Se a foto corresponder, aparecerá uma mensagem de **confirmação** ✅.
+   - Se a foto não corresponder, aparecerá uma mensagem de **erro** ❌. Nesse caso, tente novamente com melhor iluminação ou posicionamento.
+
+6. **Validação de localização (quando aplicável):**
+   - Se a obra possui localização cadastrada, o sistema verifica se o funcionário está próximo do local de trabalho.
+   - Se estiver dentro do perímetro, a localização será validada ✅.
+   - Se estiver fora do perímetro, um alerta será exibido ⚠️.
+
+7. **Ponto registrado!**
+   - Após as validações, o ponto é salvo automaticamente com o horário atual.
+
+> **Dica:** O registro de ponto pode ser feito pelo celular, tablet ou computador. Basta acessar o sistema pelo navegador do dispositivo.
+
+### 3.7.2. Tipos de registro de ponto
+
+O sistema reconhece diferentes tipos de dias no registro de ponto:
+
+| Tipo | O que significa |
 |---|---|
-| Data | Data do registro |
-| Funcionário | Nome do funcionário |
-| Entrada | Hora de entrada registrada |
-| Saída Almoço | Hora de saída para almoço |
-| Retorno Almoço | Hora de retorno do almoço |
-| Saída | Hora de saída registrada |
-| Horas Trabalhadas | Total de horas calculado automaticamente |
-| Horas Extras | Horas extras calculadas (excedente da jornada contratual) |
+| Dia trabalhado | Dia normal de trabalho |
+| Falta | O funcionário não compareceu e não apresentou justificativa |
+| Falta justificada | O funcionário não compareceu, mas apresentou justificativa (atestado médico, licença, etc.) |
+| Feriado | Dia de feriado — sem trabalho |
+| Feriado trabalhado | O funcionário trabalhou em um dia de feriado |
+| Sábado (hora extra) | Trabalho realizado no sábado, contado como hora extra |
+| Domingo (hora extra) | Trabalho realizado no domingo, contado como hora extra |
+
+### 3.7.3. O que o sistema calcula automaticamente
+
+Você não precisa fazer contas! O sistema calcula automaticamente:
+
+- **Horas trabalhadas** — Com base nos horários de entrada e saída, descontando o intervalo de almoço.
+- **Horas extras** — A diferença entre as horas trabalhadas e a jornada prevista no contrato.
+- **Atrasos** — Se o funcionário chegou depois do horário de entrada previsto, o atraso é registrado.
+- **DSR sobre horas extras** — O Descanso Semanal Remunerado sobre as horas extras é calculado conforme a legislação.
+
+> **Sobre o almoço:** Se o funcionário trabalha mais de 6 horas, o sistema desconta automaticamente 1 hora de almoço do total de horas trabalhadas.
+
+---
+
+## 3.8. Consultando os Registros de Ponto
+
+### Como acessar o controle de ponto
+
+1. No menu do sistema, clique em **Ponto**.
+2. Selecione a opção **Controle de Ponto**.
+
+### Usando os filtros
+
+A tela de controle de ponto permite filtrar os registros de diversas formas:
+
+1. **Por funcionário** — Selecione um funcionário específico ou escolha "Todos" para ver a equipe toda.
+2. **Por período** — Preencha os campos de **Data Início** e **Data Fim** para definir o período desejado.
+3. **Por obra** — Selecione uma obra específica para ver apenas os registros daquela obra.
+4. **Por tipo de registro** — Filtre por dia trabalhado, falta, feriado, etc.
+
+Após selecionar os filtros, clique em **Filtrar** para atualizar a tabela.
+
+### Entendendo a tabela de registros
+
+A tabela exibe as seguintes informações para cada registro:
+
+| Coluna | O que mostra |
+|---|---|
+| Data | A data do registro |
+| Funcionário | O nome do funcionário |
+| Entrada | Horário em que chegou ao trabalho |
+| Saída Almoço | Horário em que saiu para almoçar |
+| Retorno Almoço | Horário em que voltou do almoço |
+| Saída | Horário em que encerrou o expediente |
+| Horas Trabalhadas | Total de horas no dia (calculado automaticamente) |
+| Horas Extras | Horas extras no dia (se houver) |
 | Tipo | Tipo do registro (trabalhado, falta, feriado, etc.) |
-| Reconhecimento | Indica se houve validação facial |
-| Observações | Anotações adicionais |
+| Reconhecimento | Indica se o rosto foi verificado ✅ ou não ❌ |
+| Observações | Notas ou comentários sobre o registro |
 
-#### Cálculos Automáticos
+### Editando um registro de ponto
 
-O sistema realiza os seguintes cálculos automaticamente:
+Se for necessário corrigir um registro (por exemplo, o funcionário esqueceu de bater o ponto de saída):
 
-1. **Horas trabalhadas** — Diferença entre entrada e saída, descontando o período de almoço. Se a jornada ultrapassa 6 horas, 1 hora de almoço é descontada automaticamente.
-2. **Horas extras** — Diferença entre as horas trabalhadas e a jornada contratual definida no horário de trabalho do funcionário.
-3. **Atrasos** — Diferença entre o horário contratual de entrada e o horário efetivo de entrada.
-4. **DSR sobre horas extras** — Descanso semanal remunerado calculado proporcionalmente sobre as horas extras, conforme a Lei 605/49.
-
-### 3.6.3. Editando e Justificando Registros
-
-#### Editando um Registro
-
-1. Na tela de controle de ponto (`/controle_ponto`), localize o registro desejado.
-2. Clique no botão **Editar** (ícone de lápis) na linha correspondente.
-3. Um formulário será exibido permitindo alterar:
-   - Horários de entrada, saída, almoço
-   - Tipo de registro
+1. Na tela de controle de ponto, localize o registro que precisa ser corrigido.
+2. Clique no botão **Editar** (ícone de lápis) ao lado do registro.
+3. O formulário de edição será aberto. Você pode alterar:
+   - Horários de entrada, saída e almoço
+   - Tipo do registro
    - Obra vinculada
    - Observações
-4. Clique em **Salvar** para confirmar as alterações.
+4. Faça as correções necessárias.
+5. Clique em **Salvar** para confirmar.
 
-#### Justificando Faltas
+### Justificando uma falta
 
-Para registrar uma justificativa de falta:
+Se um funcionário faltou mas apresentou justificativa (atestado médico, por exemplo):
 
-1. Localize o registro de falta na tela de controle de ponto.
-2. Clique em **Editar**.
-3. Altere o tipo de registro para **Falta Justificada**.
-4. No campo **Observações**, registre o motivo da justificativa (ex.: "Atestado médico", "Licença", etc.).
-5. Salve o registro.
+1. Na tela de controle de ponto, localize o registro de falta do funcionário.
+2. Clique no botão **Editar** (ícone de lápis).
+3. No campo **Tipo**, altere de "Falta" para **Falta Justificada**.
+4. No campo **Observações**, descreva o motivo da justificativa.
+   - Exemplo: "Atestado médico — consulta odontológica".
+   - Exemplo: "Licença para acompanhar filho ao médico".
+5. Clique em **Salvar**.
 
-> **Importante:** Faltas justificadas são tratadas de forma diferente no cálculo de DSR. Enquanto faltas não justificadas podem gerar perda proporcional do DSR, faltas justificadas preservam o direito ao descanso semanal remunerado.
+> **Por que justificar faltas?** Faltas sem justificativa podem afetar o cálculo do Descanso Semanal Remunerado (DSR) do funcionário. Quando a falta é justificada, o funcionário mantém o direito ao DSR integral.
 
 ---
 
-## 3.7. Relatórios de Funcionários
+## 3.9. Relatórios de Funcionários
 
-O SIGE oferece diversas opções de relatórios relacionados aos funcionários:
+### 3.9.1. Relatório individual em PDF
 
-### Relatório Individual (PDF)
+Para gerar um relatório completo de um funcionário específico:
 
-Gere um relatório completo de um funcionário específico:
+1. Acesse o perfil do funcionário (clicando no card dele na tela de funcionários).
+2. No perfil, ajuste o período desejado nos campos de **Data Início** e **Data Fim**.
+3. Clique no botão **Gerar PDF** ou **Exportar PDF**.
+4. O sistema vai gerar o documento e o download começará automaticamente.
 
-1. Acesse o perfil do funcionário em `/funcionario_perfil/<id>`.
-2. Selecione o período desejado nos filtros de data.
-3. Clique em **Gerar PDF** ou acesse diretamente:
-   ```
-   /funcionario_perfil/<id>/pdf
-   ```
+#### O que o PDF inclui:
 
-O relatório PDF inclui:
+- **Dados cadastrais** — Nome, CPF, departamento, função, data de admissão, etc.
+- **Indicadores do período** — Horas trabalhadas, horas extras, faltas, atrasos, custos.
+- **Detalhamento financeiro** — Valor da hora, valor das horas extras, DSR, descontos.
+- **Histórico de ponto** — Tabela com todos os registros de ponto do período.
+- **Obras vinculadas** — Lista de obras em que o funcionário trabalhou.
 
-- Dados cadastrais completos
-- KPIs do período selecionado (horas, extras, faltas, custos)
-- Detalhamento financeiro (valor hora, DSR, descontos)
-- Histórico completo de registros de ponto
-- Informações de obras vinculadas
+> **Dica:** Esse relatório é muito útil para fechar a folha de pagamento, acompanhar produtividade individual ou apresentar informações para auditorias.
 
-### Relatórios Consolidados
+### 3.9.2. Indicadores consolidados da equipe
 
-Na tela principal de funcionários (`/funcionarios`), os KPIs consolidados oferecem uma visão gerencial de toda a equipe:
+Na tela principal de funcionários, os indicadores no topo da página oferecem uma visão geral de toda a equipe:
 
-| Relatório | Dados Incluídos |
+| Indicador | O que mostra |
 |---|---|
-| Resumo de horas | Total de horas trabalhadas e extras por funcionário |
-| Controle de faltas | Faltas, faltas justificadas e taxa de absenteísmo |
+| Resumo de horas | Total de horas trabalhadas e horas extras por funcionário |
+| Controle de faltas | Faltas, faltas justificadas e taxa de absenteísmo da equipe |
 | Custo de mão de obra | Custo total com salários, horas extras e encargos |
-| Produtividade | Horas por obra, eficiência e alocação |
+| Produtividade | Horas trabalhadas por obra e eficiência da alocação |
 
-### Acessando Relatórios Gerais
+### 3.9.3. Relatórios gerais
 
-1. No menu de navegação, clique em **Relatórios**.
+Para acessar relatórios mais detalhados:
+
+1. No menu do sistema, clique em **Relatórios**.
 2. Selecione a categoria **Funcionários** ou **Ponto**.
-3. Configure os filtros (período, departamento, obra).
+3. Configure os filtros:
+   - **Período** — Selecione as datas de início e fim.
+   - **Departamento** — Filtre por departamento específico (ou selecione "Todos").
+   - **Função** — Filtre por cargo ou função (ou selecione "Todas").
+   - **Obra** — Filtre por obra específica (ou selecione "Todas").
 4. Clique em **Gerar Relatório**.
+5. O relatório será exibido na tela e poderá ser exportado em PDF.
 
 ---
 
-## Resumo de URLs do Módulo de Funcionários
+## 3.10. Perguntas Frequentes
 
-| Funcionalidade | URL | Método |
-|---|---|---|
-| Lista de funcionários | `/funcionarios` | GET |
-| Criar funcionário | `/funcionarios` | POST |
-| Perfil do funcionário | `/funcionario_perfil/<id>` | GET |
-| PDF do perfil | `/funcionario_perfil/<id>/pdf` | GET |
-| Dashboard do funcionário | `/funcionario-dashboard` | GET |
-| Horário padrão | `/funcionarios/<id>/horario-padrao` | GET |
-| Fotos faciais | `/ponto/funcionario/<id>/fotos-faciais` | GET/POST |
-| Registro de ponto | `/ponto` | GET/POST |
-| Controle de ponto | `/controle_ponto` | GET |
+**Posso cadastrar dois funcionários com o mesmo CPF?**
+Não. O CPF é único para cada funcionário. Se você tentar cadastrar um CPF que já existe, o sistema não vai permitir e exibirá uma mensagem de erro.
+
+**O que faço se o reconhecimento facial não está funcionando para um funcionário?**
+Cadastre novas fotos faciais em condições parecidas com o ambiente onde o ponto é batido. Veja as dicas na seção 3.6.3 deste manual.
+
+**Posso corrigir um ponto registrado com horário errado?**
+Sim. Acesse o controle de ponto, localize o registro, clique em Editar e corrija os horários. Veja o passo a passo na seção 3.8.
+
+**Como mudo o horário de trabalho de um funcionário específico?**
+No perfil do funcionário, use a opção de horário personalizado para definir uma jornada diferente da padrão do departamento. Veja a seção 3.5.3.
+
+**Preciso cadastrar fotos faciais para todos os funcionários?**
+Recomendamos que sim. As fotos faciais garantem que o registro de ponto seja feito pela pessoa certa, evitando fraudes. Sem fotos cadastradas, o ponto poderá ser registrado sem verificação de identidade.
+
+**Quantas fotos devo cadastrar por funcionário?**
+Recomendamos pelo menos 3 fotos com variações (com óculos, sem óculos, diferentes iluminações). Quanto mais fotos, melhor a precisão do reconhecimento.
 
 ---
 
-# Capitulo 4 — Gestão de Obras
+# Capítulo 4 — Gestão de Obras
 
-## 4.1. Introdução à Gestão de Obras
+## 4.1. Introdução
 
-O módulo de **Gestão de Obras** do SIGE (Sistema Integrado de Gestão Empresarial) é o núcleo operacional do sistema, concentrando todo o ciclo de vida de projetos de construção — desde o cadastro inicial até o encerramento e a análise financeira final. Este módulo é acessado pelo menu lateral **Obras** na barra de navegação principal do sistema.
+O módulo de **Gestão de Obras** é o coração do SIGE. É aqui que você cadastra, acompanha e controla todos os seus projetos de construção — do início ao fim. Neste capítulo, você vai aprender a:
 
-Principais funcionalidades cobertas neste capítulo:
+- Visualizar todas as suas obras em um painel organizado
+- Cadastrar novas obras com todas as informações importantes
+- Acompanhar o andamento, os custos e a equipe de cada projeto
+- Planejar e gerenciar os serviços que serão executados
+- Criar Registros Diários de Obra (RDOs) diretamente pela tela de obras
+- Gerar relatórios completos para tomada de decisão
 
-| Funcionalidade | Descrição |
-|---|---|
-| Cadastro de obras | Registro completo com dados do projeto, cliente, orçamento e geolocalização |
-| Planejamento de serviços | Vinculação de serviços planejados com quantidades, prazos e custos unitários |
-| Acompanhamento executivo | Dashboard com KPIs de custo, prazo, equipe e progresso da obra |
-| Controle financeiro | Comparação entre orçado e realizado, análise de desvios e fluxo de caixa |
-| Lançamento de RDO | Registro Diário de Obra vinculado diretamente ao projeto |
-| Relatórios gerenciais | Geração de relatórios consolidados por obra em PDF |
-| Portal do cliente | Acesso externo para o cliente acompanhar o andamento da obra |
-
-> **Pré-requisito:** Para cadastrar e gerenciar obras, o usuário deve possuir permissão de **Administrador**. Funcionários e Gestores de Equipe podem visualizar as obras às quais estão alocados e registrar RDOs a partir da listagem.
+> **Quem pode usar:** Administradores têm acesso total para cadastrar e gerenciar obras. Gestores de equipe e funcionários podem visualizar as obras onde estão alocados e registrar RDOs.
 
 ---
 
 ## 4.2. Tela Principal de Obras
 
-### Acessando a Tela
+### Como acessar
 
-1. No menu de navegação superior, clique em **Obras**.
-2. O sistema direcionará você para a URL `/obras`.
+1. No menu lateral do sistema, clique em **Obras**.
+2. A tela principal será exibida com todas as suas obras.
 
-### Visão Geral da Interface
+### O que você vai encontrar na tela
 
-A tela principal de obras é dividida nas seguintes áreas:
+A tela de obras é dividida em três áreas principais: os **indicadores resumidos** no topo, os **filtros de pesquisa** e os **cards das obras**.
 
-#### KPIs Resumidos (Topo)
+---
 
-No topo da página, são exibidos indicadores gerais do portfólio de obras:
+### Indicadores Resumidos (Topo da Página)
 
-| KPI | Descrição |
+No topo da tela, você encontra um resumo rápido de todo o seu portfólio de obras:
+
+| Indicador | O que significa |
 |---|---|
-| Obras Ativas | Quantidade de obras com status "Em andamento" (ex.: 8) |
-| Obras Disponíveis | Total de obras cadastradas no sistema (ex.: 142) |
-| Custo Total no Período | Somatório dos custos de todas as obras no período filtrado |
-| Funcionários Alocados | Total de funcionários distintos com registro de ponto em obras ativas |
+| **Obras Ativas** | Quantas obras estão em andamento neste momento |
+| **Obras Disponíveis** | Total de obras cadastradas no sistema |
+| **Custo Total no Período** | Quanto foi gasto em todas as obras no período selecionado |
+| **Funcionários Alocados** | Quantos funcionários estão trabalhando nas obras ativas |
 
-#### Filtros de Pesquisa
+Esses números atualizam automaticamente conforme você aplica filtros ou quando novos dados são registrados no sistema.
 
-Acima dos cards de obras, o sistema oferece filtros para refinar a listagem:
+---
 
-1. **Nome da Obra** — Campo de texto para busca por nome (parcial ou completo).
-2. **Status** — Filtre por status: *Em andamento*, *Concluída*, *Paralisada* ou *Cancelada*.
-3. **Cliente** — Campo de texto para busca pelo nome do cliente responsável.
-4. **Data Início** — Define o início do período para filtro por data de início da obra.
-5. **Data Fim** — Define o final do período para filtro por data de início da obra.
-6. Clique em **Filtrar** para atualizar a listagem e os KPIs exibidos.
+### Filtros de Pesquisa
 
-#### Cards de Obras
+Acima dos cards de obras, você encontra filtros para localizar rapidamente a obra que procura:
 
-Cada obra é exibida em formato de **card** (cartão visual), contendo:
+1. **Nome da Obra** — Digite o nome (ou parte dele) para buscar.
+2. **Status** — Filtre por situação: *Em andamento*, *Concluída*, *Paralisada* ou *Cancelada*.
+3. **Cliente** — Digite o nome do cliente para filtrar as obras dele.
+4. **Data Início** — Selecione uma data para ver obras que começaram a partir dela.
+5. **Data Fim** — Selecione uma data limite para o filtro.
+6. Clique no botão **Filtrar** para aplicar os filtros.
 
-- **Nome da obra** e **código** identificador (ex.: O0001).
-- **Status** da obra com indicador visual colorido.
-- **Cliente** associado ao projeto.
-- **Endereço** da obra.
-- **Data de início** e **previsão de término**.
-- **Progresso** — Barra visual indicando o percentual de conclusão.
-- **KPIs do card** — Custo total, dias trabalhados e funcionários alocados no período.
-- **Botão +RDO** — Atalho direto para criar um novo Registro Diário de Obra, redirecionando para `/funcionario/rdo/novo?obra_id=<id>`.
-- **Botão Detalhes** — Acessa a página completa da obra em `/obras/detalhes/<id>`.
+Os indicadores do topo também são atualizados de acordo com os filtros aplicados, mostrando os dados apenas das obras que atendem aos critérios selecionados.
 
-#### Ordenação
+> **Dica:** Para ver todas as obras novamente, limpe os filtros e clique em **Filtrar**.
 
-A listagem de obras é ordenada automaticamente por **data de início** (mais recente primeiro). Obras com status "Em andamento" tendem a aparecer no topo por possuírem datas de início mais recentes.
+---
+
+### Cards de Obras
+
+Cada obra aparece na tela como um **card** (cartão visual), que funciona como um resumo rápido do projeto. Veja o que cada card mostra:
+
+- **Nome da obra** — O nome que você deu ao projeto.
+- **Código** — Código identificador único (ex.: O0001).
+- **Status** — Situação atual da obra, com cor indicativa (verde para ativa, cinza para concluída, etc.).
+- **Cliente** — Nome da empresa ou pessoa contratante.
+- **Endereço** — Local onde a obra está sendo executada.
+- **Datas** — Data de início e previsão de término.
+- **Barra de progresso** — Mostra visualmente quanto da obra já foi concluído (em percentual).
+- **Custos resumidos** — Custo total acumulado no período.
+- **Dias trabalhados** — Quantos dias úteis foram registrados na obra.
+- **Funcionários** — Quantos funcionários estão alocados.
+
+Cada card possui dois botões importantes:
+
+| Botão | O que faz |
+|---|---|
+| **+RDO** | Abre o formulário para criar um novo Registro Diário de Obra, já com essa obra selecionada |
+| **Detalhes** | Abre a página completa da obra com todas as informações, gráficos e controles |
+
+### Ordenação das Obras
+
+As obras são organizadas automaticamente com as **mais recentes primeiro**. Obras em andamento geralmente aparecem no topo da lista.
 
 ---
 
 ## 4.3. Cadastrando uma Nova Obra
 
-### Acessando o Formulário
+### Passo a passo
 
-1. Na tela principal de obras (`/obras`), clique no botão **+ Nova Obra**.
-2. O sistema direcionará você para a URL `/obras/nova`.
+1. Na tela principal de obras, clique no botão **+ Nova Obra** (geralmente no canto superior direito).
+2. O formulário de cadastro será aberto.
+3. Preencha os campos conforme explicado abaixo.
+4. Clique em **Salvar** para criar a obra.
 
-### 4.3.1. Dados da Obra
-
-Preencha os campos do formulário conforme a tabela abaixo:
-
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Nome | Texto | Sim | Nome identificador do projeto/obra |
-| Código | Texto | Não | Código único da obra (ex.: O0001). Se não informado, o sistema gera automaticamente no formato `O` + sequencial de 4 dígitos |
-| Endereço | Texto | Não | Endereço completo do canteiro de obras |
-| Status | Seleção | Sim | Status inicial: *Em andamento*, *Concluída*, *Paralisada* ou *Cancelada* |
-| Data de Início | Data | Sim | Data de início prevista ou efetiva da obra |
-| Data de Previsão de Término | Data | Não | Data estimada para conclusão do projeto |
-| Área Total (m²) | Numérico | Não | Área total do projeto em metros quadrados |
-| Responsável | Seleção | Não | Funcionário responsável técnico pela obra (lista de funcionários ativos) |
-
-#### Dados do Cliente
-
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Nome do Cliente | Texto | Não | Nome da pessoa ou empresa contratante |
-| E-mail do Cliente | E-mail | Não | E-mail para comunicação e acesso ao portal do cliente |
-| Telefone do Cliente | Texto | Não | Telefone de contato do cliente |
-| Portal Ativo | Checkbox | Não | Ativa o Portal do Cliente para acompanhamento externo. Ao marcar e informar o e-mail, o sistema gera automaticamente um token de acesso seguro |
-
-#### Geolocalização e Geofencing
-
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Latitude | Numérico | Não | Coordenada de latitude do canteiro de obras |
-| Longitude | Numérico | Não | Coordenada de longitude do canteiro de obras |
-| Raio de Geofence (metros) | Numérico | Não | Raio da cerca virtual para validação de ponto eletrônico (padrão: 100 metros) |
-
-> **Dica:** O geofencing permite validar se o funcionário está fisicamente dentro do perímetro da obra ao registrar o ponto. Configure latitude, longitude e raio para ativar essa funcionalidade.
-
-### 4.3.2. Orçamento e Custos
-
-Na seção financeira do formulário, informe os valores planejados:
-
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Orçamento | Monetário (R$) | Não | Valor total orçado para a execução da obra |
-| Valor do Contrato | Monetário (R$) | Não | Valor firmado em contrato com o cliente. Utilizado para cálculo de margem de lucro |
-
-> **Importante:** O valor do contrato é a referência principal para análise de rentabilidade. O sistema calcula automaticamente a margem comparando o valor do contrato com os custos reais apurados (mão de obra, alimentação, transporte e custos diversos).
-
-### 4.3.3. Equipe da Obra
-
-A alocação de funcionários à obra é realizada de duas formas:
-
-1. **Responsável técnico** — Definido diretamente no formulário de cadastro da obra (campo Responsável).
-2. **Equipe de campo** — Alocada através do módulo **Equipe** ou automaticamente quando funcionários registram ponto indicando a obra.
-
-Para vincular serviços à obra durante o cadastro:
-
-1. Na seção **Serviços da Obra**, marque os serviços desejados na lista de serviços disponíveis.
-2. Os serviços listados são aqueles cadastrados previamente no módulo de Serviços do sistema.
-3. Clique em **Salvar** para criar a obra com os serviços selecionados.
-
-> **Nota:** Após o cadastro, o sistema redireciona automaticamente para a página de detalhes da obra recém-criada (`/obras/detalhes/<id>`).
+Após salvar, o sistema levará você automaticamente para a página de detalhes da obra recém-criada.
 
 ---
 
-## 4.4. Planejamento da Obra
+### 4.3.1. Informações Básicas da Obra
 
-### 4.4.1. Serviços da Obra
+Esses são os dados principais do seu projeto:
 
-O planejamento de serviços define **o quê** será executado na obra e em **qual quantidade**. Cada serviço vinculado possui controle individual de planejamento e execução.
+| Campo | O que preencher | Obrigatório? |
+|---|---|---|
+| **Nome** | Nome do projeto ou da obra (ex.: "Residencial Vila Nova", "Reforma Galpão Industrial") | Sim |
+| **Código** | Um código único para identificar a obra (ex.: O0001). Se você deixar em branco, o sistema gera automaticamente | Não |
+| **Endereço** | Endereço completo do canteiro de obras | Não |
+| **Status** | Situação inicial da obra: *Em andamento*, *Concluída*, *Paralisada* ou *Cancelada*. Na maioria dos casos, selecione *Em andamento* | Sim |
+| **Data de Início** | Quando a obra começou (ou vai começar) | Sim |
+| **Previsão de Término** | Data estimada para entrega do projeto | Não |
+| **Área Total (m²)** | Tamanho total da obra em metros quadrados | Não |
+| **Responsável** | Selecione o engenheiro ou mestre de obras responsável pelo projeto (a lista mostra os funcionários cadastrados) | Não |
 
-#### Vinculando Serviços
-
-1. Acesse a obra desejada em `/obras/detalhes/<id>`.
-2. Na seção **Serviços**, clique em **Gerenciar Serviços**.
-3. Selecione os serviços desejados na listagem de serviços disponíveis.
-4. Para cada serviço selecionado, o sistema cria um registro na tabela de planejamento.
-
-#### Campos de Planejamento por Serviço
-
-| Campo | Descrição |
-|---|---|
-| Serviço | Nome do serviço (ex.: Concretagem, Alvenaria, Pintura) |
-| Unidade de Medida | Unidade padrão do serviço (m², m³, kg, ton, un, m, h) |
-| Quantidade Planejada | Volume total planejado para execução na obra |
-| Valor Unitário | Custo por unidade do serviço (R$) |
-| Valor Total Planejado | Calculado automaticamente: quantidade × valor unitário |
-| Data Início Planejada | Data prevista para início da atividade |
-| Data Fim Planejada | Data prevista para conclusão da atividade |
-| Prioridade | Nível de prioridade: Alta (1), Média (2), Baixa (3) |
-| Responsável | Funcionário responsável pela execução do serviço |
-| Status | Não Iniciado, Em Andamento, Concluído ou Pausado |
-
-#### Acompanhamento da Execução de Serviços
-
-À medida que os RDOs são registrados, o sistema atualiza automaticamente:
-
-- **Quantidade Executada** — Soma das quantidades informadas nos RDOs.
-- **Percentual Concluído** — Razão entre executado e planejado.
-- **Valor Total Executado** — Custo real acumulado do serviço.
-- **Data de Início Real** — Registrada na primeira execução.
-- **Data de Fim Real** — Registrada quando o serviço atinge 100% de conclusão.
-
-| Indicador | Fórmula |
-|---|---|
-| % Concluído | (Quantidade Executada / Quantidade Planejada) x 100 |
-| Desvio de Custo | Valor Total Executado - Valor Total Planejado |
-| Status Automático | Atualizado conforme o percentual (0% = Não Iniciado, 1-99% = Em Andamento, 100% = Concluído) |
-
-### 4.4.2. Cronograma
-
-O cronograma da obra é montado a partir das datas planejadas dos serviços vinculados:
-
-1. **Data de início da obra** — Definida no cadastro da obra.
-2. **Data de previsão de término** — Definida no cadastro da obra.
-3. **Datas dos serviços** — Cada serviço possui data de início e fim planejados.
-4. O sistema compara as datas planejadas com as datas reais para identificar atrasos.
-
-> **Dica:** Mantenha as datas dos serviços atualizadas para que o dashboard executivo reflita com precisão o andamento do projeto.
+> **Dica:** Preencha o máximo de informações possível. Quanto mais completo o cadastro, mais preciso será o acompanhamento do projeto.
 
 ---
 
-## 4.5. Acompanhamento da Obra
+### 4.3.2. Dados do Cliente
 
-### 4.5.1. Dashboard Executivo
+Informe os dados da empresa ou pessoa que contratou a obra:
 
-Ao acessar os detalhes de uma obra em `/obras/detalhes/<id>`, o sistema exibe um painel executivo com os principais indicadores:
+| Campo | O que preencher | Obrigatório? |
+|---|---|---|
+| **Nome do Cliente** | Nome da pessoa física ou empresa contratante | Não |
+| **E-mail do Cliente** | E-mail de contato do cliente | Não |
+| **Telefone do Cliente** | Telefone para contato | Não |
+| **Portal Ativo** | Marque esta opção se deseja que o cliente possa acompanhar a obra pela internet. Ao ativar, o sistema gera automaticamente um link de acesso exclusivo para o cliente | Não |
 
-#### KPIs Principais
+> **Sobre o Portal do Cliente:** Quando ativado, o cliente recebe um link exclusivo para acompanhar o andamento da obra, visualizar fotos e acompanhar o progresso — sem precisar de login no sistema principal. Para isso, é necessário informar o e-mail do cliente.
 
-| KPI | Descrição |
+---
+
+### 4.3.3. Orçamento e Valores do Contrato
+
+Esta é uma das seções mais importantes do cadastro. Aqui você define os valores financeiros do projeto:
+
+| Campo | O que preencher | Obrigatório? |
+|---|---|---|
+| **Orçamento** | Quanto você estimou gastar para executar a obra (custos internos: mão de obra, materiais, equipamentos, etc.) | Não |
+| **Valor do Contrato** | Quanto o cliente vai pagar pela obra (o valor fechado em contrato) | Não |
+
+**Entendendo a diferença entre Orçamento e Valor do Contrato:**
+
+- O **Orçamento** é o quanto você prevê gastar para executar a obra. É o seu custo interno.
+- O **Valor do Contrato** é o quanto o cliente vai te pagar. É a sua receita.
+- A diferença entre os dois é a sua **margem de lucro prevista**.
+
+Por exemplo:
+- Orçamento: R$ 800.000,00 (seus custos estimados)
+- Valor do Contrato: R$ 1.000.000,00 (o que o cliente paga)
+- Margem prevista: R$ 200.000,00 (20%)
+
+O sistema acompanha os custos reais conforme a obra avança e compara com esses valores, alertando quando os gastos estão se aproximando ou ultrapassando o orçamento.
+
+> **Importante:** Mesmo que você não tenha todos os valores definidos no momento do cadastro, preencha pelo menos o orçamento estimado. Você pode atualizar esses valores a qualquer momento editando a obra.
+
+---
+
+### 4.3.4. Geolocalização e Cerca Virtual
+
+Se deseja controlar a presença dos funcionários no canteiro de obras pelo sistema de ponto, configure a localização:
+
+| Campo | O que preencher | Obrigatório? |
+|---|---|---|
+| **Latitude** | Coordenada de latitude do local da obra | Não |
+| **Longitude** | Coordenada de longitude do local da obra | Não |
+| **Raio de Geofence (metros)** | Tamanho da "cerca virtual" ao redor da obra. O padrão é 100 metros | Não |
+
+**Como funciona a cerca virtual (geofence):**
+
+A cerca virtual é um recurso que verifica se o funcionário está realmente no local da obra quando registra o ponto. Funciona assim:
+
+1. Você define as coordenadas (latitude e longitude) do centro do canteiro de obras.
+2. Define um raio em metros (ex.: 100m, 200m, 500m — dependendo do tamanho da obra).
+3. Quando o funcionário bate o ponto pelo celular, o sistema verifica se ele está dentro desse raio.
+
+> **Como obter as coordenadas:** Abra o Google Maps, clique com o botão direito no local da obra e selecione "O que há aqui?". As coordenadas aparecerão na parte inferior da tela.
+
+---
+
+### 4.3.5. Serviços da Obra
+
+Durante o cadastro, você já pode vincular os serviços que serão executados nesta obra:
+
+1. Na seção **Serviços da Obra**, você verá a lista de serviços disponíveis (cadastrados previamente no módulo de Serviços).
+2. Marque os serviços que fazem parte deste projeto (ex.: Concretagem, Alvenaria, Pintura, Instalação Elétrica).
+3. Ao salvar a obra, os serviços selecionados serão vinculados automaticamente.
+
+> **Nota:** Você também pode adicionar ou remover serviços depois, pela página de detalhes da obra. Não se preocupe em acertar tudo no primeiro cadastro.
+
+---
+
+## 4.4. Visualizando os Detalhes da Obra
+
+### Como acessar
+
+1. Na tela principal de obras, clique no botão **Detalhes** no card da obra desejada.
+2. A página de detalhes será aberta com todas as informações do projeto.
+
+A página de detalhes é o **painel de controle** da sua obra. Aqui você encontra tudo sobre o projeto em um só lugar.
+
+---
+
+### 4.4.1. Indicadores Principais (KPIs)
+
+No topo da página de detalhes, você encontra os indicadores mais importantes da obra:
+
+| Indicador | O que mostra |
 |---|---|
-| Custo Total | Somatório de todos os custos apurados: mão de obra + alimentação + transporte + diversos |
-| Custo de Mão de Obra | Calculado com base nos registros de ponto x valor/hora do funcionário, incluindo horas extras a 150% |
-| Custo de Alimentação | Soma dos registros de alimentação vinculados à obra no período |
-| Custos Diversos | Lançamentos avulsos de custos operacionais da obra |
-| Custo de Transporte | Despesas de veículos associadas à obra |
-| Dias Trabalhados | Quantidade de dias distintos com registros de ponto na obra |
-| Funcionários Alocados | Total de funcionários distintos que registraram ponto na obra |
-| Orçamento Restante | Orçamento - Custo Total (com indicador visual de alerta se negativo) |
+| **Custo Total** | Quanto já foi gasto na obra até agora (somando tudo: mão de obra, alimentação, transporte e outros custos) |
+| **Custo de Mão de Obra** | Quanto foi gasto com salários e horas extras dos funcionários nesta obra |
+| **Custo de Alimentação** | Quanto foi gasto com refeições e alimentação da equipe |
+| **Custos Diversos** | Outros gastos operacionais registrados (materiais, locações, etc.) |
+| **Custo de Transporte** | Despesas com veículos utilizados na obra |
+| **Dias Trabalhados** | Quantos dias de trabalho foram registrados na obra |
+| **Funcionários Alocados** | Quantas pessoas trabalharam nesta obra |
+| **Orçamento Restante** | Quanto ainda resta do orçamento (se ficar negativo, significa que os gastos ultrapassaram o previsto) |
 
-#### Composição de Custos
+Esses números são calculados automaticamente pelo sistema com base nos registros de ponto, alimentação, veículos e lançamentos de custos.
 
-O sistema apresenta a composição de custos de forma visual, permitindo identificar rapidamente qual categoria representa a maior parcela do gasto:
+---
 
-| Categoria | Fonte de Dados |
+### 4.4.2. Composição de Custos
+
+O sistema mostra como os custos da obra estão distribuídos entre as categorias:
+
+| Categoria | De onde vem a informação |
 |---|---|
-| Mão de Obra | Registros de ponto x valor/hora (horas normais + horas extras x 1,5) |
-| Alimentação | Módulo de Alimentação — registros vinculados à obra |
-| Transporte | Módulo de Veículos — despesas com obra_id associado |
-| Diversos | Lançamentos manuais de custos avulsos (OutroCusto) |
+| **Mão de Obra** | Calculada automaticamente com base nos registros de ponto dos funcionários (horas normais e extras) |
+| **Alimentação** | Registros de refeições e marmitas fornecidas à equipe da obra |
+| **Transporte** | Despesas com veículos que prestaram serviço para esta obra |
+| **Diversos** | Custos avulsos que você lança manualmente (materiais, locações, etc.) |
 
-### 4.5.2. Lançamento de Custos
+Essa visão ajuda você a identificar onde está gastando mais e tomar decisões para otimizar os custos.
 
-Para registrar custos operacionais diretamente na obra:
+---
 
-1. Acesse a obra em `/obras/detalhes/<id>`.
+## 4.5. Planejamento de Serviços
+
+### O que é o planejamento de serviços?
+
+O planejamento de serviços define **o que** vai ser feito na obra e **quanto** de cada serviço será necessário. É como o escopo do projeto dividido em atividades mensuráveis.
+
+### Como gerenciar os serviços de uma obra
+
+1. Acesse a página de detalhes da obra.
+2. Localize a seção **Serviços**.
+3. Clique em **Gerenciar Serviços** para adicionar ou remover serviços.
+4. Selecione os serviços que deseja vincular à obra.
+
+### Informações de cada serviço
+
+Para cada serviço vinculado à obra, você pode definir:
+
+| Campo | O que preencher |
+|---|---|
+| **Serviço** | Nome da atividade (ex.: Concretagem, Alvenaria, Pintura, Instalações) |
+| **Unidade de Medida** | Como o serviço é medido (metros quadrados, metros cúbicos, quilos, unidades, horas, etc.) |
+| **Quantidade Planejada** | Quanto do serviço precisa ser executado no total (ex.: 500 m² de alvenaria) |
+| **Valor Unitário (R$)** | Quanto custa cada unidade do serviço (ex.: R$ 45,00 por m²) |
+| **Valor Total Planejado** | Calculado automaticamente: quantidade × valor unitário |
+| **Data de Início Prevista** | Quando esse serviço deve começar |
+| **Data de Término Prevista** | Quando esse serviço deve ser concluído |
+| **Prioridade** | Nível de importância: Alta, Média ou Baixa |
+| **Responsável** | Funcionário encarregado de executar esse serviço |
+| **Status** | Situação: Não Iniciado, Em Andamento, Concluído ou Pausado |
+
+### Acompanhamento automático da execução
+
+Conforme os RDOs (Registros Diários de Obra) são preenchidos com as quantidades executadas, o sistema atualiza automaticamente:
+
+- **Quantidade executada** — Soma de tudo que já foi feito daquele serviço.
+- **Percentual concluído** — Quanto já foi feito em relação ao planejado (ex.: 350 m² de 500 m² = 70%).
+- **Valor executado** — Quanto já foi gasto com aquele serviço até o momento.
+- **Status automático** — O sistema muda o status conforme o progresso (0% = Não Iniciado, entre 1% e 99% = Em Andamento, 100% = Concluído).
+
+Isso permite que você acompanhe o progresso de cada serviço sem precisar atualizar manualmente.
+
+---
+
+### Cronograma da Obra
+
+O cronograma da obra é montado automaticamente a partir das datas dos serviços:
+
+- As **datas de início e término** de cada serviço formam o cronograma geral.
+- O sistema compara as datas planejadas com o que está sendo executado para identificar possíveis atrasos.
+- A **data de previsão de término da obra** serve como referência para verificar se o projeto está dentro do prazo.
+
+> **Dica:** Mantenha as datas dos serviços sempre atualizadas. Assim, o painel da obra reflete com precisão o andamento real do projeto.
+
+---
+
+## 4.6. Lançamento de Custos Diversos
+
+Além dos custos automáticos (mão de obra, alimentação e transporte), você pode registrar outros gastos diretamente na obra.
+
+### Como lançar um custo
+
+1. Acesse a página de detalhes da obra.
 2. Na seção **Custos**, clique em **Novo Lançamento**.
-3. Preencha os campos:
+3. Preencha as informações:
 
-| Campo | Descrição |
+| Campo | O que preencher |
 |---|---|
-| Descrição | Descrição do custo (ex.: "Material elétrico", "Locação de betoneira") |
-| Valor (R$) | Valor do lançamento |
-| Data | Data de referência do custo |
-| Categoria | Tipo do custo para classificação |
-| Observações | Informações complementares |
+| **Descrição** | O que foi o gasto (ex.: "Compra de material elétrico", "Locação de betoneira", "Aluguel de andaimes") |
+| **Valor (R$)** | Quanto custou |
+| **Data** | Quando o gasto aconteceu |
+| **Categoria** | Tipo do custo para organização |
+| **Observações** | Informações extras que julgar importantes |
 
 4. Clique em **Salvar** para registrar o custo.
 
-> **Nota:** Custos de mão de obra e alimentação são calculados automaticamente a partir dos módulos de Ponto e Alimentação. Não é necessário lançá-los manualmente.
-
-### 4.5.3. Registro Diário de Obra (RDO)
-
-O RDO é o instrumento principal de registro do dia a dia da obra. Cada obra na listagem possui um botão **+RDO** que direciona para `/funcionario/rdo/novo?obra_id=<id>`.
-
-#### Como criar um RDO a partir da obra
-
-1. Na listagem de obras (`/obras`), localize a obra desejada.
-2. Clique no botão **+RDO** no card da obra.
-3. O formulário de RDO será aberto com a obra já pré-selecionada.
-4. Preencha as informações do dia: condições climáticas, mão de obra presente, equipamentos utilizados, serviços executados, ocorrências e fotos.
-5. Clique em **Salvar** para registrar o RDO.
-
-> **Referência:** Para detalhes completos sobre o preenchimento do RDO, consulte o **Capítulo 6 — Relatório Diário de Obra (RDO)**.
-
-#### Informações registradas no RDO
-
-| Seção | Dados Registrados |
-|---|---|
-| Mão de Obra | Funcionários presentes, horas trabalhadas, função exercida |
-| Equipamentos | Equipamentos utilizados, horas de operação, status |
-| Serviços/Subatividades | Serviços executados com quantidades medidas |
-| Ocorrências | Eventos relevantes: acidentes, paralisações, visitas técnicas |
-| Fotos | Registro fotográfico do andamento da obra |
-| Condições Climáticas | Tempo (ensolarado, nublado, chuvoso) e impacto nas atividades |
+> **Bom saber:** Os custos de mão de obra são calculados automaticamente com base nos registros de ponto. Os custos de alimentação vêm do módulo de Alimentação. Você não precisa lançar esses valores manualmente — o sistema faz isso por você.
 
 ---
 
-## 4.6. Controle Financeiro da Obra
+## 4.7. Controle Financeiro da Obra
 
-O controle financeiro da obra integra dados de múltiplos módulos para fornecer uma visão completa da saúde financeira do projeto.
+O controle financeiro reúne todas as informações de custos e receitas do projeto para que você tenha uma visão clara da saúde financeira da obra.
 
-### Orçado vs. Realizado
+### Orçado versus Realizado
 
-| Indicador | Cálculo |
+O sistema compara continuamente o que foi planejado com o que está acontecendo de fato:
+
+| Indicador | O que significa |
 |---|---|
-| Valor Orçado | Campo `orcamento` definido no cadastro da obra |
-| Valor do Contrato | Campo `valor_contrato` — receita prevista do projeto |
-| Custo Realizado | Soma de: mão de obra + alimentação + transporte + custos diversos |
-| Margem Bruta | Valor do Contrato - Custo Realizado |
-| Margem Percentual | (Margem Bruta / Valor do Contrato) x 100 |
-| Desvio Orçamentário | Custo Realizado - Valor Orçado |
-| % Consumido do Orçamento | (Custo Realizado / Valor Orçado) x 100 |
+| **Valor Orçado** | O orçamento que você definiu no cadastro da obra (custo interno previsto) |
+| **Valor do Contrato** | O valor que o cliente vai pagar pela obra (receita prevista) |
+| **Custo Realizado** | Quanto já foi gasto de fato (soma de mão de obra + alimentação + transporte + custos diversos) |
+| **Margem Bruta** | Valor do Contrato menos o Custo Realizado — é o lucro real até o momento |
+| **Margem Percentual** | A margem em percentual (quanto maior, melhor para o seu negócio) |
+| **Desvio Orçamentário** | Diferença entre o custo real e o orçamento — se positivo, significa que gastou mais que o previsto |
+| **% do Orçamento Consumido** | Quanto do orçamento já foi utilizado |
 
-### Análise de Desvios
+### Alertas Automáticos
 
-O sistema destaca automaticamente situações que requerem atenção:
+O sistema sinaliza automaticamente quando algo precisa de atenção:
 
-| Situação | Indicador Visual | Ação Recomendada |
+| Situação | Sinal Visual | O que fazer |
 |---|---|---|
-| Custo dentro do orçamento (< 80%) | Verde | Projeto sob controle |
-| Custo próximo do limite (80-100%) | Amarelo | Revisar projeções de custo |
-| Custo acima do orçamento (> 100%) | Vermelho | Ação corretiva urgente necessária |
-| Margem negativa | Vermelho piscante | Renegociar contrato ou reduzir custos |
+| Gastos dentro do orçamento (abaixo de 80%) | 🟢 Verde | Tudo sob controle, continue acompanhando |
+| Gastos se aproximando do limite (80% a 100%) | 🟡 Amarelo | Atenção! Revise as projeções de custo e avalie ajustes |
+| Gastos acima do orçamento (mais de 100%) | 🔴 Vermelho | Ação urgente! Identifique onde estourou e tome medidas corretivas |
+| Margem negativa (prejuízo) | 🔴 Vermelho | Situação crítica — renegocie o contrato ou reduza custos imediatamente |
 
 ### Fluxo de Caixa da Obra
 
-O fluxo de caixa por obra considera:
+O fluxo de caixa mostra o equilíbrio entre o que entra e o que sai na obra:
 
-1. **Entradas** — Parcelas do contrato recebidas (registradas no módulo Financeiro).
-2. **Saídas** — Todos os custos apurados (mão de obra, alimentação, transporte, diversos).
-3. **Saldo** — Diferença entre entradas e saídas acumuladas.
+- **Entradas** — Parcelas do contrato recebidas do cliente (registradas no módulo Financeiro).
+- **Saídas** — Todos os custos apurados (mão de obra, alimentação, transporte e outros).
+- **Saldo** — A diferença entre entradas e saídas. Se negativo, significa que você está gastando mais do que recebendo.
 
-> **Integração:** O controle financeiro da obra está diretamente integrado ao módulo **Financeiro** (acessível em **Financeiro** no menu de navegação). Lançamentos financeiros com centro de custo vinculado à obra são automaticamente considerados na análise.
-
----
-
-## 4.7. Relatórios de Obras
-
-O módulo de relatórios permite gerar documentos consolidados sobre o andamento e os custos das obras. Acesse pelo menu **Relatórios** ou diretamente na página de detalhes da obra.
-
-### Tipos de Relatórios Disponíveis
-
-| Relatório | Descrição | Formato |
-|---|---|---|
-| Resumo Executivo da Obra | Visão geral com KPIs, progresso e status financeiro | PDF |
-| Relatório de Custos | Detalhamento de todos os custos por categoria e período | PDF |
-| Relatório de Serviços | Comparação entre planejado e executado por serviço | PDF |
-| Relatório de Mão de Obra | Funcionários alocados, horas trabalhadas e custos | PDF |
-| Relatório de RDOs | Consolidado dos Registros Diários de Obra do período | PDF |
-| Relatório Fotográfico | Compilação das fotos registradas nos RDOs | PDF |
-
-### Gerando um Relatório
-
-1. Acesse a obra desejada em `/obras/detalhes/<id>`.
-2. Clique em **Relatórios** ou **Gerar Relatório**.
-3. Selecione o tipo de relatório desejado.
-4. Defina o período de análise (data início e data fim).
-5. Clique em **Gerar PDF**.
-6. O sistema processará os dados e disponibilizará o arquivo para download.
-
-> **Dica:** Para uma análise comparativa entre múltiplas obras, utilize o módulo **Relatórios** no menu principal, que oferece visões consolidadas de todo o portfólio.
+> **Integração com o Financeiro:** Os lançamentos financeiros feitos no módulo **Financeiro** que estejam vinculados a esta obra são automaticamente considerados na análise. Acesse o módulo Financeiro pelo menu para registrar recebimentos e pagamentos.
 
 ---
 
-## Operações Administrativas de Obras
+## 4.8. Criando RDOs a partir da Obra
 
-### Editando uma Obra
+O **RDO (Registro Diário de Obra)** é o documento que registra tudo o que aconteceu na obra em cada dia de trabalho. Você pode criar um RDO diretamente pela tela de obras.
 
-1. Acesse a listagem de obras em `/obras`.
-2. Clique no card da obra desejada para acessar os detalhes.
-3. Clique em **Editar** para abrir o formulário de edição em `/obras/editar/<id>`.
-4. Altere os campos necessários e clique em **Salvar**.
+### Como criar um RDO rápido
 
-### Alterando o Status da Obra
+1. Na tela principal de obras, localize a obra desejada.
+2. Clique no botão **+RDO** que aparece no card da obra.
+3. O formulário de RDO será aberto com a obra já selecionada automaticamente.
+4. Preencha as informações do dia:
 
-O status de uma obra pode ser alternado rapidamente:
-
-1. Na página de detalhes da obra, clique no botão de **Alterar Status**.
-2. O sistema alterna o status via requisição POST para `/obras/toggle-status/<id>`.
-3. Os status disponíveis são:
-
-| Status | Descrição |
+| Seção | O que registrar |
 |---|---|
-| Em andamento | Obra em execução ativa |
-| Concluída | Obra finalizada e entregue |
-| Paralisada | Obra temporariamente interrompida |
-| Cancelada | Obra cancelada definitivamente |
+| **Mão de Obra** | Quais funcionários trabalharam, quantas horas cada um, qual função exerceu |
+| **Equipamentos** | Quais equipamentos foram usados, por quanto tempo, se houve algum problema |
+| **Serviços Executados** | Quais serviços foram realizados e as quantidades medidas (ex.: 25 m² de alvenaria) |
+| **Ocorrências** | Eventos importantes: acidentes, paralisações, visitas técnicas, chuvas que impediram o trabalho |
+| **Fotos** | Fotos do andamento da obra, de problemas encontrados ou de serviços concluídos |
+| **Condições Climáticas** | Como estava o tempo (sol, nublado, chuva) e se isso afetou as atividades |
 
-### Excluindo uma Obra
+5. Clique em **Salvar** para registrar o RDO.
+
+> **Para saber mais:** O preenchimento completo do RDO é explicado no **Capítulo 6 — Relatório Diário de Obra (RDO)**. Lá você encontra instruções detalhadas para cada seção do formulário.
+
+---
+
+## 4.9. Editando uma Obra
+
+Precisa atualizar alguma informação da obra? É simples:
+
+1. Na tela principal de obras, clique no botão **Detalhes** no card da obra.
+2. Na página de detalhes, clique no botão **Editar**.
+3. O formulário de edição será aberto com todos os dados atuais preenchidos.
+4. Altere o que for necessário (nome, datas, orçamento, cliente, etc.).
+5. Clique em **Salvar** para aplicar as alterações.
+
+> **Dica:** Você pode editar o orçamento e o valor do contrato a qualquer momento. Isso é útil quando há aditivos contratuais ou revisões de escopo.
+
+---
+
+## 4.10. Alterando o Status da Obra
+
+O status da obra indica a situação atual do projeto. Você pode alterá-lo rapidamente:
 
 1. Acesse a página de detalhes da obra.
-2. Clique em **Excluir Obra**.
-3. Confirme a exclusão na caixa de diálogo.
-4. O sistema envia uma requisição POST para `/obras/excluir/<id>`.
+2. Clique no botão **Alterar Status**.
+3. O sistema mudará o status da obra.
 
-> **Atenção:** A exclusão de uma obra remove permanentemente todos os dados associados, incluindo serviços vinculados, custos e registros de alocação. RDOs já registrados são mantidos no sistema para fins de histórico.
+### Status disponíveis
 
----
+| Status | Quando usar |
+|---|---|
+| **Em andamento** | A obra está em execução ativa, com equipe trabalhando |
+| **Paralisada** | A obra foi temporariamente interrompida (aguardando aprovação, problema com fornecedor, chuvas prolongadas, etc.) |
+| **Concluída** | A obra foi finalizada e entregue ao cliente |
+| **Cancelada** | A obra foi cancelada definitivamente e não será retomada |
 
-## Resumo de URLs do Módulo de Obras
-
-| Ação | URL | Método |
-|---|---|---|
-| Listagem de obras | `/obras` | GET |
-| Nova obra | `/obras/nova` | GET / POST |
-| Detalhes da obra | `/obras/detalhes/<id>` | GET |
-| Editar obra | `/obras/editar/<id>` | GET / POST |
-| Excluir obra | `/obras/excluir/<id>` | POST |
-| Alternar status | `/obras/toggle-status/<id>` | POST |
-| Novo RDO vinculado | `/funcionario/rdo/novo?obra_id=<id>` | GET |
+> **Bom saber:** Alterar o status de uma obra não apaga nenhum dado. Todos os registros de custos, RDOs e serviços são mantidos, independente do status. Você pode mudar o status de volta a qualquer momento.
 
 ---
 
-# Capitulo 5 — Gestão de Frota e Veículos
+## 4.11. Equipe da Obra
 
-## 5.1. Introdução à Gestão de Frota
+A equipe de cada obra pode ser definida de duas formas:
 
-O módulo de **Gestão de Frota** do SIGE (EnterpriseSync) permite o controle completo dos veículos utilizados pela empresa em suas operações. Com ele, é possível:
+1. **Responsável técnico** — Definido diretamente no cadastro da obra (campo "Responsável"). Geralmente é o engenheiro ou mestre de obras.
+2. **Equipe de campo** — Os funcionários são vinculados à obra através do módulo **Equipe** ou automaticamente quando registram ponto indicando que estão trabalhando naquela obra.
 
-- Cadastrar e manter atualizados os dados de cada veículo da frota;
-- Registrar o uso dos veículos, incluindo motorista, obra de destino, quilometragem e passageiros;
-- Controlar todos os custos associados (combustível, manutenção, pedágio, seguro, entre outros);
-- Acompanhar indicadores-chave de desempenho (KPIs) como custo total, custo por quilômetro e quilometragem acumulada;
-- Visualizar gráficos de custos por mês e por categoria;
-- Monitorar documentação veicular, como data de licenciamento e vigência do seguro.
+Para verificar quais funcionários estão alocados em uma obra, acesse a página de detalhes da obra e consulte a seção de equipe.
 
-O acesso ao módulo é feito pelo menu lateral, clicando em **Veículos**. O Dashboard principal do sistema também exibe o KPI de quantidade de veículos cadastrados.
-
-[IMAGEM: Menu lateral com destaque no item Veículos]
+> **Dica:** Manter a equipe atualizada é importante para o cálculo correto dos custos de mão de obra e para os relatórios de produtividade.
 
 ---
 
-## 5.2. Tela Principal de Veículos
+## 4.12. Excluindo uma Obra
 
-Ao acessar o menu **Veículos** (URL: `/veiculos`), o sistema exibe a listagem completa dos veículos cadastrados. A tela apresenta os veículos em formato de cards ou lista, permitindo uma visão rápida do estado da frota.
+Se precisar excluir uma obra do sistema, siga estes passos:
 
-[IMAGEM: Tela principal de veículos com listagem]
+1. Acesse a página de detalhes da obra.
+2. Clique no botão **Excluir Obra**.
+3. Uma mensagem de confirmação será exibida.
+4. Confirme a exclusão.
 
-### 5.2.1. Informações Exibidas
+> ⚠️ **Atenção — Leia antes de excluir!**
+>
+> A exclusão de uma obra é **permanente** e **não pode ser desfeita**. Ao excluir, serão removidos:
+>
+> - Todos os serviços vinculados à obra
+> - Todos os custos diversos registrados
+> - Todos os registros de alocação de equipe
+>
+> Os RDOs (Registros Diários de Obra) já criados são **mantidos** no sistema para fins de histórico e auditoria.
+>
+> **Recomendação:** Se a obra foi cancelada ou concluída, prefira **alterar o status** para *Cancelada* ou *Concluída* em vez de excluí-la. Assim você mantém todo o histórico para consultas futuras.
 
-Cada veículo na listagem apresenta as seguintes informações:
+---
 
-| Informação         | Descrição                                                  |
-|---------------------|------------------------------------------------------------|
-| **Placa**           | Placa do veículo no formato Mercosul ou antigo             |
-| **Modelo / Marca**  | Modelo e fabricante do veículo                             |
-| **Ano**             | Ano de fabricação                                          |
-| **Tipo**            | Categoria do veículo (caminhonete, carro, caminhão, etc.)  |
-| **Cor**             | Cor do veículo                                             |
-| **KM Atual**        | Quilometragem atual registrada no odômetro                 |
-| **Status**          | Situação atual: Ativo, Em manutenção, Inativo, etc.        |
+## 4.13. Relatórios de Obras
 
-### 5.2.2. Status dos Veículos
+O sistema oferece relatórios completos para análise e documentação das suas obras.
 
-O sistema utiliza indicadores visuais (badges coloridos) para representar o status de cada veículo:
+### Tipos de relatórios disponíveis
 
-| Status              | Cor        | Descrição                                      |
-|---------------------|------------|-------------------------------------------------|
-| **Ativo**           | Verde      | Veículo disponível para uso                     |
-| **Em manutenção**   | Amarelo    | Veículo temporariamente indisponível            |
-| **Inativo**         | Vermelho   | Veículo fora de operação                        |
+| Relatório | O que contém |
+|---|---|
+| **Resumo Executivo** | Visão geral da obra: indicadores principais, progresso e situação financeira |
+| **Relatório de Custos** | Detalhamento de todos os gastos por categoria e período |
+| **Relatório de Serviços** | Comparação entre o que foi planejado e o que foi executado em cada serviço |
+| **Relatório de Mão de Obra** | Lista de funcionários que trabalharam na obra, horas registradas e custos |
+| **Relatório de RDOs** | Resumo de todos os Registros Diários de Obra do período |
+| **Relatório Fotográfico** | Compilação de todas as fotos registradas nos RDOs |
 
-### 5.2.3. Ações Disponíveis
+### Como gerar um relatório
 
-Na tela de listagem, o usuário pode executar as seguintes ações:
+1. Acesse a página de detalhes da obra.
+2. Clique em **Relatórios** ou **Gerar Relatório**.
+3. Escolha o tipo de relatório que deseja.
+4. Selecione o período de análise (data de início e data de fim).
+5. Clique em **Gerar PDF**.
+6. Aguarde o processamento e faça o download do arquivo.
 
-1. **Novo Veículo** — Botão para cadastrar um novo veículo na frota;
-2. **Visualizar Detalhes** — Acessa o painel completo com KPIs, gráficos e histórico do veículo;
-3. **Editar** — Altera os dados cadastrais do veículo;
-4. **Registrar Uso** — Abre o formulário para lançar uma nova viagem/uso;
-5. **Lançar Custo** — Registra um novo custo associado ao veículo;
-6. **Excluir** — Remove o veículo do sistema (ação restrita a administradores).
+> **Dica:** Para comparar resultados entre várias obras ao mesmo tempo, acesse o módulo **Relatórios** pelo menu lateral. Lá você encontra relatórios consolidados de todo o portfólio de projetos.
 
-[IMAGEM: Botões de ação na listagem de veículos]
+---
+
+## 4.14. Dicas e Boas Práticas
+
+Aqui vão algumas recomendações para aproveitar ao máximo o módulo de Gestão de Obras:
+
+### Cadastro Completo
+Preencha todos os campos possíveis no cadastro da obra, especialmente orçamento e valor do contrato. Isso permite que o sistema calcule margens e desvios automaticamente.
+
+### RDOs Diários
+Incentive sua equipe a preencher o RDO todos os dias. Quanto mais registros, mais preciso será o acompanhamento de custos e progresso.
+
+### Acompanhamento Semanal
+Reserve um momento da semana para verificar os indicadores de cada obra ativa. Os alertas de cores ajudam a identificar rapidamente quais obras precisam de atenção.
+
+### Serviços Bem Planejados
+Cadastre os serviços com quantidades e valores unitários realistas. Isso é a base para o acompanhamento do progresso e a identificação de desvios.
+
+### Controle de Aditivos
+Quando houver aditivos contratuais, atualize o valor do contrato e o orçamento na edição da obra. Assim os indicadores financeiros continuam refletindo a realidade do projeto.
+
+### Portal do Cliente
+Ative o portal do cliente para obras importantes. Isso demonstra transparência e profissionalismo, permitindo que o contratante acompanhe o andamento sem precisar ligar ou visitar a obra.
+
+---
+
+# Capítulo 5 — Gestão de Frota e Veículos
+
+## 5.1. Introdução
+
+Bem-vindo ao módulo de **Gestão de Frota** do SIGE! Este é o seu centro de controle para tudo que envolve os veículos da empresa. Aqui você pode:
+
+- Cadastrar todos os veículos da sua frota (carros, caminhonetes, caminhões, vans, motos);
+- Registrar cada viagem realizada — quem dirigiu, para onde foi, quantos quilômetros rodou e quem estava no veículo;
+- Controlar todos os gastos — combustível, manutenção, pedágio, seguro, licenciamento, multas e muito mais;
+- Acompanhar indicadores importantes como custo total, custo por quilômetro e quilometragem acumulada;
+- Visualizar gráficos que mostram para onde está indo o dinheiro da frota;
+- Ficar de olho nos vencimentos de licenciamento e seguro para não ter surpresas.
+
+Para acessar o módulo, basta clicar em **Veículos** no menu do sistema.
+
+> **Dica rápida:** O Dashboard principal do SIGE também mostra um resumo com a quantidade de veículos cadastrados na sua frota.
+
+---
+
+## 5.2. Visualizando a Lista de Veículos
+
+Ao clicar em **Veículos** no menu, você verá a tela principal com todos os veículos cadastrados. Cada veículo aparece em formato de card, permitindo uma visão rápida do estado da sua frota.
+
+### O que você vê em cada card de veículo
+
+Cada card exibe as informações essenciais do veículo de forma resumida:
+
+- **Placa** — A placa do veículo (pode ser no formato antigo ABC-1234 ou no formato Mercosul ABC1D23)
+- **Modelo e Marca** — Por exemplo: "Hilux — Toyota" ou "Saveiro — Volkswagen"
+- **Ano** — Ano de fabricação do veículo
+- **Tipo** — Se é carro, caminhonete, caminhão, van, moto, etc.
+- **Cor** — A cor do veículo
+- **KM Atual** — A quilometragem mais recente registrada no odômetro
+- **Status** — A situação atual do veículo
+
+### Entendendo os status dos veículos
+
+Os veículos são classificados com etiquetas coloridas para facilitar a identificação:
+
+- 🟢 **Ativo** — O veículo está disponível e pronto para uso
+- 🟡 **Em manutenção** — O veículo está temporariamente fora de operação (na oficina, por exemplo)
+- 🔴 **Inativo** — O veículo não está sendo utilizado (vendido, baixado, parado definitivamente)
+
+Essas etiquetas ajudam você a saber rapidamente quantos veículos estão disponíveis na sua frota.
+
+### O que você pode fazer nesta tela
+
+A partir da lista de veículos, você tem acesso a diversas ações:
+
+1. **Cadastrar um novo veículo** — Clique no botão **Novo Veículo** no topo da página
+2. **Ver os detalhes completos** — Clique no card de um veículo para acessar KPIs, gráficos e todo o histórico
+3. **Editar os dados** — Atualize informações como placa, modelo, quilometragem ou status
+4. **Registrar uma viagem** — Informe quem usou o veículo, para onde foi e quantos km rodou
+5. **Lançar um custo** — Registre um abastecimento, uma manutenção, um pedágio ou qualquer outro gasto
+6. **Excluir** — Remova o veículo do sistema (esta ação é restrita a administradores)
 
 ---
 
 ## 5.3. Cadastrando um Novo Veículo
 
-Para cadastrar um novo veículo, clique no botão **Novo Veículo** na tela principal ou acesse diretamente a URL `/veiculos/novo`. O formulário de cadastro está dividido em três seções.
+Quando a empresa adquire um novo veículo ou você precisa incluir um veículo que já existia mas não estava no sistema, siga estes passos:
 
-[IMAGEM: Formulário de cadastro de novo veículo]
+### Passo a passo
 
-### 5.3.1. Dados do Veículo
+1. Acesse **Veículos** no menu
+2. Clique no botão **Novo Veículo** (geralmente no canto superior da tela)
+3. Preencha o formulário conforme orientações abaixo
+4. Clique em **Salvar** para concluir o cadastro
 
-Preencha os campos de identificação básica do veículo:
+### Seção 1: Dados do Veículo
 
-| Campo       | Obrigatório | Descrição                                              |
-|-------------|-------------|--------------------------------------------------------|
-| **Placa**   | Sim         | Placa do veículo (formato antigo ABC-1234 ou Mercosul ABC1D23) |
-| **Modelo**  | Sim         | Modelo do veículo (ex.: Hilux, Saveiro, HR)            |
-| **Marca**   | Sim         | Fabricante (ex.: Toyota, Volkswagen, Hyundai)          |
-| **Ano**     | Sim         | Ano de fabricação do veículo                           |
-| **Tipo**    | Sim         | Categoria: Carro, Caminhonete, Caminhão, Van, Moto, etc. |
-| **Cor**     | Não         | Cor predominante do veículo                            |
-| **KM Atual**| Não         | Quilometragem atual do odômetro                        |
-| **Status**  | Sim         | Situação inicial do veículo (Ativo, Em manutenção, Inativo) |
+Estes são os dados básicos de identificação:
 
-**Dica:** Informe a quilometragem atual com precisão, pois ela será utilizada como referência para validação dos lançamentos de uso subsequentes.
+- **Placa** *(obrigatório)* — Digite a placa do veículo. Pode ser no formato antigo (ABC-1234) ou no formato Mercosul (ABC1D23). Exemplo: *HXT-4A52*
 
-### 5.3.2. Dados de Documentação
+- **Modelo** *(obrigatório)* — Informe o modelo do veículo. Exemplos: *Hilux, Saveiro, HR, Clio, Sprinter*
 
-Registre as informações documentais do veículo para controle de regularidade:
+- **Marca** *(obrigatório)* — O fabricante do veículo. Exemplos: *Toyota, Volkswagen, Hyundai, Renault, Mercedes-Benz*
 
-| Campo                    | Obrigatório | Descrição                                        |
-|--------------------------|-------------|--------------------------------------------------|
-| **RENAVAM**              | Não         | Número do Registro Nacional de Veículos          |
-| **Chassi**               | Não         | Número do chassi do veículo                      |
-| **Data de Licenciamento**| Não         | Data de vencimento do licenciamento anual         |
-| **Vigência do Seguro**   | Não         | Data de vencimento da apólice de seguro           |
+- **Ano** *(obrigatório)* — O ano de fabricação. Exemplo: *2022*
 
-**Importante:** O sistema utiliza a data de licenciamento para exibir alertas de proximidade de vencimento na tela de detalhes do veículo.
+- **Tipo** *(obrigatório)* — Escolha a categoria que melhor descreve o veículo:
+  - Carro
+  - Caminhonete
+  - Caminhão
+  - Van
+  - Moto
+  - Outros
 
-### 5.3.3. Configurações de Custo
+- **Cor** *(opcional)* — A cor predominante do veículo. Exemplo: *Branca, Prata, Preta*
 
-Configure os parâmetros financeiros do veículo:
+- **KM Atual** *(opcional, mas recomendado)* — Informe a quilometragem atual que aparece no painel do veículo. Exemplo: *45.230*
 
-| Campo         | Obrigatório | Descrição                                          |
-|---------------|-------------|-----------------------------------------------------|
-| **Custo/KM**  | Não         | Custo estimado por quilômetro rodado (R$/km)        |
+- **Status** *(obrigatório)* — Selecione a situação inicial:
+  - **Ativo** — Se o veículo está pronto para uso
+  - **Em manutenção** — Se está na oficina
+  - **Inativo** — Se não será utilizado no momento
 
-Este valor é utilizado para cálculos de custo operacional e comparações de eficiência entre veículos da frota.
+> **Atenção:** Informe a quilometragem atual com a maior precisão possível! Esse número será usado como referência para validar os registros de viagens futuras. Se o veículo tiver 45.230 km no painel, informe exatamente esse valor.
 
-**Passo a passo para cadastrar:**
+### Seção 2: Documentação do Veículo
 
-1. Acesse **Veículos** no menu lateral;
-2. Clique no botão **Novo Veículo**;
-3. Preencha os campos obrigatórios (Placa, Modelo, Marca, Ano, Tipo);
-4. Informe os dados de documentação e configurações de custo conforme necessário;
-5. Clique em **Salvar** para concluir o cadastro.
+Registre os dados documentais para facilitar o controle de regularidade:
 
-Após o cadastro, o veículo aparecerá na listagem principal e estará disponível para registro de uso e custos.
+- **RENAVAM** *(opcional)* — O número do Registro Nacional de Veículos Automotores. Você encontra esse número no documento do veículo (CRV/CRLV). Exemplo: *00123456789*
 
----
+- **Chassi** *(opcional)* — O número do chassi gravado na estrutura do veículo. Exemplo: *9BWHE21JX24060811*
 
-## 5.4. Registrando o Uso de Veículos
+- **Data de Licenciamento** *(opcional, mas recomendado)* — Quando vence o licenciamento anual do veículo. O sistema vai avisar quando estiver perto do vencimento para você não perder o prazo!
 
-O registro de uso documenta cada viagem ou deslocamento realizado com os veículos da frota, vinculando o motorista, a obra de destino, a quilometragem percorrida e os passageiros transportados.
+- **Vigência do Seguro** *(opcional, mas recomendado)* — Até quando vale a apólice de seguro do veículo. Assim como o licenciamento, o sistema vai alertar quando estiver próximo do vencimento.
 
-### 5.4.1. Lançando Nova Viagem/Uso
+> **Dica:** Mesmo que esses campos não sejam obrigatórios, preencha pelo menos as datas de licenciamento e seguro. Assim o sistema trabalha a seu favor, avisando antes que os documentos vençam!
 
-Para registrar um novo uso, utilize o botão **Registrar Uso** na listagem de veículos ou acesse o formulário diretamente. O sistema abrirá um modal ou formulário com os seguintes campos:
+### Seção 3: Configuração de Custo
 
-[IMAGEM: Formulário de registro de uso do veículo]
+- **Custo por KM** *(opcional)* — Se você sabe quanto custa, em média, cada quilômetro rodado por esse veículo, informe aqui. Esse valor ajuda nas comparações de eficiência entre os veículos da frota. Exemplo: *R$ 0,85/km*
 
-| Campo                     | Obrigatório | Descrição                                              |
-|---------------------------|-------------|--------------------------------------------------------|
-| **Veículo**               | Sim         | Veículo utilizado (selecionado automaticamente se acessado via card) |
-| **Motorista/Condutor**    | Sim         | Funcionário responsável pela condução                  |
-| **Data do Uso**           | Sim         | Data em que o deslocamento ocorreu                     |
-| **Horário de Saída**      | Não         | Hora de partida do veículo                             |
-| **Horário de Chegada**    | Não         | Hora de retorno do veículo                             |
-| **KM Inicial**            | Sim         | Quilometragem do odômetro na saída                     |
-| **KM Final**              | Sim         | Quilometragem do odômetro no retorno                   |
-| **Obra**                  | Não         | Obra de destino (vincula o deslocamento a uma obra)    |
-| **Observações**           | Não         | Informações complementares sobre o deslocamento        |
-| **% Combustível**         | Não         | Nível do tanque de combustível no momento do registro  |
-| **Passageiros (Frente)**  | Não         | Funcionários transportados no banco da frente (máx. 3) |
-| **Passageiros (Traseira)**| Não         | Funcionários transportados no banco traseiro (máx. 5)  |
+### Após o cadastro
 
-**Validações automáticas:**
-
-- O **KM Final** deve ser maior que o **KM Inicial**;
-- O **KM Final** não pode ser menor que a quilometragem atual registrada do veículo;
-- O mesmo funcionário não pode ser registrado como motorista e passageiro simultaneamente;
-- Há limite máximo de 3 passageiros na frente e 5 na traseira.
-
-**Passo a passo:**
-
-1. Na listagem de veículos, clique em **Registrar Uso** no card do veículo desejado;
-2. O campo **Veículo** será preenchido automaticamente;
-3. Selecione o **Motorista** na lista de funcionários ativos;
-4. Informe a **Data**, os **horários** e a **quilometragem** de saída e retorno;
-5. Opcionalmente, vincule a uma **Obra** e adicione **passageiros**;
-6. Clique em **Salvar** para registrar o uso.
-
-Após o registro, a quilometragem atual do veículo é atualizada automaticamente com o valor do KM Final informado.
-
-### 5.4.2. Histórico de Usos
-
-O histórico de usos pode ser consultado na tela de **Detalhes do Veículo** (seção 5.6). Ele apresenta uma tabela cronológica com todos os deslocamentos registrados, incluindo:
-
-- Data do uso;
-- Nome do motorista/condutor;
-- KM inicial e final;
-- Quilometragem percorrida;
-- Obra de destino;
-- Horários de saída e retorno;
-- Passageiros transportados (com indicação de posição: frente/traseira).
-
-[IMAGEM: Tabela de histórico de usos do veículo]
-
-É possível visualizar os detalhes completos de cada uso clicando sobre o registro, que abrirá um modal com informações detalhadas incluindo dados técnicos, horários e lista de passageiros organizados por posição no veículo.
+Depois de salvar, o veículo aparecerá imediatamente na lista principal e você já poderá:
+- Registrar viagens
+- Lançar custos
+- Acompanhar os indicadores
 
 ---
 
-## 5.5. Controle de Custos de Veículos
+## 5.4. Registrando o Uso do Veículo (Viagens)
 
-O módulo de custos permite registrar e acompanhar todas as despesas associadas a cada veículo, categorizadas por tipo para análise financeira detalhada.
+Toda vez que um veículo sair para uma viagem ou deslocamento, é importante registrar no sistema. Esse controle permite saber quem usou cada veículo, para onde foi, quantos quilômetros rodou e quem estava junto.
 
-### 5.5.1. Lançando Novo Custo
+### Passo a passo para registrar uma viagem
 
-Para registrar um novo custo, utilize o botão **Lançar Custo** na listagem de veículos ou acesse o formulário de novo custo. Preencha os seguintes campos:
+1. Na lista de veículos, localize o veículo que foi utilizado
+2. Clique no botão **Registrar Uso** no card desse veículo
+3. Preencha o formulário conforme as orientações abaixo
+4. Clique em **Salvar** para confirmar o registro
 
-[IMAGEM: Formulário de lançamento de custo do veículo]
+### Campos do formulário de viagem
 
-| Campo            | Obrigatório | Descrição                                              |
-|------------------|-------------|--------------------------------------------------------|
-| **Veículo**      | Sim         | Veículo ao qual o custo será atribuído                 |
-| **Tipo de Custo**| Sim         | Categoria da despesa (ver tabela abaixo)               |
-| **Valor (R$)**   | Sim         | Valor monetário da despesa                             |
-| **Data**         | Sim         | Data em que a despesa ocorreu                          |
-| **Fornecedor**   | Não         | Nome do fornecedor ou prestador de serviço             |
-| **Nota Fiscal**  | Não         | Número da nota fiscal para controle contábil           |
-| **Obra**         | Não         | Obra vinculada ao custo (para rateio por obra)         |
-| **Observações**  | Não         | Detalhes adicionais sobre a despesa                    |
+- **Veículo** *(preenchido automaticamente)* — Se você clicou no botão do card, o veículo já vem selecionado
 
-**Tipos de custo disponíveis:**
+- **Motorista/Condutor** *(obrigatório)* — Selecione na lista o funcionário que dirigiu o veículo. A lista mostra apenas funcionários ativos cadastrados no sistema
 
-| Tipo de Custo    | Descrição                                           |
-|------------------|-----------------------------------------------------|
-| **Combustível**  | Abastecimentos de combustível                       |
-| **Manutenção**   | Revisões, reparos, troca de peças                   |
-| **Pedágio**      | Custos com pedágios em rodovias                     |
-| **Seguro**       | Pagamento de apólice de seguro                      |
-| **Licenciamento**| Taxas de licenciamento e IPVA                       |
-| **Multa**        | Multas de trânsito                                  |
-| **Lavagem**      | Lavagem e higienização do veículo                   |
-| **Outros**       | Despesas diversas não classificadas acima            |
+- **Data do Uso** *(obrigatório)* — Informe a data em que a viagem aconteceu. Exemplo: *15/01/2026*
 
-**Passo a passo:**
+- **Horário de Saída** *(opcional)* — Que horas o veículo saiu. Exemplo: *07:30*
 
-1. Na listagem de veículos, clique em **Lançar Custo** no card do veículo;
-2. Selecione o **Tipo de Custo** adequado;
-3. Informe o **Valor**, a **Data** e, opcionalmente, o **Fornecedor** e a **Nota Fiscal**;
-4. Vincule a uma **Obra** se o custo for específico de um projeto;
-5. Clique em **Salvar** para registrar o custo.
+- **Horário de Chegada** *(opcional)* — Que horas o veículo retornou. Exemplo: *17:45*
 
-### 5.5.2. Histórico de Custos
+- **KM Inicial** *(obrigatório)* — A quilometragem que estava no painel do veículo no momento da saída. Exemplo: *45.230*
 
-O histórico completo de custos de cada veículo está disponível na tela de **Detalhes do Veículo** (seção 5.6). A tabela apresenta:
+- **KM Final** *(obrigatório)* — A quilometragem que estava no painel quando o veículo voltou. Exemplo: *45.380*
 
-- Data do custo;
-- Tipo de custo (com indicador visual por categoria);
-- Valor;
-- Fornecedor;
-- Nota fiscal;
-- Obra vinculada;
-- Observações.
+- **Obra** *(opcional)* — Se o veículo foi para alguma obra específica, selecione a obra na lista. Isso é muito útil para depois saber quanto cada obra gastou com transporte
 
-[IMAGEM: Tabela de histórico de custos do veículo]
+- **% Combustível** *(opcional)* — O nível do tanque de combustível no momento do registro. Útil para controlar o consumo
 
-Os custos são exibidos em ordem cronológica decrescente (mais recentes primeiro) e podem ser editados ou excluídos conforme a permissão do usuário.
+- **Passageiros (Frente)** *(opcional)* — Selecione os funcionários que foram no banco da frente (máximo 3 pessoas, incluindo o motorista)
+
+- **Passageiros (Traseira)** *(opcional)* — Selecione os funcionários que foram no banco de trás (máximo 5 pessoas)
+
+- **Observações** *(opcional)* — Qualquer informação adicional sobre a viagem. Exemplo: *"Entrega de materiais na obra do Parque Industrial"*
+
+### Regras que o sistema verifica automaticamente
+
+Para garantir a consistência dos dados, o sistema faz algumas verificações:
+
+- O **KM Final** precisa ser maior que o **KM Inicial** — afinal, o veículo não anda para trás!
+- O **KM Final** não pode ser menor que a última quilometragem registrada do veículo
+- O mesmo funcionário não pode ser motorista e passageiro ao mesmo tempo
+- O número máximo de passageiros na frente é 3 e na traseira é 5
+
+> **Importante:** Após salvar o registro de uso, a quilometragem atual do veículo é atualizada automaticamente com o valor do KM Final. Você não precisa fazer isso manualmente!
+
+### Consultando o histórico de viagens
+
+Todas as viagens registradas ficam guardadas no sistema. Para consultá-las:
+
+1. Clique no card do veículo desejado para abrir a tela de **Detalhes**
+2. Role a página até a seção de **Histórico de Usos**
+3. Você verá uma tabela organizada por data com todas as viagens, mostrando:
+   - Data da viagem
+   - Nome do motorista
+   - KM de saída e chegada
+   - Total de quilômetros percorridos
+   - Obra de destino (quando informada)
+   - Horários de saída e retorno
+   - Lista de passageiros (separados por posição no veículo)
+
+> **Dica:** Clique em qualquer viagem na tabela para ver todos os detalhes completos, incluindo a lista de passageiros organizada por posição (frente e traseira).
 
 ---
 
-## 5.6. Detalhes do Veículo
+## 5.5. Controlando os Custos dos Veículos
 
-A tela de detalhes (URL: `/veiculos/<id>/detalhes`) é o painel central de acompanhamento de cada veículo. Ela reúne todas as informações cadastrais, indicadores de desempenho, gráficos analíticos e histórico de movimentação.
+Manter o controle financeiro da frota é essencial. O SIGE permite que você registre cada centavo gasto com os veículos, separando por categoria para facilitar a análise.
 
-[IMAGEM: Tela de detalhes do veículo com KPIs e gráficos]
+### Passo a passo para lançar um custo
 
-### 5.6.1. Indicadores-Chave (KPIs)
+1. Na lista de veículos, localize o veículo que teve a despesa
+2. Clique no botão **Lançar Custo** no card desse veículo
+3. Preencha o formulário conforme as orientações abaixo
+4. Clique em **Salvar** para registrar o custo
 
-No topo da página de detalhes são exibidos os principais KPIs do veículo:
+### Campos do formulário de custo
 
-| KPI                        | Descrição                                                     |
-|-----------------------------|---------------------------------------------------------------|
-| **Custo Total**             | Soma de todos os custos registrados para o veículo (R$)       |
-| **Custo por KM**            | Custo total dividido pela quilometragem total percorrida      |
-| **KM Total**                | Quilometragem total acumulada pelo veículo                    |
-| **Próximo Licenciamento**   | Data prevista para o próximo licenciamento veicular           |
+- **Veículo** *(preenchido automaticamente)* — Se você clicou no botão do card, o veículo já vem selecionado
 
-Esses indicadores são calculados automaticamente com base nos registros de uso e custos lançados no sistema. Os KPIs podem ser filtrados por período (data inicial e data final) para análise de intervalos específicos.
+- **Tipo de Custo** *(obrigatório)* — Escolha a categoria da despesa:
 
-### 5.6.2. Gráficos Analíticos
+  | Categoria         | Quando usar                                                    |
+  |-------------------|----------------------------------------------------------------|
+  | **Combustível**   | Abastecimentos (gasolina, diesel, etanol, GNV)                 |
+  | **Manutenção**    | Revisões, troca de óleo, pneus, peças, reparos em geral       |
+  | **Pedágio**       | Valores pagos em pedágios de rodovias                          |
+  | **Seguro**        | Parcelas ou pagamento integral do seguro do veículo            |
+  | **Licenciamento** | IPVA, taxas de licenciamento, emplacamento                     |
+  | **Multa**         | Multas de trânsito recebidas                                   |
+  | **Lavagem**       | Lavagem, higienização e limpeza do veículo                     |
+  | **Outros**        | Qualquer despesa que não se encaixe nas categorias acima       |
 
-A tela de detalhes inclui gráficos interativos para análise visual dos dados:
+- **Valor (R$)** *(obrigatório)* — O valor da despesa. Exemplo: *R$ 350,00*
 
-1. **Custos por Mês** — Gráfico de barras mostrando a evolução mensal dos custos totais do veículo, permitindo identificar tendências de aumento ou redução de despesas;
+- **Data** *(obrigatório)* — A data em que a despesa ocorreu. Exemplo: *20/01/2026*
 
-2. **Custos por Categoria** — Gráfico de pizza (ou rosca) com a distribuição percentual dos custos por tipo (combustível, manutenção, pedágio, seguro, etc.), facilitando a identificação das principais fontes de despesa.
+- **Fornecedor** *(opcional)* — O nome do posto, oficina ou empresa que prestou o serviço. Exemplo: *Posto Shell BR-101* ou *Oficina do João*
 
-[IMAGEM: Gráficos de custos por mês e por categoria]
+- **Nota Fiscal** *(opcional)* — O número da nota fiscal, para controle contábil. Exemplo: *NF 004521*
+
+- **Obra** *(opcional)* — Se o gasto foi relacionado a uma obra específica, selecione-a aqui. Isso permite saber depois quanto cada obra gastou com frota
+
+- **Observações** *(opcional)* — Detalhes adicionais. Exemplo: *"Troca de 4 pneus dianteiros — desgaste por uso em estrada de terra"*
+
+> **Dica:** Escolha sempre a categoria correta! Isso faz toda a diferença nos gráficos e relatórios. Se você colocar uma troca de óleo como "Outros" em vez de "Manutenção", o gráfico de distribuição de custos não vai refletir a realidade.
+
+### Consultando o histórico de custos
+
+Para ver todos os gastos de um veículo:
+
+1. Clique no card do veículo para abrir a tela de **Detalhes**
+2. Role até a seção de **Histórico de Custos**
+3. Você verá uma tabela com todos os lançamentos, organizada do mais recente para o mais antigo:
+   - Data do gasto
+   - Tipo de custo (com indicador visual colorido por categoria)
+   - Valor em reais
+   - Fornecedor
+   - Número da nota fiscal
+   - Obra vinculada (quando informada)
+   - Observações
+
+> **Importante:** Você pode editar ou excluir um lançamento de custo caso tenha cometido algum erro. Basta clicar no registro desejado na tabela de histórico.
+
+---
+
+## 5.6. Painel de Detalhes do Veículo
+
+O painel de detalhes é onde você encontra **tudo** sobre um veículo em um só lugar. Para acessá-lo, basta clicar no card do veículo na lista principal.
+
+### 5.6.1. Indicadores de Desempenho (KPIs)
+
+No topo da página, você encontra os números mais importantes do veículo:
+
+**Custo Total (R$)**
+Mostra a soma de **todos** os gastos registrados para esse veículo — combustível, manutenção, pedágio, seguro, tudo somado. É o valor total que esse veículo custou para a empresa.
+
+*Exemplo: Se aparece R$ 12.450,00, significa que desde o primeiro lançamento até hoje, foram gastos doze mil quatrocentos e cinquenta reais com esse veículo.*
+
+**Custo por KM (R$/km)**
+Esse é um dos indicadores mais importantes para gestão de frota. Ele divide o custo total pela quilometragem total percorrida. Quanto menor esse número, mais econômico é o veículo.
+
+*Exemplo: Se o custo por km é R$ 1,20, significa que cada quilômetro rodado custou, em média, um real e vinte centavos. Se outro veículo da frota tem custo de R$ 0,85/km, ele é mais econômico.*
+
+**KM Total**
+A quilometragem total acumulada pelo veículo desde que começou a ser registrado no sistema.
+
+*Exemplo: 15.200 km significa que o veículo percorreu quinze mil e duzentos quilômetros nos registros de viagem.*
+
+**Próximo Licenciamento**
+Mostra a data prevista para o vencimento do licenciamento. Fique atento! Se essa data estiver próxima ou vencida, providencie a regularização o quanto antes.
+
+*Exemplo: Se aparece "15/03/2026", significa que o licenciamento vence em março de 2026.*
+
+> **Dica:** Você pode filtrar os indicadores por período! Use os campos de data inicial e data final para analisar os números de um mês específico, de um trimestre ou do período que quiser.
+
+### 5.6.2. Entendendo os Gráficos
+
+A tela de detalhes traz dois gráficos muito úteis para a gestão financeira da frota:
+
+**Gráfico de Custos por Mês**
+
+Este gráfico de barras mostra quanto foi gasto com o veículo em cada mês. Com ele você consegue:
+
+- Ver se os gastos estão aumentando ou diminuindo ao longo dos meses
+- Identificar meses com despesas fora do normal (um pico pode indicar uma manutenção grande, por exemplo)
+- Comparar o padrão de gastos entre períodos diferentes
+- Planejar o orçamento para os próximos meses com base no histórico
+
+*Exemplo prático: Se você percebe que nos meses de janeiro e julho os custos sempre são maiores, pode ser porque coincidem com revisões programadas. Sabendo disso, você consegue se planejar financeiramente.*
+
+**Gráfico de Custos por Categoria**
+
+Este gráfico circular (pizza) mostra a distribuição percentual dos gastos por tipo. Com ele você descobre:
+
+- Qual tipo de despesa mais pesa no bolso (combustível? manutenção?)
+- Se existe alguma categoria de custo desproporcional
+- Onde focar esforços para reduzir custos
+
+*Exemplo prático: Se o gráfico mostra que 60% dos custos são com combustível e 25% com manutenção, você sabe que investir em rotas mais eficientes ou em veículos mais econômicos pode trazer uma boa economia.*
 
 ### 5.6.3. Dados Cadastrais
 
-A seção de dados cadastrais exibe todas as informações registradas do veículo, incluindo:
+Nesta seção você encontra todas as informações do veículo que foram preenchidas no cadastro:
 
-- Placa, modelo, marca, ano, tipo e cor;
-- RENAVAM e número do chassi;
-- Quilometragem atual;
-- Data de licenciamento e vigência do seguro;
-- Status atual do veículo;
-- Custo por KM configurado.
+- Placa, modelo, marca, ano, tipo e cor
+- RENAVAM e número do chassi
+- Quilometragem atual
+- Data de vencimento do licenciamento
+- Data de vencimento do seguro
+- Status atual (ativo, em manutenção ou inativo)
+- Custo por km configurado
+
+Para alterar qualquer uma dessas informações, clique no botão **Editar** disponível na tela.
 
 ### 5.6.4. Histórico Completo
 
-Na parte inferior da tela de detalhes, o sistema apresenta o histórico completo de:
+Na parte inferior da tela de detalhes, você encontra o histórico completo de movimentação do veículo, dividido em duas seções:
 
-- **Usos/Viagens** — Todos os deslocamentos registrados com informações de motorista, quilometragem, obra e passageiros;
-- **Custos** — Todos os lançamentos financeiros com tipo, valor, data e fornecedor.
+- **Viagens/Usos** — Todas as viagens registradas com motorista, quilometragem, obra de destino e passageiros
+- **Custos** — Todos os lançamentos financeiros com tipo, valor, data e fornecedor
 
-Cada registro pode ser expandido para visualização detalhada ou editado diretamente a partir desta tela.
-
----
-
-## 5.7. Relatórios de Frota
-
-O módulo de Veículos integra-se ao sistema de relatórios do SIGE, disponível no menu **Relatórios**. Os principais relatórios disponíveis para a gestão de frota incluem:
-
-### 5.7.1. Relatório de Custos por Veículo
-
-Apresenta um resumo consolidado dos custos de cada veículo em um período selecionado, com detalhamento por categoria de custo. Útil para comparar a eficiência financeira entre veículos da frota.
-
-### 5.7.2. Relatório de Utilização da Frota
-
-Mostra a frequência de uso de cada veículo, quilometragem percorrida e motoristas associados. Permite identificar veículos subutilizados ou sobrecarregados.
-
-### 5.7.3. Relatório de Custos por Obra
-
-Quando os custos de veículos são vinculados a obras específicas, este relatório consolida os gastos de frota por projeto, auxiliando no controle orçamentário e no rateio de despesas.
-
-### 5.7.4. Alertas de Documentação
-
-O sistema gera alertas automáticos para:
-
-- Licenciamento próximo do vencimento (exibido no KPI "Próximo Licenciamento");
-- Seguro próximo do vencimento;
-- Veículos com status "Em manutenção" por período prolongado.
-
-[IMAGEM: Tela de relatórios de frota]
+Clique em qualquer registro para ver os detalhes completos ou para editar as informações.
 
 ---
 
-## Resumo das URLs do Módulo de Veículos
+## 5.7. Controle de Documentação e Alertas
 
-| Funcionalidade          | URL                                |
-|-------------------------|------------------------------------|
-| Listagem de Veículos    | `/veiculos`                        |
-| Novo Veículo            | `/veiculos/novo`                   |
-| Editar Veículo          | `/veiculos/<id>/editar`            |
-| Detalhes do Veículo     | `/veiculos/<id>/detalhes`          |
-| Registrar Uso           | `/veiculos/uso` (POST)             |
-| Novo Custo              | `/custo_veiculo/novo`              |
-| Editar Custo            | `/custo_veiculo/<id>/editar`       |
+Manter a documentação dos veículos em dia é fundamental para evitar problemas legais e multas. O SIGE ajuda você nessa tarefa!
 
----
+### Licenciamento
 
-## Dicas e Boas Práticas para Veículos
+Quando você cadastra a data de vencimento do licenciamento, o sistema passa a monitorar automaticamente. Na tela de detalhes do veículo, o indicador **Próximo Licenciamento** mostra claramente quando vence.
 
-1. **Mantenha a quilometragem atualizada** — Sempre registre os usos com KM inicial e final corretos para que o sistema calcule corretamente o custo por quilômetro;
-2. **Classifique os custos corretamente** — Utilize o tipo de custo adequado para cada despesa, pois isso impacta diretamente nos gráficos e relatórios analíticos;
-3. **Vincule custos e usos às obras** — Sempre que possível, associe os registros a uma obra para possibilitar o rateio correto das despesas;
-4. **Monitore os alertas de documentação** — Verifique regularmente os KPIs de licenciamento e seguro para evitar irregularidades;
-5. **Registre todos os passageiros** — O controle de passageiros por posição (frente/traseira) é importante para conformidade com normas de segurança e seguro;
-6. **Revise os gráficos mensalmente** — Utilize os gráficos de custos por mês e por categoria para identificar oportunidades de redução de despesas.
+**O que fazer:**
+1. Ao cadastrar o veículo, informe a data de vencimento do licenciamento
+2. Verifique periodicamente o indicador na tela de detalhes
+3. Quando estiver próximo do vencimento, providencie o pagamento do IPVA e das taxas de licenciamento
+4. Após renovar, atualize a data no cadastro do veículo
 
----
+### Seguro
 
-# Capitulo 6 — Relatorio Diario de Obra (RDO)
+Da mesma forma, o sistema acompanha a vigência do seguro do veículo.
 
-## 6.1. Introducao ao RDO
+**O que fazer:**
+1. Ao cadastrar o veículo, informe a data de vencimento do seguro
+2. Antes do vencimento, entre em contato com a seguradora para renovação
+3. Após renovar, atualize a data no cadastro do veículo
 
-O **Relatorio Diario de Obra (RDO)** e o principal instrumento de registro e controle da execucao fisica de uma obra no SIGE. Funciona como um verdadeiro **diario de bordo** da construcao, documentando tudo o que acontece no canteiro de obras a cada dia: mao de obra presente, equipamentos utilizados, servicos executados, condicoes climaticas e registros fotograficos.
+### Alertas automáticos
 
-### Por que o RDO e essencial?
+O sistema gera avisos automáticos para situações que precisam de atenção:
 
-| Beneficio | Descricao |
-|-----------|-----------|
-| **Registro historico** | Documenta diariamente todas as atividades executadas no canteiro |
-| **Controle de progresso automatico** | Ao aprovar um RDO, o sistema atualiza automaticamente o percentual de conclusao da obra |
-| **Rastreabilidade** | Permite verificar quem trabalhou, quais servicos foram realizados e em que condicoes |
-| **Evidencia fotografica** | Fotos otimizadas em WebP comprovam a execucao dos servicos |
-| **Integracao financeira** | Dados de mao de obra e equipamentos alimentam o modulo financeiro |
-| **Base para medicoes** | Serve como base documental para medicoes contratuais com o cliente |
+- ⚠️ **Licenciamento próximo do vencimento** — Quando a data de licenciamento está chegando
+- ⚠️ **Seguro próximo do vencimento** — Quando a apólice de seguro está perto de expirar
+- ⚠️ **Veículo em manutenção prolongada** — Quando um veículo está com status "Em manutenção" há muito tempo
 
-> **Importante:** O RDO foi projetado com **design mobile-first**, permitindo que o responsavel pela obra preencha o relatorio diretamente do canteiro, usando smartphone ou tablet.
-
-### Fluxo Geral do RDO
-
-```
-Criacao (Rascunho) → Elaboracao → Envio para Aprovacao → Aprovacao/Rejeicao → Atualizacao Automatica da Obra
-```
-
-O sistema utiliza um **EventManager** para integracoes automaticas: ao aprovar um RDO, o progresso da obra, os indicadores financeiros e o dashboard sao atualizados de forma automatica e transparente.
+> **Dica:** Crie o hábito de verificar a tela de detalhes dos veículos pelo menos uma vez por semana. Assim você nunca será pego de surpresa com documentos vencidos!
 
 ---
 
-## 6.2. Tela Principal de RDOs
+## 5.8. Relatórios de Frota
 
-### Acessando a Lista Consolidada
+O SIGE oferece relatórios que ajudam na tomada de decisões sobre a frota. Acesse-os pelo menu **Relatórios**.
 
-Para acessar a tela principal de RDOs, navegue pelo menu lateral ate:
+### Relatório de Custos por Veículo
+
+Apresenta um resumo dos gastos de cada veículo em um período que você escolhe. É ótimo para:
+
+- Comparar qual veículo gasta mais
+- Identificar veículos que estão dando muito custo de manutenção (pode ser hora de trocar!)
+- Apresentar números para a diretoria
+
+### Relatório de Utilização da Frota
+
+Mostra com que frequência cada veículo é utilizado, quantos quilômetros rodou e quais motoristas o utilizaram. Serve para:
+
+- Descobrir veículos que estão parados (subutilizados) — será que vale a pena mantê-los?
+- Identificar veículos sobrecarregados que precisam de um substituto
+- Verificar se a distribuição de uso está equilibrada
+
+### Relatório de Custos por Obra
+
+Quando você vincula os custos e viagens às obras, este relatório mostra quanto cada projeto gastou com frota. Muito útil para:
+
+- Saber o custo real de transporte de cada obra
+- Fazer o rateio correto das despesas entre os projetos
+- Incluir os custos de frota no orçamento de futuras obras
+
+---
+
+## 5.9. Dicas Práticas para uma Boa Gestão de Frota
+
+Aqui vão algumas recomendações para você tirar o máximo proveito do módulo de frota:
+
+### 1. Registre tudo, sempre
+
+Quanto mais informações você registrar, mais preciso será o controle. Peça aos motoristas que anotem o km de saída e chegada de cada viagem. Guarde todas as notas fiscais de abastecimento e manutenção.
+
+### 2. Mantenha a quilometragem sempre atualizada
+
+A quilometragem é a base para o cálculo do custo por km. Se os registros de viagem pularem números (por exemplo, de 45.000 para 48.000 sem registros intermediários), os indicadores perdem a precisão.
+
+### 3. Classifique os custos corretamente
+
+Na hora de lançar um custo, escolha a categoria certa. Não coloque tudo como "Outros"! Os gráficos e relatórios só serão úteis se os dados estiverem bem categorizados.
+
+### 4. Vincule custos e viagens às obras
+
+Sempre que possível, informe a obra relacionada. Isso permite calcular o custo real de transporte de cada projeto e fazer o rateio correto entre as obras.
+
+### 5. Fique de olho nos vencimentos
+
+Preencha as datas de licenciamento e seguro no cadastro de cada veículo. Verifique os alertas regularmente. Documento vencido pode gerar multas e até apreensão do veículo!
+
+### 6. Registre todos os passageiros
+
+O controle de quem estava no veículo (frente e traseira) é importante para:
+- Conformidade com normas de segurança do trabalho
+- Controle para o seguro (em caso de sinistro)
+- Saber quem estava no veículo em determinada data
+
+### 7. Analise os gráficos mensalmente
+
+Reserve um tempo todo mês para olhar os gráficos de custos. Procure por:
+- Gastos que estão crescendo sem motivo aparente
+- Veículos com custo por km muito acima da média da frota
+- Categorias de custo que podem ser reduzidas (será que dá para negociar o combustível?)
+
+### 8. Compare os veículos entre si
+
+Use o indicador de custo por km para comparar a eficiência dos veículos. Se um veículo está custando muito mais que os outros, investigue: pode ser hora de fazer uma revisão completa ou até considerar a substituição.
+
+### 9. Planeje a manutenção preventiva
+
+Acompanhe o histórico de manutenção de cada veículo. É mais barato fazer revisões preventivas do que esperar o veículo quebrar. Use as observações nos lançamentos para anotar quando deve ser feita a próxima revisão.
+
+### 10. Mantenha o cadastro atualizado
+
+Se um veículo foi vendido, mude o status para **Inativo**. Se está na oficina, mude para **Em manutenção**. Quando voltar, coloque como **Ativo** novamente. Assim a lista sempre reflete a realidade da sua frota.
+
+---
+
+## 5.10. Perguntas Frequentes
+
+**Como altero a quilometragem de um veículo?**
+A quilometragem é atualizada automaticamente quando você registra uma viagem. Se precisar corrigir manualmente, edite os dados cadastrais do veículo.
+
+**Posso excluir um registro de viagem ou custo lançado errado?**
+Sim! Acesse os detalhes do veículo, encontre o registro na tabela de histórico e clique para excluir ou editar.
+
+**O que acontece se eu tentar registrar um KM Final menor que o KM Inicial?**
+O sistema não permite. Vai aparecer uma mensagem de erro pedindo para você verificar os valores.
+
+**Posso cadastrar um veículo que não tem placa ainda?**
+A placa é um campo obrigatório. Se o veículo ainda não tem placa, use um identificador temporário e atualize depois.
+
+**Como sei quanto cada obra gastou com veículos?**
+Vincule os custos e viagens às obras. Depois, consulte o relatório de Custos por Obra no menu Relatórios.
+
+**É possível ver o histórico de um veículo que já está inativo?**
+Sim! Veículos inativos continuam no sistema com todo o histórico preservado. Basta acessar os detalhes normalmente.
+
+---
+
+# Capítulo 6 — Relatório Diário de Obra (RDO)
+
+## 6.1. O que é o RDO?
+
+O **Relatório Diário de Obra (RDO)** é o diário de bordo da sua obra. É nele que você, responsável pelo canteiro, registra tudo o que aconteceu no dia: quem trabalhou, que equipamentos foram usados, quais serviços avançaram, como estava o tempo e, claro, tira fotos para comprovar.
+
+Pense no RDO como a **prestação de contas do dia**. Sem ele, fica difícil saber o que realmente aconteceu na obra — e mais difícil ainda cobrar resultados ou justificar atrasos.
+
+### Por que preencher o RDO todo dia?
+
+- **Memória da obra** — Daqui a seis meses, você não vai lembrar o que aconteceu num dia específico. O RDO lembra por você.
+- **Progresso atualizado** — Quando o gestor aprova o RDO, o sistema atualiza automaticamente o andamento da obra. Sem RDO, o percentual de conclusão fica parado.
+- **Comprovação para o cliente** — Fotos e registros do RDO servem como prova do que foi executado, facilitando medições e cobranças.
+- **Registro de mão de obra** — Saber quem trabalhou e quantas horas ajuda no controle de custos e na folha de pagamento.
+- **Proteção em caso de problemas** — Se houver questionamento sobre prazos, qualidade ou presença de equipe, o RDO é seu respaldo documental.
+- **Controle de equipamentos** — Saber quais máquinas foram usadas e se eram próprias ou alugadas ajuda a controlar gastos operacionais.
+
+> **Lembrete:** O RDO foi feito para ser preenchido pelo celular, direto do canteiro. Você não precisa esperar chegar no escritório para preencher!
+
+### Como funciona o ciclo do RDO?
+
+O caminho de um RDO é simples:
+
+1. **Você cria** o RDO e preenche as informações do dia
+2. **Você salva como rascunho** (se quiser terminar depois) ou **envia para aprovação**
+3. **O gestor revisa** e aprova ou pede correções
+4. **Quando aprovado**, o sistema atualiza automaticamente o progresso da obra
+
+---
+
+## 6.2. Visualizando a Lista de RDOs
+
+### Como acessar
+
+Para ver todos os RDOs registrados, vá pelo menu:
 
 **Menu → RDO → Lista Consolidada**
 
-A URL de acesso direto e: `/funcionario/rdo/consolidado`
+Essa tela mostra todos os RDOs da sua empresa, organizados em uma tabela fácil de navegar.
 
-### Colunas da Lista
+### O que aparece na lista
 
-A tabela consolidada de RDOs apresenta as seguintes informacoes:
+Cada linha da tabela mostra um RDO com as seguintes informações:
 
-| Coluna | Descricao | Exemplo |
-|--------|-----------|---------|
-| **Numero RDO** | Identificador unico gerado automaticamente | RDO-10-2025-013 |
-| **Obra** | Nome da obra associada ao RDO | Obra E2E Test yBSJZA |
-| **Data** | Data do relatorio diario | 27/10/2025 |
-| **Status** | Situacao atual do RDO | Rascunho |
-| **Progresso** | Percentual de conclusao dos servicos registrados | 45,2% |
-| **Acoes** | Botoes para visualizar, editar ou excluir | Visualizar / Editar |
+- **Número do RDO** — Um código único gerado automaticamente (exemplo: RDO-10-2025-013)
+- **Obra** — O nome da obra a que o RDO se refere
+- **Data** — A data do relatório
+- **Status** — A situação atual do RDO (veja os status abaixo)
+- **Progresso** — O percentual de avanço dos serviços registrados naquele dia
+- **Ações** — Botões para visualizar, editar ou excluir o RDO
 
-### Filtros Disponiveis
+### Filtrando RDOs
 
-A tela principal oferece filtros para localizar RDOs rapidamente:
+Se você tem muitos RDOs cadastrados, use os filtros para encontrar o que precisa:
 
-1. **Filtro por Obra** — Selecione uma obra especifica no dropdown
-2. **Filtro por Status** — Filtre por Rascunho, Em Elaboracao, Pendente de Aprovacao, Aprovado ou Reprovado
-3. **Filtro por Data Inicio** — Defina a data inicial do periodo de busca
-4. **Filtro por Data Fim** — Defina a data final do periodo de busca
-5. **Filtro por Funcionario** — Filtre por responsavel pelo preenchimento
+1. **Por obra** — Escolha uma obra específica no seletor
+2. **Por status** — Filtre por Rascunho, Em Elaboração, Pendente de Aprovação, Aprovado ou Reprovado
+3. **Por período** — Defina uma data de início e uma data de fim para buscar RDOs de um intervalo específico
+4. **Por responsável** — Filtre pelo nome de quem preencheu o RDO
 
-### Status dos RDOs
+### Entendendo os status
 
-O sistema utiliza os seguintes status para controle do ciclo de vida do RDO:
+Cada RDO passa por diferentes fases. Veja o que cada status significa:
 
-| Status | Descricao | Cor |
-|--------|-----------|-----|
-| **Rascunho** | RDO criado, ainda em preenchimento inicial | Cinza |
-| **Em Elaboracao** | RDO sendo preenchido com detalhes de servicos e mao de obra | Azul |
-| **Pendente de Aprovacao** | RDO finalizado e enviado para aprovacao do gestor | Amarelo |
-| **Aprovado** | RDO revisado e aprovado pelo gestor — atualiza progresso da obra | Verde |
-| **Reprovado** | RDO rejeitado com observacoes — necessita correcao e reenvio | Vermelho |
+- 🔘 **Rascunho** — O RDO foi criado, mas ainda não está completo. Você pode continuar preenchendo depois.
+- 🔵 **Em Elaboração** — O RDO está sendo preenchido com detalhes de serviços e mão de obra.
+- 🟡 **Pendente de Aprovação** — O RDO foi finalizado e enviado para o gestor revisar.
+- 🟢 **Aprovado** — O gestor revisou e aprovou. O progresso da obra já foi atualizado.
+- 🔴 **Reprovado** — O gestor pediu correções. Você precisa ajustar e reenviar.
 
-### Acoes Rapidas
+### Ações disponíveis
 
-Na lista de RDOs, cada registro apresenta botoes de acao:
+Na lista de RDOs, cada registro tem botões de ação:
 
-- **Visualizar** — Abre o RDO em modo somente leitura com todos os detalhes
-- **Editar** — Abre o formulario de edicao (disponivel apenas para RDOs em Rascunho ou Em Elaboracao)
-- **Excluir** — Remove o RDO e todas as suas dependencias (mao de obra, equipamentos, fotos, subatividades)
+- **Visualizar** — Abre o RDO completo, só para leitura. Bom para conferir informações.
+- **Editar** — Abre o formulário para fazer alterações. Só funciona para RDOs em Rascunho ou Em Elaboração.
+- **Excluir** — Remove o RDO por completo. Use com cuidado!
 
-> **Dica:** Na tela de Obras (`/funcionario/obras`), cada obra possui um botao **"+RDO"** que permite criar um novo RDO ja vinculado aquela obra, agilizando o preenchimento.
+> **Dica rápida:** Na tela de Obras, cada obra tem um botão **"+RDO"** que já cria o RDO vinculado àquela obra. É o jeito mais rápido de começar!
 
 ---
 
-## 6.3. Criando um Novo RDO
+## 6.3. Criando um Novo RDO — Passo a Passo
 
-### Acesso ao Formulario de Criacao
+### Como começar
 
-Existem duas formas de criar um novo RDO:
+Você tem duas formas de criar um novo RDO:
 
-1. **Pela tela de RDOs:** Clique no botao **"Novo RDO"** na lista consolidada
-   - URL: `/rdo/novo`
-2. **Pela tela de Obras:** Clique no botao **"+RDO"** na obra desejada
-   - URL: `/funcionario/rdo/novo?obra_id=<id_da_obra>`
+**Opção 1 — Pela tela de RDOs:**
+Clique no botão **"Novo RDO"** que aparece no topo da lista consolidada.
 
-Ao acessar via obra, o formulario ja vem com a obra pre-selecionada e com as atividades do ultimo RDO pre-carregadas.
+**Opção 2 — Pela tela de Obras (recomendado):**
+Vá até a obra desejada e clique no botão **"+RDO"**. Assim, o formulário já vem com a obra selecionada e com as atividades do último RDO carregadas, economizando seu tempo.
 
-### 6.3.1. Informacoes Gerais
+### Passo 1 — Selecione a Obra
 
-O primeiro bloco do formulario solicita as informacoes basicas do RDO:
+No campo **"Obra"**, escolha a obra para a qual você está fazendo o relatório do dia. Se você criou o RDO pelo botão "+RDO" da obra, esse campo já vem preenchido.
 
-| Campo | Tipo | Obrigatorio | Descricao |
-|-------|------|:-----------:|-----------|
-| **Obra** | Dropdown de selecao | Sim | Selecione a obra para a qual o RDO sera registrado |
-| **Data** | Campo de data | Sim | Data do relatorio (padrao: data atual) |
-| **Condicao Climatica — Manha** | Dropdown | Sim | Condicao do tempo no periodo da manha (Bom, Nublado, Chuvoso, etc.) |
-| **Condicao Climatica — Tarde** | Dropdown | Sim | Condicao do tempo no periodo da tarde |
-| **Observacoes Meteorologicas** | Texto livre | Nao | Detalhes adicionais sobre as condicoes climaticas |
-| **Comentario Geral** | Texto livre | Nao | Observacoes gerais sobre o dia de trabalho |
+**Importante:** O sistema não permite criar dois RDOs para a mesma obra no mesmo dia. Se já existir um RDO para aquela data, você será redirecionado automaticamente para editar o RDO existente.
 
-**Regras de Negocio:**
+### Passo 2 — Defina a Data
 
-- O sistema **nao permite** criar dois RDOs para a mesma obra na mesma data. Se ja existir um RDO para a combinacao obra + data selecionada, o usuario sera redirecionado automaticamente para a edicao do RDO existente.
-- O **numero do RDO** e gerado automaticamente pelo sistema no formato: `RDO-<obra_id>-<ano>-<sequencial>` (exemplo: RDO-10-2025-013).
-- O **responsavel** e identificado automaticamente pelo usuario logado no sistema.
+O campo **"Data"** vem preenchido com a data de hoje, mas você pode alterar caso precise registrar um RDO de um dia anterior (por exemplo, se não conseguiu preencher ontem).
 
-> **Importante:** O campo de data vem preenchido com a data atual, mas pode ser alterado para registrar RDOs retroativos, caso necessario.
+> **Dica de campo:** O ideal é preencher o RDO no final de cada dia de trabalho, enquanto as informações ainda estão frescas na memória. Deixar para o dia seguinte aumenta o risco de esquecer detalhes.
 
-### 6.3.2. Mao de Obra
+### Passo 3 — Informe as Condições Climáticas
 
-A secao de Mao de Obra permite registrar todos os trabalhadores presentes no canteiro durante o dia:
+Registrar o clima é obrigatório e muito importante. Chuva, calor excessivo ou tempo instável afetam diretamente a produtividade da equipe e podem justificar atrasos.
 
-| Campo | Descricao |
-|-------|-----------|
-| **Funcionario** | Selecao do funcionario presente (lista filtrada pela obra) |
-| **Funcao** | Funcao exercida pelo trabalhador no dia |
-| **Tipo** | Classificacao: **Proprio** (equipe interna) ou **Terceirizado** |
-| **Horas Trabalhadas** | Quantidade de horas trabalhadas no dia |
+Preencha dois campos:
 
-**Como adicionar mao de obra:**
+- **Condição Climática — Manhã:** Como estava o tempo de manhã? (Bom, Nublado, Chuvoso, etc.)
+- **Condição Climática — Tarde:** Como estava o tempo à tarde?
 
-1. Clique no botao **"Adicionar Mao de Obra"**
-2. Selecione o funcionario no dropdown
-3. Informe a funcao exercida
-4. Selecione o tipo (proprio ou terceirizado)
-5. Informe as horas trabalhadas
-6. Repita para cada trabalhador presente
+Se quiser dar mais detalhes, use o campo **"Observações Meteorológicas"**. Por exemplo: *"Chuva forte entre 14h e 16h, paralisação parcial dos serviços externos."*
 
-> **Dica:** O sistema pre-carrega a lista de funcionarios ativos vinculados a empresa, facilitando a selecao rapida.
+### Passo 4 — Registre a Mão de Obra
 
-### 6.3.3. Equipamentos
+Aqui você informa quem trabalhou no canteiro naquele dia. Isso inclui tanto funcionários da sua empresa quanto terceirizados.
 
-A secao de Equipamentos registra as maquinas e equipamentos utilizados no dia:
+**Como adicionar um trabalhador:**
 
-| Campo | Descricao |
-|-------|-----------|
-| **Descricao** | Nome ou descricao do equipamento utilizado |
-| **Quantidade** | Quantidade de unidades do equipamento |
-| **Tipo** | Classificacao: **Proprio** ou **Alugado** |
+1. Clique no botão **"Adicionar Mão de Obra"**
+2. **Selecione o funcionário** na lista. O sistema mostra os funcionários ativos da empresa, facilitando a busca.
+3. **Informe a função** que ele exerceu no dia (pedreiro, servente, eletricista, etc.)
+4. **Escolha o tipo:**
+   - **Próprio** — funcionário da sua empresa
+   - **Terceirizado** — funcionário de empreiteira ou subcontratado
+5. **Informe as horas trabalhadas** no dia
+6. Repita o processo para cada trabalhador presente
 
-**Como adicionar equipamentos:**
+> **Dica:** Não esqueça de incluir os terceirizados! Muitas vezes, empreiteiros trazem equipe própria e é fundamental registrar essa presença para controle de custos e segurança.
 
-1. Clique no botao **"Adicionar Equipamento"**
-2. Informe a descricao do equipamento (ex: "Retroescavadeira CAT 416F")
-3. Informe a quantidade
-4. Selecione o tipo (proprio ou alugado)
-5. Repita para cada equipamento utilizado
+**Exemplo prático:**
 
----
+| Funcionário | Função | Tipo | Horas |
+|------------|--------|------|-------|
+| João Silva | Pedreiro | Próprio | 8h |
+| Maria Santos | Servente | Próprio | 8h |
+| Carlos (Empreiteira ABC) | Eletricista | Terceirizado | 6h |
+| Pedro (Empreiteira ABC) | Ajudante | Terceirizado | 6h |
 
-## 6.4. Registrando Atividades no RDO
+### Passo 5 — Registre os Equipamentos
 
-A secao de Atividades e a parte mais importante do RDO, pois alimenta diretamente o calculo de progresso da obra. O sistema utiliza uma estrutura hierarquica: **Servicos → Subatividades**.
+Nesta seção, informe quais máquinas e equipamentos foram utilizados no dia.
 
-### 6.4.1. Selecionando Servicos
+**Como adicionar um equipamento:**
 
-Os servicos disponiveis para registro no RDO sao aqueles previamente cadastrados na obra atraves do modulo de **Servicos da Obra** (`servico_obra_real`).
+1. Clique no botão **"Adicionar Equipamento"**
+2. **Descreva o equipamento** — Seja específico! Em vez de "retroescavadeira", escreva "Retroescavadeira CAT 416F"
+3. **Informe a quantidade** — Quantas unidades foram utilizadas
+4. **Escolha o tipo:**
+   - **Próprio** — equipamento da empresa
+   - **Alugado** — equipamento locado para a obra
 
-**Pre-carregamento inteligente:**
+**Exemplo prático:**
 
-- Ao criar o **primeiro RDO** de uma obra, o sistema carrega automaticamente todos os servicos cadastrados naquela obra, com suas respectivas subatividades
-- Ao criar **RDOs subsequentes**, o sistema pre-carrega os dados do ultimo RDO da obra, permitindo atualizar os percentuais de conclusao
+| Equipamento | Quantidade | Tipo |
+|------------|:----------:|------|
+| Retroescavadeira CAT 416F | 1 | Alugado |
+| Betoneira 400L | 2 | Próprio |
+| Vibrador de concreto | 1 | Próprio |
+| Andaime metálico (conjunto) | 3 | Alugado |
 
-| Informacao Exibida | Descricao |
-|--------------------|-----------|
-| **Nome do Servico** | Nome do servico cadastrado (ex: "Alvenaria de Vedacao") |
-| **Categoria** | Categoria do servico (ex: "Estrutura", "Acabamento") |
-| **Quantidade Planejada** | Quantidade total planejada para o servico na obra |
-| **Unidade de Medida** | Unidade utilizada (m2, m3, kg, un, m, h, etc.) |
-
-### 6.4.2. Registrando Subatividades
-
-Cada servico pode conter multiplas **subatividades** cadastradas na tabela mestre (`SubatividadeMestre`). No RDO, o usuario registra:
-
-| Campo | Descricao |
-|-------|-----------|
-| **Subatividade** | Nome da subatividade (pre-carregado da tabela mestre) |
-| **Quantidade Executada** | Quantidade efetivamente executada no dia |
-| **Percentual de Conclusao** | Percentual acumulado de conclusao da subatividade |
-| **Observacoes Tecnicas** | Notas tecnicas sobre a execucao |
-
-**Calculo de Progresso:**
-
-O progresso total do RDO e calculado como a **media simples** dos percentuais de conclusao de todas as subatividades registradas:
-
-```
-Progresso Total = Soma dos Percentuais / Numero de Subatividades
-```
-
-Exemplo: Se um RDO possui 3 subatividades com 100%, 50% e 30%, o progresso total sera:
-```
-(100 + 50 + 30) / 3 = 60%
-```
-
-### 6.4.3. Anexando Fotos
-
-O sistema permite anexar fotografias para documentar a execucao dos servicos:
-
-| Campo | Descricao |
-|-------|-----------|
-| **Foto** | Upload de imagem (JPG, PNG ou WebP) |
-| **Descricao** | Descricao da foto (o que ela documenta) |
-| **Tipo** | Classificacao da foto (servico, material, seguranca, etc.) |
-
-**Caracteristicas do upload de fotos:**
-
-- As fotos sao automaticamente **otimizadas para formato WebP**, reduzindo o tamanho do arquivo sem perda significativa de qualidade
-- As fotos sao armazenadas na pasta `static/uploads/rdo/<obra_id>/<rdo_id>/`
-- E possivel anexar multiplas fotos por RDO
-- As fotos ficam disponiveis para visualizacao na tela de detalhes do RDO e no portal do cliente
-
-> **Dica Mobile:** O upload de fotos foi otimizado para dispositivos moveis, permitindo capturar fotos diretamente da camera do smartphone e anexar ao RDO em tempo real.
+> **Por que registrar equipamentos?** Equipamentos alugados representam custo diário. Registrar o uso ajuda a conferir faturas de locação e controlar gastos da obra.
 
 ---
 
-## 6.5. Finalizando e Enviando para Aprovacao
+## 6.4. Registrando Atividades e Serviços
 
-Apos preencher todas as secoes do RDO, o usuario pode:
+Esta é a parte mais importante do RDO, pois é aqui que você informa o que foi efetivamente executado no dia. Esses dados alimentam diretamente o cálculo de progresso da obra.
 
-### Salvar como Rascunho
+### Como funciona a estrutura de serviços
 
-- Clique no botao **"Salvar Rascunho"**
-- O RDO sera salvo com status **Rascunho** e podera ser editado posteriormente
-- Ideal para quando o preenchimento sera concluido em outro momento
+Os serviços disponíveis no RDO são aqueles que já foram cadastrados na obra (no módulo de Serviços). Cada serviço pode ter várias **subatividades** — etapas menores que compõem o serviço completo.
 
-### Enviar para Aprovacao
+**Exemplo:**
+- **Serviço:** Alvenaria de Vedação
+  - Subatividade 1: Marcação
+  - Subatividade 2: Elevação 1º pavimento
+  - Subatividade 3: Elevação 2º pavimento
 
-1. Revise todas as informacoes preenchidas (mao de obra, equipamentos, servicos, fotos)
-2. Clique no botao **"Enviar para Aprovacao"**
-3. O status do RDO sera alterado para **Pendente de Aprovacao**
-4. O gestor/administrador recebera uma notificacao sobre o novo RDO pendente
+### Preenchimento inteligente
 
-**Checklist antes de enviar:**
+O sistema facilita o seu trabalho:
 
-- [ ] Condicoes climaticas informadas para manha e tarde
-- [ ] Mao de obra presente registrada com horas trabalhadas
-- [ ] Equipamentos utilizados registrados (se houver)
-- [ ] Servicos e subatividades com percentuais atualizados
-- [ ] Fotos anexadas documentando os servicos executados
-- [ ] Comentarios e observacoes preenchidos quando necessario
+- **No primeiro RDO da obra:** Todos os serviços cadastrados são carregados automaticamente, com suas subatividades
+- **Nos RDOs seguintes:** O sistema traz os dados do último RDO, para que você só precise atualizar o que mudou
 
-> **Atencao:** Apos o envio para aprovacao, o RDO **nao podera ser editado** pelo responsavel ate que o gestor aprove ou rejeite o documento.
+### Como registrar o avanço dos serviços
 
----
+Para cada subatividade, informe:
 
-## 6.6. Aprovacao de RDOs
+1. **Quantidade executada** — Quanto foi feito no dia (em metros quadrados, metros cúbicos, unidades, etc., conforme a unidade do serviço)
+2. **Percentual de conclusão** — Qual o percentual acumulado de conclusão daquela subatividade (de 0% a 100%)
+3. **Observações** — Anote informações relevantes sobre a execução (opcional, mas recomendado)
 
-O fluxo de aprovacao e responsabilidade do **gestor** ou **administrador** da empresa.
+**Exemplo prático:**
 
-### Acessando RDOs Pendentes
+| Serviço | Subatividade | Executado Hoje | % Conclusão | Observações |
+|---------|-------------|:--------------:|:-----------:|------------|
+| Alvenaria de Vedação | Elevação 2º pav. | 45 m² | 75% | Falta parede do banheiro |
+| Instalação Elétrica | Tubulação embutida | 30 m | 60% | Aguardando material para sala 3 |
+| Pintura Interna | Massa corrida | 80 m² | 40% | Equipe reduzida por falta de EPIs |
 
-1. Acesse a lista de RDOs pelo menu lateral
-2. Utilize o filtro de status **"Pendente de Aprovacao"**
-3. Os RDOs pendentes serao exibidos com destaque visual (badge amarelo)
+> **Atenção com os percentuais!** O percentual é **acumulado**, não é só o que foi feito hoje. Se ontem a subatividade estava em 50% e hoje avançou mais 10%, o percentual deve ser informado como 60%.
 
-### Fluxo de Aprovacao
+### Como o progresso é calculado
 
-O gestor pode realizar as seguintes acoes em um RDO pendente:
+O sistema calcula o progresso geral do RDO fazendo a média dos percentuais de todas as subatividades. Por exemplo:
 
-| Acao | Descricao | Resultado |
-|------|-----------|-----------|
-| **Aprovar** | Confirma que os dados do RDO estao corretos | Status muda para **Aprovado**; progresso da obra e atualizado automaticamente |
-| **Reprovar** | Indica que o RDO necessita de correcoes | Status muda para **Reprovado**; RDO retorna para edicao do responsavel |
+- Subatividade A: 100%
+- Subatividade B: 50%
+- Subatividade C: 30%
+- **Progresso do RDO: (100 + 50 + 30) ÷ 3 = 60%**
 
-### Aprovando um RDO
-
-1. Abra o RDO pendente clicando em **"Visualizar"**
-2. Revise todos os dados: mao de obra, servicos executados, fotos e observacoes
-3. Clique no botao **"Aprovar RDO"**
-4. Confirme a aprovacao na caixa de dialogo
-5. O sistema registra o aprovador e a data/hora da aprovacao
-
-**Dados registrados na aprovacao:**
-
-- `aprovado_por` — Identificacao do gestor que aprovou
-- `data_aprovacao` — Data e hora exata da aprovacao
-
-### Reprovando um RDO
-
-1. Abra o RDO pendente clicando em **"Visualizar"**
-2. Identifique os pontos que necessitam correcao
-3. Clique no botao **"Reprovar RDO"**
-4. Informe o motivo da reprovacao no campo de observacoes
-5. O RDO retorna para o status de edicao e o responsavel pode corrigir e reenviar
-
-> **Boas praticas para aprovacao:** Sempre verifique se as fotos anexadas correspondem aos servicos declarados e se os percentuais de conclusao sao coerentes com o historico da obra.
+Esse valor, quando o RDO é aprovado, atualiza automaticamente o progresso geral da obra.
 
 ---
 
-## 6.7. Impacto do RDO no Sistema
+## 6.5. Tirando e Anexando Fotos
 
-O RDO nao e apenas um documento de registro — ele e o **motor de atualizacao** de diversos modulos do SIGE. Quando um RDO e aprovado, uma cadeia de atualizacoes automaticas e disparada pelo **EventManager**.
+As fotos são fundamentais para comprovar o que foi executado. Clientes, gestores e auditores confiam muito mais em um RDO que tem registro fotográfico.
 
-### 6.7.1. Atualizacao Automatica do Progresso da Obra
+### Como anexar fotos
 
-Ao aprovar um RDO, o sistema:
+1. Na seção de fotos do RDO, clique no botão **"Adicionar Foto"**
+2. **Tire a foto** diretamente pela câmera do celular ou **selecione uma foto** já salva na galeria
+3. **Descreva a foto** — Escreva o que ela mostra (exemplo: "Concretagem da laje do 2º pavimento")
+4. **Escolha o tipo** — Classifique a foto (serviço executado, material recebido, segurança, etc.)
+5. Repita para quantas fotos forem necessárias
 
-1. Recalcula o percentual de conclusao de cada servico da obra baseado nas subatividades registradas
-2. Atualiza o campo `quantidade_executada` dos servicos reais (`servico_obra_real`)
-3. Recalcula o percentual de conclusao global da obra
-4. Atualiza o status do servico (Nao Iniciado → Em Andamento → Concluido)
+> O sistema otimiza automaticamente as fotos para que ocupem menos espaço, sem perder qualidade visual. Você não precisa se preocupar com o tamanho do arquivo.
 
-### 6.7.2. Atualizacao Financeira
+### Dicas para tirar boas fotos no canteiro
 
-Os dados de mao de obra e equipamentos alimentam o modulo financeiro:
+Fotos bem tiradas fazem toda a diferença na hora da aprovação. Siga estas dicas:
 
-- **Horas trabalhadas** sao contabilizadas para calculo de custo de mao de obra
-- **Equipamentos alugados** sao considerados no custo operacional
-- A **produtividade** (quantidade/hora) e registrada no historico de produtividade por servico
+📸 **Enquadramento** — Mostre o serviço de forma ampla, para que seja possível identificar o local e a etapa. Evite fotos muito de perto que não mostram contexto.
 
-### 6.7.3. Atualizacao do Dashboard
+📸 **Iluminação** — Prefira tirar fotos com luz natural. Evite fotos contra o sol (contraluz).
 
-O dashboard principal reflete os dados dos RDOs aprovados:
+📸 **Antes e depois** — Sempre que possível, tire uma foto do local antes de iniciar o serviço e outra depois. Isso mostra claramente o avanço.
 
-- **KPIs de progresso** sao recalculados com base nos servicos atualizados
-- **Graficos de evolucao** apresentam a curva de progresso real vs. planejado
-- **Alertas** sao gerados automaticamente quando o progresso esta abaixo do esperado
+📸 **Referências visuais** — Inclua elementos que ajudem a identificar o local, como pilares, marcações ou placas de eixo.
 
-### 6.7.4. Portal do Cliente
+📸 **Segurança** — Registre também as condições de segurança: uso de EPIs, proteções coletivas, sinalizações.
 
-Quando o portal do cliente esta ativo para a obra:
+📸 **Problemas encontrados** — Encontrou algo errado? Tubulação quebrada, material com defeito, área alagada? Fotografe e registre nas observações.
 
-- O progresso atualizado e refletido automaticamente no portal
-- As fotos do RDO podem ser disponibilizadas para visualizacao do cliente
-- Notificacoes sao enviadas ao cliente sobre atualizacoes relevantes
+📸 **Quantidade** — Não economize nas fotos. É melhor ter fotos demais do que de menos. Registre pelo menos uma foto por serviço executado no dia.
 
 ---
 
-## 6.8. Relatorios de RDO
+## 6.6. Salvando e Enviando o RDO
 
-O SIGE oferece opcoes de geracao de relatorios a partir dos dados coletados nos RDOs.
+Depois de preencher todas as informações, você tem duas opções:
 
-### 6.8.1. Relatorio Consolidado
+### Opção 1 — Salvar como Rascunho
 
-O relatorio consolidado apresenta uma visao geral de todos os RDOs de uma obra ou periodo:
+Clique no botão **"Salvar Rascunho"** quando:
 
-| Informacao | Descricao |
-|------------|-----------|
-| **Resumo de Mao de Obra** | Total de horas trabalhadas por funcionario e por tipo (proprio/terceirizado) |
-| **Resumo de Equipamentos** | Equipamentos utilizados com classificacao proprio/alugado |
-| **Progresso Acumulado** | Evolucao do percentual de conclusao dos servicos ao longo do tempo |
-| **Condicoes Climaticas** | Historico de condicoes climaticas que podem justificar atrasos |
-| **Registro Fotografico** | Galeria cronologica de fotos organizadas por data |
+- Você ainda não terminou de preencher todas as informações
+- Quer revisar antes de enviar
+- Precisa consultar algum dado antes de finalizar
+- Vai completar o preenchimento em outro momento
 
-**Filtros do relatorio consolidado:**
+O RDO ficará salvo com status **Rascunho** e você poderá voltar a editá-lo quando quiser.
 
-1. **Periodo** — Selecione data inicio e data fim
-2. **Obra** — Filtre por obra especifica
-3. **Status** — Inclua apenas RDOs aprovados, todos, ou filtre por status especifico
+### Opção 2 — Enviar para Aprovação
 
-### 6.8.2. Exportacao Individual em PDF
+Quando tudo estiver preenchido e conferido, clique no botão **"Enviar para Aprovação"**.
 
-Cada RDO pode ser exportado individualmente em formato PDF contendo:
+Antes de enviar, passe por este checklist mental:
 
-- Cabecalho com dados da obra e data do relatorio
-- Condicoes climaticas do dia
-- Tabela de mao de obra com horas trabalhadas
-- Tabela de equipamentos utilizados
-- Detalhamento de servicos e subatividades executadas
-- Fotos anexadas com descricoes
-- Observacoes gerais e assinatura do responsavel
+- ✅ Condições climáticas da manhã e da tarde estão preenchidas?
+- ✅ Todos os trabalhadores presentes foram registrados com suas horas?
+- ✅ Os equipamentos utilizados foram informados?
+- ✅ Os serviços e subatividades estão com percentuais atualizados?
+- ✅ As fotos dos serviços executados foram anexadas?
+- ✅ As observações importantes foram registradas?
 
-**Para exportar um RDO em PDF:**
+Após o envio, o RDO muda para o status **Pendente de Aprovação** e fica travado para edição até que o gestor aprove ou peça correções.
 
-1. Acesse o RDO desejado clicando em **"Visualizar"**
-2. Clique no botao **"Exportar PDF"** localizado no topo da pagina
-3. O arquivo PDF sera gerado e disponibilizado para download
-
-### 6.8.3. Relatorio de Produtividade
-
-O sistema gera relatorios de produtividade baseados nos dados dos RDOs:
-
-| Metrica | Calculo |
-|---------|---------|
-| **Produtividade por Servico** | Quantidade executada / Horas de mao de obra |
-| **Eficiencia da Equipe** | Comparacao entre planejado e realizado |
-| **Custo Real vs. Orcado** | Custo de mao de obra real vs. custo orcado por servico |
+> **Atenção:** Depois de enviar para aprovação, você não consegue editar o RDO. Confira tudo antes de enviar! Se precisar fazer alguma correção, peça ao gestor para reprovar o RDO para que ele volte para edição.
 
 ---
 
-## Resumo do Capitulo 6
+## 6.7. Aprovação de RDOs (Para Gestores)
 
-O RDO e a peca central do controle de execucao de obras no SIGE. Atraves dele, o responsavel em campo documenta diariamente o que foi realizado, permitindo que gestores acompanhem o progresso em tempo real e tomem decisoes baseadas em dados concretos.
+Se você é gestor ou administrador, esta seção explica como revisar e aprovar os RDOs enviados pela equipe de campo.
 
-**Pontos-chave:**
+### Encontrando RDOs pendentes
 
-1. O RDO registra mao de obra, equipamentos, servicos executados e fotos
-2. O preenchimento e otimizado para dispositivos moveis (mobile-first)
-3. O fluxo de aprovacao garante a qualidade dos dados registrados
-4. A aprovacao do RDO dispara atualizacoes automaticas de progresso, financeiro e dashboard
-5. Fotos sao otimizadas automaticamente para WebP, economizando armazenamento
-6. Relatorios consolidados e PDFs individuais podem ser gerados a qualquer momento
+1. Acesse a lista de RDOs pelo menu (**Menu → RDO → Lista Consolidada**)
+2. Use o filtro de status e selecione **"Pendente de Aprovação"**
+3. Os RDOs aguardando sua revisão aparecerão destacados com um indicador amarelo
+
+### Como aprovar um RDO
+
+1. Clique em **"Visualizar"** no RDO que deseja revisar
+2. Confira todas as informações:
+   - A mão de obra registrada está coerente com o que você sabe da obra?
+   - Os percentuais de avanço fazem sentido com o histórico?
+   - As fotos correspondem aos serviços declarados?
+   - Os equipamentos informados estão corretos?
+3. Se tudo estiver correto, clique no botão **"Aprovar RDO"**
+4. Confirme na caixa de diálogo que aparecerá
+
+**O que acontece quando você aprova:**
+- O status do RDO muda para **Aprovado**
+- O progresso da obra é atualizado automaticamente
+- Os dados ficam disponíveis nos relatórios e no painel de controle
+- Se a obra tem portal do cliente, o progresso atualizado aparece lá também
+
+### Como reprovar um RDO
+
+Se você encontrar algum problema no RDO:
+
+1. Clique em **"Visualizar"** no RDO
+2. Identifique o que precisa ser corrigido
+3. Clique no botão **"Reprovar RDO"**
+4. **Escreva o motivo da reprovação** no campo de observações — seja claro sobre o que precisa ser corrigido
+5. O RDO volta para o responsável de campo, que poderá editar e reenviar
+
+**Exemplos de motivos para reprovação:**
+
+- *"Percentual de alvenaria informado como 80%, mas pela foto parece estar em torno de 60%. Favor verificar."*
+- *"Faltou registrar a equipe do eletricista terceirizado que estava na obra hoje."*
+- *"Não foram anexadas fotos da concretagem da laje. Favor adicionar."*
+
+> **Boas práticas para gestores:** Revise os RDOs no mesmo dia ou no dia seguinte ao envio. Quanto mais rápido a aprovação, mais atualizado fica o acompanhamento da obra.
 
 ---
 
-# Capitulo 7 — Modulo Financeiro
+## 6.8. Como o RDO Atualiza o Progresso da Obra
 
-## 7.1. Introducao ao Modulo Financeiro
+Quando um RDO é aprovado pelo gestor, o sistema faz atualizações automáticas. Aqui está o que acontece, de forma simples:
 
-O **Modulo Financeiro** do SIGE e o centro de controle economico da empresa. Ele reune todas as funcionalidades necessarias para gerenciar receitas, despesas, fluxo de caixa, contas a pagar e a receber, alem de oferecer relatorios contabeis completos como DRE (Demonstrativo de Resultado do Exercicio) e balancetes.
+### Progresso da obra
 
-### Por que utilizar o Modulo Financeiro?
+- O sistema pega os percentuais de conclusão informados nas subatividades do RDO
+- Atualiza o andamento de cada serviço da obra
+- Recalcula o progresso geral da obra
+- Se um serviço atingiu 100%, ele é marcado como concluído
 
-| Beneficio | Descricao |
-|-----------|-----------|
-| **Visao consolidada** | Dashboard com KPIs em tempo real: entradas, saidas, saldo e receitas pendentes |
-| **Controle de contas** | Gestao completa de contas a pagar (fornecedores) e contas a receber (clientes) |
-| **Fluxo de caixa** | Extrato detalhado de todas as movimentacoes financeiras com filtros avancados |
-| **Plano de contas** | Estrutura hierarquica de contas contabeis com suporte a partidas dobradas |
-| **Centros de custo** | Classificacao de despesas por obra, departamento ou projeto |
-| **Integracao com obras** | Custos automaticamente vinculados a obras para controle por projeto |
-| **Relatorios contabeis** | DRE, balancete, fluxo de caixa e analise por centro de custo |
-| **Lancamentos automaticos** | Lancamentos contabeis gerados automaticamente a partir de movimentacoes |
+**Na prática:** Se você informou no RDO que a alvenaria do 2º pavimento está em 75%, ao aprovar o RDO, o progresso desse serviço na obra vai para 75%.
 
-### Acesso ao Modulo
+### Painel de controle (Dashboard)
 
-Para acessar o Modulo Financeiro, utilize o menu de navegacao superior:
+- Os gráficos de evolução da obra são atualizados
+- Os indicadores de desempenho refletem os novos dados
+- Alertas são gerados se o progresso está abaixo do planejado
+
+### Portal do Cliente
+
+- Se a obra tem portal do cliente ativo, o progresso atualizado aparece automaticamente
+- As fotos do RDO podem ficar disponíveis para o cliente visualizar
+- O cliente acompanha a evolução sem precisar ir ao canteiro
+
+### Controle financeiro
+
+- As horas de mão de obra registradas alimentam o controle de custos
+- Os equipamentos alugados são contabilizados nas despesas operacionais
+
+> **Resumindo:** O simples ato de preencher e aprovar o RDO mantém toda a gestão da obra atualizada. Sem o RDO, os números ficam desatualizados e as decisões ficam prejudicadas.
+
+---
+
+## 6.9. Relatórios e Exportação
+
+### Relatório Consolidado
+
+O sistema permite gerar um relatório completo com dados de vários RDOs. É útil para reuniões com clientes, medições contratuais e análise de desempenho.
+
+O relatório consolidado inclui:
+
+- **Resumo de mão de obra** — Total de horas por funcionário, separado entre próprios e terceirizados
+- **Resumo de equipamentos** — Quais equipamentos foram usados e com que frequência
+- **Evolução do progresso** — Como os serviços avançaram ao longo do tempo
+- **Histórico do clima** — Registro das condições climáticas (útil para justificar atrasos por chuva)
+- **Galeria de fotos** — Todas as fotos organizadas por data
+
+Para gerar o relatório, use os filtros de período, obra e status.
+
+### Exportação em PDF
+
+Cada RDO pode ser exportado individualmente como um arquivo PDF completo, contendo:
+
+- Dados da obra e data do relatório
+- Condições climáticas do dia
+- Lista de trabalhadores e horas
+- Lista de equipamentos
+- Detalhamento dos serviços e subatividades
+- Fotos com descrições
+- Observações gerais
+
+**Para exportar:**
+1. Abra o RDO desejado clicando em **"Visualizar"**
+2. Clique no botão **"Exportar PDF"** no topo da página
+3. O arquivo será gerado e baixado automaticamente
+
+> **Dica:** O PDF do RDO é muito útil para enviar ao cliente junto com as medições. É um documento profissional que comprova o trabalho realizado.
+
+---
+
+## 6.10. Dicas para Escrever Bons RDOs
+
+Um RDO bem preenchido facilita a aprovação, evita retrabalho e serve como documento confiável. Siga estas recomendações:
+
+### ✍️ Seja específico nas atividades
+
+❌ *"Alvenaria"*
+✅ *"Elevação de alvenaria de vedação no 2º pavimento, trecho entre eixos A e C"*
+
+### 📊 Atualize os percentuais com cuidado
+
+Não chute os percentuais. Avalie visualmente ou meça o que foi feito. Um percentual errado prejudica todo o planejamento da obra.
+
+### 📝 Use as observações
+
+O campo de observações é seu aliado. Registre:
+
+- Motivos de paralisação (chuva, falta de material, falta de energia)
+- Problemas encontrados (solo instável, tubulação danificada)
+- Decisões tomadas em campo
+- Visitas de fiscalização ou do cliente
+- Recebimento de materiais importantes
+
+### 📸 Capriche nas fotos
+
+- Tire pelo menos uma foto por serviço executado
+- Fotografe problemas e situações incomuns
+- Registre condições de segurança
+- Use a descrição para explicar o que a foto mostra
+
+### ⏰ Preencha no mesmo dia
+
+Preencher o RDO no mesmo dia em que o trabalho foi feito garante que as informações sejam precisas. Deixar para depois aumenta a chance de esquecer detalhes ou informar dados incorretos.
+
+### 👷 Não esqueça ninguém
+
+Registre todos os trabalhadores que estiveram no canteiro, incluindo terceirizados, estagiários e equipes de fornecedores. Isso é importante para controle de custos e, principalmente, para questões de segurança do trabalho.
+
+### 🔄 Seja consistente
+
+Mantenha um padrão de preenchimento. Use sempre os mesmos termos para descrever serviços e locais. Isso facilita a leitura e a busca nos relatórios futuramente.
+
+---
+
+# Capítulo 7 — Módulo Financeiro
+
+## 7.1. Introdução ao Módulo Financeiro
+
+O **Módulo Financeiro** do SIGE é o coração do controle de dinheiro da sua empresa. É aqui que você acompanha tudo o que entra e sai do caixa, controla as contas a pagar e a receber, e tem uma visão clara de como está a saúde financeira do seu negócio.
+
+### O que você consegue fazer com o Módulo Financeiro?
+
+- **Ver o resumo financeiro da empresa** — Um painel com os números mais importantes do seu caixa
+- **Controlar contas a pagar** — Registrar boletos, notas fiscais e todas as despesas com fornecedores
+- **Controlar contas a receber** — Registrar tudo o que seus clientes devem para você
+- **Acompanhar o fluxo de caixa** — Ver o extrato completo de entradas e saídas de dinheiro
+- **Gerar relatórios** — Entender o lucro ou prejuízo da empresa em cada período
+- **Filtrar por obra** — Saber exatamente quanto cada obra está custando e gerando de receita
+
+### Como acessar o Módulo Financeiro
+
+Para acessar, clique no menu de navegação no topo da tela:
 
 **Menu → Financeiro**
 
-O menu Financeiro e um dropdown que apresenta as seguintes opcoes de acesso rapido:
+Ao clicar, você verá as seguintes opções:
 
-- Dashboard Financeiro
+- Dashboard Financeiro (visão geral)
 - Contas a Pagar
 - Contas a Receber
 - Fluxo de Caixa
-- Plano de Contas
 - Centros de Custo
-- Relatorios
+- Relatórios
 
-A URL de acesso direto ao dashboard financeiro e: `/financeiro`
-
-> **Importante:** O Modulo Financeiro utiliza **partidas dobradas** (debito e credito) para garantir a integridade contabil de todos os lancamentos. Cada movimentacao gera automaticamente os lancamentos contabeis correspondentes.
+> **Dica:** O Dashboard Financeiro é a melhor tela para começar o dia. Em poucos segundos, você vê como está o caixa da empresa.
 
 ---
 
-## 7.2. Dashboard Financeiro
+## 7.2. Dashboard Financeiro — Seu Painel de Controle
 
-### Visao Geral dos KPIs
+Ao abrir o Módulo Financeiro, a primeira coisa que você vê é o **Dashboard Financeiro**, um painel com os números mais importantes do período selecionado.
 
-Ao acessar `/financeiro`, o sistema apresenta um painel com os principais indicadores financeiros do periodo selecionado:
+### O que cada número significa
 
-| KPI | Descricao | Exemplo |
-|-----|-----------|---------|
-| **Total Entradas** | Soma de todas as receitas e recebimentos no periodo | R$ 244.200,00 |
-| **Total Saidas** | Soma de todas as despesas e pagamentos no periodo | R$ 15.630,00 |
-| **Saldo Periodo** | Diferenca entre entradas e saidas (Entradas - Saidas) | R$ 228.570,00 |
-| **Receitas Pendentes** | Total de receitas com status pendente de recebimento | R$ 244.200,00 |
+O painel apresenta quatro indicadores principais no topo da tela:
 
-### Grafico de Fluxo de Caixa
+| Indicador | O que significa | Exemplo |
+|-----------|----------------|---------|
+| **Total de Entradas** | Todo o dinheiro que entrou na empresa no período (pagamentos de clientes, recebimentos, etc.) | R$ 244.200,00 |
+| **Total de Saídas** | Todo o dinheiro que saiu da empresa no período (pagamentos a fornecedores, custos, salários, etc.) | R$ 15.630,00 |
+| **Saldo do Período** | A diferença entre o que entrou e o que saiu. Se o número for positivo, entrou mais do que saiu. Se for negativo, atenção: você gastou mais do que recebeu | R$ 228.570,00 |
+| **Receitas Pendentes** | Valores que seus clientes ainda não pagaram. É o dinheiro que você tem para receber | R$ 244.200,00 |
 
-Abaixo dos KPIs, o dashboard exibe a secao **Fluxo de Caixa** com um grafico que apresenta a evolucao das entradas e saidas ao longo do periodo. O grafico permite:
+> **Atenção:** "Receitas Pendentes" em valor alto pode significar que seus clientes estão demorando para pagar. Fique de olho!
 
-1. Visualizar a tendencia de receitas e despesas
-2. Identificar periodos de maior ou menor liquidez
-3. Comparar entradas vs. saidas de forma visual
+### Gráfico de Entradas e Saídas
 
-### Detalhamento de Custos
+Logo abaixo dos indicadores, o sistema mostra um **gráfico** que compara as entradas e saídas ao longo do tempo. Esse gráfico é útil para:
 
-O dashboard tambem apresenta um resumo dos custos por categoria:
+1. Perceber em quais meses a empresa recebeu mais ou menos
+2. Identificar meses em que os gastos foram maiores que o faturamento
+3. Planejar os próximos meses com base no histórico
 
-| Categoria | Descricao |
-|-----------|-----------|
-| **Alimentacao** | Custos com refeicoes e alimentacao de equipes |
-| **Transporte** | Despesas com veiculos, combustivel e deslocamentos |
-| **Mao de Obra** | Salarios, encargos e custos com pessoal |
-| **Total** | Soma consolidada de todas as categorias |
+### Resumo de Custos por Categoria
 
-### Filtros do Dashboard
+O dashboard também mostra um resumo dos custos divididos por categoria. Isso ajuda a entender para onde o dinheiro está indo:
 
-O dashboard permite filtrar os dados por:
+| Categoria | O que inclui |
+|-----------|-------------|
+| **Alimentação** | Custos com refeições das equipes de campo (gerados automaticamente pelo módulo de Alimentação) |
+| **Transporte** | Despesas com veículos, combustível e manutenção (gerados automaticamente pelo módulo de Frota) |
+| **Mão de Obra** | Salários e custos com pessoal |
+| **Total** | Soma de todas as categorias |
 
-1. **Periodo** — Selecione data inicial e data final para analise
-2. **Obra** — Filtre os dados financeiros por obra especifica
-3. **Categoria** — Visualize apenas uma categoria de movimentacao
+> **Importante:** Os custos de **alimentação** e **transporte/veículos** aparecem automaticamente no financeiro. Quando você registra uma refeição no módulo de Alimentação ou um abastecimento no módulo de Frota, o valor já aparece aqui — sem precisar lançar duas vezes!
+
+### Como filtrar os dados do Dashboard
+
+Você pode ajustar os dados exibidos usando os filtros no topo da tela:
+
+1. **Período** — Escolha a data inicial e a data final para ver os números de um intervalo específico (ex: o mês atual, o trimestre, o ano)
+2. **Obra** — Selecione uma obra específica para ver apenas os números daquela obra
+3. **Categoria** — Filtre para ver apenas um tipo de custo (ex: só alimentação, só transporte)
+
+**Passo a passo para filtrar por período:**
+
+1. Clique no campo **Data Inicial** e selecione a data de início
+2. Clique no campo **Data Final** e selecione a data de término
+3. Clique em **Filtrar** (ou o botão de busca)
+4. Os indicadores e gráficos serão atualizados automaticamente
 
 ---
 
-## 7.3. Plano de Contas e Centros de Custo
+## 7.3. Contas a Pagar — Controlando suas Despesas
 
-### 7.3.1. Configurando o Plano de Contas
+A seção de **Contas a Pagar** é onde você registra todas as contas e boletos que a empresa precisa pagar: fornecedores de material, prestadores de serviço, aluguel, energia elétrica, etc.
 
-O **Plano de Contas** e a estrutura hierarquica que organiza todas as contas contabeis da empresa. O SIGE utiliza o padrao brasileiro de plano de contas com os seguintes grupos principais:
+### 7.3.1. Como registrar uma nova despesa
 
-| Codigo | Grupo | Natureza | Descricao |
-|--------|-------|----------|-----------|
-| 1.x.xx.xxx | **Ativo** | Devedora | Bens e direitos da empresa |
-| 2.x.xx.xxx | **Passivo** | Credora | Obrigacoes e dividas |
-| 3.x.xx.xxx | **Patrimonio Liquido** | Credora | Capital e reservas |
-| 4.x.xx.xxx | **Receitas** | Credora | Faturamento e ganhos |
-| 5.x.xx.xxx | **Despesas** | Devedora | Custos e gastos operacionais |
+**Passo a passo:**
 
-#### Estrutura Hierarquica
+1. No menu, clique em **Financeiro → Contas a Pagar**
+2. Clique no botão **Nova Conta a Pagar**
+3. Preencha as informações da conta:
 
-O plano de contas possui **4 niveis** de hierarquia:
-
-```
-1           → Grupo (Ativo)
- 1.1        → Subgrupo (Ativo Circulante)
-  1.1.01    → Conta Sintetica (Caixa e Equivalentes)
-   1.1.01.001 → Conta Analitica (Caixa Geral)
-```
-
-> **Regra:** Somente contas **analiticas** (ultimo nivel) aceitam lancamentos. Contas sinteticas servem apenas para agrupamento nos relatorios.
-
-#### Cadastrando uma Nova Conta
-
-Para adicionar uma conta ao plano de contas:
-
-1. Acesse **Financeiro → Plano de Contas**
-2. Clique no botao **Nova Conta**
-3. Preencha os campos obrigatorios:
-
-| Campo | Descricao | Exemplo |
-|-------|-----------|---------|
-| **Codigo** | Codigo hierarquico unico | 1.1.01.003 |
-| **Nome** | Nome descritivo da conta | Banco Bradesco - CC |
-| **Tipo** | ATIVO, PASSIVO, PATRIMONIO, RECEITA ou DESPESA | ATIVO |
-| **Natureza** | DEVEDORA ou CREDORA | DEVEDORA |
-| **Nivel** | Nivel na hierarquia (1 a 4) | 4 |
-| **Conta Pai** | Codigo da conta pai na hierarquia | 1.1.01 |
-| **Aceita Lancamento** | Se a conta e analitica (aceita lancamentos) | Sim |
+| Campo | Obrigatório? | O que preencher |
+|-------|:------------:|-----------------|
+| **Fornecedor** | Sim | Selecione o fornecedor na lista. Se não existir, cadastre antes no módulo de Fornecedores |
+| **Nº do Documento** | Não | Número do boleto, nota fiscal ou recibo |
+| **Descrição** | Sim | Descreva o que está sendo pago (ex: "Cimento para Obra Solar", "Aluguel escritório Jan/2026") |
+| **Valor** | Sim | Valor total da conta em reais (ex: R$ 5.000,00) |
+| **Data de Emissão** | Sim | A data que aparece no boleto ou nota fiscal |
+| **Data de Vencimento** | Sim | A data limite para pagar sem juros |
+| **Obra** | Não | Se esse gasto é de uma obra específica, selecione a obra aqui |
+| **Forma de Pagamento** | Não | Como vai pagar: boleto, transferência, PIX, dinheiro, etc. |
+| **Observações** | Não | Qualquer informação extra que queira anotar |
 
 4. Clique em **Salvar**
 
-### 7.3.2. Centros de Custo
+> **Dica:** Sempre vincule a despesa a uma **obra** quando possível. Assim, depois você consegue saber exatamente quanto cada obra está custando.
 
-Os **Centros de Custo** permitem classificar as despesas por area de responsabilidade, facilitando a analise de custos por obra, departamento ou projeto.
+### 7.3.2. Como marcar uma conta como paga (baixar pagamento)
 
-#### Tipos de Centro de Custo
+Quando você pagar um boleto ou conta, é importante registrar o pagamento no sistema. Assim, seus números ficam sempre atualizados.
 
-| Tipo | Descricao | Exemplo |
-|------|-----------|---------|
-| **Obra** | Vinculado a uma obra especifica | CC-OBRA-001 - Residencial Solar |
-| **Departamento** | Vinculado a um departamento | CC-DEPT-ADM - Administrativo |
-| **Projeto** | Para projetos transversais | CC-PROJ-TI - Implantacao ERP |
-| **Atividade** | Para atividades especificas | CC-ATIV-TREIN - Treinamentos |
+**Passo a passo:**
 
-#### Cadastrando um Centro de Custo
+1. Vá em **Financeiro → Contas a Pagar**
+2. Na lista, encontre a conta que foi paga
+3. Clique no botão **Baixar Pagamento** (ao lado da conta)
+4. Preencha os dados do pagamento:
+   - **Valor Pago** — Quanto foi pago (pode ser parcial ou total)
+   - **Data do Pagamento** — A data em que o pagamento foi feito
+   - **Forma de Pagamento** — Como pagou (PIX, boleto, dinheiro, etc.)
+5. Clique em **Confirmar Baixa**
+
+Pronto! O sistema atualiza tudo automaticamente:
+
+- O valor que já foi pago
+- O saldo restante (quanto falta pagar)
+- O status da conta
+
+### Entendendo os status das contas a pagar
+
+| Status | O que significa |
+|--------|----------------|
+| **Pendente** | A conta ainda não foi paga |
+| **Parcial** | Parte do valor foi pago, mas ainda falta um saldo |
+| **Pago** | A conta foi paga integralmente — tudo certo! |
+| **Vencido** | A data de vencimento já passou e a conta não foi paga (ou não foi paga totalmente) |
+
+> **Atenção:** Contas com status **Vencido** aparecem em destaque na lista. Verifique diariamente para evitar juros e multas!
+
+### 7.3.3. Visualizando e filtrando contas a pagar
+
+A tela de Contas a Pagar mostra todas as suas contas em uma lista organizada com as seguintes informações:
+
+- Nome do fornecedor
+- Descrição da despesa
+- Valor total da conta
+- Quanto já foi pago
+- Quanto falta pagar
+- Data de vencimento
+- Status atual (Pendente, Parcial, Pago ou Vencido)
+
+**Filtros disponíveis para encontrar contas rapidamente:**
+
+1. **Por status** — Veja apenas as contas pendentes, pagas, parciais ou vencidas
+2. **Por fornecedor** — Busque contas de um fornecedor específico
+3. **Por período de vencimento** — Veja contas que vencem em um intervalo de datas
+4. **Por obra** — Veja apenas as contas de uma obra específica
+
+> **Dica prática:** Todo início de semana, filtre as contas por "Pendente" e "Vencido" para saber exatamente o que precisa ser pago nos próximos dias.
+
+---
+
+## 7.4. Contas a Receber — Controlando suas Receitas
+
+A seção de **Contas a Receber** é onde você registra tudo o que seus clientes devem pagar para a empresa: medições de obras, serviços prestados, vendas, etc.
+
+### 7.4.1. Como registrar uma nova receita
+
+**Passo a passo:**
+
+1. No menu, clique em **Financeiro → Contas a Receber**
+2. Clique no botão **Nova Conta a Receber**
+3. Preencha as informações:
+
+| Campo | Obrigatório? | O que preencher |
+|-------|:------------:|-----------------|
+| **Cliente** | Sim | Nome do cliente que vai pagar |
+| **CPF/CNPJ** | Não | Documento do cliente (para controle) |
+| **Nº do Documento** | Não | Número do contrato, nota fiscal ou fatura |
+| **Descrição** | Sim | Descreva de onde vem essa receita (ex: "Medição 3 - Obra Residencial Solar") |
+| **Valor** | Sim | Valor total a receber em reais (ex: R$ 85.000,00) |
+| **Data de Emissão** | Sim | Data em que a cobrança foi emitida |
+| **Data de Vencimento** | Sim | Data combinada para o cliente pagar |
+| **Obra** | Não | Se é o pagamento de uma obra específica, selecione aqui |
+| **Forma de Recebimento** | Não | Como vai receber: transferência, boleto, cheque, PIX, etc. |
+| **Observações** | Não | Qualquer anotação extra |
+
+4. Clique em **Salvar**
+
+### 7.4.2. Como registrar que um cliente pagou (baixar recebimento)
+
+Quando o cliente efetuar o pagamento, registre no sistema para manter o controle atualizado.
+
+**Passo a passo:**
+
+1. Vá em **Financeiro → Contas a Receber**
+2. Na lista, encontre a conta que foi recebida
+3. Clique no botão **Baixar Recebimento**
+4. Preencha:
+   - **Valor Recebido** — Quanto o cliente pagou (pode ser parcial ou total)
+   - **Data do Recebimento** — A data em que o dinheiro caiu na conta
+   - **Forma de Recebimento** — Como recebeu (PIX, transferência, boleto, cheque, etc.)
+5. Clique em **Confirmar Baixa**
+
+O sistema atualiza automaticamente o valor recebido, o saldo restante e o status.
+
+### Entendendo os status das contas a receber
+
+| Status | O que significa |
+|--------|----------------|
+| **Pendente** | O cliente ainda não pagou |
+| **Parcial** | O cliente pagou uma parte, mas ainda deve um saldo |
+| **Recebido** | O cliente pagou tudo — valor quitado! |
+| **Vencido** | O prazo de pagamento já passou e o cliente não pagou (ou pagou parcialmente) |
+
+> **Dica:** Contas com status **Vencido** precisam de atenção especial. Entre em contato com o cliente para negociar o pagamento.
+
+### 7.4.3. Visualizando e filtrando contas a receber
+
+A tela de Contas a Receber mostra uma lista com:
+
+- Nome do cliente
+- Descrição da receita
+- Valor total a receber
+- Quanto já foi recebido
+- Quanto falta receber
+- Data de vencimento
+- Status atual
+
+**Filtros disponíveis:**
+
+1. **Por status** — Veja apenas os pendentes, parciais, recebidos ou vencidos
+2. **Por cliente** — Busque cobranças de um cliente específico
+3. **Por período de vencimento** — Veja cobranças que vencem em um intervalo de datas
+4. **Por obra** — Veja apenas as cobranças de uma obra específica
+
+---
+
+## 7.5. Fluxo de Caixa — O Extrato da Sua Empresa
+
+O **Fluxo de Caixa** funciona como o extrato bancário da sua empresa. Ele mostra todas as movimentações de dinheiro — tudo o que entrou e tudo o que saiu — em ordem cronológica.
+
+### Como acessar o Fluxo de Caixa
+
+Clique em **Financeiro → Fluxo de Caixa** no menu.
+
+### O que você vê no Fluxo de Caixa
+
+Cada linha do extrato mostra uma movimentação com as seguintes informações:
+
+| Informação | O que significa |
+|------------|----------------|
+| **Data** | Quando a movimentação aconteceu |
+| **Tipo** | Se é uma **Entrada** (dinheiro que entrou) ou **Saída** (dinheiro que saiu) |
+| **Categoria** | De onde veio ou para onde foi (receita de obra, custo de veículo, alimentação, salário, etc.) |
+| **Descrição** | Detalhes sobre a movimentação |
+| **Valor** | Quanto foi movimentado |
+| **Obra** | A qual obra essa movimentação está vinculada (quando aplicável) |
+
+### Resumo do período
+
+No final do extrato, o sistema mostra um resumo:
+
+- **Total de Entradas** — Tudo o que entrou no período
+- **Total de Saídas** — Tudo o que saiu no período
+- **Saldo do Período** — A diferença (entradas menos saídas)
+
+Se o saldo for positivo, sua empresa recebeu mais do que gastou. Se for negativo, os gastos superaram as receitas naquele período.
+
+### Como filtrar o Fluxo de Caixa
+
+Você pode refinar a visualização com os filtros:
+
+1. **Período** — Escolha data inicial e final (ex: mês de janeiro, último trimestre)
+2. **Tipo** — Veja apenas Entradas, apenas Saídas, ou Todos
+3. **Categoria** — Filtre por um tipo específico (ex: só custos com veículos)
+4. **Obra** — Veja apenas as movimentações de uma obra
+
+**Exemplo prático:** Para saber quanto a Obra Residencial Solar gastou com veículos no mês de janeiro:
+
+1. Selecione o período: 01/01/2026 a 31/01/2026
+2. Selecione o tipo: Saídas
+3. Selecione a categoria: Transporte/Veículos
+4. Selecione a obra: Residencial Solar
+5. Clique em Filtrar
+
+> **Dica:** Use o fluxo de caixa semanalmente para conferir se não há nenhuma movimentação estranha ou lançamento esquecido.
+
+---
+
+## 7.6. De onde vêm os custos automáticos?
+
+Uma das grandes vantagens do SIGE é que **vários custos aparecem automaticamente no Módulo Financeiro**, sem que você precise lançar manualmente. Isso acontece porque o sistema integra os dados de outros módulos:
+
+### Custos de Obras
+
+Quando materiais são comprados ou serviços são contratados para uma obra, esses custos aparecem no financeiro vinculados à obra correspondente. Assim, você sempre sabe quanto cada obra já consumiu de recursos.
+
+### Custos de Veículos (Frota)
+
+Sempre que um abastecimento, manutenção ou outra despesa com veículo é registrada no **módulo de Frota**, o custo aparece automaticamente no financeiro na categoria "Transporte".
+
+### Custos de Alimentação
+
+Quando refeições e marmitas são registradas no **módulo de Alimentação**, os custos são contabilizados automaticamente no financeiro na categoria "Alimentação".
+
+### Custos de Mão de Obra
+
+Os custos com salários e folha de pagamento registrados no **módulo de Folha de Pagamento** também são refletidos no financeiro.
+
+> **Resultado:** Você tem uma visão real e completa dos custos da empresa, sem precisar lançar as mesmas informações em dois lugares diferentes. Se quiser ver o custo total de uma obra, basta filtrar o fluxo de caixa ou o dashboard pela obra — todos os custos (materiais, veículos, alimentação, mão de obra) estarão lá.
+
+---
+
+## 7.7. Centros de Custo — Organizando seus Gastos
+
+Os **Centros de Custo** ajudam você a organizar as despesas da empresa por áreas. É como criar "pastas" para classificar para onde cada dinheiro foi.
+
+### Tipos de Centro de Custo
+
+| Tipo | Para que serve | Exemplo |
+|------|---------------|---------|
+| **Obra** | Agrupar todos os custos de uma obra | "Residencial Solar" |
+| **Departamento** | Separar custos por setor da empresa | "Administrativo", "Operacional" |
+| **Projeto** | Agrupar custos de projetos específicos | "Reforma sede" |
+
+### Como criar um Centro de Custo
 
 1. Acesse **Financeiro → Centros de Custo**
 2. Clique em **Novo Centro de Custo**
-3. Preencha os campos:
-
-| Campo | Obrigatorio | Descricao |
-|-------|:-----------:|-----------|
-| **Codigo** | Sim | Codigo unico (ex: CC001) |
-| **Nome** | Sim | Nome descritivo do centro de custo |
-| **Tipo** | Sim | Obra, Departamento, Projeto ou Atividade |
-| **Descricao** | Nao | Detalhamento do centro de custo |
-| **Obra** | Nao | Obra associada (quando tipo = Obra) |
-| **Departamento** | Nao | Departamento associado (quando tipo = Departamento) |
-
+3. Preencha:
+   - **Código** — Um código curto para identificar (ex: CC001)
+   - **Nome** — Nome descritivo (ex: "Obra Residencial Solar")
+   - **Tipo** — Selecione: Obra, Departamento ou Projeto
+   - **Descrição** — Detalhes adicionais (opcional)
+   - **Obra associada** — Se for do tipo Obra, selecione a obra correspondente
 4. Clique em **Salvar**
 
-> **Dica:** Ao cadastrar uma nova obra no sistema, crie um centro de custo vinculado a ela para facilitar o rastreamento de todas as despesas do projeto.
+> **Dica:** Sempre que cadastrar uma nova obra no sistema, crie também um centro de custo para ela. Isso facilita muito na hora de gerar relatórios e saber quanto cada obra está custando.
 
 ---
 
-## 7.4. Contas a Pagar
+## 7.8. Relatórios Financeiros — Entendendo os Números da Empresa
 
-O modulo de **Contas a Pagar** gerencia todas as obrigacoes financeiras com fornecedores, prestadores de servico e demais credores.
+O SIGE oferece relatórios prontos para você entender a saúde financeira da empresa. Não é preciso ser contador para usá-los — eles foram feitos para serem simples e práticos.
 
-### 7.4.1. Lancando Nova Despesa
+### DRE — O Resultado da Sua Empresa (Lucro ou Prejuízo)
 
-Para registrar uma nova conta a pagar:
+O **DRE** (Demonstrativo de Resultado do Exercício) é basicamente o **demonstrativo de lucro ou prejuízo da sua empresa**. Ele mostra, de forma organizada, quanto a empresa faturou, quanto gastou e qual foi o resultado final.
 
-1. Acesse **Financeiro → Contas a Pagar**
-2. Clique no botao **Nova Conta a Pagar**
-3. Preencha o formulario:
+**Como ler o DRE em termos simples:**
 
-| Campo | Obrigatorio | Descricao |
-|-------|:-----------:|-----------|
-| **Fornecedor** | Sim | Selecione o fornecedor cadastrado |
-| **Numero do Documento** | Nao | Numero da NF, boleto ou recibo |
-| **Descricao** | Sim | Descricao detalhada da despesa |
-| **Valor Original** | Sim | Valor total do documento (R$) |
-| **Data de Emissao** | Sim | Data de emissao do documento |
-| **Data de Vencimento** | Sim | Data limite para pagamento |
-| **Obra** | Nao | Obra associada a despesa |
-| **Conta Contabil** | Nao | Conta do plano de contas para classificacao |
-| **Forma de Pagamento** | Nao | Boleto, transferencia, dinheiro, etc. |
-| **Observacoes** | Nao | Informacoes complementares |
+| Linha do Relatório | O que significa na prática |
+|--------------------|---------------------------|
+| **(+) Receita Bruta** | Tudo o que a empresa faturou no período (total de serviços prestados, obras, vendas) |
+| **(-) Impostos** | Os impostos que incidem sobre o faturamento |
+| **(=) Receita Líquida** | O que sobra do faturamento depois de pagar os impostos |
+| **(-) Custos Diretos** | Os custos diretamente ligados aos serviços/obras (materiais, mão de obra direta) |
+| **(=) Lucro Bruto** | O que sobra depois de pagar os custos diretos — é a margem bruta do negócio |
+| **(-) Despesas Operacionais** | Gastos para manter a empresa funcionando (aluguel, salários administrativos, energia, etc.) |
+| **(=) Lucro Operacional** | O que sobra depois de pagar todas as despesas do dia a dia |
+| **(=) Lucro Líquido** | O resultado final — é o lucro (ou prejuízo) real da empresa no período |
 
-4. Clique em **Salvar**
+**Como gerar o DRE:**
 
-> **Importante:** O sistema calcula automaticamente o **saldo** da conta (Valor Original - Valor Pago) e atualiza o status conforme os pagamentos sao registrados.
+1. Acesse **Financeiro → Relatórios → DRE**
+2. Selecione o **mês e ano** que deseja analisar
+3. Clique em **Gerar Relatório**
 
-### 7.4.2. Baixando Pagamento
+> **Dica:** Gere o DRE todo mês para acompanhar se a empresa está dando lucro ou prejuízo. Se o **Lucro Líquido** estiver negativo por vários meses seguidos, é hora de revisar custos ou aumentar o faturamento.
 
-Para registrar o pagamento (total ou parcial) de uma conta:
+### Relatório de Contas a Pagar e Receber
 
-1. Na lista de Contas a Pagar, localize a conta desejada
-2. Clique no botao **Baixar Pagamento**
-3. Informe:
-   - **Valor Pago** — Valor efetivamente pago nesta baixa
-   - **Data do Pagamento** — Data em que o pagamento foi realizado
-   - **Forma de Pagamento** — Meio utilizado para o pagamento
-4. Clique em **Confirmar Baixa**
+Esse relatório mostra uma lista detalhada de todas as contas pendentes, pagas e vencidas. É muito útil para:
 
-O sistema atualiza automaticamente:
+- Saber quanto a empresa deve pagar nos próximos dias
+- Saber quanto tem para receber dos clientes
+- Identificar clientes inadimplentes
 
-- O **valor pago acumulado** da conta
-- O **saldo restante** (Valor Original - Valor Pago)
-- O **status** da conta:
+**Filtros disponíveis:**
 
-| Status | Condicao |
-|--------|----------|
-| **PENDENTE** | Nenhum pagamento realizado |
-| **PARCIAL** | Pagamento parcial efetuado (saldo > 0) |
-| **PAGO** | Pagamento integral realizado (saldo = 0) |
-| **VENCIDO** | Data de vencimento ultrapassada sem pagamento total |
+- **Por status** — Pendentes, Pagas/Recebidas ou Vencidas
+- **Por período** — Escolha o intervalo de datas
+- **Por fornecedor ou cliente** — Busque uma pessoa específica
+- **Por obra** — Veja contas vinculadas a uma obra
 
-### 7.4.3. Visualizando Contas a Pagar
+### Relatório de Despesas por Centro de Custo
 
-A tela de listagem apresenta todas as contas a pagar com as seguintes colunas:
+Esse relatório agrupa todas as despesas por centro de custo, mostrando:
 
-| Coluna | Descricao |
-|--------|-----------|
-| **Fornecedor** | Nome do fornecedor |
-| **Descricao** | Descricao resumida da despesa |
-| **Valor Original** | Valor total do documento |
-| **Valor Pago** | Total ja pago |
-| **Saldo** | Valor restante a pagar |
-| **Vencimento** | Data de vencimento |
-| **Status** | Situacao atual (Pendente, Parcial, Pago, Vencido) |
-| **Acoes** | Visualizar, Editar, Baixar Pagamento |
+- Qual centro de custo gastou mais
+- Quanto cada obra ou departamento consumiu de recursos
+- O percentual que cada centro de custo representa no total de despesas
 
-**Filtros disponiveis:**
+É muito útil para comparar custos entre obras e identificar onde é possível economizar.
 
-1. **Status** — Filtre por Pendente, Parcial, Pago ou Vencido
-2. **Fornecedor** — Busque por fornecedor especifico
-3. **Periodo de Vencimento** — Filtre por intervalo de datas
-4. **Obra** — Exiba contas vinculadas a uma obra especifica
+### Como exportar relatórios
+
+Todos os relatórios podem ser:
+
+- **Visualizados na tela** — Para consulta rápida
+- **Exportados em PDF** — Para imprimir, enviar por e-mail ou guardar em arquivo
 
 ---
 
-## 7.5. Contas a Receber
+## 7.9. Dicas para Manter suas Finanças Organizadas
 
-O modulo de **Contas a Receber** controla todos os valores a receber de clientes, medicoes de obras e demais fontes de receita.
+Aqui vão algumas dicas práticas para aproveitar ao máximo o Módulo Financeiro do SIGE:
 
-### 7.5.1. Lancando Nova Receita
+### Rotina diária
+- Registre **todas** as contas a pagar assim que receber o boleto ou nota fiscal. Não deixe para depois!
+- Confira o **Dashboard Financeiro** todos os dias para ter uma visão rápida do caixa
 
-Para registrar uma nova conta a receber:
+### Rotina semanal
+- Verifique as contas com status **Vencido** — tanto a pagar quanto a receber
+- Faça a **baixa dos pagamentos** realizados durante a semana
+- Confira o **Fluxo de Caixa** para garantir que todas as movimentações estão corretas
 
-1. Acesse **Financeiro → Contas a Receber**
-2. Clique no botao **Nova Conta a Receber**
-3. Preencha o formulario:
+### Rotina mensal
+- Gere o **DRE** para saber se a empresa teve lucro ou prejuízo no mês
+- Analise o relatório de **Despesas por Centro de Custo** para identificar onde estão os maiores gastos
+- Compare os custos por obra para entender quais projetos são mais rentáveis
 
-| Campo | Obrigatorio | Descricao |
-|-------|:-----------:|-----------|
-| **Cliente** | Sim | Nome do cliente |
-| **CPF/CNPJ** | Nao | Documento do cliente |
-| **Numero do Documento** | Nao | Numero do contrato, NF ou fatura |
-| **Descricao** | Sim | Descricao da receita |
-| **Valor Original** | Sim | Valor total a receber (R$) |
-| **Data de Emissao** | Sim | Data de emissao do documento |
-| **Data de Vencimento** | Sim | Data prevista para recebimento |
-| **Obra** | Nao | Obra associada a esta receita |
-| **Conta Contabil** | Nao | Conta do plano de contas |
-| **Forma de Recebimento** | Nao | Transferencia, boleto, cheque, etc. |
-| **Observacoes** | Nao | Informacoes complementares |
+### Boas práticas gerais
 
-4. Clique em **Salvar**
+1. **Sempre vincule despesas a uma obra** — Isso permite rastrear o custo real de cada projeto
+2. **Use descrições claras** — Em vez de "Material", escreva "Cimento CP-II 50kg - Obra Solar"
+3. **Não acumule lançamentos** — Lance as despesas e receitas no mesmo dia em que acontecem
+4. **Confira os custos automáticos** — Verifique se os custos de alimentação, veículos e mão de obra estão aparecendo corretamente
+5. **Exporte relatórios mensais** — Guarde o PDF do DRE e do Fluxo de Caixa para ter um histórico organizado
+6. **Crie centros de custo para cada obra** — Facilita muito a análise de rentabilidade por projeto
 
-### 7.5.2. Baixando Recebimento
-
-Para registrar o recebimento (total ou parcial) de uma conta:
-
-1. Na lista de Contas a Receber, localize a conta desejada
-2. Clique no botao **Baixar Recebimento**
-3. Informe:
-   - **Valor Recebido** — Valor efetivamente recebido
-   - **Data do Recebimento** — Data em que o valor foi recebido
-   - **Forma de Recebimento** — Meio pelo qual foi recebido
-4. Clique em **Confirmar Baixa**
-
-O sistema atualiza automaticamente o valor recebido acumulado, o saldo restante e o status da conta (PENDENTE, PARCIAL ou RECEBIDO).
-
-### 7.5.3. Visualizando Contas a Receber
-
-A tela de listagem exibe todas as contas a receber com colunas analogas as de Contas a Pagar:
-
-| Coluna | Descricao |
-|--------|-----------|
-| **Cliente** | Nome do cliente |
-| **Descricao** | Descricao resumida da receita |
-| **Valor Original** | Valor total a receber |
-| **Valor Recebido** | Total ja recebido |
-| **Saldo** | Valor restante a receber |
-| **Vencimento** | Data de vencimento |
-| **Status** | Situacao atual (Pendente, Parcial, Recebido, Vencido) |
-| **Acoes** | Visualizar, Editar, Baixar Recebimento |
-
-**Filtros disponiveis:**
-
-1. **Status** — Filtre por Pendente, Parcial, Recebido ou Vencido
-2. **Cliente** — Busque por cliente especifico
-3. **Periodo de Vencimento** — Filtre por intervalo de datas
-4. **Obra** — Exiba contas vinculadas a uma obra especifica
+> **Lembre-se:** Um financeiro bem organizado não é luxo — é necessidade. Com os dados corretos no SIGE, você toma decisões melhores sobre preços, custos e investimentos.
 
 ---
 
-## 7.6. Fluxo de Caixa
+# Capítulo 8 — Outros Módulos
 
-O **Fluxo de Caixa** apresenta o extrato completo de todas as movimentacoes financeiras da empresa, consolidando entradas e saidas em uma visao unificada.
-
-### Acessando o Fluxo de Caixa
-
-Acesse **Financeiro → Fluxo de Caixa** ou visualize a secao Fluxo de Caixa diretamente no dashboard financeiro em `/financeiro`.
-
-### Estrutura do Extrato
-
-Cada movimentacao no fluxo de caixa registra:
-
-| Campo | Descricao |
-|-------|-----------|
-| **Data** | Data da movimentacao |
-| **Tipo** | ENTRADA ou SAIDA |
-| **Categoria** | Classificacao: receita, custo_obra, custo_veiculo, alimentacao, salario |
-| **Descricao** | Detalhamento da movimentacao |
-| **Valor** | Valor da movimentacao (R$) |
-| **Obra** | Obra vinculada (quando aplicavel) |
-| **Centro de Custo** | Centro de custo associado |
-
-### Filtros e Analise
-
-O fluxo de caixa oferece filtros avancados para analise:
-
-1. **Periodo** — Selecione intervalo de datas (data inicial e final)
-2. **Tipo de Movimento** — Filtre por Entradas, Saidas ou Todos
-3. **Categoria** — Selecione uma categoria especifica
-4. **Obra** — Filtre movimentacoes por obra
-
-### Analise de Entradas vs. Saidas
-
-O sistema apresenta um resumo comparativo ao final do extrato:
-
-| Indicador | Descricao |
-|-----------|-----------|
-| **Total de Entradas** | Soma de todas as movimentacoes do tipo ENTRADA no periodo |
-| **Total de Saidas** | Soma de todas as movimentacoes do tipo SAIDA no periodo |
-| **Saldo do Periodo** | Diferenca entre total de entradas e total de saidas |
-| **Saldo Acumulado** | Saldo progressivo considerando movimentacoes anteriores |
-
-> **Dica:** Utilize o grafico de fluxo de caixa no dashboard para identificar rapidamente periodos com saldo negativo e antecipar necessidades de capital de giro.
-
-### Contas Bancarias
-
-O modulo tambem permite o cadastro de contas bancarias da empresa para controle de saldos:
-
-| Campo | Descricao |
-|-------|-----------|
-| **Nome do Banco** | Instituicao financeira |
-| **Agencia** | Numero da agencia |
-| **Conta** | Numero da conta corrente |
-| **Tipo de Conta** | Corrente, Poupanca, etc. |
-| **Saldo Inicial** | Saldo na data de implantacao |
-| **Saldo Atual** | Saldo atualizado automaticamente |
+Neste capítulo, apresentamos os demais módulos do SIGE que complementam as funcionalidades principais do sistema. Cada um deles atende a uma necessidade específica do dia a dia da sua empresa de construção.
 
 ---
 
-## 7.7. Relatorios Financeiros
+## 8.1. Propostas Comerciais
 
-O SIGE oferece um conjunto completo de relatorios financeiros para suporte a tomada de decisao.
+O módulo de **Propostas Comerciais** permite criar, gerenciar e acompanhar orçamentos e propostas para novos projetos. Com ele, você organiza toda a parte comercial da empresa em um só lugar.
 
-### DRE — Demonstrativo de Resultado do Exercicio
+### Como acessar
 
-O **DRE** apresenta o resultado economico da empresa em um periodo determinado, detalhando receitas, custos e despesas:
+No menu superior, clique em **Propostas**. Você verá a lista de todas as propostas já cadastradas.
 
-| Linha do DRE | Descricao |
-|--------------|-----------|
-| **(+) Receita Bruta** | Total de receitas no periodo |
-| **(-) Impostos sobre Vendas** | Tributos incidentes sobre o faturamento |
-| **(=) Receita Liquida** | Receita Bruta - Impostos |
-| **(-) Custo Total** | Custos diretos de producao/servicos |
-| **(=) Lucro Bruto** | Receita Liquida - Custo Total |
-| **(-) Despesas Operacionais** | Despesas administrativas, comerciais, etc. |
-| **(=) Lucro Operacional** | Lucro Bruto - Despesas Operacionais |
-| **(=) Lucro Liquido** | Resultado final do periodo |
+### Criando uma nova proposta
 
-Para gerar o DRE:
+1. Clique no botão **Nova Proposta**.
+2. Preencha as informações principais:
 
-1. Acesse **Financeiro → Relatorios → DRE**
-2. Selecione o **mes/ano de referencia**
-3. Clique em **Gerar Relatorio**
-
-### Relatorio de Fluxo de Caixa Contabil
-
-O relatorio de fluxo de caixa contabil classifica as movimentacoes em tres categorias conforme normas contabeis:
-
-| Categoria | Descricao | Exemplos |
-|-----------|-----------|----------|
-| **Operacional** | Atividades do dia a dia da empresa | Receitas de obras, pagamento de salarios |
-| **Investimento** | Aquisicao e venda de ativos | Compra de equipamentos, venda de veiculos |
-| **Financiamento** | Captacao e pagamento de recursos | Emprestimos, aportes de capital |
-
-### Relatorio de Contas a Pagar/Receber
-
-Relatorios detalhados de contas a pagar e a receber com opcoes de filtro por:
-
-- **Status** — Pendentes, Pagas/Recebidas, Vencidas
-- **Periodo de Vencimento** — Intervalo de datas
-- **Fornecedor/Cliente** — Filtro por entidade
-- **Obra** — Filtro por projeto
-
-### Despesas por Centro de Custo
-
-Este relatorio agrupa todas as despesas por centro de custo, permitindo:
-
-1. Identificar centros de custo com maior consumo de recursos
-2. Comparar orcado vs. realizado por obra
-3. Analisar a distribuicao percentual de despesas
-4. Acompanhar a evolucao mensal dos custos
-
-| Coluna | Descricao |
-|--------|-----------|
-| **Centro de Custo** | Codigo e nome do centro de custo |
-| **Tipo** | Obra, Departamento, Projeto ou Atividade |
-| **Total Despesas** | Soma das despesas no periodo |
-| **% do Total** | Participacao percentual no total geral |
-| **Variacao** | Comparativo com periodo anterior |
-
-### Balancete de Verificacao
-
-O **Balancete** apresenta os saldos de todas as contas contabeis em um periodo:
-
-| Coluna | Descricao |
-|--------|-----------|
-| **Codigo** | Codigo da conta no plano de contas |
-| **Nome da Conta** | Descricao da conta contabil |
-| **Saldo Anterior** | Saldo no inicio do periodo |
-| **Debitos** | Total de debitos no periodo |
-| **Creditos** | Total de creditos no periodo |
-| **Saldo Atual** | Saldo ao final do periodo |
-
-> **Nota:** O balancete e gerado automaticamente a partir dos lancamentos contabeis registrados pelo sistema de partidas dobradas.
-
-### Exportacao de Relatorios
-
-Todos os relatorios financeiros podem ser exportados nos seguintes formatos:
-
-1. **PDF** — Para impressao e arquivo fisico
-2. **Tela** — Visualizacao direta no navegador com opcao de impressao
-
-> **Integracao SPED:** O SIGE suporta a geracao de arquivos no formato SPED Contabil para transmissao a Receita Federal, contemplando todos os lancamentos contabeis do periodo.
-
----
-
-# Capitulo 8 — Módulos Avançados
-
-**SIGE - Estruturas do Vale (EnterpriseSync)**
-Manual do Usuário — Versão 9.0
-
----
-
-## 8.1. Módulo de Propostas Comerciais
-
-O módulo de **Propostas Comerciais** do SIGE permite criar, gerenciar e acompanhar propostas de orçamento enviadas a clientes e prospects. Ele integra-se diretamente com o módulo de Obras, facilitando a conversão de propostas aprovadas em novos projetos.
-
-### 8.1.1. Visão Geral
-
-| Funcionalidade | Descrição |
+| Campo | O que preencher |
 |---|---|
-| Criação de propostas | Formulário completo com dados do cliente, serviços, valores e condições |
-| Templates reutilizáveis | Modelos pré-configurados para agilizar a elaboração de novas propostas |
-| Geração de PDF | Exportação automática da proposta em formato PDF profissional |
-| Portal do cliente | Acesso externo via token seguro para o cliente visualizar e aprovar propostas |
-| Controle de validade | Gestão de prazos de validade com alertas automáticos de expiração |
-| Histórico de versões | Registro de todas as alterações realizadas em cada proposta |
+| **Título** | Nome da proposta (ex.: "Proposta — Residencial Parque Sul") |
+| **Cliente** | Nome da empresa ou pessoa para quem a proposta será enviada |
+| **Data da Proposta** | A data de emissão da proposta |
+| **Validade** | Até quando o cliente pode aceitar a proposta (ex.: 30 dias) |
+| **Descrição** | Descreva o escopo do projeto, incluindo os principais serviços que serão prestados |
+| **Valor Total** | O valor total da proposta em reais |
+| **Observações** | Condições de pagamento, prazos, exclusões ou qualquer informação adicional |
 
-### 8.1.2. Criando uma Nova Proposta
+3. Clique em **Salvar**.
 
-Para criar uma nova proposta comercial:
+### Usando modelos de proposta
 
-1. Acesse **Propostas** no menu de navegação superior.
-2. Clique no botão **"Nova Proposta"**.
-3. Preencha os campos do formulário:
+O sistema pode carregar informações de propostas anteriores para você reaproveitar. Isso economiza tempo quando você precisa criar propostas semelhantes para diferentes clientes. Basta selecionar uma proposta existente como base e ajustar os valores e descrições.
 
-| Campo | Obrigatório | Descrição |
-|---|:---:|---|
-| **Título** | Sim | Título descritivo da proposta (ex.: "Construção Residencial - Lote 15") |
-| **Cliente** | Sim | Nome do cliente ou empresa destinatária |
-| **E-mail do Cliente** | Não | E-mail para envio da proposta e acesso ao portal |
-| **Telefone do Cliente** | Não | Telefone de contato |
-| **Descrição** | Não | Descrição detalhada do escopo da proposta |
-| **Valor Total** | Sim | Valor total da proposta em R$ |
-| **Data de Validade** | Sim | Data limite para aceitação da proposta |
-| **Condições de Pagamento** | Não | Termos e condições de pagamento |
-| **Observações** | Não | Informações adicionais ou ressalvas |
+### Gerando o PDF da proposta
 
-4. Na seção **Itens da Proposta**, adicione os serviços e materiais inclusos:
-   - Descrição do item
-   - Quantidade
-   - Unidade de medida
-   - Valor unitário
-   - Valor total (calculado automaticamente)
+Após criar e revisar a proposta, você pode gerar um documento profissional em PDF:
 
-5. Clique em **"Salvar"** para criar a proposta como rascunho.
+1. Abra a proposta desejada clicando nela na lista.
+2. Clique no botão **Gerar PDF**.
+3. O sistema vai criar um documento formatado com o logo da empresa, os dados do cliente, o escopo, os valores e as condições.
+4. O PDF será baixado automaticamente para o seu computador ou celular.
 
-### 8.1.3. Templates de Propostas
+> **Dica:** Revise o PDF antes de enviar ao cliente. Confira se o valor, o escopo e as condições estão corretos.
 
-O sistema permite criar e utilizar templates para padronizar e agilizar a criação de propostas:
+### Compartilhando a proposta com o cliente
 
-1. Acesse **Propostas → Templates**.
-2. Crie um novo template com itens pré-definidos, textos padrão e condições comerciais.
-3. Ao criar uma nova proposta, selecione o template desejado para pré-preencher os campos automaticamente.
+Você pode enviar a proposta ao cliente de duas formas:
 
-### 8.1.4. Geração de PDF
+- **Por e-mail** — Envie o PDF gerado como anexo no e-mail.
+- **Por link** — O sistema gera um link exclusivo que você pode compartilhar com o cliente. Ao acessar o link, o cliente visualiza a proposta diretamente no navegador, sem precisar de login.
 
-Cada proposta pode ser exportada em formato PDF profissional:
+### Acompanhando os status das propostas
 
-1. Acesse a proposta desejada.
-2. Clique no botão **"Gerar PDF"**.
-3. O sistema gerará um documento formatado contendo:
-   - Cabeçalho com logo da empresa e dados de contato
-   - Dados do cliente
-   - Escopo detalhado dos serviços
-   - Tabela de itens com valores
-   - Condições de pagamento
-   - Prazo de validade
-   - Espaço para assinatura
+| Status | O que significa |
+|---|---|
+| **Rascunho** | A proposta está sendo elaborada e ainda não foi enviada |
+| **Enviada** | A proposta foi enviada ao cliente e aguarda resposta |
+| **Aprovada** | O cliente aceitou a proposta |
+| **Rejeitada** | O cliente não aceitou a proposta |
+| **Expirada** | O prazo de validade da proposta venceu sem resposta |
 
-### 8.1.5. Portal do Cliente com Token de Acesso
+Para alterar o status, abra a proposta e clique no botão correspondente (ex.: **Marcar como Enviada**, **Marcar como Aprovada**).
 
-O Portal do Cliente permite que o destinatário da proposta visualize e interaja com o documento sem necessidade de login no sistema:
-
-1. Ao criar ou editar uma proposta, marque a opção **"Ativar Portal do Cliente"**.
-2. Informe o e-mail do cliente.
-3. O sistema gera automaticamente um **token de acesso seguro** (URL única).
-4. O link é enviado ao cliente por e-mail.
-5. O cliente pode:
-   - Visualizar todos os detalhes da proposta
-   - Aprovar ou solicitar alterações
-   - Baixar o PDF da proposta
-   - Acompanhar o andamento (quando vinculada a uma obra)
-
-> **Segurança:** O token de acesso é único e criptografado. Ele pode ser revogado ou regenerado a qualquer momento pelo administrador.
-
-### 8.1.6. Ciclo de Vida da Proposta
-
-| Status | Descrição | Ação Disponível |
-|---|---|---|
-| **Rascunho** | Proposta em elaboração | Editar, Enviar |
-| **Enviada** | Proposta enviada ao cliente | Aguardar resposta |
-| **Aprovada** | Proposta aceita pelo cliente | Converter em Obra |
-| **Rejeitada** | Proposta recusada pelo cliente | Criar nova versão |
-| **Expirada** | Prazo de validade vencido | Renovar ou arquivar |
+> **Dica:** Quando uma proposta for aprovada, você pode criar a obra correspondente diretamente a partir dos dados da proposta, agilizando o processo.
 
 ---
 
-## 8.2. Módulo de Alimentação
+## 8.2. Alimentação
 
-O módulo de **Alimentação** do SIGE gerencia o controle de refeições fornecidas aos funcionários nas obras, permitindo o acompanhamento de custos e a gestão de fornecedores de alimentação.
+O módulo de **Alimentação** permite controlar todas as refeições fornecidas aos funcionários durante o trabalho. Os custos registrados aqui são automaticamente vinculados às obras correspondentes e aparecem no módulo Financeiro.
 
-### 8.2.1. Visão Geral
+### Como acessar
 
-| Funcionalidade | Descrição |
+No menu superior, clique em **Alimentação**.
+
+### Registrando refeições
+
+1. Clique no botão **Novo Registro** ou **Nova Refeição**.
+2. Preencha as informações:
+
+| Campo | O que preencher |
 |---|---|
-| Registro de refeições | Controle diário de refeições servidas por obra e por funcionário |
-| Tipos de refeição | Café da manhã, almoço, jantar, lanche e marmita |
-| Custo por obra | Rateio automático dos custos de alimentação por obra |
-| Fornecedores | Cadastro e gestão de fornecedores de alimentação |
-| Relatórios | Relatórios de consumo e custos por período, obra e funcionário |
+| **Data** | A data em que a refeição foi fornecida |
+| **Obra** | Selecione a obra para a qual a refeição foi destinada |
+| **Tipo de Refeição** | Café da manhã, Almoço, Jantar ou Lanche |
+| **Quantidade** | Número de refeições fornecidas |
+| **Valor Unitário** | Quanto custou cada refeição (ex.: R$ 18,00) |
+| **Fornecedor** | Quem forneceu a refeição (restaurante, marmitaria, etc.) |
+| **Observações** | Informações adicionais (ex.: "Marmita para equipe de 8 pessoas") |
 
-### 8.2.2. Registrando Refeições
+3. Clique em **Salvar**.
 
-Para registrar refeições fornecidas:
+O sistema calcula automaticamente o **valor total** (quantidade × valor unitário) e vincula o custo à obra selecionada.
 
-1. Acesse **Alimentação** no menu de navegação.
-2. Clique em **"Novo Registro"**.
-3. Preencha os campos:
+### Acompanhando os custos de alimentação
 
-| Campo | Obrigatório | Descrição |
-|---|:---:|---|
-| **Data** | Sim | Data da refeição |
-| **Obra** | Sim | Obra onde a refeição foi servida |
-| **Tipo de Refeição** | Sim | Café da manhã, Almoço, Jantar, Lanche ou Marmita |
-| **Quantidade** | Sim | Número de refeições servidas |
-| **Valor Unitário** | Sim | Custo por refeição (R$) |
-| **Fornecedor** | Não | Fornecedor responsável pela refeição |
-| **Funcionários** | Não | Funcionários que receberam a refeição |
-| **Observações** | Não | Informações adicionais |
+Na tela principal do módulo, você encontra:
 
-4. Clique em **"Salvar"**.
+- **Resumo do período** — Total gasto com alimentação no período selecionado
+- **Custo por obra** — Quanto cada obra gastou com refeições
+- **Histórico de registros** — Lista de todas as refeições registradas, com filtros por data, obra e tipo de refeição
 
-### 8.2.3. Custo por Obra
+### Gerando relatórios de alimentação
 
-O sistema calcula automaticamente o custo total de alimentação por obra:
+1. Acesse a tela de Alimentação.
+2. Use os filtros para selecionar o período e a obra desejados.
+3. Clique em **Gerar Relatório** ou **Exportar PDF**.
+4. O relatório mostrará o detalhamento dos custos com alimentação, incluindo totais por obra e por tipo de refeição.
 
-- **Custo diário** — Soma das refeições registradas no dia para a obra
-- **Custo mensal** — Acumulado do mês para a obra
-- **Custo por funcionário** — Média de custo de alimentação por colaborador alocado
-
-Esses valores são automaticamente integrados ao **Dashboard da Obra** e ao **Módulo Financeiro**, aparecendo na categoria "Alimentação" dos custos operacionais.
-
-### 8.2.4. Relatórios de Alimentação
-
-| Relatório | Descrição |
-|---|---|
-| Consumo por Obra | Total de refeições e custos por obra no período |
-| Consumo por Funcionário | Detalhamento individual de refeições recebidas |
-| Custos por Tipo de Refeição | Distribuição de custos entre café, almoço, jantar, etc. |
-| Evolução Mensal | Gráfico de evolução dos custos de alimentação ao longo dos meses |
+> **Bom saber:** Os custos de alimentação registrados aqui aparecem automaticamente no Dashboard, nos detalhes da obra e no módulo Financeiro. Você não precisa lançar esses valores manualmente em outros módulos.
 
 ---
 
-## 8.3. Módulo de Almoxarifado
+## 8.3. Almoxarifado
 
-O módulo de **Almoxarifado** gerencia todo o controle de materiais, ferramentas, EPIs (Equipamentos de Proteção Individual) e insumos utilizados nas obras e operações da empresa.
+O módulo de **Almoxarifado** permite controlar todo o estoque de materiais, ferramentas e EPIs (Equipamentos de Proteção Individual) da empresa. Com ele, você sabe exatamente o que tem disponível, o que foi entregue e para quem.
 
-### 8.3.1. Visão Geral
+### Como acessar
 
-| Funcionalidade | Descrição |
+No menu superior, clique em **Almoxarifado**. Você verá as seguintes opções:
+
+- **Estoque** — Visualizar todos os itens cadastrados e suas quantidades
+- **Movimentações** — Registrar entradas, saídas e devoluções
+- **Requisições** — Controlar pedidos de material feitos pelas equipes
+
+### Cadastrando itens no estoque
+
+1. Acesse **Almoxarifado → Estoque**.
+2. Clique em **Novo Item**.
+3. Preencha as informações:
+
+| Campo | O que preencher |
 |---|---|
-| Cadastro de materiais | Registro completo de materiais com código, descrição, unidade e estoque mínimo |
-| Controle de ferramentas | Gestão de ferramentas com controle de empréstimo e devolução |
-| Gestão de EPIs | Controle de equipamentos de proteção individual por funcionário |
-| Fornecedores | Cadastro de fornecedores com histórico de compras |
-| Movimentações | Registro de entradas, saídas e devoluções de materiais |
-| Inventário | Controle de estoque com alertas de estoque mínimo |
+| **Nome** | Nome do material, ferramenta ou EPI (ex.: "Capacete de segurança", "Furadeira Bosch", "Cimento CP-II 50kg") |
+| **Categoria** | Tipo do item: Material, Ferramenta ou EPI |
+| **Unidade de Medida** | Como o item é contado (unidade, kg, metro, saco, etc.) |
+| **Quantidade em Estoque** | Quantidade atual disponível |
+| **Estoque Mínimo** | Quantidade mínima desejada — o sistema avisa quando o estoque ficar abaixo desse valor |
+| **Localização** | Onde o item está guardado (ex.: "Prateleira A3", "Galpão principal") |
 
-### 8.3.2. Cadastrando Materiais
+4. Clique em **Salvar**.
 
-Para cadastrar um novo material no almoxarifado:
+### Registrando movimentações (entradas, saídas e devoluções)
 
-1. Acesse **Almoxarifado → Materiais** no menu de navegação.
-2. Clique em **"Novo Material"**.
-3. Preencha os campos:
+Toda vez que um material entrar ou sair do estoque, registre a movimentação:
 
-| Campo | Obrigatório | Descrição |
-|---|:---:|---|
-| **Código** | Sim | Código interno do material (ex.: MAT-001) |
-| **Descrição** | Sim | Nome/descrição do material |
-| **Categoria** | Sim | Categoria: Material de Construção, Ferramenta, EPI, Consumível, etc. |
-| **Unidade de Medida** | Sim | Unidade: un, kg, m, m², m³, litro, caixa, pacote |
-| **Estoque Mínimo** | Não | Quantidade mínima para alerta de reposição |
-| **Estoque Atual** | Não | Quantidade atual em estoque |
-| **Valor Unitário** | Não | Custo médio por unidade (R$) |
-| **Localização** | Não | Local de armazenamento no almoxarifado |
-| **Fornecedor Padrão** | Não | Fornecedor preferencial para reposição |
-
-4. Clique em **"Salvar"**.
-
-### 8.3.3. Ferramentas e EPIs
-
-O sistema possui categorias específicas para controle de ferramentas e EPIs:
-
-**Ferramentas:**
-- Registro de patrimônio com número de série
-- Controle de empréstimo por funcionário
-- Histórico de manutenção e vida útil
-- Alerta de devolução pendente
-
-**EPIs:**
-- Controle de entrega por funcionário com assinatura digital
-- Registro de CA (Certificado de Aprovação) e validade
-- Controle de periodicidade de troca
-- Relatório de conformidade com NR-6
-
-### 8.3.4. Fornecedores
-
-O cadastro de fornecedores do almoxarifado inclui:
-
-| Campo | Descrição |
-|---|---|
-| **Razão Social** | Nome oficial do fornecedor |
-| **CNPJ** | Cadastro Nacional de Pessoa Jurídica |
-| **Contato** | Nome da pessoa de contato |
-| **Telefone** | Telefone comercial |
-| **E-mail** | E-mail para pedidos e comunicação |
-| **Endereço** | Endereço completo |
-| **Materiais Fornecidos** | Lista de materiais que o fornecedor oferece |
-| **Condições Comerciais** | Prazos de pagamento, descontos, frete |
-
-### 8.3.5. Movimentação de Materiais
-
-O fluxo de materiais no almoxarifado é controlado por três tipos de movimentação:
-
-| Tipo | Descrição | Impacto no Estoque |
-|---|---|---|
-| **Entrada** | Recebimento de materiais de fornecedores ou transferências | Aumenta o estoque |
-| **Saída** | Retirada de materiais para uso em obras ou setores | Diminui o estoque |
-| **Devolução** | Retorno de materiais não utilizados ou ferramentas emprestadas | Aumenta o estoque |
-
-**Registrando uma movimentação:**
+**Para registrar uma saída (entrega de material):**
 
 1. Acesse **Almoxarifado → Movimentações**.
-2. Clique em **"Nova Movimentação"**.
-3. Selecione o tipo (Entrada, Saída ou Devolução).
-4. Informe:
-   - Material ou ferramenta
-   - Quantidade
-   - Obra de destino (para saídas)
-   - Funcionário responsável
-   - Nota fiscal (para entradas)
-   - Observações
-5. Clique em **"Confirmar"**.
+2. Clique em **Nova Movimentação**.
+3. Selecione o tipo: **Saída**.
+4. Selecione o **item** que está saindo do estoque.
+5. Informe a **quantidade** entregue.
+6. Selecione o **funcionário** que está recebendo o item.
+7. Selecione a **obra** de destino (quando aplicável).
+8. Clique em **Salvar**.
 
-O sistema atualiza automaticamente o saldo de estoque e registra o histórico completo da movimentação para rastreabilidade.
+**Para registrar uma entrada (recebimento de material):**
 
-### 8.3.6. Alertas do Almoxarifado
+Siga o mesmo processo, mas selecione o tipo **Entrada** e informe o fornecedor de origem.
 
-O sistema gera alertas automáticos para:
+**Para registrar uma devolução:**
 
-- Materiais com estoque abaixo do mínimo configurado
-- Ferramentas com devolução pendente há mais de X dias
-- EPIs com validade próxima do vencimento
-- Pedidos de compra pendentes de aprovação
+Quando um funcionário devolver uma ferramenta ou EPI, registre como **Devolução**. O sistema atualizará o estoque automaticamente.
 
----
+### Controlando quem está com o quê
 
-## 8.4. Módulo de API
+O sistema mantém um registro completo de todos os itens que foram entregues a cada funcionário. Para consultar:
 
-O SIGE disponibiliza uma **API RESTful** que permite a integração com aplicativos móveis, sistemas externos e automações personalizadas.
+1. Acesse **Almoxarifado → Movimentações**.
+2. Filtre por **funcionário** para ver todos os itens que estão em posse dele.
+3. Você pode verificar se há ferramentas ou EPIs pendentes de devolução.
 
-### 8.4.1. Visão Geral da API
+> **Dica:** Esse controle é muito importante para EPIs. Você pode comprovar que entregou os equipamentos de segurança necessários a cada funcionário, o que é fundamental para a conformidade com as normas de segurança do trabalho.
 
-| Característica | Descrição |
-|---|---|
-| **Protocolo** | RESTful sobre HTTPS |
-| **Formato** | JSON (entrada e saída) |
-| **Autenticação** | Token Bearer (JWT) |
-| **Versionamento** | Prefixo `/api/v1/` |
-| **Rate Limiting** | 100 requisições por minuto por token |
-| **Documentação** | Disponível em `/api/docs` |
+### Alertas de estoque baixo
 
-### 8.4.2. Autenticação por Token
-
-Para utilizar a API, é necessário obter um token de autenticação:
-
-**Endpoint de autenticação:**
-```
-POST /api/v1/auth/login
-```
-
-**Corpo da requisição (JSON):**
-```json
-{
-  "username": "seu_usuario",
-  "password": "sua_senha"
-}
-```
-
-**Resposta de sucesso:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "expires_in": 86400,
-  "user": {
-    "id": 1,
-    "nome": "Administrador",
-    "tipo": "ADMIN"
-  }
-}
-```
-
-**Utilizando o token:**
-
-Inclua o token no cabeçalho `Authorization` de todas as requisições subsequentes:
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
-```
-
-### 8.4.3. Endpoints Principais
-
-| Recurso | Método | Endpoint | Descrição |
-|---|---|---|---|
-| **Funcionários** | GET | `/api/v1/funcionarios` | Lista todos os funcionários |
-| **Funcionários** | GET | `/api/v1/funcionarios/<id>` | Detalhes de um funcionário |
-| **Funcionários** | POST | `/api/v1/funcionarios` | Cria novo funcionário |
-| **Obras** | GET | `/api/v1/obras` | Lista todas as obras |
-| **Obras** | GET | `/api/v1/obras/<id>` | Detalhes de uma obra |
-| **Ponto** | POST | `/api/v1/ponto/registrar` | Registra ponto de funcionário |
-| **RDOs** | GET | `/api/v1/rdos` | Lista todos os RDOs |
-| **RDOs** | POST | `/api/v1/rdos` | Cria novo RDO |
-| **Veículos** | GET | `/api/v1/veiculos` | Lista veículos da frota |
-| **Financeiro** | GET | `/api/v1/financeiro/resumo` | Resumo financeiro do período |
-| **Serviços** | GET | `/api/v1/servicos` | Lista serviços cadastrados |
-
-### 8.4.4. Integração Mobile
-
-A API foi projetada para suportar aplicativos móveis nativos e PWA (Progressive Web Apps), oferecendo:
-
-- Endpoints otimizados para conexões de baixa largura de banda
-- Suporte a upload de fotos comprimidas para registro de ponto e RDO
-- Notificações push via webhooks configuráveis
-- Modo offline com sincronização posterior
-
-### 8.4.5. Integração com Sistemas Externos
-
-O SIGE permite integração com sistemas de terceiros através da API:
-
-| Sistema | Tipo de Integração | Descrição |
-|---|---|---|
-| **ERP** | Bidirecional | Sincronização de dados financeiros e de funcionários |
-| **Contabilidade** | Exportação | Envio de lançamentos contábeis no formato SPED |
-| **eSocial** | Exportação | Geração de eventos de admissão, ponto e folha |
-| **Folha de Pagamento** | Exportação | Exportação de dados de horas e cálculos trabalhistas |
-| **BI (Business Intelligence)** | Leitura | Acesso a dados consolidados para dashboards externos |
+Quando a quantidade de um item ficar abaixo do **estoque mínimo** cadastrado, o sistema exibe um alerta visual para que você providencie a reposição antes que o material acabe.
 
 ---
 
-## 8.5. Módulo de Relatórios
+## 8.4. Equipe
 
-O módulo de **Relatórios** centraliza todas as opções de geração de relatórios do SIGE, oferecendo uma interface unificada com filtros globais e múltiplos formatos de exportação.
+O módulo de **Equipe** permite organizar seus funcionários em equipes de trabalho e alocá-los nas obras. Com ele, você tem controle sobre quem está trabalhando em cada projeto.
 
-### 8.5.1. Central de Relatórios
+### Como acessar
 
-Acesse **Relatórios** no menu de navegação para visualizar a central de relatórios. A tela principal organiza os relatórios por categoria:
+No menu superior, clique em **Equipe**.
 
-| Categoria | Relatórios Disponíveis |
-|---|---|
-| **Funcionários** | Folha de ponto, horas extras, absenteísmo, custo de mão de obra |
-| **Obras** | Resumo executivo, custos por obra, progresso, cronograma |
-| **Financeiro** | DRE, fluxo de caixa, contas a pagar/receber, balancete |
-| **Veículos** | Custos por veículo, utilização da frota, quilometragem |
-| **Alimentação** | Consumo por obra, custo por funcionário, evolução mensal |
-| **Almoxarifado** | Posição de estoque, movimentações, materiais críticos |
-| **RDO** | Consolidado por obra, produtividade, condições climáticas |
-| **Propostas** | Pipeline comercial, taxa de conversão, valor médio |
+### Gerenciando equipes
 
-### 8.5.2. Filtros Globais
+Na tela principal, você visualiza as equipes cadastradas e seus membros. Para cada equipe, é possível ver:
 
-Todos os relatórios compartilham um conjunto de filtros globais que podem ser combinados:
+- **Nome da equipe** — Identificação do grupo (ex.: "Equipe de Alvenaria", "Equipe Elétrica")
+- **Líder da equipe** — O encarregado ou responsável pelo grupo
+- **Membros** — Lista de funcionários que fazem parte da equipe
+- **Obra vinculada** — Em qual obra a equipe está alocada
 
-| Filtro | Descrição |
-|---|---|
-| **Período** | Data de início e data de fim para delimitação temporal |
-| **Obra** | Filtra dados por uma obra específica ou todas as obras |
-| **Departamento** | Filtra por departamento da empresa |
-| **Funcionário** | Filtra por um funcionário específico |
-| **Status** | Filtra por status do registro (ativo, concluído, pendente, etc.) |
+### Criando uma nova equipe
 
-### 8.5.3. Exportação em PDF e Excel
+1. Clique em **Nova Equipe**.
+2. Defina o **nome** da equipe.
+3. Selecione o **líder** (encarregado) da equipe na lista de funcionários.
+4. Adicione os **membros** da equipe, selecionando os funcionários desejados.
+5. Vincule a equipe a uma **obra**, se aplicável.
+6. Clique em **Salvar**.
 
-Todos os relatórios podem ser exportados nos seguintes formatos:
+### Alocando funcionários em projetos
 
-| Formato | Descrição | Uso Recomendado |
-|---|---|---|
-| **PDF** | Documento formatado para impressão e arquivo | Relatórios gerenciais, apresentações, arquivo físico |
-| **Excel (XLSX)** | Planilha com dados estruturados em colunas | Análises detalhadas, gráficos personalizados, manipulação de dados |
-| **Tela** | Visualização direta no navegador | Consultas rápidas, impressão via navegador |
+Para mover um funcionário de uma obra para outra ou alterar a composição de uma equipe:
 
-**Para exportar um relatório:**
+1. Abra a equipe desejada.
+2. Adicione ou remova membros conforme necessário.
+3. Altere a obra vinculada, se for o caso.
+4. Clique em **Salvar**.
 
-1. Selecione o relatório desejado na central de relatórios.
-2. Configure os filtros (período, obra, departamento, etc.).
-3. Clique em **"Gerar Relatório"** para visualizar na tela.
-4. Utilize os botões **"Exportar PDF"** ou **"Exportar Excel"** para download do arquivo.
+> **Dica:** Manter as equipes atualizadas ajuda na precisão dos relatórios de mão de obra e no cálculo dos custos por obra. Quando um funcionário é alocado a uma obra, os registros de ponto dele podem ser automaticamente vinculados a essa obra.
 
 ---
 
-## 8.6. Módulo de Administração
+## 8.5. Relatórios
 
-O módulo de **Administração** é acessível exclusivamente por usuários do tipo **SUPER_ADMIN** e oferece ferramentas avançadas para gestão, diagnóstico e monitoramento do sistema como um todo.
+O módulo de **Relatórios** é o centro de informações consolidadas do SIGE. Aqui você acessa todos os relatórios disponíveis no sistema, reunidos em um só lugar.
 
-### 8.6.1. Painel Super Admin
+### Como acessar
 
-O painel do Super Admin (URL: `/super_admin_dashboard`) é o centro de controle global do sistema, oferecendo visão sobre todos os tenants (empresas) cadastrados.
+No menu superior, clique em **Relatórios**.
 
-| Funcionalidade | Descrição |
+### Tipos de relatórios disponíveis
+
+| Categoria | Relatórios disponíveis |
 |---|---|
-| **Gestão de Tenants** | Visualizar, criar e gerenciar empresas (administradores) cadastrados no sistema |
-| **Monitoramento Global** | KPIs consolidados de todos os tenants: total de usuários, obras, RDOs, etc. |
-| **Auditoria** | Logs de ações críticas realizadas por todos os usuários do sistema |
-| **Configurações Globais** | Parâmetros que afetam todo o sistema (rate limiting, tamanhos de upload, etc.) |
+| **Obras** | Resumo executivo, custos por obra, progresso dos serviços, comparativo entre obras |
+| **Funcionários** | Horas trabalhadas, horas extras, faltas e absenteísmo, custo de mão de obra |
+| **Ponto** | Frequência por funcionário, resumo de ponto por período, horas extras detalhadas |
+| **Financeiro** | DRE, contas a pagar/receber, fluxo de caixa, despesas por centro de custo |
+| **Frota** | Custos por veículo, utilização da frota, custos por obra |
+| **Alimentação** | Custos com refeições por obra e por período |
+| **RDO** | Relatórios consolidados de obra, evolução de progresso, histórico climático |
 
-### 8.6.2. Diagnósticos do Sistema
+### Como gerar um relatório
 
-O módulo de diagnósticos permite verificar a saúde e o desempenho do sistema:
+1. Selecione a **categoria** do relatório desejado.
+2. Escolha o **tipo** de relatório dentro da categoria.
+3. Aplique os **filtros** disponíveis:
+   - **Período** — Data de início e data de fim
+   - **Obra** — Selecione uma obra específica ou "Todas"
+   - **Departamento** — Filtre por setor (quando aplicável)
+   - **Funcionário** — Filtre por pessoa (quando aplicável)
+4. Clique em **Gerar Relatório**.
+5. O relatório será exibido na tela.
 
-| Diagnóstico | Descrição |
-|---|---|
-| **Status do Banco de Dados** | Verifica conexão, latência e integridade do PostgreSQL |
-| **Uso de Armazenamento** | Espaço utilizado por uploads (fotos de ponto, RDO, propostas) |
-| **Performance** | Tempo de resposta das principais rotas e endpoints |
-| **Integridade de Dados** | Verificação de consistência entre tabelas relacionadas |
-| **Sessões Ativas** | Número de usuários conectados simultaneamente |
-| **Logs de Erro** | Registro de erros e exceções ocorridos no sistema |
+### Exportando relatórios
 
-### 8.6.3. Saúde do Sistema (Health Check)
+Todos os relatórios podem ser exportados para consulta offline ou impressão:
 
-O endpoint de health check permite monitorar a disponibilidade do sistema:
+- **PDF** — Clique no botão **Exportar PDF** para gerar um documento formatado, pronto para imprimir ou enviar por e-mail.
+- **Excel** — Quando disponível, clique em **Exportar Excel** para baixar os dados em formato de planilha, permitindo fazer cálculos e análises adicionais.
 
-```
-GET /api/health
-```
-
-**Resposta:**
-```json
-{
-  "status": "healthy",
-  "database": "connected",
-  "uptime": "72h 15m",
-  "version": "9.0",
-  "timestamp": "2026-02-23T10:30:00Z"
-}
-```
-
-### 8.6.4. Gestão de Backups
-
-O módulo de administração oferece ferramentas para gestão de backups:
-
-| Funcionalidade | Descrição |
-|---|---|
-| **Backup Manual** | Gerar backup completo do banco de dados sob demanda |
-| **Backup Agendado** | Configurar rotina automática de backup (diário, semanal) |
-| **Restauração** | Restaurar banco de dados a partir de um backup anterior |
-| **Histórico** | Visualizar lista de backups realizados com data e tamanho |
-
-> **Importante:** Recomenda-se configurar backups automáticos diários e manter pelo menos 30 dias de histórico. Armazene os backups em local separado do servidor de produção para proteção contra perda de dados.
+> **Dica:** Crie uma rotina mensal de geração de relatórios. Exporte o DRE, o relatório de custos por obra e o resumo de ponto todo mês e guarde em uma pasta organizada. Isso facilita muito quando você precisa consultar dados históricos ou apresentar resultados em reuniões.
 
 ---
 
-# Capitulo 9 — Suporte e Considerações Finais
+# Capítulo 9 — Dúvidas Frequentes e Suporte
 
-**SIGE - Estruturas do Vale (EnterpriseSync)**
-Manual do Usuário — Versão 9.0
-
----
-
-## 9.1. Troubleshooting
-
-Esta seção apresenta os problemas mais comuns encontrados pelos usuários do SIGE e suas respectivas soluções. Consulte a tabela abaixo antes de entrar em contato com o suporte técnico.
-
-### Problemas Comuns e Soluções
-
-| Problema | Causa Provável | Solução |
-|---|---|---|
-| **Não consigo fazer login** | Credenciais incorretas ou usuário desativado | Verifique se o username/e-mail e senha estão corretos. Confirme com o administrador se o usuário está ativo. Tente recuperar a senha ou solicite uma redefinição ao ADMIN. |
-| **Mensagem "Email/Username ou senha inválidos"** | Username ou senha digitados incorretamente | Verifique maiúsculas/minúsculas na senha. Tente usar o e-mail em vez do username (ou vice-versa). Limpe o cache do navegador. |
-| **Sistema muito lento** | Alto volume de dados ou conexão de rede instável | Verifique a conexão de internet. Tente acessar em outro navegador. Reduza o período do filtro de datas. Contate o administrador para verificar o desempenho do servidor. |
-| **Reconhecimento facial falha constantemente** | Fotos cadastradas em condições diferentes da captura | Cadastre novas fotos faciais com iluminação semelhante ao ambiente de registro de ponto. Certifique-se de que a câmera está limpa. Evite contraluz. Cadastre pelo menos 3 fotos diferentes. |
-| **Reconhecimento facial rejeita funcionário válido** | Distância facial acima do limiar (0.40) | Adicione mais fotos ao cadastro facial do funcionário. Tente em condições de melhor iluminação. Verifique se o funcionário mudou de aparência (barba, óculos, etc.) e atualize as fotos. |
-| **RDO não salva / erro ao salvar** | Campos obrigatórios não preenchidos ou RDO duplicado | Verifique se todos os campos obrigatórios estão preenchidos (Obra e Data são obrigatórios). Confirme que não existe outro RDO para a mesma obra na mesma data. |
-| **RDO não pode ser editado** | RDO com status "Pendente de Aprovação" ou "Aprovado" | Apenas RDOs com status "Rascunho" ou "Em Elaboração" podem ser editados. Solicite ao gestor que reprove o RDO para permitir a edição. |
-| **Progresso da obra não atualiza** | RDO não foi aprovado pelo gestor | O progresso da obra só é atualizado quando o RDO é aprovado. Solicite ao gestor que aprove os RDOs pendentes. |
-| **Discrepância nos valores financeiros** | Lançamentos duplicados ou período de filtro incorreto | Verifique o período selecionado nos filtros. Confira se não há lançamentos duplicados. Revise os centros de custo associados. Compare com o extrato de fluxo de caixa. |
-| **Contas a pagar/receber com status incorreto** | Baixas não registradas ou valores incorretos | Verifique se todos os pagamentos/recebimentos foram baixados corretamente. Confira os valores de cada baixa. O status é calculado automaticamente pelo sistema. |
-| **Fotos do RDO não carregam** | Erro no upload ou formato não suportado | Verifique se a foto está em formato JPG, PNG ou WebP. O tamanho máximo é de 10 MB por imagem. Tente capturar a foto novamente. |
-| **Geolocalização não funciona** | GPS desativado ou permissão negada no navegador | Ative o GPS/localização do dispositivo. Conceda permissão de localização ao navegador. Verifique se a obra possui coordenadas cadastradas (latitude e longitude). |
-| **Relatório PDF em branco** | Sem dados no período selecionado | Verifique se existem dados para o período e filtros selecionados. Tente ampliar o intervalo de datas. |
-| **Erro "500 Internal Server Error"** | Erro interno do servidor | Tente novamente em alguns minutos. Se persistir, contate o suporte técnico informando a URL, o horário e a ação que estava realizando. |
-| **Usuário não aparece na lista** | Filtro de status ativo ou busca restritiva | Verifique se o filtro de status não está ocultando usuários inativos. Limpe o campo de busca e tente novamente. |
-| **Dados de outro tenant aparecendo** | Erro de configuração do admin_id | Contate o suporte técnico imediatamente. Este é um problema crítico de isolamento de dados que deve ser resolvido com urgência. |
-
-### Passos Gerais para Resolução
-
-1. **Atualize a página** — Pressione `Ctrl+F5` (ou `Cmd+Shift+R` no Mac) para forçar a atualização completa.
-2. **Limpe o cache** — Acesse as configurações do navegador e limpe o cache e cookies.
-3. **Tente outro navegador** — Teste em Chrome, Firefox ou Edge para descartar problemas de compatibilidade.
-4. **Verifique a conexão** — Confirme que a internet está funcionando e estável.
-5. **Consulte o administrador** — Se o problema persistir, informe ao administrador do sistema com detalhes do erro.
+Este capítulo reúne as perguntas mais comuns sobre o uso do SIGE, dicas práticas para o dia a dia e informações sobre como obter suporte.
 
 ---
 
-## 9.2. Boas Práticas
+## 9.1. Perguntas Frequentes
 
-Adotar boas práticas no uso diário do SIGE garante a qualidade dos dados, a eficiência operacional e a confiabilidade das informações gerenciais.
+Abaixo estão as dúvidas mais comuns dos usuários do SIGE e suas respostas:
 
-### 9.2.1. Rotinas Diárias
+| # | Pergunta | Resposta |
+|:-:|----------|----------|
+| 1 | **Não consigo fazer login. O que faço?** | Verifique se o nome de usuário (ou e-mail) e a senha estão corretos. Confira se o Caps Lock não está ativado. Se ainda não funcionar, peça ao administrador da empresa para verificar seu cadastro ou redefinir sua senha. |
+| 2 | **Esqueci minha senha. Como recupero?** | Entre em contato com o administrador da sua empresa. Ele pode redefinir sua senha pelo painel de gestão de usuários. Após receber a nova senha, altere-a no primeiro acesso. |
+| 3 | **O RDO não está salvando. O que pode ser?** | Verifique se todos os campos obrigatórios foram preenchidos (obra, data, condições climáticas). Confira também se sua conexão com a internet está funcionando. Se o problema persistir, tente recarregar a página e preencher novamente. |
+| 4 | **A foto não está sendo enviada no RDO.** | Verifique se o navegador tem permissão para acessar a câmera do dispositivo. Tente tirar a foto novamente com boa iluminação. Se estiver usando uma foto da galeria, verifique se o arquivo não é muito grande. O sistema aceita fotos em JPG e PNG. |
+| 5 | **Os números do financeiro parecem errados.** | Verifique se o filtro de período está selecionando as datas corretas. Confira se todos os pagamentos e recebimentos foram registrados no sistema. Lembre-se de que os custos de alimentação, transporte e mão de obra são calculados automaticamente — verifique se esses módulos estão com dados atualizados. |
+| 6 | **Como altero o status de uma obra?** | Acesse a página de detalhes da obra e clique no botão **Alterar Status**. Você pode alternar entre "Em andamento", "Paralisada", "Concluída" e "Cancelada". |
+| 7 | **Posso criar dois RDOs para a mesma obra no mesmo dia?** | Não. O sistema permite apenas um RDO por obra por dia. Se já existir um RDO para aquela data, você será redirecionado para editar o existente. |
+| 8 | **O reconhecimento facial não está funcionando.** | Cadastre novas fotos do funcionário em condições de iluminação semelhantes ao local onde o ponto é registrado. Cadastre pelo menos 3 fotos com variações (com/sem óculos, com/sem capacete). Veja as dicas no Capítulo 3, seção 3.6.3. |
+| 9 | **Como faço para um funcionário ver apenas suas próprias informações?** | Funcionários com perfil "Funcionário" já têm acesso restrito por padrão. Eles só conseguem ver o próprio painel, registrar ponto e visualizar os RDOs consolidados. |
+| 10 | **O progresso da obra não está atualizando.** | O progresso só é atualizado quando um RDO é **aprovado** pelo gestor. Verifique se os RDOs da obra estão com status "Aprovado". RDOs em rascunho ou pendentes de aprovação não atualizam o progresso. |
+| 11 | **Como exporto um relatório em PDF?** | Acesse o relatório desejado (pode ser no módulo de Obras, Funcionários, RDO ou Financeiro), configure os filtros e clique no botão **Exportar PDF** ou **Gerar PDF**. O arquivo será baixado automaticamente. |
+| 12 | **Cadastrei um funcionário com dados errados. Posso corrigir?** | Sim. Acesse o perfil do funcionário, clique em **Editar** e corrija as informações necessárias. Clique em **Salvar** para confirmar. |
+| 13 | **Posso usar o SIGE pelo celular?** | Sim! O sistema é totalmente responsivo e funciona em celulares e tablets. Basta acessar o endereço do SIGE pelo navegador do dispositivo (Chrome ou Safari). |
+| 14 | **Como sei quanto uma obra está custando?** | Acesse a página de detalhes da obra. Os indicadores no topo mostram o custo total, dividido por categoria (mão de obra, alimentação, transporte e outros). Você também pode gerar relatórios detalhados de custos. |
+| 15 | **O que acontece se eu excluir uma obra?** | A exclusão é permanente. Os serviços, custos diversos e alocações de equipe são removidos. Os RDOs já criados são mantidos para histórico. Recomendamos alterar o status para "Concluída" ou "Cancelada" em vez de excluir. |
+| 16 | **Como registro uma falta justificada?** | No controle de ponto, localize o registro de falta, clique em Editar, altere o tipo para "Falta Justificada" e descreva o motivo nas observações (ex.: atestado médico). |
+| 17 | **Por que meu Dashboard está mostrando tudo zerado?** | Provavelmente o filtro de período está selecionando um intervalo sem dados. Ajuste as datas de início e fim para um período que tenha registros no sistema. |
 
-| Prática | Descrição | Responsável |
-|---|---|---|
-| **Registrar ponto diariamente** | Todos os funcionários devem registrar entrada e saída todos os dias | Funcionários / Gestores |
-| **Preencher RDOs no mesmo dia** | Registre o RDO no próprio dia da obra para maior precisão dos dados | Gestores de Equipe |
-| **Aprovar RDOs pendentes** | Revise e aprove os RDOs no final de cada dia ou início do dia seguinte | Administradores |
-| **Verificar o Dashboard** | Acesse o Dashboard no início do expediente para acompanhar os KPIs | Administradores |
-| **Registrar refeições** | Lance as refeições fornecidas diariamente no módulo de Alimentação | Responsáveis pela alimentação |
+---
 
-### 9.2.2. Rotinas Semanais
+## 9.2. Dicas do Dia a Dia
 
-| Prática | Descrição | Responsável |
-|---|---|---|
-| **Revisar custos das obras** | Compare orçado vs. realizado e identifique desvios | Administradores |
-| **Atualizar alocação de equipes** | Verifique se as equipes estão corretamente alocadas às obras | Gestores |
-| **Conferir movimentações de almoxarifado** | Valide entradas e saídas de materiais registradas na semana | Almoxarifes |
-| **Verificar contas a pagar** | Confira vencimentos da semana seguinte e programe pagamentos | Financeiro |
-| **Atualizar quilometragem dos veículos** | Confirme que os registros de uso estão atualizados | Motoristas / Gestores |
+Confira dicas práticas organizadas por perfil de usuário para aproveitar ao máximo o SIGE:
 
-### 9.2.3. Rotinas Mensais
+### Para Administradores
 
-| Prática | Descrição | Responsável |
-|---|---|---|
-| **Gerar relatórios consolidados** | Emita relatórios de funcionários, obras e financeiro do mês | Administradores |
-| **Conferir folha de pagamento** | Valide horas trabalhadas, extras, faltas e DSR calculados pelo sistema | RH / Administradores |
-| **Realizar backup manual** | Gere um backup completo do banco de dados e armazene em local seguro | Super Admin / TI |
-| **Revisar propostas comerciais** | Acompanhe propostas pendentes, expiradas e oportunidades de follow-up | Comercial |
-| **Atualizar dados cadastrais** | Revise e atualize dados de funcionários, veículos e fornecedores | Administradores |
-| **Inventário de almoxarifado** | Realize contagem física e compare com o saldo do sistema | Almoxarifes |
+1. **Comece o dia pelo Dashboard** — Acesse o Painel de Controle logo cedo para ter uma visão geral de como está a operação da empresa.
+2. **Revise as contas toda semana** — No módulo Financeiro, filtre as contas a pagar por "Vencido" e "Pendente" para não perder prazos.
+3. **Acompanhe os RDOs pendentes** — Aprove os RDOs rapidamente para manter o progresso das obras atualizado.
+4. **Gere o DRE todo mês** — O Demonstrativo de Resultado mostra se a empresa está lucrando ou não. É fundamental para tomada de decisão.
+5. **Mantenha os cadastros atualizados** — Funcionários que saíram devem ser marcados como inativos. Obras concluídas devem ter o status alterado. Isso mantém os indicadores precisos.
+6. **Exporte relatórios mensais** — Guarde PDFs do DRE, do fluxo de caixa e dos custos por obra para ter um histórico organizado.
+7. **Configure os horários de trabalho** — Verifique se os modelos de horário estão corretos para evitar erros no cálculo de horas extras.
 
-### 9.2.4. Dicas Gerais
+### Para Engenheiros e Gestores de Campo
 
-1. **Mantenha os cadastros atualizados** — Dados desatualizados comprometem a qualidade dos relatórios e KPIs.
-2. **Utilize senhas fortes** — Combine letras, números e caracteres especiais. Troque as senhas periodicamente.
-3. **Treine os usuários** — Garanta que todos os colaboradores conheçam as funcionalidades que precisam utilizar.
-4. **Documente processos** — Registre os procedimentos operacionais padrão da empresa no uso do sistema.
-5. **Utilize filtros e relatórios** — Explore os filtros avançados e relatórios para tomar decisões baseadas em dados.
-6. **Faça backups regulares** — Nunca dependa de um único ponto de armazenamento para dados críticos.
-7. **Monitore alertas** — Preste atenção aos alertas do Dashboard e do almoxarifado para agir preventivamente.
-8. **Atualize fotos faciais** — Quando funcionários mudam de aparência, atualize as fotos de reconhecimento.
-9. **Registre observações nos RDOs** — Comentários detalhados facilitam a análise futura e a resolução de disputas.
-10. **Vincule custos às obras** — Sempre associe despesas a obras específicas para um controle financeiro preciso.
+1. **Preencha o RDO todo dia** — Não deixe para o dia seguinte. As informações ficam mais precisas quando registradas no mesmo dia.
+2. **Capriche nas fotos** — Tire pelo menos uma foto por serviço executado. Fotos são a melhor prova do andamento da obra.
+3. **Atualize os percentuais com cuidado** — Percentuais errados prejudicam todo o planejamento. Avalie visualmente antes de informar.
+4. **Registre as condições climáticas** — Chuva e mau tempo justificam atrasos. Sem registro, fica difícil comprovar depois.
+5. **Use o botão +RDO na tela de Obras** — É mais rápido do que criar pelo menu de RDOs, e o formulário já vem com a obra selecionada.
+6. **Registre todos os terceirizados** — Mesmo que não sejam funcionários da empresa, é importante registrar a presença deles para controle de custos e segurança.
+7. **Confira o progresso da obra semanalmente** — Acesse os detalhes da obra para verificar se os indicadores refletem a realidade do canteiro.
+
+### Para Funcionários
+
+1. **Bata o ponto pelo celular** — Acesse o SIGE pelo navegador do celular e registre seu ponto de entrada e saída diariamente.
+2. **Posicione bem o rosto para o reconhecimento facial** — Centralize o rosto na tela, com boa iluminação, para que o sistema reconheça rapidamente.
+3. **Finalize seus RDOs em rascunho** — Se você tem RDOs pendentes, complete-os para que as informações sejam contabilizadas.
+4. **Use as Ações Rápidas** — Os botões de ação rápida no seu painel economizam tempo: Criar RDO, Ver Obras e Ver RDOs.
+5. **Informe ao gestor se o ponto não for registrado** — Se houve algum problema no registro (sem internet, câmera não funcionou), avise para que o gestor possa corrigir manualmente.
 
 ---
 
 ## 9.3. Contato do Suporte
 
-Para suporte técnico ou dúvidas sobre o sistema SIGE EnterpriseSync, utilize os canais abaixo:
+Se você encontrou algum problema que não conseguiu resolver com as orientações deste manual, entre em contato com o suporte:
 
-### Canais de Atendimento
+| Canal | Informação |
+|---|---|
+| **E-mail do Suporte** | [suporte@suaempresa.com.br] |
+| **Telefone / WhatsApp** | [(XX) XXXX-XXXX] |
+| **Horário de Atendimento** | Segunda a sexta, das 08h às 18h |
+| **Administrador do Sistema** | Procure o administrador da sua empresa para questões internas (redefinição de senha, criação de cadastro, ajuste de permissões) |
 
-| Canal | Informação | Horário |
-|---|---|---|
-| **E-mail** | [suporte@enterprisesync.com.br] | Segunda a Sexta, 08:00 - 18:00 |
-| **Telefone** | [+55 (XX) XXXX-XXXX] | Segunda a Sexta, 08:00 - 18:00 |
-| **WhatsApp** | [+55 (XX) XXXXX-XXXX] | Segunda a Sexta, 08:00 - 18:00 |
-| **Portal de Suporte** | [https://suporte.enterprisesync.com.br] | 24 horas (registro de chamados) |
-
-### Níveis de Suporte
-
-| Nível | Descrição | SLA |
-|---|---|---|
-| **Crítico** | Sistema indisponível ou perda de dados | Resposta em até 1 hora |
-| **Alto** | Funcionalidade principal inoperante | Resposta em até 4 horas |
-| **Médio** | Problema parcial que não impede o uso | Resposta em até 8 horas |
-| **Baixo** | Dúvida, sugestão ou melhoria | Resposta em até 24 horas |
-
-### Informações para o Chamado
-
-Ao entrar em contato com o suporte, tenha em mãos:
-
-1. **Nome do usuário** e **tipo de perfil** (ADMIN, GESTOR, etc.)
-2. **URL da página** onde o problema ocorreu
-3. **Descrição detalhada** do problema ou dúvida
-4. **Passos para reprodução** (o que foi feito antes do erro)
-5. **Mensagem de erro** exibida (se houver)
-6. **Print da tela** com o erro visível
-7. **Navegador e dispositivo** utilizados (ex.: Chrome 120, Windows 11)
-
-> **Nota:** Os dados de contato acima são placeholders. Substitua pelas informações reais da equipe de suporte da sua organização.
+> **Antes de entrar em contato com o suporte:**
+>
+> 1. Consulte este manual — muitas dúvidas são respondidas aqui.
+> 2. Verifique se o problema pode ser resolvido pelo administrador da empresa (ex.: redefinição de senha, alteração de perfil).
+> 3. Anote as informações do problema: qual tela estava usando, o que tentou fazer, e se apareceu alguma mensagem de erro. Isso ajuda o suporte a resolver mais rápido.
 
 ---
 
 ## 9.4. Glossário
 
-Relação dos principais termos e siglas utilizados no SIGE EnterpriseSync:
+Abaixo estão os termos mais usados no SIGE e suas explicações em linguagem simples:
 
-| Termo | Definição |
+| Termo | O que significa |
 |---|---|
-| **Admin (ADMIN)** | Administrador do sistema — tipo de usuário com permissões completas para gerenciar dados da sua empresa (tenant) |
-| **admin_id** | Campo presente em todas as tabelas do banco de dados que garante o isolamento multi-tenant dos dados por empresa |
-| **Almoxarifado** | Módulo do sistema responsável pelo controle de estoque de materiais, ferramentas e EPIs |
-| **API** | Application Programming Interface — interface de programação para integração com sistemas externos |
-| **Balancete** | Relatório contábil que apresenta os saldos de todas as contas em um determinado período |
-| **CA** | Certificado de Aprovação — documento obrigatório para EPIs conforme NR-6 |
-| **Centro de Custo** | Unidade de classificação de despesas por área de responsabilidade (obra, departamento, projeto) |
-| **DRE** | Demonstrativo de Resultado do Exercício — relatório contábil que apresenta receitas, custos e resultado do período |
-| **DSR** | Descanso Semanal Remunerado — direito trabalhista calculado sobre horas extras conforme Lei 605/49 |
-| **EPI** | Equipamento de Proteção Individual — equipamento de segurança obrigatório conforme NR-6 |
-| **EventManager** | Componente interno do sistema que gerencia eventos e dispara atualizações automáticas entre módulos |
-| **Geofencing** | Cerca virtual baseada em coordenadas GPS utilizada para validar a localização do funcionário no registro de ponto |
-| **KPI** | Key Performance Indicator — Indicador-Chave de Desempenho exibido nos dashboards e relatórios |
-| **Multi-tenant** | Arquitetura que permite múltiplas empresas operarem de forma isolada na mesma instalação do sistema |
-| **NR-6** | Norma Regulamentadora nº 6 do Ministério do Trabalho — regulamenta o uso de EPIs |
-| **Obra** | Projeto de construção civil cadastrado no sistema, com orçamento, equipe, serviços e controle financeiro |
-| **Ponto** | Registro de frequência do funcionário — entrada, saída, almoço — com suporte a reconhecimento facial |
-| **Portal do Cliente** | Interface web de acesso externo que permite ao cliente acompanhar o andamento da obra ou proposta |
-| **RDO** | Relatório Diário de Obra — documento que registra diariamente as atividades executadas no canteiro |
-| **Reconhecimento Facial** | Tecnologia biométrica utilizada para validar a identidade do funcionário no registro de ponto |
-| **SIGE** | Sistema Integrado de Gestão Empresarial — nome interno do sistema EnterpriseSync |
-| **SPED** | Sistema Público de Escrituração Digital — formato da Receita Federal para transmissão de dados contábeis |
-| **Subatividade** | Divisão detalhada de um serviço cadastrado na obra, utilizada para controle granular de progresso no RDO |
-| **Super Admin (SUPER_ADMIN)** | Tipo de usuário com acesso irrestrito a todas as funcionalidades e dados de todos os tenants do sistema |
-| **Tenant** | Inquilino — cada empresa que opera dentro da mesma instalação do sistema com dados isolados |
-| **Token** | Chave de autenticação temporária utilizada para acesso à API ou ao portal do cliente |
-| **WebP** | Formato de imagem otimizado utilizado pelo sistema para armazenar fotos com qualidade e menor tamanho |
+| **Almoxarifado** | O local onde são guardados materiais, ferramentas e equipamentos de proteção (EPIs). No sistema, é o módulo que controla o estoque desses itens. |
+| **Card** | Cartão visual que aparece na tela do sistema, mostrando um resumo das informações de um item (funcionário, obra, veículo, etc.). |
+| **Centro de Custo** | Uma forma de organizar os gastos da empresa por área, obra ou departamento, facilitando a análise de onde o dinheiro está sendo gasto. |
+| **Contraluz** | Quando a luz está atrás da pessoa na hora de tirar a foto, deixando o rosto escuro. Evite essa situação ao tirar fotos para o reconhecimento facial. |
+| **Dashboard** | Painel de controle do sistema, que mostra indicadores, gráficos e resumos da empresa em uma única tela. |
+| **DRE** | Demonstrativo de Resultado do Exercício — relatório financeiro que mostra se a empresa teve lucro ou prejuízo em um período. |
+| **DSR** | Descanso Semanal Remunerado — valor adicional pago sobre as horas extras, garantido por lei. O sistema calcula automaticamente. |
+| **EPI** | Equipamento de Proteção Individual — itens como capacete, luva, óculos de proteção e botas, obrigatórios para trabalho em obra. |
+| **Fluxo de Caixa** | Extrato que mostra todas as entradas e saídas de dinheiro da empresa em ordem cronológica. |
+| **Geofence** | Cerca virtual — um perímetro digital ao redor da obra que verifica se o funcionário está no local correto ao registrar o ponto. |
+| **KPI** | Indicador-chave de desempenho (Key Performance Indicator) — são os números importantes que aparecem nos painéis do sistema (ex.: custo total, obras ativas, funcionários). |
+| **Licenciamento** | Documento anual obrigatório para veículos, que inclui o pagamento do IPVA e taxas. O sistema avisa quando está próximo do vencimento. |
+| **Login** | O processo de entrar no sistema usando seu nome de usuário (ou e-mail) e sua senha. |
+| **Logout** | O processo de sair do sistema, encerrando sua sessão de forma segura. |
+| **Margem** | A diferença entre o valor do contrato (o que o cliente paga) e o custo real da obra. Margem positiva significa lucro; negativa significa prejuízo. |
+| **Obra** | Um projeto de construção cadastrado no sistema, que pode ser uma edificação, reforma, instalação ou qualquer serviço de engenharia. |
+| **Orçamento** | O valor estimado que a empresa prevê gastar para executar uma obra (custo interno). |
+| **PDF** | Formato de arquivo para documentos, usado para gerar relatórios que podem ser impressos ou enviados por e-mail. |
+| **Ponto** | O registro de entrada e saída do funcionário no trabalho, usado para controlar a jornada de trabalho. |
+| **Portal do Cliente** | Um link exclusivo gerado pelo sistema que permite ao cliente acompanhar o andamento da obra pela internet, sem precisar de login no SIGE. |
+| **Proposta Comercial** | Um documento que apresenta ao cliente o escopo, o valor e as condições de um serviço que a empresa oferece. |
+| **RDO** | Relatório Diário de Obra — documento que registra tudo o que aconteceu na obra em um dia de trabalho (equipe, serviços, fotos, clima, equipamentos). |
+| **Reconhecimento Facial** | Funcionalidade que compara a foto tirada no momento do registro de ponto com as fotos cadastradas do funcionário, para confirmar a identidade. |
+| **RENAVAM** | Registro Nacional de Veículos Automotores — número de identificação do veículo que consta no documento (CRV/CRLV). |
+| **Responsivo** | Característica do sistema que faz com que a tela se adapte automaticamente ao tamanho do dispositivo (computador, tablet ou celular). |
+| **Status** | A situação atual de um item no sistema (ex.: obra "Em andamento", conta "Pendente", veículo "Ativo", RDO "Aprovado"). |
+| **Subatividade** | Uma etapa menor dentro de um serviço da obra. Por exemplo, o serviço "Alvenaria" pode ter as subatividades "Marcação", "Elevação 1º pavimento" e "Elevação 2º pavimento". |
+| **Taxa de Absenteísmo** | Percentual que indica quantos dias os funcionários faltaram em relação ao total de dias úteis do período. |
+| **Valor do Contrato** | O valor total que o cliente pagará pela obra, conforme acordado em contrato. É a receita prevista do projeto. |
 
 ---
 
-<div align="center">
-
----
-
-**SIGE - Estruturas do Vale (EnterpriseSync)**
-**Manual do Usuário — Versão 9.0**
-
-Documento gerado em Fevereiro de 2026
-Todos os direitos reservados.
-
----
-
-</div>
+*SIGE - Estruturas do Vale (EnterpriseSync) — Manual do Usuário*
+*Versão 1.0 | Fevereiro de 2026*
