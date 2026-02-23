@@ -1,348 +1,497 @@
 # Capítulo 5 — Gestão de Frota e Veículos
 
-## 5.1. Introdução à Gestão de Frota
+## 5.1. Introdução
 
-O módulo de **Gestão de Frota** do SIGE (EnterpriseSync) permite o controle completo dos veículos utilizados pela empresa em suas operações. Com ele, é possível:
+Bem-vindo ao módulo de **Gestão de Frota** do SIGE! Este é o seu centro de controle para tudo que envolve os veículos da empresa. Aqui você pode:
 
-- Cadastrar e manter atualizados os dados de cada veículo da frota;
-- Registrar o uso dos veículos, incluindo motorista, obra de destino, quilometragem e passageiros;
-- Controlar todos os custos associados (combustível, manutenção, pedágio, seguro, entre outros);
-- Acompanhar indicadores-chave de desempenho (KPIs) como custo total, custo por quilômetro e quilometragem acumulada;
-- Visualizar gráficos de custos por mês e por categoria;
-- Monitorar documentação veicular, como data de licenciamento e vigência do seguro.
+- Cadastrar todos os veículos da sua frota (carros, caminhonetes, caminhões, vans, motos);
+- Registrar cada viagem realizada — quem dirigiu, para onde foi, quantos quilômetros rodou e quem estava no veículo;
+- Controlar todos os gastos — combustível, manutenção, pedágio, seguro, licenciamento, multas e muito mais;
+- Acompanhar indicadores importantes como custo total, custo por quilômetro e quilometragem acumulada;
+- Visualizar gráficos que mostram para onde está indo o dinheiro da frota;
+- Ficar de olho nos vencimentos de licenciamento e seguro para não ter surpresas.
 
-O acesso ao módulo é feito pelo menu lateral, clicando em **Veículos**. O Dashboard principal do sistema também exibe o KPI de quantidade de veículos cadastrados.
+Para acessar o módulo, basta clicar em **Veículos** no menu lateral do sistema.
 
 [IMAGEM: Menu lateral com destaque no item Veículos]
 
+> **Dica rápida:** O Dashboard principal do SIGE também mostra um resumo com a quantidade de veículos cadastrados na sua frota.
+
 ---
 
-## 5.2. Tela Principal de Veículos
+## 5.2. Visualizando a Lista de Veículos
 
-Ao acessar o menu **Veículos** (URL: `/veiculos`), o sistema exibe a listagem completa dos veículos cadastrados. A tela apresenta os veículos em formato de cards ou lista, permitindo uma visão rápida do estado da frota.
+Ao clicar em **Veículos** no menu lateral, você verá a tela principal com todos os veículos cadastrados. Cada veículo aparece em formato de card, permitindo uma visão rápida do estado da sua frota.
 
-[IMAGEM: Tela principal de veículos com listagem]
+[IMAGEM: Tela principal de veículos com listagem em cards]
 
-### 5.2.1. Informações Exibidas
+### O que você vê em cada card de veículo
 
-Cada veículo na listagem apresenta as seguintes informações:
+Cada card exibe as informações essenciais do veículo de forma resumida:
 
-| Informação         | Descrição                                                  |
-|---------------------|------------------------------------------------------------|
-| **Placa**           | Placa do veículo no formato Mercosul ou antigo             |
-| **Modelo / Marca**  | Modelo e fabricante do veículo                             |
-| **Ano**             | Ano de fabricação                                          |
-| **Tipo**            | Categoria do veículo (caminhonete, carro, caminhão, etc.)  |
-| **Cor**             | Cor do veículo                                             |
-| **KM Atual**        | Quilometragem atual registrada no odômetro                 |
-| **Status**          | Situação atual: Ativo, Em manutenção, Inativo, etc.        |
+- **Placa** — A placa do veículo (pode ser no formato antigo ABC-1234 ou no formato Mercosul ABC1D23)
+- **Modelo e Marca** — Por exemplo: "Hilux — Toyota" ou "Saveiro — Volkswagen"
+- **Ano** — Ano de fabricação do veículo
+- **Tipo** — Se é carro, caminhonete, caminhão, van, moto, etc.
+- **Cor** — A cor do veículo
+- **KM Atual** — A quilometragem mais recente registrada no odômetro
+- **Status** — A situação atual do veículo
 
-### 5.2.2. Status dos Veículos
+### Entendendo os status dos veículos
 
-O sistema utiliza indicadores visuais (badges coloridos) para representar o status de cada veículo:
+Os veículos são classificados com etiquetas coloridas para facilitar a identificação:
 
-| Status              | Cor        | Descrição                                      |
-|---------------------|------------|-------------------------------------------------|
-| **Ativo**           | Verde      | Veículo disponível para uso                     |
-| **Em manutenção**   | Amarelo    | Veículo temporariamente indisponível            |
-| **Inativo**         | Vermelho   | Veículo fora de operação                        |
+- 🟢 **Ativo** — O veículo está disponível e pronto para uso
+- 🟡 **Em manutenção** — O veículo está temporariamente fora de operação (na oficina, por exemplo)
+- 🔴 **Inativo** — O veículo não está sendo utilizado (vendido, baixado, parado definitivamente)
 
-### 5.2.3. Ações Disponíveis
+Essas etiquetas ajudam você a saber rapidamente quantos veículos estão disponíveis na sua frota.
 
-Na tela de listagem, o usuário pode executar as seguintes ações:
+### O que você pode fazer nesta tela
 
-1. **Novo Veículo** — Botão para cadastrar um novo veículo na frota;
-2. **Visualizar Detalhes** — Acessa o painel completo com KPIs, gráficos e histórico do veículo;
-3. **Editar** — Altera os dados cadastrais do veículo;
-4. **Registrar Uso** — Abre o formulário para lançar uma nova viagem/uso;
-5. **Lançar Custo** — Registra um novo custo associado ao veículo;
-6. **Excluir** — Remove o veículo do sistema (ação restrita a administradores).
+A partir da lista de veículos, você tem acesso a diversas ações:
 
-[IMAGEM: Botões de ação na listagem de veículos]
+1. **Cadastrar um novo veículo** — Clique no botão **Novo Veículo** no topo da página
+2. **Ver os detalhes completos** — Clique no card de um veículo para acessar KPIs, gráficos e todo o histórico
+3. **Editar os dados** — Atualize informações como placa, modelo, quilometragem ou status
+4. **Registrar uma viagem** — Informe quem usou o veículo, para onde foi e quantos km rodou
+5. **Lançar um custo** — Registre um abastecimento, uma manutenção, um pedágio ou qualquer outro gasto
+6. **Excluir** — Remova o veículo do sistema (esta ação é restrita a administradores)
+
+[IMAGEM: Botões de ação disponíveis nos cards de veículos]
 
 ---
 
 ## 5.3. Cadastrando um Novo Veículo
 
-Para cadastrar um novo veículo, clique no botão **Novo Veículo** na tela principal ou acesse diretamente a URL `/veiculos/novo`. O formulário de cadastro está dividido em três seções.
+Quando a empresa adquire um novo veículo ou você precisa incluir um veículo que já existia mas não estava no sistema, siga estes passos:
+
+### Passo a passo
+
+1. Acesse **Veículos** no menu lateral
+2. Clique no botão **Novo Veículo** (geralmente no canto superior da tela)
+3. Preencha o formulário conforme orientações abaixo
+4. Clique em **Salvar** para concluir o cadastro
 
 [IMAGEM: Formulário de cadastro de novo veículo]
 
-### 5.3.1. Dados do Veículo
+### Seção 1: Dados do Veículo
 
-Preencha os campos de identificação básica do veículo:
+Estes são os dados básicos de identificação:
 
-| Campo       | Obrigatório | Descrição                                              |
-|-------------|-------------|--------------------------------------------------------|
-| **Placa**   | Sim         | Placa do veículo (formato antigo ABC-1234 ou Mercosul ABC1D23) |
-| **Modelo**  | Sim         | Modelo do veículo (ex.: Hilux, Saveiro, HR)            |
-| **Marca**   | Sim         | Fabricante (ex.: Toyota, Volkswagen, Hyundai)          |
-| **Ano**     | Sim         | Ano de fabricação do veículo                           |
-| **Tipo**    | Sim         | Categoria: Carro, Caminhonete, Caminhão, Van, Moto, etc. |
-| **Cor**     | Não         | Cor predominante do veículo                            |
-| **KM Atual**| Não         | Quilometragem atual do odômetro                        |
-| **Status**  | Sim         | Situação inicial do veículo (Ativo, Em manutenção, Inativo) |
+- **Placa** *(obrigatório)* — Digite a placa do veículo. Pode ser no formato antigo (ABC-1234) ou no formato Mercosul (ABC1D23). Exemplo: *HXT-4A52*
 
-**Dica:** Informe a quilometragem atual com precisão, pois ela será utilizada como referência para validação dos lançamentos de uso subsequentes.
+- **Modelo** *(obrigatório)* — Informe o modelo do veículo. Exemplos: *Hilux, Saveiro, HR, Clio, Sprinter*
 
-### 5.3.2. Dados de Documentação
+- **Marca** *(obrigatório)* — O fabricante do veículo. Exemplos: *Toyota, Volkswagen, Hyundai, Renault, Mercedes-Benz*
 
-Registre as informações documentais do veículo para controle de regularidade:
+- **Ano** *(obrigatório)* — O ano de fabricação. Exemplo: *2022*
 
-| Campo                    | Obrigatório | Descrição                                        |
-|--------------------------|-------------|--------------------------------------------------|
-| **RENAVAM**              | Não         | Número do Registro Nacional de Veículos          |
-| **Chassi**               | Não         | Número do chassi do veículo                      |
-| **Data de Licenciamento**| Não         | Data de vencimento do licenciamento anual         |
-| **Vigência do Seguro**   | Não         | Data de vencimento da apólice de seguro           |
+- **Tipo** *(obrigatório)* — Escolha a categoria que melhor descreve o veículo:
+  - Carro
+  - Caminhonete
+  - Caminhão
+  - Van
+  - Moto
+  - Outros
 
-**Importante:** O sistema utiliza a data de licenciamento para exibir alertas de proximidade de vencimento na tela de detalhes do veículo.
+- **Cor** *(opcional)* — A cor predominante do veículo. Exemplo: *Branca, Prata, Preta*
 
-### 5.3.3. Configurações de Custo
+- **KM Atual** *(opcional, mas recomendado)* — Informe a quilometragem atual que aparece no painel do veículo. Exemplo: *45.230*
 
-Configure os parâmetros financeiros do veículo:
+- **Status** *(obrigatório)* — Selecione a situação inicial:
+  - **Ativo** — Se o veículo está pronto para uso
+  - **Em manutenção** — Se está na oficina
+  - **Inativo** — Se não será utilizado no momento
 
-| Campo         | Obrigatório | Descrição                                          |
-|---------------|-------------|-----------------------------------------------------|
-| **Custo/KM**  | Não         | Custo estimado por quilômetro rodado (R$/km)        |
+> **Atenção:** Informe a quilometragem atual com a maior precisão possível! Esse número será usado como referência para validar os registros de viagens futuras. Se o veículo tiver 45.230 km no painel, informe exatamente esse valor.
 
-Este valor é utilizado para cálculos de custo operacional e comparações de eficiência entre veículos da frota.
+### Seção 2: Documentação do Veículo
 
-**Passo a passo para cadastrar:**
+Registre os dados documentais para facilitar o controle de regularidade:
 
-1. Acesse **Veículos** no menu lateral;
-2. Clique no botão **Novo Veículo**;
-3. Preencha os campos obrigatórios (Placa, Modelo, Marca, Ano, Tipo);
-4. Informe os dados de documentação e configurações de custo conforme necessário;
-5. Clique em **Salvar** para concluir o cadastro.
+- **RENAVAM** *(opcional)* — O número do Registro Nacional de Veículos Automotores. Você encontra esse número no documento do veículo (CRV/CRLV). Exemplo: *00123456789*
 
-Após o cadastro, o veículo aparecerá na listagem principal e estará disponível para registro de uso e custos.
+- **Chassi** *(opcional)* — O número do chassi gravado na estrutura do veículo. Exemplo: *9BWHE21JX24060811*
+
+- **Data de Licenciamento** *(opcional, mas recomendado)* — Quando vence o licenciamento anual do veículo. O sistema vai avisar quando estiver perto do vencimento para você não perder o prazo!
+
+- **Vigência do Seguro** *(opcional, mas recomendado)* — Até quando vale a apólice de seguro do veículo. Assim como o licenciamento, o sistema vai alertar quando estiver próximo do vencimento.
+
+> **Dica:** Mesmo que esses campos não sejam obrigatórios, preencha pelo menos as datas de licenciamento e seguro. Assim o sistema trabalha a seu favor, avisando antes que os documentos vençam!
+
+### Seção 3: Configuração de Custo
+
+- **Custo por KM** *(opcional)* — Se você sabe quanto custa, em média, cada quilômetro rodado por esse veículo, informe aqui. Esse valor ajuda nas comparações de eficiência entre os veículos da frota. Exemplo: *R$ 0,85/km*
+
+### Após o cadastro
+
+Depois de salvar, o veículo aparecerá imediatamente na lista principal e você já poderá:
+- Registrar viagens
+- Lançar custos
+- Acompanhar os indicadores
 
 ---
 
-## 5.4. Registrando o Uso de Veículos
+## 5.4. Registrando o Uso do Veículo (Viagens)
 
-O registro de uso documenta cada viagem ou deslocamento realizado com os veículos da frota, vinculando o motorista, a obra de destino, a quilometragem percorrida e os passageiros transportados.
+Toda vez que um veículo sair para uma viagem ou deslocamento, é importante registrar no sistema. Esse controle permite saber quem usou cada veículo, para onde foi, quantos quilômetros rodou e quem estava junto.
 
-### 5.4.1. Lançando Nova Viagem/Uso
+### Passo a passo para registrar uma viagem
 
-Para registrar um novo uso, utilize o botão **Registrar Uso** na listagem de veículos ou acesse o formulário diretamente. O sistema abrirá um modal ou formulário com os seguintes campos:
+1. Na lista de veículos, localize o veículo que foi utilizado
+2. Clique no botão **Registrar Uso** no card desse veículo
+3. Preencha o formulário conforme as orientações abaixo
+4. Clique em **Salvar** para confirmar o registro
 
 [IMAGEM: Formulário de registro de uso do veículo]
 
-| Campo                     | Obrigatório | Descrição                                              |
-|---------------------------|-------------|--------------------------------------------------------|
-| **Veículo**               | Sim         | Veículo utilizado (selecionado automaticamente se acessado via card) |
-| **Motorista/Condutor**    | Sim         | Funcionário responsável pela condução                  |
-| **Data do Uso**           | Sim         | Data em que o deslocamento ocorreu                     |
-| **Horário de Saída**      | Não         | Hora de partida do veículo                             |
-| **Horário de Chegada**    | Não         | Hora de retorno do veículo                             |
-| **KM Inicial**            | Sim         | Quilometragem do odômetro na saída                     |
-| **KM Final**              | Sim         | Quilometragem do odômetro no retorno                   |
-| **Obra**                  | Não         | Obra de destino (vincula o deslocamento a uma obra)    |
-| **Observações**           | Não         | Informações complementares sobre o deslocamento        |
-| **% Combustível**         | Não         | Nível do tanque de combustível no momento do registro  |
-| **Passageiros (Frente)**  | Não         | Funcionários transportados no banco da frente (máx. 3) |
-| **Passageiros (Traseira)**| Não         | Funcionários transportados no banco traseiro (máx. 5)  |
+### Campos do formulário de viagem
 
-**Validações automáticas:**
+- **Veículo** *(preenchido automaticamente)* — Se você clicou no botão do card, o veículo já vem selecionado
 
-- O **KM Final** deve ser maior que o **KM Inicial**;
-- O **KM Final** não pode ser menor que a quilometragem atual registrada do veículo;
-- O mesmo funcionário não pode ser registrado como motorista e passageiro simultaneamente;
-- Há limite máximo de 3 passageiros na frente e 5 na traseira.
+- **Motorista/Condutor** *(obrigatório)* — Selecione na lista o funcionário que dirigiu o veículo. A lista mostra apenas funcionários ativos cadastrados no sistema
 
-**Passo a passo:**
+- **Data do Uso** *(obrigatório)* — Informe a data em que a viagem aconteceu. Exemplo: *15/01/2026*
 
-1. Na listagem de veículos, clique em **Registrar Uso** no card do veículo desejado;
-2. O campo **Veículo** será preenchido automaticamente;
-3. Selecione o **Motorista** na lista de funcionários ativos;
-4. Informe a **Data**, os **horários** e a **quilometragem** de saída e retorno;
-5. Opcionalmente, vincule a uma **Obra** e adicione **passageiros**;
-6. Clique em **Salvar** para registrar o uso.
+- **Horário de Saída** *(opcional)* — Que horas o veículo saiu. Exemplo: *07:30*
 
-Após o registro, a quilometragem atual do veículo é atualizada automaticamente com o valor do KM Final informado.
+- **Horário de Chegada** *(opcional)* — Que horas o veículo retornou. Exemplo: *17:45*
 
-### 5.4.2. Histórico de Usos
+- **KM Inicial** *(obrigatório)* — A quilometragem que estava no painel do veículo no momento da saída. Exemplo: *45.230*
 
-O histórico de usos pode ser consultado na tela de **Detalhes do Veículo** (seção 5.6). Ele apresenta uma tabela cronológica com todos os deslocamentos registrados, incluindo:
+- **KM Final** *(obrigatório)* — A quilometragem que estava no painel quando o veículo voltou. Exemplo: *45.380*
 
-- Data do uso;
-- Nome do motorista/condutor;
-- KM inicial e final;
-- Quilometragem percorrida;
-- Obra de destino;
-- Horários de saída e retorno;
-- Passageiros transportados (com indicação de posição: frente/traseira).
+- **Obra** *(opcional)* — Se o veículo foi para alguma obra específica, selecione a obra na lista. Isso é muito útil para depois saber quanto cada obra gastou com transporte
 
-[IMAGEM: Tabela de histórico de usos do veículo]
+- **% Combustível** *(opcional)* — O nível do tanque de combustível no momento do registro. Útil para controlar o consumo
 
-É possível visualizar os detalhes completos de cada uso clicando sobre o registro, que abrirá um modal com informações detalhadas incluindo dados técnicos, horários e lista de passageiros organizados por posição no veículo.
+- **Passageiros (Frente)** *(opcional)* — Selecione os funcionários que foram no banco da frente (máximo 3 pessoas, incluindo o motorista)
+
+- **Passageiros (Traseira)** *(opcional)* — Selecione os funcionários que foram no banco de trás (máximo 5 pessoas)
+
+- **Observações** *(opcional)* — Qualquer informação adicional sobre a viagem. Exemplo: *"Entrega de materiais na obra do Parque Industrial"*
+
+### Regras que o sistema verifica automaticamente
+
+Para garantir a consistência dos dados, o sistema faz algumas verificações:
+
+- O **KM Final** precisa ser maior que o **KM Inicial** — afinal, o veículo não anda para trás!
+- O **KM Final** não pode ser menor que a última quilometragem registrada do veículo
+- O mesmo funcionário não pode ser motorista e passageiro ao mesmo tempo
+- O número máximo de passageiros na frente é 3 e na traseira é 5
+
+> **Importante:** Após salvar o registro de uso, a quilometragem atual do veículo é atualizada automaticamente com o valor do KM Final. Você não precisa fazer isso manualmente!
+
+### Consultando o histórico de viagens
+
+Todas as viagens registradas ficam guardadas no sistema. Para consultá-las:
+
+1. Clique no card do veículo desejado para abrir a tela de **Detalhes**
+2. Role a página até a seção de **Histórico de Usos**
+3. Você verá uma tabela organizada por data com todas as viagens, mostrando:
+   - Data da viagem
+   - Nome do motorista
+   - KM de saída e chegada
+   - Total de quilômetros percorridos
+   - Obra de destino (quando informada)
+   - Horários de saída e retorno
+   - Lista de passageiros (separados por posição no veículo)
+
+[IMAGEM: Tabela de histórico de viagens do veículo]
+
+> **Dica:** Clique em qualquer viagem na tabela para ver todos os detalhes completos, incluindo a lista de passageiros organizada por posição (frente e traseira).
 
 ---
 
-## 5.5. Controle de Custos de Veículos
+## 5.5. Controlando os Custos dos Veículos
 
-O módulo de custos permite registrar e acompanhar todas as despesas associadas a cada veículo, categorizadas por tipo para análise financeira detalhada.
+Manter o controle financeiro da frota é essencial. O SIGE permite que você registre cada centavo gasto com os veículos, separando por categoria para facilitar a análise.
 
-### 5.5.1. Lançando Novo Custo
+### Passo a passo para lançar um custo
 
-Para registrar um novo custo, utilize o botão **Lançar Custo** na listagem de veículos ou acesse o formulário de novo custo. Preencha os seguintes campos:
+1. Na lista de veículos, localize o veículo que teve a despesa
+2. Clique no botão **Lançar Custo** no card desse veículo
+3. Preencha o formulário conforme as orientações abaixo
+4. Clique em **Salvar** para registrar o custo
 
 [IMAGEM: Formulário de lançamento de custo do veículo]
 
-| Campo            | Obrigatório | Descrição                                              |
-|------------------|-------------|--------------------------------------------------------|
-| **Veículo**      | Sim         | Veículo ao qual o custo será atribuído                 |
-| **Tipo de Custo**| Sim         | Categoria da despesa (ver tabela abaixo)               |
-| **Valor (R$)**   | Sim         | Valor monetário da despesa                             |
-| **Data**         | Sim         | Data em que a despesa ocorreu                          |
-| **Fornecedor**   | Não         | Nome do fornecedor ou prestador de serviço             |
-| **Nota Fiscal**  | Não         | Número da nota fiscal para controle contábil           |
-| **Obra**         | Não         | Obra vinculada ao custo (para rateio por obra)         |
-| **Observações**  | Não         | Detalhes adicionais sobre a despesa                    |
+### Campos do formulário de custo
 
-**Tipos de custo disponíveis:**
+- **Veículo** *(preenchido automaticamente)* — Se você clicou no botão do card, o veículo já vem selecionado
 
-| Tipo de Custo    | Descrição                                           |
-|------------------|-----------------------------------------------------|
-| **Combustível**  | Abastecimentos de combustível                       |
-| **Manutenção**   | Revisões, reparos, troca de peças                   |
-| **Pedágio**      | Custos com pedágios em rodovias                     |
-| **Seguro**       | Pagamento de apólice de seguro                      |
-| **Licenciamento**| Taxas de licenciamento e IPVA                       |
-| **Multa**        | Multas de trânsito                                  |
-| **Lavagem**      | Lavagem e higienização do veículo                   |
-| **Outros**       | Despesas diversas não classificadas acima            |
+- **Tipo de Custo** *(obrigatório)* — Escolha a categoria da despesa:
 
-**Passo a passo:**
+  | Categoria         | Quando usar                                                    |
+  |-------------------|----------------------------------------------------------------|
+  | **Combustível**   | Abastecimentos (gasolina, diesel, etanol, GNV)                 |
+  | **Manutenção**    | Revisões, troca de óleo, pneus, peças, reparos em geral       |
+  | **Pedágio**       | Valores pagos em pedágios de rodovias                          |
+  | **Seguro**        | Parcelas ou pagamento integral do seguro do veículo            |
+  | **Licenciamento** | IPVA, taxas de licenciamento, emplacamento                     |
+  | **Multa**         | Multas de trânsito recebidas                                   |
+  | **Lavagem**       | Lavagem, higienização e limpeza do veículo                     |
+  | **Outros**        | Qualquer despesa que não se encaixe nas categorias acima       |
 
-1. Na listagem de veículos, clique em **Lançar Custo** no card do veículo;
-2. Selecione o **Tipo de Custo** adequado;
-3. Informe o **Valor**, a **Data** e, opcionalmente, o **Fornecedor** e a **Nota Fiscal**;
-4. Vincule a uma **Obra** se o custo for específico de um projeto;
-5. Clique em **Salvar** para registrar o custo.
+- **Valor (R$)** *(obrigatório)* — O valor da despesa. Exemplo: *R$ 350,00*
 
-### 5.5.2. Histórico de Custos
+- **Data** *(obrigatório)* — A data em que a despesa ocorreu. Exemplo: *20/01/2026*
 
-O histórico completo de custos de cada veículo está disponível na tela de **Detalhes do Veículo** (seção 5.6). A tabela apresenta:
+- **Fornecedor** *(opcional)* — O nome do posto, oficina ou empresa que prestou o serviço. Exemplo: *Posto Shell BR-101* ou *Oficina do João*
 
-- Data do custo;
-- Tipo de custo (com indicador visual por categoria);
-- Valor;
-- Fornecedor;
-- Nota fiscal;
-- Obra vinculada;
-- Observações.
+- **Nota Fiscal** *(opcional)* — O número da nota fiscal, para controle contábil. Exemplo: *NF 004521*
+
+- **Obra** *(opcional)* — Se o gasto foi relacionado a uma obra específica, selecione-a aqui. Isso permite saber depois quanto cada obra gastou com frota
+
+- **Observações** *(opcional)* — Detalhes adicionais. Exemplo: *"Troca de 4 pneus dianteiros — desgaste por uso em estrada de terra"*
+
+> **Dica:** Escolha sempre a categoria correta! Isso faz toda a diferença nos gráficos e relatórios. Se você colocar uma troca de óleo como "Outros" em vez de "Manutenção", o gráfico de distribuição de custos não vai refletir a realidade.
+
+### Consultando o histórico de custos
+
+Para ver todos os gastos de um veículo:
+
+1. Clique no card do veículo para abrir a tela de **Detalhes**
+2. Role até a seção de **Histórico de Custos**
+3. Você verá uma tabela com todos os lançamentos, organizada do mais recente para o mais antigo:
+   - Data do gasto
+   - Tipo de custo (com indicador visual colorido por categoria)
+   - Valor em reais
+   - Fornecedor
+   - Número da nota fiscal
+   - Obra vinculada (quando informada)
+   - Observações
 
 [IMAGEM: Tabela de histórico de custos do veículo]
 
-Os custos são exibidos em ordem cronológica decrescente (mais recentes primeiro) e podem ser editados ou excluídos conforme a permissão do usuário.
+> **Importante:** Você pode editar ou excluir um lançamento de custo caso tenha cometido algum erro. Basta clicar no registro desejado na tabela de histórico.
 
 ---
 
-## 5.6. Detalhes do Veículo
+## 5.6. Painel de Detalhes do Veículo
 
-A tela de detalhes (URL: `/veiculos/<id>/detalhes`) é o painel central de acompanhamento de cada veículo. Ela reúne todas as informações cadastrais, indicadores de desempenho, gráficos analíticos e histórico de movimentação.
+O painel de detalhes é onde você encontra **tudo** sobre um veículo em um só lugar. Para acessá-lo, basta clicar no card do veículo na lista principal.
 
 [IMAGEM: Tela de detalhes do veículo com KPIs e gráficos]
 
-### 5.6.1. Indicadores-Chave (KPIs)
+### 5.6.1. Indicadores de Desempenho (KPIs)
 
-No topo da página de detalhes são exibidos os principais KPIs do veículo:
+No topo da página, você encontra os números mais importantes do veículo:
 
-| KPI                        | Descrição                                                     |
-|-----------------------------|---------------------------------------------------------------|
-| **Custo Total**             | Soma de todos os custos registrados para o veículo (R$)       |
-| **Custo por KM**            | Custo total dividido pela quilometragem total percorrida      |
-| **KM Total**                | Quilometragem total acumulada pelo veículo                    |
-| **Próximo Licenciamento**   | Data prevista para o próximo licenciamento veicular           |
+**Custo Total (R$)**
+Mostra a soma de **todos** os gastos registrados para esse veículo — combustível, manutenção, pedágio, seguro, tudo somado. É o valor total que esse veículo custou para a empresa.
 
-Esses indicadores são calculados automaticamente com base nos registros de uso e custos lançados no sistema. Os KPIs podem ser filtrados por período (data inicial e data final) para análise de intervalos específicos.
+*Exemplo: Se aparece R$ 12.450,00, significa que desde o primeiro lançamento até hoje, foram gastos doze mil quatrocentos e cinquenta reais com esse veículo.*
 
-### 5.6.2. Gráficos Analíticos
+**Custo por KM (R$/km)**
+Esse é um dos indicadores mais importantes para gestão de frota. Ele divide o custo total pela quilometragem total percorrida. Quanto menor esse número, mais econômico é o veículo.
 
-A tela de detalhes inclui gráficos interativos para análise visual dos dados:
+*Exemplo: Se o custo por km é R$ 1,20, significa que cada quilômetro rodado custou, em média, um real e vinte centavos. Se outro veículo da frota tem custo de R$ 0,85/km, ele é mais econômico.*
 
-1. **Custos por Mês** — Gráfico de barras mostrando a evolução mensal dos custos totais do veículo, permitindo identificar tendências de aumento ou redução de despesas;
+**KM Total**
+A quilometragem total acumulada pelo veículo desde que começou a ser registrado no sistema.
 
-2. **Custos por Categoria** — Gráfico de pizza (ou rosca) com a distribuição percentual dos custos por tipo (combustível, manutenção, pedágio, seguro, etc.), facilitando a identificação das principais fontes de despesa.
+*Exemplo: 15.200 km significa que o veículo percorreu quinze mil e duzentos quilômetros nos registros de viagem.*
 
-[IMAGEM: Gráficos de custos por mês e por categoria]
+**Próximo Licenciamento**
+Mostra a data prevista para o vencimento do licenciamento. Fique atento! Se essa data estiver próxima ou vencida, providencie a regularização o quanto antes.
+
+*Exemplo: Se aparece "15/03/2026", significa que o licenciamento vence em março de 2026.*
+
+> **Dica:** Você pode filtrar os indicadores por período! Use os campos de data inicial e data final para analisar os números de um mês específico, de um trimestre ou do período que quiser.
+
+### 5.6.2. Entendendo os Gráficos
+
+A tela de detalhes traz dois gráficos muito úteis para a gestão financeira da frota:
+
+**Gráfico de Custos por Mês**
+
+Este gráfico de barras mostra quanto foi gasto com o veículo em cada mês. Com ele você consegue:
+
+- Ver se os gastos estão aumentando ou diminuindo ao longo dos meses
+- Identificar meses com despesas fora do normal (um pico pode indicar uma manutenção grande, por exemplo)
+- Comparar o padrão de gastos entre períodos diferentes
+- Planejar o orçamento para os próximos meses com base no histórico
+
+*Exemplo prático: Se você percebe que nos meses de janeiro e julho os custos sempre são maiores, pode ser porque coincidem com revisões programadas. Sabendo disso, você consegue se planejar financeiramente.*
+
+[IMAGEM: Gráfico de barras de custos mensais]
+
+**Gráfico de Custos por Categoria**
+
+Este gráfico circular (pizza) mostra a distribuição percentual dos gastos por tipo. Com ele você descobre:
+
+- Qual tipo de despesa mais pesa no bolso (combustível? manutenção?)
+- Se existe alguma categoria de custo desproporcional
+- Onde focar esforços para reduzir custos
+
+*Exemplo prático: Se o gráfico mostra que 60% dos custos são com combustível e 25% com manutenção, você sabe que investir em rotas mais eficientes ou em veículos mais econômicos pode trazer uma boa economia.*
+
+[IMAGEM: Gráfico circular de distribuição de custos por categoria]
 
 ### 5.6.3. Dados Cadastrais
 
-A seção de dados cadastrais exibe todas as informações registradas do veículo, incluindo:
+Nesta seção você encontra todas as informações do veículo que foram preenchidas no cadastro:
 
-- Placa, modelo, marca, ano, tipo e cor;
-- RENAVAM e número do chassi;
-- Quilometragem atual;
-- Data de licenciamento e vigência do seguro;
-- Status atual do veículo;
-- Custo por KM configurado.
+- Placa, modelo, marca, ano, tipo e cor
+- RENAVAM e número do chassi
+- Quilometragem atual
+- Data de vencimento do licenciamento
+- Data de vencimento do seguro
+- Status atual (ativo, em manutenção ou inativo)
+- Custo por km configurado
+
+Para alterar qualquer uma dessas informações, clique no botão **Editar** disponível na tela.
 
 ### 5.6.4. Histórico Completo
 
-Na parte inferior da tela de detalhes, o sistema apresenta o histórico completo de:
+Na parte inferior da tela de detalhes, você encontra o histórico completo de movimentação do veículo, dividido em duas seções:
 
-- **Usos/Viagens** — Todos os deslocamentos registrados com informações de motorista, quilometragem, obra e passageiros;
-- **Custos** — Todos os lançamentos financeiros com tipo, valor, data e fornecedor.
+- **Viagens/Usos** — Todas as viagens registradas com motorista, quilometragem, obra de destino e passageiros
+- **Custos** — Todos os lançamentos financeiros com tipo, valor, data e fornecedor
 
-Cada registro pode ser expandido para visualização detalhada ou editado diretamente a partir desta tela.
-
----
-
-## 5.7. Relatórios de Frota
-
-O módulo de Veículos integra-se ao sistema de relatórios do SIGE, disponível no menu **Relatórios**. Os principais relatórios disponíveis para a gestão de frota incluem:
-
-### 5.7.1. Relatório de Custos por Veículo
-
-Apresenta um resumo consolidado dos custos de cada veículo em um período selecionado, com detalhamento por categoria de custo. Útil para comparar a eficiência financeira entre veículos da frota.
-
-### 5.7.2. Relatório de Utilização da Frota
-
-Mostra a frequência de uso de cada veículo, quilometragem percorrida e motoristas associados. Permite identificar veículos subutilizados ou sobrecarregados.
-
-### 5.7.3. Relatório de Custos por Obra
-
-Quando os custos de veículos são vinculados a obras específicas, este relatório consolida os gastos de frota por projeto, auxiliando no controle orçamentário e no rateio de despesas.
-
-### 5.7.4. Alertas de Documentação
-
-O sistema gera alertas automáticos para:
-
-- Licenciamento próximo do vencimento (exibido no KPI "Próximo Licenciamento");
-- Seguro próximo do vencimento;
-- Veículos com status "Em manutenção" por período prolongado.
-
-[IMAGEM: Tela de relatórios de frota]
+Clique em qualquer registro para ver os detalhes completos ou para editar as informações.
 
 ---
 
-## Resumo das URLs do Módulo
+## 5.7. Controle de Documentação e Alertas
 
-| Funcionalidade          | URL                                |
-|-------------------------|------------------------------------|
-| Listagem de Veículos    | `/veiculos`                        |
-| Novo Veículo            | `/veiculos/novo`                   |
-| Editar Veículo          | `/veiculos/<id>/editar`            |
-| Detalhes do Veículo     | `/veiculos/<id>/detalhes`          |
-| Registrar Uso           | `/veiculos/uso` (POST)             |
-| Novo Custo              | `/custo_veiculo/novo`              |
-| Editar Custo            | `/custo_veiculo/<id>/editar`       |
+Manter a documentação dos veículos em dia é fundamental para evitar problemas legais e multas. O SIGE ajuda você nessa tarefa!
+
+### Licenciamento
+
+Quando você cadastra a data de vencimento do licenciamento, o sistema passa a monitorar automaticamente. Na tela de detalhes do veículo, o indicador **Próximo Licenciamento** mostra claramente quando vence.
+
+**O que fazer:**
+1. Ao cadastrar o veículo, informe a data de vencimento do licenciamento
+2. Verifique periodicamente o indicador na tela de detalhes
+3. Quando estiver próximo do vencimento, providencie o pagamento do IPVA e das taxas de licenciamento
+4. Após renovar, atualize a data no cadastro do veículo
+
+### Seguro
+
+Da mesma forma, o sistema acompanha a vigência do seguro do veículo.
+
+**O que fazer:**
+1. Ao cadastrar o veículo, informe a data de vencimento do seguro
+2. Antes do vencimento, entre em contato com a seguradora para renovação
+3. Após renovar, atualize a data no cadastro do veículo
+
+### Alertas automáticos
+
+O sistema gera avisos automáticos para situações que precisam de atenção:
+
+- ⚠️ **Licenciamento próximo do vencimento** — Quando a data de licenciamento está chegando
+- ⚠️ **Seguro próximo do vencimento** — Quando a apólice de seguro está perto de expirar
+- ⚠️ **Veículo em manutenção prolongada** — Quando um veículo está com status "Em manutenção" há muito tempo
+
+> **Dica:** Crie o hábito de verificar a tela de detalhes dos veículos pelo menos uma vez por semana. Assim você nunca será pego de surpresa com documentos vencidos!
 
 ---
 
-## Dicas e Boas Práticas
+## 5.8. Relatórios de Frota
 
-1. **Mantenha a quilometragem atualizada** — Sempre registre os usos com KM inicial e final corretos para que o sistema calcule corretamente o custo por quilômetro;
-2. **Classifique os custos corretamente** — Utilize o tipo de custo adequado para cada despesa, pois isso impacta diretamente nos gráficos e relatórios analíticos;
-3. **Vincule custos e usos às obras** — Sempre que possível, associe os registros a uma obra para possibilitar o rateio correto das despesas;
-4. **Monitore os alertas de documentação** — Verifique regularmente os KPIs de licenciamento e seguro para evitar irregularidades;
-5. **Registre todos os passageiros** — O controle de passageiros por posição (frente/traseira) é importante para conformidade com normas de segurança e seguro;
-6. **Revise os gráficos mensalmente** — Utilize os gráficos de custos por mês e por categoria para identificar oportunidades de redução de despesas.
+O SIGE oferece relatórios que ajudam na tomada de decisões sobre a frota. Acesse-os pelo menu **Relatórios**.
+
+### Relatório de Custos por Veículo
+
+Apresenta um resumo dos gastos de cada veículo em um período que você escolhe. É ótimo para:
+
+- Comparar qual veículo gasta mais
+- Identificar veículos que estão dando muito custo de manutenção (pode ser hora de trocar!)
+- Apresentar números para a diretoria
+
+### Relatório de Utilização da Frota
+
+Mostra com que frequência cada veículo é utilizado, quantos quilômetros rodou e quais motoristas o utilizaram. Serve para:
+
+- Descobrir veículos que estão parados (subutilizados) — será que vale a pena mantê-los?
+- Identificar veículos sobrecarregados que precisam de um substituto
+- Verificar se a distribuição de uso está equilibrada
+
+### Relatório de Custos por Obra
+
+Quando você vincula os custos e viagens às obras, este relatório mostra quanto cada projeto gastou com frota. Muito útil para:
+
+- Saber o custo real de transporte de cada obra
+- Fazer o rateio correto das despesas entre os projetos
+- Incluir os custos de frota no orçamento de futuras obras
 
 ---
 
-*Manual do Usuário — SIGE EnterpriseSync v8.0 | Capítulo 5: Gestão de Frota e Veículos*
+## 5.9. Dicas Práticas para uma Boa Gestão de Frota
+
+Aqui vão algumas recomendações para você tirar o máximo proveito do módulo de frota:
+
+### 1. Registre tudo, sempre
+
+Quanto mais informações você registrar, mais preciso será o controle. Peça aos motoristas que anotem o km de saída e chegada de cada viagem. Guarde todas as notas fiscais de abastecimento e manutenção.
+
+### 2. Mantenha a quilometragem sempre atualizada
+
+A quilometragem é a base para o cálculo do custo por km. Se os registros de viagem pularem números (por exemplo, de 45.000 para 48.000 sem registros intermediários), os indicadores perdem a precisão.
+
+### 3. Classifique os custos corretamente
+
+Na hora de lançar um custo, escolha a categoria certa. Não coloque tudo como "Outros"! Os gráficos e relatórios só serão úteis se os dados estiverem bem categorizados.
+
+### 4. Vincule custos e viagens às obras
+
+Sempre que possível, informe a obra relacionada. Isso permite calcular o custo real de transporte de cada projeto e fazer o rateio correto entre as obras.
+
+### 5. Fique de olho nos vencimentos
+
+Preencha as datas de licenciamento e seguro no cadastro de cada veículo. Verifique os alertas regularmente. Documento vencido pode gerar multas e até apreensão do veículo!
+
+### 6. Registre todos os passageiros
+
+O controle de quem estava no veículo (frente e traseira) é importante para:
+- Conformidade com normas de segurança do trabalho
+- Controle para o seguro (em caso de sinistro)
+- Saber quem estava no veículo em determinada data
+
+### 7. Analise os gráficos mensalmente
+
+Reserve um tempo todo mês para olhar os gráficos de custos. Procure por:
+- Gastos que estão crescendo sem motivo aparente
+- Veículos com custo por km muito acima da média da frota
+- Categorias de custo que podem ser reduzidas (será que dá para negociar o combustível?)
+
+### 8. Compare os veículos entre si
+
+Use o indicador de custo por km para comparar a eficiência dos veículos. Se um veículo está custando muito mais que os outros, investigue: pode ser hora de fazer uma revisão completa ou até considerar a substituição.
+
+### 9. Planeje a manutenção preventiva
+
+Acompanhe o histórico de manutenção de cada veículo. É mais barato fazer revisões preventivas do que esperar o veículo quebrar. Use as observações nos lançamentos para anotar quando deve ser feita a próxima revisão.
+
+### 10. Mantenha o cadastro atualizado
+
+Se um veículo foi vendido, mude o status para **Inativo**. Se está na oficina, mude para **Em manutenção**. Quando voltar, coloque como **Ativo** novamente. Assim a lista sempre reflete a realidade da sua frota.
+
+---
+
+## 5.10. Perguntas Frequentes
+
+**Como altero a quilometragem de um veículo?**
+A quilometragem é atualizada automaticamente quando você registra uma viagem. Se precisar corrigir manualmente, edite os dados cadastrais do veículo.
+
+**Posso excluir um registro de viagem ou custo lançado errado?**
+Sim! Acesse os detalhes do veículo, encontre o registro na tabela de histórico e clique para excluir ou editar.
+
+**O que acontece se eu tentar registrar um KM Final menor que o KM Inicial?**
+O sistema não permite. Vai aparecer uma mensagem de erro pedindo para você verificar os valores.
+
+**Posso cadastrar um veículo que não tem placa ainda?**
+A placa é um campo obrigatório. Se o veículo ainda não tem placa, use um identificador temporário e atualize depois.
+
+**Como sei quanto cada obra gastou com veículos?**
+Vincule os custos e viagens às obras. Depois, consulte o relatório de Custos por Obra no menu Relatórios.
+
+**É possível ver o histórico de um veículo que já está inativo?**
+Sim! Veículos inativos continuam no sistema com todo o histórico preservado. Basta acessar os detalhes normalmente.
+
+---
+
+*Manual do Usuário — SIGE EnterpriseSync | Capítulo 5: Gestão de Frota e Veículos*

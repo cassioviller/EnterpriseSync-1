@@ -1,569 +1,305 @@
-# Capítulo 1 — Configuração Inicial e Instalação
+# Capítulo 1 — Primeiro Acesso e Navegação
 
 **SIGE - Estruturas do Vale (EnterpriseSync)**
 Manual do Usuário — Versão 8.0
 
 ---
 
-## 1.1. Introdução
+## 1.1. Bem-vindo ao SIGE
 
-Bem-vindo ao **SIGE (Sistema Integrado de Gestão Empresarial)**, comercializado sob a marca **EnterpriseSync** e operado pela **Estruturas do Vale**. O SIGE é uma plataforma completa desenvolvida especificamente para empresas do setor de construção civil e engenharia, reunindo **97 modelos de dados** e **18 módulos integrados** em uma única solução web multi-tenant.
+Bem-vindo ao **SIGE (Sistema Integrado de Gestão Empresarial)**, a plataforma completa da **Estruturas do Vale** para gerenciar todas as atividades da sua empresa de construção civil e engenharia.
 
-**Objetivos do EnterpriseSync:**
+Com o SIGE, você tem acesso a todas as ferramentas que precisa no dia a dia, reunidas em um único lugar:
 
-1. **Centralizar informações** — Reunir todos os dados operacionais, administrativos e financeiros em um único ambiente acessível de qualquer dispositivo.
-2. **Automatizar processos** — Reduzir trabalho manual por meio de cálculos automáticos de horas trabalhadas, horas extras, custos e produtividade.
-3. **Garantir rastreabilidade** — Manter histórico completo e auditável de todas as operações realizadas no sistema.
-4. **Isolamento multi-tenant** — Permitir que múltiplas empresas operem de forma isolada na mesma instalação, com segregação total de dados via coluna `admin_id`.
-5. **Apoiar a tomada de decisão** — Fornecer dashboards, KPIs e relatórios gerenciais em tempo real.
+- **Gestão de Obras** — Acompanhe o andamento de cada obra, registre atividades diárias e controle prazos.
+- **Funcionários e Equipes** — Cadastre colaboradores, organize equipes de campo e gerencie escalas.
+- **Controle de Ponto** — Registre entradas, saídas e pausas dos funcionários, com cálculo automático de horas trabalhadas e horas extras.
+- **Relatórios Diários de Obra (RDO)** — Documente tudo o que acontece em cada obra, todos os dias.
+- **Financeiro** — Gerencie contas a pagar, contas a receber e acompanhe o fluxo de caixa.
+- **Propostas Comerciais** — Crie e acompanhe orçamentos e propostas para novos projetos.
+- **Frota de Veículos** — Controle veículos, abastecimentos e manutenções.
+- **Alimentação** — Gerencie refeições e vales alimentação dos colaboradores.
+- **Almoxarifado** — Controle o estoque de materiais, requisições e movimentações.
+- **Relatórios Gerenciais** — Visualize indicadores, gráficos e exporte dados para tomada de decisão.
 
-### Módulos Disponíveis
-
-O menu de navegação do SIGE exibe os seguintes módulos na barra superior:
-
-| Nº | Módulo | Tipo de Menu | Descrição |
-|:--:|:-------|:------------|:----------|
-| 1 | Dashboard | Link direto | Painel gerencial com KPIs e indicadores |
-| 2 | RDOs | Link direto | Relatórios Diários de Obra |
-| 3 | Obras | Link direto | Gestão completa de obras e projetos |
-| 4 | Funcionários | Link direto | Cadastro e gestão de colaboradores |
-| 5 | Equipe | Link direto | Alocação e gestão de equipes de campo |
-| 6 | Ponto | Dropdown ▼ | Controle de ponto eletrônico com reconhecimento facial |
-| 7 | Propostas | Dropdown ▼ | Propostas comerciais e orçamentos |
-| 8 | Financeiro | Dropdown ▼ | Contas a pagar, receber e fluxo de caixa |
-| 9 | Veículos | Link direto | Gestão de frota e controle de veículos |
-| 10 | Alimentação | Link direto | Controle de refeições e vales alimentação |
-| 11 | Almoxarifado | Dropdown ▼ | Estoque, requisições e movimentações de materiais |
-| 12 | Relatórios | Link direto | Relatórios consolidados e exportações |
-
-> **URL de acesso em produção:** [https://sige.cassioviller.tech](https://sige.cassioviller.tech)
-
-### O que será coberto neste capítulo
-
-Neste capítulo, você aprenderá a:
-
-1. Verificar os requisitos de hardware e software necessários para o funcionamento do sistema
-2. Instalar e configurar o SIGE em ambiente de produção via Docker e EasyPanel
-3. Realizar o primeiro acesso e configurar os dados da empresa
-4. Cadastrar departamentos, funções e horários de trabalho
-5. Gerenciar usuários e suas permissões de acesso
+O sistema foi projetado para ser simples e intuitivo, permitindo que todos os colaboradores — desde o escritório até o campo — possam utilizá-lo sem dificuldades.
 
 ---
 
-## 1.2. Requisitos do Sistema
+## 1.2. Acessando o Sistema
 
-### 1.2.1. Requisitos de Hardware (Servidor)
+### Como acessar
 
-| Componente | Requisito Mínimo | Requisito Recomendado |
-|:-----------|:-----------------|:---------------------|
-| Processador | 2 vCPUs | 4 vCPUs |
-| Memória RAM | 2 GB | 4 GB ou superior |
-| Armazenamento | 20 GB SSD | 50 GB SSD ou superior |
-| Rede | 10 Mbps | 100 Mbps |
+O SIGE é um sistema online, acessado diretamente pelo navegador de internet do seu computador, tablet ou celular. Não é necessário instalar nenhum programa.
 
-### 1.2.2. Requisitos de Software (Servidor)
+Para acessar, basta:
 
-| Software | Versão Mínima | Observação |
-|:---------|:-------------|:-----------|
-| Sistema Operacional | Ubuntu 20.04 LTS ou similar | Qualquer distribuição Linux com suporte a Docker |
-| Docker | 20.10+ | Motor de contêineres para deploy da aplicação |
-| Docker Compose | 2.0+ | Orquestração de serviços (app + banco de dados) |
-| PostgreSQL | 14+ | Banco de dados relacional (Neon-backed em produção) |
-| Python | 3.11+ | Runtime da aplicação (incluso no contêiner Docker) |
+1. Abra o navegador de internet de sua preferência.
+2. Digite o endereço (URL) do sistema na barra de endereços. O endereço será fornecido pelo administrador da sua empresa.
+3. A tela de login será exibida.
 
-### 1.2.3. Requisitos do Navegador (Cliente)
+[IMAGEM: Barra de endereços do navegador com a URL do SIGE]
 
-| Navegador | Versão Mínima |
-|:----------|:-------------|
-| Google Chrome | 90+ |
-| Mozilla Firefox | 88+ |
-| Microsoft Edge | 90+ |
-| Safari | 14+ |
+### Navegadores compatíveis
 
-> **Nota:** O sistema é totalmente responsivo e pode ser acessado via dispositivos móveis (smartphones e tablets). Para funcionalidades de reconhecimento facial e geolocalização no módulo de Ponto, é necessário que o navegador tenha acesso à câmera e ao GPS do dispositivo.
+O SIGE funciona nos principais navegadores de internet. Recomendamos manter seu navegador sempre atualizado para a melhor experiência:
 
-### 1.2.4. Requisitos de Rede
+| Navegador | Versão Recomendada |
+|:----------|:-------------------|
+| Google Chrome | Versão 90 ou superior |
+| Mozilla Firefox | Versão 88 ou superior |
+| Microsoft Edge | Versão 90 ou superior |
+| Safari (Mac/iPhone) | Versão 14 ou superior |
 
-- Conexão com a internet estável (mínimo 10 Mbps)
-- Porta 443 (HTTPS) liberada para acesso externo
-- Certificado SSL válido (obrigatório para ambiente de produção)
+### Acesso pelo celular e tablet
+
+O SIGE é **totalmente responsivo**, ou seja, se adapta automaticamente ao tamanho da tela do seu dispositivo. Você pode acessar todas as funcionalidades pelo celular ou tablet da mesma forma que acessa pelo computador.
+
+**Dicas para acesso mobile:**
+
+- Use o navegador Chrome ou Safari no seu celular.
+- Para facilitar o acesso, adicione o SIGE como atalho na tela inicial do seu celular.
+- Para funcionalidades como registro de ponto com foto, o navegador precisará de permissão para acessar a câmera do dispositivo.
 
 ---
 
-## 1.3. Instalação do Sistema
+## 1.3. Fazendo Login
 
-O SIGE é distribuído como uma aplicação containerizada via **Docker**, com suporte nativo ao **EasyPanel** para gerenciamento simplificado do deploy.
+O login é o primeiro passo para utilizar o sistema. Você precisará das suas credenciais de acesso (usuário e senha), que são fornecidas pelo administrador da empresa.
 
-### 1.3.1. Pré-requisitos de Instalação
+### Passo a passo para fazer login
 
-Certifique-se de que o Docker e o Docker Compose estão instalados no servidor:
+1. Abra o navegador e acesse o endereço do SIGE.
+2. Na tela de login, você verá dois campos:
+   - **Username / E-mail** — Digite seu nome de usuário ou seu e-mail cadastrado.
+   - **Senha** — Digite sua senha.
+3. Clique no botão **"Entrar"**.
 
-```bash
-# Verificar instalação do Docker
-docker --version
+[IMAGEM: Tela de login do SIGE com os campos Username e Senha destacados]
 
-# Verificar instalação do Docker Compose
-docker compose version
-```
+### O que acontece após o login
 
-### 1.3.2. Clonando o Repositório
+Após fazer login com sucesso, você será direcionado automaticamente para a página inicial do sistema, que varia conforme o seu perfil de acesso:
 
-```bash
-# Clonar o repositório do projeto
-git clone https://github.com/sua-organizacao/enterprisesync.git
+| Seu Perfil | Página Inicial |
+|:-----------|:---------------|
+| Administrador Master | Painel do Super Administrador |
+| Administrador | Dashboard (Painel de Controle) |
+| Gestor de Equipes | RDO Consolidado |
+| Almoxarife | RDO Consolidado |
+| Funcionário | RDO Consolidado |
 
-# Acessar o diretório do projeto
-cd enterprisesync
-```
+### Se o login não funcionar
 
-### 1.3.3. Configuração das Variáveis de Ambiente
+Caso suas credenciais estejam incorretas, o sistema exibirá a mensagem:
 
-Crie o arquivo `.env` na raiz do projeto com as seguintes variáveis obrigatórias:
+> *"Email/Username ou senha inválidos."*
 
-```env
-# === Banco de Dados ===
-DATABASE_URL=postgresql://usuario:senha@host:5432/nome_do_banco
-PGHOST=host_do_banco
-PGPORT=5432
-PGUSER=usuario_do_banco
-PGPASSWORD=senha_do_banco
-PGDATABASE=nome_do_banco
+**O que fazer nesse caso:**
 
-# === Segurança ===
-SESSION_SECRET=sua_chave_secreta_aqui
-```
+1. **Verifique o nome de usuário ou e-mail** — Confira se digitou corretamente, sem espaços extras.
+2. **Verifique a senha** — Lembre-se de que a senha diferencia letras maiúsculas de minúsculas.
+3. **Confira se o Caps Lock está desligado** — Uma causa comum de erro é digitar a senha com o Caps Lock ativado.
+4. **Entre em contato com o administrador** — Se ainda não conseguir acessar, solicite ao administrador da sua empresa que verifique seu cadastro ou redefina sua senha.
 
-**Detalhamento das variáveis:**
+[IMAGEM: Mensagem de erro de login exibida na tela]
 
-| Variável | Descrição | Exemplo |
-|:---------|:----------|:--------|
-| `DATABASE_URL` | URL de conexão completa com o PostgreSQL | `postgresql://sige:s3nh4@db:5432/sige_db` |
-| `SESSION_SECRET` | Chave secreta para criptografia de sessões Flask | Gere com: `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `PGHOST` | Endereço do servidor PostgreSQL | `db` ou `localhost` |
-| `PGPORT` | Porta do PostgreSQL | `5432` |
-| `PGUSER` | Usuário do banco de dados | `sige` |
-| `PGPASSWORD` | Senha do banco de dados | `s3nh4_segura_123` |
-| `PGDATABASE` | Nome do banco de dados | `sige_db` |
-
-> **Segurança:** Nunca compartilhe ou exponha o arquivo `.env` em repositórios públicos. Adicione-o ao `.gitignore`. Utilize senhas fortes com no mínimo 16 caracteres, combinando letras, números e caracteres especiais.
-
-### 1.3.4. Instalação via Docker Compose
-
-```bash
-# Construir e iniciar os containers
-docker compose up -d --build
-
-# Verificar se os containers estão rodando
-docker compose ps
-```
-
-### 1.3.5. Instalação via EasyPanel
-
-Para instalação via **EasyPanel**, siga os passos abaixo:
-
-1. Acesse o painel de controle do EasyPanel no endereço do seu servidor.
-2. Clique em **"Create Service"** → **"App"**.
-3. Selecione a opção **"Docker Image"** ou **"GitHub Repository"** e vincule ao repositório do SIGE.
-4. Configure todas as variáveis de ambiente listadas na seção 1.3.3.
-5. Defina a porta de exposição como **5000**.
-6. Configure o domínio personalizado (ex: `sige.cassioviller.tech`).
-7. Ative o certificado SSL automático (Let's Encrypt).
-8. Clique em **"Deploy"**.
-
-[IMAGEM: Tela de configuração do EasyPanel com variáveis de ambiente]
-
-### 1.3.6. Migrações do Banco de Dados
-
-O sistema executa automaticamente `db.create_all()` na inicialização, criando todas as **97 tabelas** que ainda não existem no banco de dados. Não é necessário executar migrações manuais na maioria dos casos.
-
-Caso necessário, as migrações podem ser executadas manualmente:
-
-```bash
-# Acessar o container da aplicação
-docker exec -it enterprisesync-app bash
-
-# Executar as migrações
-flask db upgrade
-```
-
-### 1.3.7. Iniciando o Servidor
-
-O servidor é iniciado automaticamente pelo Gunicorn com o seguinte comando:
-
-```bash
-gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
-```
-
-Após a inicialização bem-sucedida, o sistema estará acessível em:
-
-- **Produção:** `https://sige.cassioviller.tech`
-- **Desenvolvimento local:** `http://localhost:5000`
-
-### 1.3.8. Verificando a Instalação
-
-Acesse a URL do sistema no navegador. Se a **tela de login** for exibida corretamente com os campos **Username** e **Senha** e o botão **"Entrar"**, a instalação foi concluída com sucesso.
-
-[IMAGEM: Tela de login do SIGE com campos Username e Senha]
+> **Observação:** Por segurança, o sistema limita o número de tentativas de login. Se você errar muitas vezes em um curto intervalo, aguarde alguns minutos antes de tentar novamente.
 
 ---
 
-## 1.4. Primeiro Acesso e Configuração da Empresa
+## 1.4. Conhecendo a Interface
 
-### 1.4.1. Criando o Primeiro Usuário Super Admin
+Após fazer login, você encontrará uma interface organizada e intuitiva. Vamos conhecer cada parte da tela:
 
-O primeiro usuário do sistema deve ser do tipo **SUPER_ADMIN**, que possui acesso irrestrito a todas as funcionalidades e configurações. Este usuário é criado via linha de comando durante a implantação inicial:
+[IMAGEM: Visão geral da interface do SIGE com as áreas numeradas]
 
-```bash
-# Acessar o shell Python dentro do container
-docker exec -it enterprisesync-app flask shell
-```
+### 1.4.1. Barra de Navegação Superior
 
-```python
-from models import db, Usuario, TipoUsuario
-from werkzeug.security import generate_password_hash
+A **barra de navegação** fica no topo da tela e é o principal meio de acessar os diferentes módulos do sistema. Ela contém os seguintes itens:
 
-admin = Usuario(
-    nome="Administrador Principal",
-    username="admin",
-    email="admin@suaempresa.com.br",
-    password_hash=generate_password_hash("SenhaSegura123!"),
-    tipo_usuario=TipoUsuario.SUPER_ADMIN,
-    ativo=True
-)
+| Menu | O que você encontra |
+|:-----|:--------------------|
+| **Dashboard** | Painel de controle com indicadores gerais, gráficos e resumos da empresa. É a visão geral do negócio. |
+| **RDOs** | Relatórios Diários de Obra — lista de todos os relatórios registrados, com opções de criar novos e visualizar os existentes. |
+| **Obras** | Lista de todas as obras cadastradas, com informações de andamento, localização e equipes. |
+| **Funcionários** | Cadastro completo de colaboradores, com dados pessoais, função, departamento e documentos. |
+| **Equipe** | Gestão de equipes de trabalho, permitindo organizar os colaboradores por grupos e obras. |
+| **Ponto** ▼ | Menu com opções para controle de ponto dos funcionários, incluindo registro de entradas e saídas, consultas e relatórios de frequência. |
+| **Propostas** ▼ | Menu para criação e acompanhamento de propostas comerciais e orçamentos de obras. |
+| **Financeiro** ▼ | Menu com opções financeiras, incluindo contas a pagar, contas a receber e fluxo de caixa. |
+| **Veículos** | Gestão da frota de veículos, controle de abastecimentos, manutenções e quilometragem. |
+| **Alimentação** | Controle de refeições fornecidas aos colaboradores e gestão de vales alimentação. |
+| **Almoxarifado** ▼ | Menu para gestão de materiais, controle de estoque, requisições e movimentações de entrada e saída. |
+| **Relatórios** | Relatórios consolidados e ferramentas de exportação de dados para análise gerencial. |
 
-db.session.add(admin)
-db.session.commit()
-print(f"Super Admin criado com ID: {admin.id}")
-```
+> **O símbolo ▼** ao lado de alguns menus indica que eles possuem submenus. Ao clicar ou passar o mouse sobre esses itens, um menu suspenso será exibido com as opções disponíveis.
 
-> **Importante:** Após o primeiro acesso, altere a senha padrão imediatamente por motivos de segurança.
+[IMAGEM: Barra de navegação superior com os menus destacados]
 
-### 1.4.2. Realizando o Primeiro Login
+### 1.4.2. Menu do Usuário
 
-1. Acesse o sistema pela URL configurada: `https://sige.cassioviller.tech`
-2. Na tela de login, preencha os campos:
-   - **Username:** Informe o nome de usuário **ou** o e-mail cadastrado
-   - **Senha:** Informe a senha definida na criação do SUPER_ADMIN
-3. Clique no botão **"Entrar"**
+No canto superior direito da tela, você encontrará o **Menu do Usuário**, identificado pelo seu nome de usuário. Ao clicar sobre ele, um menu suspenso será exibido com as seguintes opções:
 
-[IMAGEM: Tela de login preenchida com credenciais de acesso]
+| Opção | O que faz |
+|:------|:----------|
+| **Perfil** | Acessa seus dados pessoais e permite editar informações como nome e e-mail. |
+| **Configurações** | Acessa as configurações da sua conta, incluindo alteração de senha. |
+| **Sair** | Encerra sua sessão e retorna à tela de login. |
 
-> **Informações sobre o login:**
-> - O campo Username aceita tanto o **nome de usuário** quanto o **e-mail** cadastrado.
-> - Em caso de credenciais inválidas, será exibida a mensagem: *"Email/Username ou senha inválidos."*
-> - O sistema possui **rate limiting de 30 tentativas por minuto** no endpoint de login para proteção contra ataques de força bruta.
+[IMAGEM: Menu do usuário no canto superior direito expandido]
 
-### 1.4.3. Redirecionamento Após Login
+> **Dica:** Sempre que terminar de usar o sistema, clique em **"Sair"** para encerrar sua sessão com segurança, especialmente se estiver usando um computador compartilhado.
 
-Após o login bem-sucedido, o sistema redireciona automaticamente o usuário conforme seu tipo:
+### 1.4.3. Área de Conteúdo Principal
 
-| Tipo de Usuário | Página de Destino | URL |
-|:----------------|:------------------|:----|
-| SUPER_ADMIN | Dashboard Super Admin | `/super_admin_dashboard` |
-| ADMIN | Dashboard Administrativo | `/dashboard` |
-| GESTOR_EQUIPES | RDO Consolidado | `/funcionario/rdo/consolidado` |
-| ALMOXARIFE | RDO Consolidado | `/funcionario/rdo/consolidado` |
-| FUNCIONARIO | RDO Consolidado | `/funcionario/rdo/consolidado` |
+A **área de conteúdo principal** ocupa a maior parte da tela e é onde as informações e formulários de cada módulo são exibidos. O conteúdo dessa área muda conforme o menu que você seleciona na barra de navegação.
 
-[IMAGEM: Dashboard do Super Admin após primeiro login]
+Por exemplo:
+- Ao clicar em **Dashboard**, a área principal exibirá gráficos e indicadores.
+- Ao clicar em **Funcionários**, será exibida a lista de colaboradores cadastrados.
+- Ao clicar em **RDOs**, aparecerão os relatórios diários de obra.
 
-### 1.4.4. Configurando os Dados da Empresa
+A maioria das telas de listagem apresenta:
+- **Botão de ação** (como "Novo", "Cadastrar" ou "Adicionar") para criar novos registros.
+- **Tabela de dados** com os registros existentes.
+- **Ícones de ação** ao lado de cada registro (visualizar, editar, excluir).
+- **Filtros e buscas** para localizar informações específicas.
 
-Após o primeiro login como Super Admin, configure os dados da sua empresa:
-
-1. Acesse o **Painel Administrativo** (Dashboard do Super Admin).
-2. Navegue até **Configurações** → **Dados da Empresa**.
-3. Preencha os seguintes campos:
-
-| Campo | Descrição | Obrigatório |
-|:------|:----------|:-----------:|
-| Nome da Empresa | Razão social ou nome fantasia | Sim |
-| CNPJ | Cadastro Nacional de Pessoa Jurídica | Sim |
-| Endereço | Endereço completo da sede | Sim |
-| Telefone | Telefone principal de contato | Não |
-| E-mail | E-mail corporativo | Não |
-
-4. Clique em **"Salvar"**.
-
-[IMAGEM: Formulário de configuração dos dados da empresa]
-
-### 1.4.5. Configurando o Logo da Empresa
-
-1. Na tela de configurações da empresa, localize a seção **"Logo"**.
-2. Clique em **"Escolher Arquivo"**.
-3. Selecione uma imagem nos formatos **PNG**, **JPG** ou **SVG** (tamanho recomendado: 200×200 pixels).
-4. Clique em **"Salvar"**.
-
-O logo será exibido no cabeçalho do sistema e nos relatórios gerados.
-
-[IMAGEM: Upload do logo da empresa]
-
-> **Multi-tenant:** O SIGE opera com isolamento de dados por empresa. Cada ADMIN gerencia seus próprios funcionários, obras, registros e configurações, sem acesso aos dados de outras empresas. Este isolamento é garantido pelo campo `admin_id` presente em todas as tabelas do sistema.
+[IMAGEM: Exemplo de área de conteúdo mostrando uma lista com botão de ação e filtros]
 
 ---
 
-## 1.5. Configurações Globais
+## 1.5. Perfis de Acesso
 
-As configurações globais definem a estrutura organizacional da empresa dentro do sistema. É **fundamental** configurá-las antes de iniciar o cadastro de funcionários e a operação dos demais módulos.
+O SIGE possui **5 perfis de acesso** diferentes. Cada perfil determina quais menus e funcionalidades o usuário pode acessar. O perfil é definido pelo administrador da empresa no momento do cadastro do usuário.
 
-### 1.5.1. Departamentos
+### Resumo dos perfis
 
-Os **departamentos** representam as divisões organizacionais da empresa. Cada funcionário deve estar vinculado a um departamento para fins de organização e geração de relatórios setoriais.
+| Perfil | Quem é | O que pode fazer |
+|:-------|:-------|:-----------------|
+| **Administrador Master** | Responsável geral pelo sistema | Acesso total a todas as funcionalidades, incluindo gestão de múltiplas empresas |
+| **Administrador** | Gestor principal da empresa | Acesso a todos os módulos da sua empresa: obras, funcionários, financeiro, relatórios, configurações |
+| **Gestor de Equipes** | Líder ou encarregado de campo | Gerencia equipes, cria RDOs, controla ponto, acompanha andamento das obras |
+| **Almoxarife** | Responsável pelo estoque | Acesso ao módulo de almoxarifado, controle de materiais, requisições e movimentações |
+| **Funcionário** | Colaborador da empresa | Acesso restrito ao próprio registro de ponto e visualização dos RDOs consolidados |
 
-**Campos do cadastro de Departamento:**
+### O que cada perfil pode ver
 
-| Campo | Tipo | Obrigatório | Descrição |
-|:------|:-----|:-----------:|:----------|
-| Nome | Texto (até 100 caracteres) | Sim | Nome do departamento |
-| Descrição | Texto livre | Não | Detalhamento das atividades do departamento |
+A tabela abaixo mostra quais módulos estão disponíveis para cada perfil de acesso:
 
-#### Criando um Departamento
+| Módulo | Administrador Master | Administrador | Gestor de Equipes | Almoxarife | Funcionário |
+|:-------|:-------------------:|:-------------:|:-----------------:|:----------:|:-----------:|
+| Dashboard | ✅ | ✅ | ❌ | ❌ | ❌ |
+| RDOs | ✅ | ✅ | ✅ | ❌ | ✅ (somente visualizar) |
+| Obras | ✅ | ✅ | ✅ (visualizar) | ❌ | ❌ |
+| Funcionários | ✅ | ✅ | ✅ (da equipe) | ❌ | ❌ |
+| Equipe | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Ponto | ✅ | ✅ | ✅ | ❌ | ✅ (próprio) |
+| Propostas | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Financeiro | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Veículos | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Alimentação | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Almoxarifado | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Relatórios | ✅ | ✅ | ✅ (parcial) | ❌ | ❌ |
+| Configurações | ✅ | ✅ | ❌ | ❌ | ❌ |
 
-1. Acesse **Configurações** → **Departamentos**.
-2. Clique no botão **"Novo Departamento"**.
-3. Preencha o **Nome** (ex: "Engenharia", "Produção", "Administrativo").
-4. Opcionalmente, adicione uma **Descrição** detalhada.
-5. Clique em **"Salvar"**.
+> **Observação:** Os menus que não fazem parte do seu perfil de acesso não serão exibidos na barra de navegação. Ou seja, cada usuário vê apenas os menus que pode utilizar.
 
-[IMAGEM: Formulário de cadastro de departamento]
-
-#### Exemplos de Departamentos
-
-| Departamento | Descrição |
-|:-------------|:----------|
-| Engenharia | Equipe de engenheiros e projetistas |
-| Produção | Equipe de operários e mestres de obra |
-| Administrativo | Equipe de escritório e gestão |
-| Almoxarifado | Equipe de controle de materiais e estoque |
-| Segurança do Trabalho | Equipe de segurança e prevenção de acidentes |
-
-#### Editando e Excluindo Departamentos
-
-- Para **editar**, clique no ícone de edição ao lado do departamento desejado.
-- Para **excluir**, clique no ícone de exclusão (somente departamentos sem funcionários vinculados podem ser excluídos).
-
-> **Atenção:** A exclusão de um departamento é irreversível. Certifique-se de que não há funcionários vinculados antes de excluir.
-
-### 1.5.2. Funções (Cargos)
-
-As **funções** definem os cargos e posições dos funcionários dentro da empresa. Cada função pode ter um salário base associado, que serve como referência para o cadastro individual dos colaboradores.
-
-**Campos do cadastro de Função:**
-
-| Campo | Tipo | Obrigatório | Descrição |
-|:------|:-----|:-----------:|:----------|
-| Nome | Texto (até 100 caracteres) | Sim | Nome da função/cargo |
-| Descrição | Texto livre | Não | Detalhamento das atribuições do cargo |
-| Salário Base | Numérico (R$) | Não | Valor base mensal de remuneração |
-
-#### Criando uma Função
-
-1. Acesse **Configurações** → **Funções**.
-2. Clique no botão **"Nova Função"**.
-3. Preencha o **Nome** (ex: "Pedreiro", "Engenheiro Civil", "Auxiliar Administrativo").
-4. Adicione a **Descrição** das atribuições do cargo (opcional).
-5. Informe o **Salário Base** em reais (opcional).
-6. Clique em **"Salvar"**.
-
-[IMAGEM: Formulário de cadastro de função]
-
-#### Exemplos de Funções
-
-| Função | Descrição | Salário Base (R$) |
-|:-------|:----------|------------------:|
-| Engenheiro Civil | Responsável técnico por projetos e obras | 12.000,00 |
-| Mestre de Obras | Coordenação de equipes em campo | 6.500,00 |
-| Pedreiro | Execução de alvenaria e acabamentos | 3.200,00 |
-| Eletricista | Instalações elétricas e manutenção | 3.800,00 |
-| Encarregado de Obra | Supervisão direta de equipes operacionais | 5.000,00 |
-| Operador de Máquinas | Operação de equipamentos pesados | 4.200,00 |
-| Auxiliar de Almoxarifado | Apoio no controle de materiais e estoque | 2.500,00 |
-| Ajudante Geral | Apoio geral às atividades de obra | 2.100,00 |
-
-> **Dica:** O salário base definido na função serve como referência. O salário individual de cada funcionário pode ser ajustado diretamente no cadastro do funcionário.
-
-### 1.5.3. Horários de Trabalho
-
-Os **horários de trabalho** definem os padrões de jornada que serão associados aos funcionários para controle de ponto e cálculo automático de horas trabalhadas, horas extras e atrasos.
-
-O SIGE permite configurar horários diferentes para **cada dia da semana**, incluindo intervalos de pausa e identificação de dias não trabalhados.
-
-**Campos do cadastro de Horário de Trabalho:**
-
-| Campo | Tipo | Obrigatório | Descrição |
-|:------|:-----|:-----------:|:----------|
-| Nome | Texto (até 100 caracteres) | Sim | Nome identificador do horário (deve ser único) |
-| Ativo | Booleano | Sim | Se o horário está ativo para uso |
-| Horas Diárias | Numérico | Não | Carga horária padrão por dia (ex: 8.0) |
-| Valor Hora | Numérico (R$) | Não | Valor da hora de trabalho |
-
-**Configuração por dia da semana (HorarioDia):**
-
-Para cada dia (Segunda a Domingo), é possível configurar individualmente:
-
-| Campo | Tipo | Descrição |
-|:------|:-----|:----------|
-| Dia da Semana | Inteiro (0-6) | 0=Segunda, 1=Terça, 2=Quarta, 3=Quinta, 4=Sexta, 5=Sábado, 6=Domingo |
-| Entrada | Hora (HH:MM) | Horário de entrada (ex: 07:00) |
-| Saída | Hora (HH:MM) | Horário de saída (ex: 17:00) |
-| Pausa (horas) | Numérico | Duração do intervalo de almoço em horas (ex: 1.0) |
-| Trabalha | Booleano | Define se é dia útil de trabalho |
-
-#### Criando um Horário de Trabalho
-
-1. Acesse **Configurações** → **Horários de Trabalho**.
-2. Clique no botão **"Novo Horário"**.
-3. Informe o **Nome** do horário (ex: "Comercial Padrão", "Obra - Campo").
-4. Configure os horários para **cada dia da semana**:
-   - Marque os dias em que há trabalho (normalmente segunda a sexta).
-   - Defina entrada, saída e tempo de pausa para cada dia.
-   - Para sábados com meia jornada, configure entrada e saída diferenciadas.
-5. Clique em **"Salvar"**.
-
-[IMAGEM: Formulário de configuração de horário de trabalho com dias da semana]
-
-#### Exemplo: Horário Comercial Padrão (44h semanais)
-
-| Dia | Trabalha | Entrada | Saída | Pausa (h) | Horas Líquidas |
-|:----|:--------:|:-------:|:-----:|:---------:|:--------------:|
-| Segunda-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Terça-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Quarta-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Quinta-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Sexta-feira | Sim | 07:30 | 17:30 | 1,0 | 9,0 |
-| Sábado | Sim | 07:30 | 11:30 | 0,0 | 4,0 |
-| Domingo | Não | — | — | — | 0,0 |
-
-#### Outros Exemplos de Horários
-
-| Nome do Horário | Seg–Sex | Sábado | Carga Semanal |
-|:----------------|:-------:|:------:|:-------------:|
-| Comercial Padrão | 07:30–17:30 | 07:30–11:30 | 44h |
-| Administrativo | 08:00–17:00 | Não trabalha | 40h |
-| Obra Turno Manhã | 06:00–14:00 | 06:00–10:00 | 44h |
-| Obra Turno Tarde | 14:00–22:00 | Não trabalha | 40h |
-
-#### Configuração de Tolerâncias
-
-O sistema suporta configuração de tolerâncias de atraso por obra/local de trabalho:
-
-| Configuração | Valor Padrão | Descrição |
-|:-------------|:------------:|:----------|
-| Tolerância de Atraso | 15 minutos | Registros dentro da tolerância não são contabilizados como atraso |
-| Carga Horária Diária | 8 horas (480 min) | Horas de trabalho esperadas por dia |
-| Pausa para Almoço | 1 hora | Tempo de intervalo para refeição |
-
-> **Importante:** O horário de trabalho é uma peça fundamental do sistema. Ele é utilizado no cálculo automático de horas trabalhadas, horas extras, atrasos e na geração da folha de pagamento.
+[IMAGEM: Comparação das barras de navegação para perfil Administrador e perfil Funcionário]
 
 ---
 
-## 1.6. Gestão de Usuários
+## 1.6. Alterando sua Senha
 
-A gestão de usuários é uma das configurações mais importantes do SIGE. Cada pessoa que acessa o sistema precisa ter um usuário cadastrado com o tipo de permissão adequado. O sistema opera no modelo **multi-tenant**, onde cada administrador (ADMIN) gerencia seus próprios dados de forma isolada.
+Para manter a segurança da sua conta, é recomendável alterar sua senha periodicamente, especialmente após o primeiro acesso.
 
-### 1.6.1. Tipos de Usuário
+### Como alterar sua senha
 
-O SIGE possui **5 tipos de usuário**, cada um com diferentes níveis de permissão:
+1. Clique no seu **nome de usuário** no canto superior direito da tela.
+2. No menu suspenso, selecione **"Configurações"** ou **"Perfil"**.
+3. Localize a seção de **alteração de senha**.
+4. Preencha os campos:
+   - **Senha atual** — Digite sua senha atual.
+   - **Nova senha** — Digite a nova senha desejada.
+   - **Confirmar nova senha** — Repita a nova senha para confirmação.
+5. Clique em **"Salvar"** para confirmar a alteração.
 
-| Tipo | Identificador | Nível | Descrição | Destino Após Login |
-|:-----|:--------------|:-----:|:----------|:-------------------|
-| **Super Administrador** | `SUPER_ADMIN` | Total | Acesso irrestrito a todo o sistema, incluindo gestão de múltiplas empresas/tenants e diagnósticos | `/super_admin_dashboard` |
-| **Administrador** | `ADMIN` | Alto | Gerencia todos os dados da sua empresa (tenant). Cria usuários, departamentos, obras e configurações | `/dashboard` |
-| **Gestor de Equipes** | `GESTOR_EQUIPES` | Médio | Gerencia equipes de campo, cria RDOs, controla ponto e acompanha o andamento das obras | `/funcionario/rdo/consolidado` |
-| **Almoxarife** | `ALMOXARIFE` | Específico | Acesso ao módulo de almoxarifado para controle de materiais, estoque e movimentações | `/funcionario/rdo/consolidado` |
-| **Funcionário** | `FUNCIONARIO` | Básico | Acesso restrito ao próprio perfil, registro de ponto e visualização de RDOs consolidados | `/funcionario/rdo/consolidado` |
+[IMAGEM: Tela de alteração de senha com os campos destacados]
 
-**Hierarquia de permissões:** `SUPER_ADMIN` > `ADMIN` > `GESTOR_EQUIPES` / `ALMOXARIFE` > `FUNCIONARIO`
+### Dicas para criar uma senha segura
 
-[IMAGEM: Diagrama de hierarquia dos tipos de usuário]
+- Use no mínimo **8 caracteres**.
+- Combine **letras maiúsculas e minúsculas**.
+- Inclua **números** e **caracteres especiais** (como @, #, $, !).
+- Evite usar informações pessoais como nome, data de nascimento ou sequências óbvias (123456, abcdef).
+- Não compartilhe sua senha com outras pessoas.
 
-### 1.6.2. Criando Usuários
-
-Somente usuários do tipo **ADMIN** ou **SUPER_ADMIN** podem criar novos usuários.
-
-**Para criar um novo usuário:**
-
-1. Faça login como ADMIN ou SUPER_ADMIN.
-2. Acesse a lista de usuários pela URL `/usuarios`.
-3. Clique no botão **"Novo Usuário"** (URL: `/usuarios/novo`).
-4. Preencha os campos do formulário:
-
-| Campo | Obrigatório | Descrição |
-|:------|:-----------:|:----------|
-| Nome | Sim | Nome completo do usuário |
-| E-mail | Sim | Endereço de e-mail (deve ser único no sistema) |
-| Username | Sim | Nome de usuário para login (deve ser único) |
-| Senha | Sim | Senha de acesso (será armazenada com hash criptográfico) |
-| Tipo de Usuário | Sim | Selecione entre: ADMIN, GESTOR_EQUIPES, ALMOXARIFE ou FUNCIONARIO |
-
-5. Clique em **"Salvar"** para criar o usuário.
-
-[IMAGEM: Formulário de criação de novo usuário]
-
-> **Segurança:** As senhas são armazenadas utilizando hash criptográfico via Werkzeug. O sistema nunca armazena senhas em texto puro. Recomenda-se senhas com no mínimo 8 caracteres, combinando letras maiúsculas, minúsculas, números e caracteres especiais.
-
-> **Multi-tenant:** Quando um ADMIN cria um novo usuário, o campo `admin_id` é preenchido automaticamente, vinculando o novo usuário à empresa do administrador. Isso garante o isolamento dos dados entre empresas.
-
-### 1.6.3. Editando e Desativando Usuários
-
-#### Editando um Usuário
-
-1. Acesse a lista de usuários em `/usuarios`.
-2. Localize o usuário desejado na listagem.
-3. Clique no ícone de **edição** ao lado do nome (URL: `/usuarios/<id>/editar`).
-4. Altere os campos necessários:
-   - **Nome**, **E-mail**, **Username** e **Tipo de Usuário** podem ser atualizados.
-   - A **Senha** só será alterada se um novo valor for informado no campo correspondente. Se o campo for deixado em branco, a senha atual será mantida.
-   - O campo **Ativo** permite ativar ou desativar o acesso do usuário.
-5. Clique em **"Salvar"** para confirmar as alterações.
-
-[IMAGEM: Formulário de edição de usuário com campo Ativo destacado]
-
-#### Desativando um Usuário
-
-1. Acesse a edição do usuário conforme descrito acima.
-2. Desmarque a opção **"Ativo"**.
-3. Clique em **"Salvar"**.
-
-#### Reativando um Usuário
-
-1. Acesse a edição do usuário.
-2. Marque novamente a opção **"Ativo"**.
-3. Clique em **"Salvar"**.
-
-> **Importante:** Desativar um usuário **não exclui** seus dados do sistema. O usuário desativado simplesmente não conseguirá realizar login. Todos os registros históricos (ponto, RDOs, movimentações) são preservados integralmente. Esta abordagem garante a integridade e rastreabilidade dos dados.
+> **Esqueceu sua senha?** Entre em contato com o administrador da sua empresa. Ele poderá redefinir sua senha pelo painel de gestão de usuários.
 
 ---
 
-## 1.7. Checklist de Configuração Inicial
+## 1.7. Saindo do Sistema (Logout)
 
-Utilize a tabela abaixo como guia para garantir que todas as etapas de configuração inicial foram concluídas antes de iniciar a operação do sistema:
+Ao terminar de usar o SIGE, é importante encerrar sua sessão corretamente para proteger seus dados.
 
-| Nº | Etapa | Descrição | Status |
-|:--:|:------|:----------|:------:|
-| 1 | Instalação do servidor | Docker e EasyPanel configurados, deploy realizado com sucesso | ☐ |
-| 2 | Variáveis de ambiente | `DATABASE_URL`, `SESSION_SECRET`, `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` e `PGDATABASE` configuradas | ☐ |
-| 3 | Banco de dados | PostgreSQL acessível e tabelas criadas automaticamente | ☐ |
-| 4 | Certificado SSL | HTTPS configurado e funcionando no domínio de produção | ☐ |
-| 5 | Primeiro login | Usuário SUPER_ADMIN criado e login realizado com sucesso | ☐ |
-| 6 | Dados da empresa | Razão social, CNPJ, endereço e logotipo configurados | ☐ |
-| 7 | Departamentos | Ao menos um departamento cadastrado (ex: Engenharia, Produção) | ☐ |
-| 8 | Funções | Ao menos uma função/cargo cadastrada com salário base | ☐ |
-| 9 | Horários de trabalho | Ao menos um horário de trabalho configurado com dias da semana | ☐ |
-| 10 | Usuário ADMIN | Administrador da empresa criado e testado | ☐ |
-| 11 | Usuários operacionais | Gestores, almoxarifes e funcionários cadastrados conforme necessidade | ☐ |
-| 12 | Teste de acesso | Login testado com cada tipo de usuário, confirmando redirecionamento correto | ☐ |
-| 13 | Backup | Rotina de backup do banco de dados PostgreSQL configurada | ☐ |
+### Como sair do sistema
 
-> **Próximos passos:** Após concluir todas as etapas deste checklist, o sistema estará pronto para uso operacional. Prossiga para o **Capítulo 2 — Dashboard e Painel de Controle** para aprender a utilizar as funcionalidades do dia a dia.
+1. Clique no seu **nome de usuário** no canto superior direito da tela.
+2. No menu suspenso, clique em **"Sair"**.
+3. Você será redirecionado para a tela de login e verá a mensagem:
+
+> *"Você saiu do sistema."*
+
+[IMAGEM: Menu do usuário com a opção Sair destacada]
+
+> **Importante:** Sempre faça logout ao terminar de usar o sistema, especialmente em computadores compartilhados ou públicos. Isso evita que outras pessoas acessem seus dados.
 
 ---
 
-## Navegação do Sistema
+## 1.8. Dicas de Navegação
 
-**Barra de navegação superior do SIGE:**
+Confira algumas dicas para aproveitar melhor o SIGE no seu dia a dia:
 
-`Dashboard` · `RDOs` · `Obras` · `Funcionários` · `Equipe` · `Ponto ▼` · `Propostas ▼` · `Financeiro ▼` · `Veículos` · `Alimentação` · `Almoxarifado ▼` · `Relatórios`
+### Navegação responsiva no celular
+
+- No celular, a barra de navegação se transforma em um **menu hambúrguer** (ícone com três linhas horizontais ☰). Toque nele para abrir o menu completo.
+- As tabelas e formulários se adaptam automaticamente à tela do celular, podendo ser roladas horizontalmente quando necessário.
+- Para uma melhor experiência, use o celular na posição **horizontal (paisagem)** ao visualizar tabelas com muitas colunas.
+
+### Atalhos úteis do navegador
+
+Embora o SIGE não possua atalhos de teclado próprios, você pode usar os atalhos padrão do seu navegador para agilizar o uso:
+
+| Atalho | O que faz |
+|:-------|:----------|
+| **F5** ou **Ctrl + R** | Atualiza a página atual |
+| **Ctrl + F** | Abre a busca de texto na página |
+| **Ctrl + T** | Abre uma nova aba no navegador |
+| **Alt + ←** | Volta para a página anterior |
+| **Alt + →** | Avança para a próxima página |
+| **Ctrl + +** | Aumenta o zoom da página |
+| **Ctrl + -** | Diminui o zoom da página |
+| **Ctrl + 0** | Restaura o zoom padrão |
+
+### Listas e tabelas
+
+- A maioria das telas de listagem permite **ordenar** os dados clicando no cabeçalho da coluna desejada.
+- Use os **filtros** disponíveis acima das tabelas para localizar registros específicos.
+- Procure pelo **campo de busca** para encontrar rapidamente um funcionário, obra ou outro registro pelo nome.
+
+### Formulários
+
+- Campos marcados com **asterisco (*)** são obrigatórios e devem ser preenchidos.
+- Após preencher um formulário, clique no botão **"Salvar"** para registrar as informações.
+- Se quiser descartar as alterações, clique em **"Cancelar"** ou simplesmente navegue para outra página.
+
+### Conexão com a internet
+
+- O SIGE requer uma conexão estável com a internet para funcionar corretamente.
+- Se a conexão for interrompida durante o preenchimento de um formulário, suas informações poderão ser perdidas. Nesse caso, recarregue a página e preencha novamente.
+
+> **Dica final:** Em caso de dúvidas sobre qualquer funcionalidade, consulte os capítulos específicos deste manual ou entre em contato com o administrador da sua empresa.
 
 ---
 

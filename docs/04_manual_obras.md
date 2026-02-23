@@ -1,412 +1,529 @@
 # Capítulo 4 — Gestão de Obras
 
-## 4.1. Introdução à Gestão de Obras
+## 4.1. Introdução
 
-O módulo de **Gestão de Obras** do SIGE (Sistema Integrado de Gestão Empresarial) é o núcleo operacional do sistema, concentrando todo o ciclo de vida de projetos de construção — desde o cadastro inicial até o encerramento e a análise financeira final. Este módulo é acessado pelo menu lateral **Obras** na barra de navegação principal do sistema.
+O módulo de **Gestão de Obras** é o coração do SIGE. É aqui que você cadastra, acompanha e controla todos os seus projetos de construção — do início ao fim. Neste capítulo, você vai aprender a:
 
-Principais funcionalidades cobertas neste capítulo:
+- Visualizar todas as suas obras em um painel organizado
+- Cadastrar novas obras com todas as informações importantes
+- Acompanhar o andamento, os custos e a equipe de cada projeto
+- Planejar e gerenciar os serviços que serão executados
+- Criar Registros Diários de Obra (RDOs) diretamente pela tela de obras
+- Gerar relatórios completos para tomada de decisão
 
-| Funcionalidade | Descrição |
-|---|---|
-| Cadastro de obras | Registro completo com dados do projeto, cliente, orçamento e geolocalização |
-| Planejamento de serviços | Vinculação de serviços planejados com quantidades, prazos e custos unitários |
-| Acompanhamento executivo | Dashboard com KPIs de custo, prazo, equipe e progresso da obra |
-| Controle financeiro | Comparação entre orçado e realizado, análise de desvios e fluxo de caixa |
-| Lançamento de RDO | Registro Diário de Obra vinculado diretamente ao projeto |
-| Relatórios gerenciais | Geração de relatórios consolidados por obra em PDF |
-| Portal do cliente | Acesso externo para o cliente acompanhar o andamento da obra |
-
-> **Pré-requisito:** Para cadastrar e gerenciar obras, o usuário deve possuir permissão de **Administrador**. Funcionários e Gestores de Equipe podem visualizar as obras às quais estão alocados e registrar RDOs a partir da listagem.
+> **Quem pode usar:** Administradores têm acesso total para cadastrar e gerenciar obras. Gestores de equipe e funcionários podem visualizar as obras onde estão alocados e registrar RDOs.
 
 ---
 
 ## 4.2. Tela Principal de Obras
 
-### Acessando a Tela
+### Como acessar
 
-1. No menu de navegação superior, clique em **Obras**.
-2. O sistema direcionará você para a URL `/obras`.
+1. No menu lateral do sistema, clique em **Obras**.
+2. A tela principal será exibida com todas as suas obras.
 
 ![Tela principal de obras](placeholder_tela_obras.png)
 
-### Visão Geral da Interface
+### O que você vai encontrar na tela
 
-A tela principal de obras é dividida nas seguintes áreas:
+A tela de obras é dividida em três áreas principais: os **indicadores resumidos** no topo, os **filtros de pesquisa** e os **cards das obras**.
 
-#### KPIs Resumidos (Topo)
+---
 
-No topo da página, são exibidos indicadores gerais do portfólio de obras:
+### Indicadores Resumidos (Topo da Página)
 
-| KPI | Descrição |
+No topo da tela, você encontra um resumo rápido de todo o seu portfólio de obras:
+
+| Indicador | O que significa |
 |---|---|
-| Obras Ativas | Quantidade de obras com status "Em andamento" (ex.: 8) |
-| Obras Disponíveis | Total de obras cadastradas no sistema (ex.: 142) |
-| Custo Total no Período | Somatório dos custos de todas as obras no período filtrado |
-| Funcionários Alocados | Total de funcionários distintos com registro de ponto em obras ativas |
+| **Obras Ativas** | Quantas obras estão em andamento neste momento |
+| **Obras Disponíveis** | Total de obras cadastradas no sistema |
+| **Custo Total no Período** | Quanto foi gasto em todas as obras no período selecionado |
+| **Funcionários Alocados** | Quantos funcionários estão trabalhando nas obras ativas |
 
-#### Filtros de Pesquisa
+Esses números atualizam automaticamente conforme você aplica filtros ou quando novos dados são registrados no sistema.
 
-Acima dos cards de obras, o sistema oferece filtros para refinar a listagem:
+---
 
-1. **Nome da Obra** — Campo de texto para busca por nome (parcial ou completo).
-2. **Status** — Filtre por status: *Em andamento*, *Concluída*, *Paralisada* ou *Cancelada*.
-3. **Cliente** — Campo de texto para busca pelo nome do cliente responsável.
-4. **Data Início** — Define o início do período para filtro por data de início da obra.
-5. **Data Fim** — Define o final do período para filtro por data de início da obra.
-6. Clique em **Filtrar** para atualizar a listagem e os KPIs exibidos.
+### Filtros de Pesquisa
+
+Acima dos cards de obras, você encontra filtros para localizar rapidamente a obra que procura:
+
+1. **Nome da Obra** — Digite o nome (ou parte dele) para buscar.
+2. **Status** — Filtre por situação: *Em andamento*, *Concluída*, *Paralisada* ou *Cancelada*.
+3. **Cliente** — Digite o nome do cliente para filtrar as obras dele.
+4. **Data Início** — Selecione uma data para ver obras que começaram a partir dela.
+5. **Data Fim** — Selecione uma data limite para o filtro.
+6. Clique no botão **Filtrar** para aplicar os filtros.
+
+Os indicadores do topo também são atualizados de acordo com os filtros aplicados, mostrando os dados apenas das obras que atendem aos critérios selecionados.
 
 ![Filtros de pesquisa de obras](placeholder_filtros_obras.png)
 
-#### Cards de Obras
+> **Dica:** Para ver todas as obras novamente, limpe os filtros e clique em **Filtrar**.
 
-Cada obra é exibida em formato de **card** (cartão visual), contendo:
+---
 
-- **Nome da obra** e **código** identificador (ex.: O0001).
-- **Status** da obra com indicador visual colorido.
-- **Cliente** associado ao projeto.
-- **Endereço** da obra.
-- **Data de início** e **previsão de término**.
-- **Progresso** — Barra visual indicando o percentual de conclusão.
-- **KPIs do card** — Custo total, dias trabalhados e funcionários alocados no período.
-- **Botão +RDO** — Atalho direto para criar um novo Registro Diário de Obra, redirecionando para `/funcionario/rdo/novo?obra_id=<id>`.
-- **Botão Detalhes** — Acessa a página completa da obra em `/obras/detalhes/<id>`.
+### Cards de Obras
+
+Cada obra aparece na tela como um **card** (cartão visual), que funciona como um resumo rápido do projeto. Veja o que cada card mostra:
+
+- **Nome da obra** — O nome que você deu ao projeto.
+- **Código** — Código identificador único (ex.: O0001).
+- **Status** — Situação atual da obra, com cor indicativa (verde para ativa, cinza para concluída, etc.).
+- **Cliente** — Nome da empresa ou pessoa contratante.
+- **Endereço** — Local onde a obra está sendo executada.
+- **Datas** — Data de início e previsão de término.
+- **Barra de progresso** — Mostra visualmente quanto da obra já foi concluído (em percentual).
+- **Custos resumidos** — Custo total acumulado no período.
+- **Dias trabalhados** — Quantos dias úteis foram registrados na obra.
+- **Funcionários** — Quantos funcionários estão alocados.
+
+Cada card possui dois botões importantes:
+
+| Botão | O que faz |
+|---|---|
+| **+RDO** | Abre o formulário para criar um novo Registro Diário de Obra, já com essa obra selecionada |
+| **Detalhes** | Abre a página completa da obra com todas as informações, gráficos e controles |
 
 ![Card de obra com informações e KPIs](placeholder_card_obra.png)
 
-#### Ordenação
+### Ordenação das Obras
 
-A listagem de obras é ordenada automaticamente por **data de início** (mais recente primeiro). Obras com status "Em andamento" tendem a aparecer no topo por possuírem datas de início mais recentes.
+As obras são organizadas automaticamente com as **mais recentes primeiro**. Obras em andamento geralmente aparecem no topo da lista.
 
 ---
 
 ## 4.3. Cadastrando uma Nova Obra
 
-### Acessando o Formulário
+### Passo a passo
 
-1. Na tela principal de obras (`/obras`), clique no botão **+ Nova Obra**.
-2. O sistema direcionará você para a URL `/obras/nova`.
+1. Na tela principal de obras, clique no botão **+ Nova Obra** (geralmente no canto superior direito).
+2. O formulário de cadastro será aberto.
+3. Preencha os campos conforme explicado abaixo.
+4. Clique em **Salvar** para criar a obra.
+
+Após salvar, o sistema levará você automaticamente para a página de detalhes da obra recém-criada.
 
 ![Formulário de nova obra](placeholder_form_nova_obra.png)
 
-### 4.3.1. Dados da Obra
+---
 
-Preencha os campos do formulário conforme a tabela abaixo:
+### 4.3.1. Informações Básicas da Obra
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Nome | Texto | Sim | Nome identificador do projeto/obra |
-| Código | Texto | Não | Código único da obra (ex.: O0001). Se não informado, o sistema gera automaticamente no formato `O` + sequencial de 4 dígitos |
-| Endereço | Texto | Não | Endereço completo do canteiro de obras |
-| Status | Seleção | Sim | Status inicial: *Em andamento*, *Concluída*, *Paralisada* ou *Cancelada* |
-| Data de Início | Data | Sim | Data de início prevista ou efetiva da obra |
-| Data de Previsão de Término | Data | Não | Data estimada para conclusão do projeto |
-| Área Total (m²) | Numérico | Não | Área total do projeto em metros quadrados |
-| Responsável | Seleção | Não | Funcionário responsável técnico pela obra (lista de funcionários ativos) |
+Esses são os dados principais do seu projeto:
 
-#### Dados do Cliente
+| Campo | O que preencher | Obrigatório? |
+|---|---|---|
+| **Nome** | Nome do projeto ou da obra (ex.: "Residencial Vila Nova", "Reforma Galpão Industrial") | Sim |
+| **Código** | Um código único para identificar a obra (ex.: O0001). Se você deixar em branco, o sistema gera automaticamente | Não |
+| **Endereço** | Endereço completo do canteiro de obras | Não |
+| **Status** | Situação inicial da obra: *Em andamento*, *Concluída*, *Paralisada* ou *Cancelada*. Na maioria dos casos, selecione *Em andamento* | Sim |
+| **Data de Início** | Quando a obra começou (ou vai começar) | Sim |
+| **Previsão de Término** | Data estimada para entrega do projeto | Não |
+| **Área Total (m²)** | Tamanho total da obra em metros quadrados | Não |
+| **Responsável** | Selecione o engenheiro ou mestre de obras responsável pelo projeto (a lista mostra os funcionários cadastrados) | Não |
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Nome do Cliente | Texto | Não | Nome da pessoa ou empresa contratante |
-| E-mail do Cliente | E-mail | Não | E-mail para comunicação e acesso ao portal do cliente |
-| Telefone do Cliente | Texto | Não | Telefone de contato do cliente |
-| Portal Ativo | Checkbox | Não | Ativa o Portal do Cliente para acompanhamento externo. Ao marcar e informar o e-mail, o sistema gera automaticamente um token de acesso seguro |
+> **Dica:** Preencha o máximo de informações possível. Quanto mais completo o cadastro, mais preciso será o acompanhamento do projeto.
 
-#### Geolocalização e Geofencing
+---
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Latitude | Numérico | Não | Coordenada de latitude do canteiro de obras |
-| Longitude | Numérico | Não | Coordenada de longitude do canteiro de obras |
-| Raio de Geofence (metros) | Numérico | Não | Raio da cerca virtual para validação de ponto eletrônico (padrão: 100 metros) |
+### 4.3.2. Dados do Cliente
 
-> **Dica:** O geofencing permite validar se o funcionário está fisicamente dentro do perímetro da obra ao registrar o ponto. Configure latitude, longitude e raio para ativar essa funcionalidade.
+Informe os dados da empresa ou pessoa que contratou a obra:
+
+| Campo | O que preencher | Obrigatório? |
+|---|---|---|
+| **Nome do Cliente** | Nome da pessoa física ou empresa contratante | Não |
+| **E-mail do Cliente** | E-mail de contato do cliente | Não |
+| **Telefone do Cliente** | Telefone para contato | Não |
+| **Portal Ativo** | Marque esta opção se deseja que o cliente possa acompanhar a obra pela internet. Ao ativar, o sistema gera automaticamente um link de acesso exclusivo para o cliente | Não |
+
+> **Sobre o Portal do Cliente:** Quando ativado, o cliente recebe um link exclusivo para acompanhar o andamento da obra, visualizar fotos e acompanhar o progresso — sem precisar de login no sistema principal. Para isso, é necessário informar o e-mail do cliente.
+
+---
+
+### 4.3.3. Orçamento e Valores do Contrato
+
+Esta é uma das seções mais importantes do cadastro. Aqui você define os valores financeiros do projeto:
+
+| Campo | O que preencher | Obrigatório? |
+|---|---|---|
+| **Orçamento** | Quanto você estimou gastar para executar a obra (custos internos: mão de obra, materiais, equipamentos, etc.) | Não |
+| **Valor do Contrato** | Quanto o cliente vai pagar pela obra (o valor fechado em contrato) | Não |
+
+**Entendendo a diferença entre Orçamento e Valor do Contrato:**
+
+- O **Orçamento** é o quanto você prevê gastar para executar a obra. É o seu custo interno.
+- O **Valor do Contrato** é o quanto o cliente vai te pagar. É a sua receita.
+- A diferença entre os dois é a sua **margem de lucro prevista**.
+
+Por exemplo:
+- Orçamento: R$ 800.000,00 (seus custos estimados)
+- Valor do Contrato: R$ 1.000.000,00 (o que o cliente paga)
+- Margem prevista: R$ 200.000,00 (20%)
+
+O sistema acompanha os custos reais conforme a obra avança e compara com esses valores, alertando quando os gastos estão se aproximando ou ultrapassando o orçamento.
+
+> **Importante:** Mesmo que você não tenha todos os valores definidos no momento do cadastro, preencha pelo menos o orçamento estimado. Você pode atualizar esses valores a qualquer momento editando a obra.
+
+---
+
+### 4.3.4. Geolocalização e Cerca Virtual
+
+Se deseja controlar a presença dos funcionários no canteiro de obras pelo sistema de ponto, configure a localização:
+
+| Campo | O que preencher | Obrigatório? |
+|---|---|---|
+| **Latitude** | Coordenada de latitude do local da obra | Não |
+| **Longitude** | Coordenada de longitude do local da obra | Não |
+| **Raio de Geofence (metros)** | Tamanho da "cerca virtual" ao redor da obra. O padrão é 100 metros | Não |
+
+**Como funciona a cerca virtual (geofence):**
+
+A cerca virtual é um recurso que verifica se o funcionário está realmente no local da obra quando registra o ponto. Funciona assim:
+
+1. Você define as coordenadas (latitude e longitude) do centro do canteiro de obras.
+2. Define um raio em metros (ex.: 100m, 200m, 500m — dependendo do tamanho da obra).
+3. Quando o funcionário bate o ponto pelo celular, o sistema verifica se ele está dentro desse raio.
+
+> **Como obter as coordenadas:** Abra o Google Maps, clique com o botão direito no local da obra e selecione "O que há aqui?". As coordenadas aparecerão na parte inferior da tela.
 
 ![Campos de geolocalização no formulário](placeholder_geofencing_obra.png)
 
-### 4.3.2. Orçamento e Custos
+---
 
-Na seção financeira do formulário, informe os valores planejados:
+### 4.3.5. Serviços da Obra
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| Orçamento | Monetário (R$) | Não | Valor total orçado para a execução da obra |
-| Valor do Contrato | Monetário (R$) | Não | Valor firmado em contrato com o cliente. Utilizado para cálculo de margem de lucro |
+Durante o cadastro, você já pode vincular os serviços que serão executados nesta obra:
 
-> **Importante:** O valor do contrato é a referência principal para análise de rentabilidade. O sistema calcula automaticamente a margem comparando o valor do contrato com os custos reais apurados (mão de obra, alimentação, transporte e custos diversos).
+1. Na seção **Serviços da Obra**, você verá a lista de serviços disponíveis (cadastrados previamente no módulo de Serviços).
+2. Marque os serviços que fazem parte deste projeto (ex.: Concretagem, Alvenaria, Pintura, Instalação Elétrica).
+3. Ao salvar a obra, os serviços selecionados serão vinculados automaticamente.
 
-### 4.3.3. Equipe da Obra
-
-A alocação de funcionários à obra é realizada de duas formas:
-
-1. **Responsável técnico** — Definido diretamente no formulário de cadastro da obra (campo Responsável).
-2. **Equipe de campo** — Alocada através do módulo **Equipe** ou automaticamente quando funcionários registram ponto indicando a obra.
-
-Para vincular serviços à obra durante o cadastro:
-
-1. Na seção **Serviços da Obra**, marque os serviços desejados na lista de serviços disponíveis.
-2. Os serviços listados são aqueles cadastrados previamente no módulo de Serviços do sistema.
-3. Clique em **Salvar** para criar a obra com os serviços selecionados.
-
-> **Nota:** Após o cadastro, o sistema redireciona automaticamente para a página de detalhes da obra recém-criada (`/obras/detalhes/<id>`).
+> **Nota:** Você também pode adicionar ou remover serviços depois, pela página de detalhes da obra. Não se preocupe em acertar tudo no primeiro cadastro.
 
 ---
 
-## 4.4. Planejamento da Obra
+## 4.4. Visualizando os Detalhes da Obra
 
-### 4.4.1. Serviços da Obra
+### Como acessar
 
-O planejamento de serviços define **o quê** será executado na obra e em **qual quantidade**. Cada serviço vinculado possui controle individual de planejamento e execução.
-
-#### Vinculando Serviços
-
-1. Acesse a obra desejada em `/obras/detalhes/<id>`.
-2. Na seção **Serviços**, clique em **Gerenciar Serviços**.
-3. Selecione os serviços desejados na listagem de serviços disponíveis.
-4. Para cada serviço selecionado, o sistema cria um registro na tabela de planejamento.
-
-#### Campos de Planejamento por Serviço
-
-| Campo | Descrição |
-|---|---|
-| Serviço | Nome do serviço (ex.: Concretagem, Alvenaria, Pintura) |
-| Unidade de Medida | Unidade padrão do serviço (m², m³, kg, ton, un, m, h) |
-| Quantidade Planejada | Volume total planejado para execução na obra |
-| Valor Unitário | Custo por unidade do serviço (R$) |
-| Valor Total Planejado | Calculado automaticamente: quantidade × valor unitário |
-| Data Início Planejada | Data prevista para início da atividade |
-| Data Fim Planejada | Data prevista para conclusão da atividade |
-| Prioridade | Nível de prioridade: Alta (1), Média (2), Baixa (3) |
-| Responsável | Funcionário responsável pela execução do serviço |
-| Status | Não Iniciado, Em Andamento, Concluído ou Pausado |
-
-![Planejamento de serviços da obra](placeholder_servicos_obra.png)
-
-#### Acompanhamento da Execução de Serviços
-
-À medida que os RDOs são registrados, o sistema atualiza automaticamente:
-
-- **Quantidade Executada** — Soma das quantidades informadas nos RDOs.
-- **Percentual Concluído** — Razão entre executado e planejado.
-- **Valor Total Executado** — Custo real acumulado do serviço.
-- **Data de Início Real** — Registrada na primeira execução.
-- **Data de Fim Real** — Registrada quando o serviço atinge 100% de conclusão.
-
-| Indicador | Fórmula |
-|---|---|
-| % Concluído | (Quantidade Executada ÷ Quantidade Planejada) × 100 |
-| Desvio de Custo | Valor Total Executado − Valor Total Planejado |
-| Status Automático | Atualizado conforme o percentual (0% = Não Iniciado, 1–99% = Em Andamento, 100% = Concluído) |
-
-### 4.4.2. Cronograma
-
-O cronograma da obra é montado a partir das datas planejadas dos serviços vinculados:
-
-1. **Data de início da obra** — Definida no cadastro da obra.
-2. **Data de previsão de término** — Definida no cadastro da obra.
-3. **Datas dos serviços** — Cada serviço possui data de início e fim planejados.
-4. O sistema compara as datas planejadas com as datas reais para identificar atrasos.
-
-> **Dica:** Mantenha as datas dos serviços atualizadas para que o dashboard executivo reflita com precisão o andamento do projeto.
-
----
-
-## 4.5. Acompanhamento da Obra
-
-### 4.5.1. Dashboard Executivo
-
-Ao acessar os detalhes de uma obra em `/obras/detalhes/<id>`, o sistema exibe um painel executivo com os principais indicadores:
+1. Na tela principal de obras, clique no botão **Detalhes** no card da obra desejada.
+2. A página de detalhes será aberta com todas as informações do projeto.
 
 ![Dashboard executivo da obra](placeholder_dashboard_obra.png)
 
-#### KPIs Principais
+A página de detalhes é o **painel de controle** da sua obra. Aqui você encontra tudo sobre o projeto em um só lugar.
 
-| KPI | Descrição |
+---
+
+### 4.4.1. Indicadores Principais (KPIs)
+
+No topo da página de detalhes, você encontra os indicadores mais importantes da obra:
+
+| Indicador | O que mostra |
 |---|---|
-| Custo Total | Somatório de todos os custos apurados: mão de obra + alimentação + transporte + diversos |
-| Custo de Mão de Obra | Calculado com base nos registros de ponto × valor/hora do funcionário, incluindo horas extras a 150% |
-| Custo de Alimentação | Soma dos registros de alimentação vinculados à obra no período |
-| Custos Diversos | Lançamentos avulsos de custos operacionais da obra |
-| Custo de Transporte | Despesas de veículos associadas à obra |
-| Dias Trabalhados | Quantidade de dias distintos com registros de ponto na obra |
-| Funcionários Alocados | Total de funcionários distintos que registraram ponto na obra |
-| Orçamento Restante | Orçamento − Custo Total (com indicador visual de alerta se negativo) |
+| **Custo Total** | Quanto já foi gasto na obra até agora (somando tudo: mão de obra, alimentação, transporte e outros custos) |
+| **Custo de Mão de Obra** | Quanto foi gasto com salários e horas extras dos funcionários nesta obra |
+| **Custo de Alimentação** | Quanto foi gasto com refeições e alimentação da equipe |
+| **Custos Diversos** | Outros gastos operacionais registrados (materiais, locações, etc.) |
+| **Custo de Transporte** | Despesas com veículos utilizados na obra |
+| **Dias Trabalhados** | Quantos dias de trabalho foram registrados na obra |
+| **Funcionários Alocados** | Quantas pessoas trabalharam nesta obra |
+| **Orçamento Restante** | Quanto ainda resta do orçamento (se ficar negativo, significa que os gastos ultrapassaram o previsto) |
 
-#### Composição de Custos
+Esses números são calculados automaticamente pelo sistema com base nos registros de ponto, alimentação, veículos e lançamentos de custos.
 
-O sistema apresenta a composição de custos de forma visual, permitindo identificar rapidamente qual categoria representa a maior parcela do gasto:
+---
 
-| Categoria | Fonte de Dados |
+### 4.4.2. Composição de Custos
+
+O sistema mostra como os custos da obra estão distribuídos entre as categorias:
+
+| Categoria | De onde vem a informação |
 |---|---|
-| Mão de Obra | Registros de ponto × valor/hora (horas normais + horas extras × 1,5) |
-| Alimentação | Módulo de Alimentação — registros vinculados à obra |
-| Transporte | Módulo de Veículos — despesas com obra_id associado |
-| Diversos | Lançamentos manuais de custos avulsos (OutroCusto) |
+| **Mão de Obra** | Calculada automaticamente com base nos registros de ponto dos funcionários (horas normais e extras) |
+| **Alimentação** | Registros de refeições e marmitas fornecidas à equipe da obra |
+| **Transporte** | Despesas com veículos que prestaram serviço para esta obra |
+| **Diversos** | Custos avulsos que você lança manualmente (materiais, locações, etc.) |
 
-### 4.5.2. Lançamento de Custos
+Essa visão ajuda você a identificar onde está gastando mais e tomar decisões para otimizar os custos.
 
-Para registrar custos operacionais diretamente na obra:
+---
 
-1. Acesse a obra em `/obras/detalhes/<id>`.
+## 4.5. Planejamento de Serviços
+
+### O que é o planejamento de serviços?
+
+O planejamento de serviços define **o que** vai ser feito na obra e **quanto** de cada serviço será necessário. É como o escopo do projeto dividido em atividades mensuráveis.
+
+### Como gerenciar os serviços de uma obra
+
+1. Acesse a página de detalhes da obra.
+2. Localize a seção **Serviços**.
+3. Clique em **Gerenciar Serviços** para adicionar ou remover serviços.
+4. Selecione os serviços que deseja vincular à obra.
+
+### Informações de cada serviço
+
+Para cada serviço vinculado à obra, você pode definir:
+
+| Campo | O que preencher |
+|---|---|
+| **Serviço** | Nome da atividade (ex.: Concretagem, Alvenaria, Pintura, Instalações) |
+| **Unidade de Medida** | Como o serviço é medido (metros quadrados, metros cúbicos, quilos, unidades, horas, etc.) |
+| **Quantidade Planejada** | Quanto do serviço precisa ser executado no total (ex.: 500 m² de alvenaria) |
+| **Valor Unitário (R$)** | Quanto custa cada unidade do serviço (ex.: R$ 45,00 por m²) |
+| **Valor Total Planejado** | Calculado automaticamente: quantidade × valor unitário |
+| **Data de Início Prevista** | Quando esse serviço deve começar |
+| **Data de Término Prevista** | Quando esse serviço deve ser concluído |
+| **Prioridade** | Nível de importância: Alta, Média ou Baixa |
+| **Responsável** | Funcionário encarregado de executar esse serviço |
+| **Status** | Situação: Não Iniciado, Em Andamento, Concluído ou Pausado |
+
+![Planejamento de serviços da obra](placeholder_servicos_obra.png)
+
+### Acompanhamento automático da execução
+
+Conforme os RDOs (Registros Diários de Obra) são preenchidos com as quantidades executadas, o sistema atualiza automaticamente:
+
+- **Quantidade executada** — Soma de tudo que já foi feito daquele serviço.
+- **Percentual concluído** — Quanto já foi feito em relação ao planejado (ex.: 350 m² de 500 m² = 70%).
+- **Valor executado** — Quanto já foi gasto com aquele serviço até o momento.
+- **Status automático** — O sistema muda o status conforme o progresso (0% = Não Iniciado, entre 1% e 99% = Em Andamento, 100% = Concluído).
+
+Isso permite que você acompanhe o progresso de cada serviço sem precisar atualizar manualmente.
+
+---
+
+### Cronograma da Obra
+
+O cronograma da obra é montado automaticamente a partir das datas dos serviços:
+
+- As **datas de início e término** de cada serviço formam o cronograma geral.
+- O sistema compara as datas planejadas com o que está sendo executado para identificar possíveis atrasos.
+- A **data de previsão de término da obra** serve como referência para verificar se o projeto está dentro do prazo.
+
+> **Dica:** Mantenha as datas dos serviços sempre atualizadas. Assim, o painel da obra reflete com precisão o andamento real do projeto.
+
+---
+
+## 4.6. Lançamento de Custos Diversos
+
+Além dos custos automáticos (mão de obra, alimentação e transporte), você pode registrar outros gastos diretamente na obra.
+
+### Como lançar um custo
+
+1. Acesse a página de detalhes da obra.
 2. Na seção **Custos**, clique em **Novo Lançamento**.
-3. Preencha os campos:
+3. Preencha as informações:
 
-| Campo | Descrição |
+| Campo | O que preencher |
 |---|---|
-| Descrição | Descrição do custo (ex.: "Material elétrico", "Locação de betoneira") |
-| Valor (R$) | Valor do lançamento |
-| Data | Data de referência do custo |
-| Categoria | Tipo do custo para classificação |
-| Observações | Informações complementares |
+| **Descrição** | O que foi o gasto (ex.: "Compra de material elétrico", "Locação de betoneira", "Aluguel de andaimes") |
+| **Valor (R$)** | Quanto custou |
+| **Data** | Quando o gasto aconteceu |
+| **Categoria** | Tipo do custo para organização |
+| **Observações** | Informações extras que julgar importantes |
 
 4. Clique em **Salvar** para registrar o custo.
 
-> **Nota:** Custos de mão de obra e alimentação são calculados automaticamente a partir dos módulos de Ponto e Alimentação. Não é necessário lançá-los manualmente.
-
-### 4.5.3. Registro Diário de Obra (RDO)
-
-O RDO é o instrumento principal de registro do dia a dia da obra. Cada obra na listagem possui um botão **+RDO** que direciona para `/funcionario/rdo/novo?obra_id=<id>`.
-
-#### Como criar um RDO a partir da obra
-
-1. Na listagem de obras (`/obras`), localize a obra desejada.
-2. Clique no botão **+RDO** no card da obra.
-3. O formulário de RDO será aberto com a obra já pré-selecionada.
-4. Preencha as informações do dia: condições climáticas, mão de obra presente, equipamentos utilizados, serviços executados, ocorrências e fotos.
-5. Clique em **Salvar** para registrar o RDO.
-
-> **Referência:** Para detalhes completos sobre o preenchimento do RDO, consulte o **Capítulo 6 — Registro Diário de Obra (RDO)**.
-
-#### Informações registradas no RDO
-
-| Seção | Dados Registrados |
-|---|---|
-| Mão de Obra | Funcionários presentes, horas trabalhadas, função exercida |
-| Equipamentos | Equipamentos utilizados, horas de operação, status |
-| Serviços/Subatividades | Serviços executados com quantidades medidas |
-| Ocorrências | Eventos relevantes: acidentes, paralisações, visitas técnicas |
-| Fotos | Registro fotográfico do andamento da obra |
-| Condições Climáticas | Tempo (ensolarado, nublado, chuvoso) e impacto nas atividades |
+> **Bom saber:** Os custos de mão de obra são calculados automaticamente com base nos registros de ponto. Os custos de alimentação vêm do módulo de Alimentação. Você não precisa lançar esses valores manualmente — o sistema faz isso por você.
 
 ---
 
-## 4.6. Controle Financeiro da Obra
+## 4.7. Controle Financeiro da Obra
 
-O controle financeiro da obra integra dados de múltiplos módulos para fornecer uma visão completa da saúde financeira do projeto.
+O controle financeiro reúne todas as informações de custos e receitas do projeto para que você tenha uma visão clara da saúde financeira da obra.
 
-### Orçado vs. Realizado
+### Orçado versus Realizado
 
-| Indicador | Cálculo |
+O sistema compara continuamente o que foi planejado com o que está acontecendo de fato:
+
+| Indicador | O que significa |
 |---|---|
-| Valor Orçado | Campo `orcamento` definido no cadastro da obra |
-| Valor do Contrato | Campo `valor_contrato` — receita prevista do projeto |
-| Custo Realizado | Soma de: mão de obra + alimentação + transporte + custos diversos |
-| Margem Bruta | Valor do Contrato − Custo Realizado |
-| Margem Percentual | (Margem Bruta ÷ Valor do Contrato) × 100 |
-| Desvio Orçamentário | Custo Realizado − Valor Orçado |
-| % Consumido do Orçamento | (Custo Realizado ÷ Valor Orçado) × 100 |
+| **Valor Orçado** | O orçamento que você definiu no cadastro da obra (custo interno previsto) |
+| **Valor do Contrato** | O valor que o cliente vai pagar pela obra (receita prevista) |
+| **Custo Realizado** | Quanto já foi gasto de fato (soma de mão de obra + alimentação + transporte + custos diversos) |
+| **Margem Bruta** | Valor do Contrato menos o Custo Realizado — é o lucro real até o momento |
+| **Margem Percentual** | A margem em percentual (quanto maior, melhor para o seu negócio) |
+| **Desvio Orçamentário** | Diferença entre o custo real e o orçamento — se positivo, significa que gastou mais que o previsto |
+| **% do Orçamento Consumido** | Quanto do orçamento já foi utilizado |
 
 ![Gráfico orçado vs realizado](placeholder_orcado_realizado.png)
 
-### Análise de Desvios
+### Alertas Automáticos
 
-O sistema destaca automaticamente situações que requerem atenção:
+O sistema sinaliza automaticamente quando algo precisa de atenção:
 
-| Situação | Indicador Visual | Ação Recomendada |
+| Situação | Sinal Visual | O que fazer |
 |---|---|---|
-| Custo dentro do orçamento (< 80%) | Verde | Projeto sob controle |
-| Custo próximo do limite (80–100%) | Amarelo | Revisar projeções de custo |
-| Custo acima do orçamento (> 100%) | Vermelho | Ação corretiva urgente necessária |
-| Margem negativa | Vermelho piscante | Renegociar contrato ou reduzir custos |
+| Gastos dentro do orçamento (abaixo de 80%) | 🟢 Verde | Tudo sob controle, continue acompanhando |
+| Gastos se aproximando do limite (80% a 100%) | 🟡 Amarelo | Atenção! Revise as projeções de custo e avalie ajustes |
+| Gastos acima do orçamento (mais de 100%) | 🔴 Vermelho | Ação urgente! Identifique onde estourou e tome medidas corretivas |
+| Margem negativa (prejuízo) | 🔴 Vermelho | Situação crítica — renegocie o contrato ou reduza custos imediatamente |
 
 ### Fluxo de Caixa da Obra
 
-O fluxo de caixa por obra considera:
+O fluxo de caixa mostra o equilíbrio entre o que entra e o que sai na obra:
 
-1. **Entradas** — Parcelas do contrato recebidas (registradas no módulo Financeiro).
-2. **Saídas** — Todos os custos apurados (mão de obra, alimentação, transporte, diversos).
-3. **Saldo** — Diferença entre entradas e saídas acumuladas.
+- **Entradas** — Parcelas do contrato recebidas do cliente (registradas no módulo Financeiro).
+- **Saídas** — Todos os custos apurados (mão de obra, alimentação, transporte e outros).
+- **Saldo** — A diferença entre entradas e saídas. Se negativo, significa que você está gastando mais do que recebendo.
 
-> **Integração:** O controle financeiro da obra está diretamente integrado ao módulo **Financeiro** (acessível em **Financeiro** no menu de navegação). Lançamentos financeiros com centro de custo vinculado à obra são automaticamente considerados na análise.
+> **Integração com o Financeiro:** Os lançamentos financeiros feitos no módulo **Financeiro** que estejam vinculados a esta obra são automaticamente considerados na análise. Acesse o módulo Financeiro pelo menu lateral para registrar recebimentos e pagamentos.
 
 ---
 
-## 4.7. Relatórios de Obras
+## 4.8. Criando RDOs a partir da Obra
 
-O módulo de relatórios permite gerar documentos consolidados sobre o andamento e os custos das obras. Acesse pelo menu **Relatórios** ou diretamente na página de detalhes da obra.
+O **RDO (Registro Diário de Obra)** é o documento que registra tudo o que aconteceu na obra em cada dia de trabalho. Você pode criar um RDO diretamente pela tela de obras.
 
-### Tipos de Relatórios Disponíveis
+### Como criar um RDO rápido
 
-| Relatório | Descrição | Formato |
-|---|---|---|
-| Resumo Executivo da Obra | Visão geral com KPIs, progresso e status financeiro | PDF |
-| Relatório de Custos | Detalhamento de todos os custos por categoria e período | PDF |
-| Relatório de Serviços | Comparação entre planejado e executado por serviço | PDF |
-| Relatório de Mão de Obra | Funcionários alocados, horas trabalhadas e custos | PDF |
-| Relatório de RDOs | Consolidado dos Registros Diários de Obra do período | PDF |
-| Relatório Fotográfico | Compilação das fotos registradas nos RDOs | PDF |
+1. Na tela principal de obras, localize a obra desejada.
+2. Clique no botão **+RDO** que aparece no card da obra.
+3. O formulário de RDO será aberto com a obra já selecionada automaticamente.
+4. Preencha as informações do dia:
 
-### Gerando um Relatório
+| Seção | O que registrar |
+|---|---|
+| **Mão de Obra** | Quais funcionários trabalharam, quantas horas cada um, qual função exerceu |
+| **Equipamentos** | Quais equipamentos foram usados, por quanto tempo, se houve algum problema |
+| **Serviços Executados** | Quais serviços foram realizados e as quantidades medidas (ex.: 25 m² de alvenaria) |
+| **Ocorrências** | Eventos importantes: acidentes, paralisações, visitas técnicas, chuvas que impediram o trabalho |
+| **Fotos** | Fotos do andamento da obra, de problemas encontrados ou de serviços concluídos |
+| **Condições Climáticas** | Como estava o tempo (sol, nublado, chuva) e se isso afetou as atividades |
 
-1. Acesse a obra desejada em `/obras/detalhes/<id>`.
+5. Clique em **Salvar** para registrar o RDO.
+
+> **Para saber mais:** O preenchimento completo do RDO é explicado no **Capítulo 6 — Registro Diário de Obra (RDO)**. Lá você encontra instruções detalhadas para cada seção do formulário.
+
+---
+
+## 4.9. Editando uma Obra
+
+Precisa atualizar alguma informação da obra? É simples:
+
+1. Na tela principal de obras, clique no botão **Detalhes** no card da obra.
+2. Na página de detalhes, clique no botão **Editar**.
+3. O formulário de edição será aberto com todos os dados atuais preenchidos.
+4. Altere o que for necessário (nome, datas, orçamento, cliente, etc.).
+5. Clique em **Salvar** para aplicar as alterações.
+
+> **Dica:** Você pode editar o orçamento e o valor do contrato a qualquer momento. Isso é útil quando há aditivos contratuais ou revisões de escopo.
+
+---
+
+## 4.10. Alterando o Status da Obra
+
+O status da obra indica a situação atual do projeto. Você pode alterá-lo rapidamente:
+
+1. Acesse a página de detalhes da obra.
+2. Clique no botão **Alterar Status**.
+3. O sistema mudará o status da obra.
+
+### Status disponíveis
+
+| Status | Quando usar |
+|---|---|
+| **Em andamento** | A obra está em execução ativa, com equipe trabalhando |
+| **Paralisada** | A obra foi temporariamente interrompida (aguardando aprovação, problema com fornecedor, chuvas prolongadas, etc.) |
+| **Concluída** | A obra foi finalizada e entregue ao cliente |
+| **Cancelada** | A obra foi cancelada definitivamente e não será retomada |
+
+> **Bom saber:** Alterar o status de uma obra não apaga nenhum dado. Todos os registros de custos, RDOs e serviços são mantidos, independente do status. Você pode mudar o status de volta a qualquer momento.
+
+---
+
+## 4.11. Equipe da Obra
+
+A equipe de cada obra pode ser definida de duas formas:
+
+1. **Responsável técnico** — Definido diretamente no cadastro da obra (campo "Responsável"). Geralmente é o engenheiro ou mestre de obras.
+2. **Equipe de campo** — Os funcionários são vinculados à obra através do módulo **Equipe** ou automaticamente quando registram ponto indicando que estão trabalhando naquela obra.
+
+Para verificar quais funcionários estão alocados em uma obra, acesse a página de detalhes da obra e consulte a seção de equipe.
+
+> **Dica:** Manter a equipe atualizada é importante para o cálculo correto dos custos de mão de obra e para os relatórios de produtividade.
+
+---
+
+## 4.12. Excluindo uma Obra
+
+Se precisar excluir uma obra do sistema, siga estes passos:
+
+1. Acesse a página de detalhes da obra.
+2. Clique no botão **Excluir Obra**.
+3. Uma mensagem de confirmação será exibida.
+4. Confirme a exclusão.
+
+> ⚠️ **Atenção — Leia antes de excluir!**
+>
+> A exclusão de uma obra é **permanente** e **não pode ser desfeita**. Ao excluir, serão removidos:
+>
+> - Todos os serviços vinculados à obra
+> - Todos os custos diversos registrados
+> - Todos os registros de alocação de equipe
+>
+> Os RDOs (Registros Diários de Obra) já criados são **mantidos** no sistema para fins de histórico e auditoria.
+>
+> **Recomendação:** Se a obra foi cancelada ou concluída, prefira **alterar o status** para *Cancelada* ou *Concluída* em vez de excluí-la. Assim você mantém todo o histórico para consultas futuras.
+
+---
+
+## 4.13. Relatórios de Obras
+
+O sistema oferece relatórios completos para análise e documentação das suas obras.
+
+### Tipos de relatórios disponíveis
+
+| Relatório | O que contém |
+|---|---|
+| **Resumo Executivo** | Visão geral da obra: indicadores principais, progresso e situação financeira |
+| **Relatório de Custos** | Detalhamento de todos os gastos por categoria e período |
+| **Relatório de Serviços** | Comparação entre o que foi planejado e o que foi executado em cada serviço |
+| **Relatório de Mão de Obra** | Lista de funcionários que trabalharam na obra, horas registradas e custos |
+| **Relatório de RDOs** | Resumo de todos os Registros Diários de Obra do período |
+| **Relatório Fotográfico** | Compilação de todas as fotos registradas nos RDOs |
+
+### Como gerar um relatório
+
+1. Acesse a página de detalhes da obra.
 2. Clique em **Relatórios** ou **Gerar Relatório**.
-3. Selecione o tipo de relatório desejado.
-4. Defina o período de análise (data início e data fim).
+3. Escolha o tipo de relatório que deseja.
+4. Selecione o período de análise (data de início e data de fim).
 5. Clique em **Gerar PDF**.
-6. O sistema processará os dados e disponibilizará o arquivo para download.
+6. Aguarde o processamento e faça o download do arquivo.
 
 ![Geração de relatórios de obras](placeholder_relatorios_obra.png)
 
-> **Dica:** Para uma análise comparativa entre múltiplas obras, utilize o módulo **Relatórios** no menu principal, que oferece visões consolidadas de todo o portfólio.
+> **Dica:** Para comparar resultados entre várias obras ao mesmo tempo, acesse o módulo **Relatórios** pelo menu lateral. Lá você encontra relatórios consolidados de todo o portfólio de projetos.
 
 ---
 
-## Operações Administrativas
+## 4.14. Dicas e Boas Práticas
 
-### Editando uma Obra
+Aqui vão algumas recomendações para aproveitar ao máximo o módulo de Gestão de Obras:
 
-1. Acesse a listagem de obras em `/obras`.
-2. Clique no card da obra desejada para acessar os detalhes.
-3. Clique em **Editar** para abrir o formulário de edição em `/obras/editar/<id>`.
-4. Altere os campos necessários e clique em **Salvar**.
+### Cadastro Completo
+Preencha todos os campos possíveis no cadastro da obra, especialmente orçamento e valor do contrato. Isso permite que o sistema calcule margens e desvios automaticamente.
 
-### Alterando o Status da Obra
+### RDOs Diários
+Incentive sua equipe a preencher o RDO todos os dias. Quanto mais registros, mais preciso será o acompanhamento de custos e progresso.
 
-O status de uma obra pode ser alternado rapidamente:
+### Acompanhamento Semanal
+Reserve um momento da semana para verificar os indicadores de cada obra ativa. Os alertas de cores ajudam a identificar rapidamente quais obras precisam de atenção.
 
-1. Na página de detalhes da obra, clique no botão de **Alterar Status**.
-2. O sistema alterna o status via requisição POST para `/obras/toggle-status/<id>`.
-3. Os status disponíveis são:
+### Serviços Bem Planejados
+Cadastre os serviços com quantidades e valores unitários realistas. Isso é a base para o acompanhamento do progresso e a identificação de desvios.
 
-| Status | Descrição |
-|---|---|
-| Em andamento | Obra em execução ativa |
-| Concluída | Obra finalizada e entregue |
-| Paralisada | Obra temporariamente interrompida |
-| Cancelada | Obra cancelada definitivamente |
+### Controle de Aditivos
+Quando houver aditivos contratuais, atualize o valor do contrato e o orçamento na edição da obra. Assim os indicadores financeiros continuam refletindo a realidade do projeto.
 
-### Excluindo uma Obra
-
-1. Acesse a página de detalhes da obra.
-2. Clique em **Excluir Obra**.
-3. Confirme a exclusão na caixa de diálogo.
-4. O sistema envia uma requisição POST para `/obras/excluir/<id>`.
-
-> **Atenção:** A exclusão de uma obra remove permanentemente todos os dados associados, incluindo serviços vinculados, custos e registros de alocação. RDOs já registrados são mantidos no sistema para fins de histórico.
-
----
-
-## Resumo de URLs do Módulo
-
-| Ação | URL | Método |
-|---|---|---|
-| Listagem de obras | `/obras` | GET |
-| Nova obra | `/obras/nova` | GET / POST |
-| Detalhes da obra | `/obras/detalhes/<id>` | GET |
-| Editar obra | `/obras/editar/<id>` | GET / POST |
-| Excluir obra | `/obras/excluir/<id>` | POST |
-| Alternar status | `/obras/toggle-status/<id>` | POST |
-| Novo RDO vinculado | `/funcionario/rdo/novo?obra_id=<id>` | GET |
+### Portal do Cliente
+Ative o portal do cliente para obras importantes. Isso demonstra transparência e profissionalismo, permitindo que o contratante acompanhe o andamento sem precisar ligar ou visitar a obra.
 
 ---
 

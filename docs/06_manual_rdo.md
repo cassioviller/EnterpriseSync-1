@@ -1,418 +1,480 @@
-# Capitulo 6 — Relatorio Diario de Obra (RDO)
+# Capítulo 6 — Relatório Diário de Obra (RDO)
 
-## 6.1. Introducao ao RDO
+## 6.1. O que é o RDO?
 
-O **Relatorio Diario de Obra (RDO)** e o principal instrumento de registro e controle da execucao fisica de uma obra no SIGE. Funciona como um verdadeiro **diario de bordo** da construcao, documentando tudo o que acontece no canteiro de obras a cada dia: mao de obra presente, equipamentos utilizados, servicos executados, condicoes climaticas e registros fotograficos.
+O **Relatório Diário de Obra (RDO)** é o diário de bordo da sua obra. É nele que você, responsável pelo canteiro, registra tudo o que aconteceu no dia: quem trabalhou, que equipamentos foram usados, quais serviços avançaram, como estava o tempo e, claro, tira fotos para comprovar.
 
-### Por que o RDO e essencial?
+Pense no RDO como a **prestação de contas do dia**. Sem ele, fica difícil saber o que realmente aconteceu na obra — e mais difícil ainda cobrar resultados ou justificar atrasos.
 
-| Beneficio | Descricao |
-|-----------|-----------|
-| **Registro historico** | Documenta diariamente todas as atividades executadas no canteiro |
-| **Controle de progresso automatico** | Ao aprovar um RDO, o sistema atualiza automaticamente o percentual de conclusao da obra |
-| **Rastreabilidade** | Permite verificar quem trabalhou, quais servicos foram realizados e em que condicoes |
-| **Evidencia fotografica** | Fotos otimizadas em WebP comprovam a execucao dos servicos |
-| **Integracao financeira** | Dados de mao de obra e equipamentos alimentam o modulo financeiro |
-| **Base para medicoes** | Serve como base documental para medicoes contratuais com o cliente |
+### Por que preencher o RDO todo dia?
 
-> **Importante:** O RDO foi projetado com **design mobile-first**, permitindo que o responsavel pela obra preencha o relatorio diretamente do canteiro, usando smartphone ou tablet.
+- **Memória da obra** — Daqui a seis meses, você não vai lembrar o que aconteceu num dia específico. O RDO lembra por você.
+- **Progresso atualizado** — Quando o gestor aprova o RDO, o sistema atualiza automaticamente o andamento da obra. Sem RDO, o percentual de conclusão fica parado.
+- **Comprovação para o cliente** — Fotos e registros do RDO servem como prova do que foi executado, facilitando medições e cobranças.
+- **Registro de mão de obra** — Saber quem trabalhou e quantas horas ajuda no controle de custos e na folha de pagamento.
+- **Proteção em caso de problemas** — Se houver questionamento sobre prazos, qualidade ou presença de equipe, o RDO é seu respaldo documental.
+- **Controle de equipamentos** — Saber quais máquinas foram usadas e se eram próprias ou alugadas ajuda a controlar gastos operacionais.
 
-### Fluxo Geral do RDO
+> **Lembrete:** O RDO foi feito para ser preenchido pelo celular, direto do canteiro. Você não precisa esperar chegar no escritório para preencher!
 
-```
-Criacao (Rascunho) → Elaboracao → Envio para Aprovacao → Aprovacao/Rejeicao → Atualizacao Automatica da Obra
-```
+### Como funciona o ciclo do RDO?
 
-O sistema utiliza um **EventManager** para integracoes automaticas: ao aprovar um RDO, o progresso da obra, os indicadores financeiros e o dashboard sao atualizados de forma automatica e transparente.
+O caminho de um RDO é simples:
+
+1. **Você cria** o RDO e preenche as informações do dia
+2. **Você salva como rascunho** (se quiser terminar depois) ou **envia para aprovação**
+3. **O gestor revisa** e aprova ou pede correções
+4. **Quando aprovado**, o sistema atualiza automaticamente o progresso da obra
+
+![Fluxo do RDO - da criação à aprovação](placeholder_rdo_fluxo_ciclo.png)
 
 ---
 
-## 6.2. Tela Principal de RDOs
+## 6.2. Visualizando a Lista de RDOs
 
-### Acessando a Lista Consolidada
+### Como acessar
 
-Para acessar a tela principal de RDOs, navegue pelo menu lateral ate:
+Para ver todos os RDOs registrados, vá pelo menu lateral:
 
 **Menu → RDO → Lista Consolidada**
 
-A URL de acesso direto e: `/funcionario/rdo/consolidado`
+Essa tela mostra todos os RDOs da sua empresa, organizados em uma tabela fácil de navegar.
 
 ![Tela principal de RDOs - Lista consolidada](placeholder_rdo_lista_consolidada.png)
 
-### Colunas da Lista
+### O que aparece na lista
 
-A tabela consolidada de RDOs apresenta as seguintes informacoes:
+Cada linha da tabela mostra um RDO com as seguintes informações:
 
-| Coluna | Descricao | Exemplo |
-|--------|-----------|---------|
-| **Numero RDO** | Identificador unico gerado automaticamente | RDO-10-2025-013 |
-| **Obra** | Nome da obra associada ao RDO | Obra E2E Test yBSJZA |
-| **Data** | Data do relatorio diario | 27/10/2025 |
-| **Status** | Situacao atual do RDO | Rascunho |
-| **Progresso** | Percentual de conclusao dos servicos registrados | 45,2% |
-| **Acoes** | Botoes para visualizar, editar ou excluir | Visualizar / Editar |
+- **Número do RDO** — Um código único gerado automaticamente (exemplo: RDO-10-2025-013)
+- **Obra** — O nome da obra a que o RDO se refere
+- **Data** — A data do relatório
+- **Status** — A situação atual do RDO (veja os status abaixo)
+- **Progresso** — O percentual de avanço dos serviços registrados naquele dia
+- **Ações** — Botões para visualizar, editar ou excluir o RDO
 
-### Filtros Disponiveis
+### Filtrando RDOs
 
-A tela principal oferece filtros para localizar RDOs rapidamente:
+Se você tem muitos RDOs cadastrados, use os filtros para encontrar o que precisa:
 
-1. **Filtro por Obra** — Selecione uma obra especifica no dropdown
-2. **Filtro por Status** — Filtre por Rascunho, Em Elaboracao, Pendente de Aprovacao, Aprovado ou Reprovado
-3. **Filtro por Data Inicio** — Defina a data inicial do periodo de busca
-4. **Filtro por Data Fim** — Defina a data final do periodo de busca
-5. **Filtro por Funcionario** — Filtre por responsavel pelo preenchimento
+1. **Por obra** — Escolha uma obra específica no seletor
+2. **Por status** — Filtre por Rascunho, Em Elaboração, Pendente de Aprovação, Aprovado ou Reprovado
+3. **Por período** — Defina uma data de início e uma data de fim para buscar RDOs de um intervalo específico
+4. **Por responsável** — Filtre pelo nome de quem preencheu o RDO
 
-### Status dos RDOs
+### Entendendo os status
 
-O sistema utiliza os seguintes status para controle do ciclo de vida do RDO:
+Cada RDO passa por diferentes fases. Veja o que cada status significa:
 
-| Status | Descricao | Cor |
-|--------|-----------|-----|
-| **Rascunho** | RDO criado, ainda em preenchimento inicial | Cinza |
-| **Em Elaboracao** | RDO sendo preenchido com detalhes de servicos e mao de obra | Azul |
-| **Pendente de Aprovacao** | RDO finalizado e enviado para aprovacao do gestor | Amarelo |
-| **Aprovado** | RDO revisado e aprovado pelo gestor — atualiza progresso da obra | Verde |
-| **Reprovado** | RDO rejeitado com observacoes — necessita correcao e reenvio | Vermelho |
+- 🔘 **Rascunho** — O RDO foi criado, mas ainda não está completo. Você pode continuar preenchendo depois.
+- 🔵 **Em Elaboração** — O RDO está sendo preenchido com detalhes de serviços e mão de obra.
+- 🟡 **Pendente de Aprovação** — O RDO foi finalizado e enviado para o gestor revisar.
+- 🟢 **Aprovado** — O gestor revisou e aprovou. O progresso da obra já foi atualizado.
+- 🔴 **Reprovado** — O gestor pediu correções. Você precisa ajustar e reenviar.
 
-### Acoes Rapidas
+### Ações disponíveis
 
-Na lista de RDOs, cada registro apresenta botoes de acao:
+Na lista de RDOs, cada registro tem botões de ação:
 
-- **Visualizar** — Abre o RDO em modo somente leitura com todos os detalhes
-- **Editar** — Abre o formulario de edicao (disponivel apenas para RDOs em Rascunho ou Em Elaboracao)
-- **Excluir** — Remove o RDO e todas as suas dependencias (mao de obra, equipamentos, fotos, subatividades)
+- **Visualizar** — Abre o RDO completo, só para leitura. Bom para conferir informações.
+- **Editar** — Abre o formulário para fazer alterações. Só funciona para RDOs em Rascunho ou Em Elaboração.
+- **Excluir** — Remove o RDO por completo. Use com cuidado!
 
-> **Dica:** Na tela de Obras (`/funcionario/obras`), cada obra possui um botao **"+RDO"** que permite criar um novo RDO ja vinculado aquela obra, agilizando o preenchimento.
+> **Dica rápida:** Na tela de Obras, cada obra tem um botão **"+RDO"** que já cria o RDO vinculado àquela obra. É o jeito mais rápido de começar!
 
 ---
 
-## 6.3. Criando um Novo RDO
+## 6.3. Criando um Novo RDO — Passo a Passo
 
-### Acesso ao Formulario de Criacao
+### Como começar
 
-Existem duas formas de criar um novo RDO:
+Você tem duas formas de criar um novo RDO:
 
-1. **Pela tela de RDOs:** Clique no botao **"Novo RDO"** na lista consolidada
-   - URL: `/rdo/novo`
-2. **Pela tela de Obras:** Clique no botao **"+RDO"** na obra desejada
-   - URL: `/funcionario/rdo/novo?obra_id=<id_da_obra>`
+**Opção 1 — Pela tela de RDOs:**
+Clique no botão **"Novo RDO"** que aparece no topo da lista consolidada.
 
-Ao acessar via obra, o formulario ja vem com a obra pre-selecionada e com as atividades do ultimo RDO pre-carregadas.
+**Opção 2 — Pela tela de Obras (recomendado):**
+Vá até a obra desejada e clique no botão **"+RDO"**. Assim, o formulário já vem com a obra selecionada e com as atividades do último RDO carregadas, economizando seu tempo.
 
-![Formulario de criacao de novo RDO](placeholder_rdo_novo_formulario.png)
+![Formulário de criação de novo RDO](placeholder_rdo_novo_formulario.png)
 
-### 6.3.1. Informacoes Gerais
+### Passo 1 — Selecione a Obra
 
-O primeiro bloco do formulario solicita as informacoes basicas do RDO:
+No campo **"Obra"**, escolha a obra para a qual você está fazendo o relatório do dia. Se você criou o RDO pelo botão "+RDO" da obra, esse campo já vem preenchido.
 
-| Campo | Tipo | Obrigatorio | Descricao |
-|-------|------|:-----------:|-----------|
-| **Obra** | Dropdown de selecao | Sim | Selecione a obra para a qual o RDO sera registrado |
-| **Data** | Campo de data | Sim | Data do relatorio (padrao: data atual) |
-| **Condicao Climatica — Manha** | Dropdown | Sim | Condicao do tempo no periodo da manha (Bom, Nublado, Chuvoso, etc.) |
-| **Condicao Climatica — Tarde** | Dropdown | Sim | Condicao do tempo no periodo da tarde |
-| **Observacoes Meteorologicas** | Texto livre | Nao | Detalhes adicionais sobre as condicoes climaticas |
-| **Comentario Geral** | Texto livre | Nao | Observacoes gerais sobre o dia de trabalho |
+**Importante:** O sistema não permite criar dois RDOs para a mesma obra no mesmo dia. Se já existir um RDO para aquela data, você será redirecionado automaticamente para editar o RDO existente.
 
-**Regras de Negocio:**
+### Passo 2 — Defina a Data
 
-- O sistema **nao permite** criar dois RDOs para a mesma obra na mesma data. Se ja existir um RDO para a combinacao obra + data selecionada, o usuario sera redirecionado automaticamente para a edicao do RDO existente.
-- O **numero do RDO** e gerado automaticamente pelo sistema no formato: `RDO-<obra_id>-<ano>-<sequencial>` (exemplo: RDO-10-2025-013).
-- O **responsavel** e identificado automaticamente pelo usuario logado no sistema.
+O campo **"Data"** vem preenchido com a data de hoje, mas você pode alterar caso precise registrar um RDO de um dia anterior (por exemplo, se não conseguiu preencher ontem).
 
-> **Importante:** O campo de data vem preenchido com a data atual, mas pode ser alterado para registrar RDOs retroativos, caso necessario.
+> **Dica de campo:** O ideal é preencher o RDO no final de cada dia de trabalho, enquanto as informações ainda estão frescas na memória. Deixar para o dia seguinte aumenta o risco de esquecer detalhes.
 
-### 6.3.2. Mao de Obra
+### Passo 3 — Informe as Condições Climáticas
 
-A secao de Mao de Obra permite registrar todos os trabalhadores presentes no canteiro durante o dia:
+Registrar o clima é obrigatório e muito importante. Chuva, calor excessivo ou tempo instável afetam diretamente a produtividade da equipe e podem justificar atrasos.
 
-| Campo | Descricao |
-|-------|-----------|
-| **Funcionario** | Selecao do funcionario presente (lista filtrada pela obra) |
-| **Funcao** | Funcao exercida pelo trabalhador no dia |
-| **Tipo** | Classificacao: **Proprio** (equipe interna) ou **Terceirizado** |
-| **Horas Trabalhadas** | Quantidade de horas trabalhadas no dia |
+Preencha dois campos:
 
-**Como adicionar mao de obra:**
+- **Condição Climática — Manhã:** Como estava o tempo de manhã? (Bom, Nublado, Chuvoso, etc.)
+- **Condição Climática — Tarde:** Como estava o tempo à tarde?
 
-1. Clique no botao **"Adicionar Mao de Obra"**
-2. Selecione o funcionario no dropdown
-3. Informe a funcao exercida
-4. Selecione o tipo (proprio ou terceirizado)
-5. Informe as horas trabalhadas
-6. Repita para cada trabalhador presente
+Se quiser dar mais detalhes, use o campo **"Observações Meteorológicas"**. Por exemplo: *"Chuva forte entre 14h e 16h, paralisação parcial dos serviços externos."*
 
-![Secao de mao de obra do RDO](placeholder_rdo_mao_obra.png)
+### Passo 4 — Registre a Mão de Obra
 
-> **Dica:** O sistema pre-carrega a lista de funcionarios ativos vinculados a empresa, facilitando a selecao rapida.
+Aqui você informa quem trabalhou no canteiro naquele dia. Isso inclui tanto funcionários da sua empresa quanto terceirizados.
 
-### 6.3.3. Equipamentos
+**Como adicionar um trabalhador:**
 
-A secao de Equipamentos registra as maquinas e equipamentos utilizados no dia:
+1. Clique no botão **"Adicionar Mão de Obra"**
+2. **Selecione o funcionário** na lista. O sistema mostra os funcionários ativos da empresa, facilitando a busca.
+3. **Informe a função** que ele exerceu no dia (pedreiro, servente, eletricista, etc.)
+4. **Escolha o tipo:**
+   - **Próprio** — funcionário da sua empresa
+   - **Terceirizado** — funcionário de empreiteira ou subcontratado
+5. **Informe as horas trabalhadas** no dia
+6. Repita o processo para cada trabalhador presente
 
-| Campo | Descricao |
-|-------|-----------|
-| **Descricao** | Nome ou descricao do equipamento utilizado |
-| **Quantidade** | Quantidade de unidades do equipamento |
-| **Tipo** | Classificacao: **Proprio** ou **Alugado** |
+![Seção de mão de obra do RDO](placeholder_rdo_mao_obra.png)
 
-**Como adicionar equipamentos:**
+> **Dica:** Não esqueça de incluir os terceirizados! Muitas vezes, empreiteiros trazem equipe própria e é fundamental registrar essa presença para controle de custos e segurança.
 
-1. Clique no botao **"Adicionar Equipamento"**
-2. Informe a descricao do equipamento (ex: "Retroescavadeira CAT 416F")
-3. Informe a quantidade
-4. Selecione o tipo (proprio ou alugado)
-5. Repita para cada equipamento utilizado
+**Exemplo prático:**
 
----
+| Funcionário | Função | Tipo | Horas |
+|------------|--------|------|-------|
+| João Silva | Pedreiro | Próprio | 8h |
+| Maria Santos | Servente | Próprio | 8h |
+| Carlos (Empreiteira ABC) | Eletricista | Terceirizado | 6h |
+| Pedro (Empreiteira ABC) | Ajudante | Terceirizado | 6h |
 
-## 6.4. Registrando Atividades no RDO
+### Passo 5 — Registre os Equipamentos
 
-A secao de Atividades e a parte mais importante do RDO, pois alimenta diretamente o calculo de progresso da obra. O sistema utiliza uma estrutura hierarquica: **Servicos → Subatividades**.
+Nesta seção, informe quais máquinas e equipamentos foram utilizados no dia.
 
-### 6.4.1. Selecionando Servicos
+**Como adicionar um equipamento:**
 
-Os servicos disponiveis para registro no RDO sao aqueles previamente cadastrados na obra atraves do modulo de **Servicos da Obra** (`servico_obra_real`).
+1. Clique no botão **"Adicionar Equipamento"**
+2. **Descreva o equipamento** — Seja específico! Em vez de "retroescavadeira", escreva "Retroescavadeira CAT 416F"
+3. **Informe a quantidade** — Quantas unidades foram utilizadas
+4. **Escolha o tipo:**
+   - **Próprio** — equipamento da empresa
+   - **Alugado** — equipamento locado para a obra
 
-**Pre-carregamento inteligente:**
+**Exemplo prático:**
 
-- Ao criar o **primeiro RDO** de uma obra, o sistema carrega automaticamente todos os servicos cadastrados naquela obra, com suas respectivas subatividades
-- Ao criar **RDOs subsequentes**, o sistema pre-carrega os dados do ultimo RDO da obra, permitindo atualizar os percentuais de conclusao
+| Equipamento | Quantidade | Tipo |
+|------------|:----------:|------|
+| Retroescavadeira CAT 416F | 1 | Alugado |
+| Betoneira 400L | 2 | Próprio |
+| Vibrador de concreto | 1 | Próprio |
+| Andaime metálico (conjunto) | 3 | Alugado |
 
-| Informacao Exibida | Descricao |
-|--------------------|-----------|
-| **Nome do Servico** | Nome do servico cadastrado (ex: "Alvenaria de Vedacao") |
-| **Categoria** | Categoria do servico (ex: "Estrutura", "Acabamento") |
-| **Quantidade Planejada** | Quantidade total planejada para o servico na obra |
-| **Unidade de Medida** | Unidade utilizada (m2, m3, kg, un, m, h, etc.) |
-
-### 6.4.2. Registrando Subatividades
-
-Cada servico pode conter multiplas **subatividades** cadastradas na tabela mestre (`SubatividadeMestre`). No RDO, o usuario registra:
-
-| Campo | Descricao |
-|-------|-----------|
-| **Subatividade** | Nome da subatividade (pre-carregado da tabela mestre) |
-| **Quantidade Executada** | Quantidade efetivamente executada no dia |
-| **Percentual de Conclusao** | Percentual acumulado de conclusao da subatividade |
-| **Observacoes Tecnicas** | Notas tecnicas sobre a execucao |
-
-**Calculo de Progresso:**
-
-O progresso total do RDO e calculado como a **media simples** dos percentuais de conclusao de todas as subatividades registradas:
-
-```
-Progresso Total = Soma dos Percentuais / Numero de Subatividades
-```
-
-Exemplo: Se um RDO possui 3 subatividades com 100%, 50% e 30%, o progresso total sera:
-```
-(100 + 50 + 30) / 3 = 60%
-```
-
-### 6.4.3. Anexando Fotos
-
-O sistema permite anexar fotografias para documentar a execucao dos servicos:
-
-| Campo | Descricao |
-|-------|-----------|
-| **Foto** | Upload de imagem (JPG, PNG ou WebP) |
-| **Descricao** | Descricao da foto (o que ela documenta) |
-| **Tipo** | Classificacao da foto (servico, material, seguranca, etc.) |
-
-**Caracteristicas do upload de fotos:**
-
-- As fotos sao automaticamente **otimizadas para formato WebP**, reduzindo o tamanho do arquivo sem perda significativa de qualidade
-- As fotos sao armazenadas na pasta `static/uploads/rdo/<obra_id>/<rdo_id>/`
-- E possivel anexar multiplas fotos por RDO
-- As fotos ficam disponiveis para visualizacao na tela de detalhes do RDO e no portal do cliente
-
-![Secao de upload de fotos do RDO](placeholder_rdo_fotos_upload.png)
-
-> **Dica Mobile:** O upload de fotos foi otimizado para dispositivos moveis, permitindo capturar fotos diretamente da camera do smartphone e anexar ao RDO em tempo real.
+> **Por que registrar equipamentos?** Equipamentos alugados representam custo diário. Registrar o uso ajuda a conferir faturas de locação e controlar gastos da obra.
 
 ---
 
-## 6.5. Finalizando e Enviando para Aprovacao
+## 6.4. Registrando Atividades e Serviços
 
-Apos preencher todas as secoes do RDO, o usuario pode:
+Esta é a parte mais importante do RDO, pois é aqui que você informa o que foi efetivamente executado no dia. Esses dados alimentam diretamente o cálculo de progresso da obra.
 
-### Salvar como Rascunho
+### Como funciona a estrutura de serviços
 
-- Clique no botao **"Salvar Rascunho"**
-- O RDO sera salvo com status **Rascunho** e podera ser editado posteriormente
-- Ideal para quando o preenchimento sera concluido em outro momento
+Os serviços disponíveis no RDO são aqueles que já foram cadastrados na obra (no módulo de Serviços). Cada serviço pode ter várias **subatividades** — etapas menores que compõem o serviço completo.
 
-### Enviar para Aprovacao
+**Exemplo:**
+- **Serviço:** Alvenaria de Vedação
+  - Subatividade 1: Marcação
+  - Subatividade 2: Elevação 1º pavimento
+  - Subatividade 3: Elevação 2º pavimento
 
-1. Revise todas as informacoes preenchidas (mao de obra, equipamentos, servicos, fotos)
-2. Clique no botao **"Enviar para Aprovacao"**
-3. O status do RDO sera alterado para **Pendente de Aprovacao**
-4. O gestor/administrador recebera uma notificacao sobre o novo RDO pendente
+### Preenchimento inteligente
 
-**Checklist antes de enviar:**
+O sistema facilita o seu trabalho:
 
-- [ ] Condicoes climaticas informadas para manha e tarde
-- [ ] Mao de obra presente registrada com horas trabalhadas
-- [ ] Equipamentos utilizados registrados (se houver)
-- [ ] Servicos e subatividades com percentuais atualizados
-- [ ] Fotos anexadas documentando os servicos executados
-- [ ] Comentarios e observacoes preenchidos quando necessario
+- **No primeiro RDO da obra:** Todos os serviços cadastrados são carregados automaticamente, com suas subatividades
+- **Nos RDOs seguintes:** O sistema traz os dados do último RDO, para que você só precise atualizar o que mudou
 
-> **Atencao:** Apos o envio para aprovacao, o RDO **nao podera ser editado** pelo responsavel ate que o gestor aprove ou rejeite o documento.
+### Como registrar o avanço dos serviços
 
----
+Para cada subatividade, informe:
 
-## 6.6. Aprovacao de RDOs
+1. **Quantidade executada** — Quanto foi feito no dia (em metros quadrados, metros cúbicos, unidades, etc., conforme a unidade do serviço)
+2. **Percentual de conclusão** — Qual o percentual acumulado de conclusão daquela subatividade (de 0% a 100%)
+3. **Observações** — Anote informações relevantes sobre a execução (opcional, mas recomendado)
 
-O fluxo de aprovacao e responsabilidade do **gestor** ou **administrador** da empresa.
+**Exemplo prático:**
 
-### Acessando RDOs Pendentes
+| Serviço | Subatividade | Executado Hoje | % Conclusão | Observações |
+|---------|-------------|:--------------:|:-----------:|------------|
+| Alvenaria de Vedação | Elevação 2º pav. | 45 m² | 75% | Falta parede do banheiro |
+| Instalação Elétrica | Tubulação embutida | 30 m | 60% | Aguardando material para sala 3 |
+| Pintura Interna | Massa corrida | 80 m² | 40% | Equipe reduzida por falta de EPIs |
 
-1. Acesse a lista de RDOs pelo menu lateral
-2. Utilize o filtro de status **"Pendente de Aprovacao"**
-3. Os RDOs pendentes serao exibidos com destaque visual (badge amarelo)
+> **Atenção com os percentuais!** O percentual é **acumulado**, não é só o que foi feito hoje. Se ontem a subatividade estava em 50% e hoje avançou mais 10%, o percentual deve ser informado como 60%.
 
-### Fluxo de Aprovacao
+### Como o progresso é calculado
 
-O gestor pode realizar as seguintes acoes em um RDO pendente:
+O sistema calcula o progresso geral do RDO fazendo a média dos percentuais de todas as subatividades. Por exemplo:
 
-| Acao | Descricao | Resultado |
-|------|-----------|-----------|
-| **Aprovar** | Confirma que os dados do RDO estao corretos | Status muda para **Aprovado**; progresso da obra e atualizado automaticamente |
-| **Reprovar** | Indica que o RDO necessita de correcoes | Status muda para **Reprovado**; RDO retorna para edicao do responsavel |
+- Subatividade A: 100%
+- Subatividade B: 50%
+- Subatividade C: 30%
+- **Progresso do RDO: (100 + 50 + 30) ÷ 3 = 60%**
 
-### Aprovando um RDO
-
-1. Abra o RDO pendente clicando em **"Visualizar"**
-2. Revise todos os dados: mao de obra, servicos executados, fotos e observacoes
-3. Clique no botao **"Aprovar RDO"**
-4. Confirme a aprovacao na caixa de dialogo
-5. O sistema registra o aprovador e a data/hora da aprovacao
-
-**Dados registrados na aprovacao:**
-
-- `aprovado_por` — Identificacao do gestor que aprovou
-- `data_aprovacao` — Data e hora exata da aprovacao
-
-### Reprovando um RDO
-
-1. Abra o RDO pendente clicando em **"Visualizar"**
-2. Identifique os pontos que necessitam correcao
-3. Clique no botao **"Reprovar RDO"**
-4. Informe o motivo da reprovacao no campo de observacoes
-5. O RDO retorna para o status de edicao e o responsavel pode corrigir e reenviar
-
-> **Boas praticas para aprovacao:** Sempre verifique se as fotos anexadas correspondem aos servicos declarados e se os percentuais de conclusao sao coerentes com o historico da obra.
+Esse valor, quando o RDO é aprovado, atualiza automaticamente o progresso geral da obra.
 
 ---
 
-## 6.7. Impacto do RDO no Sistema
+## 6.5. Tirando e Anexando Fotos
 
-O RDO nao e apenas um documento de registro — ele e o **motor de atualizacao** de diversos modulos do SIGE. Quando um RDO e aprovado, uma cadeia de atualizacoes automaticas e disparada pelo **EventManager**.
+As fotos são fundamentais para comprovar o que foi executado. Clientes, gestores e auditores confiam muito mais em um RDO que tem registro fotográfico.
 
-### 6.7.1. Atualizacao Automatica do Progresso da Obra
+### Como anexar fotos
 
-Ao aprovar um RDO, o sistema:
+1. Na seção de fotos do RDO, clique no botão **"Adicionar Foto"**
+2. **Tire a foto** diretamente pela câmera do celular ou **selecione uma foto** já salva na galeria
+3. **Descreva a foto** — Escreva o que ela mostra (exemplo: "Concretagem da laje do 2º pavimento")
+4. **Escolha o tipo** — Classifique a foto (serviço executado, material recebido, segurança, etc.)
+5. Repita para quantas fotos forem necessárias
 
-1. Recalcula o percentual de conclusao de cada servico da obra baseado nas subatividades registradas
-2. Atualiza o campo `quantidade_executada` dos servicos reais (`servico_obra_real`)
-3. Recalcula o percentual de conclusao global da obra
-4. Atualiza o status do servico (Nao Iniciado → Em Andamento → Concluido)
+![Seção de upload de fotos do RDO](placeholder_rdo_fotos_upload.png)
 
-### 6.7.2. Atualizacao Financeira
+> O sistema otimiza automaticamente as fotos para que ocupem menos espaço, sem perder qualidade visual. Você não precisa se preocupar com o tamanho do arquivo.
 
-Os dados de mao de obra e equipamentos alimentam o modulo financeiro:
+### Dicas para tirar boas fotos no canteiro
 
-- **Horas trabalhadas** sao contabilizadas para calculo de custo de mao de obra
-- **Equipamentos alugados** sao considerados no custo operacional
-- A **produtividade** (quantidade/hora) e registrada no historico de produtividade por servico
+Fotos bem tiradas fazem toda a diferença na hora da aprovação. Siga estas dicas:
 
-### 6.7.3. Atualizacao do Dashboard
+📸 **Enquadramento** — Mostre o serviço de forma ampla, para que seja possível identificar o local e a etapa. Evite fotos muito de perto que não mostram contexto.
 
-O dashboard principal reflete os dados dos RDOs aprovados:
+📸 **Iluminação** — Prefira tirar fotos com luz natural. Evite fotos contra o sol (contraluz).
 
-- **KPIs de progresso** sao recalculados com base nos servicos atualizados
-- **Graficos de evolucao** apresentam a curva de progresso real vs. planejado
-- **Alertas** sao gerados automaticamente quando o progresso esta abaixo do esperado
+📸 **Antes e depois** — Sempre que possível, tire uma foto do local antes de iniciar o serviço e outra depois. Isso mostra claramente o avanço.
 
-### 6.7.4. Portal do Cliente
+📸 **Referências visuais** — Inclua elementos que ajudem a identificar o local, como pilares, marcações ou placas de eixo.
 
-Quando o portal do cliente esta ativo para a obra:
+📸 **Segurança** — Registre também as condições de segurança: uso de EPIs, proteções coletivas, sinalizações.
 
-- O progresso atualizado e refletido automaticamente no portal
-- As fotos do RDO podem ser disponibilizadas para visualizacao do cliente
-- Notificacoes sao enviadas ao cliente sobre atualizacoes relevantes
+📸 **Problemas encontrados** — Encontrou algo errado? Tubulação quebrada, material com defeito, área alagada? Fotografe e registre nas observações.
+
+📸 **Quantidade** — Não economize nas fotos. É melhor ter fotos demais do que de menos. Registre pelo menos uma foto por serviço executado no dia.
 
 ---
 
-## 6.8. Relatorios de RDO
+## 6.6. Salvando e Enviando o RDO
 
-O SIGE oferece opcoes de geracao de relatorios a partir dos dados coletados nos RDOs.
+Depois de preencher todas as informações, você tem duas opções:
 
-### 6.8.1. Relatorio Consolidado
+### Opção 1 — Salvar como Rascunho
 
-O relatorio consolidado apresenta uma visao geral de todos os RDOs de uma obra ou periodo:
+Clique no botão **"Salvar Rascunho"** quando:
 
-| Informacao | Descricao |
-|------------|-----------|
-| **Resumo de Mao de Obra** | Total de horas trabalhadas por funcionario e por tipo (proprio/terceirizado) |
-| **Resumo de Equipamentos** | Equipamentos utilizados com classificacao proprio/alugado |
-| **Progresso Acumulado** | Evolucao do percentual de conclusao dos servicos ao longo do tempo |
-| **Condicoes Climaticas** | Historico de condicoes climaticas que podem justificar atrasos |
-| **Registro Fotografico** | Galeria cronologica de fotos organizadas por data |
+- Você ainda não terminou de preencher todas as informações
+- Quer revisar antes de enviar
+- Precisa consultar algum dado antes de finalizar
+- Vai completar o preenchimento em outro momento
 
-**Filtros do relatorio consolidado:**
+O RDO ficará salvo com status **Rascunho** e você poderá voltar a editá-lo quando quiser.
 
-1. **Periodo** — Selecione data inicio e data fim
-2. **Obra** — Filtre por obra especifica
-3. **Status** — Inclua apenas RDOs aprovados, todos, ou filtre por status especifico
+### Opção 2 — Enviar para Aprovação
 
-### 6.8.2. Exportacao Individual em PDF
+Quando tudo estiver preenchido e conferido, clique no botão **"Enviar para Aprovação"**.
 
-Cada RDO pode ser exportado individualmente em formato PDF contendo:
+Antes de enviar, passe por este checklist mental:
 
-- Cabecalho com dados da obra e data do relatorio
-- Condicoes climaticas do dia
-- Tabela de mao de obra com horas trabalhadas
-- Tabela de equipamentos utilizados
-- Detalhamento de servicos e subatividades executadas
-- Fotos anexadas com descricoes
-- Observacoes gerais e assinatura do responsavel
+- ✅ Condições climáticas da manhã e da tarde estão preenchidas?
+- ✅ Todos os trabalhadores presentes foram registrados com suas horas?
+- ✅ Os equipamentos utilizados foram informados?
+- ✅ Os serviços e subatividades estão com percentuais atualizados?
+- ✅ As fotos dos serviços executados foram anexadas?
+- ✅ As observações importantes foram registradas?
 
-**Para exportar um RDO em PDF:**
+Após o envio, o RDO muda para o status **Pendente de Aprovação** e fica travado para edição até que o gestor aprove ou peça correções.
 
-1. Acesse o RDO desejado clicando em **"Visualizar"**
-2. Clique no botao **"Exportar PDF"** localizado no topo da pagina
-3. O arquivo PDF sera gerado e disponibilizado para download
+> **Atenção:** Depois de enviar para aprovação, você não consegue editar o RDO. Confira tudo antes de enviar! Se precisar fazer alguma correção, peça ao gestor para reprovar o RDO para que ele volte para edição.
+
+---
+
+## 6.7. Aprovação de RDOs (Para Gestores)
+
+Se você é gestor ou administrador, esta seção explica como revisar e aprovar os RDOs enviados pela equipe de campo.
+
+### Encontrando RDOs pendentes
+
+1. Acesse a lista de RDOs pelo menu lateral (**Menu → RDO → Lista Consolidada**)
+2. Use o filtro de status e selecione **"Pendente de Aprovação"**
+3. Os RDOs aguardando sua revisão aparecerão destacados com um indicador amarelo
+
+### Como aprovar um RDO
+
+1. Clique em **"Visualizar"** no RDO que deseja revisar
+2. Confira todas as informações:
+   - A mão de obra registrada está coerente com o que você sabe da obra?
+   - Os percentuais de avanço fazem sentido com o histórico?
+   - As fotos correspondem aos serviços declarados?
+   - Os equipamentos informados estão corretos?
+3. Se tudo estiver correto, clique no botão **"Aprovar RDO"**
+4. Confirme na caixa de diálogo que aparecerá
+
+**O que acontece quando você aprova:**
+- O status do RDO muda para **Aprovado**
+- O progresso da obra é atualizado automaticamente
+- Os dados ficam disponíveis nos relatórios e no painel de controle
+- Se a obra tem portal do cliente, o progresso atualizado aparece lá também
+
+### Como reprovar um RDO
+
+Se você encontrar algum problema no RDO:
+
+1. Clique em **"Visualizar"** no RDO
+2. Identifique o que precisa ser corrigido
+3. Clique no botão **"Reprovar RDO"**
+4. **Escreva o motivo da reprovação** no campo de observações — seja claro sobre o que precisa ser corrigido
+5. O RDO volta para o responsável de campo, que poderá editar e reenviar
+
+**Exemplos de motivos para reprovação:**
+
+- *"Percentual de alvenaria informado como 80%, mas pela foto parece estar em torno de 60%. Favor verificar."*
+- *"Faltou registrar a equipe do eletricista terceirizado que estava na obra hoje."*
+- *"Não foram anexadas fotos da concretagem da laje. Favor adicionar."*
+
+> **Boas práticas para gestores:** Revise os RDOs no mesmo dia ou no dia seguinte ao envio. Quanto mais rápido a aprovação, mais atualizado fica o acompanhamento da obra.
+
+---
+
+## 6.8. Como o RDO Atualiza o Progresso da Obra
+
+Quando um RDO é aprovado pelo gestor, o sistema faz atualizações automáticas. Aqui está o que acontece, de forma simples:
+
+### Progresso da obra
+
+- O sistema pega os percentuais de conclusão informados nas subatividades do RDO
+- Atualiza o andamento de cada serviço da obra
+- Recalcula o progresso geral da obra
+- Se um serviço atingiu 100%, ele é marcado como concluído
+
+**Na prática:** Se você informou no RDO que a alvenaria do 2º pavimento está em 75%, ao aprovar o RDO, o progresso desse serviço na obra vai para 75%.
+
+### Painel de controle (Dashboard)
+
+- Os gráficos de evolução da obra são atualizados
+- Os indicadores de desempenho refletem os novos dados
+- Alertas são gerados se o progresso está abaixo do planejado
+
+### Portal do Cliente
+
+- Se a obra tem portal do cliente ativo, o progresso atualizado aparece automaticamente
+- As fotos do RDO podem ficar disponíveis para o cliente visualizar
+- O cliente acompanha a evolução sem precisar ir ao canteiro
+
+### Controle financeiro
+
+- As horas de mão de obra registradas alimentam o controle de custos
+- Os equipamentos alugados são contabilizados nas despesas operacionais
+
+> **Resumindo:** O simples ato de preencher e aprovar o RDO mantém toda a gestão da obra atualizada. Sem o RDO, os números ficam desatualizados e as decisões ficam prejudicadas.
+
+---
+
+## 6.9. Relatórios e Exportação
+
+### Relatório Consolidado
+
+O sistema permite gerar um relatório completo com dados de vários RDOs. É útil para reuniões com clientes, medições contratuais e análise de desempenho.
+
+O relatório consolidado inclui:
+
+- **Resumo de mão de obra** — Total de horas por funcionário, separado entre próprios e terceirizados
+- **Resumo de equipamentos** — Quais equipamentos foram usados e com que frequência
+- **Evolução do progresso** — Como os serviços avançaram ao longo do tempo
+- **Histórico do clima** — Registro das condições climáticas (útil para justificar atrasos por chuva)
+- **Galeria de fotos** — Todas as fotos organizadas por data
+
+Para gerar o relatório, use os filtros de período, obra e status.
+
+### Exportação em PDF
+
+Cada RDO pode ser exportado individualmente como um arquivo PDF completo, contendo:
+
+- Dados da obra e data do relatório
+- Condições climáticas do dia
+- Lista de trabalhadores e horas
+- Lista de equipamentos
+- Detalhamento dos serviços e subatividades
+- Fotos com descrições
+- Observações gerais
+
+**Para exportar:**
+1. Abra o RDO desejado clicando em **"Visualizar"**
+2. Clique no botão **"Exportar PDF"** no topo da página
+3. O arquivo será gerado e baixado automaticamente
 
 ![Exemplo de RDO exportado em PDF](placeholder_rdo_pdf_export.png)
 
-### 6.8.3. Relatorio de Produtividade
-
-O sistema gera relatorios de produtividade baseados nos dados dos RDOs:
-
-| Metrica | Calculo |
-|---------|---------|
-| **Produtividade por Servico** | Quantidade executada / Horas de mao de obra |
-| **Eficiencia da Equipe** | Comparacao entre planejado e realizado |
-| **Custo Real vs. Orcado** | Custo de mao de obra real vs. custo orcado por servico |
+> **Dica:** O PDF do RDO é muito útil para enviar ao cliente junto com as medições. É um documento profissional que comprova o trabalho realizado.
 
 ---
 
-## Resumo do Capitulo
+## 6.10. Dicas para Escrever Bons RDOs
 
-O RDO e a peca central do controle de execucao de obras no SIGE. Atraves dele, o responsavel em campo documenta diariamente o que foi realizado, permitindo que gestores acompanhem o progresso em tempo real e tomem decisoes baseadas em dados concretos.
+Um RDO bem preenchido facilita a aprovação, evita retrabalho e serve como documento confiável. Siga estas recomendações:
 
-**Pontos-chave:**
+### ✍️ Seja específico nas atividades
 
-1. O RDO registra mao de obra, equipamentos, servicos executados e fotos
-2. O preenchimento e otimizado para dispositivos moveis (mobile-first)
-3. O fluxo de aprovacao garante a qualidade dos dados registrados
-4. A aprovacao do RDO dispara atualizacoes automaticas de progresso, financeiro e dashboard
-5. Fotos sao otimizadas automaticamente para WebP, economizando armazenamento
-6. Relatorios consolidados e PDFs individuais podem ser gerados a qualquer momento
+❌ *"Alvenaria"*
+✅ *"Elevação de alvenaria de vedação no 2º pavimento, trecho entre eixos A e C"*
+
+### 📊 Atualize os percentuais com cuidado
+
+Não chute os percentuais. Avalie visualmente ou meça o que foi feito. Um percentual errado prejudica todo o planejamento da obra.
+
+### 📝 Use as observações
+
+O campo de observações é seu aliado. Registre:
+
+- Motivos de paralisação (chuva, falta de material, falta de energia)
+- Problemas encontrados (solo instável, tubulação danificada)
+- Decisões tomadas em campo
+- Visitas de fiscalização ou do cliente
+- Recebimento de materiais importantes
+
+### 📸 Capriche nas fotos
+
+- Tire pelo menos uma foto por serviço executado
+- Fotografe problemas e situações incomuns
+- Registre condições de segurança
+- Use a descrição para explicar o que a foto mostra
+
+### ⏰ Preencha no mesmo dia
+
+Preencher o RDO no mesmo dia em que o trabalho foi feito garante que as informações sejam precisas. Deixar para depois aumenta a chance de esquecer detalhes ou informar dados incorretos.
+
+### 👷 Não esqueça ninguém
+
+Registre todos os trabalhadores que estiveram no canteiro, incluindo terceirizados, estagiários e equipes de fornecedores. Isso é importante para controle de custos e, principalmente, para questões de segurança do trabalho.
+
+### 🔄 Seja consistente
+
+Mantenha um padrão de preenchimento. Use sempre os mesmos termos para descrever serviços e locais. Isso facilita a leitura e a busca nos relatórios futuramente.
 
 ---
 
-*Proximo capitulo: [Capitulo 7 — Modulo Financeiro](07_manual_financeiro.md)*
+## Resumo do Capítulo
+
+O RDO é a peça central do acompanhamento de obras no SIGE. Preenchê-lo corretamente e diariamente garante que toda a equipe — do campo ao escritório — tenha informações confiáveis e atualizadas.
+
+**Pontos principais:**
+
+1. O RDO registra mão de obra, equipamentos, serviços executados e fotos do dia
+2. Foi projetado para ser preenchido pelo celular, direto do canteiro de obras
+3. O fluxo de aprovação garante a qualidade das informações
+4. Quando aprovado, o progresso da obra é atualizado automaticamente
+5. Fotos são otimizadas automaticamente para ocupar menos espaço
+6. Relatórios consolidados e PDFs individuais podem ser gerados a qualquer momento
+7. Um RDO bem preenchido é a melhor proteção documental da sua obra
+
+---
+
+*Próximo capítulo: [Capítulo 7 — Módulo Financeiro](07_manual_financeiro.md)*

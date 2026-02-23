@@ -1,377 +1,451 @@
-# Capítulo 2 — Módulo Dashboard
+# Capítulo 2 — Painel de Controle (Dashboard)
 
-**SIGE - Estruturas do Vale (EnterpriseSync)**
+**SIGE - Estruturas do Vale**
 Manual do Usuário — Versão 8.0
 
 ---
 
-## 2.1. Introdução ao Dashboard
+## 2.1. O que é o Painel de Controle?
 
-O **Dashboard** é a tela principal do SIGE e funciona como um painel de controle centralizado para a gestão da sua empresa. Ao acessar o sistema, o Dashboard apresenta uma visão consolidada e em tempo real dos principais indicadores operacionais, financeiros e de produtividade.
+O **Painel de Controle** (Dashboard) é a primeira tela que você verá ao entrar no SIGE. Pense nele como o "painel do carro" da sua empresa: em uma única tela, você acompanha os números mais importantes do seu dia a dia — quantos funcionários estão ativos, quantas obras estão em andamento, o tamanho da sua frota e quanto está custando a operação no período.
 
-**Principais funcionalidades do Dashboard:**
+Você não precisa abrir vários módulos para ter uma visão geral. O Painel de Controle reúne tudo em um só lugar, de forma visual e prática.
 
-1. **Visão Geral (KPIs)** — Exibe cartões com indicadores-chave: Funcionários Ativos, Obras Ativas, Veículos e Custos do Período.
-2. **Custos Detalhados do Período** — Apresenta a composição dos custos em categorias: Alimentação, Transporte, Mão de Obra e Total, com valores em R$.
-3. **Propostas Comerciais** — Mostra estatísticas de propostas enviadas, aprovadas, rejeitadas e em rascunho.
-4. **Obras e RDO** — Lista as obras ativas com acesso rápido para criação de novos Relatórios Diários de Obra (RDO).
-5. **Gráficos e Evolução** — Gráfico de evolução de propostas e tendências ao longo do tempo.
+**O que você encontra no Painel de Controle:**
 
-> **Importante:** O Dashboard exibe dados filtrados pelo **admin_id** do usuário logado, garantindo o isolamento multi-tenant. Cada empresa visualiza apenas os seus próprios dados.
+- **Cartões de resumo (KPIs)** — Funcionários Ativos, Obras Ativas, Veículos e Custos do Período
+- **Custos Detalhados** — Quanto está sendo gasto em Alimentação, Transporte e Mão de Obra
+- **Propostas Comerciais** — Quantas propostas foram enviadas, aprovadas ou rejeitadas
+- **Obras e RDO** — Lista das suas obras com botão rápido para criar novos relatórios
+- **Gráfico de Evolução** — Tendência das suas propostas ao longo do tempo
 
-[IMAGEM: Dashboard principal com visão geral dos KPIs e custos]
+[IMAGEM: Visão geral do Painel de Controle com os cartões de KPI e seções principais]
 
 ---
 
-## 2.2. Acessando o Dashboard
+## 2.2. Como Acessar o Painel de Controle
 
-### 2.2.1. Após o Login
+### 2.2.1. Acesso Automático após o Login
 
-Ao realizar o login no SIGE com suas credenciais de administrador, o sistema redireciona automaticamente para o Dashboard principal.
+Ao entrar no SIGE com seu e-mail e senha, você será levado automaticamente para o Painel de Controle. Não é necessário clicar em nada — o sistema já abre na tela certa para você.
 
 **Passo a passo:**
 
-1. Acesse o endereço do sistema no navegador (ex.: `https://sige.cassioviller.tech`)
-2. Informe seu **e-mail** e **senha** na tela de login
+1. Abra o SIGE no seu navegador
+2. Digite seu **e-mail** e **senha**
 3. Clique em **Entrar**
-4. O sistema redirecionará automaticamente para a URL `/dashboard`
+4. Pronto! O Painel de Controle aparecerá na tela
 
-> **Nota:** O comportamento de redirecionamento varia conforme o tipo de usuário:
->
-> | Tipo de Usuário | Redirecionamento | Dashboard Exibido |
-> |:----------------|:-----------------|:------------------|
-> | ADMIN | `/dashboard` | Dashboard Administrativo completo |
-> | FUNCIONÁRIO | `/funcionario/dashboard` | Dashboard do Funcionário (simplificado) |
-> | SUPER_ADMIN | `/super-admin/dashboard` | Dashboard do Super Administrador |
+> **Bom saber:** Se você é um **administrador**, verá o Painel de Controle completo com todos os indicadores da empresa. Se você é um **funcionário**, verá uma versão adaptada com as informações relevantes para o seu trabalho de campo (mais detalhes na seção 2.6).
 
-### 2.2.2. Menu de Navegação
+[IMAGEM: Tela de login do SIGE com campos de e-mail e senha]
 
-O Dashboard é acessível a qualquer momento por meio da barra de navegação superior (navbar). A barra apresenta o logotipo **SIGE - Estruturas do Vale** à esquerda, com fundo verde, e os seguintes itens de menu:
+### 2.2.2. Voltando ao Painel a Qualquer Momento
 
-| Nº | Item do Menu | Descrição |
-|:--:|:-------------|:----------|
-| 1 | Dashboard | Painel principal com KPIs e indicadores |
-| 2 | RDOs | Relatórios Diários de Obra |
-| 3 | Obras | Gestão de obras e projetos |
-| 4 | Funcionários | Cadastro de colaboradores |
-| 5 | Equipe | Alocação de equipes de campo |
-| 6 | Ponto | Controle de ponto eletrônico |
-| 7 | Propostas | Propostas comerciais e orçamentos |
-| 8 | Financeiro | Gestão financeira |
-| 9 | Veículos | Gestão de frota |
-| 10 | Alimentação | Controle de refeições |
-| 11 | Almoxarifado | Estoque e materiais |
-| 12 | Relatórios | Relatórios consolidados |
+Você pode retornar ao Painel de Controle de qualquer tela do sistema. Basta olhar para o menu verde no topo da página e clicar em **Dashboard**.
 
-Para retornar ao Dashboard de qualquer tela, basta clicar no item **Dashboard** no menu superior.
+O menu de navegação superior apresenta os seguintes itens:
 
-[IMAGEM: Barra de navegação verde com os itens de menu do SIGE]
+| Item do Menu | Para que serve |
+|:-------------|:---------------|
+| **Dashboard** | Voltar ao Painel de Controle |
+| **RDOs** | Relatórios Diários de Obra |
+| **Obras** | Ver e gerenciar suas obras |
+| **Funcionários** | Cadastro dos seus colaboradores |
+| **Equipe** | Alocação de equipes nas obras |
+| **Ponto** | Controle de ponto dos funcionários |
+| **Propostas** | Propostas comerciais e orçamentos |
+| **Financeiro** | Gestão financeira da empresa |
+| **Veículos** | Gestão da sua frota |
+| **Alimentação** | Controle de refeições e vales |
+| **Almoxarifado** | Estoque e materiais |
+| **Relatórios** | Relatórios consolidados |
 
-### 2.2.3. Filtro de Período
+> **Dica:** O item **Dashboard** é sempre o primeiro do menu. Se você se perder em qualquer tela, basta clicar nele para voltar à visão geral.
 
-O Dashboard permite filtrar os dados exibidos por período. O sistema detecta automaticamente o mês mais recente com registros de ponto cadastrados e utiliza esse intervalo como padrão. Para alterar o período:
-
-1. Localize os campos **Data Início** e **Data Fim** no topo do Dashboard
-2. Selecione as datas desejadas
-3. Clique em **Filtrar** para atualizar os indicadores
-
-> **Dica:** Se não houver registros para o período selecionado, os cartões de KPI exibirão valores zerados. Verifique se existem dados lançados no período escolhido.
+[IMAGEM: Barra de navegação verde do SIGE com os itens de menu destacados]
 
 ---
 
-## 2.3. KPIs Principais
+## 2.3. Filtro de Período — Escolhendo o Intervalo de Datas
 
-A seção **Visão Geral** do Dashboard apresenta 4 cartões de KPI (Key Performance Indicators) que oferecem uma fotografia instantânea da operação da empresa.
+No topo do Painel de Controle, você verá dois campos de data: **Data Início** e **Data Fim**. Esses campos controlam qual período os números do painel estão mostrando.
 
-[IMAGEM: Seção Visão Geral com os 4 cartões de KPI]
+**Como usar o filtro:**
 
-### 2.3.1. Funcionários Ativos
+1. Clique no campo **Data Início** e selecione a data inicial desejada
+2. Clique no campo **Data Fim** e selecione a data final
+3. Clique no botão **Filtrar**
+4. Todos os números e gráficos serão atualizados para o período escolhido
 
-| Atributo | Detalhe |
-|:---------|:--------|
-| **Indicador** | Quantidade de funcionários com status ativo |
-| **Fonte dos dados** | Tabela `funcionario` filtrada por `admin_id` e `ativo = true` |
-| **Exemplo** | Exibe um número como **10** (dez funcionários ativos) |
-| **Atualização** | Em tempo real, a cada acesso ao Dashboard |
+**Exemplos práticos de uso:**
 
-**Como interpretar:**
+- Quer ver os custos do mês passado? Selecione o primeiro e o último dia do mês
+- Precisa comparar dois meses? Filtre cada mês separadamente e anote os valores
+- Quer analisar o trimestre inteiro? Selecione um período de 3 meses
 
-- O número reflete todos os colaboradores cadastrados e com status **Ativo** no sistema
-- Funcionários desligados ou inativos não são contabilizados
-- Para gerenciar funcionários, acesse o módulo **Funcionários** pelo menu superior
+> **Bom saber:** Quando você acessa o Painel pela primeira vez, o sistema escolhe automaticamente o mês mais recente que possui registros. Assim, você sempre verá dados relevantes sem precisar configurar nada.
 
-### 2.3.2. Obras Ativas
+> **Atenção:** Se os cartões estiverem mostrando valores zerados, pode ser que não existam registros no período selecionado. Tente ampliar o intervalo de datas ou selecionar um mês diferente.
 
-| Atributo | Detalhe |
-|:---------|:--------|
-| **Indicador** | Quantidade de obras com status ativo (em andamento, planejamento) |
-| **Fonte dos dados** | Tabela `obra` filtrada por `admin_id` e status ativo |
-| **Exemplo** | Exibe um número como **8** (oito obras ativas) |
-| **Atualização** | Em tempo real, a cada acesso ao Dashboard |
-
-**Como interpretar:**
-
-- Contabiliza obras nos status: `ATIVO`, `andamento`, `Em andamento`, `ativa` e `planejamento`
-- Obras finalizadas ou canceladas não aparecem neste indicador
-- Clique no cartão ou acesse **Obras** no menu para ver os detalhes de cada obra
-
-### 2.3.3. Veículos
-
-| Atributo | Detalhe |
-|:---------|:--------|
-| **Indicador** | Quantidade de veículos ativos na frota |
-| **Fonte dos dados** | Tabela `veiculo` filtrada por `admin_id` e `ativo = true` |
-| **Exemplo** | Exibe um número como **3** (três veículos na frota) |
-| **Atualização** | Em tempo real, a cada acesso ao Dashboard |
-
-**Como interpretar:**
-
-- Inclui todos os veículos cadastrados com status ativo
-- Veículos baixados ou desativados não são contabilizados
-- Para gerenciar a frota, acesse o módulo **Veículos** pelo menu superior
-
-### 2.3.4. Custos do Período (Financeiro)
-
-| Atributo | Detalhe |
-|:---------|:--------|
-| **Indicador** | Valor total dos custos no período selecionado (em R$) |
-| **Fonte dos dados** | Soma dos custos de mão de obra, alimentação e transporte |
-| **Exemplo** | Exibe um valor como **R$ 45.320,00** |
-| **Atualização** | Conforme o filtro de período aplicado |
-
-**Como interpretar:**
-
-- Representa a soma consolidada de todos os custos operacionais do período
-- O valor é exibido em Reais (R$) com formatação brasileira
-- Para análise detalhada, consulte a seção **Custos Detalhados do Período** (abaixo dos KPIs)
+[IMAGEM: Campos de filtro de período com Data Início, Data Fim e botão Filtrar]
 
 ---
 
-## 2.4. Gráficos e Visualizações
+## 2.4. Cartões de KPI — Os Números que Importam
 
-O Dashboard apresenta seções gráficas e detalhadas que permitem uma análise mais aprofundada da operação.
+Logo abaixo do filtro de período, você verá **4 cartões coloridos** que mostram os indicadores mais importantes da sua empresa. Esses cartões são atualizados sempre que você acessa o Painel ou altera o filtro de período.
 
-### 2.4.1. Custos Detalhados do Período
+[IMAGEM: Os 4 cartões de KPI — Funcionários Ativos, Obras Ativas, Veículos e Custos do Período]
 
-A seção **Custos Detalhados do Período** apresenta cartões individuais com a decomposição dos custos operacionais:
+### 2.4.1. Funcionários Ativos
 
-| Cartão | Descrição | Exemplo |
-|:-------|:----------|:--------|
-| **Alimentação** | Custos com refeições, vales e cestas básicas | R$ 8.500,00 |
-| **Transporte** | Custos com combustível, pedágios e deslocamentos | R$ 5.200,00 |
-| **Mão de Obra** | Custos com salários, horas extras e encargos | R$ 28.600,00 |
-| **Total** | Soma de todas as categorias | R$ 42.300,00 |
+Este cartão mostra **quantos colaboradores estão ativos** na sua empresa neste momento.
 
-[IMAGEM: Cartões de Custos Detalhados do Período mostrando Alimentação, Transporte, Mão de Obra e Total]
+**O que esse número significa na prática:**
 
-**Como utilizar:**
+- Se o cartão mostra **10**, você tem 10 funcionários cadastrados e ativos trabalhando
+- Este número indica a capacidade atual da sua equipe
+- Funcionários que foram desligados ou colocados como inativos **não aparecem** neste número
 
-1. Os valores são calculados automaticamente com base nos lançamentos do período selecionado
-2. Compare os custos entre categorias para identificar onde estão os maiores gastos
-3. Utilize o filtro de período para analisar a evolução mensal dos custos
-4. Para detalhes de cada categoria, acesse os módulos específicos (Alimentação, Veículos, Funcionários)
+**Quando prestar atenção:**
 
-### 2.4.2. Propostas Comerciais
+- Se o número estiver menor do que o esperado, pode ser que algum funcionário tenha sido desativado por engano
+- Se você contratou alguém recentemente e o número não mudou, verifique se o cadastro foi concluído
 
-A seção **Propostas Comerciais** exibe estatísticas consolidadas sobre as propostas da empresa:
+**Para ver mais detalhes:** Clique em **Funcionários** no menu superior para acessar a lista completa dos seus colaboradores.
 
-- **Total de Propostas** — Quantidade total de propostas no período
-- **Taxa de Conversão** — Percentual de propostas aprovadas em relação ao total
-- **Valor Médio** — Valor médio das propostas aprovadas
-- **Propostas por Mês** — Média mensal de propostas criadas nos últimos 6 meses
+### 2.4.2. Obras Ativas
 
-**Status de Propostas:**
+Este cartão mostra **quantas obras estão em andamento ou planejamento** na sua empresa.
 
-| Status | Descrição | Cor |
-|:-------|:----------|:----|
-| Aprovada | Proposta aceita pelo cliente | Verde |
-| Enviada | Proposta enviada aguardando resposta | Azul |
-| Rascunho | Proposta em elaboração | Cinza |
-| Rejeitada | Proposta não aceita pelo cliente | Vermelho |
-| Expirada | Proposta enviada cuja validade expirou | Laranja |
+**O que esse número significa na prática:**
 
-[IMAGEM: Seção de Propostas Comerciais com estatísticas e status]
+- Se o cartão mostra **8**, você tem 8 obras abertas no momento
+- Este número inclui obras em andamento, em planejamento ou com status ativo
+- Obras que já foram finalizadas ou canceladas **não entram** nesta contagem
 
-### 2.4.3. Evolução de Propostas
+**Quando prestar atenção:**
 
-O gráfico **Evolução de Propostas** apresenta visualmente a tendência de criação e aprovação de propostas ao longo do tempo.
+- Um número muito alto pode indicar que a equipe está sobrecarregada
+- Se uma obra foi concluída mas o número não diminuiu, pode ser que o status não tenha sido atualizado no sistema
 
-**Como interpretar o gráfico:**
+**Para ver mais detalhes:** Clique em **Obras** no menu superior para ver a lista de todas as suas obras com seus respectivos status.
 
-1. O eixo horizontal (X) representa os meses
-2. O eixo vertical (Y) representa a quantidade de propostas
-3. As linhas ou barras mostram a evolução por status (aprovadas, enviadas, rejeitadas)
-4. Identifique tendências de crescimento ou queda na atividade comercial
+### 2.4.3. Veículos
 
-[IMAGEM: Gráfico de Evolução de Propostas ao longo do tempo]
+Este cartão mostra **quantos veículos ativos estão na sua frota**.
 
-### 2.4.4. Obras e RDO
+**O que esse número significa na prática:**
 
-A seção **Obras e RDO** lista as obras ativas com informações resumidas e ações rápidas:
+- Se o cartão mostra **3**, você tem 3 veículos cadastrados e disponíveis para uso
+- Veículos que foram baixados ou desativados não aparecem neste número
 
-| Coluna | Descrição |
-|:-------|:----------|
-| Nome da Obra | Identificação da obra |
-| Status | Situação atual (ativo, em andamento, planejamento) |
-| Progresso | Percentual de conclusão baseado nos RDOs |
-| Ação | Botão **+RDO** para criar novo Relatório Diário de Obra |
+**Quando prestar atenção:**
 
-**Como criar um RDO a partir do Dashboard:**
+- Se um veículo quebrou e está fora de operação, considere desativá-lo temporariamente no sistema para manter o número atualizado
+- Use este número para planejar a logística de deslocamento das equipes
 
-1. Localize a obra desejada na lista **Obras e RDO**
-2. Clique no botão **+RDO** ao lado da obra
-3. O sistema abrirá o formulário de criação de RDO já vinculado à obra selecionada
-4. Preencha os dados do relatório e salve
+**Para ver mais detalhes:** Clique em **Veículos** no menu superior para gerenciar a sua frota.
 
-[IMAGEM: Lista de Obras e RDO com botões de ação rápida]
+### 2.4.4. Custos do Período
 
-> **Dica:** O progresso de cada obra é calculado automaticamente com base nas subatividades registradas no RDO mais recente. Mantenha os RDOs atualizados para refletir o andamento real.
+Este cartão mostra o **valor total de custos operacionais** no período selecionado no filtro, exibido em Reais (R$).
+
+**O que esse número significa na prática:**
+
+- Se o cartão mostra **R$ 45.320,00**, este é o total que a operação custou no período filtrado
+- O valor inclui custos com alimentação, transporte e mão de obra somados
+- Compare este valor com meses anteriores para identificar tendências de aumento ou redução
+
+**Quando prestar atenção:**
+
+- Se o valor subiu significativamente em relação ao mês anterior, investigue qual categoria de custo cresceu (veja a seção de Custos Detalhados logo abaixo)
+- Use este número em reuniões gerenciais para apresentar o custo operacional da empresa
+
+**Para análise detalhada:** Role a página para baixo e veja a seção **Custos Detalhados do Período**, que decompõe esse valor total por categoria.
 
 ---
 
-## 2.5. Dashboard Executivo por Obra
+## 2.5. Custos Detalhados do Período
 
-Além do Dashboard principal, o SIGE oferece um **Dashboard Executivo** individual para cada obra. Este painel detalhado permite acompanhar os indicadores específicos de um projeto.
+Logo abaixo dos cartões de KPI, você encontrará a seção **Custos Detalhados do Período**. Aqui, o custo total é dividido em categorias para que você entenda **onde o dinheiro está sendo gasto**.
+
+[IMAGEM: Cartões de Custos Detalhados mostrando Alimentação, Transporte, Mão de Obra e Total]
+
+Você verá 4 cartões:
+
+| Cartão | O que mostra | Exemplo |
+|:-------|:-------------|:--------|
+| **Alimentação** | Custos com refeições, vales-refeição e cestas básicas | R$ 8.500,00 |
+| **Transporte** | Custos com combustível, pedágios e deslocamentos da equipe | R$ 5.200,00 |
+| **Mão de Obra** | Custos com salários, horas extras e encargos trabalhistas | R$ 28.600,00 |
+| **Total** | Soma de todas as categorias acima | R$ 42.300,00 |
+
+**Como usar esses números no seu dia a dia:**
+
+1. **Identifique o maior custo** — Normalmente, a Mão de Obra representa a maior fatia. Se outro item estiver desproporcionalmente alto, vale investigar
+2. **Compare com meses anteriores** — Use o filtro de período para ver mês a mês e identificar se alguma categoria está crescendo fora do normal
+3. **Planeje reduções** — Se os custos com Transporte estão altos, talvez seja o momento de otimizar rotas ou revisar contratos de combustível
+4. **Apresente em reuniões** — Esses cartões são perfeitos para mostrar de forma clara a composição dos custos para sócios ou gestores
+
+> **Dica prática:** Para entender melhor cada categoria de custo, você pode acessar os módulos específicos pelo menu: **Alimentação** para ver os lançamentos de refeições, **Veículos** para ver os gastos com a frota, e **Funcionários** para ver os custos com a equipe.
+
+---
+
+## 2.6. Propostas Comerciais
+
+A seção **Propostas Comerciais** no Painel de Controle oferece uma visão rápida de como está a atividade comercial da sua empresa.
+
+[IMAGEM: Seção de Propostas Comerciais com estatísticas e indicadores]
+
+**O que você encontra aqui:**
+
+- **Total de Propostas** — Quantas propostas foram criadas no período
+- **Taxa de Conversão** — De cada 100 propostas enviadas, quantas foram aprovadas? Esse percentual mostra a eficiência comercial
+- **Valor Médio** — Qual é o valor médio das propostas aprovadas. Útil para entender o ticket médio dos seus contratos
+- **Propostas por Mês** — Média de propostas criadas nos últimos 6 meses, ajuda a entender o ritmo comercial
+
+**Os status das propostas e o que significam:**
+
+| Status | O que significa | Como identificar |
+|:-------|:----------------|:-----------------|
+| **Aprovada** | O cliente aceitou a proposta — ótima notícia! | Aparece em verde |
+| **Enviada** | A proposta foi enviada e aguarda a resposta do cliente | Aparece em azul |
+| **Rascunho** | A proposta está sendo elaborada e ainda não foi enviada | Aparece em cinza |
+| **Rejeitada** | O cliente não aceitou a proposta | Aparece em vermelho |
+| **Expirada** | O prazo de validade da proposta venceu sem resposta | Aparece em laranja |
+
+**Dicas para acompanhar suas propostas:**
+
+- Se você tem muitas propostas com status **Enviada**, entre em contato com os clientes para obter respostas
+- Propostas **Expiradas** podem ser reenviadas com valores atualizados
+- Uma **Taxa de Conversão** baixa pode indicar que os valores estão acima do mercado ou que a apresentação precisa melhorar
+
+**Para gerenciar suas propostas:** Clique em **Propostas** no menu superior para ver a lista completa, criar novas propostas ou editar as existentes.
+
+---
+
+## 2.7. Gráfico de Evolução de Propostas
+
+O gráfico **Evolução de Propostas** mostra visualmente como suas propostas se comportaram ao longo do tempo. É uma forma rápida de identificar se a atividade comercial está crescendo, estável ou diminuindo.
+
+[IMAGEM: Gráfico de Evolução de Propostas com linhas mostrando a tendência ao longo dos meses]
+
+**Como ler o gráfico:**
+
+- O **eixo horizontal** (embaixo) mostra os meses
+- O **eixo vertical** (na lateral) mostra a quantidade de propostas
+- As linhas ou barras mostram como cada status evoluiu ao longo do tempo
+
+**O que observar:**
+
+1. **Tendência de crescimento** — Se as linhas estão subindo, sua equipe comercial está mais ativa
+2. **Queda brusca** — Se houve uma queda repentina, investigue o que aconteceu naquele mês
+3. **Proporção de aprovações** — Idealmente, a linha de propostas aprovadas deve acompanhar o crescimento das propostas enviadas
+
+> **Dica prática:** Use este gráfico em reuniões comerciais para demonstrar a evolução dos resultados e planejar metas futuras.
+
+---
+
+## 2.8. Obras e RDO — Acompanhamento Rápido
+
+A seção **Obras e RDO** é uma das mais úteis do Painel de Controle. Ela lista suas obras ativas com informações resumidas e permite criar Relatórios Diários de Obra (RDOs) com apenas um clique.
+
+[IMAGEM: Lista de Obras e RDO com nomes das obras, status e botão +RDO]
+
+**O que você verá na lista:**
+
+| Coluna | O que mostra |
+|:-------|:-------------|
+| **Nome da Obra** | O nome ou identificação do projeto |
+| **Status** | Se a obra está ativa, em andamento ou em planejamento |
+| **Progresso** | Quanto da obra já foi concluído (em percentual) |
+| **Ação** | Botão **+RDO** para criar um relatório rapidamente |
+
+### Como Criar um RDO Direto do Painel
+
+Esta é uma das funcionalidades mais práticas do Painel de Controle. Em vez de navegar até o módulo de Obras e depois criar o RDO, você pode fazer tudo em poucos cliques:
+
+1. Encontre a obra desejada na lista **Obras e RDO**
+2. Clique no botão **+RDO** ao lado do nome da obra
+3. O sistema abrirá o formulário de criação de RDO já vinculado àquela obra
+4. Preencha as informações do dia (atividades, equipe, condições climáticas, etc.)
+5. Salve o relatório
+
+> **Dica importante:** Mantenha os RDOs atualizados diariamente. O progresso de cada obra é calculado com base nos relatórios registrados. Quanto mais atualizados os RDOs, mais precisa será a visão de andamento das obras no Painel.
+
+**Para ver todas as obras:** Clique em **Obras** no menu superior para acessar a lista completa com todos os detalhes, incluindo obras finalizadas.
+
+---
+
+## 2.9. Dashboard Executivo por Obra
+
+Além do Painel de Controle principal, o SIGE oferece um **painel detalhado individual para cada obra**. Este painel é ideal para gestores de projeto que precisam acompanhar os indicadores de uma obra específica.
 
 **Como acessar:**
 
-1. Acesse o módulo **Obras** pelo menu superior
-2. Clique na obra desejada para abrir seus detalhes
-3. A URL será no formato `/obras/detalhes/<id>` (onde `<id>` é o identificador da obra)
+1. Clique em **Obras** no menu superior
+2. Na lista de obras, clique na obra que deseja acompanhar
+3. Você verá uma tela com todas as informações consolidadas daquela obra
 
-**Informações disponíveis no Dashboard Executivo:**
+**Informações disponíveis:**
 
-| Seção | Descrição |
+| Seção | O que você encontra |
+|:------|:--------------------|
+| **Dados Gerais** | Nome da obra, cliente, endereço, data de início e previsão de término |
+| **Progresso** | Percentual de conclusão geral do projeto |
+| **RDOs** | Lista dos Relatórios Diários registrados para esta obra |
+| **Equipe Alocada** | Quais funcionários estão trabalhando nesta obra |
+| **Custos** | Detalhamento dos custos específicos da obra por categoria |
+| **Serviços** | Serviços contratados e executados no projeto |
+
+[IMAGEM: Painel Executivo de uma obra com dados gerais, progresso e custos]
+
+> **Dica prática:** Use o Painel Executivo por Obra para preparar relatórios para clientes, mostrando o andamento do projeto com dados reais do sistema.
+
+---
+
+## 2.10. Painel do Funcionário
+
+Se você acessa o SIGE como **funcionário** (e não como administrador), verá uma versão do painel adaptada para as suas necessidades de campo. O sistema reconhece automaticamente o seu perfil e mostra apenas as informações relevantes para o seu trabalho.
+
+[IMAGEM: Painel do Funcionário com cartões de resumo e ações rápidas]
+
+### 2.10.1. Seus Cartões de Resumo
+
+Ao entrar no sistema, você verá 3 cartões informativos:
+
+| Cartão | O que mostra | Exemplo |
+|:-------|:-------------|:--------|
+| **Obras Disponíveis** | Quantas obras estão disponíveis para você registrar relatórios | 142 |
+| **RDOs Registrados** | Quantos Relatórios Diários você já criou | 10 |
+| **RDOs Rascunho** | Quantos relatórios você começou mas ainda não finalizou | 5 |
+
+**O que esses números significam para você:**
+
+- **Obras Disponíveis** indica em quantas obras você pode trabalhar e registrar RDOs. Esse número é definido pelo seu administrador
+- **RDOs Registrados** mostra o total de relatórios que você já enviou. Quanto mais RDOs registrados, mais completo estará o acompanhamento das obras
+- **RDOs Rascunho** são relatórios que você começou a preencher mas não finalizou. Lembre-se de completá-los para que as informações sejam contabilizadas
+
+> **Atenção:** Se você tem RDOs em rascunho, finalize-os o quanto antes! Rascunhos não são contabilizados nos relatórios da empresa e podem causar lacunas no acompanhamento das obras.
+
+### 2.10.2. Ações Rápidas
+
+Logo abaixo dos cartões, você encontra botões de **Ações Rápidas** que dão acesso direto às funcionalidades mais usadas:
+
+| Botão | O que faz |
 |:------|:----------|
-| Dados Gerais | Nome, cliente, endereço, datas de início e previsão de término |
-| Progresso | Percentual de conclusão geral da obra |
-| RDOs | Lista de Relatórios Diários vinculados à obra |
-| Equipe Alocada | Funcionários designados para a obra |
-| Custos | Detalhamento dos custos operacionais por categoria |
-| Serviços | Serviços contratados e executados na obra |
+| **Criar RDO** | Abre o formulário para você criar um novo Relatório Diário de Obra |
+| **Ver Todos os RDOs** | Mostra a lista de todos os seus RDOs (enviados e rascunhos) |
+| **Ver Obras** | Exibe as obras disponíveis para você |
+| **Sair** | Encerra sua sessão no sistema |
 
-[IMAGEM: Dashboard Executivo de uma obra com indicadores detalhados]
+**Fluxo típico do dia a dia:**
 
-> **Nota:** O Dashboard Executivo por obra é especialmente útil para gestores de projeto que precisam acompanhar o andamento de obras específicas, com dados consolidados de mão de obra, materiais e progresso físico.
+1. Acesse o sistema no início do dia
+2. Clique em **Criar RDO** para registrar o relatório do dia
+3. Selecione a obra em que está trabalhando
+4. Preencha as informações: atividades realizadas, equipe presente, condições climáticas, fotos
+5. Salve o relatório
 
----
+### 2.10.3. RDOs Recentes e Obras Disponíveis
 
-## 2.6. Dashboard do Funcionário
+Na parte inferior do painel, você encontra duas listas úteis:
 
-Quando um usuário do tipo **FUNCIONÁRIO** acessa o sistema, ele é redirecionado automaticamente para o **Dashboard do Funcionário**, uma versão simplificada e focada nas atividades do colaborador.
+**RDOs Recentes:**
+- Mostra os últimos relatórios que você criou
+- Cada item exibe a data, a obra e o status (enviado ou rascunho)
+- Clique em qualquer RDO para abri-lo e editá-lo (se ainda estiver como rascunho)
 
-**Título da página:** *Dashboard do Funcionário*
+**Obras Disponíveis:**
+- Lista as obras em que você pode registrar relatórios
+- Cada obra mostra seu nome e status atual
+- Clique em uma obra para ver mais detalhes sobre ela
 
-### 2.6.1. Cartões de Resumo
-
-O Dashboard do Funcionário apresenta 4 cartões informativos:
-
-| Cartão | Descrição |
-|:-------|:----------|
-| **Obras Disponíveis** | Quantidade de obras às quais o funcionário está alocado |
-| **RDOs Registrados** | Total de RDOs criados pelo funcionário |
-| **RDOs Rascunho** | Quantidade de RDOs salvos como rascunho (não finalizados) |
-| **Acesso** | Informações sobre o nível de acesso do funcionário |
-
-### 2.6.2. Ações Rápidas
-
-A seção **Ações Rápidas** oferece botões de acesso direto às principais funcionalidades:
-
-| Botão | Ação |
-|:------|:-----|
-| **Criar RDO** | Abre o formulário para criação de um novo Relatório Diário de Obra |
-| **Ver Todos os RDOs** | Lista todos os RDOs do funcionário |
-| **Ver Obras** | Exibe as obras disponíveis para o funcionário |
-| **Sair** | Encerra a sessão do usuário |
-
-### 2.6.3. RDOs Recentes e Obras Disponíveis
-
-Abaixo dos cartões e ações rápidas, o Dashboard do Funcionário exibe:
-
-- **RDOs Recentes** — Lista dos últimos RDOs criados pelo funcionário, com data, obra e status
-- **Obras Disponíveis** — Lista das obras às quais o funcionário está alocado, com nome e status
-
-[IMAGEM: Dashboard do Funcionário com cartões, ações rápidas e listas]
+[IMAGEM: Listas de RDOs Recentes e Obras Disponíveis no Painel do Funcionário]
 
 ---
 
-## 2.7. Alertas e Notificações
+## 2.11. Boas Práticas — Aproveitando o Painel ao Máximo
 
-O Dashboard apresenta alertas e notificações visuais para situações que requerem atenção do administrador:
+O Painel de Controle é mais útil quando você o consulta regularmente. Aqui estão algumas dicas práticas para tirar o máximo proveito dele:
 
-### 2.7.1. Tipos de Alertas
+### Para Administradores e Gestores
 
-| Tipo | Descrição | Indicador Visual |
-|:-----|:----------|:-----------------|
-| **Propostas Expirando** | Propostas enviadas cuja validade está próxima do vencimento | Badge laranja |
-| **Obras sem RDO** | Obras ativas que não tiveram RDO registrado recentemente | Destaque na lista de obras |
-| **Custos Elevados** | Quando os custos do período ultrapassam a média histórica | Cartão com destaque |
-| **Funcionários sem Alocação** | Colaboradores ativos não vinculados a nenhuma obra | Indicador no cartão |
+1. **Comece o dia pelo Painel** — Acesse o Painel de Controle logo no início do expediente para ter uma visão rápida de como está a operação
+2. **Verifique os custos semanalmente** — Compare os custos do período atual com semanas anteriores para identificar tendências antes que se tornem problemas
+3. **Acompanhe as propostas** — Propostas com status "Enviada" há muito tempo podem precisar de um follow-up com o cliente
+4. **Monitore os RDOs** — Obras sem RDOs recentes podem indicar que a equipe de campo não está registrando as atividades
+5. **Use o filtro de período** — Compare diferentes meses para entender a sazonalidade dos custos e da atividade comercial
+6. **Crie RDOs direto do Painel** — Use o botão **+RDO** na seção de Obras para agilizar o registro de relatórios
 
-### 2.7.2. Boas Práticas para Monitoramento
+### Para Funcionários
 
-1. **Acesse o Dashboard diariamente** — Verifique os KPIs e alertas no início do expediente
-2. **Mantenha os RDOs atualizados** — Garanta que cada obra tenha pelo menos um RDO por dia útil
-3. **Monitore os custos** — Compare os custos do período atual com meses anteriores
-4. **Acompanhe as propostas** — Verifique propostas enviadas que aguardam resposta do cliente
-5. **Revise a alocação** — Confirme que todos os funcionários estão designados a obras ativas
+1. **Registre o RDO diariamente** — Mesmo que o dia tenha sido curto, registre o que foi feito
+2. **Finalize os rascunhos** — Não deixe RDOs em rascunho por mais de um dia
+3. **Verifique suas obras** — Confirme que você está registrando RDOs na obra correta
+4. **Use as Ações Rápidas** — Os botões de ação rápida economizam tempo no dia a dia
 
----
+### Perguntas Frequentes sobre o Painel
 
-## 2.8. Personalização do Dashboard
+**Por que os valores estão zerados?**
+Provavelmente o período selecionado no filtro não possui registros. Tente selecionar um período diferente ou verifique se os dados foram lançados no sistema.
 
-O Dashboard do SIGE exibe dados de forma automática com base no perfil do usuário logado. Embora o layout seja padronizado, existem formas de personalizar a experiência:
+**Com que frequência os números são atualizados?**
+Os dados são atualizados toda vez que você acessa o Painel ou clica em Filtrar. Não é necessário atualizar a página manualmente.
 
-### 2.8.1. Filtros de Período
+**Posso ver dados de meses anteriores?**
+Sim! Use o filtro de período no topo do Painel para selecionar qualquer intervalo de datas.
 
-A principal forma de personalização é o **filtro de período**, que permite ajustar o intervalo de datas para todos os indicadores do Dashboard:
-
-| Parâmetro | Descrição | Formato |
-|:----------|:----------|:--------|
-| `data_inicio` | Data de início do período | `AAAA-MM-DD` |
-| `data_fim` | Data de fim do período | `AAAA-MM-DD` |
-
-**Exemplo de URL com filtro:**
-```
-/dashboard?data_inicio=2024-07-01&data_fim=2024-07-31
-```
-
-### 2.8.2. Detecção Automática de Período
-
-Quando nenhum filtro é aplicado manualmente, o sistema executa a seguinte lógica:
-
-1. Busca a data do **registro de ponto mais recente** vinculado ao `admin_id` do usuário
-2. Utiliza o **mês completo** dessa data como período padrão
-3. Caso não existam registros, utiliza **Julho/2024** como período fallback
-
-### 2.8.3. Isolamento Multi-Tenant
-
-Todos os dados exibidos no Dashboard respeitam o isolamento multi-tenant:
-
-- Cada administrador visualiza **apenas os dados da sua empresa**
-- O filtro por `admin_id` é aplicado automaticamente em todas as consultas
-- Não é possível visualizar dados de outras empresas, mesmo conhecendo os IDs
-
-> **Segurança:** O sistema verifica automaticamente o `admin_id` do usuário logado e aplica o filtro em todas as queries de banco de dados. Esse comportamento é transparente para o usuário e não requer configuração.
+**O que acontece se eu não registrar RDOs?**
+O progresso das obras no Painel ficará desatualizado e os gestores não terão visibilidade do andamento real dos projetos.
 
 ---
 
-## 2.9. Resumo do Capítulo
+## 2.12. Navegando do Painel para Outros Módulos
 
-| Seção | Conteúdo |
-|:------|:---------|
-| 2.1 | Introdução e visão geral do Dashboard |
-| 2.2 | Como acessar o Dashboard e navegar pelo menu |
-| 2.3 | KPIs: Funcionários, Obras, Veículos e Custos |
-| 2.4 | Gráficos: Custos detalhados, Propostas e Obras/RDO |
-| 2.5 | Dashboard Executivo por Obra |
-| 2.6 | Dashboard do Funcionário |
-| 2.7 | Alertas e notificações |
-| 2.8 | Personalização e filtros |
+O Painel de Controle funciona como um ponto de partida para acessar os outros módulos do SIGE. Aqui está um guia rápido de como ir do Painel para cada funcionalidade:
+
+| Você quer... | Faça isso |
+|:-------------|:----------|
+| Ver detalhes de um funcionário | Clique em **Funcionários** no menu superior |
+| Criar um RDO para uma obra | Clique no botão **+RDO** na seção Obras e RDO |
+| Ver todas as suas propostas | Clique em **Propostas** no menu superior |
+| Gerenciar a frota de veículos | Clique em **Veículos** no menu superior |
+| Consultar os custos com alimentação | Clique em **Alimentação** no menu superior |
+| Ver o estoque de materiais | Clique em **Almoxarifado** no menu superior |
+| Gerar relatórios consolidados | Clique em **Relatórios** no menu superior |
+| Ver o controle de ponto | Clique em **Ponto** no menu superior |
+| Gerenciar a alocação da equipe | Clique em **Equipe** no menu superior |
+| Acessar o financeiro da empresa | Clique em **Financeiro** no menu superior |
+
+> **Lembre-se:** Você pode voltar ao Painel de Controle a qualquer momento clicando em **Dashboard** no menu superior.
+
+---
+
+## 2.13. Resumo do Capítulo
+
+Neste capítulo, você aprendeu a:
+
+| Seção | O que você aprendeu |
+|:------|:--------------------|
+| 2.1 | O que é o Painel de Controle e o que ele mostra |
+| 2.2 | Como acessar o Painel e navegar pelo menu |
+| 2.3 | Como usar o filtro de período para ver dados de diferentes datas |
+| 2.4 | O que significam os cartões de KPI (Funcionários, Obras, Veículos, Custos) |
+| 2.5 | Como interpretar os Custos Detalhados por categoria |
+| 2.6 | Como acompanhar as Propostas Comerciais |
+| 2.7 | Como ler o gráfico de Evolução de Propostas |
+| 2.8 | Como usar a seção Obras e RDO para criar relatórios rapidamente |
+| 2.9 | O que é o Painel Executivo por Obra |
+| 2.10 | Como funciona o Painel do Funcionário |
+| 2.11 | Boas práticas para usar o Painel no dia a dia |
+| 2.12 | Como navegar do Painel para outros módulos |
 
 **Próximo capítulo:** [Capítulo 3 — Módulo Funcionários](03_manual_funcionarios.md)
 
 ---
 
-*SIGE - Estruturas do Vale (EnterpriseSync) — Manual do Usuário v8.0*
+*SIGE - Estruturas do Vale — Manual do Usuário v8.0*
 *Documento gerado em Fevereiro/2026*
