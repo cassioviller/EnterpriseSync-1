@@ -857,8 +857,6 @@ def funcionario_perfil_pdf(id):
         traceback.print_exc()
         return f"Erro ao gerar PDF: {str(e)}", 500
 
-# ===== OBRAS =====
-@main_bp.route('/obras')
 # ===== FUNCIONÁRIO DASHBOARD =====
 @main_bp.route('/funcionario-dashboard')
 @funcionario_required
