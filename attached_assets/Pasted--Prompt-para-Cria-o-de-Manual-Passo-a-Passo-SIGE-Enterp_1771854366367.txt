@@ -1,0 +1,200 @@
+
+# Prompt para Criação de Manual Passo a Passo - SIGE EnterpriseSync
+
+**Objetivo:** Gerar um manual do usuário detalhado, em formato de passo a passo, para as funcionalidades essenciais do sistema SIGE EnterpriseSync. O manual deve ser claro, objetivo e focado em como um usuário final realiza cada tarefa.
+
+---
+
+## Diretrizes Gerais para o Manual
+
+1.  **Formato:** O manual deve ser um único arquivo Markdown (`.md`).
+2.  **Linguagem:** Simples, direta e acessível para usuários sem conhecimento técnico.
+3.  **Estrutura de Cada Seção:**
+    *   **Título:** Nome da funcionalidade (ex: "Passo a Passo: Cadastro de Funcionários").
+    *   **Introdução:** Um parágrafo explicando para que serve a funcionalidade.
+    *   **Pré-requisitos:** O que o usuário precisa ter feito antes (se houver). Ex: "Para criar um RDO, você precisa ter uma obra e um funcionário cadastrados."
+    *   **Passo a Passo:** Instruções numeradas e detalhadas.
+    *   **Dica Prática:** Uma dica para usar a funcionalidade de forma mais eficiente.
+    *   **Placeholder de Imagem:** Inclua um placeholder `[IMAGEM: Descrição da tela]` onde um screenshot seria inserido.
+4.  **Consistência:** Mantenha a mesma estrutura e tom de voz em todas as seções.
+
+---
+
+## Conteúdo do Manual (Gerar na Ordem Abaixo)
+
+Crie um capítulo para cada uma das funcionalidades listadas abaixo, seguindo rigorosamente as diretrizes.
+
+### **Capítulo 1: Gerenciando Usuários**
+
+*   **Título:** Passo a Passo: Gerenciando Usuários
+*   **Introdução:** Explique que esta seção é para administradores e mostra como criar, editar e definir permissões para os usuários que acessam o sistema.
+*   **Passo a Passo:**
+    1.  Como acessar a tela de gerenciamento de usuários.
+    2.  Como clicar no botão "Novo Usuário".
+    3.  Como preencher os campos: Nome, E-mail (que será o login) e Senha inicial.
+    4.  Como definir o **Perfil de Acesso** (Administrador, Gestor, Funcionário) e explicar brevemente o que cada um faz.
+    5.  Como salvar o novo usuário.
+    6.  Como editar um usuário existente.
+    7.  Como desativar um usuário que não trabalha mais na empresa.
+*   **Dica Prática:** "Sempre crie uma senha inicial forte e oriente o novo usuário a alterá-la no primeiro acesso para garantir a segurança."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Tela de lista de usuários com o botão 'Novo Usuário' destacado]`
+    *   `[IMAGEM: Formulário de criação de novo usuário com o campo 'Perfil de Acesso' em destaque]`
+
+### **Capítulo 2: Cadastro de Funcionários**
+
+*   **Título:** Passo a Passo: Cadastro de Funcionários
+*   **Introdução:** Explique que o cadastro de funcionários é a base para quase tudo no sistema, como RDOs, equipes e controle de ponto.
+*   **Passo a Passo:**
+    1.  Como acessar o módulo de **Funcionários**.
+    2.  Como clicar em "+ Novo Funcionário".
+    3.  Como preencher as seções: Informações Pessoais, Contato, Endereço e Informações do Contrato (Cargo, Salário, etc.).
+    4.  Como vincular o funcionário a um usuário do sistema na seção **Acesso ao Sistema**.
+    5.  Como salvar o cadastro.
+*   **Dica Prática:** "Preencha o campo 'Custo por Hora' corretamente. Ele será usado para calcular automaticamente os custos de mão de obra nas obras."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Tela do módulo de Funcionários com a lista de colaboradores]`
+    *   `[IMAGEM: Formulário de cadastro de funcionário com a seção 'Informações do Contrato' destacada]`
+
+### **Capítulo 3: Criação de Obras**
+
+*   **Título:** Passo a Passo: Criação de Obras
+*   **Introdução:** Explique que cada projeto deve ser cadastrado como uma obra para permitir o controle de custos, equipes e RDOs.
+*   **Passo a Passo:**
+    1.  Como acessar o módulo de **Obras**.
+    2.  Como clicar em "+ Nova Obra".
+    3.  Como preencher as informações principais: Nome da Obra, Cliente, Responsável Técnico.
+    4.  Como definir os prazos (Data de Início e Término Prevista) e o **Status da Obra**.
+    5.  Como salvar a obra.
+*   **Dica Prática:** "Use o painel Kanban para ter uma visão rápida do status de todas as suas obras. Arraste os cards para atualizar o status de forma fácil."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Painel Kanban do módulo de Obras com as colunas de status]`
+    *   `[IMAGEM: Formulário de criação de nova obra]`
+
+### **Capítulo 4: Gestão de Equipes**
+
+*   **Título:** Passo a Passo: Gestão de Equipes
+*   **Introdução:** Explique que o módulo de Equipes serve para alocar os funcionários nas obras corretas, definindo quem trabalha onde.
+*   **Passo a Passo:**
+    1.  Como acessar o módulo de **Equipe**.
+    2.  Como selecionar uma **Obra** na lista suspensa para ver a equipe alocada.
+    3.  Como usar a lista de **"Funcionários Disponíveis"** para encontrar colaboradores.
+    4.  Como **arrastar e soltar** um funcionário da lista de disponíveis para a lista da **"Equipe da Obra"**.
+    5.  Como remover um funcionário da equipe de uma obra.
+*   **Dica Prática:** "Manter as equipes atualizadas é crucial. Um funcionário só pode registrar um RDO para uma obra se estiver alocado na equipe dela."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Tela de gestão de equipes com as duas colunas: 'Funcionários Disponíveis' e 'Equipe da Obra']`
+
+### **Capítulo 5: Relatório Diário de Obra (RDO)**
+
+*   **Título:** Passo a Passo: Preenchimento do RDO
+*   **Introdução:** Explique que o RDO é o registro diário do que aconteceu em uma obra, incluindo atividades, equipe presente e ocorrências.
+*   **Passo a Passo:**
+    1.  Como acessar o módulo de **RDOs**.
+    2.  Como clicar em "Criar RDO".
+    3.  Como selecionar a **Obra** e a **Data**.
+    4.  Como a lista de **funcionários da equipe** aparece automaticamente.
+    5.  Como marcar a **presença** dos funcionários e registrar as **horas trabalhadas** de cada um.
+    6.  Como descrever as **atividades realizadas** no dia.
+    7.  Como registrar **ocorrências** (ex: chuva, falta de material).
+    8.  Como anexar **fotos** ao RDO.
+    9.  Como **Salvar como Rascunho** ou **Finalizar** o RDO.
+*   **Dica Prática:** "Use o botão 'Salvar como Rascunho' para preencher o RDO ao longo do dia e clique em 'Finalizar' apenas no final do expediente."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Formulário de criação de RDO com a seção de equipe e presença destacada]`
+    *   `[IMAGEM: Seção de 'Atividades Realizadas' e 'Ocorrências' do RDO]`
+
+### **Capítulo 6: Reconhecimento Facial (Cadastro e Uso)**
+
+*   **Título:** Passo a Passo: Reconhecimento Facial
+*   **Introdução:** Explique que o sistema usa reconhecimento facial para o controle de ponto, garantindo segurança e precisão.
+*   **Subseção 6.1: Cadastro de Fotos**
+    *   **Passo a Passo:**
+        1.  Como o administrador acessa o perfil do funcionário.
+        2.  Como vai até a aba "Reconhecimento Facial".
+        3.  Como clica em "Cadastrar Fotos".
+        4.  Como o sistema ativa a câmera para tirar uma sequência de fotos do funcionário (olhando para frente, para os lados, etc.).
+        5.  Como o sistema processa e salva o modelo facial.
+*   **Subseção 6.2: Batendo o Ponto com Reconhecimento Facial**
+    *   **Passo a Passo:**
+        1.  Como o funcionário acessa a tela de **Controle de Ponto**.
+        2.  Como clica em "Registrar Ponto".
+        3.  Como a câmera é ativada.
+        4.  Como o funcionário se posiciona em frente à câmera.
+        5.  Como o sistema reconhece o rosto e confirma o registro de ponto com sucesso.
+*   **Dica Prática:** "Para um bom cadastro, certifique-se de que o ambiente está bem iluminado e que o funcionário não está usando boné ou óculos escuros."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Tela de cadastro de fotos no perfil do funcionário]`
+    *   `[IMAGEM: Tela de registro de ponto com a câmera ativa e o rosto do funcionário enquadrado]`
+
+### **Capítulo 7: Propostas Comerciais**
+
+*   **Título:** Passo a Passo: Propostas Comerciais
+*   **Introdução:** Explique como criar e gerenciar propostas comerciais para novos clientes.
+*   **Subseção 7.1: Criando um Template de Proposta**
+    *   **Passo a Passo:**
+        1.  Como acessar **Propostas → Templates**.
+        2.  Como criar um novo template, definindo seções padrão (ex: "1. Escopo", "2. Cronograma", "3. Investimento").
+        3.  Como salvar o template para uso futuro.
+*   **Subseção 7.2: Criando uma Nova Proposta**
+    *   **Passo a Passo:**
+        1.  Como acessar **Propostas → Criar Proposta**.
+        2.  Como selecionar um **template** (opcional).
+        3.  Como preencher os dados do cliente e os detalhes da proposta.
+        4.  Como adicionar itens e valores.
+        5.  Como gerar o PDF da proposta e enviá-la.
+*   **Dica Prática:** "Crie templates para diferentes tipos de serviço. Isso economiza muito tempo na criação de novas propostas."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Tela de criação de template de proposta]`
+    *   `[IMAGEM: Formulário de criação de nova proposta com itens e valores]`
+
+### **Capítulo 8: Veículos (Uso e Custo)**
+
+*   **Título:** Passo a Passo: Controle de Veículos
+*   **Introdução:** Explique como registrar o uso e os custos da frota de veículos da empresa.
+*   **Passo a Passo:**
+    1.  Como acessar o módulo de **Veículos**.
+    2.  Como selecionar um veículo da lista.
+    3.  Como clicar em "Registrar Uso/Custo".
+    4.  Como preencher o formulário, selecionando o tipo de registro: **Abastecimento**, **Manutenção** ou **Outra Despesa**.
+    5.  Como informar o valor, a data, o hodômetro e anexar um comprovante (foto da nota fiscal).
+    6.  Como salvar o registro.
+*   **Dica Prática:** "Sempre anexe uma foto do comprovante. Isso ajuda na prestação de contas e auditoria dos custos da frota."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Detalhes de um veículo com o botão 'Registrar Uso/Custo' destacado]`
+    *   `[IMAGEM: Formulário de registro de custo de veículo]`
+
+### **Capítulo 9: Controle de Alimentação**
+
+*   **Título:** Passo a Passo: Controle de Alimentação
+*   **Introdução:** Explique como registrar os custos com refeições (marmitas) para as equipes.
+*   **Passo a Passo:**
+    1.  Como acessar o módulo de **Alimentação**.
+    2.  Como clicar em "Registrar Refeições".
+    3.  Como selecionar a **Obra** e a **Data**.
+    4.  Como informar a **quantidade** de refeições fornecidas e o **valor total**.
+    5.  Como anexar o comprovante do fornecedor.
+    6.  Como salvar o registro.
+*   **Dica Prática:** "Registre os custos de alimentação diariamente para que o financeiro da obra fique sempre atualizado."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Tela de registro de custos de alimentação]`
+
+### **Capítulo 10: Almoxarifado**
+
+*   **Título:** Passo a Passo: Almoxarifado
+*   **Introdução:** Explique como controlar a entrada e saída de materiais do estoque.
+*   **Passo a Passo:**
+    1.  Como acessar **Almoxarifado → Movimentações**.
+    2.  Como clicar em "Nova Movimentação".
+    3.  Como selecionar o tipo: **Entrada** (compra de material) ou **Saída** (material enviado para uma obra).
+    4.  Como selecionar o **Material** da lista de itens cadastrados.
+    5.  Como informar a **Quantidade**.
+    6.  Se for uma saída, como selecionar a **Obra de Destino**.
+    7.  Como salvar a movimentação.
+*   **Dica Prática:** "Mantenha o cadastro de materiais sempre atualizado para facilitar a seleção durante as movimentações."
+*   **Placeholders de Imagem:**
+    *   `[IMAGEM: Formulário de movimentação de estoque com os tipos 'Entrada' e 'Saída' destacados]`
+
+---
+
+**Instrução Final:** Após gerar o conteúdo para todos os capítulos, consolide tudo em um único arquivo chamado `MANUAL_PASSO_A_PASSO.md`, mantendo a ordem e a formatação especificadas.
