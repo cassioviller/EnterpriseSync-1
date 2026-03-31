@@ -1,0 +1,147 @@
+{% extends "base_completo.html" %}
+{% block title %}Gestão de Compras{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0 fw-bold"><i class="fas fa-shopping-cart me-2 text-primary"></i>Gestão de Compras</h1>
+      <small class="text-muted">Materiais, contas a pagar e apropriação automática de custo</small>
+    </div>
+    <a href="{{ url_for('compras.nova') }}" class="btn btn-primary">
+      <i class="fas fa-plus me-1"></i> Nova Compra
+    </a>
+  </div>
+
+  <!-- KPI -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm" style="background:linear-gradient(135deg,#0d6efd,#0a58ca)">
+        <div class="card-body text-white py-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small opacity-75">Total filtrado</div>
+              <div class="fs-4 fw-bold">R$ {{ '%.2f'|format(total_valor) }}</div>
+            </div>
+            <i class="fas fa-file-invoice-dollar fa-2x opacity-50"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small text-muted">Pedidos</div>
+              <div class="fs-4 fw-bold text-dark">{{ pedidos|length }}</div>
+            </div>
+            <i class="fas fa-receipt fa-2x text-muted"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <form method="GET" class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label small">Fornecedor</label>
+          <select name="fornecedor_id" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for f in fornecedores %}
+              <option value="{{ f.id }}" {% if filtro_fornecedor == f.id %}selected{% endif %}>{{ f.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">Data início</label>
+          <input type="date" name="data_inicio" class="form-control form-control-sm" value="{{ filtro_data_inicio or '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">Data fim</label>
+          <input type="date" name="data_fim" class="form-control form-control-sm" value="{{ filtro_data_fim or '' }}">
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter me-1"></i>Filtrar</button>
+          <a href="{{ url_for('compras.index') }}" class="btn btn-outline-secondary btn-sm ms-1">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabela -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      {% if pedidos %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Data</th>
+              <th>NF / Recibo</th>
+              <th>Fornecedor</th>
+              <th>Centro de Custo</th>
+              <th>Obra</th>
+              <th>Pagamento</th>
+              <th class="text-end">Total (R$)</th>
+              <th>Anexo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in pedidos %}
+            <tr>
+              <td class="text-nowrap">{{ p.data_compra.strftime('%d/%m/%Y') }}</td>
+              <td>{{ p.numero or '—' }}</td>
+              <td>{{ p.fornecedor.nome }}</td>
+              <td>{{ p.centro_custo.nome }}</td>
+              <td>{{ p.obra.nome if p.obra else '—' }}</td>
+              <td>
+                <span class="badge bg-secondary-subtle text-secondary">
+                  {{ CONDICOES.get(p.condicao_pagamento, p.condicao_pagamento) }}
+                  {% if p.parcelas > 1 %} ({{ p.parcelas }}x){% endif %}
+                </span>
+              </td>
+              <td class="text-end fw-semibold text-dark">{{ '%.2f'|format(p.valor_total|float) }}</td>
+              <td>
+                {% if p.anexo_url %}
+                  <a href="{{ p.anexo_url }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0 px-2">
+                    <i class="fas fa-paperclip"></i>
+                  </a>
+                {% else %}—{% endif %}
+              </td>
+              <td class="text-nowrap">
+                <a href="{{ url_for('compras.detalhe', pedido_id=p.id) }}" class="btn btn-outline-primary btn-sm py-0 px-2 me-1">
+                  <i class="fas fa-eye"></i>
+                </a>
+                <form method="POST" action="{{ url_for('compras.excluir', pedido_id=p.id) }}" style="display:inline"
+                      onsubmit="return confirm('Excluir compra e contas a pagar vinculadas?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="fas fa-shopping-cart fa-3x mb-3 opacity-25"></i>
+        <p class="mb-1">Nenhuma compra registrada.</p>
+        <a href="{{ url_for('compras.nova') }}" class="btn btn-primary btn-sm mt-2">
+          <i class="fas fa-plus me-1"></i> Registrar primeira compra
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

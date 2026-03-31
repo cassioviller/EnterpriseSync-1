@@ -3773,6 +3773,7 @@ def executar_migracoes():
             (71, "Remuneração por Diária V2 (Funcionario)", _migration_71_remuneracao_diaria_funcionario),
             (72, "Alimentação V2 - funcionario_id e centro_custo_id por item", _migration_72_alimentacao_item_v2),
             (73, "Transporte V2 - tabelas categoria_transporte e lancamento_transporte", _migration_73_transporte_v2),
+            (74, "Compras V2 - tabelas pedido_compra e pedido_compra_item", _migration_74_compras_v2),
         ]
         
         # Executar cada migração com rastreamento
@@ -6541,6 +6542,86 @@ def _migration_69_custo_veiculo_obra_nullable():
     except Exception as e:
         logger.error(f"❌ Erro na migração 69: {e}")
         if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
+
+
+def _migration_74_compras_v2():
+    """
+    MIGRAÇÃO 74: Criar tabelas pedido_compra e pedido_compra_item para módulo V2.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        logger.info("Migração 74: criando tabelas de Compras V2")
+
+        # Tabela pedido_compra
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'pedido_compra'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            cursor.execute("""
+                CREATE TABLE pedido_compra (
+                    id SERIAL PRIMARY KEY,
+                    numero VARCHAR(50),
+                    fornecedor_id INTEGER NOT NULL REFERENCES fornecedor(id),
+                    data_compra DATE NOT NULL,
+                    centro_custo_id INTEGER NOT NULL REFERENCES centro_custo(id),
+                    obra_id INTEGER REFERENCES obra(id) ON DELETE SET NULL,
+                    condicao_pagamento VARCHAR(50) DEFAULT 'a_vista',
+                    parcelas INTEGER DEFAULT 1,
+                    valor_total NUMERIC(12,2) NOT NULL,
+                    observacoes TEXT,
+                    anexo_url VARCHAR(500),
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            logger.info("  pedido_compra criada")
+        else:
+            logger.info("  pedido_compra ja existe - SKIP")
+
+        # Tabela pedido_compra_item
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'pedido_compra_item'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            cursor.execute("""
+                CREATE TABLE pedido_compra_item (
+                    id SERIAL PRIMARY KEY,
+                    pedido_id INTEGER NOT NULL REFERENCES pedido_compra(id) ON DELETE CASCADE,
+                    almoxarifado_item_id INTEGER REFERENCES almoxarifado_item(id) ON DELETE SET NULL,
+                    descricao VARCHAR(200) NOT NULL,
+                    quantidade NUMERIC(10,3) NOT NULL,
+                    preco_unitario NUMERIC(12,2) NOT NULL,
+                    subtotal NUMERIC(12,2) NOT NULL
+                )
+            """)
+            logger.info("  pedido_compra_item criada")
+        else:
+            logger.info("  pedido_compra_item ja existe - SKIP")
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 74 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 74: {e}")
+        if connection:
             try:
                 connection.rollback()
                 cursor.close()

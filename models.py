@@ -4021,6 +4021,53 @@ FrotaDespesa = VehicleExpense
 
 
 # ================================
+# MÓDULO V2: COMPRAS DE MATERIAIS
+# ================================
+
+class PedidoCompra(db.Model):
+    """Pedido / recibo de compra V2 — vinculado a fornecedor, centro de custo e obra"""
+    __tablename__ = 'pedido_compra'
+
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.String(50))                        # Número da NF/recibo (livre)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=False)
+    data_compra = db.Column(db.Date, nullable=False)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+    condicao_pagamento = db.Column(db.String(50), default='a_vista')  # a_vista, 30d, 60d, 90d, parcelado
+    parcelas = db.Column(db.Integer, default=1)
+    valor_total = db.Column(db.Numeric(12, 2), nullable=False)
+    observacoes = db.Column(db.Text)
+    anexo_url = db.Column(db.String(500))
+
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relacionamentos
+    fornecedor = db.relationship('Fornecedor', backref='pedidos_compra', foreign_keys=[fornecedor_id])
+    centro_custo = db.relationship('CentroCusto', backref='pedidos_compra', foreign_keys=[centro_custo_id])
+    obra = db.relationship('Obra', backref='pedidos_compra', foreign_keys=[obra_id])
+    itens = db.relationship('PedidoCompraItem', backref='pedido', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class PedidoCompraItem(db.Model):
+    """Itens de um pedido de compra V2"""
+    __tablename__ = 'pedido_compra_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    pedido_id = db.Column(db.Integer, db.ForeignKey('pedido_compra.id'), nullable=False)
+    almoxarifado_item_id = db.Column(db.Integer, db.ForeignKey('almoxarifado_item.id'), nullable=True)
+    descricao = db.Column(db.String(200), nullable=False)   # free-text caso item não esteja no catálogo
+    quantidade = db.Column(db.Numeric(10, 3), nullable=False)
+    preco_unitario = db.Column(db.Numeric(12, 2), nullable=False)
+    subtotal = db.Column(db.Numeric(12, 2), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+
+    # Relacionamentos
+    almoxarifado_item = db.relationship('AlmoxarifadoItem', backref='pedido_itens', foreign_keys=[almoxarifado_item_id])
+
+
+# ================================
 # MÓDULO V2: TRANSPORTE
 # ================================
 

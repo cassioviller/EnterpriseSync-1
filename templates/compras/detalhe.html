@@ -1,0 +1,119 @@
+{% extends "base_completo.html" %}
+{% block title %}Detalhe da Compra{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center mb-4">
+    <a href="{{ url_for('compras.index') }}" class="btn btn-outline-secondary me-3">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <div>
+      <h1 class="h3 mb-0 fw-bold">
+        <i class="fas fa-file-invoice me-2 text-primary"></i>
+        Compra {{ pedido.numero or '#' + pedido.id|string }}
+      </h1>
+      <small class="text-muted">{{ pedido.data_compra.strftime('%d/%m/%Y') }} — {{ pedido.fornecedor.nome }}</small>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Dados gerais -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent fw-semibold py-3">Dados da Compra</div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Fornecedor</dt><dd class="col-sm-7">{{ pedido.fornecedor.nome }}</dd>
+            <dt class="col-sm-5">NF / Recibo</dt><dd class="col-sm-7">{{ pedido.numero or '—' }}</dd>
+            <dt class="col-sm-5">Data</dt><dd class="col-sm-7">{{ pedido.data_compra.strftime('%d/%m/%Y') }}</dd>
+            <dt class="col-sm-5">Centro de Custo</dt><dd class="col-sm-7">{{ pedido.centro_custo.nome }}</dd>
+            <dt class="col-sm-5">Obra</dt><dd class="col-sm-7">{{ pedido.obra.nome if pedido.obra else '—' }}</dd>
+            <dt class="col-sm-5">Pagamento</dt>
+            <dd class="col-sm-7">
+              {{ CONDICOES.get(pedido.condicao_pagamento, pedido.condicao_pagamento) }}
+              {% if pedido.parcelas > 1 %} em {{ pedido.parcelas }}x{% endif %}
+            </dd>
+            <dt class="col-sm-5 fw-bold">Total</dt>
+            <dd class="col-sm-7 fw-bold text-dark fs-5">R$ {{ '%.2f'|format(pedido.valor_total|float) }}</dd>
+          </dl>
+          {% if pedido.observacoes %}
+          <hr>
+          <p class="small text-muted mb-0"><strong>Obs:</strong> {{ pedido.observacoes }}</p>
+          {% endif %}
+          {% if pedido.anexo_url %}
+          <hr>
+          <a href="{{ pedido.anexo_url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-paperclip me-1"></i> Ver Anexo
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Contas a Pagar geradas -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent fw-semibold py-3">
+          <i class="fas fa-calendar-check me-2 text-warning"></i>Contas a Pagar Geradas
+        </div>
+        <div class="card-body p-0">
+          {% if contas %}
+          <table class="table table-sm mb-0">
+            <thead class="table-light"><tr><th>Vencimento</th><th>Descrição</th><th class="text-end">Valor</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for c in contas %}
+              <tr>
+                <td class="text-nowrap">{{ c.data_vencimento.strftime('%d/%m/%Y') }}</td>
+                <td class="small">{{ c.descricao[:50] }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(c.valor_original|float) }}</td>
+                <td>
+                  <span class="badge {% if c.status == 'PAGO' %}bg-success{% elif c.status == 'VENCIDO' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                    {{ c.status }}
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="text-center py-4 text-muted small">Nenhuma conta a pagar vinculada.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Itens -->
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent fw-semibold py-3">
+          <i class="fas fa-list me-2 text-primary"></i>Itens da Compra
+        </div>
+        <div class="card-body p-0">
+          <table class="table mb-0 align-middle">
+            <thead class="table-light">
+              <tr><th>Descrição</th><th>Catálogo</th><th class="text-end">Qtd</th><th class="text-end">Preço Unit.</th><th class="text-end">Subtotal</th></tr>
+            </thead>
+            <tbody>
+              {% for item in itens %}
+              <tr>
+                <td>{{ item.descricao }}</td>
+                <td>{{ item.almoxarifado_item.nome if item.almoxarifado_item else '—' }}</td>
+                <td class="text-end">{{ item.quantidade }}</td>
+                <td class="text-end">R$ {{ '%.2f'|format(item.preco_unitario|float) }}</td>
+                <td class="text-end fw-semibold">R$ {{ '%.2f'|format(item.subtotal|float) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <td colspan="4" class="text-end fw-bold">Total</td>
+                <td class="text-end fw-bold fs-5 text-dark">R$ {{ '%.2f'|format(pedido.valor_total|float) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

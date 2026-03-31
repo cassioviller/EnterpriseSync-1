@@ -511,6 +511,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint FROTA: {e}")
     
+    # Registrar blueprint COMPRAS V2
+    try:
+        from compras_views import compras_bp
+        app.register_blueprint(compras_bp)
+        logging.info("[OK] Blueprint COMPRAS registrado")
+    except ImportError as e:
+        logging.warning(f"[WARN] Blueprint COMPRAS não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint COMPRAS: {e}")
+
     # Registrar blueprint TRANSPORTE V2
     try:
         from transporte_views import transporte_bp

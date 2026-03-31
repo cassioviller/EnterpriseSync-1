@@ -1,0 +1,249 @@
+{% extends "base_completo.html" %}
+{% block title %}Nova Compra{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center mb-4">
+    <a href="{{ url_for('compras.index') }}" class="btn btn-outline-secondary me-3">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <div>
+      <h1 class="h3 mb-0 fw-bold"><i class="fas fa-shopping-cart me-2 text-primary"></i>Nova Compra de Materiais</h1>
+      <small class="text-muted">Registre a compra e gere automaticamente custo de obra e contas a pagar</small>
+    </div>
+  </div>
+
+  <form method="POST" action="{{ url_for('compras.nova_post') }}" enctype="multipart/form-data" id="formCompra">
+
+    <div class="row g-3">
+      <!-- COLUNA ESQUERDA: Cabeçalho da compra -->
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm mb-3">
+          <div class="card-header bg-transparent fw-semibold py-3">
+            <i class="fas fa-file-invoice me-2 text-primary"></i>Dados da Compra
+          </div>
+          <div class="card-body">
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Fornecedor <span class="text-danger">*</span></label>
+                <select name="fornecedor_id" class="form-select" required>
+                  <option value="">Selecione...</option>
+                  {% for f in fornecedores %}
+                    <option value="{{ f.id }}">{{ f.nome }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">Nº NF / Recibo</label>
+                <input type="text" name="numero" class="form-control" placeholder="Ex: 001234" maxlength="50">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold">Data da Compra <span class="text-danger">*</span></label>
+                <input type="date" name="data_compra" class="form-control" value="{{ hoje }}" required>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Centro de Custo <span class="text-danger">*</span></label>
+                <select name="centro_custo_id" class="form-select" required>
+                  <option value="">Selecione...</option>
+                  {% for cc in centros_custo %}
+                    <option value="{{ cc.id }}">{{ cc.nome }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Obra <span class="text-muted fw-normal">(opcional)</span></label>
+                <select name="obra_id" class="form-select">
+                  <option value="">Sem obra específica</option>
+                  {% for o in obras %}
+                    <option value="{{ o.id }}">{{ o.nome }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Condição de Pagamento</label>
+                <select name="condicao_pagamento" id="selectCondicao" class="form-select" onchange="toggleParcelas(this.value)">
+                  {% for key, label in CONDICOES.items() %}
+                    <option value="{{ key }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6" id="campoParcelas" style="display:none">
+                <label class="form-label fw-semibold">Número de Parcelas</label>
+                <input type="number" name="parcelas" id="inputParcelas" class="form-control" min="2" max="48" value="2">
+              </div>
+
+              <div class="col-12">
+                <label class="form-label fw-semibold">Observações</label>
+                <input type="text" name="observacoes" class="form-control" placeholder="Anotações sobre a compra..." maxlength="300">
+              </div>
+
+              <div class="col-12">
+                <label class="form-label fw-semibold">Anexo (NF, XML ou Recibo)</label>
+                <input type="file" name="anexo" class="form-control" accept=".jpg,.jpeg,.png,.pdf,.xml,.webp">
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- COLUNA DIREITA: Resumo -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-3" style="position:sticky;top:80px">
+          <div class="card-header bg-transparent fw-semibold py-3">
+            <i class="fas fa-receipt me-2 text-success"></i>Resumo da Compra
+          </div>
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+              <span class="fw-semibold">Total da Compra</span>
+              <span class="fs-4 fw-bold text-dark" id="totalGeral">R$ 0,00</span>
+            </div>
+            <div class="alert alert-info py-2 small mb-3">
+              <i class="fas fa-info-circle me-1"></i>
+              Ao salvar, o sistema irá gerar automaticamente:<br>
+              • Custo de obra (se selecionada)<br>
+              • Conta(s) a pagar conforme condição
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2">
+              <i class="fas fa-save me-1"></i> Registrar Compra
+            </button>
+            <a href="{{ url_for('compras.index') }}" class="btn btn-outline-secondary w-100 mt-2">
+              Cancelar
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ITENS DA COMPRA -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-3">
+        <span class="fw-semibold"><i class="fas fa-list me-2 text-primary"></i>Itens da Compra</span>
+        <button type="button" class="btn btn-outline-primary btn-sm" onclick="adicionarItem()">
+          <i class="fas fa-plus me-1"></i> Adicionar Item
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table mb-0 align-middle" id="tabelaItens">
+            <thead class="table-light">
+              <tr>
+                <th style="width:35%">Produto / Material</th>
+                <th style="width:25%">Catálogo <span class="text-muted fw-normal small">(opcional)</span></th>
+                <th style="width:12%">Qtd</th>
+                <th style="width:14%">Preço Unit. (R$)</th>
+                <th style="width:12%">Subtotal</th>
+                <th style="width:2%"></th>
+              </tr>
+            </thead>
+            <tbody id="corpoItens">
+              <!-- linha inicial gerada pelo JS -->
+            </tbody>
+            <tfoot>
+              <tr class="table-light">
+                <td colspan="4" class="text-end fw-semibold">Total:</td>
+                <td class="fw-bold text-dark" id="totalTabela">R$ 0,00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </form>
+</div>
+
+<script>
+const ITENS_CATALOGO = [
+  {% for item in itens_catalogo %}
+    { id: {{ item.id }}, nome: "{{ item.nome }}", unidade: "{{ item.unidade or 'un' }}" },
+  {% endfor %}
+];
+
+let idxItem = 0;
+
+function adicionarItem() {
+  const corpo = document.getElementById('corpoItens');
+  const i = idxItem++;
+  const optionsCatalogo = '<option value="">— item livre —</option>' +
+    ITENS_CATALOGO.map(it => `<option value="${it.id}">${it.nome} (${it.unidade})</option>`).join('');
+
+  const row = document.createElement('tr');
+  row.id = `row_${i}`;
+  row.innerHTML = `
+    <td>
+      <input type="text" name="item_descricao[]" class="form-control form-control-sm" placeholder="Descrição do item" required>
+    </td>
+    <td>
+      <select name="item_almoxarifado_id[]" class="form-select form-select-sm" onchange="preencherDescricao(this, ${i})">
+        ${optionsCatalogo}
+      </select>
+    </td>
+    <td>
+      <input type="number" name="item_quantidade[]" id="qtd_${i}" class="form-control form-control-sm item-qtd"
+             min="0.001" step="0.001" value="1" oninput="calcSubtotal(${i})" required>
+    </td>
+    <td>
+      <input type="number" name="item_preco[]" id="preco_${i}" class="form-control form-control-sm item-preco"
+             min="0" step="0.01" value="0" oninput="calcSubtotal(${i})" required>
+    </td>
+    <td class="fw-semibold" id="sub_${i}">R$ 0,00</td>
+    <td>
+      <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1" onclick="removerItem(${i})" title="Remover">
+        <i class="fas fa-times"></i>
+      </button>
+    </td>
+  `;
+  corpo.appendChild(row);
+}
+
+function preencherDescricao(sel, i) {
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.value) {
+    const row = document.getElementById(`row_${i}`);
+    row.querySelector('input[name="item_descricao[]"]').value = opt.text;
+  }
+}
+
+function removerItem(i) {
+  const row = document.getElementById(`row_${i}`);
+  if (row) {
+    row.remove();
+    calcTotal();
+  }
+}
+
+function calcSubtotal(i) {
+  const qtd = parseFloat(document.getElementById(`qtd_${i}`)?.value || 0);
+  const preco = parseFloat(document.getElementById(`preco_${i}`)?.value || 0);
+  const sub = qtd * preco;
+  const el = document.getElementById(`sub_${i}`);
+  if (el) el.textContent = 'R$ ' + sub.toFixed(2).replace('.', ',');
+  calcTotal();
+}
+
+function calcTotal() {
+  const subs = document.querySelectorAll('[id^="sub_"]');
+  let total = 0;
+  subs.forEach(el => {
+    const txt = el.textContent.replace('R$ ', '').replace(',', '.');
+    total += parseFloat(txt) || 0;
+  });
+  const fmt = 'R$ ' + total.toFixed(2).replace('.', ',');
+  document.getElementById('totalTabela').textContent = fmt;
+  document.getElementById('totalGeral').textContent = fmt;
+}
+
+function toggleParcelas(val) {
+  const campo = document.getElementById('campoParcelas');
+  campo.style.display = val === 'parcelado' ? 'block' : 'none';
+}
+
+// Inicializar com 1 item
+adicionarItem();
+</script>
+{% endblock %}

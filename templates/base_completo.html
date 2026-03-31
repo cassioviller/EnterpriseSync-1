@@ -799,6 +799,12 @@
                                 <li><a class="dropdown-item" href="{{ url_for('almoxarifado.categorias') }}">
                                     <i class="fas fa-tags me-1"></i> Categorias
                                 </a></li>
+                                {% if is_v2_active() %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('compras.index') }}">
+                                    <i class="fas fa-shopping-cart me-1 text-primary"></i> Gestão de Compras
+                                </a></li>
+                                {% endif %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('almoxarifado.entrada') }}">
                                     <i class="fas fa-plus-circle me-1 text-success"></i> Nova Entrada
