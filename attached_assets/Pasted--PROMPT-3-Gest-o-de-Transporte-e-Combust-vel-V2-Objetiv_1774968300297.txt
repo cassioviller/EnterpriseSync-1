@@ -1,0 +1,72 @@
+# PROMPT 3: Gestão de Transporte e Combustível (V2)
+
+**Objetivo:** Criar um módulo integrado para gerenciar despesas de transporte (Vale Transporte, Combustível, Passagens) vinculando-as diretamente aos funcionários e aos centros de custo das obras.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `frota_views.py` (ou criar `transporte_views.py`)
+- `templates/frota/` (ou `templates/transporte/`)
+- `utils/financeiro_integration.py`
+
+Por favor, implemente as seguintes alterações passo a passo:
+
+## Passo 1: Modelagem de Dados de Transporte
+No arquivo `models.py`, crie os modelos para gerenciar os lançamentos de transporte de forma genérica (não apenas para veículos da frota, mas também VT e Uber):
+
+```python
+class CategoriaTransporte(db.Model):
+    __tablename__ = 'categoria_transporte'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50), nullable=False) # 'Vale Transporte', 'Combustível', 'Aplicativo', 'Passagem Aérea'
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+class LancamentoTransporte(db.Model):
+    __tablename__ = 'lancamento_transporte'
+    id = db.Column(db.Integer, primary_key=True)
+    categoria_id = db.Column(db.Integer, db.ForeignKey('categoria_transporte.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=True)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'), nullable=True)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+    
+    data_lancamento = db.Column(db.Date, nullable=False)
+    valor = db.Column(db.Numeric(10, 2), nullable=False)
+    descricao = db.Column(db.String(200))
+    comprovante_url = db.Column(db.String(500)) # Caminho do anexo
+    
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    categoria = db.relationship('CategoriaTransporte')
+    funcionario = db.relationship('Funcionario')
+    veiculo = db.relationship('Vehicle')
+    centro_custo = db.relationship('CentroCusto')
+```
+
+## Passo 2: Interface de Lançamento de Transporte
+Crie uma nova tela (`templates/transporte/novo_lancamento.html`):
+1. Formulário com os campos: Categoria, Data, Valor, Descrição e Anexo.
+2. Lógica condicional na UI (JavaScript):
+   - Se a categoria for "Combustível", mostre o campo "Veículo" (select com a frota).
+   - Se a categoria for "Vale Transporte" ou "Aplicativo", mostre o campo "Funcionário".
+3. Campo obrigatório "Centro de Custo" para apropriação correta da despesa.
+
+## Passo 3: Processamento no Backend
+Crie as rotas em um novo arquivo `transporte_views.py` (ou adicione em `frota_views.py`):
+1. Rota GET para listar os lançamentos com filtros (por data, funcionário, centro de custo).
+2. Rota POST para salvar o `LancamentoTransporte`.
+3. Upload de arquivo: Salve o comprovante na pasta `static/uploads/comprovantes/` e grave o caminho no banco.
+
+## Passo 4: Integração com Custos de Obra (Apropriação Automática)
+Sempre que um lançamento de transporte for salvo, o sistema deve gerar automaticamente o custo na obra correspondente.
+1. No backend, após salvar o `LancamentoTransporte`, crie um registro na tabela `CustoObra`:
+   - `tipo = 'veiculo'` (ou crie um novo tipo `'transporte'`)
+   - `valor = lancamento.valor`
+   - `centro_custo_id = lancamento.centro_custo_id`
+   - `obra_id = lancamento.obra_id`
+   - `descricao = f"{categoria.nome} - {funcionario.nome if funcionario else veiculo.placa} - {lancamento.descricao}"`
+2. Isso garante que o dashboard executivo da obra mostre o custo real de mobilidade da equipe.
+
+## Passo 5: Proteção V1/V2
+No menu lateral (`templates/base.html`), adicione o link para "Gestão de Transporte" dentro do menu "Financeiro" ou "Frota", mas envolva-o com `{% if is_v2_active() %}` para que apenas clientes V2 vejam esta nova funcionalidade. Clientes V1 continuarão usando o lançamento genérico de despesas.
