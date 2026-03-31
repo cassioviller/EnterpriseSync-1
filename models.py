@@ -985,11 +985,17 @@ class AlimentacaoLancamentoItem(db.Model):
     quantidade = db.Column(db.Integer, nullable=False, default=1)
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)
     
+    # V2: detalhamento por funcionário e centro de custo
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=True)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
+
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     lancamento = db.relationship('AlimentacaoLancamento', backref=db.backref('itens', lazy='selectin', cascade='all, delete-orphan'))
     item = db.relationship('AlimentacaoItem', backref='lancamento_itens')
+    funcionario = db.relationship('Funcionario', backref='refeicoes_consumidas', foreign_keys=[funcionario_id])
+    centro_custo = db.relationship('CentroCusto', backref='despesas_alimentacao', foreign_keys=[centro_custo_id])
 
 
 class DocumentoFiscal(db.Model):

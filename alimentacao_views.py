@@ -1,11 +1,12 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from models import db, Restaurante, AlimentacaoLancamento, RegistroAlimentacao, Funcionario, Obra, AlimentacaoItem, AlimentacaoLancamentoItem
+from models import db, Restaurante, AlimentacaoLancamento, RegistroAlimentacao, Funcionario, Obra, AlimentacaoItem, AlimentacaoLancamentoItem, CentroCusto, CustoObra
 from datetime import datetime
 from sqlalchemy import func
 from decimal import Decimal
 import logging
 import re
+from utils.tenant import is_v2_active
 
 logger = logging.getLogger(__name__)
 
@@ -284,92 +285,119 @@ def lancamento_novo():
 @alimentacao_bp.route('/lancamentos/novo-v2', methods=['GET', 'POST'])
 @login_required
 def lancamento_novo_v2():
-    """Criar novo lançamento v2 com múltiplos itens e seleção mobile-friendly"""
+    """Criar novo lançamento v2 com múltiplos itens e seleção mobile-friendly.
+    V2 feature flag: adiciona detalhamento por funcionário e centro de custo por item.
+    """
     admin_id = get_admin_id()
-    
+    v2 = is_v2_active()
+
     if request.method == 'POST':
         try:
-            logger.info(f"🍽️ [ALIMENTACAO_V2] Processando novo lançamento para admin_id={admin_id}")
-            
-            # Validação básica
+            logger.info(f"[ALIMENTACAO] Processando novo lancamento para admin_id={admin_id} v2={v2}")
+
+            # --- Validação cabeçalho ---
             obra_id = request.form.get('obra_id')
             if not obra_id:
                 flash('Selecione uma obra', 'error')
                 return redirect(url_for('alimentacao.lancamento_novo_v2'))
-            
+
             obra = Obra.query.filter_by(id=int(obra_id), admin_id=admin_id).first()
             if not obra:
                 flash('Obra inválida', 'error')
                 return redirect(url_for('alimentacao.lancamento_novo_v2'))
-            
-            # Restaurante (opcional agora)
+
             restaurante_id = request.form.get('restaurante_id')
             restaurante = None
             if restaurante_id:
                 restaurante = Restaurante.query.filter_by(id=int(restaurante_id), admin_id=admin_id).first()
-            
-            # Validar funcionários
-            funcionarios_ids = request.form.getlist('funcionarios')
-            if not funcionarios_ids:
-                flash('Selecione pelo menos um funcionário', 'error')
-                return redirect(url_for('alimentacao.lancamento_novo_v2'))
-            
-            funcionarios_validos = []
-            for func_id in funcionarios_ids:
-                funcionario = Funcionario.query.filter_by(id=int(func_id), admin_id=admin_id).first()
-                if funcionario:
-                    funcionarios_validos.append(funcionario)
-            
-            if not funcionarios_validos:
-                flash('Nenhum funcionário válido selecionado', 'error')
-                return redirect(url_for('alimentacao.lancamento_novo_v2'))
-            
-            # Processar itens do formulário
+
+            # --- Processar itens do formulário ---
             itens_data = []
-            form_data = request.form.to_dict(flat=False)
-            
-            # Encontrar todos os índices de itens
             indices = set()
-            for key in form_data.keys():
+            for key in request.form.keys():
                 match = re.match(r'itens\[(\d+)\]', key)
                 if match:
                     indices.add(int(match.group(1)))
-            
+
             for idx in sorted(indices):
                 item_id = request.form.get(f'itens[{idx}][item_id]')
-                preco = request.form.get(f'itens[{idx}][preco]')
+                preco_raw = request.form.get(f'itens[{idx}][preco]')
                 nome_custom = request.form.get(f'itens[{idx}][nome]')
-                
-                if preco:
-                    preco_decimal = Decimal(preco)
-                    if preco_decimal > 0:
-                        # Determinar nome do item
-                        if item_id and item_id != 'custom':
-                            item_ref = AlimentacaoItem.query.filter_by(id=int(item_id), admin_id=admin_id).first()
-                            nome_item = item_ref.nome if item_ref else nome_custom or 'Item'
-                        else:
-                            nome_item = nome_custom or 'Item personalizado'
-                        
-                        itens_data.append({
-                            'item_id': int(item_id) if item_id and item_id != 'custom' else None,
-                            'nome': nome_item,
-                            'preco': preco_decimal,
-                            'quantidade': len(funcionarios_validos)
-                        })
-            
+
+                if not preco_raw:
+                    continue
+                preco_decimal = Decimal(preco_raw)
+                if preco_decimal <= 0:
+                    continue
+
+                # Determinar nome do item
+                if item_id and item_id != 'custom':
+                    item_ref = AlimentacaoItem.query.filter_by(id=int(item_id), admin_id=admin_id).first()
+                    nome_item = item_ref.nome if item_ref else nome_custom or 'Item'
+                else:
+                    nome_item = nome_custom or 'Item personalizado'
+
+                item_entry = {
+                    'item_id': int(item_id) if item_id and item_id != 'custom' else None,
+                    'nome': nome_item,
+                    'preco': preco_decimal,
+                    'funcionario_id': None,
+                    'centro_custo_id': None,
+                    'quantidade': 1,
+                }
+
+                if v2:
+                    # V2: quantidade, funcionário e centro de custo por linha
+                    qtd_raw = request.form.get(f'itens[{idx}][quantidade]', '1')
+                    try:
+                        item_entry['quantidade'] = max(1, int(qtd_raw))
+                    except (ValueError, TypeError):
+                        item_entry['quantidade'] = 1
+
+                    func_id_raw = request.form.get(f'itens[{idx}][funcionario_id]')
+                    if func_id_raw and func_id_raw != '0':
+                        func_obj = Funcionario.query.filter_by(id=int(func_id_raw), admin_id=admin_id).first()
+                        if func_obj:
+                            item_entry['funcionario_id'] = func_obj.id
+
+                    cc_id_raw = request.form.get(f'itens[{idx}][centro_custo_id]')
+                    if cc_id_raw and cc_id_raw != '0':
+                        cc_obj = CentroCusto.query.filter_by(id=int(cc_id_raw), admin_id=admin_id).first()
+                        if cc_obj:
+                            item_entry['centro_custo_id'] = cc_obj.id
+                else:
+                    # V1: quantidade = número de funcionários selecionados
+                    funcionarios_ids = request.form.getlist('funcionarios')
+                    item_entry['quantidade'] = len(funcionarios_ids) if funcionarios_ids else 1
+
+                item_entry['subtotal'] = preco_decimal * item_entry['quantidade']
+                itens_data.append(item_entry)
+
             if not itens_data:
                 flash('Adicione pelo menos um item com preço válido', 'error')
                 return redirect(url_for('alimentacao.lancamento_novo_v2'))
-            
-            # Calcular valor total
-            valor_total = sum(item['preco'] * item['quantidade'] for item in itens_data)
-            
-            # Validação adicional: valor total deve ser maior que zero
+
+            # V1: validar funcionários globais
+            funcionarios_validos = []
+            if not v2:
+                funcionarios_ids = request.form.getlist('funcionarios')
+                if not funcionarios_ids:
+                    flash('Selecione pelo menos um funcionário', 'error')
+                    return redirect(url_for('alimentacao.lancamento_novo_v2'))
+                for func_id in funcionarios_ids:
+                    f = Funcionario.query.filter_by(id=int(func_id), admin_id=admin_id).first()
+                    if f:
+                        funcionarios_validos.append(f)
+                if not funcionarios_validos:
+                    flash('Nenhum funcionário válido selecionado', 'error')
+                    return redirect(url_for('alimentacao.lancamento_novo_v2'))
+
+            valor_total = sum(item['subtotal'] for item in itens_data)
             if valor_total <= 0:
-                flash('O valor total do lançamento deve ser maior que zero', 'error')
+                flash('O valor total deve ser maior que zero', 'error')
                 return redirect(url_for('alimentacao.lancamento_novo_v2'))
-            
-            # Criar lançamento principal
+
+            # --- Criar lançamento principal ---
             lancamento = AlimentacaoLancamento(
                 data=datetime.strptime(request.form['data'], '%Y-%m-%d').date(),
                 valor_total=valor_total,
@@ -380,18 +408,19 @@ def lancamento_novo_v2():
             )
             db.session.add(lancamento)
             db.session.flush()
-            
-            # Associar funcionários com admin_id (INSERT direto pois tabela tem coluna admin_id)
-            from sqlalchemy import text
-            for funcionario in funcionarios_validos:
-                db.session.execute(
-                    text("""INSERT INTO alimentacao_funcionarios_assoc 
-                            (lancamento_id, funcionario_id, admin_id) 
-                            VALUES (:lancamento_id, :funcionario_id, :admin_id)"""),
-                    {'lancamento_id': lancamento.id, 'funcionario_id': funcionario.id, 'admin_id': admin_id}
-                )
-            
-            # Criar itens do lançamento
+
+            # V1: associar funcionários globais
+            if not v2 and funcionarios_validos:
+                from sqlalchemy import text
+                for funcionario in funcionarios_validos:
+                    db.session.execute(
+                        text("""INSERT INTO alimentacao_funcionarios_assoc
+                                (lancamento_id, funcionario_id, admin_id)
+                                VALUES (:lancamento_id, :funcionario_id, :admin_id)"""),
+                        {'lancamento_id': lancamento.id, 'funcionario_id': funcionario.id, 'admin_id': admin_id}
+                    )
+
+            # --- Criar itens do lançamento ---
             for item in itens_data:
                 lancamento_item = AlimentacaoLancamentoItem(
                     lancamento_id=lancamento.id,
@@ -399,14 +428,43 @@ def lancamento_novo_v2():
                     nome_item=item['nome'],
                     preco_unitario=item['preco'],
                     quantidade=item['quantidade'],
-                    subtotal=item['preco'] * item['quantidade'],
+                    subtotal=item['subtotal'],
+                    funcionario_id=item['funcionario_id'],
+                    centro_custo_id=item['centro_custo_id'],
                     admin_id=admin_id
                 )
                 db.session.add(lancamento_item)
-            
+
+            db.session.flush()
+
+            # --- Passo 4 V2: Criar CustoObra agrupado por centro_custo_id ---
+            if v2:
+                from collections import defaultdict
+                grupos = defaultdict(Decimal)
+                for item in itens_data:
+                    chave = item['centro_custo_id']
+                    grupos[chave] += item['subtotal']
+
+                num_itens = len(itens_data)
+                restaurante_nome = restaurante.nome if restaurante else 'Alimentação'
+                data_lancamento = datetime.strptime(request.form['data'], '%Y-%m-%d').date()
+
+                for cc_id, valor_grupo in grupos.items():
+                    custo = CustoObra(
+                        obra_id=obra.id,
+                        centro_custo_id=cc_id,
+                        tipo='alimentacao',
+                        descricao=f"Refeições - {restaurante_nome} - {num_itens} itens",
+                        valor=float(valor_grupo),
+                        data=data_lancamento,
+                        admin_id=admin_id
+                    )
+                    db.session.add(custo)
+                    logger.info(f"[ALIMENTACAO_V2] CustoObra criado: obra={obra.id} cc={cc_id} valor={valor_grupo}")
+
             db.session.commit()
-            
-            # Emitir evento para integração
+
+            # --- Emitir evento para integração ---
             try:
                 from event_manager import EventManager
                 EventManager.emit('alimentacao_lancamento_criado', {
@@ -415,26 +473,31 @@ def lancamento_novo_v2():
                     'obra_id': lancamento.obra_id,
                     'valor_total': float(lancamento.valor_total)
                 }, admin_id)
-                logger.info(f"✅ Evento 'alimentacao_lancamento_criado' emitido para lançamento {lancamento.id}")
             except Exception as e:
-                logger.error(f"❌ Erro ao emitir evento: {e}")
-            
-            flash(f'Lançamento criado com sucesso! Total: R$ {valor_total:.2f} ({len(funcionarios_validos)} funcionários)', 'success')
+                logger.error(f"[ERROR] Erro ao emitir evento alimentacao: {e}")
+
+            msg = f'Lançamento criado com sucesso! Total: R$ {valor_total:.2f}'
+            if v2:
+                msg += f' ({len(itens_data)} itens detalhados)'
+            else:
+                msg += f' ({len(funcionarios_validos)} funcionários)'
+            flash(msg, 'success')
             return redirect(url_for('alimentacao.index'))
-            
+
         except Exception as e:
             db.session.rollback()
-            logger.error(f"❌ Erro ao criar lançamento v2: {e}")
+            logger.error(f"[ERROR] Erro ao criar lancamento v2: {e}")
             import traceback
             logger.error(traceback.format_exc())
             flash(f'Erro ao criar lançamento: {str(e)}', 'error')
-    
-    # GET - carregar dados para o formulário
+
+    # --- GET: carregar dados ---
     restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
     funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
     itens_cadastrados = AlimentacaoItem.query.filter_by(admin_id=admin_id, ativo=True).order_by(AlimentacaoItem.ordem).all()
-    
+    centros_custo = CentroCusto.query.filter_by(admin_id=admin_id, ativo=True).order_by(CentroCusto.nome).all()
+
     # Criar item padrão "Marmita" se nenhum item existir
     if not itens_cadastrados:
         try:
@@ -450,12 +513,11 @@ def lancamento_novo_v2():
             db.session.add(item_marmita)
             db.session.commit()
             itens_cadastrados = [item_marmita]
-            logger.info(f"✅ Item padrão 'Marmita' criado para admin_id={admin_id}")
+            logger.info(f"[OK] Item padrao Marmita criado para admin_id={admin_id}")
         except Exception as e:
-            logger.error(f"Erro ao criar item padrão: {e}")
+            logger.error(f"Erro ao criar item padrao: {e}")
             db.session.rollback()
-    
-    # Converter itens para dicionários para serialização JSON no template
+
     itens_json = [{
         'id': item.id,
         'nome': item.nome,
@@ -463,16 +525,31 @@ def lancamento_novo_v2():
         'icone': item.icone or 'fas fa-utensils',
         'is_default': item.is_default
     } for item in itens_cadastrados]
-    
-    # Pré-selecionar restaurante se passado na URL
+
+    centros_custo_json = [{
+        'id': cc.id,
+        'nome': cc.nome,
+        'codigo': cc.codigo,
+        'obra_id': cc.obra_id
+    } for cc in centros_custo]
+
+    funcionarios_json = [{
+        'id': f.id,
+        'nome': f.nome,
+        'funcao': f.funcao_ref.nome if f.funcao_ref else ''
+    } for f in funcionarios]
+
     restaurante_id_selecionado = request.args.get('restaurante_id', type=int)
-    
-    return render_template('alimentacao/lancamento_novo_v2.html', 
-                         restaurantes=restaurantes, 
-                         obras=obras, 
+
+    return render_template('alimentacao/lancamento_novo_v2.html',
+                         restaurantes=restaurantes,
+                         obras=obras,
                          funcionarios=funcionarios,
                          itens_cadastrados=itens_cadastrados,
                          itens_json=itens_json,
+                         centros_custo=centros_custo,
+                         centros_custo_json=centros_custo_json,
+                         funcionarios_json=funcionarios_json,
                          restaurante_id_selecionado=restaurante_id_selecionado)
 
 

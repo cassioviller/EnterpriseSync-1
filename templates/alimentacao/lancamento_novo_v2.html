@@ -324,6 +324,26 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
     align-items: end;
 }
 
+/* V2: 6 colunas quando funcionário e centro_custo estão presentes */
+.item-fields.v2-fields {
+    grid-template-columns: 2fr 1.5fr 1.5fr 0.7fr 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+    .item-fields.v2-fields {
+        grid-template-columns: 1fr 1fr;
+    }
+    .item-fields.v2-fields > div:first-child {
+        grid-column: span 2;
+    }
+    .item-fields.v2-fields > div:nth-child(2) {
+        grid-column: span 2;
+    }
+    .item-fields.v2-fields > div:nth-child(3) {
+        grid-column: span 2;
+    }
+}
+
 @media (max-width: 576px) {
     .item-fields {
         grid-template-columns: 1fr 1fr;
@@ -528,6 +548,7 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
                 </div>
             </div>
 
+            {% if not is_v2_active() %}
             <div class="funcionarios-section">
                 <div class="card-title">
                     <i class="fas fa-users"></i> Funcionários
@@ -560,6 +581,7 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
             <div class="itens-section">
                 <div class="card-title">
@@ -571,7 +593,7 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
                         <div class="item-header">
                             <span class="item-name"><i class="fas fa-drumstick-bite"></i> Marmita (padrão)</span>
                         </div>
-                        <div class="item-fields">
+                        <div class="item-fields{% if is_v2_active() %} v2-fields{% endif %}">
                             <div>
                                 <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Item</label>
                                 <select class="item-select" name="itens[0][item_id]" onchange="updateItemPrice(this)">
@@ -592,15 +614,41 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
                                 <input type="hidden" name="itens[0][nome]" class="item-nome-hidden" 
                                        value="{{ itens_cadastrados[0].nome if itens_cadastrados else 'Marmita' }}">
                             </div>
+                            {% if is_v2_active() %}
+                            <div>
+                                <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Funcionário</label>
+                                <select class="item-funcionario" name="itens[0][funcionario_id]" onchange="calcularTotais()">
+                                    <option value="0">Sem vínculo</option>
+                                    {% for funcionario in funcionarios %}
+                                    <option value="{{ funcionario.id }}">{{ funcionario.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Centro de Custo</label>
+                                <select class="item-centro-custo" name="itens[0][centro_custo_id]" onchange="calcularTotais()">
+                                    <option value="0">Geral / Obra</option>
+                                    {% for cc in centros_custo %}
+                                    <option value="{{ cc.id }}">{{ cc.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Qtd.</label>
+                                {% if is_v2_active() %}
+                                <input type="number" class="item-quantidade-input" name="itens[0][quantidade]"
+                                       value="1" min="1" step="1" onchange="calcularTotais()"
+                                       style="padding: 0.625rem; border: 1px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; width: 100%;">
+                                {% else %}
+                                <div class="item-quantidade" data-index="0">0</div>
+                                {% endif %}
+                            </div>
                             <div>
                                 <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Preço Unit.</label>
                                 <input type="number" class="item-preco" name="itens[0][preco]" 
                                        placeholder="0,00" step="0.01" min="0" 
                                        onchange="calcularTotais()" value="{{ itens_cadastrados[0].preco_padrao if itens_cadastrados else '18.00' }}">
-                            </div>
-                            <div>
-                                <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Qtd.</label>
-                                <div class="item-quantidade" data-index="0">0</div>
                             </div>
                             <div>
                                 <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Subtotal</label>
@@ -616,14 +664,22 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
             </div>
 
             <div class="totais-section">
+                {% if not is_v2_active() %}
                 <div class="totais-row">
                     <span>Funcionários:</span>
                     <span id="totalFuncionarios">0</span>
                 </div>
+                {% endif %}
                 <div class="totais-row">
                     <span>Itens:</span>
                     <span id="totalItens">1</span>
                 </div>
+                {% if is_v2_active() %}
+                <div class="totais-row">
+                    <span>Refeições (unidades):</span>
+                    <span id="totalUnidades">0</span>
+                </div>
+                {% endif %}
                 <div class="totais-row total">
                     <span>TOTAL:</span>
                     <span id="valorTotal">R$ 0,00</span>
@@ -656,31 +712,43 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
 <script>
 let itemIndex = 1;
 const itensData = {{ itens_json | tojson | safe if itens_json else '[]' }};
+const centrosCustoData = {{ centros_custo_json | tojson | safe if centros_custo_json else '[]' }};
+const funcionariosData = {{ funcionarios_json | tojson | safe if funcionarios_json else '[]' }};
+const isV2Active = {{ 'true' if is_v2_active() else 'false' }};
 
 document.addEventListener('DOMContentLoaded', function() {
     const hoje = new Date().toISOString().split('T')[0];
     document.getElementById('data').value = hoje;
-    
-    updateChips();
+
+    if (!isV2Active) {
+        const searchInput = document.getElementById('searchFuncionario');
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                const termo = e.target.value.toLowerCase();
+                document.querySelectorAll('.funcionario-item').forEach(item => {
+                    item.style.display = item.dataset.nome.includes(termo) ? 'flex' : 'none';
+                });
+            });
+        }
+        updateChips();
+    }
+
     calcularTotais();
-    
-    document.getElementById('searchFuncionario').addEventListener('input', function(e) {
-        const termo = e.target.value.toLowerCase();
-        document.querySelectorAll('.funcionario-item').forEach(item => {
-            const nome = item.dataset.nome;
-            item.style.display = nome.includes(termo) ? 'flex' : 'none';
-        });
-    });
 });
 
+// ========== FUNÇÕES V1 (funcionários globais) ==========
 function updateChips() {
+    if (isV2Active) return;
     const container = document.getElementById('chipsContainer');
     const checkboxes = document.querySelectorAll('input[name="funcionarios"]:checked');
     const count = checkboxes.length;
-    
-    document.getElementById('contadorFuncionarios').textContent = count + ' selecionados';
-    document.getElementById('totalFuncionarios').textContent = count;
-    
+
+    const contEl = document.getElementById('contadorFuncionarios');
+    if (contEl) contEl.textContent = count + ' selecionados';
+    const totFuncEl = document.getElementById('totalFuncionarios');
+    if (totFuncEl) totFuncEl.textContent = count;
+
+    if (!container) return;
     if (count === 0) {
         container.innerHTML = '<span class="empty-chips">Selecione os funcionários abaixo</span>';
     } else {
@@ -689,30 +757,20 @@ function updateChips() {
             const nome = cb.closest('.funcionario-item').querySelector('.funcionario-nome').textContent;
             const chip = document.createElement('span');
             chip.className = 'chip';
-            chip.innerHTML = `
-                ${nome}
-                <button type="button" class="remove" onclick="removeChip(${cb.value})">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
+            chip.innerHTML = `${nome}<button type="button" class="remove" onclick="removeChip(${cb.value})"><i class="fas fa-times"></i></button>`;
             container.appendChild(chip);
         });
     }
-    
     document.querySelectorAll('.funcionario-item').forEach(item => {
         const cb = item.querySelector('input[type="checkbox"]');
         item.classList.toggle('selected', cb.checked);
     });
-    
     calcularTotais();
 }
 
 function removeChip(id) {
     const cb = document.querySelector(`input[name="funcionarios"][value="${id}"]`);
-    if (cb) {
-        cb.checked = false;
-        updateChips();
-    }
+    if (cb) { cb.checked = false; updateChips(); }
 }
 
 function toggleSelectAll() {
@@ -722,13 +780,38 @@ function toggleSelectAll() {
     updateChips();
 }
 
+// ========== FUNÇÕES DE ITENS ==========
 function adicionarItem() {
     const container = document.getElementById('itensContainer');
-    const funcionarios = document.querySelectorAll('input[name="funcionarios"]:checked').length;
-    const optionsHtml = itensData.map(item => 
+    const optionsHtml = itensData.map(item =>
         `<option value="${item.id}" data-preco="${item.preco_padrao}" data-nome="${item.nome}">${item.nome}</option>`
     ).join('') + '<option value="custom">+ Personalizado</option>';
-    
+
+    let v2Fields = '';
+    if (isV2Active) {
+        const funcOptions = '<option value="0">Sem vínculo</option>' +
+            funcionariosData.map(f => `<option value="${f.id}">${f.nome}</option>`).join('');
+        const ccOptions = '<option value="0">Geral / Obra</option>' +
+            centrosCustoData.map(cc => `<option value="${cc.id}">${cc.nome}</option>`).join('');
+        v2Fields = `
+            <div>
+                <label style="font-size:0.75rem;color:#6c757d;margin-bottom:0.25rem;display:block;">Funcionário</label>
+                <select class="item-funcionario" name="itens[${itemIndex}][funcionario_id]" onchange="calcularTotais()" style="padding:0.625rem;border:1px solid #dee2e6;border-radius:8px;font-size:0.9rem;width:100%;">
+                    ${funcOptions}
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.75rem;color:#6c757d;margin-bottom:0.25rem;display:block;">Centro de Custo</label>
+                <select class="item-centro-custo" name="itens[${itemIndex}][centro_custo_id]" onchange="calcularTotais()" style="padding:0.625rem;border:1px solid #dee2e6;border-radius:8px;font-size:0.9rem;width:100%;">
+                    ${ccOptions}
+                </select>
+            </div>`;
+    }
+
+    const qtdField = isV2Active
+        ? `<input type="number" class="item-quantidade-input" name="itens[${itemIndex}][quantidade]" value="1" min="1" step="1" onchange="calcularTotais()" style="padding:0.625rem;border:1px solid #dee2e6;border-radius:8px;font-size:0.9rem;width:100%;">`
+        : `<div class="item-quantidade" data-index="${itemIndex}">${document.querySelectorAll('input[name="funcionarios"]:checked').length}</div>`;
+
     const itemHtml = `
         <div class="item-row" data-index="${itemIndex}">
             <div class="item-header">
@@ -737,36 +820,35 @@ function adicionarItem() {
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div class="item-fields">
+            <div class="item-fields${isV2Active ? ' v2-fields' : ''}">
                 <div>
-                    <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Item</label>
+                    <label style="font-size:0.75rem;color:#6c757d;margin-bottom:0.25rem;display:block;">Item</label>
                     <select class="item-select" name="itens[${itemIndex}][item_id]" onchange="updateItemPrice(this)">
                         <option value="">Selecione...</option>
                         ${optionsHtml}
                     </select>
                     <div class="item-custom-input">
-                        <input type="text" class="item-nome-custom" placeholder="Nome do item" 
-                               onchange="atualizarNomeItem(this)">
+                        <input type="text" class="item-nome-custom" placeholder="Nome do item" onchange="atualizarNomeItem(this)">
                     </div>
                     <input type="hidden" name="itens[${itemIndex}][nome]" class="item-nome-hidden">
                 </div>
+                ${v2Fields}
                 <div>
-                    <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Preço Unit.</label>
-                    <input type="number" class="item-preco" name="itens[${itemIndex}][preco]" 
+                    <label style="font-size:0.75rem;color:#6c757d;margin-bottom:0.25rem;display:block;">Qtd.</label>
+                    ${qtdField}
+                </div>
+                <div>
+                    <label style="font-size:0.75rem;color:#6c757d;margin-bottom:0.25rem;display:block;">Preço Unit.</label>
+                    <input type="number" class="item-preco" name="itens[${itemIndex}][preco]"
                            placeholder="0,00" step="0.01" min="0" onchange="calcularTotais()">
                 </div>
                 <div>
-                    <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Qtd.</label>
-                    <div class="item-quantidade" data-index="${itemIndex}">${funcionarios}</div>
-                </div>
-                <div>
-                    <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Subtotal</label>
+                    <label style="font-size:0.75rem;color:#6c757d;margin-bottom:0.25rem;display:block;">Subtotal</label>
                     <div class="item-subtotal" data-index="${itemIndex}">R$ 0,00</div>
                 </div>
             </div>
-        </div>
-    `;
-    
+        </div>`;
+
     container.insertAdjacentHTML('beforeend', itemHtml);
     itemIndex++;
     document.getElementById('totalItens').textContent = document.querySelectorAll('.item-row').length;
@@ -786,7 +868,7 @@ function updateItemPrice(select) {
     const customInput = row.querySelector('.item-custom-input');
     const nomeCustom = row.querySelector('.item-nome-custom');
     const option = select.options[select.selectedIndex];
-    
+
     if (option.value === 'custom') {
         customInput.classList.add('visible');
         nomeCustom.focus();
@@ -802,7 +884,6 @@ function updateItemPrice(select) {
         customInput.classList.remove('visible');
         nomeHidden.value = '';
     }
-    
     calcularTotais();
 }
 
@@ -810,7 +891,6 @@ function atualizarNomeItem(input) {
     const row = input.closest('.item-row');
     const nomeHidden = row.querySelector('.item-nome-hidden');
     const nome = input.value.trim();
-    
     if (nome) {
         nomeHidden.value = nome;
         row.querySelector('.item-name').innerHTML = `<i class="fas fa-edit"></i> ${nome}`;
@@ -818,48 +898,68 @@ function atualizarNomeItem(input) {
 }
 
 function calcularTotais() {
-    const funcionarios = document.querySelectorAll('input[name="funcionarios"]:checked').length;
     let total = 0;
-    
-    document.querySelectorAll('.item-row').forEach(row => {
-        const preco = parseFloat(row.querySelector('.item-preco').value) || 0;
-        const subtotal = preco * funcionarios;
-        total += subtotal;
-        
-        const subtotalEl = row.querySelector('.item-subtotal');
-        subtotalEl.textContent = 'R$ ' + subtotal.toFixed(2).replace('.', ',');
-        
-        const qtdEl = row.querySelector('.item-quantidade');
-        if (qtdEl) {
-            qtdEl.textContent = funcionarios;
-        }
-    });
-    
+    let totalUnidades = 0;
+
+    if (isV2Active) {
+        // V2: quantidade por item (input numérico)
+        document.querySelectorAll('.item-row').forEach(row => {
+            const preco = parseFloat(row.querySelector('.item-preco') ? row.querySelector('.item-preco').value : 0) || 0;
+            const qtdInput = row.querySelector('.item-quantidade-input');
+            const qtd = qtdInput ? (parseInt(qtdInput.value) || 1) : 1;
+            const subtotal = preco * qtd;
+            total += subtotal;
+            totalUnidades += qtd;
+
+            const subtotalEl = row.querySelector('.item-subtotal');
+            if (subtotalEl) subtotalEl.textContent = 'R$ ' + subtotal.toFixed(2).replace('.', ',');
+        });
+
+        const unidadesEl = document.getElementById('totalUnidades');
+        if (unidadesEl) unidadesEl.textContent = totalUnidades;
+    } else {
+        // V1: quantidade = nº de funcionários selecionados
+        const funcionarios = document.querySelectorAll('input[name="funcionarios"]:checked').length;
+        document.querySelectorAll('.item-row').forEach(row => {
+            const preco = parseFloat(row.querySelector('.item-preco').value) || 0;
+            const subtotal = preco * funcionarios;
+            total += subtotal;
+
+            const subtotalEl = row.querySelector('.item-subtotal');
+            if (subtotalEl) subtotalEl.textContent = 'R$ ' + subtotal.toFixed(2).replace('.', ',');
+
+            const qtdEl = row.querySelector('.item-quantidade');
+            if (qtdEl) qtdEl.textContent = funcionarios;
+        });
+    }
+
     document.getElementById('valorTotal').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
     document.getElementById('inputValorTotal').value = total.toFixed(2);
 }
 
 document.getElementById('formLancamento').addEventListener('submit', function(e) {
-    const funcionarios = document.querySelectorAll('input[name="funcionarios"]:checked');
-    if (funcionarios.length === 0) {
-        e.preventDefault();
-        alert('Selecione pelo menos um funcionário!');
-        return false;
+    if (!isV2Active) {
+        const funcionarios = document.querySelectorAll('input[name="funcionarios"]:checked');
+        if (funcionarios.length === 0) {
+            e.preventDefault();
+            alert('Selecione pelo menos um funcionário!');
+            return false;
+        }
     }
-    
+
     const itens = document.querySelectorAll('.item-row');
     let temItemValido = false;
     itens.forEach(row => {
-        const preco = parseFloat(row.querySelector('.item-preco').value);
-        if (preco > 0) temItemValido = true;
+        const precoInput = row.querySelector('.item-preco');
+        if (precoInput && parseFloat(precoInput.value) > 0) temItemValido = true;
     });
-    
+
     if (!temItemValido) {
         e.preventDefault();
         alert('Adicione pelo menos um item com preço válido!');
         return false;
     }
-    
+
     return true;
 });
 </script>

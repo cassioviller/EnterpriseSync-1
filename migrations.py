@@ -3771,6 +3771,7 @@ def executar_migracoes():
             (69, "custo_veiculo.obra_id nullable", _migration_69_custo_veiculo_obra_nullable),
             (70, "Versionamento V1/V2 por Tenant (Feature Flag)", _migration_70_versao_sistema_usuario),
             (71, "Remuneração por Diária V2 (Funcionario)", _migration_71_remuneracao_diaria_funcionario),
+            (72, "Alimentação V2 - funcionario_id e centro_custo_id por item", _migration_72_alimentacao_item_v2),
         ]
         
         # Executar cada migração com rastreamento
@@ -6539,6 +6540,63 @@ def _migration_69_custo_veiculo_obra_nullable():
     except Exception as e:
         logger.error(f"❌ Erro na migração 69: {e}")
         if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
+
+
+def _migration_72_alimentacao_item_v2():
+    """
+    MIGRAÇÃO 72: Adicionar funcionario_id e centro_custo_id em alimentacao_lancamento_item.
+    Necessário para o módulo V2 de Alimentação com detalhamento por funcionário e centro de custo.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        logger.info("Migração 72: alimentacao_lancamento_item - funcionario_id e centro_custo_id (V2)")
+
+        # funcionario_id
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'alimentacao_lancamento_item' AND column_name = 'funcionario_id'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("""
+                ALTER TABLE alimentacao_lancamento_item
+                ADD COLUMN funcionario_id INTEGER REFERENCES funcionario(id) ON DELETE SET NULL
+            """)
+            logger.info("  funcionario_id adicionada em alimentacao_lancamento_item")
+        else:
+            logger.info("  funcionario_id ja existe - SKIP")
+
+        # centro_custo_id
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'alimentacao_lancamento_item' AND column_name = 'centro_custo_id'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("""
+                ALTER TABLE alimentacao_lancamento_item
+                ADD COLUMN centro_custo_id INTEGER REFERENCES centro_custo(id) ON DELETE SET NULL
+            """)
+            logger.info("  centro_custo_id adicionada em alimentacao_lancamento_item")
+        else:
+            logger.info("  centro_custo_id ja existe - SKIP")
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 72 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 72: {e}")
+        if connection:
             try:
                 connection.rollback()
                 cursor.close()

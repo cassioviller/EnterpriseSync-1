@@ -1,0 +1,57 @@
+# PROMPT 2: Gestão de Restaurantes e Marmitas (V2)
+
+**Objetivo:** Aprimorar o módulo de Alimentação existente para permitir o lançamento detalhado de marmitas/refeições por funcionário e por centro de custo, suportando múltiplos itens no mesmo lançamento.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `alimentacao_views.py`
+- `templates/alimentacao/novo_lancamento.html` (ou equivalente)
+- `utils/financeiro_integration.py` (novo ou existente para gerar despesas)
+
+Por favor, implemente as seguintes alterações passo a passo:
+
+## Passo 1: Atualização do Modelo AlimentacaoLancamentoItem
+Atualmente, o sistema possui `AlimentacaoLancamento` e `AlimentacaoLancamentoItem`. Precisamos descer o nível de detalhe para saber *quem* comeu e para *qual centro de custo* a despesa vai.
+No arquivo `models.py`, atualize a classe `AlimentacaoLancamentoItem`:
+```python
+# Adicionar na classe AlimentacaoLancamentoItem
+funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=True)
+centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
+
+# Relacionamentos
+funcionario = db.relationship('Funcionario', backref='refeicoes_consumidas')
+centro_custo = db.relationship('CentroCusto', backref='despesas_alimentacao')
+```
+
+## Passo 2: Interface de Lançamento de Marmitas
+No template de lançamento de alimentação (`templates/alimentacao/novo_lancamento.html`):
+1. O cabeçalho do formulário deve pedir: Restaurante, Data e Obra (opcional, para preencher o centro de custo padrão).
+2. Crie uma tabela dinâmica (usando JavaScript) para adicionar múltiplos itens (marmitas).
+3. Cada linha da tabela deve ter:
+   - **Item:** Select com os itens do restaurante (ex: Marmita G, Marmita P, Refrigerante).
+   - **Funcionário:** Select com a lista de funcionários ativos (com opção "Sem vínculo" para visitantes).
+   - **Centro de Custo:** Select com os centros de custo (puxa o da obra por padrão, mas permite alterar).
+   - **Quantidade:** Input numérico (default 1).
+   - **Preço Unitário:** Preenchido automaticamente ao escolher o item.
+   - **Subtotal:** Calculado via JS.
+4. Um botão "Adicionar Linha" para inserir mais refeições no mesmo pedido.
+
+## Passo 3: Processamento no Backend (alimentacao_views.py)
+Na rota que salva o lançamento:
+1. Crie o `AlimentacaoLancamento` principal (cabeçalho).
+2. Faça um loop nos itens enviados pelo formulário dinâmico.
+3. Para cada item, crie um `AlimentacaoLancamentoItem` vinculando o `funcionario_id` e o `centro_custo_id` informados na linha.
+4. Calcule o `valor_total` do lançamento somando os subtotais.
+
+## Passo 4: Integração com Custos de Obra (Apropriação Automática)
+Sempre que um lançamento de alimentação for salvo, o sistema deve gerar automaticamente os custos apropriados.
+1. No backend, após salvar os itens, agrupe os valores por `centro_custo_id` e `obra_id`.
+2. Para cada grupo, crie um registro na tabela `CustoObra`:
+   - `tipo = 'alimentacao'`
+   - `valor = soma_do_grupo`
+   - `centro_custo_id = centro_custo_do_grupo`
+   - `descricao = f"Refeições - {restaurante.nome} - {len(itens)} itens"`
+3. Isso garante que o dashboard de custos da obra reflita imediatamente o gasto com marmitas daquele dia.
+
+## Passo 5: Proteção V1/V2
+Envolva a exibição das colunas "Funcionário" e "Centro de Custo" no template com `{% if is_v2_active() %}` (conforme Prompt 0). Se for V1, o lançamento continua sendo genérico apenas por Obra. Se for V2, exige o detalhamento por funcionário/centro de custo.
