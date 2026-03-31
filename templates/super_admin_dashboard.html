@@ -40,6 +40,7 @@
                         <th>Nome</th>
                         <th>Username</th>
                         <th>Email</th>
+                        <th>Versão</th>
                         <th>Status</th>
                         <th>Data Criação</th>
                     </tr>
@@ -50,6 +51,13 @@
                         <td>{{ admin.nome }}</td>
                         <td>{{ admin.username }}</td>
                         <td>{{ admin.email }}</td>
+                        <td>
+                            {% if admin.versao_sistema == 'v2' %}
+                                <span class="badge bg-primary">V2 - Integrada</span>
+                            {% else %}
+                                <span class="badge bg-secondary">V1 - Clássica</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if admin.ativo %}
                                 <span class="badge bg-success">Ativo</span>
@@ -95,6 +103,14 @@
                     <div class="mb-3">
                         <label class="form-label">Confirmar Senha</label>
                         <input type="password" class="form-control" name="confirmar_senha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Versão do Sistema</label>
+                        <select class="form-select" name="versao_sistema" required>
+                            <option value="v1" selected>V1 - Clássico (Atual)</option>
+                            <option value="v2">V2 - Gestão Integrada (Novo)</option>
+                        </select>
+                        <div class="form-text">V2 ativa módulos avançados: Diárias, Restaurantes, Transporte, Cronograma e RDO Integrado.</div>
                     </div>
                 </div>
                 <div class="modal-footer">

@@ -155,6 +155,17 @@ login_manager.init_app(app)
 login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
 
+# Context processor para feature flag V2
+@app.context_processor
+def inject_v2_flag():
+    """Injeta is_v2_active() como função disponível em todos os templates"""
+    try:
+        from utils.tenant import is_v2_active
+        return {'is_v2_active': is_v2_active}
+    except Exception:
+        return {'is_v2_active': lambda: False}
+
+
 # Context processor para configurações da empresa
 @app.context_processor
 def inject_company_config():

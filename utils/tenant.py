@@ -60,6 +60,31 @@ def require_tenant():
     
     return tenant_id
 
+def is_v2_active():
+    """
+    Verifica se o tenant atual está usando a V2 do sistema (Feature Flag).
+    Retorna True apenas se o admin do tenant tem versao_sistema == 'v2'.
+    Exportada para o contexto Jinja via context_processor em app.py.
+    """
+    from flask_login import current_user
+    from models import Usuario, TipoUsuario
+
+    if not current_user.is_authenticated:
+        return False
+
+    if current_user.tipo_usuario == TipoUsuario.ADMIN:
+        return getattr(current_user, 'versao_sistema', 'v1') == 'v2'
+
+    if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+        return False
+
+    if current_user.admin_id:
+        admin = Usuario.query.get(current_user.admin_id)
+        return admin is not None and getattr(admin, 'versao_sistema', 'v1') == 'v2'
+
+    return False
+
+
 def get_safe_admin_id():
     """
     Retorna admin_id com fallback SEGURO apenas para desenvolvimento

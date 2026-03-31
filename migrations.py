@@ -3769,6 +3769,7 @@ def executar_migracoes():
             (67, "Sistema de Geofencing (Cerca Virtual)", _migration_67_geofencing),
             (68, "Sistema de Múltiplas Fotos Faciais", _migration_68_multiplas_fotos_faciais),
             (69, "custo_veiculo.obra_id nullable", _migration_69_custo_veiculo_obra_nullable),
+            (70, "Versionamento V1/V2 por Tenant (Feature Flag)", _migration_70_versao_sistema_usuario),
         ]
         
         # Executar cada migração com rastreamento
@@ -6391,6 +6392,51 @@ def _migration_68_multiplas_fotos_faciais():
         
     except Exception as e:
         logger.error(f"❌ Erro na migração 68: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
+
+
+def _migration_70_versao_sistema_usuario():
+    """
+    MIGRAÇÃO 70: Adicionar coluna versao_sistema na tabela usuario.
+    Feature Flag para controle de versão V1/V2 por tenant (admin).
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        logger.info("Migração 70: usuario.versao_sistema - Feature Flag V1/V2")
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'usuario' AND column_name = 'versao_sistema'
+        """)
+        row = cursor.fetchone()
+
+        if row is None:
+            cursor.execute("""
+                ALTER TABLE usuario
+                ADD COLUMN versao_sistema VARCHAR(10) NOT NULL DEFAULT 'v1'
+            """)
+            logger.info("  versao_sistema adicionada em usuario com default 'v1'")
+        else:
+            logger.info("  versao_sistema ja existe em usuario - SKIP")
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+
+        logger.info("MIGRACAO 70 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 70: {e}")
         if 'connection' in locals():
             try:
                 connection.rollback()

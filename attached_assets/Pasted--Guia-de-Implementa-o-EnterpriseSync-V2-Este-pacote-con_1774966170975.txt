@@ -1,0 +1,41 @@
+# Guia de Implementação - EnterpriseSync V2
+
+Este pacote contém 8 prompts rigorosamente elaborados para guiar o Replit Agent na implementação da **Versão 2 (V2)** do EnterpriseSync. 
+
+A arquitetura foi desenhada para garantir que **os clientes atuais (V1) não sejam afetados**, utilizando um sistema de *Feature Flags* (Versionamento por Tenant).
+
+## Ordem de Execução Recomendada no Replit Agent
+
+Para evitar erros de dependência no banco de dados, entregue os prompts ao Replit Agent **exatamente nesta ordem**:
+
+### Fase 1: Fundação e Isolamento
+1. **`prompt_00_versionamento.md`**
+   - *Por que primeiro?* Cria a base (`is_v2_active()`) que todos os outros módulos usarão para esconder as novas telas dos clientes antigos.
+
+### Fase 2: Módulos Operacionais (Geradores de Custo)
+2. **`prompt_01_funcionarios_diaria.md`**
+   - *O que faz:* Adiciona o conceito de "Diária" vs "Salário Fixo".
+3. **`prompt_02_restaurantes.md`**
+   - *O que faz:* Detalha as marmitas por funcionário e centro de custo.
+4. **`prompt_03_transporte.md`**
+   - *O que faz:* Cria a gestão de VT, combustível e aplicativos.
+5. **`prompt_04_compras.md`**
+   - *O que faz:* Vincula compras de materiais aos centros de custo e gera Contas a Pagar automaticamente.
+
+### Fase 3: Automação Contábil
+6. **`prompt_05_balancete_automatico.md`**
+   - *O que faz:* Conecta todos os módulos da Fase 2 ao Plano de Contas. Quando uma marmita, transporte ou compra é lançada, o sistema já faz o Débito/Crédito contábil sozinho.
+
+### Fase 4: Planejamento e Execução (Obras)
+7. **`prompt_06_cronograma.md`**
+   - *O que faz:* Cria o motor do MS Project (tarefas pai/filha, predecessoras, dias úteis).
+8. **`prompt_07_rdo_integrado.md`**
+   - *O que faz:* Conecta o RDO ao Cronograma, criando as barras visuais de **Planejado vs Realizado** e o apontamento incremental de quantitativos.
+
+---
+
+## Notas Técnicas sobre a Análise (MAX)
+Durante a análise profunda do seu repositório, identifiquei que:
+- Você já possui uma estrutura contábil excelente (`PlanoContas`, `BalanceteMensal`, `LancamentoContabil`). O Prompt 5 apenas cria os "gatilhos" para preencher isso sozinho.
+- O modelo `CustoObra` já está preparado para receber os centros de custo.
+- O arquivo `views/rdo.py` é o maior do sistema (3.885 linhas). O Prompt 7 foi desenhado para adicionar a nova lógica de forma modular, sem quebrar o RDO antigo.

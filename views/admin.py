@@ -50,13 +50,18 @@ def criar_admin():
             flash(f'Username {username} já está cadastrado.', 'danger')
             return redirect(url_for('main.super_admin_dashboard'))
         
+        versao_sistema = request.form.get('versao_sistema', 'v1')
+        if versao_sistema not in ('v1', 'v2'):
+            versao_sistema = 'v1'
+        
         novo_admin = Usuario(
             nome=nome,
             username=username,
             email=email,
             password_hash=generate_password_hash(senha),
             tipo_usuario=TipoUsuario.ADMIN,
-            ativo=True
+            ativo=True,
+            versao_sistema=versao_sistema
         )
         
         db.session.add(novo_admin)

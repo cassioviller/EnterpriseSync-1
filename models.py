@@ -36,6 +36,7 @@ class Usuario(UserMixin, db.Model):
     tipo_usuario = db.Column(db.Enum(TipoUsuario), default=TipoUsuario.FUNCIONARIO, nullable=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para funcionários, referencia seu admin
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    versao_sistema = db.Column(db.String(10), default='v1', nullable=False)  # 'v1' ou 'v2' - Feature Flag V2
     
     # Relacionamentos
     funcionarios = db.relationship('Usuario', backref=db.backref('admin', remote_side=[id]), lazy='dynamic')
