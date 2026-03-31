@@ -472,6 +472,8 @@ def get_funcionario(funcionario_id):
                 'endereco': funcionario.endereco or '',
                 'data_admissao': funcionario.data_admissao.strftime('%Y-%m-%d') if funcionario.data_admissao else '',
                 'salario': float(funcionario.salario) if funcionario.salario else 0,
+                'tipo_remuneracao': funcionario.tipo_remuneracao or 'salario',
+                'valor_diaria': float(funcionario.valor_diaria) if funcionario.valor_diaria else 0,
                 'departamento_id': funcionario.departamento_id or 0,
                 'funcao_id': funcionario.funcao_id or 0,
                 'horario_trabalho_id': funcionario.horario_trabalho_id or 0,
@@ -518,6 +520,12 @@ def editar_funcionario(funcionario_id):
         
         if request.form.get('salario'):
             funcionario.salario = float(request.form['salario'])
+
+        # Campos V2: remuneração por diária
+        if request.form.get('tipo_remuneracao') in ('salario', 'diaria'):
+            funcionario.tipo_remuneracao = request.form['tipo_remuneracao']
+        if request.form.get('valor_diaria'):
+            funcionario.valor_diaria = float(request.form['valor_diaria'])
         
         # Atualizar IDs de relacionamentos
         funcionario.departamento_id = int(request.form['departamento_id']) if request.form.get('departamento_id') and request.form['departamento_id'] != '0' else None

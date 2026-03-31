@@ -889,10 +889,28 @@
                             </div>
                         </div>
                         <div class="col-md-6">
+                            {% if is_v2_active() %}
+                            <div class="mb-3">
+                                <label for="tipo_remuneracao" class="form-label">Tipo de Remuneração</label>
+                                <select class="form-select" id="tipo_remuneracao" name="tipo_remuneracao" onchange="toggleRemuneracaoModal(this.value)">
+                                    <option value="salario">Salário Fixo Mensal</option>
+                                    <option value="diaria">Diária</option>
+                                </select>
+                            </div>
+                            <div id="campo_salario_modal" class="mb-3">
+                                <label for="salario" class="form-label">Salário Mensal (R$)</label>
+                                <input type="number" class="form-control" id="salario" name="salario" step="0.01" min="0">
+                            </div>
+                            <div id="campo_diaria_modal" class="mb-3" style="display:none;">
+                                <label for="valor_diaria" class="form-label">Valor da Diária (R$)</label>
+                                <input type="number" class="form-control" id="valor_diaria" name="valor_diaria" step="0.01" min="0" value="0">
+                            </div>
+                            {% else %}
                             <div class="mb-3">
                                 <label for="salario" class="form-label">Salário</label>
                                 <input type="number" class="form-control" id="salario" name="salario" step="0.01" min="0">
                             </div>
+                            {% endif %}
                         </div>
                     </div>
                     
@@ -955,6 +973,22 @@
 
 {% block scripts %}
 <script>
+{% if is_v2_active() %}
+function toggleRemuneracaoModal(tipo) {
+    const campoDiaria = document.getElementById('campo_diaria_modal');
+    const campoSalario = document.getElementById('campo_salario_modal');
+    if (campoDiaria && campoSalario) {
+        if (tipo === 'diaria') {
+            campoDiaria.style.display = 'block';
+            campoSalario.style.display = 'none';
+        } else {
+            campoDiaria.style.display = 'none';
+            campoSalario.style.display = 'block';
+        }
+    }
+}
+{% endif %}
+
 // Abrir modal para novo funcionário
 function abrirModalNovoFuncionario() {
     // Limpar formulário
@@ -967,6 +1001,15 @@ function abrirModalNovoFuncionario() {
     if (fotoPreview) {
         fotoPreview.style.display = 'none';
     }
+
+    {% if is_v2_active() %}
+    // Reset campos V2
+    const tipoRem = document.getElementById('tipo_remuneracao');
+    if (tipoRem) {
+        tipoRem.value = 'salario';
+        toggleRemuneracaoModal('salario');
+    }
+    {% endif %}
 }
 
 // Enhanced photo upload functionality
@@ -1124,6 +1167,19 @@ async function editarFuncionario(id) {
         document.getElementById('endereco').value = func.endereco || '';
         document.getElementById('data_admissao').value = func.data_admissao || '';
         document.getElementById('salario').value = func.salario || '';
+
+        {% if is_v2_active() %}
+        // Campos V2 de remuneração
+        const tipoRemEd = document.getElementById('tipo_remuneracao');
+        const valorDiariaEd = document.getElementById('valor_diaria');
+        if (tipoRemEd) {
+            tipoRemEd.value = func.tipo_remuneracao || 'salario';
+            toggleRemuneracaoModal(tipoRemEd.value);
+        }
+        if (valorDiariaEd) {
+            valorDiariaEd.value = func.valor_diaria || 0;
+        }
+        {% endif %}
         
         // Popular dropdowns
         document.getElementById('departamento_id').value = func.departamento_id || '0';
