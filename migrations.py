@@ -3772,6 +3772,7 @@ def executar_migracoes():
             (70, "Versionamento V1/V2 por Tenant (Feature Flag)", _migration_70_versao_sistema_usuario),
             (71, "Remuneração por Diária V2 (Funcionario)", _migration_71_remuneracao_diaria_funcionario),
             (72, "Alimentação V2 - funcionario_id e centro_custo_id por item", _migration_72_alimentacao_item_v2),
+            (73, "Transporte V2 - tabelas categoria_transporte e lancamento_transporte", _migration_73_transporte_v2),
         ]
         
         # Executar cada migração com rastreamento
@@ -6540,6 +6541,90 @@ def _migration_69_custo_veiculo_obra_nullable():
     except Exception as e:
         logger.error(f"❌ Erro na migração 69: {e}")
         if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
+
+
+def _migration_73_transporte_v2():
+    """
+    MIGRAÇÃO 73: Criar tabelas categoria_transporte e lancamento_transporte para módulo V2.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        logger.info("Migração 73: criando tabelas de Transporte V2")
+
+        # Tabela categoria_transporte
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'categoria_transporte'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            cursor.execute("""
+                CREATE TABLE categoria_transporte (
+                    id SERIAL PRIMARY KEY,
+                    nome VARCHAR(50) NOT NULL,
+                    icone VARCHAR(50) DEFAULT 'fas fa-bus',
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            logger.info("  categoria_transporte criada")
+        else:
+            # garantir coluna icone
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='categoria_transporte' AND column_name='icone'
+            """)
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE categoria_transporte ADD COLUMN icone VARCHAR(50) DEFAULT 'fas fa-bus'")
+            logger.info("  categoria_transporte ja existe - SKIP")
+
+        # Tabela lancamento_transporte
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'lancamento_transporte'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            cursor.execute("""
+                CREATE TABLE lancamento_transporte (
+                    id SERIAL PRIMARY KEY,
+                    categoria_id INTEGER NOT NULL REFERENCES categoria_transporte(id),
+                    funcionario_id INTEGER REFERENCES funcionario(id) ON DELETE SET NULL,
+                    veiculo_id INTEGER REFERENCES frota_veiculo(id) ON DELETE SET NULL,
+                    centro_custo_id INTEGER NOT NULL REFERENCES centro_custo(id),
+                    obra_id INTEGER REFERENCES obra(id) ON DELETE SET NULL,
+                    data_lancamento DATE NOT NULL,
+                    valor NUMERIC(10,2) NOT NULL,
+                    descricao VARCHAR(200),
+                    comprovante_url VARCHAR(500),
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            logger.info("  lancamento_transporte criada")
+        else:
+            logger.info("  lancamento_transporte ja existe - SKIP")
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 73 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 73: {e}")
+        if connection:
             try:
                 connection.rollback()
                 cursor.close()

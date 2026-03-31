@@ -1,0 +1,157 @@
+{% extends "base_completo.html" %}
+{% block title %}Novo Lançamento de Transporte{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center mb-4">
+    <a href="{{ url_for('transporte.index') }}" class="btn btn-outline-secondary me-3">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <div>
+      <h1 class="h3 mb-0 fw-bold"><i class="fas fa-route me-2 text-primary"></i>Novo Lançamento de Transporte</h1>
+      <small class="text-muted">Registre despesas de transporte e vincule à obra para apropriação automática</small>
+    </div>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <form method="POST" action="{{ url_for('transporte.novo_post') }}" enctype="multipart/form-data" id="formTransporte">
+
+            <!-- Categoria -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Categoria <span class="text-danger">*</span></label>
+              <select name="categoria_id" id="selectCategoria" class="form-select" required>
+                <option value="">Selecione a categoria...</option>
+                {% for cat in categorias %}
+                  <option value="{{ cat.id }}" data-nome="{{ cat.nome }}">
+                    {{ cat.nome }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Campo Funcionário (aparece se VT / Aplicativo) -->
+            <div class="mb-3 d-none" id="campoFuncionario">
+              <label class="form-label fw-semibold">Funcionário</label>
+              <select name="funcionario_id" id="selectFuncionario" class="form-select">
+                <option value="">Sem vínculo</option>
+                {% for f in funcionarios %}
+                  <option value="{{ f.id }}">{{ f.nome }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Selecione o funcionário beneficiado pela despesa.</div>
+            </div>
+
+            <!-- Campo Veículo (aparece se Combustível) -->
+            <div class="mb-3 d-none" id="campoVeiculo">
+              <label class="form-label fw-semibold">Veículo</label>
+              <select name="veiculo_id" id="selectVeiculo" class="form-select">
+                <option value="">Selecione o veículo...</option>
+                {% for v in veiculos %}
+                  <option value="{{ v.id }}">{{ v.placa }} — {{ v.marca }} {{ v.modelo }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Data e Valor na mesma linha -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Data <span class="text-danger">*</span></label>
+                <input type="date" name="data_lancamento" class="form-control" value="{{ hoje }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Valor (R$) <span class="text-danger">*</span></label>
+                <input type="number" name="valor" class="form-control" min="0.01" step="0.01"
+                       placeholder="0,00" required>
+              </div>
+            </div>
+
+            <!-- Centro de Custo -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Centro de Custo <span class="text-danger">*</span></label>
+              <select name="centro_custo_id" class="form-select" required>
+                <option value="">Selecione o centro de custo...</option>
+                {% for cc in centros_custo %}
+                  <option value="{{ cc.id }}">{{ cc.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Obra (opcional) -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">
+                Obra <span class="text-muted fw-normal">(opcional — necessário para apropriar custo)</span>
+              </label>
+              <select name="obra_id" class="form-select">
+                <option value="">Nenhuma obra específica</option>
+                {% for o in obras %}
+                  <option value="{{ o.id }}">{{ o.nome }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Se selecionada, o custo será lançado automaticamente no dashboard da obra.</div>
+            </div>
+
+            <!-- Descrição -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Descrição</label>
+              <input type="text" name="descricao" class="form-control"
+                     placeholder="Ex: Abastecimento posto Shell, Uber trajeto obra-centro..." maxlength="200">
+            </div>
+
+            <!-- Comprovante -->
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Comprovante</label>
+              <input type="file" name="comprovante" class="form-control"
+                     accept=".jpg,.jpeg,.png,.pdf,.webp">
+              <div class="form-text">Formatos aceitos: JPG, PNG, PDF, WebP (máx. 10 MB)</div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary px-4">
+                <i class="fas fa-save me-1"></i> Salvar Lançamento
+              </button>
+              <a href="{{ url_for('transporte.index') }}" class="btn btn-outline-secondary px-4">
+                Cancelar
+              </a>
+            </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const select = document.getElementById('selectCategoria');
+  const campoFunc = document.getElementById('campoFuncionario');
+  const campoVeic = document.getElementById('campoVeiculo');
+  const selectFunc = document.getElementById('selectFuncionario');
+  const selectVeic = document.getElementById('selectVeiculo');
+
+  // Categorias que pedem veículo
+  const CATEGORIAS_VEICULO = ['combustível', 'combustivel'];
+  // Categorias que pedem funcionário
+  const CATEGORIAS_FUNCIONARIO = ['vale transporte', 'aplicativo', 'uber', 'passagem'];
+
+  function atualizar() {
+    const nome = (select.options[select.selectedIndex]?.dataset.nome || '').toLowerCase();
+
+    const pedeVeiculo = CATEGORIAS_VEICULO.some(k => nome.includes(k));
+    const pedeFuncionario = CATEGORIAS_FUNCIONARIO.some(k => nome.includes(k));
+
+    campoVeic.classList.toggle('d-none', !pedeVeiculo);
+    campoFunc.classList.toggle('d-none', !pedeFuncionario);
+
+    if (!pedeVeiculo) selectVeic.value = '';
+    if (!pedeFuncionario) selectFunc.value = '';
+  }
+
+  select.addEventListener('change', atualizar);
+  atualizar();
+})();
+</script>
+{% endblock %}

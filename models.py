@@ -4019,3 +4019,46 @@ FrotaVeiculo = Vehicle
 FrotaUtilizacao = VehicleUsage
 FrotaDespesa = VehicleExpense
 
+
+# ================================
+# MÓDULO V2: TRANSPORTE
+# ================================
+
+class CategoriaTransporte(db.Model):
+    """Categorias de despesas de transporte (por tenant)"""
+    __tablename__ = 'categoria_transporte'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50), nullable=False)
+    icone = db.Column(db.String(50), default='fas fa-bus')
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    lancamentos = db.relationship('LancamentoTransporte', backref='categoria', lazy='dynamic')
+
+
+class LancamentoTransporte(db.Model):
+    """Lançamentos de despesas de transporte: VT, combustível, aplicativo, passagem"""
+    __tablename__ = 'lancamento_transporte'
+
+    id = db.Column(db.Integer, primary_key=True)
+    categoria_id = db.Column(db.Integer, db.ForeignKey('categoria_transporte.id'), nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=True)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'), nullable=True)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+
+    data_lancamento = db.Column(db.Date, nullable=False)
+    valor = db.Column(db.Numeric(10, 2), nullable=False)
+    descricao = db.Column(db.String(200))
+    comprovante_url = db.Column(db.String(500))
+
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='lancamentos_transporte', foreign_keys=[funcionario_id])
+    veiculo = db.relationship('Vehicle', backref='lancamentos_transporte', foreign_keys=[veiculo_id])
+    centro_custo = db.relationship('CentroCusto', backref='lancamentos_transporte', foreign_keys=[centro_custo_id])
+    obra = db.relationship('Obra', backref='lancamentos_transporte', foreign_keys=[obra_id])
+

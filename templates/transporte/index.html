@@ -1,0 +1,174 @@
+{% extends "base_completo.html" %}
+{% block title %}Gestão de Transporte{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Cabeçalho -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0 fw-bold"><i class="fas fa-route me-2 text-primary"></i>Gestão de Transporte</h1>
+      <small class="text-muted">Vale transporte, combustível, aplicativos e passagens</small>
+    </div>
+    <a href="{{ url_for('transporte.novo') }}" class="btn btn-primary">
+      <i class="fas fa-plus me-1"></i> Novo Lançamento
+    </a>
+  </div>
+
+  <!-- KPI Total -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg,#0d6efd,#0a58ca);">
+        <div class="card-body text-white py-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small opacity-75">Total filtrado</div>
+              <div class="fs-4 fw-bold">R$ {{ '%.2f'|format(total_valor) }}</div>
+            </div>
+            <i class="fas fa-wallet fa-2x opacity-50"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="small text-muted">Lançamentos</div>
+              <div class="fs-4 fw-bold text-dark">{{ lancamentos|length }}</div>
+            </div>
+            <i class="fas fa-list-ul fa-2x text-muted"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <form method="GET" class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="form-label small">Data início</label>
+          <input type="date" name="data_inicio" class="form-control form-control-sm"
+                 value="{{ filtro_data_inicio or '' }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Data fim</label>
+          <input type="date" name="data_fim" class="form-control form-control-sm"
+                 value="{{ filtro_data_fim or '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">Funcionário</label>
+          <select name="funcionario_id" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for f in funcionarios %}
+              <option value="{{ f.id }}" {% if filtro_funcionario == f.id %}selected{% endif %}>{{ f.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">Centro de Custo</label>
+          <select name="centro_custo_id" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for cc in centros_custo %}
+              <option value="{{ cc.id }}" {% if filtro_centro_custo == cc.id %}selected{% endif %}>{{ cc.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Categoria</label>
+          <select name="categoria_id" class="form-select form-select-sm">
+            <option value="">Todas</option>
+            {% for cat in categorias %}
+              <option value="{{ cat.id }}" {% if filtro_categoria == cat.id %}selected{% endif %}>{{ cat.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter me-1"></i>Filtrar</button>
+          <a href="{{ url_for('transporte.index') }}" class="btn btn-outline-secondary btn-sm ms-1">Limpar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabela -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      {% if lancamentos %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Data</th>
+              <th>Categoria</th>
+              <th>Funcionário / Veículo</th>
+              <th>Centro de Custo</th>
+              <th>Obra</th>
+              <th>Descrição</th>
+              <th class="text-end">Valor (R$)</th>
+              <th>Comprovante</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for l in lancamentos %}
+            <tr>
+              <td class="text-nowrap">{{ l.data_lancamento.strftime('%d/%m/%Y') }}</td>
+              <td>
+                <span class="badge bg-primary-subtle text-primary">
+                  <i class="{{ l.categoria.icone }} me-1"></i>{{ l.categoria.nome }}
+                </span>
+              </td>
+              <td>
+                {% if l.funcionario %}
+                  <i class="fas fa-user me-1 text-muted"></i>{{ l.funcionario.nome }}
+                {% elif l.veiculo %}
+                  <i class="fas fa-car me-1 text-muted"></i>{{ l.veiculo.placa }}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>{{ l.centro_custo.nome if l.centro_custo else '—' }}</td>
+              <td>{{ l.obra.nome if l.obra else '—' }}</td>
+              <td>{{ l.descricao or '—' }}</td>
+              <td class="text-end fw-semibold text-dark">{{ '%.2f'|format(l.valor|float) }}</td>
+              <td>
+                {% if l.comprovante_url %}
+                  <a href="{{ l.comprovante_url }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0 px-2">
+                    <i class="fas fa-paperclip"></i>
+                  </a>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="POST" action="{{ url_for('transporte.excluir', lancamento_id=l.id) }}"
+                      onsubmit="return confirm('Excluir este lançamento?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="fas fa-route fa-3x mb-3 opacity-25"></i>
+        <p class="mb-1">Nenhum lançamento encontrado.</p>
+        <a href="{{ url_for('transporte.novo') }}" class="btn btn-primary btn-sm mt-2">
+          <i class="fas fa-plus me-1"></i> Registrar primeiro lançamento
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

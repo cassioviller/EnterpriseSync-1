@@ -511,6 +511,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint FROTA: {e}")
     
+    # Registrar blueprint TRANSPORTE V2
+    try:
+        from transporte_views import transporte_bp
+        app.register_blueprint(transporte_bp)
+        logging.info("[OK] Blueprint TRANSPORTE registrado")
+    except ImportError as e:
+        logging.warning(f"[WARN] Blueprint TRANSPORTE não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint TRANSPORTE: {e}")
+
     # Registrar blueprint landing page
     try:
         from landing_views import landing_bp
