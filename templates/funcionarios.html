@@ -901,7 +901,7 @@
                                 <label for="salario" class="form-label">Salário Mensal (R$)</label>
                                 <input type="number" class="form-control" id="salario" name="salario" step="0.01" min="0">
                             </div>
-                            <div id="campo_diaria_modal" class="mb-3" style="display:none;">
+                            <div id="campo_diaria_modal" class="mb-3 d-none">
                                 <label for="valor_diaria" class="form-label">Valor da Diária (R$)</label>
                                 <input type="number" class="form-control" id="valor_diaria" name="valor_diaria" step="0.01" min="0" value="0">
                             </div>
@@ -979,11 +979,11 @@ function toggleRemuneracaoModal(tipo) {
     const campoSalario = document.getElementById('campo_salario_modal');
     if (campoDiaria && campoSalario) {
         if (tipo === 'diaria') {
-            campoDiaria.style.display = 'block';
-            campoSalario.style.display = 'none';
+            campoDiaria.classList.remove('d-none');
+            campoSalario.classList.add('d-none');
         } else {
-            campoDiaria.style.display = 'none';
-            campoSalario.style.display = 'block';
+            campoDiaria.classList.add('d-none');
+            campoSalario.classList.remove('d-none');
         }
     }
 }

@@ -1,0 +1,59 @@
+# PROMPT 4: Gestão de Compra de Materiais (V2)
+
+**Objetivo:** Criar um fluxo de compras de materiais integrado, onde o lançamento da nota fiscal/recibo de compra gere automaticamente a apropriação de custo na obra (por centro de custo) e alimente o módulo de Contas a Pagar.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `almoxarifado_views.py` (ou criar `compras_views.py`)
+- `templates/almoxarifado/nova_compra.html` (ou equivalente)
+- `utils/financeiro_integration.py`
+
+Por favor, implemente as seguintes alterações passo a passo:
+
+## Passo 1: Atualização do Modelo de Compras (NotaFiscal / MovimentacaoEstoque)
+O sistema já possui os modelos `Fornecedor`, `NotaFiscal` e `MovimentacaoEstoque`. Precisamos garantir que a compra esteja estritamente vinculada ao Centro de Custo.
+No arquivo `models.py`, atualize a classe `NotaFiscal` (ou crie um modelo `PedidoCompra` se preferir separar a lógica):
+```python
+# Adicionar na classe NotaFiscal (ou PedidoCompra)
+centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=False)
+obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+condicao_pagamento = db.Column(db.String(50)) # 'A Vista', 'Boleto 30 dias', 'Cartão Crédito'
+parcelas = db.Column(db.Integer, default=1)
+
+# Relacionamentos
+centro_custo = db.relationship('CentroCusto', backref='notas_fiscais')
+```
+
+## Passo 2: Interface de Lançamento de Compras
+Crie uma nova tela (`templates/compras/nova_compra.html`):
+1. **Cabeçalho da Compra:** Fornecedor (select), Data da Compra, Centro de Custo (select obrigatório), Obra (opcional), Condição de Pagamento e Número de Parcelas.
+2. **Itens da Compra:** Tabela dinâmica (JavaScript) para adicionar múltiplos materiais.
+   - Colunas: Produto/Material (select do AlmoxarifadoItem), Quantidade, Preço Unitário, Subtotal.
+3. **Resumo:** Valor Total calculado automaticamente.
+4. **Anexo:** Upload do XML ou PDF da Nota Fiscal.
+
+## Passo 3: Processamento no Backend (compras_views.py)
+Na rota que salva a compra (`@compras_bp.route('/nova', methods=['POST'])`):
+1. Crie o registro principal (`NotaFiscal` ou `PedidoCompra`).
+2. Faça um loop nos itens e crie os registros em `MovimentacaoEstoque` (tipo='ENTRADA').
+3. Calcule o `valor_total` da compra.
+
+## Passo 4: Integração com Custos de Obra (Apropriação Automática)
+Sempre que uma compra for salva, o sistema deve apropriar o custo na obra.
+1. Crie um registro na tabela `CustoObra`:
+   - `tipo = 'material'`
+   - `valor = nota_fiscal.valor_total`
+   - `centro_custo_id = nota_fiscal.centro_custo_id`
+   - `obra_id = nota_fiscal.obra_id`
+   - `descricao = f"Compra NF {nota_fiscal.numero} - {fornecedor.nome}"`
+
+## Passo 5: Integração com Contas a Pagar (Automático)
+Este é o ponto crucial da V2. A compra deve gerar a obrigação financeira automaticamente.
+1. Após salvar a compra, verifique a `condicao_pagamento` e `parcelas`.
+2. Gere os registros na tabela `ContaPagar`:
+   - Se for à vista: 1 parcela com vencimento para hoje, status 'PAGO' (ou pendente dependendo da regra).
+   - Se for parcelado: Divida o `valor_total` pelo número de parcelas. Crie N registros em `ContaPagar`, incrementando a `data_vencimento` em 30 dias para cada parcela.
+   - Preencha: `fornecedor_id`, `obra_id`, `descricao = "Ref. NF X - Parcela Y/Z"`, `origem_tipo = 'COMPRA'`, `origem_id = nota_fiscal.id`.
+
+## Passo 6: Proteção V1/V2
+No menu lateral, adicione o link "Gestão de Compras" protegido por `{% if is_v2_active() %}`. Para clientes V1, o fluxo de estoque e financeiro continua separado e manual.
