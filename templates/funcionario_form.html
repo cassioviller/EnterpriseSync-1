@@ -95,8 +95,18 @@
                                         {% endif %}
                                     </div>
                                     
+                                    {% if is_v2_active() %}
                                     <div class="col-md-6">
-                                        <label for="salario" class="form-label">Salário</label>
+                                        <label for="tipo_remuneracao" class="form-label">Tipo de Remuneração</label>
+                                        <select class="form-select" id="tipo_remuneracao" name="tipo_remuneracao">
+                                            <option value="salario" {% if funcionario and funcionario.tipo_remuneracao == 'salario' %}selected{% endif %}>Salário Fixo Mensal</option>
+                                            <option value="diaria" {% if funcionario and funcionario.tipo_remuneracao == 'diaria' %}selected{% endif %}>Diária</option>
+                                        </select>
+                                    </div>
+                                    {% endif %}
+
+                                    <div class="col-md-6" id="campo_salario" {% if is_v2_active() and funcionario and funcionario.tipo_remuneracao == 'diaria' %}style="display:none"{% endif %}>
+                                        <label for="salario" class="form-label">Salário Mensal (R$)</label>
                                         {{ form.salario(class="form-control", step="0.01", min="0") }}
                                         {% if form.salario.errors %}
                                             <div class="text-danger small">
@@ -106,6 +116,15 @@
                                             </div>
                                         {% endif %}
                                     </div>
+
+                                    {% if is_v2_active() %}
+                                    <div class="col-md-6" id="campo_diaria" {% if not funcionario or funcionario.tipo_remuneracao != 'diaria' %}style="display:none"{% endif %}>
+                                        <label for="valor_diaria" class="form-label">Valor da Diária (R$)</label>
+                                        <input type="number" class="form-control" id="valor_diaria" name="valor_diaria"
+                                               step="0.01" min="0"
+                                               value="{{ funcionario.valor_diaria if funcionario and funcionario.valor_diaria else '' }}">
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             
@@ -227,6 +246,23 @@
 
 {% block scripts %}
 <script>
+// V2: Toggle salário / diária
+(function() {
+    var tipoSelect = document.getElementById('tipo_remuneracao');
+    if (!tipoSelect) return;
+
+    function toggleRemuneracao() {
+        var isDiaria = tipoSelect.value === 'diaria';
+        var campoSalario = document.getElementById('campo_salario');
+        var campoDiaria  = document.getElementById('campo_diaria');
+        if (campoSalario) campoSalario.style.display = isDiaria ? 'none' : '';
+        if (campoDiaria)  campoDiaria.style.display  = isDiaria ? '' : 'none';
+    }
+
+    tipoSelect.addEventListener('change', toggleRemuneracao);
+    toggleRemuneracao();
+})();
+
 // Preview da foto
 document.getElementById('foto').addEventListener('change', function(e) {
     const file = e.target.files[0];

@@ -1057,10 +1057,23 @@ def processar_folha_funcionario(funcionario: Funcionario, ano: int, mes: int, pa
             f"Líquido={salario_liquido}"
         )
         
+        # V2: Diaristas têm salario_base calculado pelos dias trabalhados
+        tipo_rem = getattr(funcionario, 'tipo_remuneracao', 'salario')
+        if tipo_rem == 'diaria':
+            valor_dia = float(getattr(funcionario, 'valor_diaria', 0) or 0)
+            dias_trabalhados_v = horas_info.get('dias_trabalhados', 0)
+            salario_base_exibicao = valor_dia * dias_trabalhados_v
+            logger.info(
+                f"[V2-DIARIA] Func {funcionario.id} ({funcionario.nome}): "
+                f"{dias_trabalhados_v} dias x R${valor_dia:.2f} = R${salario_base_exibicao:.2f}"
+            )
+        else:
+            salario_base_exibicao = float(funcionario.salario or 0)
+
         return {
             'funcionario_id': funcionario.id,
             'funcionario_nome': funcionario.nome,
-            'salario_base': float(funcionario.salario or 0),
+            'salario_base': salario_base_exibicao,
             'horas_trabalhadas': horas_info['total'],
             'horas_extras': horas_info['extras'],
             'horas_extras_50': horas_info.get('extras_50', 0),

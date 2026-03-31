@@ -95,6 +95,11 @@ def funcionarios():
             func_id = request.form.get('funcao_id')
             horario_id = request.form.get('horario_trabalho_id') or request.form.get('horario_id')
             
+            tipo_remuneracao = request.form.get('tipo_remuneracao', 'salario')
+            if tipo_remuneracao not in ('salario', 'diaria'):
+                tipo_remuneracao = 'salario'
+            valor_diaria = float(request.form.get('valor_diaria', 0)) if request.form.get('valor_diaria') else 0.0
+
             novo_funcionario = Funcionario(
                 nome=nome,
                 cpf=cpf,
@@ -104,6 +109,8 @@ def funcionarios():
                 endereco=request.form.get('endereco', ''),
                 data_admissao=datetime.strptime(request.form.get('data_admissao', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date(),
                 salario=float(request.form.get('salario', 0)) if request.form.get('salario') else None,
+                tipo_remuneracao=tipo_remuneracao,
+                valor_diaria=valor_diaria,
                 departamento_id=int(dept_id) if dept_id and dept_id != '0' and dept_id != '' else None,
                 funcao_id=int(func_id) if func_id and func_id != '0' and func_id != '' else None,
                 horario_trabalho_id=int(horario_id) if horario_id and horario_id != '0' and horario_id != '' else None,

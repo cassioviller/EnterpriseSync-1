@@ -3770,6 +3770,7 @@ def executar_migracoes():
             (68, "Sistema de Múltiplas Fotos Faciais", _migration_68_multiplas_fotos_faciais),
             (69, "custo_veiculo.obra_id nullable", _migration_69_custo_veiculo_obra_nullable),
             (70, "Versionamento V1/V2 por Tenant (Feature Flag)", _migration_70_versao_sistema_usuario),
+            (71, "Remuneração por Diária V2 (Funcionario)", _migration_71_remuneracao_diaria_funcionario),
         ]
         
         # Executar cada migração com rastreamento
@@ -6392,6 +6393,62 @@ def _migration_68_multiplas_fotos_faciais():
         
     except Exception as e:
         logger.error(f"❌ Erro na migração 68: {e}")
+        if 'connection' in locals():
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except:
+                pass
+        return False
+
+
+def _migration_71_remuneracao_diaria_funcionario():
+    """
+    MIGRAÇÃO 71: Adicionar campos tipo_remuneracao e valor_diaria na tabela funcionario.
+    Permite que tenants V2 configurem funcionários como diaristas.
+    """
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        logger.info("Migração 71: funcionario - tipo_remuneracao e valor_diaria (V2 Diária)")
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'funcionario' AND column_name = 'tipo_remuneracao'
+        """)
+        if cursor.fetchone() is None:
+            cursor.execute("""
+                ALTER TABLE funcionario
+                ADD COLUMN tipo_remuneracao VARCHAR(20) NOT NULL DEFAULT 'salario'
+            """)
+            logger.info("  tipo_remuneracao adicionada em funcionario")
+        else:
+            logger.info("  tipo_remuneracao ja existe - SKIP")
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'funcionario' AND column_name = 'valor_diaria'
+        """)
+        if cursor.fetchone() is None:
+            cursor.execute("""
+                ALTER TABLE funcionario
+                ADD COLUMN valor_diaria FLOAT DEFAULT 0.0
+            """)
+            logger.info("  valor_diaria adicionada em funcionario")
+        else:
+            logger.info("  valor_diaria ja existe - SKIP")
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+
+        logger.info("MIGRACAO 71 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 71: {e}")
         if 'connection' in locals():
             try:
                 connection.rollback()

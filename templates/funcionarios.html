@@ -585,6 +585,16 @@
                         <i class="fas fa-clock text-info me-2"></i>
                         <span>{{ kpi.funcionario.horario_trabalho.nome if kpi.funcionario.horario_trabalho else 'Não definido' }}</span>
                     </div>
+                    {% if is_v2_active() %}
+                    <div class="mb-2">
+                        <i class="fas fa-money-bill-wave text-warning me-2"></i>
+                        {% if kpi.funcionario.tipo_remuneracao == 'diaria' %}
+                            <span>R$ {{ '{:,.2f}'.format(kpi.funcionario.valor_diaria or 0) }} / dia</span>
+                        {% else %}
+                            <span>R$ {{ '{:,.2f}'.format(kpi.funcionario.salario or 0) }} / mês</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 
                 <!-- KPIs do Período -->
@@ -699,6 +709,16 @@
                         <i class="fas fa-clock text-muted me-2"></i>
                         <span class="text-muted">{{ kpi.funcionario.horario_trabalho.nome if kpi.funcionario.horario_trabalho else 'Não definido' }}</span>
                     </div>
+                    {% if is_v2_active() %}
+                    <div class="mb-2">
+                        <i class="fas fa-money-bill-wave text-muted me-2"></i>
+                        {% if kpi.funcionario.tipo_remuneracao == 'diaria' %}
+                            <span class="text-muted">R$ {{ '{:,.2f}'.format(kpi.funcionario.valor_diaria or 0) }} / dia</span>
+                        {% else %}
+                            <span class="text-muted">R$ {{ '{:,.2f}'.format(kpi.funcionario.salario or 0) }} / mês</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 
                 <!-- KPIs do Período (Dados Históricos) -->

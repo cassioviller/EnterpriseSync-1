@@ -195,6 +195,9 @@ class Funcionario(db.Model):
     horario_trabalho_id = db.Column(db.Integer, db.ForeignKey('horario_trabalho.id'))
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # V2: Tipo de remuneração — 'salario' (padrão V1) ou 'diaria' (V2)
+    tipo_remuneracao = db.Column(db.String(20), default='salario', nullable=False)
+    valor_diaria = db.Column(db.Float, default=0.0)
     
     # Relacionamentos
     horario_trabalho = db.relationship('HorarioTrabalho', backref=db.backref('funcionarios', overlaps="horario_trabalho"), overlaps="funcionarios")

@@ -1,0 +1,49 @@
+# PROMPT 1: Gestão de Funcionários por Diária (V2)
+
+**Objetivo:** Permitir que a empresa escolha se um funcionário recebe por "Salário Fixo Mensal" (V1) ou por "Diária" (V2). O cálculo da folha de pagamento e dos custos de obra deve se adaptar automaticamente com base nessa escolha.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `views/employees.py` (ou `equipe_views.py`)
+- `templates/funcionario/form.html` (ou equivalente de criação/edição)
+- `folha_pagamento_views.py`
+- `utils.py` (cálculos de horas/dias)
+
+Por favor, implemente as seguintes alterações passo a passo, garantindo que a lógica V2 só seja ativada se `is_v2_active()` for verdadeiro (conforme Prompt 0), ou adicionando os campos de forma retrocompatível.
+
+## Passo 1: Atualização do Modelo Funcionario
+No arquivo `models.py`, localize a classe `Funcionario` e adicione os seguintes campos:
+```python
+# Adicionar na classe Funcionario
+tipo_remuneracao = db.Column(db.String(20), default='salario') # 'salario' ou 'diaria'
+valor_diaria = db.Column(db.Float, default=0.0)
+```
+*Nota: O campo `salario` já existe e continuará sendo usado para quem tem `tipo_remuneracao == 'salario'`.*
+
+## Passo 2: Interface de Cadastro/Edição de Funcionário
+No template de formulário de funcionário (ex: `templates/funcionario/novo.html` e `editar.html`):
+1. Adicione um campo Select para "Tipo de Remuneração" (Salário Fixo / Diária).
+2. Adicione um campo Input para "Valor da Diária (R$)".
+3. Use JavaScript simples para mostrar/ocultar os campos:
+   - Se "Salário Fixo" for selecionado, mostre o campo "Salário Mensal" e oculte "Valor da Diária".
+   - Se "Diária" for selecionado, mostre "Valor da Diária" e oculte "Salário Mensal".
+4. No backend (`views/employees.py`), capture e salve esses novos campos ao criar ou atualizar o funcionário.
+
+## Passo 3: Lógica de Cálculo na Folha de Pagamento
+No arquivo `folha_pagamento_views.py` (ou onde o cálculo da folha é feito):
+1. Ao gerar a folha de um funcionário, verifique o `tipo_remuneracao`.
+2. **Se for 'salario':** Mantenha a lógica atual (V1).
+3. **Se for 'diaria':**
+   - Busque todos os dias trabalhados no mês (através do `RegistroPonto` ou `RDOMaoObra` do funcionário no mês de referência).
+   - Conte os dias únicos em que houve registro de presença.
+   - O valor base a pagar será: `total_dias_trabalhados * funcionario.valor_diaria`.
+   - Adicione este valor como o "Salário Base" na folha gerada.
+
+## Passo 4: Lógica de Custo de Obra (Apropriação)
+Quando um funcionário trabalha em uma obra (via RDO ou Ponto), o sistema apropria o custo da mão de obra.
+1. Localize a função que gera o `CustoObra` do tipo `mao_obra`.
+2. Se o funcionário for diarista (`tipo_remuneracao == 'diaria'`), o custo apropriado para aquele dia na obra deve ser exatamente o `valor_diaria`.
+3. Se ele trabalhou em duas obras no mesmo dia (meio período em cada), divida o valor da diária proporcionalmente às horas trabalhadas em cada obra, ou lance 50% para cada centro de custo.
+
+## Passo 5: Proteção V1/V2
+Na interface de listagem de funcionários, exiba a coluna "Remuneração" mostrando "R$ X / mês" ou "R$ Y / dia" dependendo do tipo. Envolva as novas opções de UI com `{% if is_v2_active() %}` caso queira restringir essa funcionalidade apenas para tenants V2.
