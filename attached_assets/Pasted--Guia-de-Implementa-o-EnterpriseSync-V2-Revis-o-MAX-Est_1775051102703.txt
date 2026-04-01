@@ -1,0 +1,52 @@
+# Guia de Implementação — EnterpriseSync V2 (Revisão MAX)
+
+Este pacote contém **9 prompts** revisados e aprimorados para guiar o Replit Agent na implementação da **Versão 2 (V2)** do EnterpriseSync. A revisão incorpora as novas regras de negócio definidas pelo cliente.
+
+## Principais Mudanças em Relação à Versão Anterior dos Prompts
+
+| Módulo | O que mudou |
+|--------|-------------|
+| **Funcionários** | Diárias fracionadas (0.5, 1, 2) por obra no mesmo dia. Lançamento de VA e VT avulso por funcionário e obra. |
+| **Gestão de Custos** | Novo módulo central com hierarquia Pai/Filho. Fluxo de aprovação: Pendente → Solicitado (amarelo) → Autorizado → Pago (Fluxo de Caixa). |
+| **Restaurantes** | Integração automática com Gestão de Custos ao salvar o lançamento. |
+| **Transporte** | Integração automática com Gestão de Custos ao salvar o lançamento. |
+| **Compras** | Integração automática com Gestão de Custos ao salvar o lançamento. |
+| **Reembolso** | Novo módulo universal. Botão "Reembolso?" em todos os formulários de despesa. Gera lançamento próprio na Gestão de Custos. |
+| **Cronograma** | Sem alterações estruturais. |
+| **RDO** | Sem alterações estruturais. |
+
+## Ordem de Execução Recomendada no Replit Agent
+
+Para evitar erros de dependência no banco de dados, entregue os prompts ao Replit Agent **exatamente nesta ordem**:
+
+### Fase 1: Fundação e Isolamento
+**Prompt 0 — Versionamento V1/V2** cria a base (`is_v2_active()`) que todos os outros módulos usarão para esconder as novas telas dos clientes antigos.
+
+### Fase 2: Módulo Central (Gestão de Custos)
+**Prompt 2 — Gestão de Custos** deve ser implementado antes dos módulos operacionais, pois ele cria os modelos `GestaoCustoPai` e `GestaoCustoFilho` e a função `registrar_custo_automatico` que todos os outros módulos irão chamar.
+
+### Fase 3: Módulos Operacionais (Geradores de Custo)
+Execute na ordem: **Prompt 1** (Funcionários/Diárias/VA/VT), **Prompt 3** (Restaurantes), **Prompt 4** (Transporte), **Prompt 5** (Compras), **Prompt 6** (Reembolso).
+
+### Fase 4: Planejamento e Execução (Obras)
+Execute na ordem: **Prompt 7** (Cronograma MS Project) e depois **Prompt 8** (RDO Integrado).
+
+## Como a Gestão de Custos Funciona (Visão Geral)
+
+A tela de Gestão de Custos exibe os lançamentos agrupados por categoria e entidade:
+
+| Categoria | Entidade | Valor Total | Status | Ações |
+|-----------|----------|-------------|--------|-------|
+| Pagamento Salário | Cássio | R$ 700,00 | PENDENTE | Detalhes / Solicitar Pagamento |
+| Pagamento Salário | Funcionário X | R$ 2.000,00 | SOLICITADO | Detalhes / Efetuar Pagamento |
+| Despesa Alimentação | Restaurante Y | R$ 450,00 | PENDENTE | Detalhes / Solicitar Pagamento |
+| Despesa Transporte | Veículo ABC-1234 | R$ 320,00 | PENDENTE | Detalhes / Solicitar Pagamento |
+| Compra Material | Fornecedor Z | R$ 5.200,00 | AUTORIZADO | Detalhes / — |
+| Reembolso a Pagar | Cássio | R$ 80,00 | PENDENTE | Detalhes / Solicitar Pagamento |
+
+Ao clicar em **Detalhes**, expande os itens filhos (ex: 7 diárias de R$ 100,00 com datas e obras).
+
+O fluxo de aprovação funciona assim: ao clicar em **Solicitar Pagamento**, abre um modal perguntando o valor a solicitar. A linha fica **amarela** (status SOLICITADO). O botão muda para **Efetuar Pagamento**. Ao clicar, abre um modal com a data de pagamento e os botões "Autorizar" (verde) e "Não Autorizado" (vermelho). Se autorizado, o lançamento vai automaticamente para o Fluxo de Caixa como saída.
+
+## Notas Técnicas sobre a Análise (MAX)
+O repositório foi analisado em profundidade. Os modelos `CustoObra`, `FluxoCaixa`, `ContaPagar`, `BeneficioFuncionario`, `RegistroPonto`, `LancamentoTransporte`, `PedidoCompra` e `TarefaCronograma` já existem no banco. Os prompts foram escritos para aproveitar e estender esses modelos sem quebrar a estrutura existente.

@@ -1,0 +1,76 @@
+# PROMPT 0: Versionamento do Sistema (V1 vs V2) por Tenant
+
+**Objetivo:** Implementar um sistema de versionamento (Feature Flag) no nível do Administrador (Tenant). O SuperAdmin poderá escolher se um novo Admin usará a versão clássica (V1) ou a nova versão integrada (V2). Isso garante que os clientes atuais não sejam afetados pelas novas mudanças.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `views/admin.py`
+- `templates/super_admin_dashboard.html`
+- `utils/tenant.py` (ou `helpers.py`)
+- `templates/base.html`
+
+Por favor, implemente as seguintes alterações passo a passo:
+
+## Passo 1: Atualização do Modelo Usuario
+No arquivo `models.py`, localize a classe `Usuario` e adicione um novo campo para controlar a versão do sistema do tenant:
+```python
+# Adicionar na classe Usuario
+versao_sistema = db.Column(db.String(10), default='v1', nullable=False) # 'v1' ou 'v2'
+```
+
+## Passo 2: Atualização do SuperAdmin Dashboard (Backend)
+No arquivo `views/admin.py`, localize a rota `@main_bp.route('/super-admin/criar-admin', methods=['POST'])` (função `criar_admin`):
+1. Capture o novo campo do formulário: `versao_sistema = request.form.get('versao_sistema', 'v1')`
+2. Adicione este campo na criação do objeto `novo_admin`:
+```python
+novo_admin = Usuario(
+    nome=nome,
+    username=username,
+    email=email,
+    password_hash=generate_password_hash(senha),
+    tipo_usuario=TipoUsuario.ADMIN,
+    ativo=True,
+    versao_sistema=versao_sistema  # NOVO CAMPO
+)
+```
+
+## Passo 3: Atualização do SuperAdmin Dashboard (Frontend)
+No arquivo `templates/super_admin_dashboard.html`:
+1. Na tabela de listagem de administradores (`<table id="adminTable">`), adicione uma nova coluna "Versão" e exiba `{{ admin.versao_sistema | upper }}`.
+2. No modal de criação (`<div id="novoAdminModal">`), adicione um novo campo select antes do botão de submit:
+```html
+<div class="mb-3">
+    <label class="form-label">Versão do Sistema</label>
+    <select class="form-select" name="versao_sistema" required>
+        <option value="v1">V1 - Clássico (Atual)</option>
+        <option value="v2">V2 - Gestão Integrada (Novo)</option>
+    </select>
+</div>
+```
+
+## Passo 4: Helper de Verificação de Versão
+Crie uma função utilitária (pode ser em `utils/tenant.py` ou `helpers.py`) para verificar facilmente a versão do admin atual:
+```python
+def is_v2_active():
+    """Verifica se o tenant atual está usando a V2 do sistema"""
+    from flask_login import current_user
+    from models import Usuario, TipoUsuario
+    
+    if not current_user.is_authenticated:
+        return False
+        
+    # Se for o próprio admin
+    if current_user.tipo_usuario == TipoUsuario.ADMIN:
+        return current_user.versao_sistema == 'v2'
+        
+    # Se for funcionário, busca o admin dele
+    if current_user.admin_id:
+        admin = Usuario.query.get(current_user.admin_id)
+        return admin and admin.versao_sistema == 'v2'
+        
+    return False
+```
+*Nota: Exporte esta função para o contexto do Jinja (templates) no `main.py` ou `__init__.py` usando `@app.context_processor` para poder usar `{% if is_v2_active() %}` nos templates HTML.*
+
+## Passo 5: Preparação do Menu Base
+No arquivo `templates/base.html`, você agora poderá usar a condicional `{% if is_v2_active() %}` para mostrar os novos menus da V2 (como Gestão de Diárias, Restaurantes, Transporte, etc.) e ocultar os antigos, garantindo isolamento total entre as versões. (Não precisa alterar os menus agora, apenas garanta que a função está disponível no template).
