@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -88,12 +88,16 @@ def index():
     if filtro_categoria:
         query = query.filter_by(categoria_id=filtro_categoria)
 
+    filtro_obra = request.args.get('obra_id', type=int)
+    if filtro_obra:
+        query = query.filter_by(obra_id=filtro_obra)
+
     lancamentos = query.limit(200).all()
     total_valor = sum(float(l.valor) for l in lancamentos)
 
     categorias = CategoriaTransporte.query.filter_by(admin_id=admin_id).order_by('nome').all()
     funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
-    centros_custo = CentroCusto.query.filter_by(admin_id=admin_id).order_by('nome').all()
+    obras = Obra.query.filter_by(admin_id=admin_id).order_by('nome').all()
 
     return render_template(
         'transporte/index.html',
@@ -101,11 +105,11 @@ def index():
         total_valor=total_valor,
         categorias=categorias,
         funcionarios=funcionarios,
-        centros_custo=centros_custo,
+        obras=obras,
         filtro_data_inicio=filtro_data_inicio,
         filtro_data_fim=filtro_data_fim,
         filtro_funcionario=filtro_funcionario,
-        filtro_centro_custo=filtro_centro_custo,
+        filtro_obra=filtro_obra,
         filtro_categoria=filtro_categoria,
     )
 
@@ -152,7 +156,8 @@ def novo_post():
 
     try:
         categoria_id = int(request.form.get('categoria_id'))
-        centro_custo_id = int(request.form.get('centro_custo_id'))
+        _cc_raw = request.form.get('centro_custo_id') or None
+        centro_custo_id = int(_cc_raw) if _cc_raw else None
         data_lancamento = datetime.strptime(request.form.get('data_lancamento'), '%Y-%m-%d').date()
         valor = float(request.form.get('valor', '0').replace(',', '.'))
         descricao = request.form.get('descricao', '').strip()
@@ -277,6 +282,131 @@ def novo_post():
         logger.error(f"[ERROR] Erro ao salvar lancamento_transporte: {e}")
         flash(f'Erro ao salvar lançamento: {str(e)}', 'danger')
         return redirect(url_for('transporte.novo'))
+
+
+# ─────────────────────────────────────────────
+# LANÇAMENTO EM LOTE (multi-funcionário × multi-dia)
+# ─────────────────────────────────────────────
+@transporte_bp.route('/novo-massa', methods=['GET'])
+@login_required
+def novo_massa():
+    guard = _check_v2()
+    if guard:
+        return guard
+    admin_id = _get_admin_id()
+    _seed_categorias(admin_id)
+
+    categorias = CategoriaTransporte.query.filter_by(admin_id=admin_id).order_by('nome').all()
+    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
+    obras = Obra.query.filter_by(admin_id=admin_id).order_by('nome').all()
+
+    return render_template(
+        'transporte/novo_massa.html',
+        categorias=categorias,
+        funcionarios=funcionarios,
+        obras=obras,
+        hoje=date.today().isoformat(),
+    )
+
+
+@transporte_bp.route('/novo-massa', methods=['POST'])
+@login_required
+def novo_massa_post():
+    guard = _check_v2()
+    if guard:
+        return guard
+    admin_id = _get_admin_id()
+
+    try:
+        categoria_id = int(request.form.get('categoria_id'))
+        data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
+        data_fim = datetime.strptime(request.form.get('data_fim'), '%Y-%m-%d').date()
+        valor = float(request.form.get('valor', '0').replace(',', '.'))
+        descricao = request.form.get('descricao', '').strip()
+        obra_id = request.form.get('obra_id') or None
+        if obra_id:
+            obra_id = int(obra_id)
+        dias_semana = [int(d) for d in request.form.getlist('dias_semana')]
+        funcionario_ids = [int(f) for f in request.form.getlist('funcionario_ids')]
+
+        if not funcionario_ids:
+            flash('Selecione pelo menos um funcionário.', 'warning')
+            return redirect(url_for('transporte.novo_massa'))
+        if not dias_semana:
+            flash('Selecione pelo menos um dia da semana.', 'warning')
+            return redirect(url_for('transporte.novo_massa'))
+        if data_fim < data_inicio:
+            flash('Data fim deve ser maior ou igual à data início.', 'warning')
+            return redirect(url_for('transporte.novo_massa'))
+        if valor <= 0:
+            flash('Valor deve ser maior que zero.', 'warning')
+            return redirect(url_for('transporte.novo_massa'))
+
+        # Gerar lista de datas no intervalo nos dias da semana selecionados
+        datas = []
+        current_date = data_inicio
+        while current_date <= data_fim:
+            if current_date.weekday() in dias_semana:
+                datas.append(current_date)
+            current_date += timedelta(days=1)
+
+        if not datas:
+            flash('Nenhuma data encontrada para os dias selecionados no período.', 'warning')
+            return redirect(url_for('transporte.novo_massa'))
+
+        categoria = CategoriaTransporte.query.get(categoria_id)
+        total_criados = 0
+
+        for func_id in funcionario_ids:
+            for d in datas:
+                lancamento = LancamentoTransporte(
+                    categoria_id=categoria_id,
+                    funcionario_id=func_id,
+                    obra_id=obra_id,
+                    data_lancamento=d,
+                    valor=valor,
+                    descricao=descricao or (categoria.nome if categoria else 'Transporte'),
+                    admin_id=admin_id,
+                )
+                db.session.add(lancamento)
+                total_criados += 1
+
+        db.session.commit()
+
+        # Integração com Gestão de Custos (por funcionário)
+        try:
+            from utils.financeiro_integration import registrar_custo_automatico
+            for func_id in funcionario_ids:
+                func = Funcionario.query.get(func_id)
+                nome_func = func.nome if func else f'Funcionário {func_id}'
+                total_func = valor * len(datas)
+                registrar_custo_automatico(
+                    admin_id=admin_id,
+                    tipo_categoria='TRANSPORTE',
+                    entidade_nome=nome_func,
+                    entidade_id=func_id,
+                    data=date.today(),
+                    descricao=f"{categoria.nome if categoria else 'Transporte'} — {len(datas)} dias",
+                    valor=total_func,
+                    obra_id=obra_id,
+                    origem_tabela='lancamento_transporte',
+                )
+            db.session.commit()
+        except Exception as _e:
+            logger.warning(f"[WARN] Gestao custo lote nao registrado: {_e}")
+
+        flash(
+            f'{total_criados} lançamento(s) criado(s) com sucesso: '
+            f'{len(funcionario_ids)} funcionário(s) × {len(datas)} dia(s).',
+            'success'
+        )
+        return redirect(url_for('transporte.index'))
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] Erro no lançamento em lote: {e}")
+        flash(f'Erro ao salvar lançamentos: {str(e)}', 'danger')
+        return redirect(url_for('transporte.novo_massa'))
 
 
 # ─────────────────────────────────────────────

@@ -3777,6 +3777,7 @@ def executar_migracoes():
             (75, "Cronograma V2 - CalendarioEmpresa e TarefaCronograma", _migration_75_cronograma_v2),
             (76, "RDO Apontamento Cronograma V2 - tabela rdo_apontamento_cronograma", _migration_76_rdo_apontamento_cronograma),
             (77, "Gestão de Custos V2 - tabelas gestao_custo_pai e gestao_custo_filho", _migration_77_gestao_custos_v2),
+            (78, "Transporte V2 - centro_custo_id nullable + funcionario_id nullable", _migration_78_transporte_centro_custo_nullable),
         ]
         
         # Executar cada migração com rastreamento
@@ -7017,6 +7018,49 @@ def _migration_77_gestao_custos_v2():
             try:
                 connection.rollback()
                 cursor.close()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_78_transporte_centro_custo_nullable():
+    """
+    MIGRAÇÃO 78: Torna centro_custo_id e funcionario_id opcionais em lancamento_transporte.
+    Centro de custo era obrigatório mas duplicava o papel da obra.
+    """
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        # Tornar centro_custo_id nullable
+        cursor.execute("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_name = 'lancamento_transporte' AND column_name = 'centro_custo_id'
+        """)
+        row = cursor.fetchone()
+        if row and row[0] == 'NO':
+            logger.info("Migração 78: tornando centro_custo_id nullable")
+            cursor.execute("""
+                ALTER TABLE lancamento_transporte
+                ALTER COLUMN centro_custo_id DROP NOT NULL
+            """)
+        else:
+            logger.info("Migração 78: centro_custo_id já é nullable")
+
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 78 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 78: {e}")
+        if connection:
+            try:
+                connection.rollback()
                 connection.close()
             except Exception:
                 pass

@@ -10,9 +10,14 @@
       <h1 class="h3 mb-0 fw-bold"><i class="fas fa-route me-2 text-primary"></i>Gestão de Transporte</h1>
       <small class="text-muted">Vale transporte, combustível, aplicativos e passagens</small>
     </div>
-    <a href="{{ url_for('transporte.novo') }}" class="btn btn-primary">
-      <i class="fas fa-plus me-1"></i> Novo Lançamento
-    </a>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('transporte.novo') }}" class="btn btn-outline-primary">
+        <i class="fas fa-plus me-1"></i> Individual
+      </a>
+      <a href="{{ url_for('transporte.novo_massa') }}" class="btn btn-success">
+        <i class="fas fa-users me-1"></i> Lançamento em Lote
+      </a>
+    </div>
   </div>
 
   <!-- KPI Total -->
@@ -69,11 +74,11 @@
           </select>
         </div>
         <div class="col-md-3">
-          <label class="form-label small">Centro de Custo</label>
-          <select name="centro_custo_id" class="form-select form-select-sm">
-            <option value="">Todos</option>
-            {% for cc in centros_custo %}
-              <option value="{{ cc.id }}" {% if filtro_centro_custo == cc.id %}selected{% endif %}>{{ cc.nome }}</option>
+          <label class="form-label small">Obra</label>
+          <select name="obra_id" class="form-select form-select-sm">
+            <option value="">Todas</option>
+            {% for o in obras %}
+              <option value="{{ o.id }}" {% if filtro_obra == o.id %}selected{% endif %}>{{ o.nome }}</option>
             {% endfor %}
           </select>
         </div>
@@ -105,7 +110,6 @@
               <th>Data</th>
               <th>Categoria</th>
               <th>Funcionário / Veículo</th>
-              <th>Centro de Custo</th>
               <th>Obra</th>
               <th>Descrição</th>
               <th class="text-end">Valor (R$)</th>
@@ -131,7 +135,6 @@
                   <span class="text-muted">—</span>
                 {% endif %}
               </td>
-              <td>{{ l.centro_custo.nome if l.centro_custo else '—' }}</td>
               <td>{{ l.obra.nome if l.obra else '—' }}</td>
               <td>{{ l.descricao or '—' }}</td>
               <td class="text-end fw-semibold text-dark">{{ '%.2f'|format(l.valor|float) }}</td>

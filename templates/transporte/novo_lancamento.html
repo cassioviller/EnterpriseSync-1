@@ -8,8 +8,10 @@
       <i class="fas fa-arrow-left"></i>
     </a>
     <div>
-      <h1 class="h3 mb-0 fw-bold"><i class="fas fa-route me-2 text-primary"></i>Novo Lançamento de Transporte</h1>
-      <small class="text-muted">Registre despesas de transporte e vincule à obra para apropriação automática</small>
+      <h1 class="h3 mb-0 fw-bold"><i class="fas fa-route me-2 text-primary"></i>Novo Lançamento Individual</h1>
+      <small class="text-muted">Para múltiplos funcionários de uma vez, use
+        <a href="{{ url_for('transporte.novo_massa') }}" class="text-primary">Lançamento em Lote</a>.
+      </small>
     </div>
   </div>
 
@@ -26,13 +28,13 @@
                 <option value="">Selecione a categoria...</option>
                 {% for cat in categorias %}
                   <option value="{{ cat.id }}" data-nome="{{ cat.nome }}">
-                    {{ cat.nome }}
+                    <i class="{{ cat.icone }}"></i> {{ cat.nome }}
                   </option>
                 {% endfor %}
               </select>
             </div>
 
-            <!-- Campo Funcionário (aparece se VT / Aplicativo) -->
+            <!-- Campo Funcionário -->
             <div class="mb-3 d-none" id="campoFuncionario">
               <label class="form-label fw-semibold">Funcionário</label>
               <select name="funcionario_id" id="selectFuncionario" class="form-select">
@@ -44,7 +46,7 @@
               <div class="form-text">Selecione o funcionário beneficiado pela despesa.</div>
             </div>
 
-            <!-- Campo Veículo (aparece se Combustível) -->
+            <!-- Campo Veículo -->
             <div class="mb-3 d-none" id="campoVeiculo">
               <label class="form-label fw-semibold">Veículo</label>
               <select name="veiculo_id" id="selectVeiculo" class="form-select">
@@ -68,21 +70,10 @@
               </div>
             </div>
 
-            <!-- Centro de Custo -->
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Centro de Custo <span class="text-danger">*</span></label>
-              <select name="centro_custo_id" class="form-select" required>
-                <option value="">Selecione o centro de custo...</option>
-                {% for cc in centros_custo %}
-                  <option value="{{ cc.id }}">{{ cc.nome }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
             <!-- Obra (opcional) -->
             <div class="mb-3">
               <label class="form-label fw-semibold">
-                Obra <span class="text-muted fw-normal">(opcional — necessário para apropriar custo)</span>
+                Obra <span class="text-muted fw-normal">(opcional — vincula o custo à obra)</span>
               </label>
               <select name="obra_id" class="form-select">
                 <option value="">Nenhuma obra específica</option>
@@ -90,7 +81,6 @@
                   <option value="{{ o.id }}">{{ o.nome }}</option>
                 {% endfor %}
               </select>
-              <div class="form-text">Se selecionada, o custo será lançado automaticamente no dashboard da obra.</div>
             </div>
 
             <!-- Descrição -->
@@ -132,14 +122,11 @@
   const selectFunc = document.getElementById('selectFuncionario');
   const selectVeic = document.getElementById('selectVeiculo');
 
-  // Categorias que pedem veículo
   const CATEGORIAS_VEICULO = ['combustível', 'combustivel'];
-  // Categorias que pedem funcionário
   const CATEGORIAS_FUNCIONARIO = ['vale transporte', 'aplicativo', 'uber', 'passagem'];
 
   function atualizar() {
     const nome = (select.options[select.selectedIndex]?.dataset.nome || '').toLowerCase();
-
     const pedeVeiculo = CATEGORIAS_VEICULO.some(k => nome.includes(k));
     const pedeFuncionario = CATEGORIAS_FUNCIONARIO.some(k => nome.includes(k));
 

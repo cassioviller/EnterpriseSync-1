@@ -1,0 +1,243 @@
+{% extends "base_completo.html" %}
+{% block title %}Lançamento em Lote — Transporte{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center mb-4">
+    <a href="{{ url_for('transporte.index') }}" class="btn btn-outline-secondary me-3">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <div>
+      <h1 class="h3 mb-0 fw-bold">
+        <i class="fas fa-users me-2 text-success"></i>Lançamento em Lote
+        <span class="badge bg-success ms-1" style="font-size:.65rem">V2</span>
+      </h1>
+      <small class="text-muted">Lance Vale Transporte e outras despesas para múltiplos funcionários em múltiplos dias de uma vez.</small>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Formulário principal -->
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <form method="POST" action="{{ url_for('transporte.novo_massa_post') }}" id="formMassa">
+
+            <!-- Categoria -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Categoria <span class="text-danger">*</span></label>
+              <select name="categoria_id" class="form-select" required>
+                {% for cat in categorias %}
+                  <option value="{{ cat.id }}" {% if 'vale' in cat.nome|lower or 'transporte' in cat.nome|lower %}selected{% endif %}>
+                    {{ cat.nome }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Obra (opcional) -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">
+                Obra <span class="text-muted fw-normal">(opcional)</span>
+              </label>
+              <select name="obra_id" class="form-select">
+                <option value="">Nenhuma obra específica</option>
+                {% for o in obras %}
+                  <option value="{{ o.id }}">{{ o.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Período -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Data início <span class="text-danger">*</span></label>
+                <input type="date" name="data_inicio" class="form-control" id="dataInicio" value="{{ hoje }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Data fim <span class="text-danger">*</span></label>
+                <input type="date" name="data_fim" class="form-control" id="dataFim" value="{{ hoje }}" required>
+              </div>
+            </div>
+
+            <!-- Dias da semana -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Dias da semana <span class="text-danger">*</span></label>
+              <div class="d-flex flex-wrap gap-2" id="diasSemana">
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input dia-check" type="checkbox" name="dias_semana" value="0" id="d0" checked>
+                  <label class="form-check-label" for="d0">Seg</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input dia-check" type="checkbox" name="dias_semana" value="1" id="d1" checked>
+                  <label class="form-check-label" for="d1">Ter</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input dia-check" type="checkbox" name="dias_semana" value="2" id="d2" checked>
+                  <label class="form-check-label" for="d2">Qua</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input dia-check" type="checkbox" name="dias_semana" value="3" id="d3" checked>
+                  <label class="form-check-label" for="d3">Qui</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input dia-check" type="checkbox" name="dias_semana" value="4" id="d4" checked>
+                  <label class="form-check-label" for="d4">Sex</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input dia-check" type="checkbox" name="dias_semana" value="5" id="d5">
+                  <label class="form-check-label" for="d5">Sáb</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input dia-check" type="checkbox" name="dias_semana" value="6" id="d6">
+                  <label class="form-check-label" for="d6">Dom</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Valor por pessoa por dia -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Valor por pessoa por dia (R$) <span class="text-danger">*</span></label>
+              <input type="number" name="valor" class="form-control" id="valorUnit"
+                     min="0.01" step="0.01" placeholder="0,00" required>
+            </div>
+
+            <!-- Descrição opcional -->
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Descrição <span class="text-muted fw-normal">(opcional)</span></label>
+              <input type="text" name="descricao" class="form-control"
+                     placeholder="Ex: Vale transporte março/2026..." maxlength="200">
+            </div>
+
+            <!-- Preview de lançamentos -->
+            <div class="alert alert-info d-none" id="previewAlert">
+              <i class="fas fa-info-circle me-1"></i>
+              Serão criados <strong id="previewCount">0</strong> lançamento(s):
+              <span id="previewFuncs">0</span> funcionário(s) ×
+              <span id="previewDias">0</span> dia(s) =
+              <strong>R$ <span id="previewTotal">0,00</span></strong> no total.
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-success px-4" id="btnSubmit" disabled>
+                <i class="fas fa-save me-1"></i> Criar Lançamentos
+              </button>
+              <a href="{{ url_for('transporte.index') }}" class="btn btn-outline-secondary px-4">
+                Cancelar
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seleção de funcionários -->
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+          <strong><i class="fas fa-users me-1 text-success"></i> Funcionários</strong>
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-secondary" onclick="selecionarTodos(true)">Todos</button>
+            <button type="button" class="btn btn-outline-secondary" onclick="selecionarTodos(false)">Nenhum</button>
+          </div>
+        </div>
+        <div class="card-body p-0" style="max-height: 450px; overflow-y: auto;">
+          {% if funcionarios %}
+          <ul class="list-group list-group-flush">
+            {% for f in funcionarios %}
+            <li class="list-group-item">
+              <div class="form-check">
+                <input class="form-check-input func-check" type="checkbox"
+                       name="funcionario_ids" value="{{ f.id }}"
+                       id="func{{ f.id }}" form="formMassa" checked>
+                <label class="form-check-label w-100" for="func{{ f.id }}">
+                  <i class="fas fa-user-circle me-1 text-muted"></i>
+                  {{ f.nome }}
+                </label>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="fas fa-user-slash fa-3x mb-3 opacity-25"></i>
+            <p class="mb-1">Nenhum funcionário ativo encontrado.</p>
+            <small>Cadastre funcionários no módulo de Funcionários.</small>
+          </div>
+          {% endif %}
+        </div>
+        {% if funcionarios %}
+        <div class="card-footer bg-white text-muted small">
+          <span id="countSelecionados">{{ funcionarios|length }}</span> de {{ funcionarios|length }} selecionados
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const dataInicio = document.getElementById('dataInicio');
+  const dataFim = document.getElementById('dataFim');
+  const valorUnit = document.getElementById('valorUnit');
+  const diasChecks = document.querySelectorAll('.dia-check');
+  const funcChecks = document.querySelectorAll('.func-check');
+  const previewAlert = document.getElementById('previewAlert');
+  const previewCount = document.getElementById('previewCount');
+  const previewFuncs = document.getElementById('previewFuncs');
+  const previewDias = document.getElementById('previewDias');
+  const previewTotal = document.getElementById('previewTotal');
+  const btnSubmit = document.getElementById('btnSubmit');
+  const countSelecionados = document.getElementById('countSelecionados');
+
+  function contarDiasUteis(inicio, fim, diasSemana) {
+    if (!inicio || !fim || diasSemana.length === 0) return 0;
+    let count = 0;
+    let d = new Date(inicio + 'T00:00:00');
+    const fimDate = new Date(fim + 'T00:00:00');
+    while (d <= fimDate) {
+      if (diasSemana.includes(d.getDay() === 0 ? 6 : d.getDay() - 1)) count++;
+      d.setDate(d.getDate() + 1);
+    }
+    return count;
+  }
+
+  function atualizar() {
+    const inicio = dataInicio.value;
+    const fim = dataFim.value;
+    const valor = parseFloat(valorUnit.value) || 0;
+    const diasSelecionados = Array.from(diasChecks).filter(c => c.checked).map(c => parseInt(c.value));
+    const funcsSelecionados = Array.from(funcChecks).filter(c => c.checked).length;
+
+    if (countSelecionados) countSelecionados.textContent = funcsSelecionados;
+
+    const dias = contarDiasUteis(inicio, fim, diasSelecionados);
+    const total = funcsSelecionados * dias;
+    const totalValor = total * valor;
+
+    previewCount.textContent = total;
+    previewFuncs.textContent = funcsSelecionados;
+    previewDias.textContent = dias;
+    previewTotal.textContent = totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const valido = total > 0 && valor > 0;
+    previewAlert.classList.toggle('d-none', !valido);
+    btnSubmit.disabled = !valido;
+  }
+
+  [dataInicio, dataFim, valorUnit].forEach(el => el && el.addEventListener('input', atualizar));
+  diasChecks.forEach(c => c.addEventListener('change', atualizar));
+  funcChecks.forEach(c => c.addEventListener('change', atualizar));
+
+  atualizar();
+
+  window.selecionarTodos = function (selecionar) {
+    funcChecks.forEach(c => { c.checked = selecionar; });
+    atualizar();
+  };
+})();
+</script>
+{% endblock %}
