@@ -624,10 +624,10 @@
                 </div>
             </div>
 
-            <!-- Datas e Cronograma -->
+            <!-- Datas da Obra -->
             <div class="obra-card">
                 <div class="obra-card-header">
-                    <h3><i class="fas fa-calendar-alt"></i> Cronograma</h3>
+                    <h3><i class="fas fa-calendar-alt"></i> Datas da Obra</h3>
                 </div>
                 <div class="obra-card-body" style="padding: 2rem;">
                     <div class="info-item">
@@ -665,6 +665,16 @@
                             Duração Prevista
                         </div>
                         <div class="info-value">{{ (obra.data_previsao_fim - obra.data_inicio).days }} dias</div>
+                    </div>
+                    {% endif %}
+
+                    {% if is_v2_active is defined and is_v2_active() %}
+                    <div class="mt-3 pt-3" style="border-top:1px solid rgba(0,0,0,.08)">
+                        <a href="{{ url_for('cronograma.cronograma_obra', obra_id=obra.id) }}"
+                           class="btn btn-sm btn-primary w-100">
+                            <i class="fas fa-project-diagram me-2"></i>
+                            Abrir Cronograma Detalhado (Gantt)
+                        </a>
                     </div>
                     {% endif %}
                 </div>
