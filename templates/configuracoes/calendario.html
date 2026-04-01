@@ -1,0 +1,157 @@
+{% extends "base_completo.html" %}
+{% block title %}Calendário de Trabalho{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+          <i class="fas fa-calendar-alt me-2 text-primary"></i>
+          Calendário de Trabalho
+        </h1>
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('configuracoes.configuracoes') }}">Configurações</a></li>
+            <li class="breadcrumb-item active">Calendário</li>
+          </ol>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-6 mx-auto">
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-cog me-2"></i>
+            Configuração dos Dias Úteis
+          </h5>
+          <small class="opacity-75">Define quais dias contam como dias de trabalho no cronograma de obras</small>
+        </div>
+        <div class="card-body p-4">
+          <form method="POST" id="formCalendario">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+
+            <p class="text-muted mb-4">
+              <i class="fas fa-info-circle me-1"></i>
+              Por padrão, o sistema considera apenas de segunda a sexta como dias úteis.
+              Ative abaixo para incluir fins de semana nos cálculos do cronograma.
+            </p>
+
+            <div class="row g-4 mb-4">
+              <div class="col-md-6">
+                <div class="card border-0 bg-light p-3 h-100">
+                  <div class="form-check form-switch d-flex align-items-center gap-3 mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="considerar_sabado" name="considerar_sabado"
+                           value="1" style="width:3em;height:1.5em"
+                           {{ 'checked' if calendario.considerar_sabado else '' }}>
+                    <div>
+                      <label class="form-check-label fw-semibold fs-6" for="considerar_sabado">
+                        <i class="fas fa-sun me-1 text-warning"></i> Sábado é dia útil
+                      </label>
+                      <div class="small text-muted mt-1">
+                        Inclui sábados no cálculo de prazos e datas
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card border-0 bg-light p-3 h-100">
+                  <div class="form-check form-switch d-flex align-items-center gap-3 mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="considerar_domingo" name="considerar_domingo"
+                           value="1" style="width:3em;height:1.5em"
+                           {{ 'checked' if calendario.considerar_domingo else '' }}>
+                    <div>
+                      <label class="form-check-label fw-semibold fs-6" for="considerar_domingo">
+                        <i class="fas fa-moon me-1 text-info"></i> Domingo é dia útil
+                      </label>
+                      <div class="small text-muted mt-1">
+                        Inclui domingos no cálculo de prazos e datas
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-4">
+
+            <div class="card border-warning bg-warning bg-opacity-10 p-3 mb-4">
+              <div class="form-check d-flex align-items-start gap-2">
+                <input class="form-check-input mt-1" type="checkbox"
+                       id="recalcular_tudo" name="recalcular_tudo" value="1">
+                <label class="form-check-label" for="recalcular_tudo">
+                  <span class="fw-semibold"><i class="fas fa-sync-alt me-1 text-warning"></i>Recalcular todos os cronogramas ativos</span>
+                  <div class="small text-muted mt-1">
+                    Ao salvar, recalcular automaticamente as datas de <strong>todas as obras ativas</strong>
+                    usando o novo calendário. Esta operação pode demorar alguns segundos.
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="d-flex gap-3 justify-content-end">
+              <a href="{{ url_for('configuracoes.configuracoes') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar
+              </a>
+              <button type="submit" class="btn btn-primary px-4">
+                <i class="fas fa-save me-1"></i> Salvar Configuração
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {# Legenda visual dos dias #}
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h6 class="card-title mb-0">
+            <i class="fas fa-table me-2"></i>Dias úteis da semana (configuração atual)
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="d-flex gap-2 flex-wrap" id="diasPreview">
+            {%- set dias = [
+              ('Seg', true),  ('Ter', true), ('Qua', true),
+              ('Qui', true),  ('Sex', true),
+              ('Sáb', calendario.considerar_sabado),
+              ('Dom', calendario.considerar_domingo)
+            ] -%}
+            {% for nome, util in dias %}
+            <div class="text-center rounded p-2" style="min-width:52px;background:{{ '#d4edda' if util else '#f8d7da' }}">
+              <div class="fw-bold small">{{ nome }}</div>
+              <i class="fas fa-{{ 'check text-success' if util else 'times text-danger' }} fa-xs"></i>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// Atualiza a prévia dos dias em tempo real
+function atualizarPrevia() {
+  const sab = document.getElementById('considerar_sabado').checked;
+  const dom = document.getElementById('considerar_domingo').checked;
+  const dias = document.querySelectorAll('#diasPreview > div');
+  if (dias.length < 7) return;
+  // Sáb = índice 5, Dom = índice 6
+  dias[5].style.background = sab ? '#d4edda' : '#f8d7da';
+  dias[5].querySelector('i').className = sab ? 'fas fa-check text-success fa-xs' : 'fas fa-times text-danger fa-xs';
+  dias[6].style.background = dom ? '#d4edda' : '#f8d7da';
+  dias[6].querySelector('i').className = dom ? 'fas fa-check text-success fa-xs' : 'fas fa-times text-danger fa-xs';
+}
+document.getElementById('considerar_sabado').addEventListener('change', atualizarPrevia);
+document.getElementById('considerar_domingo').addEventListener('change', atualizarPrevia);
+</script>
+{% endblock %}

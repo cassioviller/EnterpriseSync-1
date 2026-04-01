@@ -3774,6 +3774,7 @@ def executar_migracoes():
             (72, "Alimentação V2 - funcionario_id e centro_custo_id por item", _migration_72_alimentacao_item_v2),
             (73, "Transporte V2 - tabelas categoria_transporte e lancamento_transporte", _migration_73_transporte_v2),
             (74, "Compras V2 - tabelas pedido_compra e pedido_compra_item", _migration_74_compras_v2),
+            (75, "Cronograma V2 - CalendarioEmpresa e TarefaCronograma", _migration_75_cronograma_v2),
         ]
         
         # Executar cada migração com rastreamento
@@ -6768,5 +6769,99 @@ def _migration_72_alimentacao_item_v2():
                 cursor.close()
                 connection.close()
             except:
+                pass
+        return False
+
+
+def _migration_75_cronograma_v2():
+    """
+    MIGRAÇÃO 75: Criar tabelas calendario_empresa e tarefa_cronograma
+    para o Módulo de Cronograma de Obras (MS Project style, V2).
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        logger.info("Migração 75: criando tabelas de Cronograma V2")
+
+        # Tabela calendario_empresa
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'calendario_empresa'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            cursor.execute("""
+                CREATE TABLE calendario_empresa (
+                    id SERIAL PRIMARY KEY,
+                    admin_id INTEGER NOT NULL UNIQUE
+                        REFERENCES usuario(id) ON DELETE CASCADE,
+                    considerar_sabado BOOLEAN NOT NULL DEFAULT FALSE,
+                    considerar_domingo BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            logger.info("  calendario_empresa criada")
+        else:
+            logger.info("  calendario_empresa ja existe - SKIP")
+
+        # Tabela tarefa_cronograma
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'tarefa_cronograma'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            cursor.execute("""
+                CREATE TABLE tarefa_cronograma (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL
+                        REFERENCES obra(id) ON DELETE CASCADE,
+                    tarefa_pai_id INTEGER
+                        REFERENCES tarefa_cronograma(id) ON DELETE SET NULL,
+                    predecessora_id INTEGER
+                        REFERENCES tarefa_cronograma(id) ON DELETE SET NULL,
+                    ordem INTEGER NOT NULL DEFAULT 0,
+                    nome_tarefa VARCHAR(200) NOT NULL,
+                    duracao_dias INTEGER NOT NULL DEFAULT 1,
+                    data_inicio DATE,
+                    data_fim DATE,
+                    quantidade_total FLOAT,
+                    unidade_medida VARCHAR(20),
+                    percentual_concluido FLOAT NOT NULL DEFAULT 0.0,
+                    admin_id INTEGER NOT NULL
+                        REFERENCES usuario(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_tarefa_cronograma_obra
+                    ON tarefa_cronograma(obra_id, admin_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_tarefa_cronograma_pai
+                    ON tarefa_cronograma(tarefa_pai_id)
+            """)
+            logger.info("  tarefa_cronograma criada com índices")
+        else:
+            logger.info("  tarefa_cronograma ja existe - SKIP")
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 75 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 75: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except Exception:
                 pass
         return False

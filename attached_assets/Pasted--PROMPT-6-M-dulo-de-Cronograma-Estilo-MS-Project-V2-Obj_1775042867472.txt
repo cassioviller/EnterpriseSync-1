@@ -1,0 +1,66 @@
+# PROMPT 6: Módulo de Cronograma (Estilo MS Project) - V2
+
+**Objetivo:** Criar um módulo de planejamento e cronograma de obras idêntico ao MS Project, com suporte a hierarquia de tarefas (macro e micro), predecessoras, cálculo automático de datas e configuração de dias úteis (calendário da empresa).
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `obras.py` (ou criar `cronograma_views.py`)
+- `templates/obras/cronograma.html`
+- `utils/cronograma_engine.py` (novo)
+
+Por favor, implemente as seguintes funcionalidades passo a passo:
+
+## Passo 1: Modelagem de Dados do Cronograma
+Crie os seguintes modelos no arquivo `models.py`:
+1. **`CalendarioEmpresa`**:
+   - Campos: `id`, `admin_id`, `considerar_sabado` (Boolean, default=False), `considerar_domingo` (Boolean, default=False).
+   - Objetivo: Definir quais dias da semana são considerados dias úteis para o cálculo automático de datas.
+2. **`TarefaCronograma`**:
+   - Campos: 
+     - `id` (Integer, Primary Key)
+     - `obra_id` (ForeignKey para Obra)
+     - `tarefa_pai_id` (ForeignKey para a própria tabela `TarefaCronograma`, nullable=True) -> *Para criar a hierarquia (Macro serviços e Subserviços)*
+     - `ordem` (Integer) -> *Para manter a ordenação visual das linhas*
+     - `nome_tarefa` (String)
+     - `duracao_dias` (Integer)
+     - `data_inicio` (Date)
+     - `data_fim` (Date)
+     - `predecessora_id` (ForeignKey para a própria tabela `TarefaCronograma`, nullable=True)
+     - `quantidade_total` (Float, ex: 250)
+     - `unidade_medida` (String, ex: 'm²')
+     - `percentual_concluido` (Float, default=0.0) -> *Será atualizado automaticamente pelo RDO*
+     - `admin_id` (ForeignKey para Usuario)
+
+## Passo 2: Lógica de Cálculo de Datas (Motor de Agendamento)
+Crie um arquivo `utils/cronograma_engine.py` com a função `recalcular_cronograma(obra_id, admin_id)`:
+1. Busque a configuração do `CalendarioEmpresa` para saber se sábado e domingo contam como dias úteis.
+2. Percorra todas as tarefas da obra respeitando a ordem de dependência (predecessoras).
+3. Se a Tarefa B tem a Tarefa A como predecessora:
+   - A `data_inicio` da Tarefa B deve ser o próximo dia útil após a `data_fim` da Tarefa A.
+   - Exemplo: Se a Tarefa A termina na sexta-feira (06/02) e a empresa NÃO trabalha aos sábados, a Tarefa B deve começar na segunda-feira (09/02). Se a empresa trabalha aos sábados, a Tarefa B começa no sábado (07/02).
+4. A `data_fim` de cada tarefa deve ser calculada somando a `duracao_dias` à `data_inicio`, pulando os dias não úteis.
+5. **Lógica de Tarefa Pai (Macro):** A `data_inicio` da Tarefa Pai deve ser a menor `data_inicio` de suas filhas. A `data_fim` da Tarefa Pai deve ser a maior `data_fim` de suas filhas. A `duracao_dias` da Tarefa Pai é a diferença em dias úteis entre seu início e fim.
+
+## Passo 3: Interface Visual (Tabela MS Project)
+Crie uma tela (`templates/obras/cronograma.html`) que exiba uma tabela idêntica ao MS Project com as seguintes colunas:
+- **ID** (Número da linha)
+- **Modo da Tarefa** (Ícone indicando se é manual ou automática)
+- **Nome da Tarefa** (Com recuo/indentação para tarefas filhas e ícone de expandir/recolher para tarefas pai)
+- **Duração** (ex: "45 dias")
+- **Início** (ex: "Seg 12/01/26")
+- **Término** (ex: "Sex 13/03/26")
+- **Predecessoras** (ID da linha anterior)
+*(Nota: A coluna de % concluída será tratada no módulo de RDO)*
+
+**Interatividade na Tabela:**
+- Use JavaScript (Vanilla ou jQuery) para permitir expandir/recolher as tarefas pai (accordion).
+- Permita edição inline (duplo clique) nas colunas: Nome, Duração e Predecessoras.
+- Ao alterar a Duração ou Predecessora de uma linha, dispare uma requisição AJAX para o backend recalcular todas as datas e atualize a tabela na tela sem recarregar a página.
+
+## Passo 4: Configuração do Calendário
+1. Crie uma tela em "Configurações" onde o administrador possa marcar checkboxes: "Trabalhar aos Sábados" e "Trabalhar aos Domingos".
+2. Ao salvar essa configuração, o sistema deve perguntar se deseja recalcular os cronogramas de todas as obras ativas e chamar a função `recalcular_cronograma`.
+
+**Regras Técnicas:**
+- A lógica de pular finais de semana deve usar a biblioteca `datetime` do Python.
+- Certifique-se de que loops infinitos (referências circulares, ex: A depende de B e B depende de A) sejam bloqueados no backend ao salvar a predecessora.

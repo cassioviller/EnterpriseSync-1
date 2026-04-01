@@ -100,6 +100,25 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Calendário de Trabalho (V2) -->
+                        {% if is_v2_active is defined and is_v2_active() %}
+                        <div class="col-md-6">
+                            <div class="card h-100 border-0 shadow-sm border-primary border-opacity-25">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-calendar-alt fa-3x text-primary"></i>
+                                    </div>
+                                    <h5 class="card-title">Calendário de Trabalho</h5>
+                                    <p class="card-text">Configure quais dias da semana são úteis para o cálculo de datas do cronograma</p>
+                                    <a href="{{ url_for('cronograma.calendario') }}" class="btn btn-primary">
+                                        <i class="fas fa-cog me-2"></i>
+                                        Configurar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
 
                     {% if config %}

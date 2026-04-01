@@ -691,10 +691,25 @@
                             </a>
                         </li>
                         
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.obras') }}">
-                                <i class="fas fa-hammer me-1"></i> Obras
+                        <li class="nav-item {% if is_v2_active() %}dropdown{% endif %}">
+                          {% if is_v2_active() %}
+                            <a class="nav-link dropdown-toggle" href="#" id="obrasDropdown" role="button" data-bs-toggle="dropdown">
+                              <i class="fas fa-hammer me-1"></i> Obras
                             </a>
+                            <ul class="dropdown-menu">
+                              <li><a class="dropdown-item" href="{{ url_for('main.obras') }}">
+                                <i class="fas fa-list me-1"></i> Lista de Obras
+                              </a></li>
+                              <li><hr class="dropdown-divider"></li>
+                              <li><a class="dropdown-item" href="#" id="cronogramaNavLink">
+                                <i class="fas fa-project-diagram me-1 text-primary"></i> Cronograma <span class="badge bg-primary ms-1" style="font-size:.65rem">V2</span>
+                              </a></li>
+                            </ul>
+                          {% else %}
+                            <a class="nav-link" href="{{ url_for('main.obras') }}">
+                              <i class="fas fa-hammer me-1"></i> Obras
+                            </a>
+                          {% endif %}
                         </li>
                         
                         <li class="nav-item">

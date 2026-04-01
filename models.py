@@ -4109,3 +4109,66 @@ class LancamentoTransporte(db.Model):
     centro_custo = db.relationship('CentroCusto', backref='lancamentos_transporte', foreign_keys=[centro_custo_id])
     obra = db.relationship('Obra', backref='lancamentos_transporte', foreign_keys=[obra_id])
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MÓDULO V2: CRONOGRAMA DE OBRAS (MS PROJECT STYLE) — Migration 75
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CalendarioEmpresa(db.Model):
+    """Configuração do calendário de dias úteis da empresa para o cronograma."""
+    __tablename__ = 'calendario_empresa'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(
+        db.Integer,
+        db.ForeignKey('usuario.id', ondelete='CASCADE'),
+        nullable=False,
+        unique=True,
+    )
+    considerar_sabado = db.Column(db.Boolean, default=False, nullable=False)
+    considerar_domingo = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TarefaCronograma(db.Model):
+    """
+    Tarefa do cronograma de obra.
+    Suporta hierarquia (tarefa_pai_id) e predecessoras (predecessora_id).
+    """
+    __tablename__ = 'tarefa_cronograma'
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(
+        db.Integer,
+        db.ForeignKey('obra.id', ondelete='CASCADE'),
+        nullable=False,
+    )
+    # Hierarquia: tarefa macro contém subtarefas
+    tarefa_pai_id = db.Column(
+        db.Integer,
+        db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    # Dependência de cronograma: esta tarefa começa após o término da predecessora
+    predecessora_id = db.Column(
+        db.Integer,
+        db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    ordem = db.Column(db.Integer, nullable=False, default=0)
+    nome_tarefa = db.Column(db.String(200), nullable=False)
+    duracao_dias = db.Column(db.Integer, default=1, nullable=False)
+    data_inicio = db.Column(db.Date, nullable=True)
+    data_fim = db.Column(db.Date, nullable=True)
+    quantidade_total = db.Column(db.Float, nullable=True)
+    unidade_medida = db.Column(db.String(20), nullable=True)
+    # Atualizado automaticamente pelo RDO
+    percentual_concluido = db.Column(db.Float, default=0.0, nullable=False)
+    admin_id = db.Column(
+        db.Integer,
+        db.ForeignKey('usuario.id'),
+        nullable=False,
+    )
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+

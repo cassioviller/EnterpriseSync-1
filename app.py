@@ -531,6 +531,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint TRANSPORTE: {e}")
 
+    # Registrar blueprint CRONOGRAMA V2
+    try:
+        from cronograma_views import cronograma_bp
+        app.register_blueprint(cronograma_bp)
+        logging.info("[OK] Blueprint CRONOGRAMA registrado")
+    except ImportError as e:
+        logging.warning(f"[WARN] Blueprint CRONOGRAMA não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint CRONOGRAMA: {e}")
+
     # Registrar blueprint landing page
     try:
         from landing_views import landing_bp
