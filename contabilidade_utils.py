@@ -1,5 +1,6 @@
 """
 Utilitários para o Módulo 7 - Sistema Contábil Completo
+e funções de lançamento automático para módulos V2.
 """
 import calendar
 from datetime import date, timedelta
@@ -1439,3 +1440,181 @@ def gerar_dre_excel(admin_id, mes, ano):
         import traceback
         traceback.print_exc()
         raise
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MÓDULO V2: LANÇAMENTOS CONTÁBEIS AUTOMÁTICOS
+# Geração automática de partidas dobradas a partir de operações operacionais.
+# ─────────────────────────────────────────────────────────────────────────────
+
+MAPEAMENTO_CONTABIL = {
+    'compra_material':      {'debito': '1.1.03.001', 'credito': '2.1.01.001'},
+    'pagamento_fornecedor': {'debito': '2.1.01.001', 'credito': '1.1.01.002'},
+    'despesa_alimentacao':  {'debito': '6.1.01.002', 'credito': '2.1.01.001'},
+    'despesa_transporte':   {'debito': '6.1.02.002', 'credito': '1.1.01.002'},
+    'folha_pagamento':      {'debito': '6.1.01.001', 'credito': '2.1.02.001'},
+    'pagamento_salario':    {'debito': '2.1.02.001', 'credito': '1.1.01.002'},
+}
+
+# Contas mínimas necessárias para os lançamentos V2.
+# Nomes adaptados para os módulos V2 (alimentação, transporte, folha, compras).
+_V2_CONTAS_SEED = [
+    # (codigo, nome, tipo_conta, natureza, nivel, conta_pai_codigo, aceita_lancamento)
+    ('1',          'ATIVO',                    'ATIVO',   'DEVEDORA', 1, None,     False),
+    ('1.1',        'ATIVO CIRCULANTE',         'ATIVO',   'DEVEDORA', 2, '1',      False),
+    ('1.1.01',     'DISPONÍVEL',               'ATIVO',   'DEVEDORA', 3, '1.1',    False),
+    ('1.1.03',     'ESTOQUES',                 'ATIVO',   'DEVEDORA', 3, '1.1',    False),
+    ('2',          'PASSIVO',                  'PASSIVO', 'CREDORA',  1, None,     False),
+    ('2.1',        'PASSIVO CIRCULANTE',       'PASSIVO', 'CREDORA',  2, '2',      False),
+    ('2.1.01',     'FORNECEDORES',             'PASSIVO', 'CREDORA',  3, '2.1',    False),
+    ('2.1.02',     'OBRIGAÇÕES TRABALHISTAS',  'PASSIVO', 'CREDORA',  3, '2.1',    False),
+    ('6',          'DESPESAS',                 'DESPESA', 'DEVEDORA', 1, None,     False),
+    ('6.1',        'DESPESAS OPERACIONAIS',    'DESPESA', 'DEVEDORA', 2, '6',      False),
+    ('6.1.01',     'DESPESAS COM PESSOAL',     'DESPESA', 'DEVEDORA', 3, '6.1',    False),
+    ('6.1.02',     'DESPESAS GERAIS',          'DESPESA', 'DEVEDORA', 3, '6.1',    False),
+    ('1.1.01.001', 'Caixa Geral',              'ATIVO',   'DEVEDORA', 4, '1.1.01', True),
+    ('1.1.01.002', 'Bancos Conta Movimento',   'ATIVO',   'DEVEDORA', 4, '1.1.01', True),
+    ('1.1.03.001', 'Estoque de Materiais',     'ATIVO',   'DEVEDORA', 4, '1.1.03', True),
+    ('2.1.01.001', 'Fornecedores a Pagar',     'PASSIVO', 'CREDORA',  4, '2.1.01', True),
+    ('2.1.02.001', 'Salários a Pagar',         'PASSIVO', 'CREDORA',  4, '2.1.02', True),
+    ('6.1.01.001', 'Despesa com Salários',     'DESPESA', 'DEVEDORA', 4, '6.1.01', True),
+    ('6.1.01.002', 'Despesa com Alimentação',  'DESPESA', 'DEVEDORA', 4, '6.1.01', True),
+    ('6.1.02.002', 'Despesa com Transporte',   'DESPESA', 'DEVEDORA', 4, '6.1.02', True),
+]
+
+_v2_seeded_admins: set = set()
+
+
+def seed_plano_contas_if_needed(admin_id: int) -> None:
+    """
+    Garante que o plano de contas mínimo V2 existe para o admin_id dado.
+    Seguro para múltiplas chamadas (idempotente via ON CONFLICT e cache em memória).
+    """
+    if admin_id in _v2_seeded_admins:
+        return
+    try:
+        from sqlalchemy import text as sql_text
+        count = db.session.execute(
+            sql_text("SELECT COUNT(*) FROM plano_contas WHERE admin_id = :aid"),
+            {'aid': admin_id}
+        ).scalar() or 0
+
+        if count > 0:
+            _v2_seeded_admins.add(admin_id)
+            return
+
+        for (codigo, nome, tipo_conta, natureza, nivel, pai, aceita) in _V2_CONTAS_SEED:
+            db.session.execute(sql_text("""
+                INSERT INTO plano_contas
+                    (codigo, nome, tipo_conta, natureza, nivel,
+                     conta_pai_codigo, aceita_lancamento, ativo, admin_id)
+                VALUES
+                    (:codigo, :nome, :tipo, :natureza, :nivel,
+                     :pai, :aceita, true, :aid)
+                ON CONFLICT ON CONSTRAINT plano_contas_codigo_admin_unique DO NOTHING
+            """), {
+                'codigo': codigo, 'nome': nome, 'tipo': tipo_conta,
+                'natureza': natureza, 'nivel': nivel, 'pai': pai,
+                'aceita': aceita, 'aid': admin_id,
+            })
+
+        db.session.commit()
+        _v2_seeded_admins.add(admin_id)
+        PlanoContas.invalidar_cache()
+        logger.info(
+            f"[OK] Plano de contas V2 seed para admin_id={admin_id} "
+            f"({len(_V2_CONTAS_SEED)} contas)"
+        )
+
+    except Exception as e:
+        logger.error(f"[ERROR] seed_plano_contas_if_needed admin={admin_id}: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+
+def gerar_lancamento_contabil_automatico(
+    admin_id: int,
+    tipo_operacao: str,
+    valor: float,
+    data: date,
+    descricao: str,
+    centro_custo_id: int = None,
+) -> bool:
+    """
+    Gera lançamento contábil automático (partidas dobradas) para operações V2.
+
+    - Seed do plano de contas feito automaticamente na primeira chamada.
+    - Usa a função existente criar_lancamento_automatico para consistência.
+    - NUNCA propaga exceções: erros são apenas logados.
+
+    Retorna True se criado com sucesso, False caso contrário.
+    """
+    mapeamento = MAPEAMENTO_CONTABIL.get(tipo_operacao)
+    if not mapeamento:
+        logger.warning(f"[WARN] Operacao contabil nao mapeada: {tipo_operacao}")
+        return False
+
+    if not valor or float(valor) <= 0:
+        logger.warning(f"[WARN] Valor invalido para lancamento contabil [{tipo_operacao}]: {valor}")
+        return False
+
+    try:
+        seed_plano_contas_if_needed(admin_id)
+
+        valor_dec = Decimal(str(round(float(valor), 2)))
+        historico = (descricao or tipo_operacao)[:500]
+
+        partidas = [
+            {
+                'tipo': 'DEBITO',
+                'conta': mapeamento['debito'],
+                'valor': valor_dec,
+                'centro_custo_id': centro_custo_id,
+                'historico_comp': f"[V2] {tipo_operacao[:80]}",
+            },
+            {
+                'tipo': 'CREDITO',
+                'conta': mapeamento['credito'],
+                'valor': valor_dec,
+                'centro_custo_id': centro_custo_id,
+                'historico_comp': f"[V2] {tipo_operacao[:80]}",
+            },
+        ]
+
+        lancamento = criar_lancamento_automatico(
+            data=data,
+            historico=historico,
+            valor=valor_dec,
+            origem='V2_AUTO',
+            origem_id=None,
+            admin_id=admin_id,
+            partidas=partidas,
+        )
+        logger.info(
+            f"[OK] Lancamento V2 #{lancamento.numero} | {tipo_operacao} | "
+            f"D:{mapeamento['debito']} C:{mapeamento['credito']} | R${valor_dec}"
+        )
+        return True
+
+    except Exception as e:
+        logger.error(
+            f"[ERROR] gerar_lancamento_contabil_automatico [{tipo_operacao}] "
+            f"admin={admin_id}: {e}"
+        )
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return False
+
+
+def _is_v2_admin_direct(admin_id: int) -> bool:
+    """Verifica se admin tem V2 ativo sem precisar de request context."""
+    try:
+        from models import Usuario
+        u = db.session.get(Usuario, admin_id)
+        return u is not None and getattr(u, 'versao_sistema', 'v1') == 'v2'
+    except Exception:
+        return False

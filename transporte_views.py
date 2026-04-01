@@ -222,6 +222,20 @@ def novo_post():
             logger.info(f"[OK] CustoObra criado para obra_id={obra_id} via transporte")
 
         db.session.commit()
+
+        # Lançamento contábil automático V2
+        try:
+            from contabilidade_utils import gerar_lancamento_contabil_automatico
+            gerar_lancamento_contabil_automatico(
+                admin_id=admin_id,
+                tipo_operacao='despesa_transporte',
+                valor=float(valor),
+                data=data_lancamento,
+                descricao=f"Transporte - {descricao or 'Lançamento de transporte'}",
+            )
+        except Exception as _e:
+            logger.warning(f"[WARN] Lancamento contabil transporte nao gerado: {_e}")
+
         flash('Lançamento de transporte registrado com sucesso!', 'success')
         return redirect(url_for('transporte.index'))
 

@@ -178,7 +178,8 @@ def processar_folha_mes(ano, mes):
         # Processar cada funcionário
         folhas_criadas = 0
         erros = 0
-        
+        total_proventos_mes = 0.0
+
         for funcionario in funcionarios:
             # Calcular folha do funcionário
             dados_folha = processar_folha_funcionario(funcionario, ano, mes)
@@ -203,6 +204,7 @@ def processar_folha_mes(ano, mes):
                 db.session.add(folha)
                 db.session.flush()  # CRÍTICO: Flush para gerar o ID antes de emitir evento
                 folhas_criadas += 1
+                total_proventos_mes += float(dados_folha.get('total_proventos', 0) or 0)
                 
                 # Emitir evento para contabilidade (agora com folha.id válido)
                 try:
@@ -216,7 +218,23 @@ def processar_folha_mes(ano, mes):
         
         # Commit final
         db.session.commit()
-        
+
+        # Lançamento contábil automático V2
+        if folhas_criadas > 0 and total_proventos_mes > 0:
+            try:
+                from contabilidade_utils import gerar_lancamento_contabil_automatico
+                from utils.tenant import is_v2_active
+                if is_v2_active():
+                    gerar_lancamento_contabil_automatico(
+                        admin_id=current_user.id,
+                        tipo_operacao='folha_pagamento',
+                        valor=total_proventos_mes,
+                        data=mes_referencia,
+                        descricao=f"Folha de Pagamento {mes:02d}/{ano} - {folhas_criadas} funcionários",
+                    )
+            except Exception as _e:
+                logger.warning(f"[WARN] Lancamento contabil folha nao gerado: {_e}")
+
         # Mensagens de resultado
         if folhas_criadas > 0:
             flash(f'Folha processada com sucesso! {folhas_criadas} funcionários processados.', 'success')

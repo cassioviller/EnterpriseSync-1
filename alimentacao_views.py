@@ -464,6 +464,21 @@ def lancamento_novo_v2():
 
             db.session.commit()
 
+            # Lançamento contábil automático V2
+            try:
+                from contabilidade_utils import gerar_lancamento_contabil_automatico
+                from utils.tenant import is_v2_active
+                if is_v2_active():
+                    gerar_lancamento_contabil_automatico(
+                        admin_id=admin_id,
+                        tipo_operacao='despesa_alimentacao',
+                        valor=float(valor_total),
+                        data=lancamento.data,
+                        descricao=f"Alimentação - {lancamento.descricao or 'Refeições'}",
+                    )
+            except Exception as _e:
+                logger.warning(f"[WARN] Lancamento contabil alimentacao nao gerado: {_e}")
+
             # --- Emitir evento para integração ---
             try:
                 from event_manager import EventManager

@@ -1,0 +1,94 @@
+# PROMPT 5: Balancete Contábil Automático (V2)
+
+**Objetivo:** Automatizar a geração de partidas contábeis (débito e crédito) a partir das operações operacionais (Compras, Alimentação, Transporte, Folha) e do Fluxo de Caixa, alimentando o Balancete Mensal em tempo real.
+
+**Arquivos a serem modificados:**
+- `models.py` (verificação)
+- `utils/financeiro_integration.py` (ou `contabilidade_utils.py`)
+- `financeiro_views.py` (Fluxo de Caixa)
+- `contabilidade_views.py`
+
+Por favor, implemente as seguintes alterações passo a passo:
+
+## Passo 1: Mapeamento de Contas Padrão
+O sistema já possui o modelo `PlanoContas`. Precisamos garantir que cada operação saiba para qual conta contábil enviar o lançamento.
+Crie um dicionário ou tabela de configuração em `contabilidade_utils.py` para mapear as operações para as contas do plano de contas padrão:
+```python
+MAPEAMENTO_CONTABIL = {
+    'compra_material': {'debito': '1.1.03.001', 'credito': '2.1.01.001'}, # Estoque (D) a Fornecedores (C)
+    'pagamento_fornecedor': {'debito': '2.1.01.001', 'credito': '1.1.01.002'}, # Fornecedores (D) a Banco (C)
+    'despesa_alimentacao': {'debito': '6.1.01.002', 'credito': '2.1.01.001'}, # Despesa (D) a Fornecedores/Restaurante (C)
+    'despesa_transporte': {'debito': '6.1.02.002', 'credito': '1.1.01.002'}, # Despesa (D) a Banco/Caixa (C)
+    'folha_pagamento': {'debito': '6.1.01.001', 'credito': '2.1.02.001'}, # Despesa Salários (D) a Salários a Pagar (C)
+    'pagamento_salario': {'debito': '2.1.02.001', 'credito': '1.1.01.002'}, # Salários a Pagar (D) a Banco (C)
+}
+```
+
+## Passo 2: Função Geradora de Lançamentos Contábeis
+No arquivo `contabilidade_utils.py`, crie uma função universal para gerar os lançamentos duplos (Partidas Dobradas):
+```python
+def gerar_lancamento_contabil_automatico(admin_id, tipo_operacao, valor, data, descricao, centro_custo_id=None):
+    """Gera o lançamento contábil de débito e crédito automaticamente"""
+    from models import db, LancamentoContabil, PartidaContabil
+    
+    mapeamento = MAPEAMENTO_CONTABIL.get(tipo_operacao)
+    if not mapeamento:
+        return False
+        
+    # 1. Cria o cabeçalho do lançamento
+    lancamento = LancamentoContabil(
+        numero=get_next_lancamento_numero(admin_id),
+        data_lancamento=data,
+        descricao=descricao,
+        tipo='AUTOMATICO',
+        admin_id=admin_id
+    )
+    db.session.add(lancamento)
+    db.session.flush() # Para obter o ID
+    
+    # 2. Partida de Débito
+    debito = PartidaContabil(
+        lancamento_id=lancamento.id,
+        conta_codigo=mapeamento['debito'],
+        centro_custo_id=centro_custo_id,
+        tipo_partida='DEBITO',
+        valor=valor,
+        admin_id=admin_id
+    )
+    
+    # 3. Partida de Crédito
+    credito = PartidaContabil(
+        lancamento_id=lancamento.id,
+        conta_codigo=mapeamento['credito'],
+        centro_custo_id=centro_custo_id,
+        tipo_partida='CREDITO',
+        valor=valor,
+        admin_id=admin_id
+    )
+    
+    db.session.add(debito)
+    db.session.add(credito)
+    
+    # 4. Atualiza o Balancete Mensal
+    atualizar_balancete_mensal(admin_id, mapeamento['debito'], data, valor, 'DEBITO')
+    atualizar_balancete_mensal(admin_id, mapeamento['credito'], data, valor, 'CREDITO')
+    
+    return True
+```
+
+## Passo 3: Injeção dos Gatilhos (Triggers)
+Agora, injete a chamada dessa função nos pontos chave do sistema (apenas se `is_v2_active()` for True):
+1. **Em `compras_views.py` (ou `almoxarifado_views.py`):** Ao salvar uma nova compra, chame `gerar_lancamento_contabil_automatico(..., 'compra_material', ...)`.
+2. **Em `alimentacao_views.py`:** Ao salvar o lançamento de marmitas, chame com `'despesa_alimentacao'`.
+3. **Em `transporte_views.py`:** Ao salvar o lançamento de transporte, chame com `'despesa_transporte'`.
+4. **Em `folha_pagamento_views.py`:** Ao fechar a folha do mês, chame com `'folha_pagamento'`.
+
+## Passo 4: Integração com o Fluxo de Caixa (Baixas)
+No arquivo `financeiro_views.py`, localize a função que dá "Baixa" (pagamento) em uma `ContaPagar`.
+1. Quando uma conta a pagar for marcada como 'PAGO', verifique a origem dela.
+2. Se for origem de compra de material, chame `gerar_lancamento_contabil_automatico(..., 'pagamento_fornecedor', ...)`.
+3. Se for origem de folha, chame `'pagamento_salario'`.
+4. Isso garante que o passivo (Conta a Pagar) seja zerado e o dinheiro saia do Ativo (Banco/Caixa).
+
+## Passo 5: Visualização do Balancete
+O módulo de contabilidade já existe (`contabilidade_views.py`). Garanta que a rota do Balancete Mensal esteja lendo os dados atualizados pela função `atualizar_balancete_mensal`. Como os lançamentos agora são automáticos, o balancete será gerado em tempo real sem intervenção manual do contador.

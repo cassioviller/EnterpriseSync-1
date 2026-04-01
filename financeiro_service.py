@@ -174,6 +174,28 @@ class FinanceiroService:
                     logger.error(traceback.format_exc())
                     # Não interromper fluxo - pagamento já foi baixado
             
+            # Lançamento contábil automático V2: zerar passivo ao pagar
+            try:
+                from contabilidade_utils import gerar_lancamento_contabil_automatico, _is_v2_admin_direct
+                if _is_v2_admin_direct(admin_id):
+                    origem_tipo = getattr(conta, 'origem_tipo', None)
+                    if origem_tipo == 'COMPRA':
+                        op = 'pagamento_fornecedor'
+                    elif origem_tipo in ('FOLHA', 'SALARIO'):
+                        op = 'pagamento_salario'
+                    else:
+                        op = None
+                    if op:
+                        gerar_lancamento_contabil_automatico(
+                            admin_id=admin_id,
+                            tipo_operacao=op,
+                            valor=float(valor_pago),
+                            data=data_pagamento,
+                            descricao=f"Pagamento - {conta.descricao[:100] if conta.descricao else 'Conta a pagar'}",
+                        )
+            except Exception as _e:
+                logger.warning(f"[WARN] Lancamento contabil pagamento nao gerado: {_e}")
+
             logger.info(f"✅ Pagamento registrado: Conta {conta_id} - R$ {valor_pago}")
             return conta
             

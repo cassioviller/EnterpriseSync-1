@@ -278,6 +278,21 @@ def nova_post():
         logger.info(f"[OK] {n_parcelas} ContaPagar criado(s) para pedido_id={pedido.id}")
 
         db.session.commit()
+
+        # Lançamento contábil automático V2
+        try:
+            from contabilidade_utils import gerar_lancamento_contabil_automatico
+            forn = Fornecedor.query.get(fornecedor_id)
+            gerar_lancamento_contabil_automatico(
+                admin_id=admin_id,
+                tipo_operacao='compra_material',
+                valor=float(valor_total),
+                data=data_compra,
+                descricao=f"Compra{(' NF ' + numero) if numero else ''} - {forn.nome if forn else 'Fornecedor'}",
+            )
+        except Exception as _e:
+            logger.warning(f"[WARN] Lancamento contabil compra nao gerado: {_e}")
+
         flash(f'Compra registrada com sucesso! {n_parcelas} conta(s) a pagar gerada(s).', 'success')
         return redirect(url_for('compras.index'))
 
