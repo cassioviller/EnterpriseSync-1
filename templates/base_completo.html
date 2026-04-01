@@ -797,13 +797,19 @@
                                 <li><a class="dropdown-item" href="{{ url_for('transporte.index') }}">
                                     <i class="fas fa-list me-1"></i> Lançamentos
                                 </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('transporte.novo') }}">
-                                    <i class="fas fa-plus me-1"></i> Novo Lançamento
+                                <li><a class="dropdown-item" href="{{ url_for('transporte.categorias') }}">
+                                    <i class="fas fa-tags me-1"></i> Categorias
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header"><i class="fas fa-truck me-1"></i> Frota Própria <span class="badge bg-primary ms-1" style="font-size:.65rem">V2</span></h6></li>
                                 <li><a class="dropdown-item" href="{{ url_for('frota.lista') }}">
-                                    <i class="fas fa-car me-1"></i> Veículos da Frota
+                                    <i class="fas fa-car me-1"></i> Lista de Veículos
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('frota.lista') }}#registrar-uso">
+                                    <i class="fas fa-road me-1"></i> Registrar Uso
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('frota.lista') }}#registrar-custo">
+                                    <i class="fas fa-receipt me-1"></i> Registrar Custo
                                 </a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('frota.dashboard') }}">
                                     <i class="fas fa-chart-bar me-1"></i> Dashboard de Frota

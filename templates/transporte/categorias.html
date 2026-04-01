@@ -1,0 +1,92 @@
+{% extends "base_completo.html" %}
+{% block title %}Categorias de Transporte{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0 fw-bold"><i class="fas fa-tags me-2 text-primary"></i>Categorias de Transporte</h1>
+      <small class="text-muted">Gerencie as categorias usadas nos lançamentos de transporte</small>
+    </div>
+    <a href="{{ url_for('transporte.index') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="fas fa-arrow-left me-1"></i> Voltar aos Lançamentos
+    </a>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Formulário nova categoria -->
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <i class="fas fa-plus me-1"></i> Nova Categoria
+        </div>
+        <div class="card-body">
+          <form method="POST">
+            <input type="hidden" name="acao" value="criar">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Nome</label>
+              <input type="text" name="nome" class="form-control" placeholder="Ex: Vale Transporte" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Ícone (Font Awesome)</label>
+              <input type="text" name="icone" class="form-control" value="fas fa-route" placeholder="fas fa-bus">
+              <div class="form-text">Use classes do Font Awesome (ex: fas fa-bus, fas fa-car)</div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="fas fa-plus me-1"></i> Criar Categoria
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de categorias -->
+    <div class="col-md-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+          <strong><i class="fas fa-list me-1 text-primary"></i> Categorias Cadastradas</strong>
+          <span class="badge bg-primary ms-2">{{ categorias|length }}</span>
+        </div>
+        <div class="card-body p-0">
+          {% if categorias %}
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Ícone</th>
+                <th>Nome</th>
+                <th class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cat in categorias %}
+              <tr>
+                <td><i class="{{ cat.icone }} text-primary"></i></td>
+                <td class="fw-semibold">{{ cat.nome }}</td>
+                <td class="text-end">
+                  <form method="POST" style="display:inline;" onsubmit="return confirm('Excluir a categoria \'{{ cat.nome }}\'?');">
+                    <input type="hidden" name="acao" value="excluir">
+                    <input type="hidden" name="categoria_id" value="{{ cat.id }}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="fas fa-tags fa-3x mb-3 opacity-25"></i>
+            <p>Nenhuma categoria cadastrada ainda.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

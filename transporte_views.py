@@ -280,6 +280,52 @@ def novo_post():
 
 
 # ─────────────────────────────────────────────
+# CATEGORIAS
+# ─────────────────────────────────────────────
+@transporte_bp.route('/categorias', methods=['GET', 'POST'])
+@login_required
+def categorias():
+    guard = _check_v2()
+    if guard:
+        return guard
+    admin_id = _get_admin_id()
+
+    if request.method == 'POST':
+        acao = request.form.get('acao', 'criar')
+        if acao == 'criar':
+            nome = request.form.get('nome', '').strip()
+            icone = request.form.get('icone', 'fas fa-route').strip()
+            if nome:
+                try:
+                    nova = CategoriaTransporte(nome=nome, icone=icone, admin_id=admin_id)
+                    db.session.add(nova)
+                    db.session.commit()
+                    flash(f'Categoria "{nome}" criada com sucesso.', 'success')
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"[ERROR] Erro ao criar categoria: {e}")
+                    flash(f'Erro ao criar categoria: {e}', 'danger')
+            else:
+                flash('Nome da categoria é obrigatório.', 'warning')
+        elif acao == 'excluir':
+            cat_id = request.form.get('categoria_id', type=int)
+            if cat_id:
+                cat = CategoriaTransporte.query.filter_by(id=cat_id, admin_id=admin_id).first()
+                if cat:
+                    try:
+                        db.session.delete(cat)
+                        db.session.commit()
+                        flash('Categoria excluída.', 'success')
+                    except Exception as e:
+                        db.session.rollback()
+                        flash(f'Erro ao excluir: {e}', 'danger')
+        return redirect(url_for('transporte.categorias'))
+
+    lista = CategoriaTransporte.query.filter_by(admin_id=admin_id).order_by(CategoriaTransporte.nome).all()
+    return render_template('transporte/categorias.html', categorias=lista)
+
+
+# ─────────────────────────────────────────────
 # EXCLUSÃO
 # ─────────────────────────────────────────────
 @transporte_bp.route('/excluir/<int:lancamento_id>', methods=['POST'])
