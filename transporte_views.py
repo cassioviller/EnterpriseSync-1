@@ -165,6 +165,9 @@ def novo_post():
         veiculo_id = request.form.get('veiculo_id') or None
         obra_id = request.form.get('obra_id') or None
 
+        if not obra_id:
+            flash('Selecione a obra para vincular o custo.', 'warning')
+            return redirect(url_for('transporte.novo'))
         if funcionario_id:
             funcionario_id = int(funcionario_id)
         if veiculo_id:
@@ -324,8 +327,10 @@ def novo_massa_post():
         valor = float(request.form.get('valor', '0').replace(',', '.'))
         descricao = request.form.get('descricao', '').strip()
         obra_id = request.form.get('obra_id') or None
-        if obra_id:
-            obra_id = int(obra_id)
+        if not obra_id:
+            flash('Selecione a obra para vincular os custos.', 'warning')
+            return redirect(url_for('transporte.novo_massa'))
+        obra_id = int(obra_id)
         dias_semana = [int(d) for d in request.form.getlist('dias_semana')]
         funcionario_ids = [int(f) for f in request.form.getlist('funcionario_ids')]
 
