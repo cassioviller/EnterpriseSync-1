@@ -73,18 +73,43 @@ def editar_rdo_form(rdo_id):
         # Buscar dados completos da obra para carregar serviços
         obra_selecionada = rdo.obra_id
         
-        logger.info(f"✅ RDO carregado: {rdo.numero_rdo}, Obra: {rdo.obra.nome}")
-        logger.info(f"📊 Subatividades encontradas: {len(subatividades_rdo)}")
-        
+        logger.info(f"[OK] RDO carregado: {rdo.numero_rdo}, Obra: {rdo.obra.nome}")
+        logger.info(f"[INFO] Subatividades encontradas: {len(subatividades_rdo)}")
+
+        # V2: Buscar apontamentos de cronograma existentes
+        apontamentos_cronograma = []
+        try:
+            from utils.tenant import is_v2_active
+            if is_v2_active():
+                from models import RDOApontamentoCronograma, TarefaCronograma
+                from app import db as _db
+                aps = RDOApontamentoCronograma.query.filter_by(
+                    rdo_id=rdo_id, admin_id=admin_id
+                ).all()
+                for ap in aps:
+                    t = TarefaCronograma.query.get(ap.tarefa_cronograma_id)
+                    apontamentos_cronograma.append({
+                        'tarefa_id': ap.tarefa_cronograma_id,
+                        'nome_tarefa': t.nome_tarefa if t else '—',
+                        'quantidade_executada_dia': float(ap.quantidade_executada_dia or 0),
+                        'quantidade_acumulada': float(ap.quantidade_acumulada or 0),
+                        'percentual_realizado': float(ap.percentual_realizado or 0),
+                        'percentual_planejado': float(ap.percentual_planejado or 0),
+                        'unidade_medida': (t.unidade_medida or '') if t else '',
+                    })
+        except Exception as e_v2:
+            logger.warning(f"[WARN] Não foi possível carregar apontamentos V2 RDO {rdo_id}: {e_v2}")
+
         return render_template('rdo/editar_rdo.html',
                              rdo=rdo,
                              obras=obras,
                              obra_selecionada=obra_selecionada,
                              subatividades_data=subatividades_data,
-                             funcionarios_data=funcionarios_data)
-                             
+                             funcionarios_data=funcionarios_data,
+                             apontamentos_cronograma=apontamentos_cronograma)
+
     except Exception as e:
-        logger.error(f"❌ Erro ao carregar RDO para edição: {e}")
+        logger.error(f"[ERROR] Erro ao carregar RDO para edição: {e}")
         flash(f'Erro ao carregar RDO: {str(e)}', 'error')
         return redirect(url_for('main.funcionario_rdo_consolidado'))
 

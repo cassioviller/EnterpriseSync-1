@@ -1351,15 +1351,47 @@ def editar_rdo(id):
     """Interface administrativa para editar RDO"""
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        
+
         # Buscar RDO com verificação de acesso
         rdo = RDO.query.join(Obra).filter(
             RDO.id == id,
             Obra.admin_id == admin_id
         ).first_or_404()
-        
-        return render_template('rdo/editar_rdo.html', rdo=rdo)
-        
+
+        obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+
+        # V2: carregar apontamentos cronograma existentes deste RDO
+        apontamentos_cronograma = []
+        try:
+            from utils.tenant import is_v2_active
+            if is_v2_active():
+                from models import RDOApontamentoCronograma, TarefaCronograma
+                aps = (
+                    RDOApontamentoCronograma.query
+                    .filter_by(rdo_id=rdo.id, admin_id=admin_id)
+                    .all()
+                )
+                for ap in aps:
+                    t = TarefaCronograma.query.get(ap.tarefa_cronograma_id)
+                    apontamentos_cronograma.append({
+                        'tarefa_id': ap.tarefa_cronograma_id,
+                        'nome_tarefa': t.nome_tarefa if t else '—',
+                        'quantidade_executada_dia': ap.quantidade_executada_dia,
+                        'quantidade_acumulada': ap.quantidade_acumulada,
+                        'percentual_realizado': ap.percentual_realizado,
+                        'percentual_planejado': ap.percentual_planejado,
+                        'unidade_medida': t.unidade_medida if t else '',
+                    })
+        except Exception as e_v2:
+            logger.warning(f"[WARN] Não foi possível carregar apontamentos V2 para editar_rdo: {e_v2}")
+
+        return render_template(
+            'rdo/editar_rdo.html',
+            rdo=rdo,
+            obras=obras,
+            apontamentos_cronograma=apontamentos_cronograma,
+        )
+
     except Exception as e:
         logger.error(f"ERRO EDITAR RDO: {str(e)}")
         flash('Erro ao carregar RDO para edição.', 'error')

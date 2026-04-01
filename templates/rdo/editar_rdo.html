@@ -324,6 +324,41 @@
                 </div>
             </div>
 
+            {% if is_v2_active is defined and is_v2_active() %}
+            <!-- ===== CRONOGRAMA V2: Apontamento de Produção Diária (Edição) ===== -->
+            <div class="rdo-card slide-in" id="cardCronogramaV2Edit">
+                <div class="rdo-card-header" style="background:linear-gradient(135deg,#0d6efd 0%,#0a58ca 100%)">
+                    <h3>
+                        <i class="fas fa-project-diagram"></i>
+                        Apontamento de Produção — Cronograma
+                        <span class="badge bg-light text-primary ms-2" style="font-size:.65rem">V2</span>
+                    </h3>
+                    <button type="button" class="btn btn-sm btn-light" onclick="carregarTarefasRDOEdit()" title="Atualizar">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="rdo-card-body p-0">
+                    <div id="cronogramaLoadingEdit" class="text-center p-4 text-muted d-none">
+                        <i class="fas fa-spinner fa-spin fa-2x mb-2"></i><br>Carregando tarefas…
+                    </div>
+                    <div id="cronogramaEmptyEdit" class="text-center p-4 text-muted d-none">
+                        <i class="fas fa-clipboard-list fa-2x mb-2 opacity-50"></i><br>
+                        <span>Nenhuma tarefa cadastrada no cronograma desta obra.</span>
+                    </div>
+                    {% if apontamentos_cronograma is defined and apontamentos_cronograma %}
+                    <div class="p-3 border-bottom bg-light">
+                        <small class="text-muted fw-semibold">
+                            <i class="fas fa-check-circle text-success me-1"></i>
+                            {{ apontamentos_cronograma|length }} apontamento(s) já registrado(s) neste RDO.
+                            Altere os valores abaixo para atualizar.
+                        </small>
+                    </div>
+                    {% endif %}
+                    <div id="cronogramaTarefasEdit"></div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Seção de Serviços e Atividades -->
             <div class="rdo-card slide-in">
                 <div class="rdo-card-header">
@@ -501,8 +536,8 @@
 <script>
 // JavaScript para funcionalidades da edição de RDO
 const obraIdAtual = {{ rdo.obra_id }};
-const subatividadesAtuais = {{ subatividades_data|tojson }};
-const funcionariosAtuais = {{ funcionarios_data|tojson }};
+const subatividadesAtuais = {{ (subatividades_data or [])|tojson }};
+const funcionariosAtuais = {{ (funcionarios_data or [])|tojson }};
 const rdoId = {{ rdo.id }};
 
 function carregarServicosParaEdicao() {
@@ -519,7 +554,7 @@ function carregarServicosParaEdicao() {
     `;
     
     // Carregar serviços da obra com dados atuais
-    fetch(`/api/test/rdo/ultimo-rdo-dados/${obraId}`)
+    fetch(`/api/ultimo-rdo-dados/${obraId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -1082,12 +1117,158 @@ async function deletarFoto(fotoId) {
     }
 }
 
+{% if is_v2_active is defined and is_v2_active() %}
+// ── Cronograma V2 — edição de RDO ──────────────────────────────────────────
+const rdoV2ApontamentosExistentes = {{ (apontamentos_cronograma or []) | tojson }};
+// Mapa tarefa_id → quantidade_executada_dia já salva
+const rdoV2QtdAnterior = {};
+rdoV2ApontamentosExistentes.forEach(ap => {
+    rdoV2QtdAnterior[ap.tarefa_id] = ap.quantidade_executada_dia;
+});
+
+async function carregarTarefasRDOEdit() {
+    const obraId = {{ rdo.obra_id }};
+    const data   = '{{ rdo.data_relatorio.isoformat() }}';
+    const loading  = document.getElementById('cronogramaLoadingEdit');
+    const empty    = document.getElementById('cronogramaEmptyEdit');
+    const container= document.getElementById('cronogramaTarefasEdit');
+
+    loading?.classList.remove('d-none');
+    empty?.classList.add('d-none');
+    if (container) container.innerHTML = '';
+
+    try {
+        const res  = await fetch(`/cronograma/obra/${obraId}/tarefas-rdo?data=${data}&rdo_id=${rdoId}`);
+        const json = await res.json();
+        loading?.classList.add('d-none');
+        if (json.status !== 'ok' || !json.tarefas.length) {
+            empty?.classList.remove('d-none');
+            return;
+        }
+        renderizarTarefasEdit(json.tarefas);
+    } catch(e) {
+        loading?.classList.add('d-none');
+        empty?.classList.remove('d-none');
+        console.error('Erro ao carregar tarefas cronograma edit:', e);
+    }
+}
+
+function renderizarTarefasEdit(tarefas) {
+    const container = document.getElementById('cronogramaTarefasEdit');
+    if (!container) return;
+    const paiIds = new Set(tarefas.filter(t => t.tarefa_pai_id).map(t => t.tarefa_pai_id));
+
+    let html = '<div class="p-3">';
+    tarefas.forEach(t => {
+        const isPai = paiIds.has(t.id);
+        const perc_plan = t.percentual_planejado ?? 0;
+        const perc_real = t.percentual_realizado ?? 0;
+        const status_cor   = perc_real >= perc_plan ? '#28a745' : '#dc3545';
+        const status_label = perc_real >= perc_plan ? 'Em dia' : 'Atrasado';
+        const qty_total = t.quantidade_total ? `${t.quantidade_total} ${t.unidade_medida}` : '—';
+        const qty_acum  = t.quantidade_acumulada
+            ? `${t.quantidade_acumulada.toFixed(2)} ${t.unidade_medida}`
+            : `0 ${t.unidade_medida}`;
+        const qty_hoje  = t.quantidade_executada_hoje ?? rdoV2QtdAnterior[t.id] ?? 0;
+        const indent  = t.tarefa_pai_id ? 'ms-4' : '';
+        const bgCard  = isPai ? '#f0f7ff' : '#ffffff';
+        const boldCls = isPai ? 'fw-bold' : '';
+        const hasInput = !isPai;
+
+        html += `
+        <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden">
+          <div class="d-flex align-items-center gap-2 p-2 ps-3 flex-wrap">
+            <span class="flex-grow-1 ${boldCls}">
+              ${isPai
+                ? '<i class="fas fa-folder-open text-primary me-1"></i>'
+                : '<i class="fas fa-tasks text-secondary me-1"></i>'}
+              ${t.nome_tarefa}
+            </span>
+            ${t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
+            ${hasInput ? `
+            <div class="d-flex align-items-center gap-1" style="min-width:200px">
+              <small class="text-muted">Acum: ${qty_acum}</small>
+              <input type="number"
+                     id="qty_edit_${t.id}"
+                     class="form-control form-control-sm"
+                     style="width:85px"
+                     min="0" step="0.01"
+                     placeholder="Hoje"
+                     value="${qty_hoje > 0 ? qty_hoje : ''}"
+                     title="Quantidade executada hoje">
+              <button class="btn btn-primary btn-sm px-2"
+                      onclick="salvarApontamentoEdit(${t.id})"
+                      title="Salvar apontamento">
+                <i class="fas fa-save fa-xs"></i>
+              </button>
+              <span class="text-muted small">${t.unidade_medida || ''}</span>
+            </div>` : ''}
+          </div>
+          ${hasInput ? `
+          <div class="px-3 pb-2">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>Planejado</span><span>${perc_plan.toFixed(1)}%</span>
+            </div>
+            <div class="progress mb-1" style="height:6px;background:#e9ecef">
+              <div class="progress-bar bg-secondary" style="width:${Math.min(perc_plan,100)}%"></div>
+            </div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span style="color:${status_cor};font-weight:600">
+                Realizado &mdash; <small>${status_label}</small>
+              </span>
+              <span id="percReal_${t.id}" style="color:${status_cor};font-weight:600">${perc_real.toFixed(1)}%</span>
+            </div>
+            <div class="progress" style="height:6px;background:#e9ecef">
+              <div class="progress-bar" id="barReal_${t.id}"
+                   style="width:${Math.min(perc_real,100)}%;background:${status_cor}"></div>
+            </div>
+          </div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function salvarApontamentoEdit(tarefaId) {
+    const input = document.getElementById(`qty_edit_${tarefaId}`);
+    if (!input) return;
+    const qty = parseFloat(input.value) || 0;
+
+    try {
+        const res = await fetch(`/cronograma/rdo/${rdoId}/apontar`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({tarefa_cronograma_id: tarefaId, quantidade_executada_dia: qty}),
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            const ap = data.apontamento;
+            const cor = ap.percentual_realizado >= ap.percentual_planejado ? '#28a745' : '#dc3545';
+            const percEl = document.getElementById(`percReal_${tarefaId}`);
+            const barEl  = document.getElementById(`barReal_${tarefaId}`);
+            if (percEl) { percEl.textContent = ap.percentual_realizado.toFixed(1) + '%'; percEl.style.color = cor; }
+            if (barEl)  { barEl.style.width = Math.min(ap.percentual_realizado, 100) + '%'; barEl.style.background = cor; }
+            // Flash feedback
+            input.style.background = '#d4edda';
+            setTimeout(() => { input.style.background = ''; }, 1200);
+        } else {
+            alert(data.msg || 'Erro ao salvar apontamento');
+        }
+    } catch(e) {
+        alert('Erro de rede ao salvar apontamento');
+    }
+}
+{% endif %}
+
 // Carregar serviços e funcionários automaticamente ao carregar a página
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Página de edição carregada - iniciando carregamento');
     carregarServicosParaEdicao();
     carregarFuncionariosParaEdicao();
     carregarGaleria(); // Carregar fotos também
+    {% if is_v2_active is defined and is_v2_active() %}
+    carregarTarefasRDOEdit();
+    {% endif %}
 });
 </script>
 {% endblock %}
