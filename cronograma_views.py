@@ -517,9 +517,9 @@ def apontar_producao(rdo_id: int):
     if not tarefa_id:
         return jsonify({'status': 'error', 'msg': 'tarefa_cronograma_id obrigatório'}), 400
 
-    # Verificar que o RDO pertence ao admin
+    # Verificar que o RDO pertence ao admin (isolamento multi-tenant)
     from models import RDO
-    rdo = RDO.query.get(rdo_id)
+    rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
     if not rdo:
         return jsonify({'status': 'error', 'msg': 'RDO não encontrado'}), 404
 

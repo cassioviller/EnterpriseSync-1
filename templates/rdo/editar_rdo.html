@@ -1173,7 +1173,8 @@ function renderizarTarefasEdit(tarefas) {
         const indent  = t.tarefa_pai_id ? 'ms-4' : '';
         const bgCard  = isPai ? '#f0f7ff' : '#ffffff';
         const boldCls = isPai ? 'fw-bold' : '';
-        const hasInput = !isPai;
+        // Input só aparece para tarefas folha COM quantidade_total definida
+        const hasInput = !isPai && t.quantidade_total > 0;
 
         html += `
         <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden">
@@ -1184,19 +1185,21 @@ function renderizarTarefasEdit(tarefas) {
                 : '<i class="fas fa-tasks text-secondary me-1"></i>'}
               ${t.nome_tarefa}
             </span>
-            ${t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
+            ${t.quantidade_total
+              ? `<small class="text-muted">Total: ${qty_total}</small>`
+              : `<small class="text-warning fst-italic"><i class="fas fa-exclamation-circle fa-xs me-1"></i>Sem qtd. definida</small>`}
             ${hasInput ? `
             <div class="d-flex align-items-center gap-1" style="min-width:200px">
               <small class="text-muted">Acum: ${qty_acum}</small>
               <input type="number"
                      id="qty_edit_${t.id}"
                      class="form-control form-control-sm"
-                     style="width:85px"
+                     style="width:85px;transition:background .3s"
                      min="0" step="0.01"
                      placeholder="Hoje"
                      value="${qty_hoje > 0 ? qty_hoje : ''}"
                      title="Quantidade executada hoje">
-              <button class="btn btn-primary btn-sm px-2"
+              <button id="btn_save_${t.id}" class="btn btn-primary btn-sm px-2"
                       onclick="salvarApontamentoEdit(${t.id})"
                       title="Salvar apontamento">
                 <i class="fas fa-save fa-xs"></i>
@@ -1241,6 +1244,7 @@ async function salvarApontamentoEdit(tarefaId) {
             body: JSON.stringify({tarefa_cronograma_id: tarefaId, quantidade_executada_dia: qty}),
         });
         const data = await res.json();
+        const btn = document.getElementById(`btn_save_${tarefaId}`);
         if (data.status === 'ok') {
             const ap = data.apontamento;
             const cor = ap.percentual_realizado >= ap.percentual_planejado ? '#28a745' : '#dc3545';
@@ -1248,10 +1252,17 @@ async function salvarApontamentoEdit(tarefaId) {
             const barEl  = document.getElementById(`barReal_${tarefaId}`);
             if (percEl) { percEl.textContent = ap.percentual_realizado.toFixed(1) + '%'; percEl.style.color = cor; }
             if (barEl)  { barEl.style.width = Math.min(ap.percentual_realizado, 100) + '%'; barEl.style.background = cor; }
-            // Flash feedback
-            input.style.background = '#d4edda';
-            setTimeout(() => { input.style.background = ''; }, 1200);
+            // Feedback visual robusto: fundo do input + botão verde
+            input.style.backgroundColor = '#d4edda';
+            input.style.borderColor = '#28a745';
+            if (btn) { btn.classList.remove('btn-primary'); btn.classList.add('btn-success'); btn.innerHTML = '<i class="fas fa-check fa-xs"></i>'; }
+            setTimeout(() => {
+                input.style.backgroundColor = '';
+                input.style.borderColor = '';
+                if (btn) { btn.classList.remove('btn-success'); btn.classList.add('btn-primary'); btn.innerHTML = '<i class="fas fa-save fa-xs"></i>'; }
+            }, 2000);
         } else {
+            if (btn) { btn.classList.add('btn-danger'); btn.classList.remove('btn-primary'); setTimeout(() => { btn.classList.remove('btn-danger'); btn.classList.add('btn-primary'); }, 2000); }
             alert(data.msg || 'Erro ao salvar apontamento');
         }
     } catch(e) {
@@ -1268,6 +1279,44 @@ document.addEventListener('DOMContentLoaded', function() {
     carregarGaleria(); // Carregar fotos também
     {% if is_v2_active is defined and is_v2_active() %}
     carregarTarefasRDOEdit();
+
+    // Interceptar submit do formulário principal para salvar cronograma antes
+    const formRDO = document.getElementById('formEditarRDO');
+    if (formRDO && rdoId) {
+        async function _salvarCronogramaESubmeter(e) {
+            // Coletar todos os inputs de quantidade cronograma com valor preenchido
+            const qtyInputs = document.querySelectorAll('input[id^="qty_edit_"]');
+            const pendentes = [];
+            qtyInputs.forEach(inp => {
+                const qty = parseFloat(inp.value);
+                if (!isNaN(qty) && qty >= 0) {
+                    const tarefaId = inp.id.replace('qty_edit_', '');
+                    pendentes.push({ tarefaId: parseInt(tarefaId), qty });
+                }
+            });
+
+            if (pendentes.length === 0) return; // nada a salvar, deixa o form seguir normalmente
+
+            e.preventDefault(); // segurar o submit até salvar os apontamentos
+
+            try {
+                await Promise.all(pendentes.map(({ tarefaId, qty }) =>
+                    fetch(`/cronograma/rdo/${rdoId}/apontar`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tarefa_cronograma_id: tarefaId, quantidade_executada_dia: qty }),
+                    })
+                ));
+            } catch(err) {
+                console.warn('[CRONOGRAMA] Falha ao salvar apontamentos antes do submit:', err);
+            }
+
+            // Remover listener para evitar loop e submeter o form principal
+            formRDO.removeEventListener('submit', _salvarCronogramaESubmeter);
+            formRDO.submit();
+        }
+        formRDO.addEventListener('submit', _salvarCronogramaESubmeter);
+    }
     {% endif %}
 });
 </script>
