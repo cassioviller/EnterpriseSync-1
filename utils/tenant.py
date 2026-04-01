@@ -25,7 +25,7 @@ def get_tenant_admin_id():
         return None
     
     # Lógica baseada APENAS no usuário autenticado
-    if current_user.tipo_usuario == TipoUsuario.ADMIN:
+    if current_user.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
         return current_user.id
     else:
         return current_user.admin_id
