@@ -70,6 +70,45 @@ def _parse_date(s: str | None) -> date | None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ÍNDICE — Lista de obras com cronograma
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/')
+@login_required
+def index():
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+
+    from sqlalchemy import func as sqlfunc
+    # Monta sumário por obra
+    resumos = []
+    for obra in obras:
+        total = TarefaCronograma.query.filter_by(obra_id=obra.id, admin_id=admin_id).count()
+        perc_medio = (
+            db.session.query(sqlfunc.avg(TarefaCronograma.percentual_concluido))
+            .filter_by(obra_id=obra.id, admin_id=admin_id)
+            .scalar()
+        ) or 0.0
+        resumos.append({
+            'obra': obra,
+            'total_tarefas': total,
+            'perc_medio': round(float(perc_medio), 1),
+            'tem_cronograma': total > 0,
+        })
+
+    cal = get_calendario(admin_id)
+    return render_template(
+        'cronograma/index.html',
+        resumos=resumos,
+        calendario=cal,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PÁGINA PRINCIPAL
 # ─────────────────────────────────────────────────────────────────────────────
 

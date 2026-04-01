@@ -52,6 +52,7 @@
               <th style="width:110px">Início</th>
               <th style="width:110px">Término</th>
               <th style="width:60px">Pred.</th>
+              <th style="width:70px">% Feito</th>
               <th style="width:50px"></th>
             </tr>
           </thead>
@@ -103,6 +104,17 @@
                 <span class="pred-val" ondblclick="iniciarEdicao(this, {{ t.id }}, 'predecessora_id')">
                   {{ t.predecessora_id or '—' }}
                 </span>
+              </td>
+              <td class="text-center small perc-val">
+                {% set p = (t.percentual_concluido or 0)|int %}
+                <div class="d-flex align-items-center gap-1" title="{{ p }}% concluído">
+                  <div class="progress flex-grow-1" style="height:5px;border-radius:4px">
+                    <div class="progress-bar
+                      {% if p >= 75 %}bg-success{% elif p >= 40 %}bg-primary{% else %}bg-warning{% endif %}"
+                      style="width:{{ p }}%"></div>
+                  </div>
+                  <span style="font-size:.7rem;min-width:26px;color:#333">{{ p }}%</span>
+                </div>
               </td>
               <td class="text-center">
                 <button class="btn btn-link btn-sm p-0 text-danger"
@@ -473,17 +485,31 @@ function updateTarefaLocal(t) {
   const ini = row.querySelector('.inicio-val');
   const fim = row.querySelector('.fim-val');
   const pred = row.querySelector('.pred-val');
+  const perc = row.querySelector('.perc-val');
   if (ini) ini.textContent = t.data_inicio ? formatDate(t.data_inicio) : '—';
   if (fim) fim.textContent = t.data_fim ? formatDate(t.data_fim) : '—';
   if (pred) pred.textContent = t.predecessora_id || '—';
+  if (perc) perc.innerHTML = buildPercCell(t.percentual_concluido || 0);
   row.dataset.inicio = t.data_inicio || '';
   row.dataset.fim = t.data_fim || '';
+  row.dataset.perc = t.percentual_concluido || 0;
 }
 
 function formatDate(iso) {
   if (!iso) return '—';
   const [y,m,d] = iso.split('-');
   return `${d}/${m}/${y.slice(2)}`;
+}
+
+function buildPercCell(perc) {
+  const p = Math.round(perc || 0);
+  const color = p >= 75 ? 'bg-success' : p >= 40 ? 'bg-primary' : 'bg-warning';
+  return `<div class="d-flex align-items-center gap-1">
+    <div class="progress flex-grow-1" style="height:5px;border-radius:4px">
+      <div class="progress-bar ${color}" style="width:${p}%"></div>
+    </div>
+    <span style="font-size:.7rem;min-width:26px;color:#333">${p}%</span>
+  </div>`;
 }
 
 // ── Recalcular tudo ──
@@ -578,6 +604,7 @@ function adicionarLinhaTabela(t) {
     <td class="text-center small inicio-val">${t.data_inicio?formatDate(t.data_inicio):'—'}</td>
     <td class="text-center small fim-val">${t.data_fim?formatDate(t.data_fim):'—'}</td>
     <td class="text-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')">${t.predecessora_id||'—'}</span></td>
+    <td class="text-center small perc-val">${buildPercCell(t.percentual_concluido||0)}</td>
     <td class="text-center">
       <button class="btn btn-link btn-sm p-0 text-danger" onclick="excluirTarefa(${t.id},'${t.nome_tarefa.replace(/'/g,'')}')" title="Excluir">
         <i class="fas fa-times fa-xs"></i>

@@ -1,0 +1,100 @@
+{% extends "base_completo.html" %}
+{% block title %}Cronograma de Obras{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 py-2">
+
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="mb-0 fw-bold">
+        <i class="fas fa-project-diagram me-2 text-primary"></i>
+        Cronograma de Obras
+        <span class="badge bg-primary ms-2" style="font-size:.65rem;vertical-align:middle">V2</span>
+      </h4>
+      <nav aria-label="breadcrumb" class="mt-1">
+        <ol class="breadcrumb mb-0 small">
+          <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+          <li class="breadcrumb-item active">Cronograma</li>
+        </ol>
+      </nav>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('cronograma.calendario') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-calendar-alt me-1"></i> Calendário
+        {% if calendario.considerar_sabado or calendario.considerar_domingo %}
+          <span class="badge bg-info ms-1">+dias</span>
+        {% endif %}
+      </a>
+    </div>
+  </div>
+
+  {% if not resumos %}
+  <div class="text-center py-5">
+    <i class="fas fa-project-diagram fa-4x text-muted opacity-25 mb-3"></i>
+    <h5 class="text-muted">Nenhuma obra ativa encontrada</h5>
+    <p class="text-muted small">Cadastre uma obra ativa para começar a usar o cronograma.</p>
+    <a href="{{ url_for('main.obras') }}" class="btn btn-primary btn-sm">
+      <i class="fas fa-hammer me-1"></i> Ver Obras
+    </a>
+  </div>
+  {% else %}
+  <div class="row g-3">
+    {% for r in resumos %}
+    <div class="col-md-6 col-xl-4">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:12px;overflow:hidden">
+        <div class="card-body p-3">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <h6 class="fw-semibold mb-0 text-dark">{{ r.obra.nome }}</h6>
+              <small class="text-muted">
+                <i class="fas fa-map-marker-alt me-1"></i>
+                {{ r.obra.endereco or 'Endereço não informado' }}
+              </small>
+            </div>
+            {% if r.tem_cronograma %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:.68rem">
+                <i class="fas fa-check me-1"></i>{{ r.total_tarefas }} tarefas
+              </span>
+            {% else %}
+              <span class="badge bg-light text-muted border" style="font-size:.68rem">
+                <i class="fas fa-plus me-1"></i>Sem cronograma
+              </span>
+            {% endif %}
+          </div>
+
+          {% if r.tem_cronograma %}
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <small class="text-muted">Progresso médio</small>
+              <small class="fw-semibold text-dark">{{ r.perc_medio }}%</small>
+            </div>
+            <div class="progress" style="height:8px;border-radius:6px">
+              <div class="progress-bar
+                {% if r.perc_medio >= 75 %}bg-success
+                {% elif r.perc_medio >= 40 %}bg-primary
+                {% else %}bg-warning{% endif %}"
+                style="width:{{ r.perc_medio }}%"></div>
+            </div>
+          </div>
+          {% else %}
+          <div class="mb-3">
+            <small class="text-muted">Nenhuma tarefa cadastrada ainda. Clique para criar o cronograma.</small>
+          </div>
+          {% endif %}
+
+        </div>
+        <div class="card-footer bg-transparent border-top-0 p-3 pt-0">
+          <a href="{{ url_for('cronograma.cronograma_obra', obra_id=r.obra.id) }}"
+             class="btn btn-primary btn-sm w-100">
+            <i class="fas fa-project-diagram me-1"></i>
+            {% if r.tem_cronograma %}Ver Cronograma{% else %}Criar Cronograma{% endif %}
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
