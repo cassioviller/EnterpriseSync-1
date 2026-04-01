@@ -1,0 +1,53 @@
+# PROMPT 5: Gestão de Compra de Materiais (V2)
+
+**Objetivo:** Criar um fluxo de compras de materiais integrado, onde o lançamento da nota fiscal/recibo de compra gere automaticamente a apropriação de custo na nova Gestão de Custos (Prompt 2), agrupando por Fornecedor.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `compras_views.py`
+- `templates/compras/nova_compra.html`
+- `utils/financeiro_integration.py` (chamada da função `registrar_custo_automatico`)
+
+Por favor, implemente as seguintes alterações passo a passo:
+
+## Passo 1: Atualização do Modelo de Compras (PedidoCompra)
+O sistema já possui os modelos `Fornecedor` e `PedidoCompra`. Precisamos garantir que a compra esteja estritamente vinculada ao Centro de Custo.
+No arquivo `models.py`, atualize a classe `PedidoCompra`:
+```python
+# Adicionar na classe PedidoCompra
+centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=False)
+obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+condicao_pagamento = db.Column(db.String(50)) # 'A Vista', 'Boleto 30 dias', 'Cartão Crédito'
+parcelas = db.Column(db.Integer, default=1)
+
+# Relacionamentos
+centro_custo = db.relationship('CentroCusto', backref='pedidos_compra')
+```
+
+## Passo 2: Interface de Lançamento de Compras
+Crie uma nova tela (`templates/compras/nova_compra.html`):
+1. **Cabeçalho da Compra:** Fornecedor (select), Data da Compra, Centro de Custo (select obrigatório), Obra (opcional), Condição de Pagamento e Número de Parcelas.
+2. **Itens da Compra:** Tabela dinâmica (JavaScript) para adicionar múltiplos materiais.
+   - Colunas: Produto/Material (select do AlmoxarifadoItem), Quantidade, Preço Unitário, Subtotal.
+3. **Resumo:** Valor Total calculado automaticamente.
+4. **Anexo:** Upload do XML ou PDF da Nota Fiscal.
+
+## Passo 3: Processamento no Backend e Integração com Gestão de Custos
+Na rota que salva a compra (`@compras_bp.route('/nova', methods=['POST'])`):
+1. Crie o registro principal (`PedidoCompra`).
+2. Faça um loop nos itens e crie os registros em `PedidoCompraItem`.
+3. Calcule o `valor_total` da compra.
+4. **Integração Crucial:** Após salvar a compra, chame a função `registrar_custo_automatico` (criada no Prompt 2):
+   - `tipo_categoria = 'COMPRA'`
+   - `entidade_nome = fornecedor.nome`
+   - `entidade_id = fornecedor.id`
+   - `data = pedido.data_pedido`
+   - `descricao = f"Compra NF/Pedido {pedido.id} - {len(itens)} itens"`
+   - `valor = pedido.valor_total`
+   - `obra_id = pedido.obra_id`
+   - `origem_tabela = 'pedido_compra'`
+   - `origem_id = pedido.id`
+5. Isso garante que, na tela de Gestão de Custos, apareça um Registro Pai "Compra - Fornecedor X" com o valor total, e ao expandir, mostre os pedidos.
+
+## Passo 4: Proteção V1/V2
+No menu lateral, adicione o link "Gestão de Compras" protegido por `{% if is_v2_active() %}`. Para clientes V1, o fluxo de estoque e financeiro continua separado e manual.

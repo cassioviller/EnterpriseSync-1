@@ -1,0 +1,52 @@
+# PROMPT 8: Módulo RDO Integrado ao Cronograma (V2)
+
+**Objetivo:** Integrar o Relatório Diário de Obra (RDO) ao novo módulo de Cronograma, permitindo o apontamento de produção diária por quantitativo (incremental) e exibindo visualmente o Planejado vs Realizado através de barras de progresso.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `views/rdo.py`
+- `templates/rdo/form.html` (ou criar `form_v2.html`)
+- `templates/rdo/visualizar.html`
+
+Por favor, implemente as seguintes funcionalidades passo a passo:
+
+## Passo 1: Atualização da Modelagem de Dados do RDO
+Modifique o modelo `AtividadeRDO` (ou `RDOServicoSubatividade`) no arquivo `models.py` para vinculá-lo ao cronograma:
+```python
+# Adicionar/Modificar no modelo que registra a atividade do RDO
+tarefa_cronograma_id = db.Column(db.Integer, db.ForeignKey('tarefa_cronograma.id'), nullable=True)
+quantidade_executada_dia = db.Column(db.Float, default=0.0) # O que foi feito APENAS neste dia
+quantidade_acumulada = db.Column(db.Float, default=0.0) # Total até este dia
+percentual_realizado = db.Column(db.Float, default=0.0)
+percentual_planejado = db.Column(db.Float, default=0.0)
+```
+
+## Passo 2: Lógica de Cálculo de Progresso (Planejado vs Realizado)
+Crie uma função utilitária em `utils/cronograma_engine.py` (ex: `calcular_progresso_rdo(tarefa_id, data_rdo)`):
+1. **Planejado:** Calcule quantos dias se passaram desde a `data_inicio` da tarefa até a `data_rdo`. Divida pela `duracao_dias` total da tarefa.
+   - Exemplo: Tarefa de 10 dias (01/04 a 10/04). No dia 01/04 (1º dia), o planejado é 10%. No dia 02/04, é 20%.
+2. **Realizado:** Some todas as `quantidade_executada_dia` de RDOs anteriores a esta data.
+3. **Atualização da Tarefa:** Ao salvar o RDO, o `percentual_concluido` da `TarefaCronograma` deve ser atualizado com base no total acumulado dividido pela `quantidade_total` da tarefa.
+
+## Passo 3: Interface de Apontamento no RDO (Frontend)
+Atualize a tela de criação/edição de RDO (`templates/rdo/form.html`):
+1. **Importação do Cronograma:** A tela deve carregar a árvore de tarefas do cronograma (apenas as que estão ativas na data do RDO). Use a mesma lógica de hierarquia expansível (macros e subdivisões) para evitar poluição visual.
+2. **Campos de Apontamento:** Para cada tarefa filha, exiba:
+   - O quantitativo total (ex: 250 m²).
+   - O acumulado até ontem (ex: 18 m²).
+   - Um botão/input para "Adicionar Produção do Dia". Ao clicar, abre um modal ou input inline perguntando "Quanto foi feito hoje?".
+   - Se o usuário digitar 25, o sistema soma 18 + 25 = 43 m² e salva 25 como `quantidade_executada_dia`.
+3. **Barras Visuais (Planejado vs Realizado):**
+   - Abaixo de cada tarefa, exiba duas barras de progresso finas (linhas).
+   - **Barra 1 (Cinza/Azul):** Porcentagem Planejada (ex: 20%).
+   - **Barra 2 (Colorida):** Porcentagem Realizada (ex: 17.2%).
+   - **Regra de Cor:** Se Realizado >= Planejado, a barra fica **Verde**. Se Realizado < Planejado, a barra fica **Vermelha**.
+   - Coloque o número da porcentagem ao lado de cada barra.
+
+## Passo 4: Gestão de Equipe e Fotos
+1. Mantenha a funcionalidade existente de vincular funcionários (Mão de Obra) ao RDO.
+2. Mantenha a funcionalidade de anexar fotos e registrar ocorrências climáticas.
+3. Certifique-se de que a exclusão de um RDO reverta a `quantidade_executada_dia` e recalcule o percentual da tarefa no cronograma.
+
+## Passo 5: Proteção V1/V2
+Envolva a nova interface de apontamento por cronograma com `{% if is_v2_active() %}`. Se for V1, o usuário continua vendo o formulário antigo de texto livre ou serviços genéricos. Se for V2, ele vê a árvore do cronograma com as barras de progresso.

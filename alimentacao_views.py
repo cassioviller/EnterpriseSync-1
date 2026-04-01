@@ -467,8 +467,7 @@ def lancamento_novo_v2():
             # Lançamento contábil automático V2
             try:
                 from contabilidade_utils import gerar_lancamento_contabil_automatico
-                from utils.tenant import is_v2_active
-                if is_v2_active():
+                if v2:
                     gerar_lancamento_contabil_automatico(
                         admin_id=admin_id,
                         tipo_operacao='despesa_alimentacao',

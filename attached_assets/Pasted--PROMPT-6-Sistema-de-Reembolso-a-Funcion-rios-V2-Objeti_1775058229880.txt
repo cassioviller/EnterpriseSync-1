@@ -1,0 +1,62 @@
+# PROMPT 6: Sistema de Reembolso a Funcionários (V2)
+
+**Objetivo:** Criar um mecanismo universal de reembolso. Em qualquer módulo de lançamento (Restaurantes, Transporte, Compras), deve haver um botão "Reembolso?" (Sim/Não). Se "Sim", o usuário pode selecionar um ou mais funcionários que pagaram a despesa do próprio bolso e informar o valor que cada um deve receber de volta. Isso gera um lançamento automático na Gestão de Custos agrupado por funcionário.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `templates/alimentacao/novo_lancamento.html` (e outros templates de lançamento)
+- `alimentacao_views.py` (e outras views de lançamento)
+- `utils/financeiro_integration.py` (chamada da função `registrar_custo_automatico`)
+
+Por favor, implemente as seguintes alterações passo a passo:
+
+## Passo 1: Modelagem de Dados (Reembolso)
+No arquivo `models.py`, crie um modelo para registrar os reembolsos solicitados:
+```python
+class ReembolsoFuncionario(db.Model):
+    """Registra valores que a empresa deve devolver ao funcionário por despesas pagas do próprio bolso"""
+    __tablename__ = 'reembolso_funcionario'
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    data_despesa = db.Column(db.Date, nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
+    origem_tabela = db.Column(db.String(50)) # 'alimentacao_lancamento', 'lancamento_transporte', etc
+    origem_id = db.Column(db.Integer)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    funcionario = db.relationship('Funcionario', backref='reembolsos')
+```
+
+## Passo 2: Interface Universal de Reembolso (Frontend)
+Em todos os formulários de lançamento de despesas (ex: `templates/alimentacao/novo_lancamento.html`, `templates/transporte/novo_lancamento.html`, `templates/compras/nova_compra.html`):
+1. Adicione um Toggle/Switch: **"Houve pagamento do próprio bolso (Reembolso)?"** (Default: Não).
+2. Se marcado como "Sim", exiba uma seção dinâmica (JavaScript):
+   - Tabela para adicionar múltiplos funcionários.
+   - Colunas: Funcionário (Select), Valor a Reembolsar (Input Numérico).
+   - Botão "Adicionar Funcionário".
+   - *Exemplo de uso:* 10 marmitas de R$ 20 (Total R$ 200). O Funcionário A pagou R$ 80 e o Funcionário B pagou R$ 120.
+
+## Passo 3: Processamento no Backend
+Nas rotas que salvam as despesas (ex: `alimentacao_views.py`):
+1. Salve a despesa principal normalmente (conforme Prompts anteriores).
+2. Verifique se o campo `is_reembolso` veio como `true` no formulário.
+3. Se sim, faça um loop nos dados de reembolso enviados (lista de `funcionario_id` e `valor`).
+4. Para cada funcionário, crie um registro em `ReembolsoFuncionario`.
+5. **Integração Crucial:** Chame a função `registrar_custo_automatico` (criada no Prompt 2) para cada reembolso:
+   - `tipo_categoria = 'REEMBOLSO'`
+   - `entidade_nome = funcionario.nome`
+   - `entidade_id = funcionario.id`
+   - `data = data_despesa`
+   - `descricao = f"Reembolso ref. {descricao_da_despesa_original}"`
+   - `valor = valor_reembolsado`
+   - `obra_id = obra_id`
+   - `origem_tabela = 'reembolso_funcionario'`
+   - `origem_id = reembolso.id`
+
+## Passo 4: Visualização na Gestão de Custos
+Com a integração acima, a tela de Gestão de Custos (Prompt 2) passará a exibir automaticamente um Registro Pai chamado "Reembolso a Pagar - Funcionário X" com o valor total devido a ele. Ao expandir, o financeiro verá exatamente quais despesas (marmitas, gasolina, etc.) geraram aquele reembolso, podendo solicitar e autorizar o pagamento unificado.
