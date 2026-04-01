@@ -479,6 +479,28 @@ def lancamento_novo_v2():
             except Exception as _e:
                 logger.warning(f"[WARN] Lancamento contabil alimentacao nao gerado: {_e}")
 
+            # Integração automática: Gestão de Custos V2
+            try:
+                from utils.financeiro_integration import registrar_custo_automatico
+                _rest_nome = restaurante.nome if restaurante else 'Alimentação'
+                registrar_custo_automatico(
+                    admin_id=admin_id,
+                    tipo_categoria='ALIMENTACAO',
+                    entidade_nome=_rest_nome,
+                    entidade_id=restaurante.id if restaurante else None,
+                    data=lancamento.data,
+                    descricao=lancamento.descricao or f'Refeições — {_rest_nome}',
+                    valor=float(valor_total),
+                    obra_id=obra.id if obra else None,
+                    origem_tabela='alimentacao_lancamento',
+                    origem_id=lancamento.id,
+                )
+                from app import db as _db
+                _db.session.commit()
+                logger.info(f"[OK] GestaoCusto ALIMENTACAO registrado para {_rest_nome}")
+            except Exception as _e:
+                logger.warning(f"[WARN] Gestao custo alimentacao nao registrado: {_e}")
+
             # --- Emitir evento para integração ---
             try:
                 from event_manager import EventManager

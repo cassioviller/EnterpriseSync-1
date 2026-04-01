@@ -293,6 +293,30 @@ def nova_post():
         except Exception as _e:
             logger.warning(f"[WARN] Lancamento contabil compra nao gerado: {_e}")
 
+        # Integração automática: Gestão de Custos V2
+        try:
+            from utils.financeiro_integration import registrar_custo_automatico
+            _forn = Fornecedor.query.get(fornecedor_id)
+            _forn_nome = _forn.nome if _forn else 'Fornecedor'
+            registrar_custo_automatico(
+                admin_id=admin_id,
+                tipo_categoria='COMPRA',
+                entidade_nome=_forn_nome,
+                entidade_id=fornecedor_id,
+                data=data_compra,
+                descricao=f"Compra{(' NF ' + numero) if numero else ''} — {_forn_nome}",
+                valor=float(valor_total),
+                obra_id=obra_id,
+                centro_custo_id=centro_custo_id,
+                origem_tabela='pedido_compra',
+                origem_id=pedido.id,
+            )
+            from app import db as _db
+            _db.session.commit()
+            logger.info(f"[OK] GestaoCusto COMPRA registrado para {_forn_nome}")
+        except Exception as _e:
+            logger.warning(f"[WARN] Gestao custo compra nao registrado: {_e}")
+
         flash(f'Compra registrada com sucesso! {n_parcelas} conta(s) a pagar gerada(s).', 'success')
         return redirect(url_for('compras.index'))
 

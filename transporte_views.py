@@ -236,6 +236,39 @@ def novo_post():
         except Exception as _e:
             logger.warning(f"[WARN] Lancamento contabil transporte nao gerado: {_e}")
 
+        # Integração automática: Gestão de Custos V2
+        try:
+            from utils.financeiro_integration import registrar_custo_automatico
+            if funcionario_id:
+                _func = Funcionario.query.get(funcionario_id)
+                _entidade_nome = _func.nome if _func else 'Funcionário'
+                _entidade_id = funcionario_id
+            elif veiculo_id:
+                _veic = Vehicle.query.get(veiculo_id)
+                _entidade_nome = _veic.placa if _veic else 'Veículo'
+                _entidade_id = veiculo_id
+            else:
+                _entidade_nome = 'Transporte Geral'
+                _entidade_id = None
+            registrar_custo_automatico(
+                admin_id=admin_id,
+                tipo_categoria='TRANSPORTE',
+                entidade_nome=_entidade_nome,
+                entidade_id=_entidade_id,
+                data=data_lancamento,
+                descricao=descricao or f'Lançamento de transporte — {_entidade_nome}',
+                valor=float(valor),
+                obra_id=obra_id,
+                centro_custo_id=centro_custo_id,
+                origem_tabela='lancamento_transporte',
+                origem_id=lancamento.id,
+            )
+            from app import db as _db
+            _db.session.commit()
+            logger.info(f"[OK] GestaoCusto TRANSPORTE registrado para {_entidade_nome}")
+        except Exception as _e:
+            logger.warning(f"[WARN] Gestao custo transporte nao registrado: {_e}")
+
         flash('Lançamento de transporte registrado com sucesso!', 'success')
         return redirect(url_for('transporte.index'))
 

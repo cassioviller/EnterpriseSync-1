@@ -1,0 +1,58 @@
+# PROMPT 1: Gestão de Funcionários, Diárias Fracionadas, VA e VT (V2)
+
+**Objetivo:** Permitir que a empresa escolha se um funcionário recebe por "Salário Fixo Mensal" (V1) ou por "Diária" (V2). Para diaristas, o lançamento de presença (ponto) deve gerar imediatamente o custo na Gestão de Custos, permitindo diárias fracionadas (ex: meia diária na Obra A, meia na Obra B). Além disso, criar um local para lançar Vale Alimentação (VA) e Vale Transporte (VT) por funcionário e obra.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `ponto_views.py` (ou onde o ponto é registrado)
+- `equipe_views.py` (ou `employees.py`)
+- `templates/funcionario/form.html`
+
+Por favor, implemente as seguintes alterações passo a passo, garantindo que a lógica V2 só seja ativada se `is_v2_active()` for verdadeiro.
+
+## Passo 1: Atualização do Modelo Funcionario e RegistroPonto
+No arquivo `models.py`, certifique-se de que a classe `Funcionario` possui os campos de remuneração e atualize `RegistroPonto` para suportar diárias fracionadas:
+```python
+# Na classe Funcionario (se não existir)
+tipo_remuneracao = db.Column(db.String(20), default='salario') # 'salario' ou 'diaria'
+valor_diaria = db.Column(db.Float, default=0.0)
+
+# Na classe RegistroPonto (ou criar um modelo PontoDiariaObra se preferir separar)
+# Adicionar suporte a fracionamento (ex: 0.5 diária)
+quantidade_diaria = db.Column(db.Float, default=1.0) 
+valor_diaria_aplicado = db.Column(db.Float, default=0.0) # quantidade_diaria * funcionario.valor_diaria
+```
+
+## Passo 2: Interface de Cadastro/Edição de Funcionário
+No template de formulário de funcionário:
+1. Adicione um campo Select para "Tipo de Remuneração" (Salário Fixo / Diária).
+2. Adicione um campo Input para "Valor da Diária (R$)".
+3. Use JavaScript para mostrar/ocultar: se "Salário Fixo", mostra salário mensal; se "Diária", mostra valor da diária.
+
+## Passo 3: Lançamento de Ponto (Diárias Fracionadas)
+Na tela de lançamento de ponto/presença diária:
+1. Permita que o usuário lance múltiplas linhas para o mesmo funcionário no mesmo dia, desde que em obras diferentes.
+2. Adicione um campo "Quantidade de Diária" (ex: 1, 0.5, 0.25).
+3. Exemplo: Cássio trabalhou 0.5 diária na Obra A e 0.5 diária na Obra B.
+
+## Passo 4: Integração Imediata com Gestão de Custos (Apenas Diaristas)
+No backend (`ponto_views.py`), ao salvar a presença de um funcionário:
+1. Verifique o `tipo_remuneracao`.
+2. **Se for 'salario':** Não faça nada na Gestão de Custos agora (o custo será gerado no fechamento da folha).
+3. **Se for 'diaria':**
+   - Calcule o valor: `quantidade_diaria * funcionario.valor_diaria`.
+   - Crie um registro na tabela `ContaPagar` (ou `LancamentoCusto` que você criará no Prompt 2) com:
+     - `origem_tipo = 'DIARIA'`
+     - `origem_id = registro_ponto.id`
+     - `obra_id = registro_ponto.obra_id`
+     - `valor = valor_calculado`
+     - `status = 'PENDENTE'` (Aguardando solicitação de pagamento)
+
+## Passo 5: Lançamento Avulso de VA e VT
+Crie uma nova tela/rota (ex: `/funcionarios/beneficios/lancar`) para lançar Vale Alimentação e Vale Transporte avulsos:
+1. **Formulário:** Data, Tipo (VA ou VT), Funcionário(s) (permite selecionar múltiplos), Obra/Centro de Custo, Valor por Funcionário.
+2. **Backend:** Ao salvar, crie um registro na Gestão de Custos (`ContaPagar` ou `LancamentoCusto`) para cada funcionário selecionado:
+   - `origem_tipo = 'VA'` ou `'VT'`
+   - `obra_id = obra_selecionada`
+   - `valor = valor_informado`
+   - `status = 'PENDENTE'`
