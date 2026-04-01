@@ -779,17 +779,36 @@
                             </ul>
                         </li>
                         
+                        {% if not is_v2_active() %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('frota.lista') }}">
                                 <i class="fas fa-car me-1"></i> Veículos
                             </a>
                         </li>
+                        {% endif %}
 
                         {% if is_v2_active() %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('transporte.index') }}">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="transporteDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="fas fa-route me-1"></i> Transporte
                             </a>
+                            <ul class="dropdown-menu" aria-labelledby="transporteDropdown">
+                                <li><h6 class="dropdown-header"><i class="fas fa-user-friends me-1"></i> Deslocamentos</h6></li>
+                                <li><a class="dropdown-item" href="{{ url_for('transporte.index') }}">
+                                    <i class="fas fa-list me-1"></i> Lançamentos
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('transporte.novo') }}">
+                                    <i class="fas fa-plus me-1"></i> Novo Lançamento
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header"><i class="fas fa-truck me-1"></i> Frota Própria <span class="badge bg-primary ms-1" style="font-size:.65rem">V2</span></h6></li>
+                                <li><a class="dropdown-item" href="{{ url_for('frota.lista') }}">
+                                    <i class="fas fa-car me-1"></i> Veículos da Frota
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('frota.dashboard') }}">
+                                    <i class="fas fa-chart-bar me-1"></i> Dashboard de Frota
+                                </a></li>
+                            </ul>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('gestao_custos.index') }}">

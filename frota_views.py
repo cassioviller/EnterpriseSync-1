@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from models import Veiculo as FrotaVeiculo, UsoVeiculo as FrotaUtilizacao, CustoVeiculo as FrotaDespesa, Funcionario, Obra
 from app import db
-from utils.tenant import get_tenant_admin_id
+from utils.tenant import get_tenant_admin_id, is_v2_active
 from datetime import datetime
 import logging
 logger = logging.getLogger(__name__)
@@ -596,7 +596,33 @@ def novo_custo(veiculo_id):
             
             db.session.add(novo_custo)
             db.session.commit()
-            
+
+            # Integração automática: Gestão de Custos V2
+            try:
+                if is_v2_active():
+                    from utils.financeiro_integration import registrar_custo_automatico
+                    _tipo_desc = dados.get('tipo', 'Custo de Veículo').replace('_', ' ').title()
+                    _descricao = f"{_tipo_desc} — {veiculo.placa}"
+                    if dados.get('descricao'):
+                        _descricao += f" — {dados['descricao']}"
+                    registrar_custo_automatico(
+                        admin_id=tenant_admin_id,
+                        tipo_categoria='VEICULO',
+                        entidade_nome=veiculo.placa,
+                        entidade_id=veiculo_id,
+                        data=novo_custo.data_custo,
+                        descricao=_descricao,
+                        valor=float(novo_custo.valor),
+                        obra_id=novo_custo.obra_id,
+                        origem_tabela='custo_veiculo',
+                        origem_id=novo_custo.id,
+                    )
+                    from app import db as _db
+                    _db.session.commit()
+                    logger.info(f"[OK] GestaoCusto VEICULO registrado para {veiculo.placa}")
+            except Exception as _e:
+                logger.warning(f"[WARN] Gestao custo veiculo nao registrado: {_e}")
+
             flash(f'Custo registrado com sucesso!', 'success')
             return redirect(url_for('frota.detalhes', id=veiculo_id))
             

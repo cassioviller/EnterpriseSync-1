@@ -110,6 +110,7 @@ CATEGORIA_LABELS = {
     'SALARIO': 'Pagamento Salário',
     'ALIMENTACAO': 'Despesa Alimentação',
     'TRANSPORTE': 'Despesa Transporte',
+    'VEICULO': 'Despesa de Frota',
     'COMPRA': 'Compra de Material',
     'REEMBOLSO': 'Reembolso a Pagar',
     'OUTROS': 'Outros Custos',
