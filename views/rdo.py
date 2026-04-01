@@ -40,7 +40,7 @@ def rdos():
         logger.info("[TARGET] RDO LISTA VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
         logger.info("[LOC] ROTA USADA: /rdos, /rdo, /rdo/lista (rdos)")
         logger.info("[DOC] TEMPLATE: rdo_lista_unificada.html (MODERNO)")
-        logger.info("[USER] USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
+        logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
         # Criar sessão isolada para evitar problemas
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
@@ -280,7 +280,20 @@ def excluir_rdo(rdo_id):
         db.session.query(RDOMaoObra).filter(RDOMaoObra.rdo_id == rdo_id).delete()
         db.session.query(RDOServicoSubatividade).filter(RDOServicoSubatividade.rdo_id == rdo_id).delete()
         db.session.query(RDOOcorrencia).filter(RDOOcorrencia.rdo_id == rdo_id).delete()
-        
+
+        # V2: Excluir apontamentos de cronograma e recalcular percentuais das tarefas
+        try:
+            from models import RDOApontamentoCronograma
+            from utils.cronograma_engine import atualizar_percentual_tarefa
+            aps = RDOApontamentoCronograma.query.filter_by(rdo_id=rdo_id).all()
+            tarefa_ids_afetadas = [ap.tarefa_cronograma_id for ap in aps]
+            db.session.query(RDOApontamentoCronograma).filter_by(rdo_id=rdo_id).delete()
+            db.session.flush()
+            for tid in tarefa_ids_afetadas:
+                atualizar_percentual_tarefa(tid, admin_id)
+        except Exception as e_v2:
+            logger.warning(f"[WARN] Falha ao limpar apontamentos V2 do RDO {rdo_id}: {e_v2}")
+
         # Excluir RDO
         db.session.delete(rdo)
         db.session.commit()
@@ -303,7 +316,7 @@ def novo_rdo():
         logger.info("[TARGET] RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
         logger.info("[LOC] ROTA USADA: /rdo/novo (novo_rdo)")
         logger.info("[DOC] TEMPLATE: rdo/novo.html (MODERNO)")
-        logger.info("[USER] USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
+        logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
         # Buscar obras disponíveis
@@ -612,6 +625,64 @@ def criar_rdo():
                 logger.error(f"ERRO geral ao processar fotos: {str(e)}", exc_info=True)
                 flash(f'RDO criado, mas houve erro ao processar fotos: {str(e)}', 'warning')
         
+        # V2: Processar apontamentos de produção do cronograma
+        try:
+            from utils.tenant import is_v2_active
+            from models import RDOApontamentoCronograma, TarefaCronograma
+            from utils.cronograma_engine import calcular_progresso_rdo, atualizar_percentual_tarefa
+            if is_v2_active():
+                # Campos enviados como cronograma_tarefa_<id>=<qty>
+                tarefa_ids_afetadas = []
+                for key, val in request.form.items():
+                    if key.startswith('cronograma_tarefa_'):
+                        try:
+                            tarefa_id = int(key.replace('cronograma_tarefa_', ''))
+                            qty = float(val or 0)
+                            if qty <= 0:
+                                continue
+                            tarefa = TarefaCronograma.query.filter_by(
+                                id=tarefa_id, admin_id=admin_id
+                            ).first()
+                            if not tarefa:
+                                continue
+                            # Calcular acumulado antes deste RDO
+                            from sqlalchemy import func as sqlfunc
+                            acum_ant = (
+                                db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
+                                .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+                                .filter(
+                                    RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+                                    RDOApontamentoCronograma.admin_id == admin_id,
+                                    RDO.data_relatorio < data_relatorio,
+                                )
+                                .scalar()
+                            ) or 0.0
+                            nova_acum = acum_ant + qty
+                            progresso = calcular_progresso_rdo(tarefa_id, data_relatorio, admin_id)
+                            perc_real = 0.0
+                            if tarefa.quantidade_total and tarefa.quantidade_total > 0:
+                                perc_real = min(100.0, round(nova_acum / tarefa.quantidade_total * 100, 2))
+                            ap = RDOApontamentoCronograma(
+                                rdo_id=rdo.id,
+                                tarefa_cronograma_id=tarefa_id,
+                                quantidade_executada_dia=qty,
+                                quantidade_acumulada=nova_acum,
+                                percentual_realizado=perc_real,
+                                percentual_planejado=progresso['percentual_planejado'],
+                                admin_id=admin_id,
+                            )
+                            db.session.add(ap)
+                            tarefa_ids_afetadas.append(tarefa_id)
+                        except (ValueError, TypeError) as e_parse:
+                            logger.warning(f"[WARN] Apontamento inválido {key}={val}: {e_parse}")
+                db.session.flush()
+                for tid in tarefa_ids_afetadas:
+                    atualizar_percentual_tarefa(tid, admin_id)
+                if tarefa_ids_afetadas:
+                    logger.info(f"[OK] {len(tarefa_ids_afetadas)} apontamento(s) cronograma V2 salvos no RDO {rdo.id}")
+        except Exception as e_v2:
+            logger.warning(f"[WARN] Falha ao salvar apontamentos V2: {e_v2}")
+
         db.session.commit()
         
         flash(f'RDO {numero_rdo} criado com sucesso!', 'success')
@@ -631,7 +702,7 @@ def visualizar_rdo(id):
         logger.info("[TARGET] RDO VISUALIZAR VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
         logger.debug(f"[LOC] ROTA USADA: /rdo/{id} (visualizar_rdo)")
         logger.info("[DOC] TEMPLATE: rdo/visualizar_rdo_moderno.html (MODERNO)")
-        logger.info("[USER] USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
+        logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
         # Buscar RDO diretamente sem verificação de acesso
         rdo = RDO.query.options(
             db.joinedload(RDO.obra),
@@ -959,6 +1030,33 @@ def visualizar_rdo(id):
                 dados['subatividades'].sort(key=extrair_numero_subatividade)
                 logger.debug(f"[NUM] SUBATIVIDADES ORDENADAS PARA SERVIÇO {servico_id}: {len(dados['subatividades'])} itens")
         
+        # V2: Buscar apontamentos de produção do cronograma para este RDO
+        apontamentos_cronograma = []
+        try:
+            from utils.tenant import is_v2_active
+            from models import RDOApontamentoCronograma
+            from utils.cronograma_engine import calcular_progresso_rdo
+            if is_v2_active():
+                aps = (
+                    RDOApontamentoCronograma.query
+                    .filter_by(rdo_id=rdo.id)
+                    .all()
+                )
+                for ap in aps:
+                    t = ap.tarefa
+                    apontamentos_cronograma.append({
+                        'tarefa_id': ap.tarefa_cronograma_id,
+                        'nome_tarefa': t.nome_tarefa if t else '—',
+                        'unidade_medida': (t.unidade_medida or '') if t else '',
+                        'quantidade_total': t.quantidade_total if t else None,
+                        'quantidade_executada_dia': ap.quantidade_executada_dia,
+                        'quantidade_acumulada': ap.quantidade_acumulada,
+                        'percentual_realizado': ap.percentual_realizado,
+                        'percentual_planejado': ap.percentual_planejado,
+                    })
+        except Exception as e_v2:
+            logger.warning(f"[WARN] Falha ao buscar apontamentos V2 do RDO {id}: {e_v2}")
+
         return render_template('rdo/visualizar_rdo_moderno.html', 
                              rdo=rdo, 
                              subatividades=subatividades,
@@ -969,7 +1067,8 @@ def visualizar_rdo(id):
                              progresso_obra=progresso_obra,
                              total_subatividades_obra=total_subatividades_obra,
                              peso_por_subatividade=peso_por_subatividade,
-                             total_horas_trabalhadas=total_horas_trabalhadas)
+                             total_horas_trabalhadas=total_horas_trabalhadas,
+                             apontamentos_cronograma=apontamentos_cronograma)
         
     except Exception as e:
         logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")
@@ -1537,7 +1636,7 @@ def rdo_novo_unificado():
         logger.info("[TARGET] RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
         logger.info("[LOC] ROTA USADA: /rdo/novo (rdo_novo_unificado)")
         logger.debug(f"[DOC] TEMPLATE: {template} (MODERNO)")
-        logger.info("[USER] USUÁRIO:", current_user.email if hasattr(current_user, 'email') else 'N/A')
+        logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
         logger.debug(f"[LOCK] TIPO USUÁRIO: {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'N/A'}")
         
         # Adicionar data atual para o template
@@ -3115,7 +3214,19 @@ def salvar_rdo_flexivel():
         funcionario_id = session.get('funcionario_id') or request.form.get('funcionario_id', type=int)
         admin_id = session.get('admin_id') or request.form.get('admin_id_form', type=int)
         obra_id = request.form.get('obra_id', type=int)
-        
+
+        # FALLBACK ADMIN: Se admin/super_admin fez login, usar seu ID diretamente
+        if not admin_id and current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+                session['admin_id'] = admin_id
+                logger.info(f"[SYNC] Admin_id via current_user (ADMIN): {admin_id}")
+            elif current_user.tipo_usuario == TipoUsuario.FUNCIONARIO and current_user.admin_id:
+                admin_id = current_user.admin_id
+                funcionario_id = funcionario_id or current_user.id
+                session['admin_id'] = admin_id
+                logger.info(f"[SYNC] Admin_id via current_user (FUNCIONARIO): {admin_id}")
+
         # FALLBACK: Se sessão perdida, buscar admin_id dinamicamente
         if not admin_id and funcionario_id:
             funcionario = Funcionario.query.get(funcionario_id)
@@ -3140,7 +3251,9 @@ def salvar_rdo_flexivel():
                 session['funcionario_id'] = funcionario_id
                 logger.info(f"[SYNC] Funcionario_id recuperado: {funcionario_id}")
         
-        if not all([funcionario_id, admin_id, obra_id]):
+        # Admin users may create RDOs without an employee ID (they are the author)
+        _is_admin_user = current_user.is_authenticated and current_user.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN)
+        if not all([admin_id, obra_id]) or (not funcionario_id and not _is_admin_user):
             logger.error(f"[ERROR] Dados inválidos: funcionario_id={funcionario_id}, admin_id={admin_id}, obra_id={obra_id}")
             logger.error(f"[ERROR] Campos form: {list(request.form.keys())[:10]}")
             flash('Dados de sessão inválidos. Faça login novamente.', 'error')
@@ -3176,12 +3289,23 @@ def salvar_rdo_flexivel():
                     service_name = servico_obra.servico.nome
                     logger.info(f"[TARGET] SERVIÇO DA OBRA: {service_name} (ID: {target_service_id})")
                 else:
-                    flash('Não foi possível identificar o serviço para esta obra', 'error')
-                    return redirect(url_for('main.funcionario_rdo_novo'))
+                    # Admin users can create RDOs without a service (V2 cronograma flow)
+                    if _is_admin_user:
+                        target_service_id = None
+                        service_name = 'Geral'
+                        logger.info("[OK] Admin criando RDO sem serviço configurado — permitido")
+                    else:
+                        flash('Não foi possível identificar o serviço para esta obra', 'error')
+                        return redirect(url_for('main.funcionario_rdo_novo'))
             except Exception as e:
                 logger.error(f"[ERROR] Erro ao buscar serviço da obra: {e}")
-                flash('Erro ao identificar serviço da obra', 'error')
-                return redirect(url_for('main.funcionario_rdo_novo'))
+                if _is_admin_user:
+                    target_service_id = None
+                    service_name = 'Geral'
+                    logger.warning("[WARN] Admin RDO: fallback sem serviço após erro")
+                else:
+                    flash('Erro ao identificar serviço da obra', 'error')
+                    return redirect(url_for('main.funcionario_rdo_novo'))
         
         # FASE 2: PROCESSAR DADOS DAS SUBATIVIDADES (Arquitetura Joris Kuypers INLINE)
                 logger.info(f"[DEBUG] DEBUG FORMULÁRIO PRODUÇÃO - TODOS OS CAMPOS:")
@@ -3355,10 +3479,12 @@ def salvar_rdo_flexivel():
             numero_rdo = f"RDO-{admin_id}-{data_relatorio.year}-{random.randint(1000, 9999):04d}"
             logger.warning(f"[FALLBACK] FALLBACK: Usando número aleatório {numero_rdo}")
         
+        # criado_por_id: use funcionario (Usuario) id or fall back to current_user.id for admin logins
+        _criado_por_id = funcionario_id or (current_user.id if current_user.is_authenticated else None)
         rdo = RDO(
             numero_rdo=numero_rdo,
             obra_id=obra_id,
-            criado_por_id=funcionario_id,
+            criado_por_id=_criado_por_id,
             data_relatorio=data_relatorio,
             local=request.form.get('local', 'Campo'),
             admin_id=admin_id
@@ -3552,6 +3678,62 @@ def salvar_rdo_flexivel():
             db.session.commit()
             logger.info(f"[OK] [COMMIT] Commit executado com sucesso!")
             success = True
+
+            # V2: Processar apontamentos de produção do cronograma
+            try:
+                from utils.tenant import is_v2_active
+                from models import RDOApontamentoCronograma, TarefaCronograma
+                from utils.cronograma_engine import calcular_progresso_rdo, atualizar_percentual_tarefa
+                from sqlalchemy import func as sqlfunc
+                if is_v2_active():
+                    tarefa_ids_afetadas = []
+                    for key, val in request.form.items():
+                        if key.startswith('cronograma_tarefa_'):
+                            try:
+                                tarefa_id = int(key.replace('cronograma_tarefa_', ''))
+                                qty = float(val or 0)
+                                if qty <= 0:
+                                    continue
+                                _admin_id = admin_id or (current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else None)
+                                tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=_admin_id).first()
+                                if not tarefa:
+                                    continue
+                                acum_ant = (
+                                    db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
+                                    .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+                                    .filter(
+                                        RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+                                        RDOApontamentoCronograma.admin_id == _admin_id,
+                                        RDO.data_relatorio < data_relatorio,
+                                    )
+                                    .scalar()
+                                ) or 0.0
+                                nova_acum = acum_ant + qty
+                                progresso = calcular_progresso_rdo(tarefa_id, data_relatorio, _admin_id)
+                                perc_real = 0.0
+                                if tarefa.quantidade_total and tarefa.quantidade_total > 0:
+                                    perc_real = min(100.0, round(nova_acum / tarefa.quantidade_total * 100, 2))
+                                ap = RDOApontamentoCronograma(
+                                    rdo_id=rdo.id,
+                                    tarefa_cronograma_id=tarefa_id,
+                                    quantidade_executada_dia=qty,
+                                    quantidade_acumulada=nova_acum,
+                                    percentual_realizado=perc_real,
+                                    percentual_planejado=progresso['percentual_planejado'],
+                                    admin_id=_admin_id,
+                                )
+                                db.session.add(ap)
+                                tarefa_ids_afetadas.append(tarefa_id)
+                            except (ValueError, TypeError) as e_p:
+                                logger.warning(f"[WARN] Apontamento cronograma inválido {key}={val}: {e_p}")
+                    if tarefa_ids_afetadas:
+                        db.session.flush()
+                        for tid in tarefa_ids_afetadas:
+                            atualizar_percentual_tarefa(tid, _admin_id)
+                        db.session.commit()
+                        logger.info(f"[OK] {len(tarefa_ids_afetadas)} apontamento(s) cronograma V2 salvos no RDO {rdo.id}")
+            except Exception as e_v2:
+                logger.warning(f"[WARN] Falha ao salvar apontamentos V2 no salvar_rdo_flexivel: {e_v2}")
             
             # [DEBUG] VERIFICAÇÃO: Consultar banco para confirmar fotos salvas
             logger.info(f"[DEBUG] [VERIFICAÇÃO] Consultando banco para confirmar fotos salvas...")
@@ -3578,8 +3760,11 @@ def salvar_rdo_flexivel():
             success = False
         
         if success:
-            flash(f'RDO {numero_rdo} salvo com sucesso! Serviço: {service_name}', 'success')
-            logger.info(f"[OK] RDO {numero_rdo} salvo com {len(subactivities)} subatividades no serviço {target_service_id}")
+            flash(f'RDO {numero_rdo} salvo com sucesso!', 'success')
+            logger.info(f"[OK] RDO {numero_rdo} salvo com {len(subactivities)} subatividades")
+            # Admins vão para visualização moderna; funcionários para o consolidado
+            if current_user.is_authenticated and current_user.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN):
+                return redirect(url_for('main.visualizar_rdo', id=rdo.id))
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         else:
             # [OK] MENSAGEM DE ERRO DETALHADA

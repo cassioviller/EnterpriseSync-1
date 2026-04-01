@@ -982,6 +982,73 @@ console.log('Initializing RDO view with light theme...');
     </div>
     {% endif %}
 
+    {% if is_v2_active is defined and is_v2_active() and apontamentos_cronograma %}
+    <!-- ===== CRONOGRAMA V2: Planejado vs Realizado ===== -->
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon" style="background:linear-gradient(135deg,#0d6efd,#0a58ca)">
+                    <i class="fas fa-project-diagram"></i>
+                </div>
+                <h3>Produção do Dia — Cronograma V2</h3>
+            </div>
+            <div class="p-4">
+                <div class="row g-3">
+                {% for ap in apontamentos_cronograma %}
+                {% set status_ok = ap.percentual_realizado >= ap.percentual_planejado %}
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid {{ '#28a745' if status_ok else '#dc3545' }} !important">
+                        <div class="card-body pb-2">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="card-title mb-0 fw-semibold">
+                                    <i class="fas fa-tasks me-1 text-secondary fa-xs"></i>
+                                    {{ ap.nome_tarefa }}
+                                </h6>
+                                <span class="badge" style="background:{{ '#28a745' if status_ok else '#dc3545' }}">
+                                    {{ 'Em dia' if status_ok else 'Atrasado' }}
+                                </span>
+                            </div>
+
+                            {% if ap.quantidade_total %}
+                            <div class="d-flex gap-3 mb-3 small text-muted">
+                                <span><strong>Total:</strong> {{ ap.quantidade_total }} {{ ap.unidade_medida }}</span>
+                                <span><strong>Hoje:</strong> {{ ap.quantidade_executada_dia }} {{ ap.unidade_medida }}</span>
+                                <span><strong>Acum:</strong> {{ "%.2f"|format(ap.quantidade_acumulada) }} {{ ap.unidade_medida }}</span>
+                            </div>
+                            {% endif %}
+
+                            <div class="mb-1">
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-muted">Planejado</span>
+                                    <span class="text-muted fw-semibold">{{ "%.1f"|format(ap.percentual_planejado) }}%</span>
+                                </div>
+                                <div class="progress" style="height:5px;background:#e9ecef">
+                                    <div class="progress-bar bg-secondary"
+                                         style="width:{{ [ap.percentual_planejado, 100]|min }}%"
+                                         title="Planejado {{ '%.1f'|format(ap.percentual_planejado) }}%"></div>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <div class="d-flex justify-content-between small">
+                                    <span style="color:{{ '#28a745' if status_ok else '#dc3545' }};font-weight:600">Realizado</span>
+                                    <span style="color:{{ '#28a745' if status_ok else '#dc3545' }};font-weight:600">{{ "%.1f"|format(ap.percentual_realizado) }}%</span>
+                                </div>
+                                <div class="progress" style="height:5px;background:#e9ecef">
+                                    <div class="progress-bar"
+                                         style="width:{{ [ap.percentual_realizado, 100]|min }}%;background:{{ '#28a745' if status_ok else '#dc3545' }}"
+                                         title="Realizado {{ '%.1f'|format(ap.percentual_realizado) }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Seção Mão de Obra -->
     {% if funcionarios %}
     <div class="info-section">

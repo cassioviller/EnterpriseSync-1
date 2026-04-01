@@ -212,3 +212,85 @@ def recalcular_cronograma(obra_id: int, admin_id: int) -> bool:
         except Exception:
             pass
         return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Progresso RDO ↔ Cronograma
+# ─────────────────────────────────────────────────────────────────────────────
+
+def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dict:
+    """
+    Retorna um dict com:
+    - percentual_planejado: quanto deveria estar concluído até data_rdo (linear)
+    - percentual_realizado: total acumulado de produção até data_rdo
+    - quantidade_acumulada: soma de quantidade_executada_dia até data_rdo
+    """
+    from models import TarefaCronograma, RDOApontamentoCronograma, db
+
+    tarefa = TarefaCronograma.query.get(tarefa_id)
+    if not tarefa:
+        return {'percentual_planejado': 0.0, 'percentual_realizado': 0.0, 'quantidade_acumulada': 0.0}
+
+    # ── Planejado (interpolação linear por dias úteis) ──
+    perc_planejado = 0.0
+    if tarefa.data_inicio and tarefa.duracao_dias and tarefa.duracao_dias > 0:
+        cal = get_calendario(admin_id)
+        sab, dom = cal.considerar_sabado, cal.considerar_domingo
+        if data_rdo >= tarefa.data_inicio:
+            dias_passados = dias_uteis_entre(tarefa.data_inicio, data_rdo, sab, dom)
+            perc_planejado = min(100.0, round(dias_passados / tarefa.duracao_dias * 100, 2))
+
+    # ── Realizado ──
+    from sqlalchemy import func as sqlfunc
+    from models import RDO
+
+    acumulado = (
+        db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+        .filter(
+            RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+            RDOApontamentoCronograma.admin_id == admin_id,
+            RDO.data_relatorio <= data_rdo,
+        )
+        .scalar()
+    ) or 0.0
+
+    perc_realizado = 0.0
+    if tarefa.quantidade_total and tarefa.quantidade_total > 0:
+        perc_realizado = min(100.0, round(acumulado / tarefa.quantidade_total * 100, 2))
+
+    return {
+        'percentual_planejado': perc_planejado,
+        'percentual_realizado': perc_realizado,
+        'quantidade_acumulada': acumulado,
+    }
+
+
+def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
+    """
+    Recalcula e persiste o percentual_concluido da TarefaCronograma
+    a partir de todos os apontamentos existentes.
+    """
+    from models import TarefaCronograma, RDOApontamentoCronograma, db
+    from sqlalchemy import func as sqlfunc
+
+    tarefa = TarefaCronograma.query.get(tarefa_id)
+    if not tarefa:
+        return
+
+    total_executado = (
+        db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
+        .filter(
+            RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+            RDOApontamentoCronograma.admin_id == admin_id,
+        )
+        .scalar()
+    ) or 0.0
+
+    if tarefa.quantidade_total and tarefa.quantidade_total > 0:
+        tarefa.percentual_concluido = min(100.0, round(total_executado / tarefa.quantidade_total * 100, 2))
+    else:
+        tarefa.percentual_concluido = 0.0
+
+    db.session.add(tarefa)
+    db.session.commit()

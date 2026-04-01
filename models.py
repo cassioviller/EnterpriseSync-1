@@ -4172,3 +4172,47 @@ class TarefaCronograma(db.Model):
     )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MÓDULO V2: APONTAMENTO DE PRODUÇÃO RDO ↔ CRONOGRAMA — Migration 76
+# ─────────────────────────────────────────────────────────────────────────────
+
+class RDOApontamentoCronograma(db.Model):
+    """
+    Registra a produção diária de uma tarefa do cronograma, vinculada a um RDO.
+    Cada linha = quantidade executada em 1 dia por 1 tarefa.
+    """
+    __tablename__ = 'rdo_apontamento_cronograma'
+
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(
+        db.Integer,
+        db.ForeignKey('rdo.id', ondelete='CASCADE'),
+        nullable=False,
+    )
+    tarefa_cronograma_id = db.Column(
+        db.Integer,
+        db.ForeignKey('tarefa_cronograma.id', ondelete='CASCADE'),
+        nullable=False,
+    )
+    quantidade_executada_dia = db.Column(db.Float, default=0.0, nullable=False)
+    quantidade_acumulada = db.Column(db.Float, default=0.0, nullable=False)
+    percentual_realizado = db.Column(db.Float, default=0.0, nullable=False)
+    percentual_planejado = db.Column(db.Float, default=0.0, nullable=False)
+    admin_id = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    rdo = db.relationship(
+        'RDO',
+        backref=db.backref('apontamentos_cronograma', cascade='all, delete-orphan'),
+    )
+    tarefa = db.relationship('TarefaCronograma', backref='apontamentos')
+
+    def __repr__(self):
+        return (
+            f'<RDOApontamentoCronograma rdo={self.rdo_id} '
+            f'tarefa={self.tarefa_cronograma_id} qty={self.quantidade_executada_dia}>'
+        )

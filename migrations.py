@@ -3775,6 +3775,7 @@ def executar_migracoes():
             (73, "Transporte V2 - tabelas categoria_transporte e lancamento_transporte", _migration_73_transporte_v2),
             (74, "Compras V2 - tabelas pedido_compra e pedido_compra_item", _migration_74_compras_v2),
             (75, "Cronograma V2 - CalendarioEmpresa e TarefaCronograma", _migration_75_cronograma_v2),
+            (76, "RDO Apontamento Cronograma V2 - tabela rdo_apontamento_cronograma", _migration_76_rdo_apontamento_cronograma),
         ]
         
         # Executar cada migração com rastreamento
@@ -6857,6 +6858,71 @@ def _migration_75_cronograma_v2():
 
     except Exception as e:
         logger.error(f"Erro na migracao 75: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_76_rdo_apontamento_cronograma():
+    """
+    MIGRAÇÃO 76: Tabela rdo_apontamento_cronograma para integração RDO ↔ Cronograma V2.
+    Registra produção diária por tarefa do cronograma a partir de um RDO.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        logger.info("Migração 76: criando tabela rdo_apontamento_cronograma")
+
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'rdo_apontamento_cronograma'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            cursor.execute("""
+                CREATE TABLE rdo_apontamento_cronograma (
+                    id SERIAL PRIMARY KEY,
+                    rdo_id INTEGER NOT NULL
+                        REFERENCES rdo(id) ON DELETE CASCADE,
+                    tarefa_cronograma_id INTEGER NOT NULL
+                        REFERENCES tarefa_cronograma(id) ON DELETE CASCADE,
+                    quantidade_executada_dia FLOAT NOT NULL DEFAULT 0.0,
+                    quantidade_acumulada FLOAT NOT NULL DEFAULT 0.0,
+                    percentual_realizado FLOAT NOT NULL DEFAULT 0.0,
+                    percentual_planejado FLOAT NOT NULL DEFAULT 0.0,
+                    admin_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(rdo_id, tarefa_cronograma_id)
+                )
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_rdo_apontamento_rdo
+                    ON rdo_apontamento_cronograma(rdo_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_rdo_apontamento_tarefa
+                    ON rdo_apontamento_cronograma(tarefa_cronograma_id, admin_id)
+            """)
+            logger.info("  rdo_apontamento_cronograma criada com índices")
+        else:
+            logger.info("  rdo_apontamento_cronograma ja existe - SKIP")
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 76 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 76: {e}")
         if connection:
             try:
                 connection.rollback()

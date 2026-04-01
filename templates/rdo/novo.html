@@ -316,6 +316,33 @@
             </div>
         </div>
 
+        {% if is_v2_active is defined and is_v2_active() %}
+        <!-- ===== CRONOGRAMA V2: Apontamento de Produção Diária ===== -->
+        <div class="rdo-card slide-in" id="cardCronogramaV2" style="display:none">
+            <div class="rdo-card-header" style="background:linear-gradient(135deg,#0d6efd 0%,#0a58ca 100%)">
+                <h3>
+                    <i class="fas fa-project-diagram"></i>
+                    Apontamento de Produção — Cronograma
+                    <span class="badge bg-light text-primary ms-2" style="font-size:.65rem">V2</span>
+                </h3>
+                <button type="button" class="btn btn-sm btn-light" onclick="carregarTarefasRDO()" title="Atualizar">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            <div class="rdo-card-body p-0">
+                <div id="cronogramaLoadingRDO" class="text-center p-4 text-muted d-none">
+                    <i class="fas fa-spinner fa-spin fa-2x mb-2"></i><br>Carregando tarefas…
+                </div>
+                <div id="cronogramaEmptyRDO" class="text-center p-4 text-muted d-none">
+                    <i class="fas fa-clipboard-list fa-2x mb-2 opacity-50"></i><br>
+                    <span>Nenhuma tarefa cadastrada no cronograma desta obra.</span><br>
+                    <small>Acesse o Cronograma da obra para criar tarefas.</small>
+                </div>
+                <div id="cronogramaTarefasRDO"></div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Seção de Serviços e Atividades -->
         <div class="rdo-card slide-in">
             <div class="rdo-card-header">
@@ -1085,10 +1112,160 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.value) {
                 console.log(`Obra selecionada: ${this.value}`);
                 carregarDadosUltimoRDO();
+                {% if is_v2_active is defined and is_v2_active() %}
+                carregarTarefasRDO();
+                {% endif %}
             }
         });
     }
+
+    {% if is_v2_active is defined and is_v2_active() %}
+    const dataInput = document.getElementById('data_relatorio');
+    if (dataInput) {
+        dataInput.addEventListener('change', function() {
+            carregarTarefasRDO();
+        });
+    }
+    // Carregar automaticamente se obra já estiver selecionada
+    if (obraSelect && obraSelect.value) {
+        carregarTarefasRDO();
+    }
+    {% endif %}
 });
+
+{% if is_v2_active is defined and is_v2_active() %}
+// ════════════════════════════════════════════════════════
+// CRONOGRAMA V2 — Apontamento de Produção Diária (RDO)
+// ════════════════════════════════════════════════════════
+
+let rdoV2TarefasCache = [];
+
+async function carregarTarefasRDO() {
+    const obraId = document.getElementById('obra_id')?.value;
+    const data = document.getElementById('data_relatorio')?.value;
+    const card = document.getElementById('cardCronogramaV2');
+    const loading = document.getElementById('cronogramaLoadingRDO');
+    const empty = document.getElementById('cronogramaEmptyRDO');
+    const container = document.getElementById('cronogramaTarefasRDO');
+
+    if (!obraId || !data) { if (card) card.style.display = 'none'; return; }
+
+    if (card) card.style.display = '';
+    loading?.classList.remove('d-none');
+    empty?.classList.add('d-none');
+    if (container) container.innerHTML = '';
+
+    try {
+        const res = await fetch(`/cronograma/obra/${obraId}/tarefas-rdo?data=${data}`);
+        const json = await res.json();
+        loading?.classList.add('d-none');
+
+        if (json.status !== 'ok' || !json.tarefas.length) {
+            empty?.classList.remove('d-none');
+            return;
+        }
+
+        rdoV2TarefasCache = json.tarefas;
+        renderizarTarefasRDO(json.tarefas);
+    } catch(e) {
+        loading?.classList.add('d-none');
+        empty?.classList.remove('d-none');
+        console.error('Erro ao carregar tarefas cronograma:', e);
+    }
+}
+
+function renderizarTarefasRDO(tarefas) {
+    const container = document.getElementById('cronogramaTarefasRDO');
+    if (!container) return;
+
+    // Identificar tarefas pai
+    const paiIds = new Set(tarefas.filter(t => t.tarefa_pai_id).map(t => t.tarefa_pai_id));
+
+    let html = '<div class="p-3">';
+    tarefas.forEach(t => {
+        const isPai = paiIds.has(t.id);
+        const isFilho = !!t.tarefa_pai_id;
+        const perc_plan = t.percentual_planejado ?? 0;
+        const perc_real = t.percentual_realizado ?? 0;
+        const status_cor = perc_real >= perc_plan ? '#28a745' : '#dc3545';
+        const status_label = perc_real >= perc_plan ? 'Em dia' : 'Atrasado';
+        const qty_total = t.quantidade_total ? `${t.quantidade_total} ${t.unidade_medida}` : '—';
+        const qty_acum = t.quantidade_acumulada ? `${t.quantidade_acumulada.toFixed(2)} ${t.unidade_medida}` : `0 ${t.unidade_medida}`;
+        const qty_hoje = t.quantidade_executada_hoje ?? 0;
+        const indent = isFilho ? 'ms-4' : '';
+        const bgCard = isPai ? '#f0f7ff' : '#ffffff';
+        const boldClass = isPai ? 'fw-bold' : '';
+
+        // Só habilitar input em tarefas folha (sem filhas)
+        const hasInput = !isPai;
+
+        html += `
+        <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden">
+          <div class="d-flex align-items-center gap-2 p-2 ps-3">
+            <span class="flex-grow-1 ${boldClass}">${isPai ? '<i class="fas fa-folder-open text-primary me-1"></i>' : '<i class="fas fa-tasks text-secondary me-1"></i>'}${t.nome_tarefa}</span>
+            ${t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
+            ${hasInput ? `
+            <div class="d-flex align-items-center gap-1" style="min-width:180px">
+              <small class="text-muted">Acum: ${qty_acum}</small>
+              <input type="number"
+                     id="qty_tarefa_${t.id}"
+                     class="form-control form-control-sm"
+                     style="width:80px"
+                     min="0" step="0.01"
+                     placeholder="Hoje"
+                     value="${qty_hoje > 0 ? qty_hoje : ''}"
+                     onchange="apontarProducaoRDO(${t.id}, this.value)"
+                     title="Quantidade executada hoje">
+              <span class="text-muted small">${t.unidade_medida || ''}</span>
+            </div>` : ''}
+          </div>
+          ${hasInput ? `
+          <div class="px-3 pb-2">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>Planejado</span><span>${perc_plan.toFixed(1)}%</span>
+            </div>
+            <div class="progress mb-1" style="height:6px;background:#e9ecef">
+              <div class="progress-bar bg-secondary" style="width:${perc_plan}%" title="Planejado: ${perc_plan.toFixed(1)}%"></div>
+            </div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span style="color:${status_cor};font-weight:600">Realizado &mdash; <small>${status_label}</small></span>
+              <span style="color:${status_cor};font-weight:600">${perc_real.toFixed(1)}%</span>
+            </div>
+            <div class="progress" style="height:6px;background:#e9ecef">
+              <div class="progress-bar" style="width:${perc_real}%;background:${status_cor}" title="Realizado: ${perc_real.toFixed(1)}%"></div>
+            </div>
+          </div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function apontarProducaoRDO(tarefaId, valor) {
+    const qty = parseFloat(valor) || 0;
+    const obraId = document.getElementById('obra_id')?.value;
+    if (!obraId) { alert('Salve o RDO antes de apontar produção.'); return; }
+
+    // Neste ponto o RDO ainda não foi salvo — armazenamos localmente
+    // e eles serão salvos em bloco na submissão do formulário.
+    // Adicionamos campos hidden ao form para envio.
+    const formId = 'formNovoRDO';
+    const form = document.getElementById(formId);
+    if (!form) return;
+
+    // Remove input hidden anterior desta tarefa (se houver)
+    const prev = form.querySelector(`input[name="cronograma_tarefa_${tarefaId}"]`);
+    if (prev) prev.remove();
+
+    if (qty > 0) {
+        const h = document.createElement('input');
+        h.type = 'hidden';
+        h.name = `cronograma_tarefa_${tarefaId}`;
+        h.value = qty;
+        form.appendChild(h);
+    }
+}
+{% endif %}
 </script>
 
 <!-- Sistema de Autocomplete RDO -->
