@@ -131,6 +131,7 @@ def novo():
     veiculos = Vehicle.query.filter_by(admin_id=admin_id).order_by('modelo').all()
     centros_custo = CentroCusto.query.filter_by(admin_id=admin_id).order_by('nome').all()
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
+    funcionarios_json = [{'id': f.id, 'nome': f.nome} for f in funcionarios]
 
     return render_template(
         'transporte/novo_lancamento.html',
@@ -139,6 +140,7 @@ def novo():
         veiculos=veiculos,
         centros_custo=centros_custo,
         obras=obras,
+        funcionarios_json=funcionarios_json,
         hoje=date.today().isoformat(),
     )
 
@@ -276,6 +278,26 @@ def novo_post():
             logger.info(f"[OK] GestaoCusto TRANSPORTE registrado para {_entidade_nome}")
         except Exception as _e:
             logger.warning(f"[WARN] Gestao custo transporte nao registrado: {_e}")
+
+        # Reembolso a Funcionários V2
+        try:
+            from utils.financeiro_integration import processar_reembolsos_form
+            _desc_reimb = descricao or 'Lançamento de transporte'
+            n_reimb = processar_reembolsos_form(
+                request_form=request.form,
+                admin_id=admin_id,
+                data_despesa=data_lancamento,
+                descricao_origem=_desc_reimb,
+                obra_id=obra_id,
+                centro_custo_id=centro_custo_id,
+                origem_tabela='lancamento_transporte',
+                origem_id=lancamento.id,
+            )
+            if n_reimb:
+                db.session.commit()
+                logger.info(f"[OK] {n_reimb} reembolso(s) registrado(s) no transporte {lancamento.id}")
+        except Exception as _re:
+            logger.warning(f"[WARN] Reembolso transporte nao processado: {_re}")
 
         flash('Lançamento de transporte registrado com sucesso!', 'success')
         return redirect(url_for('transporte.index'))

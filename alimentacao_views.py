@@ -512,6 +512,25 @@ def lancamento_novo_v2():
             except Exception as e:
                 logger.error(f"[ERROR] Erro ao emitir evento alimentacao: {e}")
 
+            # Reembolso a Funcionários V2
+            if v2:
+                try:
+                    from utils.financeiro_integration import processar_reembolsos_form
+                    n_reimb = processar_reembolsos_form(
+                        request_form=request.form,
+                        admin_id=admin_id,
+                        data_despesa=lancamento.data,
+                        descricao_origem=lancamento.descricao or 'Alimentação',
+                        obra_id=lancamento.obra_id,
+                        origem_tabela='alimentacao_lancamento',
+                        origem_id=lancamento.id,
+                    )
+                    if n_reimb:
+                        db.session.commit()
+                        logger.info(f"[OK] {n_reimb} reembolso(s) registrado(s) alimentacao {lancamento.id}")
+                except Exception as _re:
+                    logger.warning(f"[WARN] Reembolso alimentacao nao processado: {_re}")
+
             msg = f'Lançamento criado com sucesso! Total: R$ {valor_total:.2f}'
             if v2:
                 msg += f' ({len(itens_data)} itens detalhados)'

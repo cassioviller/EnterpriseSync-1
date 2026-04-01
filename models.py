@@ -4269,3 +4269,30 @@ class GestaoCustoFilho(db.Model):
 
     def __repr__(self):
         return f'<GestaoCustoFilho pai={self.pai_id} R${self.valor} {self.descricao[:30]}>'
+
+
+# ================================
+# MÓDULO V2: REEMBOLSO A FUNCIONÁRIOS
+# ================================
+
+class ReembolsoFuncionario(db.Model):
+    """Registra valores que a empresa deve devolver ao funcionário por despesas pagas do próprio bolso"""
+    __tablename__ = 'reembolso_funcionario'
+
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    data_despesa = db.Column(db.Date, nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
+    origem_tabela = db.Column(db.String(50))
+    origem_id = db.Column(db.Integer)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    funcionario = db.relationship('Funcionario', backref='reembolsos', foreign_keys=[funcionario_id])
+    obra = db.relationship('Obra', foreign_keys=[obra_id])
+
+    def __repr__(self):
+        return f'<ReembolsoFuncionario func={self.funcionario_id} R${self.valor}>'

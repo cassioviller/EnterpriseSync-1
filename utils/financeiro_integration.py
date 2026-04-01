@@ -105,6 +105,84 @@ def registrar_custo_automatico(
         return None
 
 
+def processar_reembolsos_form(request_form, admin_id, data_despesa, descricao_origem,
+                              obra_id=None, centro_custo_id=None,
+                              origem_tabela=None, origem_id=None):
+    """
+    Lê os campos de reembolso do formulário e persiste os registros.
+
+    Campos esperados no form:
+        is_reembolso  = 'true' | 'false'
+        reimb_func_id[] = lista de funcionario_id
+        reimb_valor[]   = lista de valores
+
+    Retorna número de reembolsos criados (0 se não houver).
+    """
+    try:
+        if request_form.get('is_reembolso') != 'true':
+            return 0
+
+        func_ids = request_form.getlist('reimb_func_id[]')
+        valores = request_form.getlist('reimb_valor[]')
+
+        if not func_ids:
+            return 0
+
+        from app import db
+        from models import ReembolsoFuncionario, Funcionario
+        from decimal import Decimal
+
+        count = 0
+        for func_id_raw, valor_raw in zip(func_ids, valores):
+            try:
+                func_id = int(func_id_raw)
+                valor = Decimal(str(valor_raw).replace(',', '.'))
+                if valor <= 0:
+                    continue
+            except (ValueError, TypeError):
+                continue
+
+            func = Funcionario.query.get(func_id)
+            if not func or func.admin_id != admin_id:
+                continue
+
+            reembolso = ReembolsoFuncionario(
+                funcionario_id=func_id,
+                valor=valor,
+                data_despesa=data_despesa,
+                descricao=f"Reembolso ref. {descricao_origem}"[:200],
+                obra_id=obra_id,
+                centro_custo_id=centro_custo_id,
+                origem_tabela=origem_tabela,
+                origem_id=origem_id,
+                admin_id=admin_id,
+            )
+            db.session.add(reembolso)
+            db.session.flush()
+
+            registrar_custo_automatico(
+                admin_id=admin_id,
+                tipo_categoria='REEMBOLSO',
+                entidade_nome=func.nome,
+                entidade_id=func_id,
+                data=data_despesa,
+                descricao=f"Reembolso ref. {descricao_origem}"[:200],
+                valor=float(valor),
+                obra_id=obra_id,
+                centro_custo_id=centro_custo_id,
+                origem_tabela='reembolso_funcionario',
+                origem_id=reembolso.id,
+            )
+            count += 1
+            logger.info(f"[OK] Reembolso criado: func={func.nome} valor={valor}")
+
+        return count
+
+    except Exception as e:
+        logger.error(f"[ERROR] processar_reembolsos_form: {e}", exc_info=True)
+        return 0
+
+
 # Mapeamento legível de categorias
 CATEGORIA_LABELS = {
     'SALARIO': 'Pagamento Salário',

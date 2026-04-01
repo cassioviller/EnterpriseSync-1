@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from models import (AlmoxarifadoItem, CentroCusto, ContaPagar, CustoObra,
-                    Fornecedor, Obra, PedidoCompra, PedidoCompraItem)
+                    Fornecedor, Funcionario, Obra, PedidoCompra, PedidoCompraItem)
 from utils.tenant import get_tenant_admin_id, is_v2_active
 
 logger = logging.getLogger(__name__)
@@ -119,6 +119,8 @@ def nova():
     centros_custo = CentroCusto.query.filter_by(admin_id=admin_id).order_by('nome').all()
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
     itens_catalogo = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by('nome').all()
+    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
+    funcionarios_json = [{'id': f.id, 'nome': f.nome} for f in funcionarios]
 
     return render_template(
         'compras/nova_compra.html',
@@ -126,6 +128,8 @@ def nova():
         centros_custo=centros_custo,
         obras=obras,
         itens_catalogo=itens_catalogo,
+        funcionarios=funcionarios,
+        funcionarios_json=funcionarios_json,
         CONDICOES=CONDICOES,
         hoje=date.today().isoformat(),
     )
@@ -316,6 +320,25 @@ def nova_post():
             logger.info(f"[OK] GestaoCusto COMPRA registrado para {_forn_nome}")
         except Exception as _e:
             logger.warning(f"[WARN] Gestao custo compra nao registrado: {_e}")
+
+        # Reembolso a Funcionários V2
+        try:
+            from utils.financeiro_integration import processar_reembolsos_form
+            n_reimb = processar_reembolsos_form(
+                request_form=request.form,
+                admin_id=admin_id,
+                data_despesa=data_compra,
+                descricao_origem=f"Compra{(' NF ' + numero) if numero else ''}",
+                obra_id=obra_id,
+                centro_custo_id=centro_custo_id,
+                origem_tabela='pedido_compra',
+                origem_id=pedido.id,
+            )
+            if n_reimb:
+                db.session.commit()
+                logger.info(f"[OK] {n_reimb} reembolso(s) registrado(s) na compra {pedido.id}")
+        except Exception as _re:
+            logger.warning(f"[WARN] Reembolso compra nao processado: {_re}")
 
         flash(f'Compra registrada com sucesso! {n_parcelas} conta(s) a pagar gerada(s).', 'success')
         return redirect(url_for('compras.index'))

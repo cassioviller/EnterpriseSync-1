@@ -3778,6 +3778,7 @@ def executar_migracoes():
             (76, "RDO Apontamento Cronograma V2 - tabela rdo_apontamento_cronograma", _migration_76_rdo_apontamento_cronograma),
             (77, "Gestão de Custos V2 - tabelas gestao_custo_pai e gestao_custo_filho", _migration_77_gestao_custos_v2),
             (78, "Transporte V2 - centro_custo_id nullable + funcionario_id nullable", _migration_78_transporte_centro_custo_nullable),
+            (79, "Reembolso V2 - tabela reembolso_funcionario", _migration_79_reembolso_funcionario),
         ]
         
         # Executar cada migração com rastreamento
@@ -7058,6 +7059,66 @@ def _migration_78_transporte_centro_custo_nullable():
 
     except Exception as e:
         logger.error(f"Erro na migracao 78: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_79_reembolso_funcionario():
+    """Migration 79: Cria tabela reembolso_funcionario para o sistema V2 de reembolsos"""
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_name = 'reembolso_funcionario'
+            )
+        """)
+        exists = cursor.fetchone()[0]
+
+        if not exists:
+            cursor.execute("""
+                CREATE TABLE reembolso_funcionario (
+                    id SERIAL PRIMARY KEY,
+                    funcionario_id INTEGER NOT NULL REFERENCES funcionario(id),
+                    valor NUMERIC(15,2) NOT NULL,
+                    data_despesa DATE NOT NULL,
+                    descricao VARCHAR(200) NOT NULL,
+                    obra_id INTEGER REFERENCES obra(id),
+                    centro_custo_id INTEGER REFERENCES centro_custo(id),
+                    origem_tabela VARCHAR(50),
+                    origem_id INTEGER,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_reembolso_funcionario_admin
+                ON reembolso_funcionario(admin_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_reembolso_funcionario_func
+                ON reembolso_funcionario(funcionario_id)
+            """)
+            logger.info("MIGRACAO 79: tabela reembolso_funcionario criada")
+        else:
+            logger.info("MIGRACAO 79: tabela reembolso_funcionario ja existe")
+
+        connection.close()
+        logger.info("MIGRACAO 79 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 79: {e}")
         if connection:
             try:
                 connection.rollback()
