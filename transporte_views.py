@@ -130,7 +130,7 @@ def novo():
     funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
     veiculos = Vehicle.query.filter_by(admin_id=admin_id).order_by('modelo').all()
     centros_custo = CentroCusto.query.filter_by(admin_id=admin_id).order_by('nome').all()
-    obras = Obra.query.filter_by(admin_id=admin_id, status='em_andamento').order_by('nome').all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
 
     return render_template(
         'transporte/novo_lancamento.html',

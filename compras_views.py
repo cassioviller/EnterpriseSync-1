@@ -117,7 +117,7 @@ def nova():
     admin_id = _admin_id()
     fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
     centros_custo = CentroCusto.query.filter_by(admin_id=admin_id).order_by('nome').all()
-    obras = Obra.query.filter_by(admin_id=admin_id, status='em_andamento').order_by('nome').all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
     itens_catalogo = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by('nome').all()
 
     return render_template(
