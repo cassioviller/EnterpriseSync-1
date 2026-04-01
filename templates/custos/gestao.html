@@ -1,0 +1,438 @@
+{% extends "base_completo.html" %}
+{% block title %}Gestão de Custos V2{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  {# ── CABEÇALHO ─────────────────────────────────────────────── #}
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h2 class="fw-bold mb-0">
+        <i class="fas fa-coins me-2 text-warning"></i>Gestão de Custos
+        <span class="badge bg-primary ms-2" style="font-size:.6rem">V2</span>
+      </h2>
+      <small class="text-muted">Fluxo de aprovação: Pendente → Solicitado → Pago</small>
+    </div>
+    <div class="d-flex gap-2">
+      {% if modo == 'novo' %}
+      <a href="{{ url_for('gestao_custos.index') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i> Voltar
+      </a>
+      {% else %}
+      <a href="{{ url_for('gestao_custos.novo') }}" class="btn btn-success">
+        <i class="fas fa-plus me-1"></i> Novo Lançamento
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── FORMULÁRIO NOVO LANÇAMENTO ────────────────────────────── #}
+  {% if modo == 'novo' %}
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Novo Lançamento Manual</h5>
+        </div>
+        <div class="card-body">
+          <form method="post" action="{{ url_for('gestao_custos.novo') }}">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Categoria *</label>
+              <select name="tipo_categoria" class="form-select" required>
+                {% for k, (label, icone, cor) in categoria_labels.items() %}
+                <option value="{{ k }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Entidade / Nome *</label>
+              <input type="text" name="entidade_nome" class="form-control"
+                     placeholder="Ex: João Silva, Fornecedor ABC, Obra Central…" required autocomplete="off">
+              <div class="form-text">Pessoa, fornecedor ou entidade a pagar.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Descrição do lançamento</label>
+              <input type="text" name="descricao" class="form-control"
+                     placeholder="Ex: Diária 01/04, Almoço equipe, Compra cimento…" autocomplete="off">
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold">Valor (R$) *</label>
+                <input type="number" name="valor" class="form-control"
+                       step="0.01" min="0.01" placeholder="0,00" required>
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold">Data de referência *</label>
+                <input type="date" name="data_referencia" class="form-control"
+                       value="{{ today }}" required>
+              </div>
+            </div>
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Obra (opcional)</label>
+              <select name="obra_id" class="form-select">
+                <option value="">— Nenhuma —</option>
+                {% for o in obras %}
+                <option value="{{ o.id }}">{{ o.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="d-flex gap-2 justify-content-end">
+              <a href="{{ url_for('gestao_custos.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+              <button type="submit" class="btn btn-success">
+                <i class="fas fa-save me-1"></i>Salvar Lançamento
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if modo != 'novo' %}
+
+  {# ── CARDS DE RESUMO ────────────────────────────────────────── #}
+  <div class="row g-3 mb-4">
+    {% set status_list = [
+      ('PENDENTE',   'secondary', 'fas fa-clock'),
+      ('SOLICITADO', 'warning',   'fas fa-paper-plane'),
+      ('PAGO',       'primary',   'fas fa-check-circle'),
+    ] %}
+    {% for st, cor, icone in status_list %}
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm h-100" style="border-left:4px solid var(--bs-{{ cor }}) !important">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width:44px;height:44px;background:var(--bs-{{ cor }});opacity:.85">
+              <i class="{{ icone }} text-white fa-lg"></i>
+            </div>
+            <div>
+              <div class="fw-bold text-dark">R$ {{ '%.2f'|format(resumo.get(st, {}).get('total', 0)) }}</div>
+              <small class="text-muted">{{ resumo.get(st, {}).get('qtd', 0) }} registro(s) {{ st|title }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm h-100 bg-light">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="rounded-circle d-flex align-items-center justify-content-center"
+               style="width:44px;height:44px;background:#6c757d">
+            <i class="fas fa-layer-group text-white fa-lg"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-dark">{{ registros|length }} registros</div>
+            <small class="text-muted">Total listado</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── FILTROS ───────────────────────────────────────────────── #}
+  <div class="card shadow-sm mb-4 border-0">
+    <div class="card-body py-2">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-sm-4">
+          <input type="text" name="busca" class="form-control form-control-sm"
+                 placeholder="Buscar entidade…" value="{{ filtro_busca }}" autocomplete="off">
+        </div>
+        <div class="col-sm-3">
+          <select name="status" class="form-select form-select-sm">
+            <option value="">Todos os status</option>
+            {% for s in ['PENDENTE','SOLICITADO','AUTORIZADO','PAGO','RECUSADO'] %}
+            <option value="{{ s }}" {% if filtro_status == s %}selected{% endif %}>{{ s|title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-3">
+          <select name="categoria" class="form-select form-select-sm">
+            <option value="">Todas as categorias</option>
+            {% for k, (label, icone, cor) in categoria_labels.items() %}
+            <option value="{{ k }}" {% if filtro_categoria == k %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-2 d-flex gap-1">
+          <button class="btn btn-primary btn-sm flex-grow-1">
+            <i class="fas fa-search me-1"></i>Filtrar
+          </button>
+          <a href="{{ url_for('gestao_custos.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-times"></i>
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# ── TABELA PRINCIPAL ──────────────────────────────────────── #}
+  {% if registros %}
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width:36px"></th>
+              <th>Categoria</th>
+              <th>Entidade</th>
+              <th class="text-end">Valor Total</th>
+              <th class="text-end">Solicitado</th>
+              <th class="text-center">Status</th>
+              <th class="text-center">Data</th>
+              <th class="text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for reg in registros %}
+          {% set cat_info = categoria_labels.get(reg.tipo_categoria, ('Outros','fas fa-receipt','secondary')) %}
+          {% set badge_cor = status_badges.get(reg.status, 'secondary') %}
+          {% set row_class = 'table-warning' if reg.status == 'SOLICITADO' else '' %}
+          <tr class="{{ row_class }}" id="row-{{ reg.id }}">
+            {# Expand #}
+            <td class="text-center">
+              <button class="btn btn-sm btn-link p-0 text-muted expand-btn"
+                      data-pai="{{ reg.id }}" title="Ver itens">
+                <i class="fas fa-chevron-right fa-sm"></i>
+              </button>
+            </td>
+            <td>
+              <i class="{{ cat_info[1] }} me-1 text-{{ cat_info[2] }}"></i>
+              <span class="fw-semibold">{{ cat_info[0] }}</span>
+            </td>
+            <td>{{ reg.entidade_nome }}</td>
+            <td class="text-end fw-bold">R$ {{ '%.2f'|format(reg.valor_total|float) }}</td>
+            <td class="text-end text-muted">
+              {% if reg.valor_solicitado %}R$ {{ '%.2f'|format(reg.valor_solicitado|float) }}{% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              <span class="badge bg-{{ badge_cor }}">{{ reg.status }}</span>
+            </td>
+            <td class="text-center">
+              <small class="text-muted">{{ reg.data_criacao.strftime('%d/%m/%Y') }}</small>
+            </td>
+            <td class="text-center">
+              <div class="d-flex justify-content-center gap-1">
+                {# Solicitar #}
+                {% if reg.status == 'PENDENTE' %}
+                <button class="btn btn-sm btn-outline-warning"
+                        onclick="abrirModalSolicitar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ reg.valor_total|float }})"
+                        title="Solicitar pagamento">
+                  <i class="fas fa-paper-plane fa-xs"></i>
+                </button>
+                {% endif %}
+                {# Autorizar #}
+                {% if reg.status == 'SOLICITADO' %}
+                <button class="btn btn-sm btn-outline-success"
+                        onclick="abrirModalAutorizar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ (reg.valor_solicitado or reg.valor_total)|float }})"
+                        title="Efetuar pagamento">
+                  <i class="fas fa-check fa-xs"></i>
+                </button>
+                {% endif %}
+                {# Excluir #}
+                {% if reg.status in ('PENDENTE', 'RECUSADO') %}
+                <form method="post" action="{{ url_for('gestao_custos.excluir', pai_id=reg.id) }}"
+                      onsubmit="return confirm('Excluir este registro?')">
+                  <button class="btn btn-sm btn-outline-danger" title="Excluir">
+                    <i class="fas fa-trash fa-xs"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {# Linha expandida (filhos) #}
+          <tr id="filhos-{{ reg.id }}" class="d-none">
+            <td colspan="8" class="p-0 bg-light">
+              <div class="px-4 py-2" id="filhos-content-{{ reg.id }}">
+                <div class="text-center text-muted py-3">
+                  <i class="fas fa-spinner fa-spin"></i> Carregando…
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body text-center py-5 text-muted">
+      <i class="fas fa-coins fa-3x mb-3 opacity-25"></i>
+      <h5>Nenhum registro encontrado</h5>
+      <p class="mb-3">Os lançamentos de Alimentação, Transporte, Compras e Salários aparecerão aqui automaticamente.</p>
+      <a href="{{ url_for('gestao_custos.novo') }}" class="btn btn-success">
+        <i class="fas fa-plus me-1"></i> Lançar Manualmente
+      </a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ══ MODAL: SOLICITAR PAGAMENTO ══════════════════════════════════ #}
+<div class="modal fade" id="modalSolicitar" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title"><i class="fas fa-paper-plane me-2"></i>Solicitar Pagamento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="formSolicitar">
+        <div class="modal-body">
+          <p class="mb-3 text-muted" id="solicitarInfo"></p>
+          <div class="mb-0">
+            <label class="form-label fw-semibold">Valor a solicitar (R$)</label>
+            <input type="number" class="form-control" name="valor_solicitado"
+                   id="solicitarValor" step="0.01" min="0.01" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-warning btn-sm">
+            <i class="fas fa-paper-plane me-1"></i>Solicitar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ══ MODAL: AUTORIZAR / RECUSAR ══════════════════════════════════ #}
+<div class="modal fade" id="modalAutorizar" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>Efetuar Pagamento</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="formAutorizar">
+        <input type="hidden" name="acao" id="autorizarAcao" value="autorizar">
+        <div class="modal-body">
+          <p class="text-muted mb-3" id="autorizarInfo"></p>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Valor pago (R$)</label>
+              <input type="number" class="form-control" name="valor_pago"
+                     id="autorizarValor" step="0.01" min="0.01" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Data de pagamento</label>
+              <input type="date" class="form-control" name="data_pagamento"
+                     id="autorizarData" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Conta bancária (origem)</label>
+              <input type="text" class="form-control" name="conta_bancaria"
+                     placeholder="Ex: Conta Bradesco 1234-5">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer d-flex justify-content-between">
+          <button type="button" class="btn btn-danger"
+                  onclick="document.getElementById('autorizarAcao').value='recusar';document.getElementById('formAutorizar').submit()">
+            <i class="fas fa-times me-1"></i>Não Autorizado
+          </button>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-success"
+                    onclick="document.getElementById('autorizarAcao').value='autorizar'">
+              <i class="fas fa-check me-1"></i>Autorizar Pagamento
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Solicitar pagamento ──────────────────────────────────────────
+function abrirModalSolicitar(paiId, entidade, valorTotal) {
+    document.getElementById('formSolicitar').action = `/gestao-custos/${paiId}/solicitar`;
+    document.getElementById('solicitarInfo').textContent =
+        `Valor em aberto: R$ ${valorTotal.toFixed(2).replace('.',',')} — ${entidade}`;
+    document.getElementById('solicitarValor').value = valorTotal.toFixed(2);
+    new bootstrap.Modal(document.getElementById('modalSolicitar')).show();
+}
+
+// ── Autorizar pagamento ──────────────────────────────────────────
+function abrirModalAutorizar(paiId, entidade, valorSol) {
+    document.getElementById('formAutorizar').action = `/gestao-custos/${paiId}/autorizar`;
+    document.getElementById('autorizarInfo').textContent =
+        `Valor programado: R$ ${valorSol.toFixed(2).replace('.',',')} — ${entidade}`;
+    document.getElementById('autorizarValor').value = valorSol.toFixed(2);
+    document.getElementById('autorizarData').value =
+        new Date().toISOString().split('T')[0];
+    document.getElementById('autorizarAcao').value = 'autorizar';
+    new bootstrap.Modal(document.getElementById('modalAutorizar')).show();
+}
+
+// ── Expandir filhos (accordion AJAX) ────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.expand-btn').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const paiId = this.dataset.pai;
+            const filhosRow = document.getElementById(`filhos-${paiId}`);
+            const icon = this.querySelector('i');
+            const isOpen = !filhosRow.classList.contains('d-none');
+
+            if (isOpen) {
+                filhosRow.classList.add('d-none');
+                icon.className = 'fas fa-chevron-right fa-sm';
+                return;
+            }
+
+            filhosRow.classList.remove('d-none');
+            icon.className = 'fas fa-chevron-down fa-sm';
+
+            const content = document.getElementById(`filhos-content-${paiId}`);
+            content.innerHTML = '<div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin"></i> Carregando…</div>';
+
+            try {
+                const res = await fetch(`/gestao-custos/${paiId}/filhos`);
+                const json = await res.json();
+
+                if (!json.itens || json.itens.length === 0) {
+                    content.innerHTML = '<p class="text-muted py-2 mb-0 ps-2">Nenhum item lançado ainda.</p>';
+                    return;
+                }
+
+                let html = `<table class="table table-sm mb-0" style="font-size:.85rem">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Data</th><th>Descrição</th><th>Obra</th>
+                      <th class="text-end">Valor</th><th>Origem</th>
+                    </tr>
+                  </thead><tbody>`;
+                let total = 0;
+                json.itens.forEach(f => {
+                    total += f.valor;
+                    html += `<tr>
+                      <td>${f.data}</td>
+                      <td>${f.descricao}</td>
+                      <td><small class="text-muted">${f.obra}</small></td>
+                      <td class="text-end fw-semibold">R$ ${f.valor.toFixed(2).replace('.',',')}</td>
+                      <td><span class="badge bg-light text-dark border">${f.origem}</span></td>
+                    </tr>`;
+                });
+                html += `<tr class="table-light fw-bold">
+                  <td colspan="3" class="text-end">Total</td>
+                  <td class="text-end">R$ ${total.toFixed(2).replace('.',',')}</td>
+                  <td></td></tr>`;
+                html += '</tbody></table>';
+                content.innerHTML = html;
+            } catch(e) {
+                content.innerHTML = '<p class="text-danger py-2 mb-0 ps-2">Erro ao carregar itens.</p>';
+            }
+        });
+    });
+});
+</script>
+  {% endif %}{# fim modo != 'novo' #}
+</div>{# container-fluid #}
+{% endblock %}

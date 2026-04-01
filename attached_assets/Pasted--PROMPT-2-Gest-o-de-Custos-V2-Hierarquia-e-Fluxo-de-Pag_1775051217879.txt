@@ -1,0 +1,86 @@
+# PROMPT 2: Gestão de Custos (V2) - Hierarquia e Fluxo de Pagamento
+
+**Objetivo:** Criar um módulo centralizado de Gestão de Custos que receba lançamentos automáticos de todos os outros módulos (Funcionários, Restaurantes, Transporte, Compras, Reembolsos). A interface deve agrupar os lançamentos por "Registro Pai" (ex: Pagamento Salário, Despesa Alimentação) e permitir expandir para ver os detalhes ("Registros Filhos"). Além disso, implementar um fluxo de aprovação: Solicitar Pagamento -> Autorizar Pagamento -> Fluxo de Caixa.
+
+**Arquivos a serem modificados:**
+- `models.py`
+- `custos_views.py` (ou criar `gestao_custos_views.py`)
+- `templates/custos/gestao.html` (nova tela)
+- `financeiro_views.py` (integração com Fluxo de Caixa)
+
+Por favor, implemente as seguintes alterações passo a passo:
+
+## Passo 1: Modelagem de Dados (Gestão de Custos)
+No arquivo `models.py`, crie ou adapte os modelos para suportar a hierarquia e o fluxo de status:
+```python
+class GestaoCustoPai(db.Model):
+    """Agrupador de custos (ex: 'Pagamento Salário', 'Despesa Alimentação - Restaurante X')"""
+    __tablename__ = 'gestao_custo_pai'
+    id = db.Column(db.Integer, primary_key=True)
+    tipo_categoria = db.Column(db.String(50), nullable=False) # 'SALARIO', 'ALIMENTACAO', 'TRANSPORTE', 'COMPRA', 'REEMBOLSO'
+    entidade_nome = db.Column(db.String(100), nullable=False) # Nome do Funcionário, Restaurante, Fornecedor, Veículo
+    entidade_id = db.Column(db.Integer, nullable=True) # ID genérico (funcionario_id, restaurante_id, etc)
+    valor_total = db.Column(db.Numeric(15, 2), default=0.0)
+    status = db.Column(db.String(20), default='PENDENTE') # PENDENTE, SOLICITADO, AUTORIZADO, PAGO, RECUSADO
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    
+    # Relacionamento com os filhos
+    itens = db.relationship('GestaoCustoFilho', backref='pai', lazy=True, cascade="all, delete-orphan")
+
+class GestaoCustoFilho(db.Model):
+    """Lançamento individual (ex: 'Diária 01/04 - Obra A', 'Marmita 02/04 - Obra B')"""
+    __tablename__ = 'gestao_custo_filho'
+    id = db.Column(db.Integer, primary_key=True)
+    pai_id = db.Column(db.Integer, db.ForeignKey('gestao_custo_pai.id'), nullable=False)
+    data_referencia = db.Column(db.Date, nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
+    origem_tabela = db.Column(db.String(50)) # 'registro_ponto', 'alimentacao_lancamento', etc
+    origem_id = db.Column(db.Integer)
+```
+
+## Passo 2: Interface de Gestão de Custos (Frontend)
+Crie uma nova tela (`templates/custos/gestao.html`):
+1. **Tabela Principal (Registros Pai):**
+   - Colunas: Categoria (ex: Pagamento Salário), Entidade (ex: Cássio), Valor Total (ex: R$ 700,00), Status, Ações.
+   - Ações: Ícone de Detalhes (expandir), Ícone "Solicitar Pagamento" (se status == PENDENTE).
+2. **Expansão (Registros Filhos):**
+   - Ao clicar em Detalhes, expanda uma sub-tabela (accordion) mostrando os itens (ex: 7 diárias de R$ 100,00, com datas e obras).
+   - *Nota:* Se houver VA, VT ou Reembolso para o mesmo funcionário, eles devem aparecer como itens filhos sob o mesmo Registro Pai (ou criar um Registro Pai separado por categoria para o mesmo funcionário, conforme preferir. O ideal é agrupar por Categoria + Entidade).
+
+## Passo 3: Fluxo de Aprovação (Backend e Frontend)
+Implemente as seguintes rotas e lógicas em `gestao_custos_views.py`:
+1. **Solicitar Pagamento:**
+   - Ao clicar no ícone, abra um modal: "Valor R$ X em aberto. Solicitar pagamento de qual valor?" (Permite pagamento parcial).
+   - Input: Valor a solicitar (default = valor_total).
+   - Botão: "Enviar".
+   - Ação: Muda o status do `GestaoCustoPai` para `SOLICITADO`. A linha na tabela deve ficar com fundo **Amarelo**.
+2. **Efetuar Pagamento (Autorizar):**
+   - Se status == `SOLICITADO`, o botão muda para "Efetuar Pagamento".
+   - Ao clicar, abra um modal: "Valor programado R$ X. Qual a data de pagamento?".
+   - Inputs: Data de Pagamento, Conta Bancária (origem do recurso).
+   - Botões: "Autorizar" (Verde) e "Não Autorizado" (Vermelho).
+   - **Se Não Autorizado:** Volta o status para `PENDENTE` (linha volta ao normal).
+   - **Se Autorizar:** 
+     - Muda status para `AUTORIZADO` (ou `PAGO`).
+     - **Integração Crucial:** Cria automaticamente um registro na tabela `FluxoCaixa` (tipo='SAIDA', valor=X, data=data_informada, categoria=tipo_categoria).
+     - **Integração Contábil:** Chama a função `gerar_lancamento_contabil_automatico` (do Prompt 5) para gerar as partidas dobradas no Balancete.
+
+## Passo 4: Função Helper para Inserção Automática
+Crie uma função em `utils/financeiro_integration.py` para ser chamada pelos outros módulos:
+```python
+def registrar_custo_automatico(admin_id, tipo_categoria, entidade_nome, entidade_id, data, descricao, valor, obra_id, origem_tabela, origem_id):
+    """
+    Busca um Registro Pai PENDENTE para a mesma categoria e entidade.
+    Se não existir, cria um novo.
+    Adiciona o Registro Filho e atualiza o valor_total do Pai.
+    """
+    # Lógica de busca ou criação do GestaoCustoPai
+    # Criação do GestaoCustoFilho
+    # Atualização do valor_total do Pai
+    pass
+```
+*Esta função será o "coração" da integração, garantindo que quando o módulo de Restaurante lançar 10 marmitas, elas entrem automaticamente aqui.*

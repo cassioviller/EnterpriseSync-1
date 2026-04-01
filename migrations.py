@@ -3776,6 +3776,7 @@ def executar_migracoes():
             (74, "Compras V2 - tabelas pedido_compra e pedido_compra_item", _migration_74_compras_v2),
             (75, "Cronograma V2 - CalendarioEmpresa e TarefaCronograma", _migration_75_cronograma_v2),
             (76, "RDO Apontamento Cronograma V2 - tabela rdo_apontamento_cronograma", _migration_76_rdo_apontamento_cronograma),
+            (77, "Gestão de Custos V2 - tabelas gestao_custo_pai e gestao_custo_filho", _migration_77_gestao_custos_v2),
         ]
         
         # Executar cada migração com rastreamento
@@ -6923,6 +6924,95 @@ def _migration_76_rdo_apontamento_cronograma():
 
     except Exception as e:
         logger.error(f"Erro na migracao 76: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                cursor.close()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_77_gestao_custos_v2():
+    """
+    MIGRAÇÃO 77: Tabelas gestao_custo_pai e gestao_custo_filho
+    para o módulo centralizado de Gestão de Custos V2.
+    """
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        # gestao_custo_pai
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'gestao_custo_pai'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            logger.info("Migração 77: criando tabela gestao_custo_pai")
+            cursor.execute("""
+                CREATE TABLE gestao_custo_pai (
+                    id SERIAL PRIMARY KEY,
+                    tipo_categoria VARCHAR(50) NOT NULL,
+                    entidade_nome VARCHAR(150) NOT NULL,
+                    entidade_id INTEGER,
+                    valor_total NUMERIC(15,2) DEFAULT 0.00,
+                    valor_solicitado NUMERIC(15,2),
+                    status VARCHAR(20) DEFAULT 'PENDENTE',
+                    data_pagamento DATE,
+                    conta_bancaria VARCHAR(100),
+                    observacoes TEXT,
+                    data_criacao TIMESTAMP DEFAULT NOW(),
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    fluxo_caixa_id INTEGER REFERENCES fluxo_caixa(id)
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_gcp_admin_status ON gestao_custo_pai(admin_id, status)")
+            cursor.execute("CREATE INDEX idx_gcp_admin_cat_ent ON gestao_custo_pai(admin_id, tipo_categoria, entidade_nome)")
+        else:
+            logger.info("Migração 77: gestao_custo_pai já existe")
+
+        # gestao_custo_filho
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'gestao_custo_filho'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            logger.info("Migração 77: criando tabela gestao_custo_filho")
+            cursor.execute("""
+                CREATE TABLE gestao_custo_filho (
+                    id SERIAL PRIMARY KEY,
+                    pai_id INTEGER NOT NULL REFERENCES gestao_custo_pai(id) ON DELETE CASCADE,
+                    data_referencia DATE NOT NULL,
+                    descricao VARCHAR(300) NOT NULL,
+                    valor NUMERIC(15,2) NOT NULL,
+                    obra_id INTEGER REFERENCES obra(id),
+                    centro_custo_id INTEGER REFERENCES centro_custo(id),
+                    origem_tabela VARCHAR(80),
+                    origem_id INTEGER,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_gcf_pai ON gestao_custo_filho(pai_id)")
+            cursor.execute("CREATE INDEX idx_gcf_admin ON gestao_custo_filho(admin_id)")
+        else:
+            logger.info("Migração 77: gestao_custo_filho já existe")
+
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 77 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 77: {e}")
         if connection:
             try:
                 connection.rollback()

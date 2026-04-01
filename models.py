@@ -4216,3 +4216,56 @@ class RDOApontamentoCronograma(db.Model):
             f'<RDOApontamentoCronograma rdo={self.rdo_id} '
             f'tarefa={self.tarefa_cronograma_id} qty={self.quantidade_executada_dia}>'
         )
+
+
+# ═══════════════════════════════════════════════════════════
+# GESTÃO DE CUSTOS V2 (Migration 77)
+# ═══════════════════════════════════════════════════════════
+
+class GestaoCustoPai(db.Model):
+    """Agrupador de custos: Pagamento Salário, Despesa Alimentação, etc."""
+    __tablename__ = 'gestao_custo_pai'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tipo_categoria = db.Column(db.String(50), nullable=False)
+    # 'SALARIO', 'ALIMENTACAO', 'TRANSPORTE', 'COMPRA', 'REEMBOLSO', 'OUTROS'
+    entidade_nome = db.Column(db.String(150), nullable=False)
+    entidade_id = db.Column(db.Integer, nullable=True)
+    valor_total = db.Column(db.Numeric(15, 2), default=0.0)
+    valor_solicitado = db.Column(db.Numeric(15, 2), nullable=True)
+    status = db.Column(db.String(20), default='PENDENTE')
+    # PENDENTE, SOLICITADO, AUTORIZADO, PAGO, RECUSADO
+    data_pagamento = db.Column(db.Date, nullable=True)
+    conta_bancaria = db.Column(db.String(100), nullable=True)
+    observacoes = db.Column(db.Text, nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    fluxo_caixa_id = db.Column(db.Integer, db.ForeignKey('fluxo_caixa.id'), nullable=True)
+
+    itens = db.relationship('GestaoCustoFilho', backref='pai', lazy=True,
+                            cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<GestaoCustoPai {self.tipo_categoria} {self.entidade_nome} R${self.valor_total}>'
+
+
+class GestaoCustoFilho(db.Model):
+    """Lançamento individual: diária 01/04 em Obra X, marmita 02/04, etc."""
+    __tablename__ = 'gestao_custo_filho'
+
+    id = db.Column(db.Integer, primary_key=True)
+    pai_id = db.Column(db.Integer, db.ForeignKey('gestao_custo_pai.id'), nullable=False)
+    data_referencia = db.Column(db.Date, nullable=False)
+    descricao = db.Column(db.String(300), nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
+    origem_tabela = db.Column(db.String(80), nullable=True)
+    origem_id = db.Column(db.Integer, nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    obra = db.relationship('Obra', foreign_keys=[obra_id])
+
+    def __repr__(self):
+        return f'<GestaoCustoFilho pai={self.pai_id} R${self.valor} {self.descricao[:30]}>'
