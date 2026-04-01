@@ -170,12 +170,16 @@
             <input type="date" id="nt_inicio" class="form-control">
           </div>
           <div class="col-md-4">
-            <label class="form-label fw-semibold">Predecessora (ID)</label>
-            <input type="number" id="nt_pred" class="form-control" placeholder="ID ou vazio">
+            <label class="form-label fw-semibold">Predecessora</label>
+            <select id="nt_pred" class="form-select">
+              <option value="">— Nenhuma —</option>
+            </select>
           </div>
           <div class="col-md-6">
-            <label class="form-label fw-semibold">Tarefa Pai (ID macro)</label>
-            <input type="number" id="nt_pai" class="form-control" placeholder="ID ou vazio">
+            <label class="form-label fw-semibold">Tarefa Pai (macro)</label>
+            <select id="nt_pai" class="form-select">
+              <option value="">— Nenhuma (tarefa raiz) —</option>
+            </select>
           </div>
           <div class="col-md-3">
             <label class="form-label fw-semibold">Quantidade</label>
@@ -535,14 +539,49 @@ async function recalcularTudo(showToast=true) {
 }
 
 // ── Nova tarefa ──
+function _popularSelect(selectId, lista, placeholder) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  lista.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `#${t.id} — ${t.nome_tarefa}`;
+    sel.appendChild(opt);
+  });
+}
+
 function abrirModalNovaTarefa() {
   document.getElementById('nt_nome').value = '';
   document.getElementById('nt_duracao').value = '1';
   document.getElementById('nt_inicio').value = new Date().toISOString().slice(0,10);
-  document.getElementById('nt_pred').value = '';
-  document.getElementById('nt_pai').value = '';
   document.getElementById('nt_qtd').value = '';
   document.getElementById('nt_unidade').value = '';
+
+  // Popula dropdowns com tarefas existentes da obra
+  _popularSelect('nt_pred', tarefas, '— Nenhuma —');
+  _popularSelect('nt_pai',  tarefas, '— Nenhuma (tarefa raiz) —');
+
+  // Ao selecionar predecessora: limpa data início para o backend calcular próx. dia útil
+  const predSel = document.getElementById('nt_pred');
+  const inicioInp = document.getElementById('nt_inicio');
+  predSel.onchange = function() {
+    if (predSel.value) {
+      // Buscar data_fim da predecessora no array local
+      const predTarefa = tarefas.find(t => String(t.id) === String(predSel.value));
+      if (predTarefa && predTarefa.data_fim) {
+        // Sugerir data_fim + 1 dia como referência (backend corrige para dia útil)
+        const df = new Date(predTarefa.data_fim + 'T00:00:00');
+        df.setDate(df.getDate() + 1);
+        inicioInp.value = df.toISOString().slice(0, 10);
+      } else {
+        inicioInp.value = ''; // backend calcula
+      }
+    } else {
+      inicioInp.value = new Date().toISOString().slice(0, 10);
+    }
+  };
+
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNovaTarefa')).show();
 }
 

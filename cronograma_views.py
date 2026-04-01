@@ -176,10 +176,28 @@ def criar_tarefa(obra_id: int):
     tarefa_pai_id = data.get('tarefa_pai_id') or None
     if tarefa_pai_id:
         tarefa_pai_id = int(tarefa_pai_id)
+        # Validar que a tarefa pai existe e pertence à mesma obra/tenant
+        pai = TarefaCronograma.query.filter_by(
+            id=tarefa_pai_id, obra_id=obra_id, admin_id=admin_id
+        ).first()
+        if not pai:
+            return jsonify({
+                'status': 'error',
+                'msg': f'Tarefa pai id={tarefa_pai_id} não encontrada nesta obra.'
+            }), 400
 
     predecessora_id = data.get('predecessora_id') or None
     if predecessora_id:
         predecessora_id = int(predecessora_id)
+        # Validar que a predecessora existe e pertence à mesma obra/tenant
+        pred_check = TarefaCronograma.query.filter_by(
+            id=predecessora_id, obra_id=obra_id, admin_id=admin_id
+        ).first()
+        if not pred_check:
+            return jsonify({
+                'status': 'error',
+                'msg': f'Tarefa predecessora id={predecessora_id} não encontrada nesta obra.'
+            }), 400
         if verificar_ciclo(0, predecessora_id, admin_id):
             return jsonify({'status': 'error', 'msg': 'Referência circular detectada'}), 400
 
