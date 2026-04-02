@@ -127,13 +127,6 @@ def listar_contas_pagar():
         ContaPagar.data_pagamento <= hoje
     ).all())
     
-    resumo = {
-        'vencidas': vencidas,
-        'a_vencer': a_vencer,
-        'pendentes': pendentes,
-        'pagas_mes': pagas_mes
-    }
-
     # Gestão de Custos V2 — mostrar pendentes/autorizados no contas a pagar
     v2 = is_v2_active()
     custos_v2 = []
@@ -142,6 +135,21 @@ def listar_contas_pagar():
             GestaoCustoPai.admin_id == admin_id,
             GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
         ).order_by(GestaoCustoPai.data_criacao.desc()).all()
+
+    # Incorporar custos V2 nos KPI cards usando regra canônica (valor_solicitado tem prioridade)
+    valor_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2)
+    semana = hoje + timedelta(days=7)
+    v2_a_vencer = sum(
+        float(c.valor_solicitado or c.valor_total) for c in custos_v2
+        if c.data_criacao and c.data_criacao.date() <= semana
+    )
+
+    resumo = {
+        'vencidas': vencidas,
+        'a_vencer': float(a_vencer) + v2_a_vencer,
+        'pendentes': float(pendentes) + valor_v2,
+        'pagas_mes': pagas_mes
+    }
 
     return render_template(
         'financeiro/contas_pagar.html',

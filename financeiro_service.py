@@ -448,13 +448,17 @@ class FinanceiroService:
             
             saidas_previstas = sum(c.saldo for c in contas_pagar)
 
-            # Gestão de Custos V2 — saídas previstas (SOLICITADO + AUTORIZADO)
+            # Gestão de Custos V2 — saídas previstas (SOLICITADO + AUTORIZADO) filtradas por período
+            # Usa data_criacao como proxy de competência (GestaoCustoPai não tem data_vencimento)
             custos_v2 = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
-                    GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
+                    GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO']),
+                    GestaoCustoPai.data_criacao >= datetime.combine(data_inicio, datetime.min.time()),
+                    GestaoCustoPai.data_criacao <= datetime.combine(data_fim, datetime.max.time()),
                 )
             ).all()
+            # Regra canônica: valor_solicitado tem prioridade quando presente
             saidas_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2)
             saidas_previstas += saidas_v2
 
@@ -482,8 +486,9 @@ class FinanceiroService:
                 })
 
             for custo in custos_v2:
+                custo_data = custo.data_criacao.date() if hasattr(custo.data_criacao, 'date') else custo.data_criacao
                 detalhes.append({
-                    'data': custo.data_criacao.date() if hasattr(custo.data_criacao, 'date') else custo.data_criacao,
+                    'data': custo_data,
                     'tipo': 'SAIDA',
                     'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}]',
                     'valor': float(custo.valor_solicitado or custo.valor_total),
@@ -565,25 +570,17 @@ class FinanceiroService:
             ).scalar() or Decimal('0')
 
             # Gestão de Custos V2 — incluir SOLICITADO + AUTORIZADO no total a pagar
-            total_pagar_v2 = db.session.query(
-                func.sum(GestaoCustoPai.valor_total)
-            ).filter(
+            # Regra canônica: coalesce(valor_solicitado, valor_total)
+            custos_v2_list = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
                 )
-            ).scalar() or Decimal('0')
+            ).all()
+            total_pagar_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_list)
+            qtd_pagar_v2 = len(custos_v2_list)
 
-            qtd_pagar_v2 = db.session.query(
-                func.count(GestaoCustoPai.id)
-            ).filter(
-                and_(
-                    GestaoCustoPai.admin_id == admin_id,
-                    GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
-                )
-            ).scalar() or 0
-
-            total_pagar_combinado = float(total_pagar) + float(total_pagar_v2)
+            total_pagar_combinado = float(total_pagar) + total_pagar_v2
             vencidas_pagar_combinado = vencidas_pagar + qtd_pagar_v2
 
             return {
