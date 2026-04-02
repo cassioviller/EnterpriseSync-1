@@ -1,196 +1,266 @@
 # Manual do Módulo Financeiro — SIGE v9.0
 
-> Tudo que envolve dinheiro: contas a pagar, contas a receber, bancos e fluxo de caixa.
+> Cobre todo o ciclo financeiro: lançamentos automáticos dos módulos operacionais → Gestão de Custos → aprovação → Fluxo de Caixa.
 
 ---
 
-## 1. Acessar o Módulo Financeiro
+## Visão Geral do Fluxo
 
-No menu superior, clique em **Financeiro**.  
-Um dropdown aparece com as opções:
+```
+Módulos Operacionais          Gestão de Custos V2           Fluxo de Caixa
+─────────────────────         ───────────────────           ──────────────
+Transporte      ──────┐
+Alimentação     ──────┤──→  PENDENTE → SOLICITADO  ──→  Saídas Previstas
+Diária (Ponto)  ──────┘              → AUTORIZADO  ──→  Saídas Previstas
+                                     → PAGO        ──→  Histórico (FluxoCaixa)
 
-- Dashboard Financeiro
-- Fluxo de Caixa
-- Contas a Pagar
-- Contas a Receber
-- Bancos
-- Folha de Pagamento
-- Contabilidade
-- Gestão de Custos
+Material (Almox) ─────────────────────────────────→  Custo da Obra (direto)
+
+Conta a Pagar (manual) ───────────────────────────→  Saídas Previstas
+Conta a Receber (manual) ─────────────────────────→  Entradas Previstas
+```
 
 ---
 
-## 2. Cadastrar um Banco / Conta
+## PARTE A — Lançamentos Automáticos pelos Módulos
 
-Antes de registrar pagamentos, cadastre as contas bancárias da empresa.
+---
 
-**Caminho:** Financeiro → Bancos → botão **Novo Banco**
+### A1. Transporte → Gestão de Custos
+
+Todo lançamento de transporte cria automaticamente um custo na **Gestão de Custos V2** com categoria **TRANSPORTE**.
+
+#### Lançamento Individual
+
+**Caminho:** Menu superior → **Transporte** → botão **Novo Lançamento**
 
 **Preencha:**
-- Nome do Banco (ex: Banco do Brasil, Caixa, Nubank, Caixa Física)
-- Agência e Conta (opcional)
-- Tipo de Conta: Corrente, Poupança, Investimento ou Caixa Físico
-- Saldo Inicial: valor atual nessa conta
+- Funcionário ou Veículo vinculado
+- Obra (opcional, mas recomendado para rastrear o custo)
+- Categoria de transporte (ex: Vale-Transporte, Táxi, Combustível)
+- Data do lançamento
+- Valor
+- Descrição (opcional)
 
-Clique em **Cadastrar Banco**.
+Clique em **Salvar**.
 
-> O saldo dos bancos cadastrados forma o **Saldo Inicial** do Fluxo de Caixa.
+**O que acontece automaticamente:**
+- Lançamento de transporte registrado
+- Custo criado na **Gestão de Custos V2** com status **PENDENTE**, vinculado ao funcionário ou veículo
+
+#### Lançamento em Lote (múltiplos funcionários × múltiplos dias)
+
+**Caminho:** Menu superior → **Transporte** → **Lançamento em Lote**
+
+**Preencha:**
+- Selecione os funcionários (multi-seleção)
+- Selecione o período (data início e data fim)
+- Marque os dias da semana que se repetem (ex: seg, ter, qua, qui, sex)
+- Obra, categoria e valor por lançamento
+
+O sistema exibe um preview: **X funcionários × Y dias = Z lançamentos + valor total**
+
+Clique em **Confirmar Lançamento em Lote**.
+
+**O que acontece automaticamente:**
+- Um custo na Gestão de Custos V2 é criado por funcionário com o valor total do período
 
 ---
 
-## 3. Registrar uma Conta a Pagar
+### A2. Alimentação → Gestão de Custos
 
-Use para registrar despesas futuras: fornecedores, aluguel, boletos, notas fiscais, etc.
+Cada lançamento de alimentação cria automaticamente um custo na **Gestão de Custos V2** com categoria **ALIMENTACAO**.
 
-**Caminho:** Financeiro → Contas a Pagar → botão **Nova Conta a Pagar**
+**Caminho:** Menu superior → **Alimentação** → botão **Novo Lançamento**
 
 **Preencha:**
-- Descrição (obrigatório) — ex: "NF 1234 – Cimento"
-- Valor (obrigatório)
-- Vencimento (obrigatório)
-- Fornecedor (opcional) — selecione da lista se já cadastrado
-- Obra Vinculada (opcional) — vincula o custo a uma obra
-- Nº Documento (opcional) — número da NF, boleto, etc.
-- Conta Contábil (opcional) — se usar contabilidade de partidas dobradas
+- Restaurante / Fornecedor
+- Obra vinculada (opcional)
+- Funcionários e itens consumidos
+- Data e valores
 
-Clique em **Salvar Conta a Pagar**.
+Clique em **Confirmar**.
 
-**Resultado automático:** a conta aparece imediatamente em **Saídas Previstas** no Fluxo de Caixa.
+**O que acontece automaticamente:**
+- Lançamento de alimentação registrado
+- Custo criado na **Gestão de Custos V2** com status **PENDENTE**, vinculado ao restaurante e à obra
 
 ---
 
-## 4. Dar Baixa em uma Conta a Pagar (registrar pagamento)
+### A3. Material (Almoxarifado) → Custo da Obra
 
-**Caminho:** Financeiro → Contas a Pagar → localizar a conta → botão **Pagar** (ícone de check)
+A saída de material do estoque cria o custo **diretamente na obra**, sem passar pelo fluxo de aprovação da Gestão de Custos V2.
+
+> **Atenção:** Este é o único módulo que não passa pelo Fluxo de Caixa. O custo vai para o relatório de "Custos por Obra", não para as Saídas Previstas.
+
+**Caminho:** Menu superior → **Almoxarifado** → **Saída de Material**
 
 **Preencha:**
-- Valor Pago (preenche automaticamente com o saldo restante)
-- Data do Pagamento
-- Forma de Pagamento: PIX, TED, Boleto, Cartão, Dinheiro, Cheque
-- Banco (opcional) — se informado, o saldo desse banco é debitado automaticamente
+- Produto / Material
+- Quantidade
+- **Obra de destino** (obrigatório para que o custo seja lançado)
+- Responsável / Funcionário (opcional)
+- Número do lote (para rastreabilidade)
+
+Clique em **Processar Saída**.
+
+**O que acontece automaticamente:**
+- Estoque do produto diminui
+- **Custo da Obra criado** com o valor (quantidade × preço unitário)
+- Esse custo aparece em: Obras → selecionar obra → aba **Custos** → categoria ALMOXARIFADO
+
+> Se a saída não tiver obra vinculada, o custo **não é lançado** em lugar nenhum.
+
+---
+
+### A4. Diária de Funcionário → Gestão de Custos
+
+Para funcionários com tipo de remuneração **Diária**, o simples ato de **bater o ponto** gera automaticamente um custo na Gestão de Custos V2.
+
+**Caminho:** O lançamento acontece no **Ponto Eletrônico**, não no financeiro.
+
+Opção 1 — Ponto pelo celular/tablet compartilhado:
+- Menu → **Ponto Eletrônico** → funcionário se identifica → bate o ponto (entrada)
+
+Opção 2 — Lançamento administrativo:
+- Menu → **Funcionários** → selecionar funcionário → **Registrar Ponto**
+
+**O que acontece automaticamente na primeira batida (entrada) do dia:**
+- Ponto registrado
+- Custo criado na **Gestão de Custos V2** com:
+  - Categoria: **SALARIO**
+  - Entidade: nome do funcionário
+  - Valor: valor da diária configurada no cadastro do funcionário
+  - Obra: vinculada ao ponto (se o funcionário bateu o ponto em uma obra)
+- Idempotência: se o funcionário bater o ponto duas vezes no mesmo dia, o custo **não é duplicado**
+
+> Para configurar o valor da diária: Funcionários → selecionar → editar → campo "Tipo de Remuneração" = Diária + "Valor da Diária".
+
+---
+
+## PARTE B — Aprovação na Gestão de Custos V2
+
+Todos os custos criados por Transporte, Alimentação e Diária chegam aqui com status **PENDENTE**.
+
+**Caminho:** Financeiro → **Gestão de Custos** (ou menu lateral)
+
+A lista mostra todos os custos agrupados por entidade (funcionário, restaurante, veículo), com badges coloridos indicando o status:
+
+| Badge | Status | Significado |
+|---|---|---|
+| Cinza | PENDENTE | Criado, aguardando solicitação |
+| Amarelo | SOLICITADO | Solicitado ao aprovador, aparece no Fluxo de Caixa |
+| Verde | AUTORIZADO | Aprovado, pronto para pagamento, aparece no Fluxo de Caixa |
+| Azul | PAGO | Pago, registrado no histórico de FluxoCaixa |
+
+---
+
+### Passo 1 — Solicitar (PENDENTE → SOLICITADO)
+
+**Caminho:** Gestão de Custos → localizar o registro → botão **Solicitar**
+
+- Clique no botão **Solicitar** (ícone de seta / enviar)
+- Confirme na caixa de diálogo se aparecer
+- Status muda de PENDENTE para **SOLICITADO**
+
+**Efeito no Fluxo de Caixa:** o custo aparece imediatamente em **Saídas Previstas**
+
+---
+
+### Passo 2 — Autorizar ou Recusar (SOLICITADO → AUTORIZADO ou PENDENTE)
+
+**Caminho:** Gestão de Custos → localizar o registro SOLICITADO → botão **Autorizar** ou **Recusar**
+
+- **Autorizar** → status muda para **AUTORIZADO**; continua em Saídas Previstas
+- **Recusar** → status volta para **PENDENTE**; sai do Fluxo de Caixa
+
+---
+
+### Passo 3 — Pagar (AUTORIZADO → PAGO)
+
+**Caminho:** Gestão de Custos → localizar o registro AUTORIZADO → botão **Pagar**
+
+Um formulário aparece. Preencha:
+- **Data do Pagamento** (preenche com hoje automaticamente)
+- **Conta Bancária** (texto livre — ex: "BB Conta Corrente 1234-5", "Caixa Física")
+- **Valor Pago** (preenche automaticamente com o valor solicitado)
 
 Clique em **Confirmar Pagamento**.
 
-**O que muda automaticamente:**
-- Status da conta → **PAGO** (quitação total) ou **PARCIAL** (quitação parcial)
-- A conta **sai das Saídas Previstas** no Fluxo de Caixa
-- O saldo do banco selecionado **diminui** automaticamente
-- Se havia conta contábil vinculada → **lançamento contábil criado** (partida dobrada)
+**O que acontece automaticamente:**
+- Status muda para **PAGO**
+- Custo **sai das Saídas Previstas** do Fluxo de Caixa
+- Um registro de **FluxoCaixa** histórico é criado (tipo SAIDA)
+- Se a obra tiver contabilidade configurada → **lançamento contábil criado** automaticamente
 
 ---
 
-## 5. Registrar uma Conta a Receber
+## PARTE C — Resultado no Fluxo de Caixa
 
-Use para registrar receitas futuras: medições de obra, serviços prestados, contratos, etc.
+**Caminho:** Financeiro → **Fluxo de Caixa**
 
-**Caminho:** Financeiro → Contas a Receber → botão **Nova Conta a Receber**
+Use os filtros de **Data Início** e **Data Fim** para o período que deseja analisar.
 
-**Preencha:**
-- Descrição (obrigatório) — ex: "Medição #3 – Obra Vila Nova"
-- Cliente / Devedor (obrigatório) — nome da empresa ou pessoa
-- CPF / CNPJ (opcional)
-- Valor (obrigatório)
-- Vencimento (obrigatório)
-- Obra Vinculada (opcional)
-- Nº Documento (opcional)
-- Conta Contábil (opcional)
+### O que cada card mostra
 
-Clique em **Salvar Conta a Receber**.
-
-**Resultado automático:** a conta aparece imediatamente em **Entradas Previstas** no Fluxo de Caixa.
-
----
-
-## 6. Dar Baixa em uma Conta a Receber (registrar recebimento)
-
-**Caminho:** Financeiro → Contas a Receber → localizar a conta → botão **Receber** (ícone de check)
-
-**Preencha:**
-- Valor Recebido (preenche automaticamente com o saldo restante)
-- Data do Recebimento
-- Forma de Recebimento: PIX, TED, Boleto, Cartão, Dinheiro, Cheque
-- Banco (opcional) — se informado, o saldo desse banco é creditado automaticamente
-
-Clique em **Confirmar Recebimento**.
-
-**O que muda automaticamente:**
-- Status da conta → **RECEBIDO** (total) ou **PARCIAL**
-- A conta **sai das Entradas Previstas** no Fluxo de Caixa
-- O saldo do banco selecionado **aumenta** automaticamente
-- Se havia conta contábil vinculada → lançamento contábil criado
-
----
-
-## 7. Visualizar o Fluxo de Caixa
-
-Projeção do dinheiro que vai entrar e sair em um período.
-
-**Caminho:** Financeiro → Fluxo de Caixa
-
-**Filtros disponíveis:**
-- Data Início / Data Fim — período de vencimentos a analisar
-- Obra (opcional) — filtra por obra específica
-
-**O que cada card significa:**
-
-| Card | Cor | Significado |
+| Card | Cor | O que inclui |
 |---|---|---|
-| Saldo Inicial | Azul | Soma atual de todos os bancos cadastrados |
-| Entradas Previstas | Verde | Total das contas a receber PENDENTES no período |
-| Saídas Previstas | Vermelho | Total das contas a pagar PENDENTES no período + Gestão de Custos aprovados |
+| Saldo Inicial | Azul | Soma do saldo atual de todos os bancos cadastrados |
+| Entradas Previstas | Verde | Contas a Receber com status PENDENTE ou PARCIAL no período |
+| Saídas Previstas | Vermelho | Contas a Pagar PENDENTES + Gestão de Custos SOLICITADO/AUTORIZADO no período |
 | Saldo Final Projetado | Azul/Amarelo | Saldo Inicial + Entradas − Saídas |
 
-**Tabela de Movimentos:**
-- Linhas **verdes** = entradas (contas a receber pendentes)
-- Linhas **vermelhas** = saídas (contas a pagar pendentes + custos V2 aprovados)
-- Ordenadas por data de vencimento
+### Tabela de Movimentos Previstos
+
+Cada linha da tabela representa um lançamento individual:
+
+| Cor da linha | Tipo | Origem |
+|---|---|---|
+| Verde | ENTRADA | Conta a Receber pendente |
+| Vermelho | SAÍDA | Conta a Pagar pendente |
+| Vermelho | SAÍDA | Gestão de Custos (Transporte / Alimentação / Diária) SOLICITADO ou AUTORIZADO |
 
 ---
 
-## 8. Gestão de Custos V2 e o Fluxo de Caixa
+## PARTE D — Fluxo Manual (sem módulos operacionais)
 
-Custos criados pelo módulo **Gestão de Custos** também entram no Fluxo de Caixa automaticamente:
+Para despesas que não passam pelos módulos de Transporte, Alimentação etc., use o lançamento direto:
 
-| Status do Custo | Aparece no Fluxo de Caixa? |
-|---|---|
-| PENDENTE | Não |
-| SOLICITADO | Sim — Saídas Previstas |
-| AUTORIZADO | Sim — Saídas Previstas |
-| PAGO | Não (já realizado — aparece só no histórico) |
+### Conta a Pagar (manual)
+**Caminho:** Financeiro → Contas a Pagar → **Nova Conta a Pagar**
+- Preencha: Descrição, Valor, Vencimento, Fornecedor (opcional), Obra (opcional)
+- Aparece imediatamente em Saídas Previstas
 
-**Caminho para aprovar um custo:** Financeiro → Gestão de Custos → localizar → botão **Solicitar** → depois **Autorizar** → depois **Pagar**
+### Conta a Receber (manual)
+**Caminho:** Financeiro → Contas a Receber → **Nova Conta a Receber**
+- Preencha: Descrição, Cliente, Valor, Vencimento, Obra (opcional)
+- Aparece imediatamente em Entradas Previstas
 
----
-
-## 9. Resumo do Fluxo Automático
-
-```
-Criar Conta a Pagar
-    → Aparece em Saídas Previstas no Fluxo de Caixa
-    → Dar baixa (Pagar)
-        → Sai das Saídas Previstas
-        → Saldo do banco diminui (se banco informado)
-        → Lançamento contábil gerado (se conta contábil vinculada)
-
-Criar Conta a Receber
-    → Aparece em Entradas Previstas no Fluxo de Caixa
-    → Dar baixa (Receber)
-        → Sai das Entradas Previstas
-        → Saldo do banco aumenta (se banco informado)
-        → Lançamento contábil gerado (se conta contábil vinculada)
-
-Gestão de Custos V2 (SOLICITADO/AUTORIZADO)
-    → Aparece em Saídas Previstas no Fluxo de Caixa
-    → Ao marcar como PAGO
-        → Sai das Saídas Previstas
-        → Saldo do Fluxo de Caixa se ajusta
-```
+### Dar baixa (pagar ou receber)
+**Caminho:** na lista → botão **Pagar** ou **Receber** → preencher valor, data, forma e banco → confirmar
 
 ---
 
-## 10. Dicas Práticas
+## PARTE E — Tabela Resumo por Módulo
 
-- **Sempre selecione o banco** ao dar baixa — assim o saldo das contas bancárias fica correto e o Fluxo de Caixa reflete a realidade.
-- **Vincule à Obra** quando o custo pertencer a uma construção — facilita o relatório de custo por obra.
-- **Pagamento parcial** é suportado: informe apenas o valor pago hoje; o saldo restante continua em aberto no Fluxo de Caixa.
-- **Vencimentos passados** com status PENDENTE aparecem como **VENCIDO** na lista — ainda entram nas Saídas Previstas se o filtro de data incluir a data de vencimento.
+| Módulo | Como lançar | Vai para | Aprovação necessária | Aparece no Fluxo de Caixa |
+|---|---|---|---|---|
+| **Transporte** | Menu Transporte → Novo Lançamento | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
+| **Transporte Lote** | Menu Transporte → Lançamento em Lote | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO |
+| **Alimentação** | Menu Alimentação → Novo Lançamento | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
+| **Material (Saída)** | Almoxarifado → Saída de Material | Custo da Obra (direto) | Não | Não aparece (só em Custos por Obra) |
+| **Diária Funcionário** | Ponto Eletrônico → bater ponto (entrada) | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
+| **Reembolso** | Financeiro → Gestão de Custos → Reembolsos | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO |
+| **Conta a Pagar** | Financeiro → Contas a Pagar → Nova | Saídas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
+| **Conta a Receber** | Financeiro → Contas a Receber → Nova | Entradas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
+
+---
+
+## PARTE F — Dicas Práticas
+
+- **O custo de material (almoxarifado) não aparece no Fluxo de Caixa.** Ele é registrado como custo realizado da obra. Para ver: Obras → selecionar a obra → aba Custos.
+- **Sem Solicitar, o custo não aparece no Fluxo de Caixa.** Um lançamento de Transporte ou Alimentação recém-criado fica invisível no Fluxo até ser Solicitado.
+- **Recusar não apaga o custo.** Ele volta para PENDENTE e pode ser Solicitado novamente depois de corrigido.
+- **O Saldo Inicial do Fluxo de Caixa é o saldo real dos bancos.** Mantenha os bancos atualizados dando baixa correta nas contas (selecionando o banco ao pagar).
+- **Pagamento parcial:** informe só o valor pago hoje; o saldo restante continua nas Saídas Previstas.
+- **Diária duplicada:** o sistema protege automaticamente — bater o ponto duas vezes no mesmo dia não gera dois custos.
