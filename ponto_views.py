@@ -1548,6 +1548,9 @@ def registrar_ponto_facial_api():
         
         tipo_registrado = None
         
+        # tipo_ponto_canonico: valor canônico para eventos (entrada/saida_almoco/volta_almoco/saida)
+        tipo_ponto_canonico = None
+
         # Se tipo foi selecionado manualmente, usar esse
         if tipo_ponto_manual:
             if tipo_ponto_manual == 'entrada':
@@ -1558,6 +1561,7 @@ def registrar_ponto_facial_api():
                     }), 400
                 registro.hora_entrada = agora
                 tipo_registrado = 'entrada'
+                tipo_ponto_canonico = 'entrada'
             elif tipo_ponto_manual == 'almoco_saida':
                 if registro.hora_almoco_saida:
                     return jsonify({
@@ -1566,6 +1570,7 @@ def registrar_ponto_facial_api():
                     }), 400
                 registro.hora_almoco_saida = agora
                 tipo_registrado = 'saída para almoço'
+                tipo_ponto_canonico = 'saida_almoco'
             elif tipo_ponto_manual == 'almoco_retorno':
                 if registro.hora_almoco_retorno:
                     return jsonify({
@@ -1574,6 +1579,7 @@ def registrar_ponto_facial_api():
                     }), 400
                 registro.hora_almoco_retorno = agora
                 tipo_registrado = 'retorno do almoço'
+                tipo_ponto_canonico = 'volta_almoco'
             elif tipo_ponto_manual == 'saida':
                 if registro.hora_saida:
                     return jsonify({
@@ -1582,20 +1588,25 @@ def registrar_ponto_facial_api():
                     }), 400
                 registro.hora_saida = agora
                 tipo_registrado = 'saída'
+                tipo_ponto_canonico = 'saida'
         else:
             # Modo automático sequencial (fallback)
             if not registro.hora_entrada:
                 registro.hora_entrada = agora
                 tipo_registrado = 'entrada'
+                tipo_ponto_canonico = 'entrada'
             elif registro.hora_entrada and not registro.hora_almoco_saida:
                 registro.hora_almoco_saida = agora
                 tipo_registrado = 'saída para almoço'
+                tipo_ponto_canonico = 'saida_almoco'
             elif registro.hora_almoco_saida and not registro.hora_almoco_retorno:
                 registro.hora_almoco_retorno = agora
                 tipo_registrado = 'retorno do almoço'
+                tipo_ponto_canonico = 'volta_almoco'
             elif not registro.hora_saida:
                 registro.hora_saida = agora
                 tipo_registrado = 'saída'
+                tipo_ponto_canonico = 'saida'
             else:
                 return jsonify({
                     'success': False, 
@@ -1608,6 +1619,17 @@ def registrar_ponto_facial_api():
         registro.modelo_utilizado = 'SFace'
         
         db.session.commit()
+
+        # Emitir evento após commit — integração com diaristas V2 e outros módulos
+        if tipo_ponto_canonico:
+            try:
+                from event_manager import EventManager
+                EventManager.emit('ponto_registrado', {
+                    'registro_id': registro.id,
+                    'tipo_ponto': tipo_ponto_canonico,
+                }, admin_id=admin_id)
+            except Exception as ev_err:
+                logger.warning(f"[WARN] Evento ponto_registrado não emitido (facial): {ev_err}")
         
         logger.info(
             f"Ponto registrado com reconhecimento facial: "

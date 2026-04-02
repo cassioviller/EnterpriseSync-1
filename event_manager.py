@@ -432,40 +432,44 @@ def calcular_horas_folha(data: dict, admin_id: int):
                 logger.warning(f"[WARN] Diarista {funcionario.nome} sem valor_diaria configurado")
                 return
 
-            # Idempotência: só criar uma vez por dia por funcionário (na entrada)
+            # Só criar custo na entrada (não duplicar em saída/almoço)
             if tipo_ponto != 'entrada':
                 logger.info(f"[INFO] Diarista {funcionario.nome}: custo só criado na entrada, ignorando {tipo_ponto}")
                 return
 
-            ja_existe = CustoObra.query.filter_by(
-                obra_id=registro.obra_id,
-                funcionario_id=registro.funcionario_id,
-                data=registro.data,
-                categoria='PONTO_ELETRONICO_DIARIA',
+            # Idempotência via GestaoCustoFilho: origem_tabela='registro_ponto' + origem_id=registro.id
+            from models import GestaoCustoFilho
+            ja_existe = GestaoCustoFilho.query.filter_by(
+                origem_tabela='registro_ponto',
+                origem_id=registro.id,
                 admin_id=admin_id
             ).first()
             if ja_existe:
-                logger.info(f"[INFO] Custo diária de {funcionario.nome} em {registro.data} já existe — skip")
+                logger.info(f"[INFO] Custo diária de {funcionario.nome} já registrado para registro_ponto {registro.id} — skip")
                 return
 
-            descricao = f"Diária: {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}"
-            custo = CustoObra(
-                obra_id=registro.obra_id,
-                tipo='mao_obra',
+            descricao = f"Diária - {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}"
+
+            # Usar registrar_custo_automatico para criar GestaoCustoPai + Filho
+            # Assim o custo aparece na tela Gestão de Custos V2
+            from utils.financeiro_integration import registrar_custo_automatico
+            filho = registrar_custo_automatico(
+                admin_id=admin_id,
+                tipo_categoria='SALARIO',
+                entidade_nome=funcionario.nome,
+                entidade_id=funcionario.id,
+                data=registro.data,
                 descricao=descricao,
                 valor=valor_diaria,
-                data=registro.data,
-                funcionario_id=registro.funcionario_id,
-                admin_id=admin_id,
-                horas_trabalhadas=Decimal('8'),
-                horas_extras=Decimal('0'),
-                valor_unitario=Decimal(str(valor_diaria)),
-                quantidade=Decimal('1'),
-                categoria='PONTO_ELETRONICO_DIARIA'
+                obra_id=registro.obra_id,
+                origem_tabela='registro_ponto',
+                origem_id=registro.id,
             )
-            db.session.add(custo)
-            db.session.commit()
-            logger.info(f"[OK] Custo diária lançado: R$ {valor_diaria:.2f} na obra {registro.obra_id} — {funcionario.nome}")
+            if filho:
+                db.session.commit()
+                logger.info(f"[OK] Custo diária lançado na Gestão V2: R$ {valor_diaria:.2f} na obra {registro.obra_id} — {funcionario.nome}")
+            else:
+                logger.warning(f"[WARN] registrar_custo_automatico retornou None para diarista {funcionario.nome}")
             return
         # ── FIM V2: DIARISTA ──────────────────────────────────────────────
 
