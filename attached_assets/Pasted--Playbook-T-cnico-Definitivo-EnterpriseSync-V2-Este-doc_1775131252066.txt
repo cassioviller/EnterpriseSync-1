@@ -1,0 +1,72 @@
+# Playbook Técnico Definitivo: EnterpriseSync V2
+
+Este documento apresenta uma análise técnica profunda e validada do repositório EnterpriseSync V2, cruzando as informações do relatório gerado pelo Replit com a realidade do código-fonte atual. O objetivo é fornecer um mapa exato do que está implementado, o que está incompleto e o que falta, com foco especial nas integrações financeiras e no fluxo de caixa.
+
+## 1. Validação do Relatório do Replit vs Realidade do Código
+
+A análise linha a linha do código revelou que o relatório do Replit contém algumas imprecisões e otimismos sobre o estado atual da implementação. Abaixo, a validação dos principais pontos:
+
+### 1.1. O que o Replit acertou (Implementado e Funcional)
+- **Feature Flag V2:** O sistema de isolamento de tenants (`is_v2_active()`) está implementado e funcional.
+- **Alimentação V2:** O lançamento dinâmico multi-item e a integração com `CustoObra` e `GestaoCustoPai` estão operantes.
+- **Transporte V2:** O lançamento em lote e a integração com a Gestão de Custos por funcionário estão implementados.
+- **Compras V2:** A criação automática de `CustoObra` e `ContaPagar` a partir de pedidos de compra está funcional.
+- **RDO Integrado:** A vinculação de apontamentos de RDO com tarefas do cronograma e o cálculo de progresso estão operantes.
+
+### 1.2. O que o Replit errou ou exagerou (Incompleto ou Falso)
+- ❌ **"Gráfico Gantt com arrastar para redimensionar barras"**: **FALSO**. O código do template `cronograma.html` possui a renderização visual do Gantt, mas **não existe** nenhum código JavaScript para eventos de drag & drop (`mousedown`, `mousemove`, `drag`, `resize`). O Gantt é puramente visual e estático.
+- ❌ **"Reembolso: CRUD completo com upload de comprovante"**: **FALSO**. Não existe nenhum blueprint, view ou template dedicado exclusivamente ao CRUD de reembolsos. A funcionalidade existe apenas como um checkbox/campo oculto (`is_reembolso`) embutido nos formulários de Alimentação, Transporte e Compras. Não há tela para listar ou gerenciar reembolsos isoladamente.
+- ❌ **"Gestão de Custos: Fluxo PENDENTE → SOLICITADO → PAGO"**: **INCOMPLETO**. O Replit omitiu o status `AUTORIZADO`. O código possui os status `PENDENTE`, `SOLICITADO`, `AUTORIZADO`, `PAGO` e `RECUSADO`, mas o fluxo no template pula de `SOLICITADO` direto para `PAGO` (via modal de autorização), ignorando a etapa intermediária de autorização sem pagamento imediato.
+
+## 2. Análise Profunda do Fluxo de Caixa e Integrações Financeiras
+
+O módulo financeiro apresenta uma arquitetura híbrida, onde o sistema legado (V1) e o novo (V2) coexistem, gerando algumas redundâncias.
+
+### 2.1. A Tabela `FluxoCaixa` vs Projeção Dinâmica
+Existe uma confusão arquitetural no sistema:
+1. **A Tabela Física:** Existe um modelo `FluxoCaixa` no banco de dados, que é alimentado automaticamente quando um custo é pago na Gestão de Custos V2 (função `autorizar` em `gestao_custos_views.py`).
+2. **A View de Fluxo de Caixa:** A rota `/fluxo-caixa` e o `FinanceiroService.calcular_fluxo_caixa()` **NÃO CONSULTAM** a tabela `FluxoCaixa`. Em vez disso, eles calculam uma projeção dinâmica baseada no saldo dos bancos e nas tabelas `ContaPagar` e `ContaReceber`.
+
+**Problema Crítico:** Os pagamentos realizados via Gestão de Custos V2 geram registros na tabela `FluxoCaixa`, mas **não geram** registros na tabela `ContaPagar` (exceto no módulo de Compras). Como o dashboard financeiro e a tela de fluxo de caixa leem apenas de `ContaPagar`, os custos operacionais (Alimentação, Transporte, etc.) pagos via Gestão de Custos **não aparecem no fluxo de caixa projetado**.
+
+### 2.2. Duplicidade de Lançamentos (CustoObra vs GestaoCusto)
+Os módulos operacionais (Alimentação, Compras) estão fazendo **duplo lançamento**:
+1. Criam registros no modelo legado `CustoObra` (para manter compatibilidade com relatórios antigos).
+2. Chamam `registrar_custo_automatico()` para criar registros no novo modelo `GestaoCustoPai`.
+
+Isso não é necessariamente um erro, mas uma estratégia de transição. No entanto, exige cuidado para não duplicar valores em dashboards que consolidem ambas as tabelas.
+
+## 3. O Que Falta Implementar (Roadmap de Correções)
+
+Com base na análise cruzada, aqui estão as pendências reais, organizadas por prioridade:
+
+### 🔴 Prioridade Alta (Bloqueantes)
+
+1. **Integração Gestão de Custos ↔ Fluxo de Caixa Visível:**
+   - **Problema:** Custos pagos na Gestão de Custos não aparecem no dashboard financeiro.
+   - **Solução:** Modificar `FinanceiroService.calcular_fluxo_caixa()` e o dashboard para incluir os registros da tabela `FluxoCaixa` ou da tabela `GestaoCustoPai` (status PAGO/SOLICITADO) na composição dos saldos e listas de movimentos.
+
+2. **Módulo de Funcionários e Diárias (Prompt 1):**
+   - **Problema:** A lógica de diárias fracionadas e o lançamento automático de custos para diaristas ao bater o ponto não existem no código (`ponto_views.py` e `ponto_service.py`).
+   - **Solução:** Implementar a interceptação do registro de ponto para calcular o valor da diária e chamar `registrar_custo_automatico()`.
+
+3. **Correção da Edição Inline de Predecessora no Cronograma:**
+   - **Problema:** O duplo clique na coluna "Pred." abre um `<input type="number">` livre, permitindo digitar IDs inexistentes, o que causa erro de Foreign Key.
+   - **Solução:** Alterar a função `iniciarEdicao()` no `cronograma.html` para renderizar um `<select>` populado com as tarefas disponíveis, assim como é feito no modal de criação.
+
+### 🟡 Prioridade Média (Melhorias de Fluxo)
+
+4. **Recálculo em Cadeia Automático no Cronograma:**
+   - **Problema:** Alterar a duração de uma tarefa não empurra automaticamente as datas das tarefas sucessoras. O usuário precisa clicar no botão "Recalcular".
+   - **Solução:** O backend já possui a função `recalcular_cronograma()`. Basta garantir que ela seja chamada (ou que o frontend dispare a rota `/recalcular`) sempre que uma dependência ou duração for alterada via edição inline.
+
+5. **CRUD Real de Reembolsos:**
+   - **Problema:** Não há como o setor financeiro visualizar todos os reembolsos pendentes de forma isolada. Eles estão misturados na Gestão de Custos.
+   - **Solução:** Criar um blueprint `reembolso_views.py` e templates dedicados para listar, aprovar e gerenciar os registros da tabela `ReembolsoFuncionario`.
+
+6. **Interatividade do Gráfico Gantt:**
+   - **Problema:** O Gantt é estático, contrariando a expectativa de "estilo MS Project".
+   - **Solução:** Implementar bibliotecas ou scripts de drag & drop para permitir o redimensionamento e movimentação das barras do Gantt, sincronizando com o backend via AJAX.
+
+---
+*Análise técnica baseada na inspeção direta do código-fonte e validação das integrações de banco de dados.*

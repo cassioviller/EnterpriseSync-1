@@ -1,0 +1,112 @@
+# Respostas e Lógica de Implementação para o Replit Agent
+
+Abaixo estão as respostas consolidadas para as perguntas levantadas, acompanhadas da lógica técnica detalhada que você deve seguir para implementar cada funcionalidade. O objetivo é garantir a melhor experiência para o gestor da obra, mantendo a consistência arquitetural do sistema V2.
+
+---
+
+## 🔴 TASK 1 — Gestão de Custos → Fluxo de Caixa
+
+**Respostas de Negócio:**
+1. **SOLICITADO no Fluxo de Caixa:** Sim, custos com status `SOLICITADO` devem aparecer no fluxo de caixa como **saída projetada/futura**. Isso é essencial para a previsibilidade financeira.
+2. **Status AUTORIZADO:** O status `AUTORIZADO` deve funcionar como uma etapa intermediária real. O gestor da obra "Solicita" o pagamento, o diretor "Autoriza" (aprovando o gasto), e o financeiro "Paga" (quando o dinheiro efetivamente sai da conta).
+3. **Histórico Retroativo:** Sim, os custos de Alimentação e Transporte já lançados na V2 devem aparecer retroativamente no financeiro.
+4. **Onde exibir:** Os custos V2 devem aparecer em **todos os lugares** do dashboard financeiro (listagem de contas a pagar, gráfico de fluxo de caixa e KPIs do topo).
+
+**Lógica de Implementação Técnica:**
+- **Refatoração do `FinanceiroService.calcular_fluxo_caixa()`:** Modifique a query para incluir registros da tabela `GestaoCustoPai`.
+  - Registros com status `SOLICITADO` e `AUTORIZADO` devem ser somados em `saidas_previstas` (comportamento similar a `ContaPagar` pendente).
+  - Registros com status `PAGO` devem ser considerados saídas realizadas (se o dashboard exibir histórico).
+- **Ajuste no Fluxo de Status (`gestao_custos_views.py`):**
+  - Crie a rota `/<int:pai_id>/autorizar` que muda o status de `SOLICITADO` para `AUTORIZADO`.
+  - Crie a rota `/<int:pai_id>/pagar` que muda o status de `AUTORIZADO` para `PAGO` e gera o registro na tabela `FluxoCaixa`.
+  - Atualize o template `gestao.html` para refletir esses três botões/modais distintos.
+- **Unificação Visual:** No dashboard financeiro, mapeie os registros de `GestaoCustoPai` para o mesmo formato de dicionário usado por `ContaPagar`, para que o template Jinja2 não precise de grandes alterações.
+
+---
+
+## 🔴 TASK 2 — Diaristas: custo automático ao bater ponto
+
+**Respostas de Negócio:**
+1. **Cálculo da Diária:** O `valor_diaria` é fixo por dia trabalhado. Se o funcionário bateu o ponto (mesmo que incompleto), o sistema deve lançar **1 diária integral**. A negociação de meia diária, se ocorrer, será feita manualmente pelo gestor depois.
+2. **Momento do Lançamento:** O custo deve ser lançado no momento em que o funcionário bate o **ponto de entrada**. Não precisamos esperar o fechamento do dia.
+3. **Vínculo da Obra:** O custo deve ser vinculado à obra onde o ponto foi batido (campo `obra_id` do `RegistroPonto`).
+4. **Onde aparece:** O custo deve aparecer **apenas na Gestão de Custos V2** (para evitar duplicidade de código legado).
+5. **Conta a Pagar:** Não deve gerar `ContaPagar` separada. O registro na Gestão de Custos V2 (categoria SALARIO) já será lido pelo novo fluxo de caixa (conforme Task 1).
+
+**Lógica de Implementação Técnica:**
+- **Interceptação no `PontoService.bater_ponto_obra()`:**
+  - Logo após salvar o `RegistroPonto` de 'entrada', verifique se o funcionário possui `tipo_remuneracao == 'diaria'`.
+  - Se sim, chame a função `registrar_custo_automatico()` do `utils.financeiro_integration`.
+  - Parâmetros: `tipo_categoria='SALARIO'`, `valor=funcionario.valor_diaria`, `obra_id=registro.obra_id`, `origem_tabela='registro_ponto'`, `origem_id=registro.id`.
+- **Prevenção de Duplicidade:** Antes de lançar, faça uma query em `GestaoCustoFilho` filtrando por `origem_tabela='registro_ponto'` e `data_referencia=hoje` para garantir que a diária não seja lançada duas vezes se o funcionário bater a entrada novamente por engano.
+
+---
+
+## 🟡 TASK 3 — Edição inline de predecessora no Cronograma
+
+**Respostas de Negócio:**
+1. **Recálculo Automático:** Sim, ao alterar a predecessora via edição inline, o sistema deve recalcular automaticamente a data de início da tarefa e de todas as suas sucessoras em cadeia.
+2. **Remover Predecessora:** Sim, deve ser possível selecionar uma opção "Nenhuma" ou "Vazia" no dropdown para remover a dependência.
+
+**Lógica de Implementação Técnica:**
+- **Frontend (`cronograma.html`):**
+  - Modifique a função `iniciarEdicao()` para que, quando `campo === 'predecessora_id'`, ela crie um elemento `<select>` em vez de um `<input type="number">`.
+  - Popule este `<select>` iterando sobre o array global `tarefas`, adicionando uma `<option value="">— Nenhuma —</option>` no topo.
+  - Ao disparar o evento `change` ou `blur`, envie o valor (ou `null`) via requisição PUT.
+- **Backend (`cronograma_views.py`):**
+  - A rota de atualização já valida ciclos circulares e aceita `null`.
+  - Após o `db.session.commit()` da atualização da tarefa, chame a função `recalcular_cronograma(obra_id, admin_id)` do `utils.cronograma_engine` para garantir que toda a cadeia seja atualizada no banco.
+  - Retorne a lista completa de tarefas atualizadas no JSON de resposta, para que o frontend redesenhe o Gantt.
+
+---
+
+## 🟡 TASK 4 — Recálculo em cadeia automático no Cronograma
+
+**Respostas de Negócio:**
+1. **Gatilho do Recálculo:** O recálculo deve ser **automático** sempre que a duração ou a predecessora de uma tarefa for alterada.
+2. **Direção do Recálculo:** O sistema deve empurrar as sucessoras para frente (se a tarefa atrasar) e também **puxar para trás** (se a tarefa terminar mais cedo). O cronograma deve ser sempre o mais otimizado possível.
+3. **Feriados e Fins de Semana:** Sim, deve continuar respeitando o `CalendarioEmpresa` (dias úteis).
+
+**Lógica de Implementação Técnica:**
+- **Backend (`cronograma_views.py`):**
+  - Na rota `atualizar_tarefa`, se os campos `duracao_dias`, `data_inicio` ou `predecessora_id` forem modificados, chame `recalcular_cronograma(obra_id, admin_id)` antes de retornar a resposta.
+- **Engine (`utils/cronograma_engine.py`):**
+  - A função `recalcular_cronograma` atual já faz o processamento topológico correto (empurrando e puxando datas baseadas nas predecessoras e dias úteis). Nenhuma alteração profunda na engine é necessária, apenas garantir que ela seja invocada nos momentos certos.
+
+---
+
+## 🟡 TASK 5 — CRUD de Reembolsos
+
+**Respostas de Negócio:**
+1. **Quem solicita:** Um admin/gestor lança o reembolso em nome do funcionário (não há autoatendimento para peões de obra).
+2. **Quem aprova:** O fluxo de aprovação será o mesmo da Gestão de Custos (Solicitado → Autorizado → Pago).
+3. **Comprovante:** O upload de comprovante é **opcional**, mas recomendado.
+4. **Conta a Pagar:** Não deve gerar `ContaPagar`. O reembolso será gerido inteiramente dentro da Gestão de Custos V2 (categoria REEMBOLSO).
+5. **Holerite:** O reembolso é pago **separado** da folha de pagamento (não entra no holerite para não incidir impostos).
+6. **Categorias:** As categorias atuais (alimentação, transporte, hospedagem, equipamentos, outros) estão corretas e suficientes.
+
+**Lógica de Implementação Técnica:**
+- **Criação do Blueprint (`reembolso_views.py`):**
+  - Crie um CRUD completo (Listar, Novo, Editar, Excluir) para o modelo `ReembolsoFuncionario`.
+  - No formulário de criação, inclua os campos: Funcionário, Obra, Categoria, Valor, Data, Descrição e Upload de Comprovante (salvo em `static/uploads/comprovantes`).
+- **Integração com Gestão de Custos:**
+  - Ao salvar um novo reembolso, chame `registrar_custo_automatico()` com `tipo_categoria='REEMBOLSO'`.
+  - A listagem principal de reembolsos deve exibir o status atual do pagamento buscando a informação no `GestaoCustoPai` vinculado.
+
+---
+
+## 🟡 TASK 6 — Gantt interativo
+
+**Respostas de Negócio:**
+1. **Nível de Interatividade:** **Opção C (completo)**. Arrastar a barra inteira (move início+fim), puxar a extremidade para alterar duração, e atualizar automaticamente as sucessoras em cadeia.
+2. **Salvamento:** O sistema deve salvar **automaticamente via AJAX** ao soltar a barra (sem botão de confirmação), exibindo um toast de "Salvando..." e depois "Salvo".
+3. **Dispositivos:** O Gantt interativo deve funcionar prioritariamente em **desktop**. Em mobile, a visualização estática ou edição via tabela já é suficiente (drag & drop em telas pequenas de obra é inviável).
+
+**Lógica de Implementação Técnica:**
+- **Frontend (`cronograma.html`):**
+  - Integre uma biblioteca leve de drag & drop (como `interact.js` ou implemente eventos nativos de mouse `mousedown`, `mousemove`, `mouseup` restritos a telas maiores que 768px).
+  - **Drag da barra inteira:** Calcula a diferença de dias baseada nos pixels movidos (ex: 1 dia = 30px). Atualiza a `data_inicio` da tarefa e dispara requisição PUT.
+  - **Resize da extremidade direita:** Calcula a nova `duracao_dias` baseada na largura final da barra e dispara requisição PUT.
+- **Backend:**
+  - As requisições PUT disparadas pelo Gantt cairão na mesma rota `atualizar_tarefa` da Task 4, que já estará configurada para chamar `recalcular_cronograma()` e devolver a árvore atualizada.
+  - O frontend recebe o JSON com as novas datas e redesenha o Gantt completo para refletir o efeito cascata.
