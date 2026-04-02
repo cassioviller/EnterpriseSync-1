@@ -1,0 +1,111 @@
+{% extends "base_completo.html" %}
+{% block title %}Registrar Pagamento - SIGE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6 col-md-8">
+
+    <div class="d-flex align-items-center mb-4 gap-2">
+      <a href="{{ url_for('financeiro.listar_contas_pagar') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <h1 class="h4 mb-0"><i class="fas fa-check-circle me-2 text-success"></i>Registrar Pagamento</h1>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show">
+          {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="card border-danger mb-3">
+      <div class="card-header bg-danger text-white">
+        <strong><i class="fas fa-file-invoice-dollar me-1"></i> {{ conta.descricao }}</strong>
+      </div>
+      <div class="card-body">
+        <div class="row text-center">
+          <div class="col-4">
+            <small class="text-muted d-block">Valor Original</small>
+            <strong>R$ {{ "%.2f"|format(conta.valor_original) }}</strong>
+          </div>
+          <div class="col-4">
+            <small class="text-muted d-block">Já Pago</small>
+            <strong class="text-success">R$ {{ "%.2f"|format(conta.valor_pago) }}</strong>
+          </div>
+          <div class="col-4">
+            <small class="text-muted d-block">Saldo Restante</small>
+            <strong class="text-danger">R$ {{ "%.2f"|format(conta.saldo) }}</strong>
+          </div>
+        </div>
+        <hr class="my-2">
+        <small class="text-muted">Vencimento: {{ conta.data_vencimento.strftime('%d/%m/%Y') }} &bull; Status: <span class="badge bg-warning text-dark">{{ conta.status }}</span></small>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Valor Pago <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">R$</span>
+              <input type="number" class="form-control" name="valor_pago" step="0.01" min="0.01"
+                     value="{{ '%.2f'|format(conta.saldo) }}" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Data do Pagamento <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" name="data_pagamento"
+                   value="{{ now().strftime('%Y-%m-%d') if now is defined else '' }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Forma de Pagamento</label>
+            <select class="form-select" name="forma_pagamento">
+              <option value="">— Selecione —</option>
+              <option value="PIX">PIX</option>
+              <option value="TED">TED/DOC</option>
+              <option value="BOLETO">Boleto</option>
+              <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+              <option value="CARTAO_DEBITO">Cartão de Débito</option>
+              <option value="DINHEIRO">Dinheiro</option>
+              <option value="CHEQUE">Cheque</option>
+            </select>
+          </div>
+
+          {% if bancos %}
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Débito na Conta Bancária</label>
+            <select class="form-select" name="banco_id">
+              <option value="">— Não registrar no banco —</option>
+              {% for b in bancos %}
+                <option value="{{ b.id }}">{{ b.nome_banco }} — Saldo: R$ {{ "%.2f"|format(b.saldo_atual) }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success">
+              <i class="fas fa-check me-1"></i> Confirmar Pagamento
+            </button>
+            <a href="{{ url_for('financeiro.listar_contas_pagar') }}" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelector('[name="data_pagamento"]').value = new Date().toISOString().slice(0,10);
+</script>
+{% endblock %}

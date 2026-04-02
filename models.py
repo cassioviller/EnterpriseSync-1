@@ -1426,7 +1426,7 @@ class ContaPagar(db.Model):
     __tablename__ = 'conta_pagar'
     
     id = db.Column(db.Integer, primary_key=True)
-    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=False)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     numero_documento = db.Column(db.String(50))
     descricao = db.Column(db.Text, nullable=False)

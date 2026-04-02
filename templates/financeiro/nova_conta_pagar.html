@@ -1,0 +1,98 @@
+{% extends "base_completo.html" %}
+{% block title %}Nova Conta a Pagar - SIGE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7 col-md-9">
+
+    <div class="d-flex align-items-center mb-4 gap-2">
+      <a href="{{ url_for('financeiro.listar_contas_pagar') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <h1 class="h4 mb-0"><i class="fas fa-file-invoice-dollar me-2 text-danger"></i>Nova Conta a Pagar</h1>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show">
+          {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Descrição <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="descricao" required
+                   placeholder="Ex: Fornecedor de materiais, Aluguel, etc." autofocus>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Valor <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">R$</span>
+                <input type="number" class="form-control" name="valor" step="0.01" min="0.01" required placeholder="0,00">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Vencimento <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="data_vencimento" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Fornecedor</label>
+            <select class="form-select" name="fornecedor_id">
+              <option value="">— Selecione (opcional) —</option>
+              {% for f in fornecedores %}
+                <option value="{{ f.id }}">{{ f.razao_social or f.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Obra Vinculada</label>
+              <select class="form-select" name="obra_id">
+                <option value="">— Nenhuma —</option>
+                {% for o in obras %}
+                  <option value="{{ o.id }}">{{ o.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Nº Documento</label>
+              <input type="text" class="form-control" name="numero_documento" placeholder="NF, Boleto, etc.">
+            </div>
+          </div>
+
+          {% if contas_contabeis %}
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Conta Contábil</label>
+            <select class="form-select" name="conta_contabil_codigo">
+              <option value="">— Selecione (opcional) —</option>
+              {% for c in contas_contabeis %}
+                <option value="{{ c.codigo }}">{{ c.codigo }} — {{ c.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-danger">
+              <i class="fas fa-save me-1"></i> Salvar Conta a Pagar
+            </button>
+            <a href="{{ url_for('financeiro.listar_contas_pagar') }}" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

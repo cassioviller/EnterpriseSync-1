@@ -1,0 +1,76 @@
+{% extends "base_completo.html" %}
+{% block title %}Novo Banco - SIGE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6 col-md-8">
+
+    <div class="d-flex align-items-center mb-4 gap-2">
+      <a href="{{ url_for('financeiro.listar_bancos') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <h1 class="h4 mb-0"><i class="fas fa-university me-2"></i>Cadastrar Banco / Conta</h1>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show">
+          {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nome do Banco <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="nome_banco" required autofocus
+                   placeholder="Ex: Banco do Brasil, Caixa, Nubank, Caixa Interna...">
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Agência</label>
+              <input type="text" class="form-control" name="agencia" placeholder="0000-0">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Conta</label>
+              <input type="text" class="form-control" name="conta" placeholder="00000-0">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tipo de Conta</label>
+              <select class="form-select" name="tipo_conta">
+                <option value="CORRENTE">Conta Corrente</option>
+                <option value="POUPANCA">Conta Poupança</option>
+                <option value="INVESTIMENTO">Investimento</option>
+                <option value="CAIXA">Caixa Físico</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Saldo Inicial (R$)</label>
+              <div class="input-group">
+                <span class="input-group-text">R$</span>
+                <input type="number" class="form-control" name="saldo_inicial" step="0.01" value="0.00">
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save me-1"></i> Cadastrar Banco
+            </button>
+            <a href="{{ url_for('financeiro.listar_bancos') }}" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

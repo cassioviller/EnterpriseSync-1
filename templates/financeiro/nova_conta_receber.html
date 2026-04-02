@@ -1,0 +1,100 @@
+{% extends "base_completo.html" %}
+{% block title %}Nova Conta a Receber - SIGE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7 col-md-9">
+
+    <div class="d-flex align-items-center mb-4 gap-2">
+      <a href="{{ url_for('financeiro.listar_contas_receber') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <h1 class="h4 mb-0"><i class="fas fa-hand-holding-usd me-2 text-success"></i>Nova Conta a Receber</h1>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show">
+          {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Descrição <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="descricao" required
+                   placeholder="Ex: Medição #3, Serviço prestado, etc." autofocus>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Cliente / Devedor <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="cliente_nome" required
+                     placeholder="Nome do cliente">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">CPF / CNPJ</label>
+              <input type="text" class="form-control" name="cliente_cpf_cnpj" placeholder="Opcional">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Valor <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">R$</span>
+                <input type="number" class="form-control" name="valor" step="0.01" min="0.01" required placeholder="0,00">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Vencimento <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="data_vencimento" required>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Obra Vinculada</label>
+              <select class="form-select" name="obra_id">
+                <option value="">— Nenhuma —</option>
+                {% for o in obras %}
+                  <option value="{{ o.id }}">{{ o.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Nº Documento</label>
+              <input type="text" class="form-control" name="numero_documento" placeholder="NF, Contrato, etc.">
+            </div>
+          </div>
+
+          {% if contas_contabeis %}
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Conta Contábil</label>
+            <select class="form-select" name="conta_contabil_codigo">
+              <option value="">— Selecione (opcional) —</option>
+              {% for c in contas_contabeis %}
+                <option value="{{ c.codigo }}">{{ c.codigo }} — {{ c.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success">
+              <i class="fas fa-save me-1"></i> Salvar Conta a Receber
+            </button>
+            <a href="{{ url_for('financeiro.listar_contas_receber') }}" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

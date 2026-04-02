@@ -1,0 +1,119 @@
+{% extends "base_completo.html" %}
+{% block title %}Plano de Contas - SIGE{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h4 mb-0"><i class="fas fa-sitemap me-2"></i>Plano de Contas</h1>
+  <div class="d-flex gap-2">
+    {% if not contas %}
+    <form method="POST" action="{{ url_for('financeiro.inicializar_plano_contas') }}">
+      <input type="hidden" name="csrf_token" value="">
+      <button type="submit" class="btn btn-primary" onclick="return confirm('Inicializar plano de contas padrão?')">
+        <i class="fas fa-magic me-1"></i> Inicializar Padrão
+      </button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('financeiro.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="fas fa-arrow-left me-1"></i> Voltar
+    </a>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endwith %}
+
+{% if not contas %}
+<div class="card text-center py-5">
+  <div class="card-body">
+    <i class="fas fa-sitemap fa-3x text-muted mb-3"></i>
+    <h5 class="text-muted">Plano de Contas vazio</h5>
+    <p class="text-muted">Clique em "Inicializar Padrão" para criar um plano de contas básico automaticamente.</p>
+  </div>
+</div>
+{% else %}
+
+{% set grupos = contas | groupby('tipo_conta') %}
+{% for tipo, grupo_contas in grupos %}
+<div class="card mb-3">
+  <div class="card-header bg-light">
+    <strong><i class="fas fa-folder me-1"></i>
+      {% if tipo == 'ATIVO' %}Ativo
+      {% elif tipo == 'PASSIVO' %}Passivo
+      {% elif tipo == 'PATRIMONIO' %}Patrimônio Líquido
+      {% elif tipo == 'RECEITA' %}Receitas
+      {% elif tipo == 'DESPESA' %}Despesas
+      {% else %}{{ tipo }}{% endif %}
+    </strong>
+    <span class="badge bg-secondary ms-2">{{ grupo_contas | list | length }} contas</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Código</th>
+            <th>Nome</th>
+            <th>Natureza</th>
+            <th class="text-center">Lançamento</th>
+            <th class="text-center">Ativo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for conta in grupo_contas %}
+          <tr>
+            <td>
+              <code>{{ conta.codigo }}</code>
+              {% if conta.conta_pai_codigo %}
+                <small class="text-muted ms-1">← {{ conta.conta_pai_codigo }}</small>
+              {% endif %}
+            </td>
+            <td style="padding-left: {{ (conta.codigo.split('.')|length - 1) * 15 }}px">
+              {{ conta.nome }}
+            </td>
+            <td>
+              <span class="badge {% if conta.natureza == 'DEVEDORA' %}bg-danger{% else %}bg-success{% endif %}">
+                {{ conta.natureza }}
+              </span>
+            </td>
+            <td class="text-center">
+              {% if conta.aceita_lancamento %}
+                <i class="fas fa-check text-success"></i>
+              {% else %}
+                <i class="fas fa-times text-muted"></i>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if conta.ativo %}
+                <i class="fas fa-check text-success"></i>
+              {% else %}
+                <i class="fas fa-times text-danger"></i>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+  $('table').DataTable({
+    language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+    pageLength: 50,
+    order: [[0, 'asc']]
+  });
+});
+</script>
+{% endblock %}
