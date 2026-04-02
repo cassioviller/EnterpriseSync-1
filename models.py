@@ -226,9 +226,12 @@ class FotoFacialFuncionario(db.Model):
         return f'<FotoFacial {self.funcionario_id} - {self.descricao}>'
 
 class Obra(db.Model):
+    __table_args__ = (
+        db.UniqueConstraint('codigo', 'admin_id', name='uq_obra_codigo_admin_id'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
-    codigo = db.Column(db.String(20), unique=True)  # Código único da obra
+    codigo = db.Column(db.String(20))  # Código único da obra (único por tenant)
     endereco = db.Column(db.Text)
     data_inicio = db.Column(db.Date, nullable=False)
     data_previsao_fim = db.Column(db.Date)

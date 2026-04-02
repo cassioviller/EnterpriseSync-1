@@ -3781,6 +3781,7 @@ def executar_migracoes():
             (79, "Reembolso V2 - tabela reembolso_funcionario", _migration_79_reembolso_funcionario),
             (80, "Reembolso V2 - categoria e comprovante_url", _migration_80_reembolso_campos_extras),
             (81, "Reembolso V2 - gestao_custo_pai_id FK", _migration_81_reembolso_gestao_custo_pai_id),
+            (82, "Obra codigo - unique por tenant (codigo+admin_id)", _migration_82_obra_codigo_per_tenant),
         ]
         
         # Executar cada migração com rastreamento
@@ -7121,6 +7122,71 @@ def _migration_79_reembolso_funcionario():
 
     except Exception as e:
         logger.error(f"Erro na migracao 79: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_82_obra_codigo_per_tenant():
+    """Migration 82: Troca unique global de obra.codigo por unique composto (codigo, admin_id)"""
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        # 1. Remover constraint global obra_codigo_key (se existir)
+        cursor.execute("""
+            SELECT constraint_name FROM information_schema.table_constraints
+            WHERE table_name = 'obra' AND constraint_name = 'obra_codigo_key'
+        """)
+        if cursor.fetchone():
+            cursor.execute("ALTER TABLE obra DROP CONSTRAINT obra_codigo_key")
+            logger.info("MIGRACAO 82: constraint global obra_codigo_key removida")
+
+        # 2. Criar unique composto (codigo, admin_id) — se não existir
+        cursor.execute("""
+            SELECT indexname FROM pg_indexes
+            WHERE tablename = 'obra' AND indexname = 'uq_obra_codigo_admin_id'
+        """)
+        if not cursor.fetchone():
+            # Resolver duplicatas de (codigo, admin_id) antes de criar o índice
+            cursor.execute("""
+                SELECT codigo, admin_id, array_agg(id ORDER BY id) as ids
+                FROM obra
+                WHERE codigo IS NOT NULL AND admin_id IS NOT NULL
+                GROUP BY codigo, admin_id
+                HAVING COUNT(*) > 1
+            """)
+            duplicates = cursor.fetchall()
+            for dup_codigo, dup_admin_id, dup_ids in duplicates:
+                # Mantém o ID mais antigo, renomeia os demais com sufixo
+                for suffix_n, dup_id in enumerate(dup_ids[1:], start=2):
+                    new_code = f"{dup_codigo}-DUP{suffix_n}"
+                    cursor.execute(
+                        "UPDATE obra SET codigo = %s WHERE id = %s",
+                        (new_code, dup_id)
+                    )
+                    logger.info(f"MIGRACAO 82: renomeado código duplicado id={dup_id}: {dup_codigo} → {new_code}")
+
+            cursor.execute("""
+                CREATE UNIQUE INDEX uq_obra_codigo_admin_id
+                ON obra (codigo, admin_id)
+                WHERE codigo IS NOT NULL AND admin_id IS NOT NULL
+            """)
+            logger.info("MIGRACAO 82: unique index composto (codigo, admin_id) criado")
+
+        connection.close()
+        logger.info("MIGRACAO 82 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 82: {e}")
         if connection:
             try:
                 connection.rollback()

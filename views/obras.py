@@ -241,12 +241,20 @@ def nova_obra():
             longitude = float(request.form.get('longitude')) if request.form.get('longitude') else None
             raio_geofence_metros = int(request.form.get('raio_geofence_metros', 100)) if request.form.get('raio_geofence_metros') else 100
             
-            # Gerar código único se não fornecido
+            # Detectar admin_id antes de gerar código
+            admin_id = 10  # Padrão
+            if hasattr(current_user, 'admin_id') and current_user.admin_id:
+                admin_id = current_user.admin_id
+            elif hasattr(current_user, 'id'):
+                admin_id = current_user.id
+
+            # Gerar código único se não fornecido (escopo por tenant)
             if not codigo:
                 try:
-                    # Buscar apenas códigos que seguem o padrão O + números
+                    # Buscar apenas códigos que seguem o padrão O + números para este tenant
                     ultimo_codigo = db.session.execute(
-                        text("SELECT MAX(CAST(SUBSTRING(codigo FROM 2) AS INTEGER)) FROM obra WHERE codigo ~ '^O[0-9]+$'")
+                        text("SELECT MAX(CAST(SUBSTRING(codigo FROM 2) AS INTEGER)) FROM obra WHERE codigo ~ '^O[0-9]+$' AND admin_id = :admin_id"),
+                        {'admin_id': admin_id}
                     ).fetchone()
                     
                     if ultimo_codigo and ultimo_codigo[0]:
@@ -258,15 +266,8 @@ def nova_obra():
                 except Exception as e:
                     logger.error(f"[WARN] Erro na geração de código, usando fallback: {e}")
                     # Fallback: gerar código baseado em timestamp
-                    timestamp = datetime.now().strftime("%m%d%H%M")
-                    codigo = f"O{timestamp}"
-            
-            # Detectar admin_id
-            admin_id = 10  # Padrão
-            if hasattr(current_user, 'admin_id') and current_user.admin_id:
-                admin_id = current_user.admin_id
-            elif hasattr(current_user, 'id'):
-                admin_id = current_user.id
+                    import time
+                    codigo = f"O{int(time.time()) % 100000:05d}"
             
             # Gerar token para portal do cliente se ativo
             token_cliente = None
@@ -765,9 +766,10 @@ def editar_obra(id):
             # [CONFIG] CÓDIGO DE OBRA: Gerar automático se None/vazio
             codigo_form = request.form.get('codigo', '').strip()
             if not codigo_form or codigo_form.lower() == 'none':
-                # Gerar código automático: OB001, OB002, etc.
+                # Gerar código automático: OB001, OB002, etc. (escopo por tenant)
                 ultimo_obra = Obra.query.filter(
-                    Obra.codigo.like('OB%')
+                    Obra.codigo.like('OB%'),
+                    Obra.admin_id == obra.admin_id,
                 ).order_by(Obra.codigo.desc()).first()
                 
                 if ultimo_obra and ultimo_obra.codigo:
