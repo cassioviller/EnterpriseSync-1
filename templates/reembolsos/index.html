@@ -37,7 +37,7 @@
 
 {# Filtros #}
 <form method="get" class="row g-2 mb-3">
-  <div class="col-md-4">
+  <div class="col-md-3">
     <select name="funcionario_id" class="form-select form-select-sm" onchange="this.form.submit()">
       <option value="">— Todos os funcionários —</option>
       {% for f in funcionarios %}
@@ -45,11 +45,18 @@
       {% endfor %}
     </select>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-3">
     <select name="obra_id" class="form-select form-select-sm" onchange="this.form.submit()">
       <option value="">— Todas as obras —</option>
       {% for o in obras %}
       <option value="{{ o.id }}" {% if filtro_obra == o.id %}selected{% endif %}>{{ o.nome }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for val, label in status_opcoes %}
+      <option value="{{ val }}" {% if filtro_status == val %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
   </div>

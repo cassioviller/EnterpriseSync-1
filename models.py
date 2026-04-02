@@ -4288,6 +4288,7 @@ class ReembolsoFuncionario(db.Model):
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
     comprovante_url = db.Column(db.String(500), nullable=True)
+    gestao_custo_pai_id = db.Column(db.Integer, db.ForeignKey('gestao_custo_pai.id', ondelete='SET NULL'), nullable=True)
     origem_tabela = db.Column(db.String(50))
     origem_id = db.Column(db.Integer)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)

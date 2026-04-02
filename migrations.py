@@ -3780,6 +3780,7 @@ def executar_migracoes():
             (78, "Transporte V2 - centro_custo_id nullable + funcionario_id nullable", _migration_78_transporte_centro_custo_nullable),
             (79, "Reembolso V2 - tabela reembolso_funcionario", _migration_79_reembolso_funcionario),
             (80, "Reembolso V2 - categoria e comprovante_url", _migration_80_reembolso_campos_extras),
+            (81, "Reembolso V2 - gestao_custo_pai_id FK", _migration_81_reembolso_gestao_custo_pai_id),
         ]
         
         # Executar cada migração com rastreamento
@@ -7120,6 +7121,43 @@ def _migration_79_reembolso_funcionario():
 
     except Exception as e:
         logger.error(f"Erro na migracao 79: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_81_reembolso_gestao_custo_pai_id():
+    """Migration 81: Adiciona coluna gestao_custo_pai_id na tabela reembolso_funcionario"""
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'reembolso_funcionario'
+        """)
+        cols = {r[0] for r in cursor.fetchall()}
+
+        if 'gestao_custo_pai_id' not in cols:
+            cursor.execute("""
+                ALTER TABLE reembolso_funcionario
+                ADD COLUMN gestao_custo_pai_id INTEGER REFERENCES gestao_custo_pai(id) ON DELETE SET NULL
+            """)
+            logger.info("MIGRACAO 81: coluna gestao_custo_pai_id adicionada")
+
+        connection.close()
+        logger.info("MIGRACAO 81 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 81: {e}")
         if connection:
             try:
                 connection.rollback()

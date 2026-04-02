@@ -12,6 +12,7 @@ from app import db
 from models import ReembolsoFuncionario, Funcionario, Obra, GestaoCustoPai
 from multitenant_helper import get_admin_id
 from utils.tenant import is_v2_active
+from utils.financeiro_integration import registrar_custo_automatico
 import logging
 
 ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'webp'}
@@ -25,7 +26,7 @@ CATEGORIAS = [
 
 logger = logging.getLogger(__name__)
 
-reembolso_bp = Blueprint('reembolso', __name__, url_prefix='/reembolso')
+reembolso_bp = Blueprint('reembolso', __name__, url_prefix='/reembolsos')
 
 
 def _guard():
@@ -48,7 +49,7 @@ def index():
     admin_id = get_admin_id()
 
     # Filtros
-    status = request.args.get('status')          # pendente | pago
+    filtro_status = request.args.get('status', '')
     func_id = request.args.get('funcionario_id', type=int)
     obra_id = request.args.get('obra_id', type=int)
 
@@ -58,14 +59,12 @@ def index():
     if obra_id:
         q = q.filter_by(obra_id=obra_id)
 
-    reembolsos = q.order_by(ReembolsoFuncionario.data_despesa.desc()).all()
+    reembolsos_raw = q.order_by(ReembolsoFuncionario.data_despesa.desc()).all()
 
-    # Totais
-    total_valor = sum(float(r.valor) for r in reembolsos)
-
-    # Buscar status do GestaoCustoPai para cada reembolso (single query)
-    pai_ids = [r.origem_id for r in reembolsos
-               if r.origem_tabela == 'gestao_custo_pai' and r.origem_id]
+    # Buscar status do GestaoCustoPai para todos os reembolsos (single query)
+    pai_ids = [r.gestao_custo_pai_id or r.origem_id for r in reembolsos_raw
+               if (r.gestao_custo_pai_id or (r.origem_tabela == 'gestao_custo_pai' and r.origem_id))]
+    pai_ids = list(filter(None, pai_ids))
     status_map = {}
     if pai_ids:
         gcps = GestaoCustoPai.query.filter(
@@ -74,17 +73,29 @@ def index():
         ).all()
         status_map = {g.id: g.status for g in gcps}
 
-    # Injetar gestao_status em cada reembolso como atributo dinâmico
-    for r in reembolsos:
-        if r.origem_tabela == 'gestao_custo_pai' and r.origem_id:
-            r.gestao_status = status_map.get(r.origem_id, 'PENDENTE')
-        else:
-            r.gestao_status = 'PENDENTE'
+    # Injetar gestao_status e aplicar filtro de status
+    reembolsos = []
+    for r in reembolsos_raw:
+        pid = r.gestao_custo_pai_id or (r.origem_id if r.origem_tabela == 'gestao_custo_pai' else None)
+        r.gestao_status = status_map.get(pid, 'PENDENTE') if pid else 'PENDENTE'
+        if filtro_status and r.gestao_status != filtro_status.upper():
+            continue
+        reembolsos.append(r)
+
+    total_valor = sum(float(r.valor) for r in reembolsos)
 
     funcionarios = (Funcionario.query
                     .filter_by(admin_id=admin_id, ativo=True)
                     .order_by(Funcionario.nome).all())
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+
+    STATUS_OPCOES = [
+        ('', '— Todos os status —'),
+        ('PENDENTE', 'Pendente'),
+        ('SOLICITADO', 'Solicitado'),
+        ('AUTORIZADO', 'Autorizado'),
+        ('PAGO', 'Pago'),
+    ]
 
     return render_template(
         'reembolsos/index.html',
@@ -94,6 +105,8 @@ def index():
         total_valor=total_valor,
         filtro_func=func_id,
         filtro_obra=obra_id,
+        filtro_status=filtro_status,
+        status_opcoes=STATUS_OPCOES,
     )
 
 
@@ -186,22 +199,27 @@ def novo():
                 admin_id=admin_id,
             )
             db.session.add(reembolso)
+            db.session.flush()  # Gera reembolso.id
 
-            # Criar GestaoCustoPai automaticamente para integrar ao fluxo de aprovação
-            gcp = GestaoCustoPai(
+            # Integrar ao Gestão de Custos V2 via registrar_custo_automatico()
+            filho = registrar_custo_automatico(
+                admin_id=admin_id,
                 tipo_categoria='REEMBOLSO',
                 entidade_nome=funcionario.nome,
                 entidade_id=func_id,
-                valor_total=valor,
-                valor_solicitado=valor,
-                status='PENDENTE',
-                admin_id=admin_id,
-                observacoes=f'Reembolso ({categoria}): {descricao}',
+                data=data_despesa,
+                descricao=f'Reembolso ({categoria}): {descricao}',
+                valor=valor,
+                obra_id=obra_id,
+                origem_tabela='reembolso_funcionario',
+                origem_id=reembolso.id,
             )
-            db.session.add(gcp)
-            db.session.flush()
-            reembolso.origem_tabela = 'gestao_custo_pai'
-            reembolso.origem_id = gcp.id
+
+            if filho:
+                # Persistir referência ao GestaoCustoPai para consulta de status
+                reembolso.gestao_custo_pai_id = filho.pai_id
+                reembolso.origem_tabela = 'gestao_custo_pai'
+                reembolso.origem_id = filho.pai_id
 
             db.session.commit()
             flash('Reembolso registrado com sucesso!', 'success')

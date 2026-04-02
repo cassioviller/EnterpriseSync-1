@@ -45,6 +45,7 @@
         <table class="table table-sm table-bordered cronograma-table mb-0" id="tarefasTable">
           <thead class="cronograma-thead">
             <tr>
+              <th style="width:28px" title="Arraste para reordenar"></th>
               <th style="width:40px">#</th>
               <th style="width:30px"><i class="fas fa-cog fa-xs text-muted"></i></th>
               <th style="min-width:200px">Nome da Tarefa</th>
@@ -64,7 +65,13 @@
                 data-pai="{{ t.tarefa_pai_id or '' }}"
                 data-perc="{{ t.percentual_concluido or 0 }}"
                 data-inicio="{{ t.data_inicio.isoformat() if t.data_inicio else '' }}"
-                data-fim="{{ t.data_fim.isoformat() if t.data_fim else '' }}">
+                data-fim="{{ t.data_fim.isoformat() if t.data_fim else '' }}"
+                draggable="true">
+              <td class="text-center p-1">
+                <span class="drag-handle" title="Arraste para reordenar">
+                  <i class="fas fa-grip-vertical fa-xs"></i>
+                </span>
+              </td>
               <td class="text-muted small text-center">{{ loop.index }}</td>
               <td class="text-center">
                 {% if is_pai %}
@@ -286,7 +293,14 @@
 .gantt-bar-leaf { background: #1976d2; }
 .gantt-progress { height: 100%; background: rgba(255,255,255,.35); }
 .gantt-today { position: absolute; top: 0; bottom: 0; width: 2px; background: #e53935; z-index: 5; pointer-events: none; }
-.DAY_W { }
+/* ── Drag & Drop ── */
+.gantt-bar { cursor: grab; transition: opacity .1s; }
+.gantt-bar.dragging { cursor: grabbing; opacity: .6; box-shadow: 0 4px 12px rgba(0,0,0,.35); z-index: 20; }
+.gantt-row.drag-over { background: #ddeeff !important; }
+.tarefa-row.dragging-row { opacity: .45; background: #fff3cd !important; }
+.tarefa-row.drag-over-row { border-top: 2px solid #1976d2; }
+.drag-handle { cursor: grab; padding: 0 4px; color: #aaa; user-select: none; }
+.drag-handle:hover { color: #555; }
 </style>
 
 <script>
@@ -303,90 +317,6 @@ function toast(msg, tipo='success') {
   el.className = `toast align-items-center text-white border-0 bg-${tipo === 'error' ? 'danger' : tipo}`;
   document.getElementById('toastMsg').textContent = msg;
   bootstrap.Toast.getOrCreateInstance(el, {delay: 2500}).show();
-}
-
-// ── Gantt ──
-function renderGantt() {
-  const container = document.getElementById('ganttContainer');
-  const tarefasVisiveis = tarefas.filter(t => t.data_inicio && t.data_fim);
-  if (!tarefasVisiveis.length) { container.innerHTML = '<p class="text-muted small p-3">Sem datas para exibir no Gantt.</p>'; return; }
-
-  const tMin = tarefasVisiveis.reduce((a,b) => a.data_inicio < b.data_inicio ? a : b).data_inicio;
-  const tMax = tarefasVisiveis.reduce((a,b) => a.data_fim > b.data_fim ? a : b).data_fim;
-  const dMin = new Date(tMin + 'T00:00:00');
-  const dMax = new Date(tMax + 'T00:00:00');
-  // Padding
-  dMin.setDate(dMin.getDate() - 2);
-  dMax.setDate(dMax.getDate() + 5);
-
-  const totalDays = Math.round((dMax - dMin) / 86400000) + 1;
-  const totalW = totalDays * DAY_W;
-
-  // Build month cells
-  const months = [];
-  let cur = new Date(dMin);
-  while (cur <= dMax) {
-    const y = cur.getFullYear(), m = cur.getMonth();
-    const label = cur.toLocaleDateString('pt-BR', {month:'short', year:'2-digit'});
-    const daysInMonth = new Date(y, m+1, 0).getDate();
-    const startDay = new Date(y, m, 1);
-    const endDay   = new Date(y, m, daysInMonth);
-    const s = Math.max(startDay, dMin), e = Math.min(endDay, dMax);
-    const span = Math.round((e - s) / 86400000) + 1;
-    months.push({ label, span });
-    cur = new Date(y, m+1, 1);
-  }
-
-  // Header HTML
-  let monthHtml = months.map(m =>
-    `<div class="gantt-month-cell" style="width:${m.span*DAY_W}px;min-width:${m.span*DAY_W}px">${m.label}</div>`
-  ).join('');
-
-  let dayHtml = '';
-  for (let i=0; i<totalDays; i++) {
-    const d = new Date(dMin); d.setDate(d.getDate()+i);
-    const wd = d.getDay();
-    const wk = wd===0||wd===6;
-    const num = d.getDate();
-    dayHtml += `<div class="gantt-day-cell${wk?' text-warning':''}" style="width:${DAY_W}px;min-width:${DAY_W}px">${num}</div>`;
-  }
-
-  // Today marker
-  const todayD = new Date(); todayD.setHours(0,0,0,0);
-  const todayOffset = Math.round((todayD - dMin) / 86400000);
-  const todayLeft = todayOffset * DAY_W;
-
-  // Task rows
-  const paiIdsSet = new Set(tarefas.filter(t=>t.tarefa_pai_id).map(t=>t.tarefa_pai_id));
-  let rowHtml = '';
-  tarefas.forEach(t => {
-    const rowClass = paiIdsSet.has(t.id) ? 'gantt-row-pai' : '';
-    let barHtml = '';
-    if (t.data_inicio && t.data_fim) {
-      const dI = new Date(t.data_inicio+'T00:00:00');
-      const dF = new Date(t.data_fim+'T00:00:00');
-      const leftPx = Math.round((dI - dMin) / 86400000) * DAY_W;
-      const widPx  = (Math.round((dF - dI) / 86400000) + 1) * DAY_W;
-      const isPai = paiIdsSet.has(t.id);
-      const barClass = isPai ? 'gantt-bar-pai' : 'gantt-bar-leaf';
-      const perc = t.percentual_concluido || 0;
-      const progW = Math.round(perc/100*widPx);
-      barHtml = `<div class="gantt-bar ${barClass}" style="left:${leftPx}px;width:${widPx}px" title="${t.nome_tarefa} (${perc}%)">
-        <div class="gantt-progress" style="width:${progW}px"></div>
-      </div>`;
-    }
-    rowHtml += `<div class="gantt-row ${rowClass}" data-id="${t.id}" style="width:${totalW}px;min-width:${totalW}px">
-      ${todayLeft>=0&&todayLeft<=totalW?'<div class="gantt-today" style="left:'+todayLeft+'px"></div>':''}
-      ${barHtml}
-    </div>`;
-  });
-
-  container.innerHTML = `
-    <div style="width:${totalW}px;min-width:${totalW}px">
-      <div class="gantt-header-months">${monthHtml}</div>
-      <div class="gantt-header-days">${dayHtml}</div>
-      <div id="ganttRows">${rowHtml}</div>
-    </div>`;
 }
 
 // ── Sincronizar scroll vertical ──
@@ -675,8 +605,10 @@ function adicionarLinhaTabela(t) {
   row.dataset.perc = t.percentual_concluido || 0;
   row.dataset.inicio = t.data_inicio || '';
   row.dataset.fim = t.data_fim || '';
+  row.draggable = true;
   const ind = t.tarefa_pai_id ? '20px' : '0';
   row.innerHTML = `
+    <td class="text-center p-1"><span class="drag-handle" title="Arraste para reordenar"><i class="fas fa-grip-vertical fa-xs"></i></span></td>
     <td class="text-muted small text-center">—</td>
     <td class="text-center"><i class="fas fa-tasks fa-xs text-secondary"></i></td>
     <td class="nome-cell">
@@ -717,10 +649,249 @@ async function excluirTarefa(id, nome) {
   }
 }
 
+// ── Gantt Bar Drag (horizontal = mover data) ──
+let ganttDrag = null;  // { barEl, rowEl, tarefaId, startX, origLeft, origW, dMin }
+
+function initGanttBarDrag(barEl, tarefaId, dMin) {
+  barEl.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const ganttPane = document.getElementById('ganttPane');
+    const origLeft = parseFloat(barEl.style.left) || 0;
+    const origW    = parseFloat(barEl.style.width) || 0;
+    ganttDrag = { barEl, tarefaId, startX: e.clientX + ganttPane.scrollLeft, origLeft, origW, dMin };
+    barEl.classList.add('dragging');
+    document.body.style.cursor = 'grabbing';
+  });
+}
+
+document.addEventListener('mousemove', e => {
+  if (!ganttDrag) return;
+  const ganttPane = document.getElementById('ganttPane');
+  const dx = (e.clientX + ganttPane.scrollLeft) - ganttDrag.startX;
+  const newLeft = Math.max(0, ganttDrag.origLeft + dx);
+  ganttDrag.barEl.style.left = newLeft + 'px';
+});
+
+document.addEventListener('mouseup', async e => {
+  if (!ganttDrag) return;
+  const { barEl, tarefaId, startX, origLeft, dMin } = ganttDrag;
+  const ganttPane = document.getElementById('ganttPane');
+  const dx = (e.clientX + ganttPane.scrollLeft) - startX;
+  const daysDelta = Math.round(dx / DAY_W);
+  ganttDrag = null;
+  barEl.classList.remove('dragging');
+  document.body.style.cursor = '';
+
+  if (daysDelta === 0) return;
+
+  const tarefa = tarefas.find(t => t.id === tarefaId);
+  if (!tarefa || !tarefa.data_inicio) return;
+
+  const d = new Date(tarefa.data_inicio + 'T00:00:00');
+  d.setDate(d.getDate() + daysDelta);
+  const newInicio = d.toISOString().slice(0, 10);
+
+  try {
+    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ data_inicio: newInicio }),
+    });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      if (data.tarefas && data.tarefas.length) {
+        tarefas = data.tarefas;
+        data.tarefas.forEach(t => updateTarefaLocal(t));
+      } else {
+        updateTarefaLocal(data.tarefa);
+      }
+      renderGantt();
+      toast('Tarefa movida — datas atualizadas');
+    } else {
+      // Reverter barra
+      barEl.style.left = origLeft + 'px';
+      toast(data.msg || 'Erro ao mover tarefa', 'error');
+    }
+  } catch(err) {
+    barEl.style.left = origLeft + 'px';
+    toast('Erro de rede', 'error');
+  }
+});
+
+// ── renderGantt (com suporte a drag de barras) ──
+function renderGantt() {
+  const container = document.getElementById('ganttContainer');
+  const tarefasVisiveis = tarefas.filter(t => t.data_inicio && t.data_fim);
+  if (!tarefasVisiveis.length) { container.innerHTML = '<p class="text-muted small p-3">Sem datas para exibir no Gantt.</p>'; return; }
+
+  const tMin = tarefasVisiveis.reduce((a,b) => a.data_inicio < b.data_inicio ? a : b).data_inicio;
+  const tMax = tarefasVisiveis.reduce((a,b) => a.data_fim > b.data_fim ? a : b).data_fim;
+  const dMin = new Date(tMin + 'T00:00:00');
+  const dMax = new Date(tMax + 'T00:00:00');
+  dMin.setDate(dMin.getDate() - 2);
+  dMax.setDate(dMax.getDate() + 5);
+
+  const totalDays = Math.round((dMax - dMin) / 86400000) + 1;
+  const totalW = totalDays * DAY_W;
+
+  const months = [];
+  let cur = new Date(dMin);
+  while (cur <= dMax) {
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const label = cur.toLocaleDateString('pt-BR', {month:'short', year:'2-digit'});
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    const startDay = new Date(y, m, 1);
+    const endDay   = new Date(y, m, daysInMonth);
+    const s = Math.max(startDay, dMin), e2 = Math.min(endDay, dMax);
+    const span = Math.round((e2 - s) / 86400000) + 1;
+    months.push({ label, span });
+    cur = new Date(y, m+1, 1);
+  }
+
+  let monthHtml = months.map(m =>
+    `<div class="gantt-month-cell" style="width:${m.span*DAY_W}px;min-width:${m.span*DAY_W}px">${m.label}</div>`
+  ).join('');
+
+  let dayHtml = '';
+  for (let i=0; i<totalDays; i++) {
+    const d = new Date(dMin); d.setDate(d.getDate()+i);
+    const wd = d.getDay();
+    const wk = wd===0||wd===6;
+    dayHtml += `<div class="gantt-day-cell${wk?' text-warning':''}" style="width:${DAY_W}px;min-width:${DAY_W}px">${d.getDate()}</div>`;
+  }
+
+  const todayD = new Date(); todayD.setHours(0,0,0,0);
+  const todayOffset = Math.round((todayD - dMin) / 86400000);
+  const todayLeft = todayOffset * DAY_W;
+
+  const paiIdsSet = new Set(tarefas.filter(t=>t.tarefa_pai_id).map(t=>t.tarefa_pai_id));
+  let rowHtml = '';
+  tarefas.forEach(t => {
+    const rowClass = paiIdsSet.has(t.id) ? 'gantt-row-pai' : '';
+    let barHtml = '';
+    if (t.data_inicio && t.data_fim) {
+      const dI = new Date(t.data_inicio+'T00:00:00');
+      const dF = new Date(t.data_fim+'T00:00:00');
+      const leftPx = Math.round((dI - dMin) / 86400000) * DAY_W;
+      const widPx  = (Math.round((dF - dI) / 86400000) + 1) * DAY_W;
+      const isPai = paiIdsSet.has(t.id);
+      const barClass = isPai ? 'gantt-bar-pai' : 'gantt-bar-leaf';
+      const perc = t.percentual_concluido || 0;
+      const progW = Math.round(perc/100*widPx);
+      barHtml = `<div class="gantt-bar ${barClass}" data-tarefa-id="${t.id}" style="left:${leftPx}px;width:${widPx}px" title="${t.nome_tarefa} (${perc}%) — arraste para mover">
+        <div class="gantt-progress" style="width:${progW}px"></div>
+      </div>`;
+    }
+    rowHtml += `<div class="gantt-row ${rowClass}" data-id="${t.id}" style="width:${totalW}px;min-width:${totalW}px">
+      ${todayLeft>=0&&todayLeft<=totalW?'<div class="gantt-today" style="left:'+todayLeft+'px"></div>':''}
+      ${barHtml}
+    </div>`;
+  });
+
+  container.innerHTML = `
+    <div style="width:${totalW}px;min-width:${totalW}px">
+      <div class="gantt-header-months">${monthHtml}</div>
+      <div class="gantt-header-days">${dayHtml}</div>
+      <div id="ganttRows">${rowHtml}</div>
+    </div>`;
+
+  // Bind drag to every bar
+  container.querySelectorAll('.gantt-bar[data-tarefa-id]').forEach(barEl => {
+    const tid = parseInt(barEl.dataset.tarefaId);
+    initGanttBarDrag(barEl, tid, dMin);
+  });
+}
+
+// ── Row Drag & Drop (reordenar tarefas) ──
+let rowDrag = null;   // { el, startIdx }
+
+function initRowDrag() {
+  const tbody = document.getElementById('tarefasBody');
+  if (!tbody) return;
+
+  tbody.addEventListener('dragstart', e => {
+    const row = e.target.closest('.tarefa-row');
+    if (!row || !e.target.closest('.drag-handle')) { e.preventDefault(); return; }
+    rowDrag = { el: row, id: parseInt(row.dataset.id) };
+    row.classList.add('dragging-row');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', row.dataset.id);
+  });
+
+  tbody.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const row = e.target.closest('.tarefa-row');
+    tbody.querySelectorAll('.drag-over-row').forEach(r => r.classList.remove('drag-over-row'));
+    if (row && rowDrag && row !== rowDrag.el) {
+      row.classList.add('drag-over-row');
+    }
+  });
+
+  tbody.addEventListener('dragleave', e => {
+    const row = e.target.closest('.tarefa-row');
+    if (row) row.classList.remove('drag-over-row');
+  });
+
+  tbody.addEventListener('drop', async e => {
+    e.preventDefault();
+    const targetRow = e.target.closest('.tarefa-row');
+    if (!rowDrag || !targetRow || targetRow === rowDrag.el) {
+      cleanupRowDrag();
+      return;
+    }
+
+    // Reorder DOM
+    const rows = Array.from(tbody.querySelectorAll('.tarefa-row'));
+    const fromIdx = rows.indexOf(rowDrag.el);
+    const toIdx   = rows.indexOf(targetRow);
+    if (fromIdx < toIdx) {
+      targetRow.after(rowDrag.el);
+    } else {
+      targetRow.before(rowDrag.el);
+    }
+
+    cleanupRowDrag();
+
+    // Collect new order
+    const newOrder = Array.from(tbody.querySelectorAll('.tarefa-row')).map(r => parseInt(r.dataset.id));
+
+    try {
+      const res = await fetch(`${URL_BASE}/reordenar`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ ordem: newOrder }),
+      });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        // Update local tarefas array order
+        const byId = Object.fromEntries(tarefas.map(t => [t.id, t]));
+        tarefas = newOrder.map(id => byId[id]).filter(Boolean);
+        renderGantt();
+        toast('Ordem das tarefas salva');
+      } else {
+        toast('Erro ao salvar ordem', 'error');
+      }
+    } catch(err) {
+      toast('Erro de rede ao reordenar', 'error');
+    }
+  });
+
+  tbody.addEventListener('dragend', cleanupRowDrag);
+}
+
+function cleanupRowDrag() {
+  if (rowDrag) { rowDrag.el.classList.remove('dragging-row'); }
+  document.querySelectorAll('.drag-over-row').forEach(r => r.classList.remove('drag-over-row'));
+  rowDrag = null;
+}
+
 // ── Inicialização ──
 document.addEventListener('DOMContentLoaded', () => {
   renderGantt();
   syncScroll();
+  initRowDrag();
 });
 </script>
 {% endblock %}
