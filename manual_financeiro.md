@@ -93,10 +93,30 @@ A saída de material do estoque cria o custo **diretamente na obra**, sem passar
 
 > **Atenção:** Este é o único módulo que não passa pelo Fluxo de Caixa. O custo vai para o relatório de "Custos por Obra", não para as Saídas Previstas.
 
-**Caminho:** Menu superior → **Almoxarifado** → **Saída de Material**
+#### Pré-requisito: cadastrar o item no Almoxarifado
+
+Antes de dar saída, o material precisa estar cadastrado como **Item do Almoxarifado** e ter estoque registrado via entrada.
+
+**Cadastrar item:**
+**Caminho:** Menu → **Almoxarifado** → **Itens/Produtos** → botão **Novo Item**
+- Nome do item (ex: "Cimento CP-II 50kg")
+- Código interno
+- Unidade (saca, m², kg, un, etc.)
+- Tipo: Consumível ou Serializado
+- Estoque mínimo
+
+**Registrar entrada (adicionar ao estoque):**
+**Caminho:** Menu → **Almoxarifado** → **Entrada de Material**
+- Selecionar o item cadastrado
+- Quantidade, valor unitário, fornecedor, nota fiscal
+- Clicar em confirmar
+
+#### Realizar a Saída
+
+**Caminho:** Menu → **Almoxarifado** → **Saída de Material**
 
 **Preencha:**
-- Produto / Material
+- Item (selecionar da lista — só aparecem itens com estoque disponível)
 - Quantidade
 - **Obra de destino** (obrigatório para que o custo seja lançado)
 - Responsável / Funcionário (opcional)
@@ -105,36 +125,52 @@ A saída de material do estoque cria o custo **diretamente na obra**, sem passar
 Clique em **Processar Saída**.
 
 **O que acontece automaticamente:**
-- Estoque do produto diminui
+- Estoque do item diminui
 - **Custo da Obra criado** com o valor (quantidade × preço unitário)
 - Esse custo aparece em: Obras → selecionar obra → aba **Custos** → categoria ALMOXARIFADO
 
 > Se a saída não tiver obra vinculada, o custo **não é lançado** em lugar nenhum.
 
+> **Diferença importante:** o custo de material vai direto para a obra e **não aparece em Gestão de Custos nem no Fluxo de Caixa**. Para acompanhar o gasto de materiais, use o relatório de Custos por Obra.
+
 ---
 
 ### A4. Diária de Funcionário → Gestão de Custos
 
-Para funcionários com tipo de remuneração **Diária**, o simples ato de **bater o ponto** gera automaticamente um custo na Gestão de Custos V2.
+Para funcionários com tipo de remuneração **Diária**, o ato de **bater o ponto pelo dispositivo compartilhado** gera automaticamente um custo na Gestão de Custos V2.
 
-**Caminho:** O lançamento acontece no **Ponto Eletrônico**, não no financeiro.
+> **Importante:** O custo de diária só é criado quando o ponto é registrado pelo **Ponto Eletrônico** (dispositivo compartilhado ou reconhecimento facial). O registro manual feito pelo administrador no perfil do funcionário **não gera o custo automático**.
 
-Opção 1 — Ponto pelo celular/tablet compartilhado:
-- Menu → **Ponto Eletrônico** → funcionário se identifica → bate o ponto (entrada)
+#### Pré-requisito: configurar o funcionário como diarista
 
-Opção 2 — Lançamento administrativo:
-- Menu → **Funcionários** → selecionar funcionário → **Registrar Ponto**
+**Caminho:** Funcionários → selecionar funcionário → botão **Editar**
+- Campo "Tipo de Remuneração" → selecionar **Diária**
+- Campo "Valor da Diária" → informar o valor (ex: R$ 200,00)
+- Salvar
+
+#### Registrar o ponto pelo Ponto Eletrônico (cria o custo)
+
+**Caminho:** Menu → **Ponto Eletrônico** → funcionário se identifica → bate o ponto (entrada)
+
+O funcionário pode se identificar por:
+- Reconhecimento facial (câmera)
+- Seleção manual na lista (se habilitado)
 
 **O que acontece automaticamente na primeira batida (entrada) do dia:**
 - Ponto registrado
 - Custo criado na **Gestão de Custos V2** com:
   - Categoria: **SALARIO**
   - Entidade: nome do funcionário
-  - Valor: valor da diária configurada no cadastro do funcionário
-  - Obra: vinculada ao ponto (se o funcionário bateu o ponto em uma obra)
-- Idempotência: se o funcionário bater o ponto duas vezes no mesmo dia, o custo **não é duplicado**
+  - Valor: valor da diária configurada
+  - Obra: vinculada ao ponto (se configurado)
+- Status inicial: **PENDENTE** (aguarda aprovação)
+- Idempotência: segunda batida no mesmo dia **não duplica** o custo
 
-> Para configurar o valor da diária: Funcionários → selecionar → editar → campo "Tipo de Remuneração" = Diária + "Valor da Diária".
+#### O que NÃO cria o custo automático
+
+- Registro manual de ponto feito pelo administrador no perfil do funcionário (Funcionários → perfil → Novo Registro de Ponto)
+- Importação de Excel de folha de ponto
+- Esses métodos registram o ponto mas não disparam o fluxo financeiro automático
 
 ---
 
@@ -248,8 +284,8 @@ Para despesas que não passam pelos módulos de Transporte, Alimentação etc., 
 | **Transporte** | Menu Transporte → Novo Lançamento | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
 | **Transporte Lote** | Menu Transporte → Lançamento em Lote | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO |
 | **Alimentação** | Menu Alimentação → Novo Lançamento | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
-| **Material (Saída)** | Almoxarifado → Saída de Material | Custo da Obra (direto) | Não | Não aparece (só em Custos por Obra) |
-| **Diária Funcionário** | Ponto Eletrônico → bater ponto (entrada) | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
+| **Material (Saída)** | Almoxarifado → Cadastrar Item → Entrada → Saída de Material | Custo da Obra (direto) | Não | Não aparece (só em Custos por Obra) |
+| **Diária Funcionário** | **Ponto Eletrônico** (dispositivo compartilhado) → bater ponto (entrada) | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
 | **Reembolso** | Financeiro → Gestão de Custos → Reembolsos | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO |
 | **Conta a Pagar** | Financeiro → Contas a Pagar → Nova | Saídas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
 | **Conta a Receber** | Financeiro → Contas a Receber → Nova | Entradas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
