@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "DXcd_oeIzZmt0KEiyDksI"
+uri = "file://manual_financeiro.md"
+type = "text"
+title = "Manual do Módulo Financeiro — SIGE v9.0"
