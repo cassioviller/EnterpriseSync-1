@@ -215,11 +215,15 @@ def novo():
                 origem_id=reembolso.id,
             )
 
-            if filho:
-                # Persistir referência ao GestaoCustoPai para consulta de status
-                reembolso.gestao_custo_pai_id = filho.pai_id
-                reembolso.origem_tabela = 'gestao_custo_pai'
-                reembolso.origem_id = filho.pai_id
+            if not filho:
+                db.session.rollback()
+                flash('Erro ao integrar com Gestão de Custos V2. Reembolso não salvo.', 'danger')
+                return redirect(url_for('reembolso.novo'))
+
+            # Persistir referência ao GestaoCustoPai para consulta de status
+            reembolso.gestao_custo_pai_id = filho.pai_id
+            reembolso.origem_tabela = 'gestao_custo_pai'
+            reembolso.origem_id = filho.pai_id
 
             db.session.commit()
             flash('Reembolso registrado com sucesso!', 'success')
