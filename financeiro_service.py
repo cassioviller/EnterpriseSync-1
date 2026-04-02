@@ -450,17 +450,29 @@ class FinanceiroService:
 
             # Gestão de Custos V2 — saídas previstas (SOLICITADO + AUTORIZADO) filtradas por período
             # Usa data_criacao como proxy de competência (GestaoCustoPai não tem data_vencimento)
-            custos_v2 = GestaoCustoPai.query.filter(
+            dt_inicio = datetime.combine(data_inicio, datetime.min.time())
+            dt_fim = datetime.combine(data_fim, datetime.max.time())
+            custos_v2_previstos = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO']),
-                    GestaoCustoPai.data_criacao >= datetime.combine(data_inicio, datetime.min.time()),
-                    GestaoCustoPai.data_criacao <= datetime.combine(data_fim, datetime.max.time()),
+                    GestaoCustoPai.data_criacao >= dt_inicio,
+                    GestaoCustoPai.data_criacao <= dt_fim,
+                )
+            ).all()
+            # Custos V2 já pagos (histórico realizado) — usar data_pagamento (campo Date)
+            custos_v2_pagos = GestaoCustoPai.query.filter(
+                and_(
+                    GestaoCustoPai.admin_id == admin_id,
+                    GestaoCustoPai.status == 'PAGO',
+                    GestaoCustoPai.data_pagamento >= data_inicio,
+                    GestaoCustoPai.data_pagamento <= data_fim,
                 )
             ).all()
             # Regra canônica: valor_solicitado tem prioridade quando presente
-            saidas_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2)
-            saidas_previstas += saidas_v2
+            saidas_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_previstos)
+            saidas_v2_pagas = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_pagos)
+            saidas_previstas += saidas_v2 + saidas_v2_pagas
 
             # Projeção de saldo
             saldo_final = saldo_inicial + entradas_previstas - saidas_previstas
@@ -485,12 +497,22 @@ class FinanceiroService:
                     'origem': 'Conta a Pagar'
                 })
 
-            for custo in custos_v2:
+            for custo in custos_v2_previstos:
                 custo_data = custo.data_criacao.date() if hasattr(custo.data_criacao, 'date') else custo.data_criacao
                 detalhes.append({
                     'data': custo_data,
                     'tipo': 'SAIDA',
                     'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}]',
+                    'valor': float(custo.valor_solicitado or custo.valor_total),
+                    'origem': 'Gestão de Custos V2'
+                })
+
+            for custo in custos_v2_pagos:
+                pago_data = custo.data_pagamento if custo.data_pagamento else data_fim
+                detalhes.append({
+                    'data': pago_data,
+                    'tipo': 'SAIDA',
+                    'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}] (pago)',
                     'valor': float(custo.valor_solicitado or custo.valor_total),
                     'origem': 'Gestão de Custos V2'
                 })
@@ -578,10 +600,15 @@ class FinanceiroService:
                 )
             ).all()
             total_pagar_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_list)
-            qtd_pagar_v2 = len(custos_v2_list)
+            # Vencidos V2: criados há mais de 30 dias sem pagamento (proxy para overdue)
+            limite_vencimento_v2 = datetime.combine(hoje, datetime.min.time()) - timedelta(days=30)
+            vencidas_v2 = sum(
+                1 for c in custos_v2_list
+                if c.data_criacao and c.data_criacao < limite_vencimento_v2
+            )
 
             total_pagar_combinado = float(total_pagar) + total_pagar_v2
-            vencidas_pagar_combinado = vencidas_pagar + qtd_pagar_v2
+            vencidas_pagar_combinado = vencidas_pagar + vencidas_v2
 
             return {
                 'total_pagar': total_pagar_combinado,
