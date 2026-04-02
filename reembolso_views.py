@@ -2,15 +2,26 @@
 Reembolsos V2 — CRUD completo de reembolsos para funcionários
 Blueprint: /reembolso
 """
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from decimal import Decimal
+import os, uuid
+from werkzeug.utils import secure_filename
 from app import db
 from models import ReembolsoFuncionario, Funcionario, Obra, GestaoCustoPai
 from multitenant_helper import get_admin_id
 from utils.tenant import is_v2_active
 import logging
+
+ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'webp'}
+CATEGORIAS = [
+    ('alimentacao', 'Alimentação'),
+    ('transporte', 'Transporte'),
+    ('hospedagem', 'Hospedagem'),
+    ('equipamentos', 'Equipamentos'),
+    ('outros', 'Outros'),
+]
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +63,24 @@ def index():
     # Totais
     total_valor = sum(float(r.valor) for r in reembolsos)
 
+    # Buscar status do GestaoCustoPai para cada reembolso (single query)
+    pai_ids = [r.origem_id for r in reembolsos
+               if r.origem_tabela == 'gestao_custo_pai' and r.origem_id]
+    status_map = {}
+    if pai_ids:
+        gcps = GestaoCustoPai.query.filter(
+            GestaoCustoPai.id.in_(pai_ids),
+            GestaoCustoPai.admin_id == admin_id,
+        ).all()
+        status_map = {g.id: g.status for g in gcps}
+
+    # Injetar gestao_status em cada reembolso como atributo dinâmico
+    for r in reembolsos:
+        if r.origem_tabela == 'gestao_custo_pai' and r.origem_id:
+            r.gestao_status = status_map.get(r.origem_id, 'PENDENTE')
+        else:
+            r.gestao_status = 'PENDENTE'
+
     funcionarios = (Funcionario.query
                     .filter_by(admin_id=admin_id, ativo=True)
                     .order_by(Funcionario.nome).all())
@@ -71,6 +100,20 @@ def index():
 # ──────────────────────────────────────────────────────────
 # CRIAR
 # ──────────────────────────────────────────────────────────
+def _salvar_comprovante(arquivo):
+    """Salva comprovante e retorna URL relativa ou None."""
+    if not arquivo or arquivo.filename == '':
+        return None
+    ext = arquivo.filename.rsplit('.', 1)[-1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        return None
+    upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'comprovantes')
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    arquivo.save(os.path.join(upload_dir, filename))
+    return f"/static/uploads/comprovantes/{filename}"
+
+
 @reembolso_bp.route('/novo', methods=['GET', 'POST'])
 @login_required
 def novo():
@@ -91,7 +134,7 @@ def novo():
                 flash('Selecione um funcionário.', 'danger')
                 return render_template('reembolsos/form.html',
                                        funcionarios=funcionarios, obras=obras,
-                                       reembolso=None)
+                                       categorias=CATEGORIAS, reembolso=None)
 
             # Validação multi-tenant: garante que funcionario_id pertence ao mesmo admin
             funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
@@ -99,7 +142,7 @@ def novo():
                 flash('Funcionário inválido.', 'danger')
                 return render_template('reembolsos/form.html',
                                        funcionarios=funcionarios, obras=obras,
-                                       reembolso=None)
+                                       categorias=CATEGORIAS, reembolso=None)
 
             valor_str = request.form.get('valor', '0').replace(',', '.')
             valor = Decimal(valor_str)
@@ -107,7 +150,7 @@ def novo():
                 flash('Valor deve ser maior que zero.', 'danger')
                 return render_template('reembolsos/form.html',
                                        funcionarios=funcionarios, obras=obras,
-                                       reembolso=None)
+                                       categorias=CATEGORIAS, reembolso=None)
 
             data_str = request.form.get('data_despesa')
             data_despesa = datetime.strptime(data_str, '%Y-%m-%d').date() if data_str else date.today()
@@ -117,7 +160,11 @@ def novo():
                 flash('Descrição é obrigatória.', 'danger')
                 return render_template('reembolsos/form.html',
                                        funcionarios=funcionarios, obras=obras,
-                                       reembolso=None)
+                                       categorias=CATEGORIAS, reembolso=None)
+
+            categoria = request.form.get('categoria', 'outros')
+            if categoria not in [k for k, _ in CATEGORIAS]:
+                categoria = 'outros'
 
             obra_id_raw = request.form.get('obra_id', type=int)
             obra_id = None
@@ -126,12 +173,16 @@ def novo():
                 if obra:
                     obra_id = obra_id_raw
 
+            comprovante_url = _salvar_comprovante(request.files.get('comprovante'))
+
             reembolso = ReembolsoFuncionario(
                 funcionario_id=func_id,
                 valor=valor,
                 data_despesa=data_despesa,
                 descricao=descricao,
+                categoria=categoria,
                 obra_id=obra_id,
+                comprovante_url=comprovante_url,
                 admin_id=admin_id,
             )
             db.session.add(reembolso)
@@ -145,7 +196,7 @@ def novo():
                 valor_solicitado=valor,
                 status='PENDENTE',
                 admin_id=admin_id,
-                observacoes=f'Reembolso: {descricao}',
+                observacoes=f'Reembolso ({categoria}): {descricao}',
             )
             db.session.add(gcp)
             db.session.flush()
@@ -163,7 +214,7 @@ def novo():
 
     return render_template('reembolsos/form.html',
                            funcionarios=funcionarios, obras=obras,
-                           reembolso=None)
+                           categorias=CATEGORIAS, reembolso=None)
 
 
 # ──────────────────────────────────────────────────────────
@@ -192,12 +243,15 @@ def editar(reembolso_id):
                 flash('Valor deve ser maior que zero.', 'danger')
                 return render_template('reembolsos/form.html',
                                        funcionarios=funcionarios, obras=obras,
-                                       reembolso=reembolso)
+                                       categorias=CATEGORIAS, reembolso=reembolso)
 
             data_str = request.form.get('data_despesa')
             reembolso.data_despesa = datetime.strptime(data_str, '%Y-%m-%d').date() if data_str else reembolso.data_despesa
             reembolso.valor = valor
             reembolso.descricao = request.form.get('descricao', '').strip()
+
+            cat = request.form.get('categoria', 'outros')
+            reembolso.categoria = cat if cat in [k for k, _ in CATEGORIAS] else 'outros'
 
             obra_id_raw = request.form.get('obra_id', type=int)
             reembolso.obra_id = None
@@ -206,13 +260,18 @@ def editar(reembolso_id):
                 if obra:
                     reembolso.obra_id = obra_id_raw
 
+            # Upload de novo comprovante (substitui o anterior se enviado)
+            novo_comp = _salvar_comprovante(request.files.get('comprovante'))
+            if novo_comp:
+                reembolso.comprovante_url = novo_comp
+
             # Atualizar GestaoCustoPai associado se existir
             if reembolso.origem_tabela == 'gestao_custo_pai' and reembolso.origem_id:
                 gcp = GestaoCustoPai.query.filter_by(id=reembolso.origem_id, admin_id=admin_id).first()
                 if gcp and gcp.status == 'PENDENTE':
                     gcp.valor_total = valor
                     gcp.valor_solicitado = valor
-                    gcp.observacoes = f'Reembolso: {reembolso.descricao}'
+                    gcp.observacoes = f'Reembolso ({reembolso.categoria}): {reembolso.descricao}'
 
             db.session.commit()
             flash('Reembolso atualizado com sucesso!', 'success')
@@ -225,7 +284,7 @@ def editar(reembolso_id):
 
     return render_template('reembolsos/form.html',
                            funcionarios=funcionarios, obras=obras,
-                           reembolso=reembolso)
+                           categorias=CATEGORIAS, reembolso=reembolso)
 
 
 # ──────────────────────────────────────────────────────────

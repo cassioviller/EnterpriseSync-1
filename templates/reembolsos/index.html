@@ -68,20 +68,50 @@
         <thead class="table-light">
           <tr>
             <th>Funcionário</th>
+            <th>Categoria</th>
             <th>Descrição</th>
             <th class="text-end">Valor</th>
             <th class="text-center">Data</th>
             <th>Obra</th>
+            <th class="text-center">Status</th>
             <th class="text-center">Ações</th>
           </tr>
         </thead>
         <tbody>
           {% for r in reembolsos %}
+          {% set gcp = r.origem_tabela == 'gestao_custo_pai' and r.origem_id %}
           <tr>
             <td>
               <div class="fw-semibold">{{ r.funcionario.nome }}</div>
             </td>
-            <td>{{ r.descricao }}</td>
+            <td>
+              {% set cat_label = {
+                  'alimentacao': 'Alimentação',
+                  'transporte': 'Transporte',
+                  'hospedagem': 'Hospedagem',
+                  'equipamentos': 'Equipamentos',
+                  'outros': 'Outros'
+              } %}
+              {% set cat_icon = {
+                  'alimentacao': 'fa-utensils',
+                  'transporte': 'fa-car',
+                  'hospedagem': 'fa-bed',
+                  'equipamentos': 'fa-tools',
+                  'outros': 'fa-tag'
+              } %}
+              <small>
+                <i class="fas {{ cat_icon.get(r.categoria or 'outros', 'fa-tag') }} me-1 text-muted"></i>
+                {{ cat_label.get(r.categoria or 'outros', 'Outros') }}
+              </small>
+            </td>
+            <td>
+              <span title="{{ r.descricao }}">{{ r.descricao[:40] }}{% if r.descricao|length > 40 %}…{% endif %}</span>
+              {% if r.comprovante_url %}
+              <a href="{{ r.comprovante_url }}" target="_blank" class="ms-1" title="Ver comprovante">
+                <i class="fas fa-paperclip text-muted fa-xs"></i>
+              </a>
+              {% endif %}
+            </td>
             <td class="text-end fw-bold text-danger">
               R$ {{ "%.2f"|format(r.valor|float)|replace('.', ',') }}
             </td>
@@ -93,6 +123,21 @@
               <small class="text-muted">{{ r.obra.nome }}</small>
               {% else %}
               <small class="text-muted">—</small>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if r.gestao_status %}
+                {% if r.gestao_status == 'PAGO' %}
+                  <span class="badge bg-success">Pago</span>
+                {% elif r.gestao_status == 'AUTORIZADO' %}
+                  <span class="badge bg-info text-dark">Autorizado</span>
+                {% elif r.gestao_status == 'SOLICITADO' %}
+                  <span class="badge bg-warning text-dark">Solicitado</span>
+                {% else %}
+                  <span class="badge bg-secondary">Pendente</span>
+                {% endif %}
+              {% else %}
+                <span class="badge bg-secondary">Pendente</span>
               {% endif %}
             </td>
             <td class="text-center">
@@ -112,7 +157,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="6" class="text-center text-muted py-4">
+            <td colspan="8" class="text-center text-muted py-4">
               <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
               Nenhum reembolso encontrado
             </td>

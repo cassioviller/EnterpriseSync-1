@@ -3779,6 +3779,7 @@ def executar_migracoes():
             (77, "Gestão de Custos V2 - tabelas gestao_custo_pai e gestao_custo_filho", _migration_77_gestao_custos_v2),
             (78, "Transporte V2 - centro_custo_id nullable + funcionario_id nullable", _migration_78_transporte_centro_custo_nullable),
             (79, "Reembolso V2 - tabela reembolso_funcionario", _migration_79_reembolso_funcionario),
+            (80, "Reembolso V2 - categoria e comprovante_url", _migration_80_reembolso_campos_extras),
         ]
         
         # Executar cada migração com rastreamento
@@ -7119,6 +7120,50 @@ def _migration_79_reembolso_funcionario():
 
     except Exception as e:
         logger.error(f"Erro na migracao 79: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_80_reembolso_campos_extras():
+    """Migration 80: Adiciona colunas categoria e comprovante_url na tabela reembolso_funcionario"""
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'reembolso_funcionario'
+        """)
+        cols = {r[0] for r in cursor.fetchall()}
+
+        if 'categoria' not in cols:
+            cursor.execute("""
+                ALTER TABLE reembolso_funcionario
+                ADD COLUMN categoria VARCHAR(50) DEFAULT 'outros'
+            """)
+            logger.info("MIGRACAO 80: coluna categoria adicionada")
+
+        if 'comprovante_url' not in cols:
+            cursor.execute("""
+                ALTER TABLE reembolso_funcionario
+                ADD COLUMN comprovante_url VARCHAR(500)
+            """)
+            logger.info("MIGRACAO 80: coluna comprovante_url adicionada")
+
+        connection.close()
+        logger.info("MIGRACAO 80 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 80: {e}")
         if connection:
             try:
                 connection.rollback()

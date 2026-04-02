@@ -19,7 +19,7 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
       <div class="row g-3">
 
         {% if not reembolso %}
@@ -38,6 +38,19 @@
           <input type="text" class="form-control bg-light" value="{{ reembolso.funcionario.nome }}" readonly>
         </div>
         {% endif %}
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Categoria <span class="text-danger">*</span></label>
+          <select name="categoria" class="form-select" required>
+            {% for val, label in categorias %}
+            <option value="{{ val }}"
+              {% if reembolso and reembolso.categoria == val %}selected
+              {% elif not reembolso and val == 'outros' %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
 
         <div class="col-md-6">
           <label class="form-label fw-semibold">Valor (R$) <span class="text-danger">*</span></label>
@@ -61,6 +74,21 @@
             </option>
             {% endfor %}
           </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Comprovante (opcional)</label>
+          <input type="file" name="comprovante" class="form-control"
+                 accept=".pdf,.jpg,.jpeg,.png,.webp">
+          {% if reembolso and reembolso.comprovante_url %}
+          <small class="text-muted">
+            Comprovante atual:
+            <a href="{{ reembolso.comprovante_url }}" target="_blank">
+              <i class="fas fa-paperclip me-1"></i>Ver arquivo
+            </a>
+            (enviar novo arquivo substituirá o atual)
+          </small>
+          {% endif %}
         </div>
 
         <div class="col-12">
