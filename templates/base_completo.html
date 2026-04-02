@@ -767,6 +767,22 @@
                                 <i class="fas fa-dollar-sign me-1"></i> Financeiro
                             </a>
                             <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('financeiro.dashboard') }}">
+                                    <i class="fas fa-tachometer-alt me-1"></i> Dashboard Financeiro
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('financeiro.fluxo_caixa') }}">
+                                    <i class="fas fa-water me-1"></i> Fluxo de Caixa
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('financeiro.listar_contas_pagar') }}">
+                                    <i class="fas fa-file-invoice-dollar me-1"></i> Contas a Pagar
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('financeiro.listar_contas_receber') }}">
+                                    <i class="fas fa-hand-holding-usd me-1"></i> Contas a Receber
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('financeiro.listar_bancos') }}">
+                                    <i class="fas fa-university me-1"></i> Bancos
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="/folha/dashboard">
                                     <i class="fas fa-money-bill me-1"></i> Folha de Pagamento
                                 </a></li>
