@@ -600,6 +600,7 @@ class FinanceiroService:
                 )
             ).all()
             total_pagar_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_list)
+            qtd_pagar_v2 = len(custos_v2_list)
             # Vencidos V2: criados há mais de 30 dias sem pagamento (proxy para overdue)
             limite_vencimento_v2 = datetime.combine(hoje, datetime.min.time()) - timedelta(days=30)
             vencidas_v2 = sum(

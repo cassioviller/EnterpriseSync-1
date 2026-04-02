@@ -93,6 +93,14 @@ def novo():
                                        funcionarios=funcionarios, obras=obras,
                                        reembolso=None)
 
+            # Validação multi-tenant: garante que funcionario_id pertence ao mesmo admin
+            funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
+            if not funcionario:
+                flash('Funcionário inválido.', 'danger')
+                return render_template('reembolsos/form.html',
+                                       funcionarios=funcionarios, obras=obras,
+                                       reembolso=None)
+
             valor_str = request.form.get('valor', '0').replace(',', '.')
             valor = Decimal(valor_str)
             if valor <= 0:
@@ -131,7 +139,7 @@ def novo():
             # Criar GestaoCustoPai automaticamente para integrar ao fluxo de aprovação
             gcp = GestaoCustoPai(
                 tipo_categoria='REEMBOLSO',
-                entidade_nome=Funcionario.query.get(func_id).nome,
+                entidade_nome=funcionario.nome,
                 entidade_id=func_id,
                 valor_total=valor,
                 valor_solicitado=valor,
