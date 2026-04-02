@@ -437,15 +437,30 @@ def calcular_horas_folha(data: dict, admin_id: int):
                 logger.info(f"[INFO] Diarista {funcionario.nome}: custo só criado na entrada, ignorando {tipo_ponto}")
                 return
 
-            # Idempotência via GestaoCustoFilho: origem_tabela='registro_ponto' + origem_id=registro.id
-            from models import GestaoCustoFilho
+            # Idempotência dupla: por registro_id E por (funcionário+data) para cobrir edge cases
+            # de múltiplos RegistroPonto no mesmo dia (ex: imports manuais)
+            from models import GestaoCustoFilho, GestaoCustoPai
+            # Verificação primária: mesmo registro_id
             ja_existe = GestaoCustoFilho.query.filter_by(
                 origem_tabela='registro_ponto',
                 origem_id=registro.id,
                 admin_id=admin_id
             ).first()
+            if not ja_existe:
+                # Verificação secundária: mesmo funcionário + mesma data (data_referencia)
+                ja_existe = (
+                    GestaoCustoFilho.query
+                    .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+                    .filter(
+                        GestaoCustoFilho.origem_tabela == 'registro_ponto',
+                        GestaoCustoFilho.data_referencia == registro.data,
+                        GestaoCustoPai.entidade_id == funcionario.id,
+                        GestaoCustoFilho.admin_id == admin_id,
+                    )
+                    .first()
+                )
             if ja_existe:
-                logger.info(f"[INFO] Custo diária de {funcionario.nome} já registrado para registro_ponto {registro.id} — skip")
+                logger.info(f"[INFO] Custo diária de {funcionario.nome} em {registro.data} já existe — skip (idempotência)")
                 return
 
             descricao = f"Diária - {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}"
