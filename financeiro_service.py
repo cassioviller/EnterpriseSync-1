@@ -470,9 +470,11 @@ class FinanceiroService:
                 )
             ).all()
             # Regra canônica: valor_solicitado tem prioridade quando presente
+            # SOLICITADO/AUTORIZADO → saídas previstas (projeção)
             saidas_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_previstos)
+            # PAGO → apenas histórico/detalhes, não entra na projeção de saídas previstas
             saidas_v2_pagas = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_pagos)
-            saidas_previstas += saidas_v2 + saidas_v2_pagas
+            saidas_previstas += saidas_v2
 
             # Projeção de saldo
             saldo_final = saldo_inicial + entradas_previstas - saidas_previstas
