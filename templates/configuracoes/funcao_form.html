@@ -1,0 +1,97 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{% if funcao %}Editar Função{% else %}Nova Função{% endif %} - SIGE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6 col-md-8">
+
+    <div class="d-flex align-items-center mb-4 gap-2">
+      <a href="{{ url_for('configuracoes.funcoes') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <h1 class="h4 mb-0">
+        <i class="fas fa-user-tie me-2"></i>
+        {% if funcao %}Editar Função{% else %}Nova Função{% endif %}
+      </h1>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'danger' else category }} alert-dismissible fade show">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endwith %}
+
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="">
+
+          <div class="mb-3">
+            <label for="nome" class="form-label fw-semibold">
+              Nome <span class="text-danger">*</span>
+            </label>
+            <input type="text" class="form-control" id="nome" name="nome"
+                   value="{{ funcao.nome if funcao else '' }}"
+                   placeholder="Ex: Pedreiro, Eletricista, Encarregado..."
+                   required autofocus>
+          </div>
+
+          <div class="mb-3">
+            <label for="descricao" class="form-label fw-semibold">Descrição</label>
+            <textarea class="form-control" id="descricao" name="descricao"
+                      rows="3" placeholder="Descrição opcional da função">{{ funcao.descricao if funcao else '' }}</textarea>
+          </div>
+
+          <div class="mb-4">
+            <label for="salario_base" class="form-label fw-semibold">Salário Base (R$)</label>
+            <div class="input-group">
+              <span class="input-group-text">R$</span>
+              <input type="number" class="form-control" id="salario_base" name="salario_base"
+                     step="0.01" min="0"
+                     value="{{ '%.2f'|format(funcao.salario_base) if funcao else '0.00' }}"
+                     placeholder="0,00">
+            </div>
+            {% if funcao %}
+            <div class="form-text text-warning">
+              <i class="fas fa-exclamation-triangle me-1"></i>
+              Alterar o salário base atualizará automaticamente os salários de todos os funcionários com esta função.
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save me-1"></i>
+              {% if funcao %}Salvar Alterações{% else %}Criar Função{% endif %}
+            </button>
+            <a href="{{ url_for('configuracoes.funcoes') }}" class="btn btn-outline-secondary">
+              Cancelar
+            </a>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
+    {% if funcao %}
+    <div class="card mt-3 border-0 bg-light">
+      <div class="card-body py-2 px-3">
+        <small class="text-muted">
+          <i class="fas fa-info-circle me-1"></i>
+          Função utilizada por <strong>{{ funcao.funcionarios|length }}</strong> funcionário(s).
+          {% if funcao.created_at %}
+          Criada em {{ funcao.created_at.strftime('%d/%m/%Y') }}.
+          {% endif %}
+        </small>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
