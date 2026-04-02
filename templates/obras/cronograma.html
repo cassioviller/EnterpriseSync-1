@@ -503,11 +503,18 @@ async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
     const data = await res.json();
     if (data.status === 'ok') {
       const t = data.tarefa;
-      updateTarefaLocal(t);
-      restaurarCelula(el, campo, campo === 'duracao_dias' ? t.duracao_dias : (t[campo] ?? ''));
-      if (campo === 'duracao_dias' || campo === 'predecessora_id') {
+      // Se o backend devolveu a lista completa (após recalc em cadeia), usar diretamente
+      if (data.tarefas && data.tarefas.length) {
+        tarefas = data.tarefas;
+        data.tarefas.forEach(tt => updateTarefaLocal(tt));
+        renderGantt();
+      } else {
+        updateTarefaLocal(t);
+        if (campo === 'duracao_dias' || campo === 'predecessora_id') {
           await recalcularTudo(false);
         }
+      }
+      restaurarCelula(el, campo, campo === 'duracao_dias' ? t.duracao_dias : (t[campo] ?? ''));
       toast(campo === 'nome_tarefa' ? 'Nome atualizado' : 'Valor atualizado');
     } else {
       restaurarCelula(el, campo, oldRaw);

@@ -306,6 +306,15 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
                 pred_id = int(pred_val)
             except (ValueError, TypeError):
                 return jsonify({'status': 'error', 'msg': 'predecessora_id inválido'}), 400
+            # Validar existência e pertencimento à obra (igual a criar_tarefa)
+            pred_tarefa = TarefaCronograma.query.filter_by(
+                id=pred_id, obra_id=obra_id, admin_id=admin_id
+            ).first()
+            if not pred_tarefa:
+                return jsonify({
+                    'status': 'error',
+                    'msg': f'Tarefa predecessora id={pred_id} não encontrada nesta obra.'
+                }), 400
             if verificar_ciclo(tarefa_id, pred_id, admin_id):
                 return jsonify({
                     'status': 'error',
@@ -337,9 +346,16 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
     # Recálculo em cadeia: propagar mudanças para tarefas dependentes
     recalcular_cronograma(obra_id, admin_id)
 
-    # Devolver tarefa atualizada (após recalc)
+    # Devolver tarefa atualizada + lista completa após recalc para redesenho do Gantt
     db.session.refresh(tarefa)
-    return jsonify({'status': 'ok', 'tarefa': _tarefa_to_dict(tarefa)})
+    todas = TarefaCronograma.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id
+    ).order_by(TarefaCronograma.ordem, TarefaCronograma.id).all()
+    return jsonify({
+        'status': 'ok',
+        'tarefa': _tarefa_to_dict(tarefa),
+        'tarefas': [_tarefa_to_dict(t) for t in todas],
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
