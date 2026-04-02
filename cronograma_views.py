@@ -343,8 +343,10 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
     db.session.commit()
     logger.info(f"[OK] TarefaCronograma atualizada id={tarefa_id}")
 
-    # Recálculo em cadeia: propagar mudanças para tarefas dependentes
-    recalcular_cronograma(obra_id, admin_id)
+    # Recálculo em cadeia apenas quando campos de agendamento foram alterados
+    _SCHEDULING_FIELDS = {'duracao_dias', 'predecessora_id', 'data_inicio'}
+    if _SCHEDULING_FIELDS & set(data.keys()):
+        recalcular_cronograma(obra_id, admin_id)
 
     # Devolver tarefa atualizada + lista completa após recalc para redesenho do Gantt
     db.session.refresh(tarefa)

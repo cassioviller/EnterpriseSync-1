@@ -434,7 +434,7 @@ function iniciarEdicao(el, tarefaId, campo) {
 
     const optNone = document.createElement('option');
     optNone.value = '';
-    optNone.textContent = '(nenhuma)';
+    optNone.textContent = '— Nenhuma —';
     sel.appendChild(optNone);
 
     tarefas.filter(t => t.id !== tarefaId).forEach(t => {
