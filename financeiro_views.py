@@ -139,13 +139,20 @@ def listar_contas_pagar():
     # Incorporar custos V2 nos KPI cards usando regra canônica (valor_solicitado tem prioridade)
     valor_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2)
     semana = hoje + timedelta(days=7)
+    # "a vencer": criados no intervalo [hoje, hoje+7d] — bounded window, não acumula histórico
     v2_a_vencer = sum(
         float(c.valor_solicitado or c.valor_total) for c in custos_v2
-        if c.data_criacao and c.data_criacao.date() <= semana
+        if c.data_criacao and hoje <= c.data_criacao.date() <= semana
+    )
+    # "vencidas": criados há mais de 30 dias (proxy overdue — proxy consistente com service)
+    limite_overdue = hoje - timedelta(days=30)
+    v2_vencidas = sum(
+        float(c.valor_solicitado or c.valor_total) for c in custos_v2
+        if c.data_criacao and c.data_criacao.date() < limite_overdue
     )
 
     resumo = {
-        'vencidas': vencidas,
+        'vencidas': float(vencidas) + v2_vencidas,
         'a_vencer': float(a_vencer) + v2_a_vencer,
         'pendentes': float(pendentes) + valor_v2,
         'pagas_mes': pagas_mes
