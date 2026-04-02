@@ -9,8 +9,9 @@ from decimal import Decimal
 from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, Fornecedor, 
-    PlanoContas, Obra, CentroCusto
+    PlanoContas, Obra, CentroCusto, GestaoCustoPai
 )
+from utils.tenant import is_v2_active
 from financeiro_service import FinanceiroService
 from multitenant_helper import get_admin_id
 import logging
@@ -132,7 +133,16 @@ def listar_contas_pagar():
         'pendentes': pendentes,
         'pagas_mes': pagas_mes
     }
-    
+
+    # Gestão de Custos V2 — mostrar pendentes/autorizados no contas a pagar
+    v2 = is_v2_active()
+    custos_v2 = []
+    if v2:
+        custos_v2 = GestaoCustoPai.query.filter(
+            GestaoCustoPai.admin_id == admin_id,
+            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
+        ).order_by(GestaoCustoPai.data_criacao.desc()).all()
+
     return render_template(
         'financeiro/contas_pagar.html',
         contas=contas,
@@ -141,7 +151,9 @@ def listar_contas_pagar():
         resumo=resumo,
         status_selecionado=status,
         obra_selecionada=obra_id,
-        datetime=datetime
+        datetime=datetime,
+        custos_v2=custos_v2,
+        is_v2=v2,
     )
 
 

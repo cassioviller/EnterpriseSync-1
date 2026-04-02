@@ -333,6 +333,12 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
 
     db.session.commit()
     logger.info(f"[OK] TarefaCronograma atualizada id={tarefa_id}")
+
+    # Recálculo em cadeia: propagar mudanças para tarefas dependentes
+    recalcular_cronograma(obra_id, admin_id)
+
+    # Devolver tarefa atualizada (após recalc)
+    db.session.refresh(tarefa)
     return jsonify({'status': 'ok', 'tarefa': _tarefa_to_dict(tarefa)})
 
 

@@ -391,16 +391,17 @@ def criar_conta_pagar_entrada_material(data: dict, admin_id: int):
 
 @event_handler('ponto_registrado')
 def calcular_horas_folha(data: dict, admin_id: int):
-    """Handler: Calcular horas para folha quando ponto é registrado"""
+    """Handler: Calcular horas para folha quando ponto é registrado (suporta diaristas V2)"""
     try:
         from models import db, RegistroPonto, CustoObra, Funcionario
         from datetime import datetime
         from decimal import Decimal
         
         registro_id = data.get('registro_id')
+        tipo_ponto = data.get('tipo_ponto', '')
         
         if not registro_id:
-            logger.warning(f"⚠️ registro_id não fornecido no evento ponto_registrado")
+            logger.warning(f"[WARN] registro_id não fornecido no evento ponto_registrado")
             return
         
         # Buscar registro de ponto
@@ -410,27 +411,70 @@ def calcular_horas_folha(data: dict, admin_id: int):
         ).first()
         
         if not registro:
-            logger.error(f"❌ Registro de ponto {registro_id} não encontrado para admin {admin_id}")
+            logger.error(f"[ERROR] Registro de ponto {registro_id} não encontrado para admin {admin_id}")
             return
         
         # Validar se tem obra vinculada
         if not registro.obra_id:
-            logger.info(f"⏭️ Custo não lançado: registro {registro_id} sem obra vinculada")
+            logger.info(f"[INFO] Custo não lançado: registro {registro_id} sem obra vinculada")
             return
         
-        # Validar horas trabalhadas
+        # Buscar funcionário
+        funcionario = Funcionario.query.get(registro.funcionario_id)
+        if not funcionario:
+            logger.error(f"[ERROR] Funcionário {registro.funcionario_id} não encontrado")
+            return
+
+        # ── V2: DIARISTA ──────────────────────────────────────────────────
+        if getattr(funcionario, 'tipo_remuneracao', 'salario') == 'diaria':
+            valor_diaria = float(getattr(funcionario, 'valor_diaria', 0) or 0)
+            if valor_diaria <= 0:
+                logger.warning(f"[WARN] Diarista {funcionario.nome} sem valor_diaria configurado")
+                return
+
+            # Idempotência: só criar uma vez por dia por funcionário (na entrada)
+            if tipo_ponto != 'entrada':
+                logger.info(f"[INFO] Diarista {funcionario.nome}: custo só criado na entrada, ignorando {tipo_ponto}")
+                return
+
+            ja_existe = CustoObra.query.filter_by(
+                obra_id=registro.obra_id,
+                funcionario_id=registro.funcionario_id,
+                data=registro.data,
+                categoria='PONTO_ELETRONICO_DIARIA',
+                admin_id=admin_id
+            ).first()
+            if ja_existe:
+                logger.info(f"[INFO] Custo diária de {funcionario.nome} em {registro.data} já existe — skip")
+                return
+
+            descricao = f"Diária: {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}"
+            custo = CustoObra(
+                obra_id=registro.obra_id,
+                tipo='mao_obra',
+                descricao=descricao,
+                valor=valor_diaria,
+                data=registro.data,
+                funcionario_id=registro.funcionario_id,
+                admin_id=admin_id,
+                horas_trabalhadas=Decimal('8'),
+                horas_extras=Decimal('0'),
+                valor_unitario=Decimal(str(valor_diaria)),
+                quantidade=Decimal('1'),
+                categoria='PONTO_ELETRONICO_DIARIA'
+            )
+            db.session.add(custo)
+            db.session.commit()
+            logger.info(f"[OK] Custo diária lançado: R$ {valor_diaria:.2f} na obra {registro.obra_id} — {funcionario.nome}")
+            return
+        # ── FIM V2: DIARISTA ──────────────────────────────────────────────
+
+        # ── HORISTAS (comportamento original) ─────────────────────────────
         horas_trabalhadas = float(registro.horas_trabalhadas or 0)
         horas_extras = float(registro.horas_extras or 0)
         
         if horas_trabalhadas <= 0:
-            logger.info(f"⏭️ Custo não lançado: sem horas trabalhadas no registro {registro_id}")
-            return
-        
-        # Buscar funcionário para obter salário
-        funcionario = Funcionario.query.get(registro.funcionario_id)
-        
-        if not funcionario:
-            logger.error(f"❌ Funcionário {registro.funcionario_id} não encontrado")
+            logger.info(f"[INFO] Custo não lançado: sem horas trabalhadas no registro {registro_id}")
             return
         
         # Calcular valor/hora baseado no período do registro
@@ -439,23 +483,20 @@ def calcular_horas_folha(data: dict, admin_id: int):
         salario_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
         
         if salario_hora <= 0:
-            logger.warning(f"⚠️ Funcionário {funcionario.nome} sem salário configurado")
+            logger.warning(f"[WARN] Funcionário {funcionario.nome} sem salário configurado")
             salario_hora = 0
         
-        # Calcular valor do custo
-        # Horas normais + horas extras (50% adicional)
+        # Calcular valor do custo: horas normais + horas extras (50% adicional)
         valor_horas_normais = horas_trabalhadas * salario_hora
         valor_horas_extras = horas_extras * salario_hora * 1.5
         valor_total = valor_horas_normais + valor_horas_extras
         
-        # Criar descrição detalhada
         descricao = f"Mão de obra: {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}"
         if horas_extras > 0:
             descricao += f" ({horas_trabalhadas}h normais + {horas_extras}h extras)"
         else:
             descricao += f" ({horas_trabalhadas}h trabalhadas)"
         
-        # Criar registro de custo na obra
         custo = CustoObra(
             obra_id=registro.obra_id,
             tipo='mao_obra',
@@ -474,14 +515,14 @@ def calcular_horas_folha(data: dict, admin_id: int):
         db.session.add(custo)
         db.session.commit()
         
-        logger.info(f"✅ Custo de mão de obra lançado: R$ {valor_total:.2f} na obra {registro.obra_id}")
-        logger.info(f"   👷 Funcionário: {funcionario.nome} | Horas: {horas_trabalhadas}h + {horas_extras}h extras | Registro: {registro_id}")
+        logger.info(f"[OK] Custo mão de obra lançado: R$ {valor_total:.2f} na obra {registro.obra_id}")
+        logger.info(f"     Funcionário: {funcionario.nome} | {horas_trabalhadas}h + {horas_extras}h extras | Registro: {registro_id}")
         
     except ValueError as e:
-        logger.error(f"❌ Erro de validação ao calcular horas: {e}")
+        logger.error(f"[ERROR] Validação ao calcular horas: {e}")
         db.session.rollback()
     except Exception as e:
-        logger.error(f"❌ Erro ao calcular horas: {e}", exc_info=True)
+        logger.error(f"[ERROR] Erro ao calcular horas: {e}", exc_info=True)
         db.session.rollback()
 
 

@@ -243,7 +243,7 @@ def solicitar(pai_id):
 
 
 # ───────────────────────────────────────────────────────────────
-# AUTORIZAR / RECUSAR PAGAMENTO    SOLICITADO → PAGO / PENDENTE
+# AUTORIZAR / RECUSAR    SOLICITADO → AUTORIZADO / PENDENTE
 # ───────────────────────────────────────────────────────────────
 
 @gestao_custos_bp.route('/<int:pai_id>/autorizar', methods=['POST'])
@@ -265,10 +265,38 @@ def autorizar(pai_id):
         pai.status = 'PENDENTE'
         pai.valor_solicitado = None
         db.session.commit()
-        flash('Pagamento recusado. Status voltou para PENDENTE.', 'info')
+        flash('Solicitação recusada. Status voltou para PENDENTE.', 'info')
         return redirect(url_for('gestao_custos.index'))
 
-    # Autorizar
+    try:
+        pai.status = 'AUTORIZADO'
+        db.session.commit()
+        flash(f'Pagamento de R$ {float(pai.valor_solicitado or pai.valor_total):,.2f} autorizado. Aguardando efetivação pelo financeiro.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] autorizar pagamento: {e}", exc_info=True)
+        flash(f'Erro ao autorizar: {e}', 'danger')
+
+    return redirect(url_for('gestao_custos.index'))
+
+
+# ───────────────────────────────────────────────────────────────
+# EFETIVAR PAGAMENTO    AUTORIZADO → PAGO
+# ───────────────────────────────────────────────────────────────
+
+@gestao_custos_bp.route('/<int:pai_id>/pagar', methods=['POST'])
+@login_required
+def pagar(pai_id):
+    admin_id, err = _check_v2()
+    if err:
+        return err
+
+    pai = GestaoCustoPai.query.filter_by(id=pai_id, admin_id=admin_id).first_or_404()
+
+    if pai.status != 'AUTORIZADO':
+        flash('Apenas registros AUTORIZADOS podem ser efetivados como pagos.', 'warning')
+        return redirect(url_for('gestao_custos.index'))
+
     try:
         data_pgto_str = request.form.get('data_pagamento', '')
         data_pgto = (datetime.strptime(data_pgto_str, '%Y-%m-%d').date()
@@ -324,11 +352,11 @@ def autorizar(pai_id):
         except Exception as e_cont:
             logger.warning(f"[WARN] Lançamento contábil falhou (não crítico): {e_cont}")
 
-        flash(f'Pagamento de R$ {valor_pago:,.2f} autorizado e registrado no Fluxo de Caixa.', 'success')
+        flash(f'Pagamento de R$ {valor_pago:,.2f} efetivado e registrado no Fluxo de Caixa.', 'success')
     except Exception as e:
         db.session.rollback()
-        logger.error(f"[ERROR] autorizar pagamento: {e}", exc_info=True)
-        flash(f'Erro ao autorizar: {e}', 'danger')
+        logger.error(f"[ERROR] efetivar pagamento: {e}", exc_info=True)
+        flash(f'Erro ao pagar: {e}', 'danger')
 
     return redirect(url_for('gestao_custos.index'))
 

@@ -10,7 +10,7 @@ from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, PlanoContas,
     LancamentoContabil, PartidaContabil, Fornecedor, Obra,
-    FluxoCaixaContabil
+    FluxoCaixaContabil, GestaoCustoPai
 )
 import logging
 
@@ -447,7 +447,17 @@ class FinanceiroService:
             ).all()
             
             saidas_previstas = sum(c.saldo for c in contas_pagar)
-            
+
+            # Gestão de Custos V2 — saídas previstas (SOLICITADO + AUTORIZADO)
+            custos_v2 = GestaoCustoPai.query.filter(
+                and_(
+                    GestaoCustoPai.admin_id == admin_id,
+                    GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
+                )
+            ).all()
+            saidas_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2)
+            saidas_previstas += saidas_v2
+
             # Projeção de saldo
             saldo_final = saldo_inicial + entradas_previstas - saidas_previstas
             
@@ -469,6 +479,15 @@ class FinanceiroService:
                     'descricao': conta.descricao,
                     'valor': float(conta.saldo),
                     'origem': 'Conta a Pagar'
+                })
+
+            for custo in custos_v2:
+                detalhes.append({
+                    'data': custo.data_criacao.date() if hasattr(custo.data_criacao, 'date') else custo.data_criacao,
+                    'tipo': 'SAIDA',
+                    'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}]',
+                    'valor': float(custo.valor_solicitado or custo.valor_total),
+                    'origem': 'Gestão de Custos V2'
                 })
             
             # Ordenar por data
@@ -544,20 +563,44 @@ class FinanceiroService:
                     BancoEmpresa.ativo == True
                 )
             ).scalar() or Decimal('0')
-            
+
+            # Gestão de Custos V2 — incluir SOLICITADO + AUTORIZADO no total a pagar
+            total_pagar_v2 = db.session.query(
+                func.sum(GestaoCustoPai.valor_total)
+            ).filter(
+                and_(
+                    GestaoCustoPai.admin_id == admin_id,
+                    GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
+                )
+            ).scalar() or Decimal('0')
+
+            qtd_pagar_v2 = db.session.query(
+                func.count(GestaoCustoPai.id)
+            ).filter(
+                and_(
+                    GestaoCustoPai.admin_id == admin_id,
+                    GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
+                )
+            ).scalar() or 0
+
+            total_pagar_combinado = float(total_pagar) + float(total_pagar_v2)
+            vencidas_pagar_combinado = vencidas_pagar + qtd_pagar_v2
+
             return {
-                'total_pagar': float(total_pagar),
-                'vencidas_pagar': vencidas_pagar,
+                'total_pagar': total_pagar_combinado,
+                'vencidas_pagar': vencidas_pagar_combinado,
                 'total_receber': float(total_receber),
                 'vencidas_receber': vencidas_receber,
                 'saldo_bancos': float(saldo_bancos),
-                'saldo_liquido': float(saldo_bancos + total_receber - total_pagar),
+                'saldo_liquido': float(saldo_bancos + total_receber) - total_pagar_combinado,
                 'total_entradas': float(total_receber),
-                'total_saidas': float(total_pagar),
-                'saldo_periodo': float(total_receber - total_pagar),
+                'total_saidas': total_pagar_combinado,
+                'saldo_periodo': float(total_receber) - total_pagar_combinado,
                 'receitas_pendentes': float(total_receber),
                 'resumo_categorias': {},
-                'obras_com_desvio': []
+                'obras_com_desvio': [],
+                'custos_v2_pendentes': float(total_pagar_v2),
+                'custos_v2_qtd': qtd_pagar_v2,
             }
             
         except Exception as e:

@@ -421,10 +421,49 @@ function toggleFilhas(paiId) {
 
 // ── Inline edit ──
 function iniciarEdicao(el, tarefaId, campo) {
-  if (el.querySelector('input')) return;
+  if (el.querySelector('input, select')) return;
   let raw = el.textContent.trim();
   if (campo === 'duracao_dias') raw = raw.replace('d','');
   if (raw === '—') raw = '';
+
+  // Para predecessora_id: usar select com lista de tarefas
+  if (campo === 'predecessora_id') {
+    const sel = document.createElement('select');
+    sel.className = 'form-select form-select-sm cell-input';
+    sel.style.cssText = 'width:auto;min-width:120px;font-size:inherit';
+
+    const optNone = document.createElement('option');
+    optNone.value = '';
+    optNone.textContent = '(nenhuma)';
+    sel.appendChild(optNone);
+
+    tarefas.filter(t => t.id !== tarefaId).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `#${t.id} ${t.nome_tarefa.substring(0,25)}`;
+      if (String(t.id) === raw) opt.selected = true;
+      sel.appendChild(opt);
+    });
+
+    el.innerHTML = '';
+    el.appendChild(sel);
+    sel.focus();
+
+    let selCommitted = false;
+    const commitSel = async () => {
+      if (selCommitted) return;
+      selCommitted = true;
+      const val = sel.value;
+      if (val === raw) { restaurarCelula(el, campo, raw); return; }
+      await salvarCampo(tarefaId, campo, val, el, raw);
+    };
+    sel.addEventListener('change', commitSel);
+    sel.addEventListener('blur', () => { if (!selCommitted) restaurarCelula(el, campo, raw); });
+    sel.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { selCommitted = true; el.blur(); restaurarCelula(el, campo, raw); }
+    });
+    return;
+  }
 
   const input = document.createElement('input');
   input.type = campo === 'nome_tarefa' ? 'text' : 'number';

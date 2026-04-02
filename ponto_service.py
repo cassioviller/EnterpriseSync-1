@@ -138,7 +138,17 @@ class PontoService:
             PontoService._calcular_horas(registro)
             
             db.session.commit()
-            
+
+            # Emitir evento após commit para integração com outros módulos
+            try:
+                from event_manager import EventManager
+                EventManager.emit('ponto_registrado', {
+                    'registro_id': registro.id,
+                    'tipo_ponto': tipo_ponto,
+                }, admin_id=admin_id)
+            except Exception as ev_err:
+                logger.warning(f"[WARN] Evento ponto_registrado não emitido: {ev_err}")
+
             # Buscar nome do funcionário para resposta
             funcionario = Funcionario.query.get(funcionario_id)
             

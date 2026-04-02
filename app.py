@@ -549,6 +549,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint CRONOGRAMA: {e}")
 
+    # Registrar blueprint REEMBOLSOS V2
+    try:
+        from reembolso_views import reembolso_bp
+        app.register_blueprint(reembolso_bp)
+        logging.info("[OK] Blueprint REEMBOLSOS V2 registrado")
+    except ImportError as e:
+        logging.warning(f"[WARN] Blueprint REEMBOLSOS não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint REEMBOLSOS: {e}")
+
     # Registrar blueprint landing page
     try:
         from landing_views import landing_bp

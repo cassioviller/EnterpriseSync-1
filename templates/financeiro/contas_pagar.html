@@ -158,6 +158,62 @@
     </div>
 </div>
 
+{% if is_v2 and custos_v2 %}
+{# ── SEÇÃO: GESTÃO DE CUSTOS V2 ───────────────────────────────────── #}
+<div class="card shadow-sm mt-4">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h6 class="fw-bold mb-0">
+      <i class="fas fa-coins text-warning me-2"></i>Gestão de Custos V2
+      <span class="badge bg-primary ms-2" style="font-size:.65rem">V2</span>
+    </h6>
+    <span class="badge bg-warning text-dark">{{ custos_v2|length }} pendente(s) de pagamento</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Entidade / Categoria</th>
+            <th class="text-end">Valor</th>
+            <th class="text-center">Status</th>
+            <th class="text-center">Data</th>
+            <th class="text-center">Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for custo in custos_v2 %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ custo.entidade_nome }}</div>
+              <small class="text-muted">{{ custo.tipo_categoria }}</small>
+            </td>
+            <td class="text-end fw-bold">
+              R$ {{ "%.2f"|format(custo.valor_solicitado or custo.valor_total)|replace('.', ',') }}
+            </td>
+            <td class="text-center">
+              {% if custo.status == 'SOLICITADO' %}
+              <span class="badge bg-warning text-dark">Solicitado</span>
+              {% elif custo.status == 'AUTORIZADO' %}
+              <span class="badge bg-success">Autorizado</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              <small class="text-muted">{{ custo.data_criacao.strftime('%d/%m/%Y') }}</small>
+            </td>
+            <td class="text-center">
+              <a href="{{ url_for('gestao_custos.index') }}" class="btn btn-xs btn-outline-primary" style="font-size:.75rem;padding:.15rem .4rem">
+                <i class="fas fa-external-link-alt fa-xs"></i> Ver
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Modal Nova Conta -->
 <div class="modal fade" id="modalNovaConta" tabindex="-1">
     <div class="modal-dialog modal-lg">

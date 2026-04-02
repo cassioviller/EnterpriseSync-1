@@ -11,7 +11,7 @@
         <i class="fas fa-coins me-2 text-warning"></i>Gestão de Custos
         <span class="badge bg-primary ms-2" style="font-size:.6rem">V2</span>
       </h2>
-      <small class="text-muted">Fluxo de aprovação: Pendente → Solicitado → Pago</small>
+      <small class="text-muted">Fluxo de aprovação: Pendente → Solicitado → Autorizado → Pago</small>
     </div>
     <div class="d-flex gap-2">
       {% if modo == 'novo' %}
@@ -96,6 +96,7 @@
     {% set status_list = [
       ('PENDENTE',   'secondary', 'fas fa-clock'),
       ('SOLICITADO', 'warning',   'fas fa-paper-plane'),
+      ('AUTORIZADO', 'success',   'fas fa-thumbs-up'),
       ('PAGO',       'primary',   'fas fa-check-circle'),
     ] %}
     {% for st, cor, icone in status_list %}
@@ -216,7 +217,7 @@
             </td>
             <td class="text-center">
               <div class="d-flex justify-content-center gap-1">
-                {# Solicitar #}
+                {# PENDENTE → Solicitar #}
                 {% if reg.status == 'PENDENTE' %}
                 <button class="btn btn-sm btn-outline-warning"
                         onclick="abrirModalSolicitar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ reg.valor_total|float }})"
@@ -224,12 +225,20 @@
                   <i class="fas fa-paper-plane fa-xs"></i>
                 </button>
                 {% endif %}
-                {# Autorizar #}
+                {# SOLICITADO → Autorizar #}
                 {% if reg.status == 'SOLICITADO' %}
                 <button class="btn btn-sm btn-outline-success"
                         onclick="abrirModalAutorizar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ (reg.valor_solicitado or reg.valor_total)|float }})"
-                        title="Efetuar pagamento">
-                  <i class="fas fa-check fa-xs"></i>
+                        title="Autorizar pagamento">
+                  <i class="fas fa-thumbs-up fa-xs"></i>
+                </button>
+                {% endif %}
+                {# AUTORIZADO → Pagar #}
+                {% if reg.status == 'AUTORIZADO' %}
+                <button class="btn btn-sm btn-primary btn-sm"
+                        onclick="abrirModalPagar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ (reg.valor_solicitado or reg.valor_total)|float }})"
+                        title="Efetivar pagamento">
+                  <i class="fas fa-dollar-sign fa-xs"></i>
                 </button>
                 {% endif %}
                 {# Excluir #}
@@ -302,28 +311,59 @@
   </div>
 </div>
 
-{# ══ MODAL: AUTORIZAR / RECUSAR ══════════════════════════════════ #}
+{# ══ MODAL: AUTORIZAR / RECUSAR (SOLICITADO → AUTORIZADO) ════════ #}
 <div class="modal fade" id="modalAutorizar" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header bg-success text-white">
-        <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>Efetuar Pagamento</h5>
+        <h5 class="modal-title"><i class="fas fa-thumbs-up me-2"></i>Autorizar Pagamento</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" id="formAutorizar">
         <input type="hidden" name="acao" id="autorizarAcao" value="autorizar">
         <div class="modal-body">
-          <p class="text-muted mb-3" id="autorizarInfo"></p>
+          <p class="text-muted mb-0" id="autorizarInfo"></p>
+          <p class="mt-2 small text-muted">O custo será marcado como <strong>Autorizado</strong>. O financeiro efetivará o pagamento.</p>
+        </div>
+        <div class="modal-footer d-flex justify-content-between">
+          <button type="button" class="btn btn-danger btn-sm"
+                  onclick="document.getElementById('autorizarAcao').value='recusar';document.getElementById('formAutorizar').submit()">
+            <i class="fas fa-times me-1"></i>Recusar
+          </button>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-success btn-sm"
+                    onclick="document.getElementById('autorizarAcao').value='autorizar'">
+              <i class="fas fa-thumbs-up me-1"></i>Autorizar
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ══ MODAL: EFETIVAR PAGAMENTO (AUTORIZADO → PAGO) ═══════════════ #}
+<div class="modal fade" id="modalPagar" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="fas fa-dollar-sign me-2"></i>Efetivar Pagamento</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="formPagar">
+        <div class="modal-body">
+          <p class="text-muted mb-3" id="pagarInfo"></p>
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label fw-semibold">Valor pago (R$)</label>
               <input type="number" class="form-control" name="valor_pago"
-                     id="autorizarValor" step="0.01" min="0.01" required>
+                     id="pagarValor" step="0.01" min="0.01" required>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">Data de pagamento</label>
               <input type="date" class="form-control" name="data_pagamento"
-                     id="autorizarData" required>
+                     id="pagarData" required>
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">Conta bancária (origem)</label>
@@ -332,18 +372,11 @@
             </div>
           </div>
         </div>
-        <div class="modal-footer d-flex justify-content-between">
-          <button type="button" class="btn btn-danger"
-                  onclick="document.getElementById('autorizarAcao').value='recusar';document.getElementById('formAutorizar').submit()">
-            <i class="fas fa-times me-1"></i>Não Autorizado
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-check me-1"></i>Confirmar Pagamento
           </button>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-success"
-                    onclick="document.getElementById('autorizarAcao').value='autorizar'">
-              <i class="fas fa-check me-1"></i>Autorizar Pagamento
-            </button>
-          </div>
         </div>
       </form>
     </div>
@@ -360,16 +393,24 @@ function abrirModalSolicitar(paiId, entidade, valorTotal) {
     new bootstrap.Modal(document.getElementById('modalSolicitar')).show();
 }
 
-// ── Autorizar pagamento ──────────────────────────────────────────
+// ── Autorizar pagamento (SOLICITADO → AUTORIZADO) ────────────────
 function abrirModalAutorizar(paiId, entidade, valorSol) {
     document.getElementById('formAutorizar').action = `/gestao-custos/${paiId}/autorizar`;
     document.getElementById('autorizarInfo').textContent =
-        `Valor programado: R$ ${valorSol.toFixed(2).replace('.',',')} — ${entidade}`;
-    document.getElementById('autorizarValor').value = valorSol.toFixed(2);
-    document.getElementById('autorizarData').value =
-        new Date().toISOString().split('T')[0];
+        `Valor solicitado: R$ ${valorSol.toFixed(2).replace('.',',')} — ${entidade}`;
     document.getElementById('autorizarAcao').value = 'autorizar';
     new bootstrap.Modal(document.getElementById('modalAutorizar')).show();
+}
+
+// ── Efetivar pagamento (AUTORIZADO → PAGO) ───────────────────────
+function abrirModalPagar(paiId, entidade, valorSol) {
+    document.getElementById('formPagar').action = `/gestao-custos/${paiId}/pagar`;
+    document.getElementById('pagarInfo').textContent =
+        `Valor autorizado: R$ ${valorSol.toFixed(2).replace('.',',')} — ${entidade}`;
+    document.getElementById('pagarValor').value = valorSol.toFixed(2);
+    document.getElementById('pagarData').value =
+        new Date().toISOString().split('T')[0];
+    new bootstrap.Modal(document.getElementById('modalPagar')).show();
 }
 
 // ── Expandir filhos (accordion AJAX) ────────────────────────────
