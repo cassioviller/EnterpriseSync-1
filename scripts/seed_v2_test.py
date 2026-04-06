@@ -167,10 +167,11 @@ with app.app_context():
         log(f"CalendarioEmpresa criado")
 
     tarefas_template = [
-        ('Fundação',             date(2026,3,1),  date(2026,3,12), 8,  500.0, 'm³'),
-        ('Alvenaria',            date(2026,3,6),  date(2026,3,19), 10, 1200.0,'m²'),
-        ('Instalação Elétrica',  date(2026,3,13), date(2026,3,25), 9,  800.0, 'm'),
-        ('Reboco Final',         date(2026,3,18), date(2026,3,31), 10, 900.0, 'm²'),
+        # nome, data_inicio, data_fim, duracao_dias, quantidade, unidade
+        ('Fundação',            date(2026,3,1),  date(2026,3,12), 12, 500.0,  'm³'),
+        ('Alvenaria',           date(2026,3,8),  date(2026,3,27), 20, 1200.0, 'm²'),
+        ('Instalação Elétrica', date(2026,3,20), date(2026,4,8),  20, 800.0,  'm'),   # estende até Abril
+        ('Reboco Final',        date(2026,4,1),  date(2026,4,15), 15, 900.0,  'm²'),  # começa em Abril
     ]
 
     for obra in obras_criadas:
@@ -246,15 +247,17 @@ with app.app_context():
 
             # Apontamentos do cronograma (tarefas ativas nesse dia)
             for tarefa in tarefas_obra:
-                if tarefa.data_inicio and tarefa.data_inicio <= dia:
-                    qty_dia = round(tarefa.quantidade_total * 0.07, 2)  # ~7% por dia
+                if tarefa.data_inicio and tarefa.data_inicio <= dia and tarefa.quantidade_total:
+                    dias_decorridos = (dia - tarefa.data_inicio).days  # 0-based desde o início da tarefa
+                    qty_dia = round(tarefa.quantidade_total * 0.07, 2)
+                    qty_acc = min(tarefa.quantidade_total, round(qty_dia * (dias_decorridos + 1), 2))
                     ap = RDOApontamentoCronograma(
                         rdo_id=rdo.id,
                         tarefa_cronograma_id=tarefa.id,
                         quantidade_executada_dia=qty_dia,
-                        quantidade_acumulada=qty_dia * (idx + 1),
-                        percentual_realizado=min(100.0, round(qty_dia * (idx+1) / tarefa.quantidade_total * 100, 2)),
-                        percentual_planejado=min(100.0, round((idx+1) / tarefa.duracao_dias * 100, 2)),
+                        quantidade_acumulada=qty_acc,
+                        percentual_realizado=min(100.0, round(qty_acc / tarefa.quantidade_total * 100, 2)),
+                        percentual_planejado=min(100.0, round((dias_decorridos + 1) / tarefa.duracao_dias * 100, 2)),
                         admin_id=ADMIN_ID,
                     )
                     db.session.add(ap)
