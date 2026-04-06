@@ -3785,6 +3785,7 @@ def executar_migracoes():
             (83, "GestaoCustoPai - data_vencimento e numero_documento para DESPESA_GERAL", _migration_83_gestao_custo_vencimento),
             (84, "AlimentacaoLancamento - restaurante_id nullable para V2", _migration_84_alimentacao_restaurante_nullable),
             (85, "GestaoCustoPai - fornecedor_id, forma_pagamento, valor_pago, saldo, conta_contabil_codigo, data_emissao, numero_parcela, total_parcelas", _migration_85_gestao_custo_pai_novas_colunas),
+            (86, "CustoObra - colunas extras (funcionario_id, rdo_id, categoria, horas, quantidade, veiculo, almoxarifado)", _migration_86_custo_obra_colunas_extras),
         ]
         
         # Executar cada migração com rastreamento
@@ -7399,6 +7400,76 @@ def _migration_80_reembolso_campos_extras():
 
     except Exception as e:
         logger.error(f"Erro na migracao 80: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_86_custo_obra_colunas_extras():
+    """Migration 86: Garante colunas extras em custo_obra (idempotente).
+    Migration 43 deveria ter adicionado estas colunas, mas em alguns ambientes
+    de produção a migration foi marcada como executada sem que o ALTER TABLE
+    tivesse sido aplicado. Esta migration corrige esse caso."""
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.connect().connection
+        cursor = connection.cursor()
+
+        colunas = {
+            'funcionario_id':       'INTEGER REFERENCES funcionario(id)',
+            'item_almoxarifado_id': 'INTEGER REFERENCES almoxarifado_item(id)',
+            'veiculo_id':           'INTEGER REFERENCES frota_veiculo(id)',
+            'admin_id':             'INTEGER REFERENCES usuario(id)',
+            'quantidade':           'NUMERIC(10,2) DEFAULT 1',
+            'valor_unitario':       'NUMERIC(10,2) DEFAULT 0',
+            'horas_trabalhadas':    'NUMERIC(5,2)',
+            'horas_extras':         'NUMERIC(5,2)',
+            'rdo_id':               'INTEGER REFERENCES rdo(id)',
+            'categoria':            'VARCHAR(50)',
+        }
+
+        for coluna, tipo_sql in colunas.items():
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'custo_obra'
+                AND column_name = %s
+            """, (coluna,))
+            if not cursor.fetchone():
+                logger.info(f"  Adicionando coluna '{coluna}' em custo_obra...")
+                cursor.execute(f"ALTER TABLE custo_obra ADD COLUMN {coluna} {tipo_sql}")
+                logger.info(f"  Coluna '{coluna}' adicionada OK.")
+            else:
+                logger.info(f"  Coluna '{coluna}' OK.")
+
+        # Índices de performance
+        indices = [
+            ('idx_custo_obra_funcionario', 'funcionario_id'),
+            ('idx_custo_obra_veiculo',     'veiculo_id'),
+            ('idx_custo_obra_admin',       'admin_id'),
+            ('idx_custo_obra_data',        'data'),
+        ]
+        for nome, coluna in indices:
+            cursor.execute("""
+                SELECT indexname FROM pg_indexes
+                WHERE tablename = 'custo_obra' AND indexname = %s
+            """, (nome,))
+            if not cursor.fetchone():
+                cursor.execute(f"CREATE INDEX {nome} ON custo_obra({coluna})")
+                logger.info(f"  Índice {nome} criado.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 86 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 86: {e}")
         if connection:
             try:
                 connection.rollback()
