@@ -4226,12 +4226,21 @@ class RDOApontamentoCronograma(db.Model):
 # ═══════════════════════════════════════════════════════════
 
 class GestaoCustoPai(db.Model):
-    """Agrupador de custos: Pagamento Salário, Despesa Alimentação, etc."""
+    """Agrupador de custos: único módulo de saídas financeiras V2.
+    
+    Categorias (nova hierarquia contábil construção civil SINAPI/NBC TG):
+      Custo Direto de Obra:    MATERIAL, MAO_OBRA_DIRETA, EQUIPAMENTO, SUBEMPREITADA
+      Custo Indireto de Obra:  ALIMENTACAO, TRANSPORTE, CANTEIRO, TAXAS_LICENCAS
+      Despesa Administrativa:  SALARIO_ADMIN, ALUGUEL_UTILITIES, TRIBUTOS, DESPESA_FINANCEIRA, OUTROS
+    
+    Categorias legadas (mapeadas automaticamente para as novas):
+      COMPRA → MATERIAL, VEICULO → EQUIPAMENTO, SALARIO → MAO_OBRA_DIRETA,
+      REEMBOLSO → OUTROS, DESPESA_GERAL → OUTROS
+    """
     __tablename__ = 'gestao_custo_pai'
 
     id = db.Column(db.Integer, primary_key=True)
     tipo_categoria = db.Column(db.String(50), nullable=False)
-    # 'SALARIO', 'ALIMENTACAO', 'TRANSPORTE', 'COMPRA', 'REEMBOLSO', 'OUTROS', 'DESPESA_GERAL'
     entidade_nome = db.Column(db.String(150), nullable=False)
     entidade_id = db.Column(db.Integer, nullable=True)
     valor_total = db.Column(db.Numeric(15, 2), default=0.0)
@@ -4247,8 +4256,39 @@ class GestaoCustoPai(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     fluxo_caixa_id = db.Column(db.Integer, db.ForeignKey('fluxo_caixa.id'), nullable=True)
 
+    # Novos campos para absorver ContaPagar
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=True)
+    forma_pagamento = db.Column(db.String(30), nullable=True)
+    # Boleto, PIX, Transferencia, Dinheiro, Cheque
+    valor_pago = db.Column(db.Numeric(15, 2), nullable=True)
+    saldo = db.Column(db.Numeric(15, 2), nullable=True)
+    conta_contabil_codigo = db.Column(db.String(20), nullable=True)
+    # Nota: FK DB-level para plano_contas.codigo não é possível porque o banco foi
+    # criado com PK em 'id' (integer) e 'codigo' só é único composto com admin_id.
+    # Vínculo lógico gerenciado pela aplicação via conta_contabil_codigo.
+    data_emissao = db.Column(db.Date, nullable=True)
+    numero_parcela = db.Column(db.Integer, nullable=True)
+    total_parcelas = db.Column(db.Integer, nullable=True)
+
     itens = db.relationship('GestaoCustoFilho', backref='pai', lazy=True,
                             cascade='all, delete-orphan')
+    fornecedor = db.relationship('Fornecedor', foreign_keys=[fornecedor_id])
+    # conta_contabil: sem relationship ORM pois não há FK DB-level (veja nota acima).
+    # Consultar PlanoContas.query.filter_by(codigo=self.conta_contabil_codigo) quando necessário.
+
+    # Mapeamento de categorias legadas para novas
+    _CATEGORIA_LEGADA_MAP = {
+        'COMPRA':       'MATERIAL',
+        'VEICULO':      'EQUIPAMENTO',
+        'SALARIO':      'MAO_OBRA_DIRETA',
+        'REEMBOLSO':    'OUTROS',
+        'DESPESA_GERAL': 'OUTROS',
+    }
+
+    @property
+    def tipo_categoria_normalizado(self):
+        """Retorna a categoria nova correspondente, mesmo para categorias legadas."""
+        return self._CATEGORIA_LEGADA_MAP.get(self.tipo_categoria, self.tipo_categoria)
 
     def __repr__(self):
         return f'<GestaoCustoPai {self.tipo_categoria} {self.entidade_nome} R${self.valor_total}>'

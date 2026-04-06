@@ -39,8 +39,13 @@
             <div class="mb-3">
               <label class="form-label fw-semibold">Categoria *</label>
               <select name="tipo_categoria" id="selectCategoria" class="form-select" required>
-                {% for k, (label, icone, cor) in categoria_labels.items() %}
-                <option value="{{ k }}" {% if request.args.get('tipo') == k %}selected{% endif %}>{{ label }}</option>
+                {% for grupo_nome, grupo_keys in categorias_grupos %}
+                <optgroup label="{{ grupo_nome }}">
+                  {% for k in grupo_keys %}
+                  {% set info = categoria_labels[k] %}
+                  <option value="{{ k }}" {% if request.args.get('tipo') == k %}selected{% endif %}>{{ info[0] }}</option>
+                  {% endfor %}
+                </optgroup>
                 {% endfor %}
               </select>
             </div>
@@ -51,24 +56,17 @@
               <div class="form-text" id="helpEntidade">Pessoa, fornecedor ou entidade a pagar.</div>
             </div>
 
-            {# Campos extras — visíveis apenas para DESPESA_GERAL #}
-            <div id="camposDespesaGeral" style="display:none">
-              <div class="alert alert-info py-2 mb-3">
-                <i class="fas fa-info-circle me-1"></i>
-                <strong>Despesa Geral:</strong> aluguel, energia, IPTU, honorários e outros gastos sem módulo próprio.
-                A despesa passará pelo fluxo de aprovação antes de ser paga.
+            {# Campos opcionais — disponíveis para todas as categorias #}
+            <div class="row g-3 mb-3">
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold">Data de Vencimento</label>
+                <input type="date" name="data_vencimento" id="inputDataVenc" class="form-control">
+                <div class="form-text">Usado para projeção no Fluxo de Caixa.</div>
               </div>
-              <div class="row g-3 mb-3">
-                <div class="col-sm-6">
-                  <label class="form-label fw-semibold">Data de Vencimento</label>
-                  <input type="date" name="data_vencimento" id="inputDataVenc" class="form-control">
-                  <div class="form-text">Usado para projeção no Fluxo de Caixa.</div>
-                </div>
-                <div class="col-sm-6">
-                  <label class="form-label fw-semibold">Nº Documento</label>
-                  <input type="text" name="numero_documento" class="form-control"
-                         placeholder="NF, boleto, contrato…" autocomplete="off">
-                </div>
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold">Nº Documento</label>
+                <input type="text" name="numero_documento" class="form-control"
+                       placeholder="NF, boleto, contrato…" autocomplete="off">
               </div>
             </div>
 
@@ -105,27 +103,6 @@
               </button>
             </div>
           </form>
-          <script>
-          (function(){
-            const sel = document.getElementById('selectCategoria');
-            const campos = document.getElementById('camposDespesaGeral');
-            const labelEnt = document.getElementById('labelEntidade');
-            const helpEnt = document.getElementById('helpEntidade');
-            function toggle() {
-              const isDG = sel.value === 'DESPESA_GERAL';
-              campos.style.display = isDG ? '' : 'none';
-              if (isDG) {
-                labelEnt.textContent = 'Fornecedor / Credor *';
-                helpEnt.textContent = 'Quem receberá o pagamento (fornecedor, locador, prestador, etc.)';
-              } else {
-                labelEnt.textContent = 'Entidade / Nome *';
-                helpEnt.textContent = 'Pessoa, fornecedor ou entidade a pagar.';
-              }
-            }
-            sel.addEventListener('change', toggle);
-            toggle();
-          })();
-          </script>
         </div>
       </div>
     </div>
@@ -195,9 +172,20 @@
         <div class="col-sm-3">
           <select name="categoria" class="form-select form-select-sm">
             <option value="">Todas as categorias</option>
-            {% for k, (label, icone, cor) in categoria_labels.items() %}
-            <option value="{{ k }}" {% if filtro_categoria == k %}selected{% endif %}>{{ label }}</option>
+            {% for grupo_nome, grupo_keys in categorias_grupos %}
+            <optgroup label="{{ grupo_nome }}">
+              {% for k in grupo_keys %}
+              <option value="{{ k }}" {% if filtro_categoria == k %}selected{% endif %}>{{ categoria_labels[k][0] }}</option>
+              {% endfor %}
+            </optgroup>
             {% endfor %}
+            <optgroup label="Legados">
+              {% for k in ['SALARIO','VEICULO','COMPRA','REEMBOLSO','DESPESA_GERAL'] %}
+              {% if k in categoria_labels %}
+              <option value="{{ k }}" {% if filtro_categoria == k %}selected{% endif %}>{{ categoria_labels[k][0] }}</option>
+              {% endif %}
+              {% endfor %}
+            </optgroup>
           </select>
         </div>
         <div class="col-sm-2 d-flex gap-1">
@@ -232,7 +220,7 @@
           </thead>
           <tbody>
           {% for reg in registros %}
-          {% set cat_info = categoria_labels.get(reg.tipo_categoria, ('Outros','fas fa-receipt','secondary')) %}
+          {% set cat_info = categoria_labels.get(reg.tipo_categoria_normalizado, categoria_labels.get(reg.tipo_categoria, ('Outros','fas fa-receipt','secondary'))) %}
           {% set badge_cor = status_badges.get(reg.status, 'secondary') %}
           {% set row_class = 'table-warning' if reg.status == 'SOLICITADO' else '' %}
           <tr class="{{ row_class }}" id="row-{{ reg.id }}">

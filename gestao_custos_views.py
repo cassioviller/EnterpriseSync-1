@@ -24,15 +24,50 @@ gestao_custos_bp = Blueprint('gestao_custos', __name__,
                               url_prefix='/gestao-custos')
 
 CATEGORIA_LABELS = {
-    'SALARIO':        ('Pagamento Salário',    'fas fa-user-tie',     'primary'),
-    'ALIMENTACAO':    ('Despesa Alimentação',  'fas fa-utensils',     'success'),
-    'TRANSPORTE':     ('Despesa Transporte',   'fas fa-route',        'info'),
-    'VEICULO':        ('Despesa de Frota',     'fas fa-truck',        'dark'),
-    'COMPRA':         ('Compra de Material',   'fas fa-shopping-cart','warning'),
-    'REEMBOLSO':      ('Reembolso a Pagar',    'fas fa-undo',         'danger'),
-    'DESPESA_GERAL':  ('Despesa Geral / Avulsa','fas fa-file-invoice-dollar', 'purple'),
-    'OUTROS':         ('Outros Custos',        'fas fa-receipt',      'secondary'),
+    # ── Custo Direto de Obra ────────────────────────────────────────
+    'MATERIAL':           ('Material de Obra',         'fas fa-boxes',               'warning'),
+    'MAO_OBRA_DIRETA':    ('Mão de Obra Direta',       'fas fa-hard-hat',            'primary'),
+    'EQUIPAMENTO':        ('Equipamento / Frota',      'fas fa-truck',               'dark'),
+    'SUBEMPREITADA':      ('Subempreitada',            'fas fa-hammer',              'info'),
+    # ── Custo Indireto de Obra ──────────────────────────────────────
+    'ALIMENTACAO':        ('Alimentação',              'fas fa-utensils',            'success'),
+    'TRANSPORTE':         ('Transporte',               'fas fa-route',               'info'),
+    'CANTEIRO':           ('Canteiro / Instalações',   'fas fa-hard-hat',            'secondary'),
+    'TAXAS_LICENCAS':     ('Taxas e Licenças',         'fas fa-file-signature',      'danger'),
+    # ── Despesa Administrativa ──────────────────────────────────────
+    'SALARIO_ADMIN':      ('Salário Administrativo',   'fas fa-user-tie',            'primary'),
+    'ALUGUEL_UTILITIES':  ('Aluguel / Utilities',      'fas fa-building',            'purple'),
+    'TRIBUTOS':           ('Tributos / Impostos',      'fas fa-landmark',            'danger'),
+    'DESPESA_FINANCEIRA': ('Despesa Financeira',       'fas fa-percentage',          'dark'),
+    'OUTROS':             ('Outros',                   'fas fa-receipt',             'secondary'),
+    # ── Categorias legadas (retrocompatibilidade — lidas mas não oferecidas no dropdown) ──
+    'SALARIO':            ('Pagamento Salário (legado)','fas fa-user-tie',           'primary'),
+    'VEICULO':            ('Despesa de Frota (legado)', 'fas fa-truck',              'dark'),
+    'COMPRA':             ('Compra de Material (legado)','fas fa-shopping-cart',     'warning'),
+    'REEMBOLSO':          ('Reembolso a Pagar (legado)','fas fa-undo',              'danger'),
+    'DESPESA_GERAL':      ('Despesa Geral (legado)',   'fas fa-file-invoice-dollar', 'secondary'),
 }
+
+# Agrupamento para exibição no dropdown de criação
+CATEGORIAS_GRUPOS = [
+    ('Custo Direto de Obra',    ['MATERIAL', 'MAO_OBRA_DIRETA', 'EQUIPAMENTO', 'SUBEMPREITADA']),
+    ('Custo Indireto de Obra',  ['ALIMENTACAO', 'TRANSPORTE', 'CANTEIRO', 'TAXAS_LICENCAS']),
+    ('Despesa Administrativa',  ['SALARIO_ADMIN', 'ALUGUEL_UTILITIES', 'TRIBUTOS', 'DESPESA_FINANCEIRA', 'OUTROS']),
+]
+
+# Mapeamento reverso: nova → lista de categorias legadas que representam o mesmo conceito
+_LEGADO_PARA_NOVA = {
+    'MATERIAL':       ['COMPRA'],
+    'EQUIPAMENTO':    ['VEICULO'],
+    'MAO_OBRA_DIRETA':['SALARIO'],
+    'OUTROS':         ['REEMBOLSO', 'DESPESA_GERAL'],
+}
+
+def _categorias_equivalentes(categoria: str) -> list:
+    """Retorna a categoria informada + suas equivalências legadas para uso em filtros."""
+    equivalentes = [categoria]
+    equivalentes.extend(_LEGADO_PARA_NOVA.get(categoria, []))
+    return equivalentes
 
 STATUS_BADGES = {
     'PENDENTE':   'secondary',
@@ -74,7 +109,8 @@ def index():
     if filtro_status:
         q = q.filter_by(status=filtro_status)
     if filtro_categoria:
-        q = q.filter_by(tipo_categoria=filtro_categoria)
+        equivalentes = _categorias_equivalentes(filtro_categoria)
+        q = q.filter(GestaoCustoPai.tipo_categoria.in_(equivalentes))
     if filtro_busca:
         q = q.filter(GestaoCustoPai.entidade_nome.ilike(f'%{filtro_busca}%'))
 
@@ -100,6 +136,7 @@ def index():
         registros=registros,
         resumo=resumo,
         categoria_labels=CATEGORIA_LABELS,
+        categorias_grupos=CATEGORIAS_GRUPOS,
         status_badges=STATUS_BADGES,
         filtro_status=filtro_status,
         filtro_categoria=filtro_categoria,
@@ -142,6 +179,7 @@ def novo():
                 return render_template('custos/gestao.html',
                                        modo='novo', obras=obras,
                                        categoria_labels=CATEGORIA_LABELS,
+                                       categorias_grupos=CATEGORIAS_GRUPOS,
                                        status_badges=STATUS_BADGES,
                                        registros=[], resumo={})
 
@@ -182,6 +220,7 @@ def novo():
         obras=obras,
         today=today,
         categoria_labels=CATEGORIA_LABELS,
+        categorias_grupos=CATEGORIAS_GRUPOS,
         status_badges=STATUS_BADGES,
         registros=[],
         resumo={},
@@ -316,13 +355,26 @@ def pagar(pai_id):
 
         # Mapear categoria → categoria FluxoCaixa
         cat_mapa = {
-            'SALARIO':     'salario',
-            'ALIMENTACAO': 'alimentacao',
-            'TRANSPORTE':  'custo_obra',
-            'VEICULO':     'custo_obra',
-            'COMPRA':      'custo_obra',
-            'REEMBOLSO':   'custo_obra',
-            'OUTROS':      'custo_obra',
+            # Novas categorias
+            'MATERIAL':           'custo_obra',
+            'MAO_OBRA_DIRETA':    'salario',
+            'EQUIPAMENTO':        'custo_obra',
+            'SUBEMPREITADA':      'custo_obra',
+            'ALIMENTACAO':        'alimentacao',
+            'TRANSPORTE':         'custo_obra',
+            'CANTEIRO':           'custo_obra',
+            'TAXAS_LICENCAS':     'custo_obra',
+            'SALARIO_ADMIN':      'salario',
+            'ALUGUEL_UTILITIES':  'custo_obra',
+            'TRIBUTOS':           'custo_obra',
+            'DESPESA_FINANCEIRA': 'custo_obra',
+            'OUTROS':             'custo_obra',
+            # Categorias legadas
+            'SALARIO':            'salario',
+            'VEICULO':            'custo_obra',
+            'COMPRA':             'custo_obra',
+            'REEMBOLSO':          'custo_obra',
+            'DESPESA_GERAL':      'custo_obra',
         }
         cat_fc = cat_mapa.get(pai.tipo_categoria, 'custo_obra')
         label = CATEGORIA_LABELS.get(pai.tipo_categoria, ('Custo',))[0]

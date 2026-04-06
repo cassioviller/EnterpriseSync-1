@@ -38,7 +38,12 @@
                             <option value="">Todos</option>
                             {% for tipo in tipos %}
                             <option value="{{ tipo }}" {% if filtros.tipo == tipo %}selected{% endif %}>
+                                {% if tipo_labels and tipo in tipo_labels %}
+                                <i class="{{ tipo_labels[tipo][1] }}"></i>
+                                {{ tipo_labels[tipo][0] }}
+                                {% else %}
                                 {{ tipo.replace('_', ' ').title() }}
+                                {% endif %}
                             </option>
                             {% endfor %}
                         </select>
@@ -127,9 +132,16 @@
                             <td>{{ custo.data.strftime('%d/%m/%Y') }}</td>
                             <td>{{ custo.obra.nome }}</td>
                             <td>
+                                {% if tipo_labels and custo.tipo in tipo_labels %}
+                                <span class="badge bg-primary">
+                                    <i class="{{ tipo_labels[custo.tipo][1] }} me-1"></i>
+                                    {{ tipo_labels[custo.tipo][0] }}
+                                </span>
+                                {% else %}
                                 <span class="badge bg-primary">
                                     {{ custo.tipo.replace('_', ' ').title() }}
                                 </span>
+                                {% endif %}
                             </td>
                             <td>{{ custo.descricao }}</td>
                             <td class="text-end font-weight-bold">R$ {{ "{:,.2f}".format(custo.valor) }}</td>

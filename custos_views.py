@@ -425,6 +425,13 @@ def listar_custos():
     # Dados para filtros
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
     tipos = ['mao_obra', 'material', 'veiculo', 'servico', 'alimentacao']
+    tipo_labels = {
+        'mao_obra':    ('Mão de Obra Direta',       'fas fa-hard-hat'),
+        'material':    ('Material de Obra',          'fas fa-boxes'),
+        'veiculo':     ('Equipamento / Frota',       'fas fa-truck'),
+        'servico':     ('Subempreitada / Serviço',   'fas fa-hammer'),
+        'alimentacao': ('Alimentação',               'fas fa-utensils'),
+    }
     
     # Estatísticas (calcular sobre resultados filtrados, NÃO sobre página atual)
     total_custos = db.session.query(func.sum(CustoObra.valor)).filter(
@@ -441,11 +448,12 @@ def listar_custos():
     total_custos = total_custos.scalar() or 0
     
     return render_template('custos/listar.html', 
-                         custos=custos_paginados.items,  # Lista de custos da página atual
-                         pagination=custos_paginados,     # Objeto de paginação
-                         per_page=per_page,               # ✅ Evitar magic number no template
-                         obras=obras, 
+                         custos=custos_paginados.items,
+                         pagination=custos_paginados,
+                         per_page=per_page,
+                         obras=obras,
                          tipos=tipos,
+                         tipo_labels=tipo_labels,
                          total_custos=total_custos,
                          filtros={
                              'obra_id': obra_id, 
