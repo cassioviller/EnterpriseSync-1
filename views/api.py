@@ -275,6 +275,7 @@ def api_ponto_lancamento_multiplo():
         registros_criados = 0
         registros_existentes = 0
         erros = []
+        novos_registros_diaristas = []  # [(registro_obj, funcionario_obj)] para emitir evento pós-commit
         
         # Gerar lista de datas no período
         from datetime import timedelta
@@ -366,6 +367,9 @@ def api_ponto_lancamento_multiplo():
                         
                         db.session.add(registro)
                         registros_criados += 1
+
+                        if getattr(funcionario, 'tipo_remuneracao', 'salario') == 'diaria':
+                            novos_registros_diaristas.append((registro, funcionario))
                         
                     except Exception as e:
                         erros.append(f"Erro ao processar {funcionario.nome} em {data_obj}: {str(e)}")
@@ -379,7 +383,21 @@ def api_ponto_lancamento_multiplo():
         if registros_criados > 0:
             db.session.commit()
             logger.info(f"[OK] {registros_criados} registros salvos no banco")
-        
+
+            # Emitir evento ponto_registrado para diaristas (cria GestaoCustoPai)
+            if novos_registros_diaristas:
+                from event_manager import EventManager
+                for reg, func in novos_registros_diaristas:
+                    try:
+                        EventManager.emit('ponto_registrado', {
+                            'registro_id': reg.id,
+                            'tipo_ponto': 'entrada',
+                            'obra_id': reg.obra_id,
+                        }, admin_id=admin_id)
+                        logger.info(f"[OK] Custo diária emitido: {func.nome} em {reg.data}")
+                    except Exception as ev_err:
+                        logger.warning(f"[WARN] Evento diária não emitido para {func.nome}: {ev_err}")
+
         return jsonify({
             'success': True,
             'message': f'{registros_criados} lançamentos criados com sucesso',

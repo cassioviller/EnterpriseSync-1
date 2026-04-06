@@ -1387,6 +1387,7 @@ def processar_importacao():
         total_duplicados = 0
         total_atualizados = 0
         
+        novos_registros_import = []  # [(RegistroPonto_obj, funcionario_id)] para evento pós-commit
         for registro in registros_validos:
             # Verificar se já existe registro para este funcionário nesta data
             registro_existente = RegistroPonto.query.filter_by(
@@ -1406,10 +1407,27 @@ def processar_importacao():
                 # Criar novo registro
                 novo_registro = RegistroPonto(**registro)
                 db.session.add(novo_registro)
+                novos_registros_import.append((novo_registro, registro['funcionario_id']))
                 total_importados += 1
         
         # Commit
         db.session.commit()
+
+        # Emitir evento ponto_registrado para diaristas importados
+        if novos_registros_import:
+            from event_manager import EventManager
+            from models import Funcionario as FuncModel
+            for reg_obj, func_id in novos_registros_import:
+                try:
+                    func = FuncModel.query.get(func_id)
+                    if func and getattr(func, 'tipo_remuneracao', 'salario') == 'diaria':
+                        EventManager.emit('ponto_registrado', {
+                            'registro_id': reg_obj.id,
+                            'tipo_ponto': 'entrada',
+                            'obra_id': reg_obj.obra_id,
+                        }, admin_id=admin_id)
+                except Exception as ev_err:
+                    logger.warning(f"[WARN] Evento ponto_registrado import não emitido: {ev_err}")
         
         # Mensagem de resultado
         mensagens = []
