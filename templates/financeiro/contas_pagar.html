@@ -16,6 +16,21 @@
         </div>
     </div>
 
+    {% if is_v2 %}
+    <!-- Banner V2: orientar para Gestão de Custos -->
+    <div class="alert alert-warning d-flex align-items-start gap-3 mb-3" role="alert">
+      <i class="fas fa-lightbulb fa-lg mt-1 text-warning flex-shrink-0"></i>
+      <div>
+        <strong>Versão V2 ativa</strong> — Para despesas operacionais (aluguel, energia, IPTU, honorários, etc.)
+        utilize a <strong>Gestão de Custos</strong> para que passem pelo fluxo de aprovação antes do pagamento.
+        <br>
+        <a href="{{ url_for('gestao_custos.novo') }}?tipo=DESPESA_GERAL" class="btn btn-sm btn-warning mt-2">
+          <i class="fas fa-coins me-1"></i> Lançar Despesa Geral via Gestão de Custos
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Filtros -->
     <div class="card mb-4">
         <div class="card-body">

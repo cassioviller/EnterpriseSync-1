@@ -506,7 +506,13 @@ class FinanceiroService:
                 })
 
             for custo in custos_v2_previstos:
-                custo_data = custo.data_criacao.date() if hasattr(custo.data_criacao, 'date') else custo.data_criacao
+                # Priorizar data_vencimento (Despesa Geral); fallback para data_criacao
+                if custo.data_vencimento:
+                    custo_data = custo.data_vencimento
+                elif custo.data_criacao:
+                    custo_data = custo.data_criacao.date() if hasattr(custo.data_criacao, 'date') else custo.data_criacao
+                else:
+                    custo_data = data_fim
                 detalhes.append({
                     'data': custo_data,
                     'tipo': 'SAIDA',
