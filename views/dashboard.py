@@ -286,23 +286,29 @@ def dashboard():
         # [OK] CORREÇÃO: Determinar período com dados APÓS admin_id estar definido
         if not data_inicio_param:
             try:
-                # Buscar último registro de ponto DO ADMIN específico (multi-tenant seguro)
+                # Buscar a data mais recente dentre TODAS as fontes de dados do tenant
                 ultimo_registro = db.session.execute(
-                    text("SELECT MAX(rp.data) FROM registro_ponto rp JOIN funcionario f ON rp.funcionario_id = f.id WHERE f.admin_id = :admin_id"),
-                    {"admin_id": admin_id}
+                    text("""
+                        SELECT GREATEST(
+                            (SELECT MAX(rp.data) FROM registro_ponto rp
+                             JOIN funcionario f ON rp.funcionario_id = f.id WHERE f.admin_id = :aid),
+                            (SELECT MAX(co.data) FROM custo_obra co WHERE co.admin_id = :aid),
+                            (SELECT MAX(gcf.data_referencia) FROM gestao_custo_filho gcf WHERE gcf.admin_id = :aid),
+                            (SELECT MAX(r.data_relatorio) FROM rdo r WHERE r.admin_id = :aid)
+                        )
+                    """),
+                    {"aid": admin_id}
                 ).scalar()
                 
                 if ultimo_registro:
-                    # Usar o mês do último registro
                     data_inicio = date(ultimo_registro.year, ultimo_registro.month, 1)
-                    logger.info(f"[OK] PERÍODO DINÂMICO (TENANT {admin_id}): {data_inicio} (último registro: {ultimo_registro})")
+                    logger.info(f"[OK] PERÍODO DINÂMICO (TENANT {admin_id}): {data_inicio} (último dado: {ultimo_registro})")
                 else:
-                    # Fallback para período conhecido com dados
-                    data_inicio = date(2024, 7, 1)
-                    logger.info(f"[OK] PERÍODO FALLBACK: Julho/2024 (sem registros para admin_id={admin_id})")
+                    data_inicio = date(date.today().year, date.today().month, 1)
+                    logger.info(f"[OK] PERÍODO FALLBACK: mês atual ({data_inicio})")
             except Exception as e:
                 logger.error(f"[WARN] Erro ao buscar período dinâmico: {e}")
-                data_inicio = date(2024, 7, 1)
+                data_inicio = date(date.today().year, date.today().month, 1)
                 
         if not data_fim_param:
             ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]

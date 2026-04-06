@@ -123,29 +123,34 @@ def _calcular_funcionarios_departamento(admin_id):
         return {}
 
 def _calcular_custos_obra(admin_id, data_inicio, data_fim):
-    """Calcula custos por obra com proteção de transação"""
+    """Calcula custos por obra com proteção de transação — inclui CustoObra e GestaoCustoFilho"""
     try:
-        from models import VehicleExpense, RegistroPonto, RegistroAlimentacao
+        from models import VehicleExpense, RegistroPonto, CustoObra, GestaoCustoFilho
         custos_por_obra = {}
-        
+
         obras_admin = Obra.query.filter_by(admin_id=admin_id).all()
-        
+
         for obra in obras_admin:
-            custo_total_obra = 0
-            
-            registros_obra = RegistroPonto.query.filter(
-                RegistroPonto.obra_id == obra.id,
-                RegistroPonto.data >= data_inicio,
-                RegistroPonto.data <= data_fim
-            ).options(joinedload(RegistroPonto.funcionario_ref)).all()
-            
-            for registro in registros_obra:
-                funcionario = registro.funcionario_ref
-                if funcionario and funcionario.salario:
-                    valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
-                    horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
-                    custo_total_obra += horas * valor_hora
-            
+            custo_total_obra = 0.0
+
+            # 1. RegistroPonto → custo de mão de obra por horas
+            try:
+                registros_obra = RegistroPonto.query.filter(
+                    RegistroPonto.obra_id == obra.id,
+                    RegistroPonto.data >= data_inicio,
+                    RegistroPonto.data <= data_fim
+                ).options(joinedload(RegistroPonto.funcionario_ref)).all()
+
+                for registro in registros_obra:
+                    funcionario = registro.funcionario_ref
+                    if funcionario and funcionario.salario:
+                        valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
+                        horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
+                        custo_total_obra += horas * valor_hora
+            except Exception as e:
+                logger.error(f"Erro RegistroPonto obra {obra.id}: {e}")
+
+            # 2. VehicleExpense → custos de veículos
             try:
                 if hasattr(VehicleExpense, 'obra_id'):
                     veiculos_obra = VehicleExpense.query.filter(
@@ -153,15 +158,37 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim):
                         VehicleExpense.data_custo >= data_inicio,
                         VehicleExpense.data_custo <= data_fim
                     ).all()
-                else:
-                    veiculos_obra = []
-                custo_total_obra += sum(v.valor or 0 for v in veiculos_obra)
+                    custo_total_obra += sum(float(v.valor or 0) for v in veiculos_obra)
             except Exception as e:
-                logger.error(f"Erro ao calcular custos de veículos para obra {obra.nome} (ID: {obra.id}): {e}")
-            
+                logger.error(f"Erro VehicleExpense obra {obra.id}: {e}")
+
+            # 3. CustoObra → materiais, serviços, outros custos diretos
+            try:
+                custos_diretos = CustoObra.query.filter(
+                    CustoObra.obra_id == obra.id,
+                    CustoObra.admin_id == admin_id,
+                    CustoObra.data >= data_inicio,
+                    CustoObra.data <= data_fim
+                ).all()
+                custo_total_obra += sum(float(c.valor or 0) for c in custos_diretos)
+            except Exception as e:
+                logger.error(f"Erro CustoObra obra {obra.id}: {e}")
+
+            # 4. GestaoCustoFilho → diárias, transporte, alimentação vinculados à obra
+            try:
+                filhos = GestaoCustoFilho.query.filter(
+                    GestaoCustoFilho.obra_id == obra.id,
+                    GestaoCustoFilho.admin_id == admin_id,
+                    GestaoCustoFilho.data_referencia >= data_inicio,
+                    GestaoCustoFilho.data_referencia <= data_fim
+                ).all()
+                custo_total_obra += sum(float(f.valor or 0) for f in filhos)
+            except Exception as e:
+                logger.error(f"Erro GestaoCustoFilho obra {obra.id}: {e}")
+
             if custo_total_obra > 0:
                 custos_por_obra[obra.nome] = round(custo_total_obra, 2)
-                
+
         return custos_por_obra
     except Exception as e:
         logger.error(f"Erro custos por obra: {e}")
