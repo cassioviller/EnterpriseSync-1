@@ -39,3 +39,7 @@ externalPort = 8000
 
 [agent]
 integrations = ["python_database:1.0.0"]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 60000
