@@ -491,10 +491,49 @@ def excluir(lancamento_id):
     admin_id = _get_admin_id()
     lancamento = LancamentoTransporte.query.filter_by(id=lancamento_id, admin_id=admin_id).first_or_404()
     try:
+        # CRUD Integrado: remover filho na Gestão de Custos e recalcular total do pai
+        _limpar_gestao_custo_filho(lancamento_id, admin_id)
+
         db.session.delete(lancamento)
         db.session.commit()
-        flash('Lançamento excluído.', 'success')
+        flash('Lançamento excluído (Gestão de Custos atualizada).', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao excluir: {e}', 'danger')
     return redirect(url_for('transporte.index'))
+
+
+def _limpar_gestao_custo_filho(lancamento_id, admin_id):
+    """Remove o GestaoCustoFilho vinculado ao lancamento_transporte e recalcula o total do pai."""
+    try:
+        from models import GestaoCustoFilho, GestaoCustoPai
+        from decimal import Decimal
+        from sqlalchemy import func
+
+        filhos = GestaoCustoFilho.query.filter_by(
+            origem_tabela='lancamento_transporte',
+            origem_id=lancamento_id,
+            admin_id=admin_id,
+        ).all()
+
+        for filho in filhos:
+            pai = GestaoCustoPai.query.get(filho.pai_id)
+            db.session.delete(filho)
+            db.session.flush()
+
+            if pai:
+                novo_total = (
+                    db.session.query(func.coalesce(func.sum(GestaoCustoFilho.valor), 0))
+                    .filter_by(pai_id=pai.id)
+                    .scalar()
+                ) or Decimal('0.00')
+                pai.valor_total = Decimal(str(novo_total))
+                logger.info(f"[OK] CRUD Integrado: GestaoCusto pai={pai.id} total recalculado → {pai.valor_total}")
+
+                # Se o pai não tem mais filhos e está PENDENTE, exclui o pai também
+                if pai.valor_total == Decimal('0.00') and pai.status == 'PENDENTE':
+                    db.session.delete(pai)
+                    logger.info(f"[OK] CRUD Integrado: GestaoCustoPai id={pai.id} excluído (sem filhos)")
+
+    except Exception as e:
+        logger.warning(f"[WARN] CRUD Integrado transporte: {e}")

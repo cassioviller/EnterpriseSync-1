@@ -487,14 +487,48 @@ def excluir(pai_id):
         return redirect(url_for('gestao_custos.index'))
 
     try:
+        # CRUD Integrado: excluir registros de origem vinculados nos filhos
+        _excluir_origens_vinculadas(pai, admin_id)
+
         db.session.delete(pai)
         db.session.commit()
-        flash('Registro excluído com sucesso.', 'success')
+        flash('Registro excluído com sucesso (lançamentos de origem também removidos).', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao excluir: {e}', 'danger')
 
     return redirect(url_for('gestao_custos.index'))
+
+
+def _excluir_origens_vinculadas(pai, admin_id):
+    """Remove os registros de origem (transporte, alimentação, etc.) referenciados pelos filhos."""
+    _TABELAS_SUPORTADAS = {
+        'lancamento_transporte': ('models', 'LancamentoTransporte'),
+        'lancamento_alimentacao': ('models', 'AlimentacaoLancamento'),
+        'reembolso_funcionario': ('models', 'ReembolsoFuncionario'),
+    }
+
+    from models import GestaoCustoFilho
+    filhos = GestaoCustoFilho.query.filter_by(pai_id=pai.id).all()
+
+    for filho in filhos:
+        tabela = filho.origem_tabela
+        origem_id = filho.origem_id
+        if not tabela or not origem_id:
+            continue
+        if tabela not in _TABELAS_SUPORTADAS:
+            continue
+        try:
+            mod_name, class_name = _TABELAS_SUPORTADAS[tabela]
+            import importlib
+            mod = importlib.import_module(mod_name)
+            ModelClass = getattr(mod, class_name)
+            registro = ModelClass.query.filter_by(id=origem_id, admin_id=admin_id).first()
+            if registro:
+                db.session.delete(registro)
+                logger.info(f"[OK] CRUD Integrado: {tabela} id={origem_id} excluído junto com GestaoCusto pai={pai.id}")
+        except Exception as e:
+            logger.warning(f"[WARN] CRUD Integrado: erro ao excluir {tabela} id={origem_id}: {e}")
 
 
 # ─────────────────────────────────────────────

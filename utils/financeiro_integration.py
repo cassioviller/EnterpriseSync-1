@@ -73,6 +73,14 @@ def registrar_custo_automatico(
             db.session.flush()
             logger.info(f"[OK] GestaoCustoPai criado: {tipo_categoria} / {entidade_nome}")
 
+        # Calcula a soma dos filhos ANTES de adicionar o novo (evita dupla contagem
+        # pelo autoflush do SQLAlchemy que executaria o INSERT antes da query)
+        total_existente = (
+            db.session.query(func.coalesce(func.sum(GestaoCustoFilho.valor), 0))
+            .filter_by(pai_id=pai.id)
+            .scalar()
+        ) or Decimal('0.00')
+
         filho = GestaoCustoFilho(
             pai_id=pai.id,
             data_referencia=data,
@@ -86,13 +94,7 @@ def registrar_custo_automatico(
         )
         db.session.add(filho)
 
-        # Recalcula valor_total a partir de todos os filhos + novo
-        total_atual = (
-            db.session.query(func.coalesce(func.sum(GestaoCustoFilho.valor), 0))
-            .filter_by(pai_id=pai.id)
-            .scalar()
-        ) or Decimal('0.00')
-        pai.valor_total = Decimal(str(total_atual)) + valor_dec
+        pai.valor_total = Decimal(str(total_existente)) + valor_dec
 
         db.session.flush()
         logger.info(
