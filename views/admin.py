@@ -158,6 +158,18 @@ def novo_ponto():
         db.session.commit()
         
         logger.debug(f"[OK] DEBUG novo_ponto: Registro criado com sucesso, id={registro.id}")
+
+        # Emitir evento após commit — integração com diaristas V2 e outros módulos
+        tipo_ponto_canonico = 'entrada' if hora_entrada else None
+        if tipo_ponto_canonico:
+            try:
+                from event_manager import EventManager
+                EventManager.emit('ponto_registrado', {
+                    'registro_id': registro.id,
+                    'tipo_ponto': tipo_ponto_canonico,
+                }, admin_id=admin_id)
+            except Exception as ev_err:
+                logger.warning(f"[WARN] Evento ponto_registrado não emitido (manual): {ev_err}")
         
         return jsonify({
             'success': True,
