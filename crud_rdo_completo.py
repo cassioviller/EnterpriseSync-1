@@ -3,7 +3,7 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre, NotificacaoCliente, RDOFoto
+from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre, NotificacaoCliente, RDOFoto, RDOApontamentoCronograma
 from datetime import datetime, date
 import json
 import logging
@@ -90,20 +90,28 @@ def listar_rdos():
             total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
             total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
             
-            # FÓRMULA SIMPLES PROGRESSO
+            # FÓRMULA PROGRESSO — usa subatividades ou apontamentos cronograma V2
             subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
             if subatividades:
                 soma_perc = sum(s.percentual_conclusao for s in subatividades)
                 total_sub = len(subatividades)
                 progresso_medio = round(soma_perc / total_sub, 1)
+                total_atividades = total_subatividades
                 logger.debug(f"[TARGET] CRUD PROGRESSO RDO {rdo.id}: {soma_perc}÷{total_sub} = {progresso_medio}%")
             else:
-                progresso_medio = 0
+                # V2: usar percentual_realizado dos apontamentos de cronograma
+                apontamentos = RDOApontamentoCronograma.query.filter_by(rdo_id=rdo.id).all()
+                if apontamentos:
+                    progresso_medio = round(sum(a.percentual_realizado for a in apontamentos) / len(apontamentos), 1)
+                    total_atividades = len(apontamentos)
+                else:
+                    progresso_medio = 0
+                    total_atividades = 0
             
             rdos_processados.append({
                 'rdo': rdo,
                 'obra': obra,
-                'total_subatividades': total_subatividades,
+                'total_subatividades': total_atividades,
                 'total_funcionarios': total_funcionarios,
                 'progresso_medio': round(progresso_medio, 1),
                 'status_cor': {

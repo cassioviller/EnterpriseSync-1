@@ -1775,9 +1775,14 @@ def funcionario_rdo_consolidado():
                 mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
                 total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
                 
-                # Calcular progresso médio
+                # Calcular progresso médio — V1: subatividades, V2: apontamentos cronograma
                 subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
-                progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades) if subatividades else 0
+                if subatividades:
+                    progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades)
+                else:
+                    from models import RDOApontamentoCronograma as _RAC
+                    aps = _RAC.query.filter_by(rdo_id=rdo.id).all()
+                    progresso_medio = sum(a.percentual_realizado for a in aps) / len(aps) if aps else 0
                 
                 logger.debug(f"DEBUG RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {total_horas_trabalhadas}h trabalhadas, {progresso_medio}% progresso")
             except Exception as e:
@@ -1863,9 +1868,14 @@ def funcionario_rdo_consolidado():
                     # Contar funcionários reais
                     total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
                     
-                    # Calcular progresso médio real baseado nas subatividades
+                    # Calcular progresso médio real — V1: subatividades, V2: apontamentos cronograma
                     subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
-                    progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades) if subatividades else 0
+                    if subatividades:
+                        progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades)
+                    else:
+                        from models import RDOApontamentoCronograma as _RAC
+                        aps = _RAC.query.filter_by(rdo_id=rdo.id).all()
+                        progresso_medio = sum(a.percentual_realizado for a in aps) / len(aps) if aps else 0
                     
                     # Calcular horas trabalhadas reais
                     mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
