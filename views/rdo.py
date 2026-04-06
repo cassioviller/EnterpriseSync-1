@@ -1674,12 +1674,14 @@ def rdo_novo_unificado():
         # Adicionar data atual para o template
         data_hoje = date.today().strftime('%Y-%m-%d')
         
+        from utils.tenant import is_v2_active
         return render_template(template, 
                              obras=obras, 
                              funcionarios=funcionarios_dict,
                              obra_selecionada=obra_selecionada,
                              data_hoje=data_hoje,
-                             date=date)
+                             date=date,
+                             is_v2_active=is_v2_active)
         
     except Exception as e:
         logger.error(f"ERRO RDO NOVO UNIFICADO: {str(e)}")
@@ -2922,6 +2924,33 @@ def _processar_primeira_rdo(obra, admin_id):
         # Buscar serviços disponíveis com múltiplas estratégias
         servicos_obra = _buscar_servicos_obra_resiliente(obra.id, admin_id)
         
+        # V2: Se não há ServicoObraReal, verificar TarefaCronograma como fonte de serviços
+        if not servicos_obra:
+            try:
+                from utils.tenant import is_v2_active
+                from models import TarefaCronograma
+                if is_v2_active():
+                    tarefas_v2 = TarefaCronograma.query.filter_by(
+                        obra_id=obra.id, admin_id=admin_id
+                    ).order_by(TarefaCronograma.ordem).all()
+                    if tarefas_v2:
+                        logger.info(f"[V2] Usando {len(tarefas_v2)} tarefas do cronograma como serviços da obra {obra.id}")
+                        return jsonify({
+                            'success': True,
+                            'primeira_rdo': True,
+                            'ultima_rdo': None,
+                            'v2_cronograma': True,
+                            'message': 'Obra V2 — use o painel Cronograma para apontar produção',
+                            'metadata': {
+                                'obra_id': obra.id,
+                                'obra_nome': obra.nome,
+                                'total_servicos': len(tarefas_v2),
+                                'estado': 'V2_CRONOGRAMA'
+                            }
+                        })
+            except Exception as e_v2:
+                logger.warning(f"[WARN] Falha ao verificar TarefaCronograma V2 em _processar_primeira_rdo: {e_v2}")
+
         if not servicos_obra:
             return jsonify({
                 'success': True,
@@ -3145,6 +3174,25 @@ def api_servicos_obra_primeira_rdo(obra_id):
         servicos_obra = _buscar_servicos_obra_resiliente(obra_id, admin_id)
         
         if not servicos_obra:
+            # V2: verificar TarefaCronograma como fonte de serviços
+            try:
+                from utils.tenant import is_v2_active
+                from models import TarefaCronograma
+                if is_v2_active():
+                    tarefas_v2 = TarefaCronograma.query.filter_by(
+                        obra_id=obra_id, admin_id=admin_id
+                    ).count()
+                    if tarefas_v2 > 0:
+                        logger.info(f"[V2] Obra {obra_id} usa cronograma ({tarefas_v2} tarefas) — sem ServicoObraReal")
+                        return jsonify({
+                            'success': True,
+                            'v2_cronograma': True,
+                            'servicos': [],
+                            'message': f'Obra V2 com {tarefas_v2} tarefas no cronograma'
+                        })
+            except Exception as e_v2:
+                logger.warning(f"[WARN] Falha ao verificar V2 em api_servicos_obra_primeira_rdo: {e_v2}")
+
             logger.debug(f"[INFO] Nenhum serviço encontrado para obra {obra_id}")
             return jsonify({
                 'success': False,
@@ -3321,20 +3369,33 @@ def salvar_rdo_flexivel():
                     service_name = servico_obra.servico.nome
                     logger.info(f"[TARGET] SERVIÇO DA OBRA: {service_name} (ID: {target_service_id})")
                 else:
-                    # Admin users can create RDOs without a service (V2 cronograma flow)
-                    if _is_admin_user:
+                    # Verificar se é V2 (cronograma é a fonte de serviços)
+                    _is_v2 = False
+                    try:
+                        from utils.tenant import is_v2_active
+                        _is_v2 = is_v2_active()
+                    except Exception:
+                        pass
+                    # Admin ou V2: permitir criar RDO sem ServicoObraReal
+                    if _is_admin_user or _is_v2:
                         target_service_id = None
                         service_name = 'Geral'
-                        logger.info("[OK] Admin criando RDO sem serviço configurado — permitido")
+                        logger.info("[OK] Criando RDO sem ServicoObraReal — admin ou V2 (cronograma)")
                     else:
                         flash('Não foi possível identificar o serviço para esta obra', 'error')
                         return redirect(url_for('main.funcionario_rdo_novo'))
             except Exception as e:
                 logger.error(f"[ERROR] Erro ao buscar serviço da obra: {e}")
-                if _is_admin_user:
+                _is_v2 = False
+                try:
+                    from utils.tenant import is_v2_active
+                    _is_v2 = is_v2_active()
+                except Exception:
+                    pass
+                if _is_admin_user or _is_v2:
                     target_service_id = None
                     service_name = 'Geral'
-                    logger.warning("[WARN] Admin RDO: fallback sem serviço após erro")
+                    logger.warning("[WARN] RDO fallback sem serviço (admin ou V2)")
                 else:
                     flash('Erro ao identificar serviço da obra', 'error')
                     return redirect(url_for('main.funcionario_rdo_novo'))
@@ -4076,7 +4137,7 @@ def _buscar_servicos_obra_resiliente(obra_id, admin_id):
         
         # ESTRATÉGIA 3 REMOVIDA: Estava retornando todos os serviços do admin_id
         # Isso causava exibição de serviços não relacionados à obra
-            logger.error(f"[ERROR] NENHUM SERVIÇO ENCONTRADO para obra_id={obra_id}, admin_id={admin_id}")
+        logger.error(f"[ERROR] NENHUM SERVIÇO ENCONTRADO para obra_id={obra_id}, admin_id={admin_id}")
         return []
         
     except Exception as e:

@@ -619,7 +619,25 @@ function carregarServicosParaPrimeiraRDO(obraId) {
         .then(data => {
             console.log('📊 Serviços da obra recebidos:', data);
             
-            if (data.success && data.servicos && data.servicos.length > 0) {
+            if (data.success && data.v2_cronograma) {
+                // V2: obra usa cronograma como fonte de serviços
+                console.log('🗓️ Obra V2 — usando cronograma para apontamento de produção');
+                const servicosContainer = document.getElementById('servicos-container');
+                if (servicosContainer) {
+                    servicosContainer.innerHTML = `
+                        <div class="alert alert-info">
+                            <i class="fas fa-calendar-check me-2"></i>
+                            <strong>Obra com Cronograma V2</strong><br>
+                            <small>O apontamento de produção é feito pelo painel <b>Cronograma</b> abaixo. Preencha as quantidades executadas por tarefa.</small>
+                        </div>`;
+                }
+                // Mostrar card do cronograma e carregar tarefas
+                const cardCronograma = document.getElementById('cardCronogramaV2');
+                if (cardCronograma) {
+                    cardCronograma.style.display = '';
+                    if (typeof carregarTarefasRDO === 'function') carregarTarefasRDO();
+                }
+            } else if (data.success && data.servicos && data.servicos.length > 0) {
                 console.log(`✅ ${data.servicos.length} serviços encontrados para primeira RDO`);
                 exibirServicosParaPrimeiraRDO(data.servicos);
             } else {
