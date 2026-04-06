@@ -308,7 +308,7 @@
               <span class="badge bg-{{ badge_cor }}">{{ reg.status }}</span>
             </td>
             <td class="text-center">
-              <small class="text-muted">{{ reg.data_criacao.strftime('%d/%m/%Y') }}</small>
+              <small class="text-muted">{{ (reg.data_pagamento or reg.data_vencimento or reg.data_criacao.date()).strftime('%d/%m/%Y') }}</small>
             </td>
             <td class="text-center">
               <div class="d-flex justify-content-center gap-1">
