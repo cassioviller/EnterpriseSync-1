@@ -3782,6 +3782,7 @@ def executar_migracoes():
             (80, "Reembolso V2 - categoria e comprovante_url", _migration_80_reembolso_campos_extras),
             (81, "Reembolso V2 - gestao_custo_pai_id FK", _migration_81_reembolso_gestao_custo_pai_id),
             (82, "Obra codigo - unique por tenant (codigo+admin_id)", _migration_82_obra_codigo_per_tenant),
+            (83, "GestaoCustoPai - data_vencimento e numero_documento para DESPESA_GERAL", _migration_83_gestao_custo_vencimento),
         ]
         
         # Executar cada migração com rastreamento
@@ -7122,6 +7123,46 @@ def _migration_79_reembolso_funcionario():
 
     except Exception as e:
         logger.error(f"Erro na migracao 79: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_83_gestao_custo_vencimento():
+    """Migration 83: Adiciona data_vencimento e numero_documento em gestao_custo_pai (DESPESA_GERAL)"""
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'gestao_custo_pai' AND column_name = 'data_vencimento'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE gestao_custo_pai ADD COLUMN data_vencimento DATE")
+            logger.info("MIGRACAO 83: coluna data_vencimento adicionada a gestao_custo_pai")
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'gestao_custo_pai' AND column_name = 'numero_documento'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE gestao_custo_pai ADD COLUMN numero_documento VARCHAR(50)")
+            logger.info("MIGRACAO 83: coluna numero_documento adicionada a gestao_custo_pai")
+
+        connection.close()
+        logger.info("MIGRACAO 83 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 83: {e}")
         if connection:
             try:
                 connection.rollback()

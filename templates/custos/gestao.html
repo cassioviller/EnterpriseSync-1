@@ -35,21 +35,43 @@
           <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Novo Lançamento Manual</h5>
         </div>
         <div class="card-body">
-          <form method="post" action="{{ url_for('gestao_custos.novo') }}">
+          <form method="post" action="{{ url_for('gestao_custos.novo') }}" id="formNovoLancamento">
             <div class="mb-3">
               <label class="form-label fw-semibold">Categoria *</label>
-              <select name="tipo_categoria" class="form-select" required>
+              <select name="tipo_categoria" id="selectCategoria" class="form-select" required>
                 {% for k, (label, icone, cor) in categoria_labels.items() %}
-                <option value="{{ k }}">{{ label }}</option>
+                <option value="{{ k }}" {% if request.args.get('tipo') == k %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label fw-semibold">Entidade / Nome *</label>
-              <input type="text" name="entidade_nome" class="form-control"
+              <label class="form-label fw-semibold" id="labelEntidade">Entidade / Nome *</label>
+              <input type="text" name="entidade_nome" id="inputEntidade" class="form-control"
                      placeholder="Ex: João Silva, Fornecedor ABC, Obra Central…" required autocomplete="off">
-              <div class="form-text">Pessoa, fornecedor ou entidade a pagar.</div>
+              <div class="form-text" id="helpEntidade">Pessoa, fornecedor ou entidade a pagar.</div>
             </div>
+
+            {# Campos extras — visíveis apenas para DESPESA_GERAL #}
+            <div id="camposDespesaGeral" style="display:none">
+              <div class="alert alert-info py-2 mb-3">
+                <i class="fas fa-info-circle me-1"></i>
+                <strong>Despesa Geral:</strong> aluguel, energia, IPTU, honorários e outros gastos sem módulo próprio.
+                A despesa passará pelo fluxo de aprovação antes de ser paga.
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-sm-6">
+                  <label class="form-label fw-semibold">Data de Vencimento</label>
+                  <input type="date" name="data_vencimento" id="inputDataVenc" class="form-control">
+                  <div class="form-text">Usado para projeção no Fluxo de Caixa.</div>
+                </div>
+                <div class="col-sm-6">
+                  <label class="form-label fw-semibold">Nº Documento</label>
+                  <input type="text" name="numero_documento" class="form-control"
+                         placeholder="NF, boleto, contrato…" autocomplete="off">
+                </div>
+              </div>
+            </div>
+
             <div class="mb-3">
               <label class="form-label fw-semibold">Descrição do lançamento</label>
               <input type="text" name="descricao" class="form-control"
@@ -83,6 +105,27 @@
               </button>
             </div>
           </form>
+          <script>
+          (function(){
+            const sel = document.getElementById('selectCategoria');
+            const campos = document.getElementById('camposDespesaGeral');
+            const labelEnt = document.getElementById('labelEntidade');
+            const helpEnt = document.getElementById('helpEntidade');
+            function toggle() {
+              const isDG = sel.value === 'DESPESA_GERAL';
+              campos.style.display = isDG ? '' : 'none';
+              if (isDG) {
+                labelEnt.textContent = 'Fornecedor / Credor *';
+                helpEnt.textContent = 'Quem receberá o pagamento (fornecedor, locador, prestador, etc.)';
+              } else {
+                labelEnt.textContent = 'Entidade / Nome *';
+                helpEnt.textContent = 'Pessoa, fornecedor ou entidade a pagar.';
+              }
+            }
+            sel.addEventListener('change', toggle);
+            toggle();
+          })();
+          </script>
         </div>
       </div>
     </div>

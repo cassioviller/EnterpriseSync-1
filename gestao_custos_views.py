@@ -24,13 +24,14 @@ gestao_custos_bp = Blueprint('gestao_custos', __name__,
                               url_prefix='/gestao-custos')
 
 CATEGORIA_LABELS = {
-    'SALARIO':     ('Pagamento Salário',    'fas fa-user-tie',     'primary'),
-    'ALIMENTACAO': ('Despesa Alimentação',  'fas fa-utensils',     'success'),
-    'TRANSPORTE':  ('Despesa Transporte',   'fas fa-route',        'info'),
-    'VEICULO':     ('Despesa de Frota',     'fas fa-truck',        'dark'),
-    'COMPRA':      ('Compra de Material',   'fas fa-shopping-cart','warning'),
-    'REEMBOLSO':   ('Reembolso a Pagar',    'fas fa-undo',         'danger'),
-    'OUTROS':      ('Outros Custos',        'fas fa-receipt',      'secondary'),
+    'SALARIO':        ('Pagamento Salário',    'fas fa-user-tie',     'primary'),
+    'ALIMENTACAO':    ('Despesa Alimentação',  'fas fa-utensils',     'success'),
+    'TRANSPORTE':     ('Despesa Transporte',   'fas fa-route',        'info'),
+    'VEICULO':        ('Despesa de Frota',     'fas fa-truck',        'dark'),
+    'COMPRA':         ('Compra de Material',   'fas fa-shopping-cart','warning'),
+    'REEMBOLSO':      ('Reembolso a Pagar',    'fas fa-undo',         'danger'),
+    'DESPESA_GERAL':  ('Despesa Geral / Avulsa','fas fa-file-invoice-dollar', 'purple'),
+    'OUTROS':         ('Outros Custos',        'fas fa-receipt',      'secondary'),
 }
 
 STATUS_BADGES = {
@@ -127,8 +128,14 @@ def novo():
             entidade_nome = request.form.get('entidade_nome', '').strip()
             descricao = request.form.get('descricao', '').strip()
             valor = Decimal(request.form.get('valor', '0').replace(',', '.'))
-            data_ref = datetime.strptime(request.form.get('data_referencia'), '%Y-%m-%d').date()
+            data_ref_str = request.form.get('data_referencia')
+            data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date() if data_ref_str else date.today()
             obra_id = request.form.get('obra_id', type=int)
+
+            # Campos extras para DESPESA_GERAL
+            data_venc_str = request.form.get('data_vencimento', '').strip()
+            data_venc = datetime.strptime(data_venc_str, '%Y-%m-%d').date() if data_venc_str else None
+            numero_doc = request.form.get('numero_documento', '').strip() or None
 
             if not entidade_nome or valor <= 0:
                 flash('Entidade e valor são obrigatórios.', 'warning')
@@ -145,6 +152,8 @@ def novo():
                 entidade_id=None,
                 valor_total=valor,
                 status='PENDENTE',
+                data_vencimento=data_venc,
+                numero_documento=numero_doc,
             )
             db.session.add(pai)
             db.session.flush()

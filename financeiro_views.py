@@ -139,16 +139,18 @@ def listar_contas_pagar():
     # Incorporar custos V2 nos KPI cards usando regra canônica (valor_solicitado tem prioridade)
     valor_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2)
     semana = hoje + timedelta(days=7)
-    # "a vencer": criados no intervalo [hoje, hoje+7d] — bounded window, não acumula histórico
+    # "a vencer": data_vencimento (se existir) ou data_criacao no intervalo [hoje, hoje+7d]
+    def _data_ref_v2(c):
+        return c.data_vencimento if c.data_vencimento else (c.data_criacao.date() if c.data_criacao else None)
     v2_a_vencer = sum(
         float(c.valor_solicitado or c.valor_total) for c in custos_v2
-        if c.data_criacao and hoje <= c.data_criacao.date() <= semana
+        if _data_ref_v2(c) and hoje <= _data_ref_v2(c) <= semana
     )
-    # "vencidas": criados há mais de 30 dias (proxy overdue — proxy consistente com service)
+    # "vencidas": data_vencimento < hoje (overdue)
     limite_overdue = hoje - timedelta(days=30)
     v2_vencidas = sum(
         float(c.valor_solicitado or c.valor_total) for c in custos_v2
-        if c.data_criacao and c.data_criacao.date() < limite_overdue
+        if _data_ref_v2(c) and _data_ref_v2(c) < hoje
     )
 
     resumo = {
@@ -326,7 +328,8 @@ def nova_conta_pagar():
         'financeiro/nova_conta_pagar.html',
         fornecedores=fornecedores,
         obras=obras,
-        contas_contabeis=contas_contabeis
+        contas_contabeis=contas_contabeis,
+        is_v2=is_v2_active()
     )
 
 

@@ -4231,7 +4231,7 @@ class GestaoCustoPai(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     tipo_categoria = db.Column(db.String(50), nullable=False)
-    # 'SALARIO', 'ALIMENTACAO', 'TRANSPORTE', 'COMPRA', 'REEMBOLSO', 'OUTROS'
+    # 'SALARIO', 'ALIMENTACAO', 'TRANSPORTE', 'COMPRA', 'REEMBOLSO', 'OUTROS', 'DESPESA_GERAL'
     entidade_nome = db.Column(db.String(150), nullable=False)
     entidade_id = db.Column(db.Integer, nullable=True)
     valor_total = db.Column(db.Numeric(15, 2), default=0.0)
@@ -4239,6 +4239,8 @@ class GestaoCustoPai(db.Model):
     status = db.Column(db.String(20), default='PENDENTE')
     # PENDENTE, SOLICITADO, AUTORIZADO, PAGO, RECUSADO
     data_pagamento = db.Column(db.Date, nullable=True)
+    data_vencimento = db.Column(db.Date, nullable=True)
+    numero_documento = db.Column(db.String(50), nullable=True)
     conta_bancaria = db.Column(db.String(100), nullable=True)
     observacoes = db.Column(db.Text, nullable=True)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)

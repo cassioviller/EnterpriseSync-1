@@ -174,6 +174,47 @@ O funcionário pode se identificar por:
 
 ---
 
+### A5. Despesas Gerais / Avulsas → Gestão de Custos
+
+Para despesas que não têm módulo próprio no SIGE — **aluguel de escritório, energia elétrica, água, IPTU, honorários contábeis, assinaturas de software, manutenção de equipamentos** — use a categoria **Despesa Geral / Avulsa** na Gestão de Custos V2. Assim a despesa passa pelo fluxo de aprovação antes de ser paga.
+
+> **Diferença do ContaPagar manual:** o ContaPagar tradicional registra a despesa diretamente no financeiro sem aprovação. A Gestão de Custos exige aprovação (Solicitar → Autorizar → Pagar), dando mais controle ao gestor.
+
+#### Passo a passo
+
+**Caminho:** Menu → **Gestão de Custos** → botão **Novo Lançamento** → ou acesse `/gestao-custos/novo?tipo=DESPESA_GERAL`
+
+> Também há um link direto na tela de **Nova Conta a Pagar** (para tenants V2), com botão "Lançar via Gestão de Custos".
+
+1. Selecionar categoria: **Despesa Geral / Avulsa**
+2. Preencher **Fornecedor / Credor** (ex: "Imobiliária Central", "Copel Distribuição")
+3. Preencher **Data de Vencimento** — aparecerá como Saída Prevista no Fluxo de Caixa no mês correto
+4. Preencher **Nº Documento** (número da NF, boleto ou contrato — opcional)
+5. Preencher **Descrição** (ex: "Aluguel maio/2026")
+6. Preencher **Valor (R$)**
+7. Preencher **Data de Referência** (mês de competência)
+8. Vincular à obra (opcional)
+9. Clicar em **Salvar Lançamento**
+
+**O que acontece:**
+- Custo criado com status **PENDENTE** (não aparece no Fluxo de Caixa ainda)
+- Após **Solicitar**: aparece nas Saídas Previstas do Fluxo de Caixa, na data de vencimento informada
+- Após **Autorizar**: permanece nas Saídas Previstas
+- Após **Pagar**: sai das Saídas Previstas, vai para histórico do Fluxo de Caixa
+
+#### Exemplos de uso
+
+| Despesa | Fornecedor/Credor | Categoria |
+|---|---|---|
+| Aluguel do escritório | Imobiliária / Locador | Despesa Geral |
+| Conta de energia | CEMIG / Copel | Despesa Geral |
+| IPTU | Prefeitura | Despesa Geral |
+| Honorários contábeis | Escritório Contábil X | Despesa Geral |
+| Assinatura de software | SaaS Provider | Despesa Geral |
+| Manutenção de impressora | Técnico / Empresa | Despesa Geral |
+
+---
+
 ## PARTE B — Aprovação na Gestão de Custos V2
 
 Todos os custos criados por Transporte, Alimentação e Diária chegam aqui com status **PENDENTE**.
@@ -287,6 +328,7 @@ Para despesas que não passam pelos módulos de Transporte, Alimentação etc., 
 | **Material (Saída)** | Almoxarifado → Cadastrar Item → Entrada → Saída de Material | Custo da Obra (direto) | Não | Não aparece (só em Custos por Obra) |
 | **Diária Funcionário** | **Ponto Eletrônico** (dispositivo compartilhado) → bater ponto (entrada) | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
 | **Reembolso** | Financeiro → Gestão de Custos → Reembolsos | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO |
+| **Despesa Geral (V2)** | Gestão de Custos → Novo → categoria Despesa Geral | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO (pela data de vencimento) |
 | **Conta a Pagar** | Financeiro → Contas a Pagar → Nova | Saídas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
 | **Conta a Receber** | Financeiro → Contas a Receber → Nova | Entradas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
 
