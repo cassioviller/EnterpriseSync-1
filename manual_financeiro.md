@@ -28,7 +28,7 @@ Conta a Receber (manual) ──────────────────�
 
 ### A1. Transporte → Gestão de Custos
 
-Todo lançamento de transporte cria automaticamente um custo na **Gestão de Custos V2** com categoria **TRANSPORTE**.
+Todo lançamento de transporte cria automaticamente um custo na **Gestão de Custos V2** com categoria **TRANSPORTE** (Custo Indireto de Obra).
 
 #### Lançamento Individual
 
@@ -69,7 +69,7 @@ Clique em **Confirmar Lançamento em Lote**.
 
 ### A2. Alimentação → Gestão de Custos
 
-Cada lançamento de alimentação cria automaticamente um custo na **Gestão de Custos V2** com categoria **ALIMENTACAO**.
+Cada lançamento de alimentação cria automaticamente um custo na **Gestão de Custos V2** com categoria **ALIMENTACAO** (Custo Indireto de Obra).
 
 **Caminho:** Menu superior → **Alimentação** → botão **Novo Lançamento**
 
@@ -159,7 +159,7 @@ O funcionário pode se identificar por:
 **O que acontece automaticamente na primeira batida (entrada) do dia:**
 - Ponto registrado
 - Custo criado na **Gestão de Custos V2** com:
-  - Categoria: **SALARIO**
+  - Categoria: **MAO_OBRA_DIRETA** (Mão de Obra Direta)
   - Entidade: nome do funcionário
   - Valor: valor da diária configurada
   - Obra: vinculada ao ponto (se configurado)
@@ -174,19 +174,48 @@ O funcionário pode se identificar por:
 
 ---
 
-### A5. Despesas Gerais / Avulsas → Gestão de Custos
+### A5. Despesas Operacionais / Avulsas → Gestão de Custos
 
-Para despesas que não têm módulo próprio no SIGE — **aluguel de escritório, energia elétrica, água, IPTU, honorários contábeis, assinaturas de software, manutenção de equipamentos** — use a categoria **Despesa Geral / Avulsa** na Gestão de Custos V2. Assim a despesa passa pelo fluxo de aprovação antes de ser paga.
+Para despesas que não têm módulo próprio no SIGE — **aluguel de escritório, energia elétrica, água, IPTU, honorários contábeis, assinaturas de software, manutenção de equipamentos** — use a **Gestão de Custos V2** com a categoria adequada. Assim a despesa passa pelo fluxo de aprovação antes de ser paga.
 
 > **Diferença do ContaPagar manual:** o ContaPagar tradicional registra a despesa diretamente no financeiro sem aprovação. A Gestão de Custos exige aprovação (Solicitar → Autorizar → Pagar), dando mais controle ao gestor.
 
+#### Categorias disponíveis para despesas avulsas
+
+As categorias são organizadas em três grupos contábeis (padrão SINAPI/NBC TG):
+
+**Custo Direto de Obra**
+| Categoria | Quando usar |
+|---|---|
+| Material de Obra (MATERIAL) | Compra de insumos para obra sem passar pelo Almoxarifado |
+| Mão de Obra Direta (MAO_OBRA_DIRETA) | Pagamento de empreiteiros, operários avulsos |
+| Equipamento / Frota (EQUIPAMENTO) | Aluguel ou manutenção de máquinas de obra |
+| Subempreitada (SUBEMPREITADA) | Contratos de subempreitada |
+
+**Custo Indireto de Obra**
+| Categoria | Quando usar |
+|---|---|
+| Alimentação (ALIMENTACAO) | Refeições em obra (quando não lançado via módulo Alimentação) |
+| Transporte (TRANSPORTE) | Deslocamento para obra (quando não lançado via módulo Transporte) |
+| Canteiro / Instalações (CANTEIRO) | Barracão, container, sanitário de obra |
+| Taxas e Licenças (TAXAS_LICENCAS) | Anotações de responsabilidade técnica, alvarás, ISS de obra |
+
+**Despesa Administrativa**
+| Categoria | Quando usar |
+|---|---|
+| Salário Administrativo (SALARIO_ADMIN) | Pagamento de pessoal de escritório |
+| Aluguel / Utilities (ALUGUEL_UTILITIES) | Aluguel de escritório, energia, água, internet |
+| Tributos / Impostos (TRIBUTOS) | IPTU, IRPJ, CSLL, contribuições federais |
+| Despesa Financeira (DESPESA_FINANCEIRA) | Juros, tarifas bancárias, IOF |
+| Outros (OUTROS) | Qualquer despesa que não se enquadre acima |
+
 #### Passo a passo
 
-**Caminho:** Menu → **Gestão de Custos** → botão **Novo Lançamento** → ou acesse `/gestao-custos/novo?tipo=DESPESA_GERAL`
+**Caminho:** Menu → **Gestão de Custos** → botão **Novo Lançamento**
 
-> Também há um link direto na tela de **Nova Conta a Pagar** (para tenants V2), com botão "Lançar via Gestão de Custos".
+> Para tenants V2, também há um link direto na tela de **Contas a Pagar** e **Nova Conta a Pagar**, com botão "Lançar via Gestão de Custos".
 
-1. Selecionar categoria: **Despesa Geral / Avulsa**
+1. Selecionar o **Grupo de categoria** e a **Categoria** correta (ex: Despesa Administrativa → Aluguel / Utilities)
 2. Preencher **Fornecedor / Credor** (ex: "Imobiliária Central", "Copel Distribuição")
 3. Preencher **Data de Vencimento** — aparecerá como Saída Prevista no Fluxo de Caixa no mês correto
 4. Preencher **Nº Documento** (número da NF, boleto ou contrato — opcional)
@@ -204,14 +233,15 @@ Para despesas que não têm módulo próprio no SIGE — **aluguel de escritóri
 
 #### Exemplos de uso
 
-| Despesa | Fornecedor/Credor | Categoria |
+| Despesa | Fornecedor/Credor | Categoria recomendada |
 |---|---|---|
-| Aluguel do escritório | Imobiliária / Locador | Despesa Geral |
-| Conta de energia | CEMIG / Copel | Despesa Geral |
-| IPTU | Prefeitura | Despesa Geral |
-| Honorários contábeis | Escritório Contábil X | Despesa Geral |
-| Assinatura de software | SaaS Provider | Despesa Geral |
-| Manutenção de impressora | Técnico / Empresa | Despesa Geral |
+| Aluguel do escritório | Imobiliária / Locador | Aluguel / Utilities (ALUGUEL_UTILITIES) |
+| Conta de energia | CEMIG / Copel | Aluguel / Utilities (ALUGUEL_UTILITIES) |
+| IPTU | Prefeitura | Tributos / Impostos (TRIBUTOS) |
+| Honorários contábeis | Escritório Contábil X | Outros (OUTROS) |
+| Assinatura de software | SaaS Provider | Outros (OUTROS) |
+| Aluguel de betoneira | Empresa de Equipamentos | Equipamento / Frota (EQUIPAMENTO) |
+| ISS de obra | Prefeitura | Taxas e Licenças (TAXAS_LICENCAS) |
 
 ---
 
@@ -295,7 +325,9 @@ Cada linha da tabela representa um lançamento individual:
 |---|---|---|
 | Verde | ENTRADA | Conta a Receber pendente |
 | Vermelho | SAÍDA | Conta a Pagar pendente |
-| Vermelho | SAÍDA | Gestão de Custos (Transporte / Alimentação / Diária) SOLICITADO ou AUTORIZADO |
+| Vermelho | SAÍDA | Gestão de Custos (qualquer categoria) SOLICITADO ou AUTORIZADO |
+
+> **Gestão de Custos com Data de Vencimento:** quando o lançamento tem data de vencimento preenchida (ex: Aluguel, Energia), ele aparece no período que inclui essa data — não a data de criação. Isso garante que a projeção de caixa esteja no mês correto.
 
 ---
 
@@ -307,6 +339,8 @@ Para despesas que não passam pelos módulos de Transporte, Alimentação etc., 
 **Caminho:** Financeiro → Contas a Pagar → **Nova Conta a Pagar**
 - Preencha: Descrição, Valor, Vencimento, Fornecedor (opcional), Obra (opcional)
 - Aparece imediatamente em Saídas Previstas
+
+> **Tenants V2:** para despesas que precisam de aprovação antes do pagamento, use a **Gestão de Custos** em vez de Conta a Pagar diretamente. Há um banner com link direto na tela de Contas a Pagar.
 
 ### Conta a Receber (manual)
 **Caminho:** Financeiro → Contas a Receber → **Nova Conta a Receber**
@@ -322,19 +356,52 @@ Para despesas que não passam pelos módulos de Transporte, Alimentação etc., 
 
 | Módulo | Como lançar | Vai para | Aprovação necessária | Aparece no Fluxo de Caixa |
 |---|---|---|---|---|
-| **Transporte** | Menu Transporte → Novo Lançamento | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
-| **Transporte Lote** | Menu Transporte → Lançamento em Lote | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO |
-| **Alimentação** | Menu Alimentação → Novo Lançamento | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
+| **Transporte** | Menu Transporte → Novo Lançamento | Gestão de Custos PENDENTE (cat: TRANSPORTE) | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
+| **Transporte Lote** | Menu Transporte → Lançamento em Lote | Gestão de Custos PENDENTE (cat: TRANSPORTE) | Sim | Quando SOLICITADO ou AUTORIZADO |
+| **Alimentação** | Menu Alimentação → Novo Lançamento | Gestão de Custos PENDENTE (cat: ALIMENTACAO) | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
 | **Material (Saída)** | Almoxarifado → Cadastrar Item → Entrada → Saída de Material | Custo da Obra (direto) | Não | Não aparece (só em Custos por Obra) |
-| **Diária Funcionário** | **Ponto Eletrônico** (dispositivo compartilhado) → bater ponto (entrada) | Gestão de Custos PENDENTE | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
-| **Reembolso** | Financeiro → Gestão de Custos → Reembolsos | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO |
-| **Despesa Geral (V2)** | Gestão de Custos → Novo → categoria Despesa Geral | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO (pela data de vencimento) |
+| **Diária Funcionário** | **Ponto Eletrônico** (dispositivo compartilhado) → bater ponto (entrada) | Gestão de Custos PENDENTE (cat: MAO_OBRA_DIRETA) | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
+| **Reembolso** | Financeiro → Gestão de Custos → Reembolsos | Gestão de Custos PENDENTE (cat: OUTROS) | Sim | Quando SOLICITADO ou AUTORIZADO |
+| **Despesa Avulsa (V2)** | Gestão de Custos → Novo → categoria adequada | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO (pela data de vencimento) |
 | **Conta a Pagar** | Financeiro → Contas a Pagar → Nova | Saídas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
 | **Conta a Receber** | Financeiro → Contas a Receber → Nova | Entradas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
 
 ---
 
-## PARTE F — Dicas Práticas
+## PARTE F — Hierarquia de Categorias (Gestão de Custos V2)
+
+As categorias seguem o padrão contábil da construção civil (SINAPI / NBC TG 47):
+
+### Custo Direto de Obra
+| Categoria | Código | Descrição |
+|---|---|---|
+| Material de Obra | MATERIAL | Insumos físicos incorporados à obra |
+| Mão de Obra Direta | MAO_OBRA_DIRETA | Operários, pedreiros, eletricistas, diaristas |
+| Equipamento / Frota | EQUIPAMENTO | Máquinas, veículos de obra, ferramentas caras |
+| Subempreitada | SUBEMPREITADA | Contratos de terceiros para serviços de obra |
+
+### Custo Indireto de Obra
+| Categoria | Código | Descrição |
+|---|---|---|
+| Alimentação | ALIMENTACAO | Refeições, marmitas, restaurante |
+| Transporte | TRANSPORTE | Vale-transporte, táxi, combustível de obra |
+| Canteiro / Instalações | CANTEIRO | Barracão, container, aluguel de sanitário |
+| Taxas e Licenças | TAXAS_LICENCAS | Alvarás, ART/RRT, ISS de obra |
+
+### Despesa Administrativa
+| Categoria | Código | Descrição |
+|---|---|---|
+| Salário Administrativo | SALARIO_ADMIN | Pessoal de escritório, gestores |
+| Aluguel / Utilities | ALUGUEL_UTILITIES | Aluguel de imóvel, energia, água, internet |
+| Tributos / Impostos | TRIBUTOS | IPTU, IRPJ, CSLL, contribuições |
+| Despesa Financeira | DESPESA_FINANCEIRA | Juros, tarifas bancárias, IOF |
+| Outros | OUTROS | Demais despesas administrativas |
+
+> **Retrocompatibilidade:** registros criados antes da Task #8 com categorias legadas (COMPRA, VEICULO, SALARIO, REEMBOLSO, DESPESA_GERAL) foram migrados automaticamente. Caso algum registro legado apareça, ele será exibido normalmente com um badge "(legado)".
+
+---
+
+## PARTE G — Dicas Práticas
 
 - **O custo de material (almoxarifado) não aparece no Fluxo de Caixa.** Ele é registrado como custo realizado da obra. Para ver: Obras → selecionar a obra → aba Custos.
 - **Sem Solicitar, o custo não aparece no Fluxo de Caixa.** Um lançamento de Transporte ou Alimentação recém-criado fica invisível no Fluxo até ser Solicitado.
@@ -342,3 +409,5 @@ Para despesas que não passam pelos módulos de Transporte, Alimentação etc., 
 - **O Saldo Inicial do Fluxo de Caixa é o saldo real dos bancos.** Mantenha os bancos atualizados dando baixa correta nas contas (selecionando o banco ao pagar).
 - **Pagamento parcial:** informe só o valor pago hoje; o saldo restante continua nas Saídas Previstas.
 - **Diária duplicada:** o sistema protege automaticamente — bater o ponto duas vezes no mesmo dia não gera dois custos.
+- **Data de vencimento importa:** ao lançar despesas com data de vencimento (aluguel, energy, IPTU), preencha o campo para que o Fluxo de Caixa projete a saída no mês correto.
+- **Escolha a categoria correta:** use a hierarquia contábil para classificar corretamente. Isso impacta relatórios de Custo da Obra vs. Despesa Administrativa.
