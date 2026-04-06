@@ -29,19 +29,23 @@ with app.app_context():
     section("1. CONSOLIDANDO GESTÃO DE CUSTOS")
 
     for tipo in ('MAO_OBRA_DIRETA', 'SALARIO', 'TRANSPORTE', 'ALIMENTACAO'):
-        # Buscar todos os entidades únicas (funcionário/restaurante)
+        # Buscar todos as entidades únicas (funcionário/restaurante) — sem filtro de data
         entidades = db.session.execute(text(
             "SELECT DISTINCT entidade_id, entidade_nome FROM gestao_custo_pai "
-            "WHERE admin_id=:aid AND tipo_categoria=:tipo "
-            "AND EXISTS (SELECT 1 FROM gestao_custo_filho f WHERE f.pai_id=gestao_custo_pai.id "
-            "AND f.data_referencia < '2026-04-01')",
+            "WHERE admin_id=:aid AND tipo_categoria=:tipo",
         ), {'aid': ADMIN_ID, 'tipo': tipo}).fetchall()
 
         for ent_id, ent_nome in entidades:
             # Pegar todos os pais desse funcionário/entidade
-            pais = GestaoCustoPai.query.filter_by(
-                admin_id=ADMIN_ID, tipo_categoria=tipo, entidade_id=ent_id
-            ).all()
+            query = GestaoCustoPai.query.filter_by(
+                admin_id=ADMIN_ID, tipo_categoria=tipo
+            )
+            if ent_id is not None:
+                query = query.filter_by(entidade_id=ent_id)
+            else:
+                query = query.filter(GestaoCustoPai.entidade_id.is_(None),
+                                     GestaoCustoPai.entidade_nome == ent_nome)
+            pais = query.all()
 
             if len(pais) <= 1:
                 # Já consolidado ou só 1

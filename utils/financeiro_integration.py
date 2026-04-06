@@ -50,15 +50,15 @@ def registrar_custo_automatico(
         if isinstance(data, str):
             data = datetime.strptime(data, '%Y-%m-%d').date()
 
-        # Busca pai PENDENTE para a mesma categoria+entidade
-        pai = GestaoCustoPai.query.filter_by(
-            admin_id=admin_id,
-            tipo_categoria=tipo_categoria,
-            entidade_id=entidade_id if entidade_id else None,
-            status='PENDENTE',
-        ).filter(
+        # Busca pai em aberto (não PAGO/RECUSADO) para a mesma categoria+entidade
+        # → 1 dropdown por (categoria + entidade), independente da data
+        pai = GestaoCustoPai.query.filter(
+            GestaoCustoPai.admin_id == admin_id,
+            GestaoCustoPai.tipo_categoria == tipo_categoria,
+            GestaoCustoPai.entidade_id == (entidade_id if entidade_id else None),
             GestaoCustoPai.entidade_nome == entidade_nome,
-        ).first()
+            GestaoCustoPai.status.notin_(['PAGO', 'RECUSADO']),
+        ).order_by(GestaoCustoPai.id.desc()).first()
 
         if not pai:
             pai = GestaoCustoPai(
