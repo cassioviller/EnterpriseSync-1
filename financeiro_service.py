@@ -452,20 +452,26 @@ class FinanceiroService:
             # Usa data_vencimento (quando disponível) ou data_criacao como fallback
             dt_inicio = datetime.combine(data_inicio, datetime.min.time())
             dt_fim = datetime.combine(data_fim, datetime.max.time())
-            # Buscar TODOS os SOLICITADO/AUTORIZADO e filtrar por data_vencimento OU data_criacao
-            custos_v2_candidatos = GestaoCustoPai.query.filter(
+            # Filtrar por data_vencimento OU (sem vencimento) data_criacao — SQL-side com OR
+            from sqlalchemy import or_ as sql_or
+            custos_v2_previstos = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO']),
+                    sql_or(
+                        and_(
+                            GestaoCustoPai.data_vencimento != None,
+                            GestaoCustoPai.data_vencimento >= data_inicio,
+                            GestaoCustoPai.data_vencimento <= data_fim,
+                        ),
+                        and_(
+                            GestaoCustoPai.data_vencimento == None,
+                            GestaoCustoPai.data_criacao >= dt_inicio,
+                            GestaoCustoPai.data_criacao <= dt_fim,
+                        ),
+                    )
                 )
             ).all()
-            custos_v2_previstos = [
-                c for c in custos_v2_candidatos
-                if (
-                    (c.data_vencimento and data_inicio <= c.data_vencimento <= data_fim)
-                    or (not c.data_vencimento and c.data_criacao and dt_inicio <= c.data_criacao <= dt_fim)
-                )
-            ]
             # Custos V2 já pagos (histórico realizado) — usar data_pagamento (campo Date)
             custos_v2_pagos = GestaoCustoPai.query.filter(
                 and_(

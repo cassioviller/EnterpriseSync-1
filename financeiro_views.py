@@ -146,8 +146,7 @@ def listar_contas_pagar():
         float(c.valor_solicitado or c.valor_total) for c in custos_v2
         if _data_ref_v2(c) and hoje <= _data_ref_v2(c) <= semana
     )
-    # "vencidas": data_vencimento < hoje (overdue)
-    limite_overdue = hoje - timedelta(days=30)
+    # "vencidas": data_vencimento (ou data_criacao) < hoje (overdue)
     v2_vencidas = sum(
         float(c.valor_solicitado or c.valor_total) for c in custos_v2
         if _data_ref_v2(c) and _data_ref_v2(c) < hoje
