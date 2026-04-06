@@ -277,7 +277,7 @@ with app.app_context():
             valor_dia = getattr(func, 'valor_diaria', 0) or 200.0
             # Verificar se já existe para este func/dia
             existe = GestaoCustoPai.query.filter_by(
-                admin_id=ADMIN_ID, entidade_id=func.id, tipo_categoria='SALARIO'
+                admin_id=ADMIN_ID, entidade_id=func.id, tipo_categoria='MAO_OBRA_DIRETA'
             ).filter(GestaoCustoPai.data_criacao != None).first()
             # Filtro melhor: verificar por data nos filhos
             existe_filho = GestaoCustoFilho.query.filter_by(
@@ -292,7 +292,7 @@ with app.app_context():
             dt_pag = dia if status == 'PAGO' else None
 
             pai = GestaoCustoPai(
-                tipo_categoria='SALARIO',
+                tipo_categoria='MAO_OBRA_DIRETA',
                 entidade_nome=func.nome,
                 entidade_id=func.id,
                 valor_total=valor_dia,
@@ -323,7 +323,7 @@ with app.app_context():
                     admin_id=ADMIN_ID,
                     data_movimento=dia,
                     tipo_movimento='SAIDA',
-                    categoria='SALARIO',
+                    categoria='MAO_OBRA_DIRETA',
                     valor=valor_dia,
                     descricao=f'Diária paga - {func.nome} ({dia.strftime("%d/%m")})',
                     obra_id=obras_criadas[0].id,
@@ -333,7 +333,7 @@ with app.app_context():
                 db.session.add(fc)
 
     db.session.commit()
-    total_diarias = GestaoCustoPai.query.filter_by(admin_id=ADMIN_ID, tipo_categoria='SALARIO').count()
+    total_diarias = GestaoCustoPai.query.filter_by(admin_id=ADMIN_ID, tipo_categoria='MAO_OBRA_DIRETA').count()
     log(f"Diárias criadas: {total_diarias} registros")
 
     # ─────────────────────────────────────────────────────
@@ -734,7 +734,7 @@ with app.app_context():
     n_obras = Obra.query.filter_by(admin_id=ADMIN_ID).count()
     n_rdos = RDO.query.filter_by(admin_id=ADMIN_ID).count()
     n_tarefas = TarefaCronograma.query.filter_by(admin_id=ADMIN_ID).count()
-    n_diarias = GestaoCustoPai.query.filter_by(admin_id=ADMIN_ID, tipo_categoria='SALARIO').count()
+    n_diarias = GestaoCustoPai.query.filter_by(admin_id=ADMIN_ID, tipo_categoria='MAO_OBRA_DIRETA').count()
     n_transp = LancamentoTransporte.query.filter_by(admin_id=ADMIN_ID).count()
     n_alim = AlimentacaoLancamento.query.filter_by(admin_id=ADMIN_ID).count()
     n_itens = AlmoxarifadoItem.query.filter_by(admin_id=ADMIN_ID).count()

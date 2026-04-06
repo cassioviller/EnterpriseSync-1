@@ -28,7 +28,7 @@ with app.app_context():
     # ─────────────────────────────────────────────────────
     section("1. CONSOLIDANDO GESTÃO DE CUSTOS")
 
-    for tipo in ('SALARIO', 'TRANSPORTE', 'ALIMENTACAO'):
+    for tipo in ('MAO_OBRA_DIRETA', 'SALARIO', 'TRANSPORTE', 'ALIMENTACAO'):
         # Buscar todos os entidades únicas (funcionário/restaurante)
         entidades = db.session.execute(text(
             "SELECT DISTINCT entidade_id, entidade_nome FROM gestao_custo_pai "
