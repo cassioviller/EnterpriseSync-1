@@ -446,13 +446,22 @@ class FinanceiroService:
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status.in_(['PENDENTE', 'SOLICITADO', 'AUTORIZADO']),
                     sql_or(
+                        # Com data_vencimento: filtrar pelo período consultado
                         and_(
                             GestaoCustoPai.data_vencimento != None,
                             GestaoCustoPai.data_vencimento >= data_inicio,
                             GestaoCustoPai.data_vencimento <= data_fim,
                         ),
+                        # Sem data_vencimento + SOLICITADO/AUTORIZADO: sempre incluir
+                        # (obrigação aprovada pendente de pagamento, sem prazo definido)
                         and_(
                             GestaoCustoPai.data_vencimento == None,
+                            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO']),
+                        ),
+                        # Sem data_vencimento + PENDENTE: incluir se criado no período
+                        and_(
+                            GestaoCustoPai.data_vencimento == None,
+                            GestaoCustoPai.status == 'PENDENTE',
                             GestaoCustoPai.data_criacao >= dt_inicio,
                             GestaoCustoPai.data_criacao <= dt_fim,
                         ),
@@ -497,16 +506,28 @@ class FinanceiroService:
                     custo_data = custo.data_criacao.date() if hasattr(custo.data_criacao, 'date') else custo.data_criacao
                 else:
                     custo_data = data_fim
+                badge_status = custo.status  # PENDENTE / SOLICITADO / AUTORIZADO
                 detalhes.append({
                     'data': custo_data,
                     'tipo': 'SAIDA',
                     'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}]',
-                    'valor': float(custo.valor_solicitado or custo.valor_total),
-                    'origem': 'Gestão de Custos V2'
+                    'valor': float(custo.saldo if getattr(custo, 'saldo', None) is not None else (custo.valor_solicitado or custo.valor_total)),
+                    'origem': 'Gestão de Custos V2',
+                    'status': badge_status,
+                    'realizado': False,
                 })
 
-            # PAGO: não inclui em 'Movimentos Previstos' — já está no histórico FluxoCaixa
-            # (o registro é criado em gestao_custos_views.pagar via FluxoCaixa model)
+            # PAGO: incluir no histórico de movimentos realizados
+            for custo in custos_v2_pagos:
+                detalhes.append({
+                    'data': custo.data_pagamento or data_fim,
+                    'tipo': 'SAIDA',
+                    'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}]',
+                    'valor': float(custo.valor_pago or custo.valor_total),
+                    'origem': 'Gestão de Custos V2',
+                    'status': 'PAGO',
+                    'realizado': True,
+                })
             
             # Ordenar por data
             detalhes.sort(key=lambda x: x['data'])
