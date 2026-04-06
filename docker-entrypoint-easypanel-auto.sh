@@ -6,6 +6,7 @@
 # ==========================================================
 
 set -e
+set -o pipefail
 
 # Configurações de logging detalhado
 LOG_FILE="/tmp/sige_deployment.log"
