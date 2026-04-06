@@ -3784,6 +3784,7 @@ def executar_migracoes():
             (82, "Obra codigo - unique por tenant (codigo+admin_id)", _migration_82_obra_codigo_per_tenant),
             (83, "GestaoCustoPai - data_vencimento e numero_documento para DESPESA_GERAL", _migration_83_gestao_custo_vencimento),
             (84, "AlimentacaoLancamento - restaurante_id nullable para V2", _migration_84_alimentacao_restaurante_nullable),
+            (85, "GestaoCustoPai - fornecedor_id, forma_pagamento, valor_pago, saldo, conta_contabil_codigo, data_emissao, numero_parcela, total_parcelas", _migration_85_gestao_custo_pai_novas_colunas),
         ]
         
         # Executar cada migração com rastreamento
@@ -7124,6 +7125,59 @@ def _migration_79_reembolso_funcionario():
 
     except Exception as e:
         logger.error(f"Erro na migracao 79: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_85_gestao_custo_pai_novas_colunas():
+    """Migration 85: Adiciona colunas ausentes em gestao_custo_pai adicionadas pelo Task #8.
+    Colunas: fornecedor_id, forma_pagamento, valor_pago, saldo, conta_contabil_codigo,
+             data_emissao, numero_parcela, total_parcelas
+    """
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'gestao_custo_pai'
+        """)
+        existing_cols = {r[0] for r in cursor.fetchall()}
+
+        colunas_a_adicionar = [
+            ('fornecedor_id', 'INTEGER REFERENCES fornecedor(id)'),
+            ('forma_pagamento', 'VARCHAR(30)'),
+            ('valor_pago', 'NUMERIC(15, 2)'),
+            ('saldo', 'NUMERIC(15, 2)'),
+            ('conta_contabil_codigo', 'VARCHAR(20)'),
+            ('data_emissao', 'DATE'),
+            ('numero_parcela', 'INTEGER'),
+            ('total_parcelas', 'INTEGER'),
+        ]
+
+        for col_name, col_def in colunas_a_adicionar:
+            if col_name not in existing_cols:
+                cursor.execute(
+                    f"ALTER TABLE gestao_custo_pai ADD COLUMN IF NOT EXISTS {col_name} {col_def}"
+                )
+                logger.info(f"MIGRACAO 85: coluna {col_name} adicionada a gestao_custo_pai")
+            else:
+                logger.info(f"MIGRACAO 85: coluna {col_name} já existe - pulando")
+
+        connection.close()
+        logger.info("MIGRACAO 85 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 85: {e}")
         if connection:
             try:
                 connection.rollback()

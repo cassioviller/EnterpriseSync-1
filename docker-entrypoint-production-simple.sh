@@ -44,29 +44,30 @@ import sys
 import os
 sys.path.append('/app')
 
-try:
-    print('🔧 Importando aplicação...')
-    from app import app, db
-    
-    with app.app_context():
-        print('📋 Verificando/criando tabelas básicas...')
-        db.create_all()
-        print('✅ Tabelas verificadas')
-        
-        # Verificação básica de dados (apenas diagnóstico)
-        try:
-            from sqlalchemy import text
-            result = db.session.execute(text('SELECT COUNT(*) FROM usuario'))
-            user_count = result.scalar()
-            print(f'ℹ️ Usuários no banco: {user_count}')
-        except Exception as e:
-            print(f'ℹ️ Verificação diagnóstica: {e} - continuando')
-        
-        print('✅ Inicialização básica concluída')
-        
-except Exception as e:
-    print(f'⚠️ Erro na inicialização (não crítico): {e}')
-    print('🔄 Aplicação tentará continuar...')
+print('🔧 Importando aplicação...')
+from app import app, db
+
+with app.app_context():
+    print('📋 Verificando/criando tabelas básicas...')
+    db.create_all()
+    print('✅ Tabelas verificadas')
+
+    # Executar migrações para adicionar colunas em tabelas existentes
+    print('🔄 Executando migrações de schema...')
+    from migrations import executar_migracoes
+    executar_migracoes()
+    print('✅ Migrações executadas')
+
+    # Verificação básica de dados (apenas diagnóstico)
+    try:
+        from sqlalchemy import text
+        result = db.session.execute(text('SELECT COUNT(*) FROM usuario'))
+        user_count = result.scalar()
+        print(f'ℹ️ Usuários no banco: {user_count}')
+    except Exception as e:
+        print(f'ℹ️ Verificação diagnóstica: {e} - continuando')
+
+    print('✅ Inicialização básica concluída')
 "
 
 echo "🎯 SIGE v10.0 inicializado com sucesso!"
