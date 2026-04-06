@@ -343,10 +343,23 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
     db.session.commit()
     logger.info(f"[OK] TarefaCronograma atualizada id={tarefa_id}")
 
-    # Recálculo em cadeia apenas quando campos de agendamento foram alterados
+    # Recálculo em cadeia apenas quando campos de agendamento foram alterados.
+    # Se percentual_concluido foi passado explicitamente, reaplicar APÓS o recálculo
+    # (recalcular_cronograma chama atualizar_percentual_tarefa que pode sobrescrevê-lo).
     _SCHEDULING_FIELDS = {'duracao_dias', 'predecessora_id', 'data_inicio'}
+    perc_manual = None
+    if 'percentual_concluido' in data:
+        try:
+            perc_manual = min(100.0, max(0.0, float(data['percentual_concluido'])))
+        except (ValueError, TypeError):
+            pass
+
     if _SCHEDULING_FIELDS & set(data.keys()):
         recalcular_cronograma(obra_id, admin_id)
+        # Re-aplicar o percentual manual caso o recálculo tenha sobrescrito
+        if perc_manual is not None:
+            tarefa.percentual_concluido = perc_manual
+            db.session.commit()
 
     # Devolver tarefa atualizada + lista completa após recalc para redesenho do Gantt
     db.session.refresh(tarefa)

@@ -21,7 +21,7 @@
       </nav>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <button class="btn btn-success btn-sm" onclick="abrirModalNovaTarefa()">
+      <button class="btn btn-success btn-sm px-3" onclick="abrirModalNovaTarefa()">
         <i class="fas fa-plus me-1"></i> Nova Tarefa
       </button>
       <button class="btn btn-outline-primary btn-sm" id="btnRecalcular" onclick="recalcularTudo()">
@@ -36,99 +36,194 @@
     </div>
   </div>
 
+  {# ── Cards de estatísticas ── #}
+  {% if tarefas %}
+  <div class="row g-2 mb-3" id="statsRow">
+    {% set perc_total = (tarefas | map(attribute='percentual_concluido') | select | list | sum / tarefas|length) if tarefas else 0 %}
+    {% set concluidas = tarefas | selectattr('percentual_concluido', 'ge', 100) | list | length %}
+    {% set em_andamento = tarefas | selectattr('percentual_concluido', 'gt', 0) | selectattr('percentual_concluido', 'lt', 100) | list | length %}
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card-blue">
+        <div class="stat-icon"><i class="fas fa-list-check"></i></div>
+        <div class="stat-body">
+          <div class="stat-val">{{ tarefas|length }}</div>
+          <div class="stat-lbl">Total de Tarefas</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card-green">
+        <div class="stat-icon"><i class="fas fa-check-double"></i></div>
+        <div class="stat-body">
+          <div class="stat-val">{{ concluidas }}</div>
+          <div class="stat-lbl">Concluídas</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card-orange">
+        <div class="stat-icon"><i class="fas fa-hammer"></i></div>
+        <div class="stat-body">
+          <div class="stat-val">{{ em_andamento }}</div>
+          <div class="stat-lbl">Em Andamento</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-card-purple">
+        <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
+        <div class="stat-body">
+          <div class="stat-val" id="statPercGeral">{{ "%.0f"|format(perc_total) }}%</div>
+          <div class="stat-lbl">Progresso Geral</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   {# ── Painel split: tabela + gantt ── #}
   <div class="cronograma-split" id="cronogramaSplit">
 
     {# ── Painel esquerdo: tabela de tarefas ── #}
     <div class="cronograma-left" id="leftPane">
       <div class="table-responsive cronograma-scroll" id="leftScroll">
-        <table class="table table-sm table-bordered cronograma-table mb-0" id="tarefasTable">
+        <table class="table table-sm cronograma-table mb-0" id="tarefasTable">
           <thead class="cronograma-thead">
             <tr>
-              <th style="width:28px" title="Arraste para reordenar"></th>
-              <th style="width:40px">#</th>
-              <th style="width:30px"><i class="fas fa-cog fa-xs text-muted"></i></th>
-              <th style="min-width:200px">Nome da Tarefa</th>
-              <th style="width:80px">Duração</th>
-              <th style="width:110px">Início</th>
-              <th style="width:110px">Término</th>
-              <th style="width:60px">Pred.</th>
-              <th style="width:70px">% Feito</th>
-              <th style="width:50px"></th>
+              <th class="th-grip"></th>
+              <th class="th-num">#</th>
+              <th class="th-nome">Nome da Tarefa</th>
+              <th class="th-dur" title="Duração em dias úteis">Dur.</th>
+              <th class="th-date">Início</th>
+              <th class="th-date">Término</th>
+              <th class="th-pred" title="ID da tarefa predecessora">Pred.</th>
+              <th class="th-perc">Progresso</th>
+              <th class="th-qty">Qtd / Un.</th>
+              <th class="th-act"></th>
             </tr>
           </thead>
           <tbody id="tarefasBody">
             {% for t in tarefas %}
             {% set is_pai = t.id in pai_ids %}
-            <tr class="tarefa-row {% if is_pai %}tarefa-pai{% endif %} {% if t.tarefa_pai_id %}tarefa-filho d-none{% endif %}"
+            {% set perc = (t.percentual_concluido or 0)|int %}
+            <tr class="tarefa-row
+                  {% if is_pai %}tarefa-pai{% endif %}
+                  {% if t.tarefa_pai_id %}tarefa-filho d-none{% endif %}
+                  {% if perc >= 100 %}row-done{% elif perc > 0 %}row-wip{% endif %}"
                 data-id="{{ t.id }}"
                 data-pai="{{ t.tarefa_pai_id or '' }}"
-                data-perc="{{ t.percentual_concluido or 0 }}"
+                data-perc="{{ perc }}"
                 data-inicio="{{ t.data_inicio.isoformat() if t.data_inicio else '' }}"
                 data-fim="{{ t.data_fim.isoformat() if t.data_fim else '' }}"
                 draggable="true">
-              <td class="text-center p-1">
+
+              {# Drag handle #}
+              <td class="td-grip">
                 <span class="drag-handle" title="Arraste para reordenar">
-                  <i class="fas fa-grip-vertical fa-xs"></i>
+                  <i class="fas fa-grip-vertical"></i>
                 </span>
               </td>
-              <td class="text-muted small text-center">{{ loop.index }}</td>
-              <td class="text-center">
-                {% if is_pai %}
-                  <i class="fas fa-layer-group fa-xs text-warning"></i>
-                {% else %}
-                  <i class="fas fa-tasks fa-xs text-secondary"></i>
-                {% endif %}
-              </td>
+
+              {# Número #}
+              <td class="td-num text-muted">{{ loop.index }}</td>
+
+              {# Nome #}
               <td class="nome-cell">
-                <div class="d-flex align-items-center" style="padding-left: {{ '20px' if t.tarefa_pai_id else '0' }}">
+                <div class="d-flex align-items-center gap-1"
+                     style="padding-left:{{ '22px' if t.tarefa_pai_id else '0' }}">
                   {% if is_pai %}
-                  <button class="btn btn-link btn-sm p-0 me-1 toggle-btn"
-                          onclick="toggleFilhas({{ t.id }})" data-expanded="false">
-                    <i class="fas fa-chevron-right fa-xs text-warning" id="icon-{{ t.id }}"></i>
+                  <button class="btn-toggle toggle-btn" onclick="toggleFilhas({{ t.id }})"
+                          data-expanded="false" title="Expandir/recolher subtarefas">
+                    <i class="fas fa-chevron-right fa-xs" id="icon-{{ t.id }}"></i>
                   </button>
                   {% else %}
-                  <span class="me-1" style="width:16px;display:inline-block"></span>
+                  <span class="toggle-placeholder"></span>
                   {% endif %}
-                  <span class="nome-tarefa {% if is_pai %}fw-semibold{% endif %}"
-                        ondblclick="iniciarEdicao(this, {{ t.id }}, 'nome_tarefa')">
+                  <span class="nome-tarefa {% if is_pai %}fw-semibold text-dark{% endif %}"
+                        ondblclick="iniciarEdicao(this, {{ t.id }}, 'nome_tarefa')"
+                        title="Duplo-clique para editar">
                     {{ t.nome_tarefa }}
                   </span>
                 </div>
               </td>
-              <td class="text-center">
-                <span class="dur-val" ondblclick="iniciarEdicao(this, {{ t.id }}, 'duracao_dias')">
+
+              {# Duração #}
+              <td class="td-center">
+                <span class="badge-dur dur-val"
+                      ondblclick="iniciarEdicao(this, {{ t.id }}, 'duracao_dias')"
+                      title="Duplo-clique para editar">
                   {{ t.duracao_dias }}d
                 </span>
               </td>
-              <td class="text-center small inicio-val">
-                {{ t.data_inicio.strftime('%d/%m/%y') if t.data_inicio else '—' }}
-              </td>
-              <td class="text-center small fim-val">
-                {{ t.data_fim.strftime('%d/%m/%y') if t.data_fim else '—' }}
-              </td>
-              <td class="text-center small">
-                <span class="pred-val" ondblclick="iniciarEdicao(this, {{ t.id }}, 'predecessora_id')">
-                  {{ t.predecessora_id or '—' }}
+
+              {# Início #}
+              <td class="td-center small">
+                <span class="date-chip inicio-val"
+                      ondblclick="iniciarEdicao(this, {{ t.id }}, 'data_inicio')"
+                      title="Duplo-clique para editar">
+                  {{ t.data_inicio.strftime('%d/%m/%y') if t.data_inicio else '—' }}
                 </span>
               </td>
-              <td class="text-center small perc-val">
-                {% set p = (t.percentual_concluido or 0)|int %}
-                <div class="d-flex align-items-center gap-1" title="{{ p }}% concluído">
-                  <div class="progress flex-grow-1" style="height:5px;border-radius:4px">
-                    <div class="progress-bar
-                      {% if p >= 75 %}bg-success{% elif p >= 40 %}bg-primary{% else %}bg-warning{% endif %}"
-                      style="width:{{ p }}%"></div>
+
+              {# Término #}
+              <td class="td-center small">
+                <span class="date-chip fim-val">
+                  {{ t.data_fim.strftime('%d/%m/%y') if t.data_fim else '—' }}
+                </span>
+              </td>
+
+              {# Predecessora #}
+              <td class="td-center small">
+                <span class="pred-val"
+                      ondblclick="iniciarEdicao(this, {{ t.id }}, 'predecessora_id')"
+                      title="Duplo-clique para editar">
+                  {% if t.predecessora_id %}
+                    <span class="badge bg-light text-secondary border">#{{ t.predecessora_id }}</span>
+                  {% else %}—{% endif %}
+                </span>
+              </td>
+
+              {# Progresso #}
+              <td class="td-perc perc-val">
+                <div class="perc-wrapper"
+                     ondblclick="iniciarEdicao(this.querySelector('.perc-text'), {{ t.id }}, 'percentual_concluido')"
+                     title="Duplo-clique para editar">
+                  <div class="perc-bar-wrap">
+                    <div class="perc-bar-fill
+                      {% if perc >= 100 %}fill-done
+                      {% elif perc >= 60 %}fill-good
+                      {% elif perc >= 30 %}fill-mid
+                      {% else %}fill-low{% endif %}"
+                      style="width:{{ perc }}%"></div>
                   </div>
-                  <span style="font-size:.7rem;min-width:26px;color:#333">{{ p }}%</span>
+                  <span class="perc-text">{{ perc }}%</span>
                 </div>
               </td>
-              <td class="text-center">
-                <button class="btn btn-link btn-sm p-0 text-danger"
-                        onclick="excluirTarefa({{ t.id }}, '{{ t.nome_tarefa }}')"
-                        title="Excluir">
-                  <i class="fas fa-times fa-xs"></i>
-                </button>
+
+              {# Quantidade / Unidade #}
+              <td class="td-center small text-muted">
+                {% if t.quantidade_total %}
+                  <span class="qty-chip">
+                    {{ t.quantidade_total | int if t.quantidade_total == t.quantidade_total|int else "%.1f"|format(t.quantidade_total) }}
+                    {{ t.unidade_medida or '' }}
+                  </span>
+                {% else %}—{% endif %}
+              </td>
+
+              {# Ações #}
+              <td class="td-actions">
+                <div class="actions-wrap">
+                  <button class="btn-act btn-edit"
+                          onclick="abrirEditar({{ t.id }})"
+                          title="Editar tarefa">
+                    <i class="fas fa-pen-to-square"></i>
+                  </button>
+                  <button class="btn-act btn-del"
+                          onclick="excluirTarefa({{ t.id }}, '{{ t.nome_tarefa | replace("'","") }}')"
+                          title="Excluir tarefa">
+                    <i class="fas fa-trash-can"></i>
+                  </button>
+                </div>
               </td>
             </tr>
             {% endfor %}
@@ -139,7 +234,7 @@
       {% if not tarefas %}
       <div class="text-center py-5 text-muted" id="emptyState">
         <i class="fas fa-project-diagram fa-3x mb-3 opacity-25"></i>
-        <p class="mb-1">Nenhuma tarefa cadastrada</p>
+        <p class="mb-1 fw-semibold">Nenhuma tarefa cadastrada</p>
         <p class="small">Clique em <strong>Nova Tarefa</strong> para começar.</p>
       </div>
       {% endif %}
@@ -152,88 +247,191 @@
 
   </div>{# /cronograma-split #}
 
-</div>
+</div>{# /container #}
 
 {# ── Modal Nova Tarefa ── #}
 <div class="modal fade" id="modalNovaTarefa" tabindex="-1">
   <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Nova Tarefa</h5>
+    <div class="modal-content shadow-lg">
+      <div class="modal-header" style="background:linear-gradient(135deg,#1976d2,#42a5f5);color:#fff">
+        <h5 class="modal-title fw-semibold"><i class="fas fa-plus-circle me-2"></i>Nova Tarefa</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body p-4">
         <div class="row g-3">
           <div class="col-12">
-            <label class="form-label fw-semibold">Nome da Tarefa <span class="text-danger">*</span></label>
-            <input type="text" id="nt_nome" class="form-control" placeholder="Ex: Fundação">
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Nome da Tarefa <span class="text-danger">*</span></label>
+            <input type="text" id="nt_nome" class="form-control form-control-lg" placeholder="Ex: Fundação">
           </div>
           <div class="col-md-4">
-            <label class="form-label fw-semibold">Duração (dias úteis)</label>
-            <input type="number" id="nt_duracao" class="form-control" value="1" min="1">
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Duração (dias úteis)</label>
+            <div class="input-group">
+              <input type="number" id="nt_duracao" class="form-control" value="1" min="1">
+              <span class="input-group-text text-muted">dias</span>
+            </div>
           </div>
           <div class="col-md-4">
-            <label class="form-label fw-semibold">Data Início</label>
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Data Início</label>
             <input type="date" id="nt_inicio" class="form-control">
           </div>
           <div class="col-md-4">
-            <label class="form-label fw-semibold">Predecessora</label>
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Predecessora</label>
             <select id="nt_pred" class="form-select">
               <option value="">— Nenhuma —</option>
             </select>
           </div>
           <div class="col-md-6">
-            <label class="form-label fw-semibold">Tarefa Pai (macro)</label>
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Tarefa Pai (agrupador)</label>
             <select id="nt_pai" class="form-select">
               <option value="">— Nenhuma (tarefa raiz) —</option>
             </select>
           </div>
           <div class="col-md-3">
-            <label class="form-label fw-semibold">Quantidade</label>
-            <input type="number" id="nt_qtd" class="form-control" placeholder="ex: 250">
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Quantidade</label>
+            <input type="number" id="nt_qtd" class="form-control" placeholder="ex: 250" step="any">
           </div>
           <div class="col-md-3">
-            <label class="form-label fw-semibold">Unidade</label>
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Unidade</label>
             <input type="text" id="nt_unidade" class="form-control" placeholder="ex: m²">
           </div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-primary" onclick="salvarNovaTarefa()">
-          <i class="fas fa-save me-1"></i> Salvar
+      <div class="modal-footer bg-light border-0 gap-2">
+        <button class="btn btn-light border" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary px-4" onclick="salvarNovaTarefa()">
+          <i class="fas fa-save me-1"></i> Criar Tarefa
         </button>
       </div>
     </div>
   </div>
 </div>
 
+{# ── Offcanvas Editar Tarefa ── #}
+<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasEditar" style="width:420px">
+  <div class="offcanvas-header" style="background:linear-gradient(135deg,#37474f,#546e7a);color:#fff">
+    <h5 class="offcanvas-title fw-semibold"><i class="fas fa-pen-to-square me-2"></i>Editar Tarefa</h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body p-4">
+    <input type="hidden" id="ed_id">
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label fw-semibold small text-uppercase text-muted">Nome <span class="text-danger">*</span></label>
+        <input type="text" id="ed_nome" class="form-control form-control-lg">
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-semibold small text-uppercase text-muted">Duração</label>
+        <div class="input-group">
+          <input type="number" id="ed_duracao" class="form-control" min="1">
+          <span class="input-group-text text-muted">dias</span>
+        </div>
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-semibold small text-uppercase text-muted">% Concluído</label>
+        <div class="input-group">
+          <input type="number" id="ed_perc" class="form-control" min="0" max="100">
+          <span class="input-group-text text-muted">%</span>
+        </div>
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-semibold small text-uppercase text-muted">Data Início</label>
+        <input type="date" id="ed_inicio" class="form-control">
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-semibold small text-uppercase text-muted">Data Término</label>
+        <input type="date" id="ed_fim" class="form-control" disabled title="Calculado automaticamente pela duração">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold small text-uppercase text-muted">Predecessora</label>
+        <select id="ed_pred" class="form-select">
+          <option value="">— Nenhuma —</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold small text-uppercase text-muted">Tarefa Pai</label>
+        <select id="ed_pai" class="form-select">
+          <option value="">— Nenhuma (raiz) —</option>
+        </select>
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-semibold small text-uppercase text-muted">Quantidade</label>
+        <input type="number" id="ed_qtd" class="form-control" step="any" placeholder="ex: 250">
+      </div>
+      <div class="col-6">
+        <label class="form-label fw-semibold small text-uppercase text-muted">Unidade</label>
+        <input type="text" id="ed_unidade" class="form-control" placeholder="ex: m²">
+      </div>
+
+      {# Preview progresso #}
+      <div class="col-12 mt-1">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <small class="text-muted">Progresso atual</small>
+          <span class="fw-semibold" id="ed_perc_label">0%</span>
+        </div>
+        <div class="progress" style="height:10px;border-radius:8px">
+          <div class="progress-bar bg-primary" id="ed_perc_bar" style="width:0%;border-radius:8px"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="d-flex gap-2 mt-4 pt-3 border-top">
+      <button class="btn btn-light border flex-fill" data-bs-dismiss="offcanvas">Cancelar</button>
+      <button class="btn btn-primary flex-fill" onclick="salvarEditar()">
+        <i class="fas fa-save me-1"></i> Salvar Alterações
+      </button>
+    </div>
+
+    <div class="mt-3">
+      <button class="btn btn-outline-danger btn-sm w-100" id="ed_btn_del">
+        <i class="fas fa-trash-can me-1"></i> Excluir Tarefa
+      </button>
+    </div>
+  </div>
+</div>
+
 {# ── Toast de feedback ── #}
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index:2000">
-  <div id="feedbackToast" class="toast align-items-center text-white border-0" role="alert">
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:3000">
+  <div id="feedbackToast" class="toast align-items-center text-white border-0 shadow-lg" role="alert">
     <div class="d-flex">
-      <div class="toast-body" id="toastMsg">Operação realizada.</div>
+      <div class="toast-body fw-semibold" id="toastMsg">Operação realizada.</div>
       <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
     </div>
   </div>
 </div>
 
 <style>
+/* ── Stats Cards ── */
+.stat-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-radius: 12px; color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,.1);
+}
+.stat-card-blue   { background: linear-gradient(135deg, #1565c0, #42a5f5); }
+.stat-card-green  { background: linear-gradient(135deg, #2e7d32, #66bb6a); }
+.stat-card-orange { background: linear-gradient(135deg, #e65100, #ffa726); }
+.stat-card-purple { background: linear-gradient(135deg, #6a1b9a, #ab47bc); }
+.stat-icon { font-size: 1.6rem; opacity: .85; }
+.stat-val { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+.stat-lbl { font-size: .72rem; opacity: .85; margin-top: 2px; text-transform: uppercase; letter-spacing: .5px; }
+
 /* ── Layout ── */
 .cronograma-split {
   display: flex;
-  height: calc(100vh - 160px);
+  height: calc(100vh - 220px);
+  min-height: 420px;
   overflow: hidden;
   border: 1px solid #dee2e6;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,.06);
 }
 .cronograma-left {
-  width: 680px;
-  min-width: 480px;
+  width: 780px;
+  min-width: 540px;
   flex-shrink: 0;
   overflow: hidden;
-  border-right: 2px solid #dee2e6;
+  border-right: 2px solid #e9ecef;
   display: flex;
   flex-direction: column;
 }
@@ -245,107 +443,204 @@
 .cronograma-gantt {
   flex: 1;
   overflow: auto;
+  background: #fafbfc;
 }
+
 /* ── Tabela ── */
-.cronograma-table { font-size: .82rem; }
+.cronograma-table { font-size: .83rem; border-collapse: separate; border-spacing: 0; }
 .cronograma-thead th {
-  background: #3a3f51;
-  color: #fff;
+  background: #2c3249;
+  color: rgba(255,255,255,.88);
   font-weight: 600;
-  font-size: .78rem;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  font-size: .73rem;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  position: sticky; top: 0; z-index: 10;
   white-space: nowrap;
-  padding: 6px 8px;
+  padding: 10px 10px;
+  border-bottom: 2px solid #1a1f36;
 }
-.tarefa-row td { padding: 5px 8px; vertical-align: middle; }
-.tarefa-pai > td { background: #f0f4ff; }
-.tarefa-row:hover td { background: #eef2ff; }
-.nome-tarefa { cursor: default; }
-.nome-tarefa:hover { color: #3d5afe; }
-/* Editing */
-.cell-input { border: none; background: #fff8c5; outline: 2px solid #f0a500; padding: 2px 4px; border-radius: 3px; width: 100%; }
+
+/* Column widths */
+.th-grip  { width: 28px; }
+.th-num   { width: 36px; }
+.th-nome  { min-width: 220px; }
+.th-dur   { width: 68px; text-align: center; }
+.th-date  { width: 92px; text-align: center; }
+.th-pred  { width: 70px; text-align: center; }
+.th-perc  { width: 130px; }
+.th-qty   { width: 90px; text-align: center; }
+.th-act   { width: 64px; }
+
+/* Row cells */
+.tarefa-row td { padding: 8px 10px; vertical-align: middle; border-bottom: 1px solid #f0f2f5; }
+.tarefa-row:last-child td { border-bottom: none; }
+.tarefa-pai > td { background: #f4f7ff !important; }
+.tarefa-pai .nome-tarefa { color: #1565c0; }
+.tarefa-row:hover td { background: #f0f5ff; }
+.row-done td { background: #f0fdf4 !important; }
+.row-wip  td { background: #fffbf0 !important; }
+.row-done:hover td { background: #dcfce7 !important; }
+.row-wip:hover  td { background: #fef3c7 !important; }
+
+/* Cells */
+.td-grip  { padding: 0 6px !important; }
+.td-num   { color: #adb5bd; font-size: .75rem; text-align: center; }
+.td-center { text-align: center; }
+.td-perc  { padding-right: 14px !important; }
+.td-actions { padding: 4px 8px !important; }
+
+/* Drag handle */
+.drag-handle { cursor: grab; color: #ccc; padding: 2px 4px; display: flex; align-items: center; }
+.drag-handle:hover { color: #666; }
+
+/* Toggle button */
+.btn-toggle {
+  background: none; border: none; padding: 0; cursor: pointer;
+  width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+  color: #f59e0b; flex-shrink: 0;
+}
+.btn-toggle:hover { color: #d97706; }
+.toggle-placeholder { width: 18px; flex-shrink: 0; }
+
+/* Nome */
+.nome-tarefa { cursor: default; transition: color .15s; }
+.nome-tarefa:hover { color: #1976d2; }
+
+/* Duration badge */
+.badge-dur {
+  display: inline-block; background: #e8f0fe; color: #1565c0;
+  border-radius: 6px; padding: 2px 8px; font-size: .78rem; font-weight: 600;
+  cursor: default; white-space: nowrap;
+}
+.badge-dur:hover { background: #c7d7fa; }
+
+/* Date chip */
+.date-chip {
+  display: inline-block; background: #f4f4f6; border-radius: 5px;
+  padding: 2px 7px; font-size: .78rem; color: #444; cursor: default;
+  white-space: nowrap;
+}
+.date-chip:hover { background: #e2e8ff; color: #1976d2; }
+
+/* Quantity chip */
+.qty-chip {
+  display: inline-block; background: #f0fdf4; color: #166534;
+  border-radius: 5px; padding: 2px 7px; font-size: .78rem; font-weight: 500;
+}
+
+/* Progress in table */
+.perc-wrapper {
+  display: flex; align-items: center; gap: 8px;
+  cursor: default; padding: 2px 0;
+}
+.perc-bar-wrap {
+  flex: 1; height: 8px; background: #e9ecef; border-radius: 6px; overflow: hidden;
+}
+.perc-bar-fill { height: 100%; border-radius: 6px; transition: width .3s; }
+.fill-done { background: linear-gradient(90deg,#22c55e,#16a34a); }
+.fill-good { background: linear-gradient(90deg,#3b82f6,#1d4ed8); }
+.fill-mid  { background: linear-gradient(90deg,#f59e0b,#d97706); }
+.fill-low  { background: linear-gradient(90deg,#ef4444,#dc2626); }
+.perc-text { font-size: .75rem; font-weight: 700; color: #333; min-width: 30px; text-align: right; }
+
+/* Pred badge */
+.pred-val .badge { font-size: .72rem; }
+
+/* Action buttons */
+.actions-wrap { display: flex; gap: 4px; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s; }
+.tarefa-row:hover .actions-wrap { opacity: 1; }
+.btn-act {
+  background: none; border: none; padding: 4px 6px; border-radius: 5px;
+  cursor: pointer; font-size: .8rem; transition: background .15s, color .15s;
+}
+.btn-edit { color: #1976d2; }
+.btn-edit:hover { background: #e3f0ff; color: #1565c0; }
+.btn-del  { color: #d32f2f; }
+.btn-del:hover  { background: #fde8e8; color: #b71c1c; }
+
+/* Inline edit inputs */
+.cell-input {
+  border: none; background: #fffde7;
+  outline: 2px solid #f0a500; padding: 2px 6px;
+  border-radius: 4px; width: 100%; font-size: inherit;
+}
+.cell-input-date { max-width: 130px; }
+
 /* ── Gantt ── */
-#ganttContainer {
-  min-width: 100%;
-  user-select: none;
-}
-.gantt-header-months { display: flex; background: #3a3f51; color: #fff; font-size: .72rem; }
-.gantt-header-days   { display: flex; background: #4a4f63; color: #ccc; font-size: .68rem; border-bottom: 1px solid #dee2e6; }
-.gantt-month-cell { text-align: center; padding: 4px 0; border-right: 1px solid #555; font-weight: 600; }
-.gantt-day-cell   { text-align: center; padding: 2px 0; border-right: 1px solid #555; flex-shrink: 0; }
-.gantt-row { display: flex; align-items: center; height: 31px; border-bottom: 1px solid #f0f0f0; position: relative; }
+#ganttContainer { min-width: 100%; user-select: none; }
+.gantt-header-months { display: flex; background: #2c3249; color: #fff; font-size: .72rem; }
+.gantt-header-days   { display: flex; background: #3a4060; color: #b0b8c8; font-size: .68rem; border-bottom: 1px solid #dee2e6; }
+.gantt-month-cell { text-align: center; padding: 5px 0; border-right: 1px solid #4a5070; font-weight: 600; }
+.gantt-day-cell   { text-align: center; padding: 3px 0; border-right: 1px solid #4a5070; flex-shrink: 0; }
+.gantt-day-weekend { color: #f59e0b !important; }
+.gantt-row { display: flex; align-items: center; height: 37px; border-bottom: 1px solid #f0f2f5; position: relative; }
 .gantt-row:hover { background: #f5f8ff; }
-.gantt-row-pai { background: #f0f4ff; }
+.gantt-row-pai { background: #f4f7ff; }
+.gantt-row-done { background: #f0fdf4; }
 .gantt-bar {
-  position: absolute;
-  height: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  border-radius: 3px;
-  opacity: .85;
-  min-width: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.2);
-  overflow: hidden;
+  position: absolute; height: 20px; top: 50%; transform: translateY(-50%);
+  border-radius: 5px; opacity: .9; min-width: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,.18); overflow: hidden; cursor: grab;
+  transition: opacity .1s;
 }
-.gantt-bar-pai  { background: #ff9800; height: 12px; }
-.gantt-bar-leaf { background: #1976d2; }
-.gantt-progress { height: 100%; background: rgba(255,255,255,.35); }
+.gantt-bar.dragging { cursor: grabbing; opacity: .65; box-shadow: 0 4px 14px rgba(0,0,0,.3); z-index: 20; }
+.gantt-bar-pai  { background: linear-gradient(90deg,#f59e0b,#fb923c); height: 14px; border-radius: 3px; }
+.gantt-bar-leaf { background: linear-gradient(90deg,#1976d2,#42a5f5); }
+.gantt-bar-done { background: linear-gradient(90deg,#16a34a,#22c55e); }
+.gantt-bar-low  { background: linear-gradient(90deg,#ef4444,#f87171); }
+.gantt-progress { height: 100%; background: rgba(255,255,255,.3); }
+.gantt-bar-label {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  font-size: .6rem; color: rgba(255,255,255,.9); font-weight: 700;
+  white-space: nowrap; pointer-events: none;
+}
 .gantt-today { position: absolute; top: 0; bottom: 0; width: 2px; background: #e53935; z-index: 5; pointer-events: none; }
-/* ── Drag & Drop ── */
-.gantt-bar { cursor: grab; transition: opacity .1s; }
-.gantt-bar.dragging { cursor: grabbing; opacity: .6; box-shadow: 0 4px 12px rgba(0,0,0,.35); z-index: 20; }
-.gantt-row.drag-over { background: #ddeeff !important; }
+.gantt-today::before {
+  content: 'hoje'; position: absolute; top: 2px; left: 3px;
+  font-size: .6rem; color: #e53935; font-weight: 700; white-space: nowrap;
+}
+/* Row drag */
 .tarefa-row.dragging-row { opacity: .45; background: #fff3cd !important; }
 .tarefa-row.drag-over-row { border-top: 2px solid #1976d2; }
-.drag-handle { cursor: grab; padding: 0 4px; color: #aaa; user-select: none; }
-.drag-handle:hover { color: #555; }
+.gantt-row.drag-over { background: #ddeeff !important; }
+
+/* Offcanvas progress preview */
+#ed_perc { accent-color: #1976d2; }
 </style>
 
 <script>
-const OBRA_ID   = {{ obra.id }};
-const URL_BASE  = '/cronograma/obra/' + OBRA_ID;
-const DAY_W     = 26;   // px por dia
+const OBRA_ID  = {{ obra.id }};
+const URL_BASE = '/cronograma/obra/' + OBRA_ID;
+const DAY_W    = 26;
 
-// ── Dados iniciais do servidor ──
 let tarefas = {{ tarefas_dict | tojson }};
 
-// ── Toast helper ──
+// ── Toast ──
 function toast(msg, tipo='success') {
   const el = document.getElementById('feedbackToast');
-  el.className = `toast align-items-center text-white border-0 bg-${tipo === 'error' ? 'danger' : tipo}`;
+  el.className = `toast align-items-center text-white border-0 shadow-lg bg-${tipo === 'error' ? 'danger' : tipo === 'warning' ? 'warning text-dark' : tipo}`;
   document.getElementById('toastMsg').textContent = msg;
-  bootstrap.Toast.getOrCreateInstance(el, {delay: 2500}).show();
+  bootstrap.Toast.getOrCreateInstance(el, {delay: 2800}).show();
 }
 
-// ── Sincronizar scroll vertical ──
+// ── Sync scroll ──
 function syncScroll() {
   const left = document.getElementById('leftScroll');
   const right = document.getElementById('ganttPane');
-  let syncing = false;
-  left.addEventListener('scroll', () => {
-    if (syncing) return; syncing = true;
-    right.scrollTop = left.scrollTop; syncing = false;
-  });
-  right.addEventListener('scroll', () => {
-    if (syncing) return; syncing = true;
-    left.scrollTop = right.scrollTop; syncing = false;
-  });
+  let sync = false;
+  left.addEventListener('scroll', () => { if (sync) return; sync = true; right.scrollTop = left.scrollTop; sync = false; });
+  right.addEventListener('scroll', () => { if (sync) return; sync = true; left.scrollTop = right.scrollTop; sync = false; });
 }
 
-// ── Expand/collapse filhas ──
+// ── Toggle filhas ──
 function toggleFilhas(paiId) {
-  const rows  = document.querySelectorAll(`[data-pai="${paiId}"]`);
-  const icon  = document.getElementById(`icon-${paiId}`);
-  const btn   = icon?.closest('.toggle-btn');
+  const rows = document.querySelectorAll(`[data-pai="${paiId}"]`);
+  const icon = document.getElementById(`icon-${paiId}`);
+  const btn  = icon?.closest('.toggle-btn');
   const expanded = btn?.dataset.expanded === 'true';
   rows.forEach(r => r.classList.toggle('d-none', expanded));
-  if (icon) {
-    icon.className = expanded
-      ? 'fas fa-chevron-right fa-xs text-warning'
-      : 'fas fa-chevron-down fa-xs text-warning';
-  }
+  if (icon) icon.className = expanded ? 'fas fa-chevron-right fa-xs' : 'fas fa-chevron-down fa-xs';
   if (btn) btn.dataset.expanded = String(!expanded);
 }
 
@@ -353,105 +648,140 @@ function toggleFilhas(paiId) {
 function iniciarEdicao(el, tarefaId, campo) {
   if (el.querySelector('input, select')) return;
   let raw = el.textContent.trim();
-  if (campo === 'duracao_dias') raw = raw.replace('d','');
+  if (campo === 'duracao_dias') raw = raw.replace('d', '').trim();
+  if (campo === 'percentual_concluido') raw = raw.replace('%', '').trim();
   if (raw === '—') raw = '';
 
-  // Para predecessora_id: usar select com lista de tarefas
   if (campo === 'predecessora_id') {
+    // Select dropdown
     const sel = document.createElement('select');
-    sel.className = 'form-select form-select-sm cell-input';
-    sel.style.cssText = 'width:auto;min-width:120px;font-size:inherit';
-
-    const optNone = document.createElement('option');
-    optNone.value = '';
-    optNone.textContent = '— Nenhuma —';
-    sel.appendChild(optNone);
-
+    sel.className = 'cell-input';
+    sel.style.cssText = 'width:auto;min-width:130px';
+    sel.innerHTML = '<option value="">— Nenhuma —</option>';
     tarefas.filter(t => t.id !== tarefaId).forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.id;
-      opt.textContent = `#${t.id} ${t.nome_tarefa.substring(0,25)}`;
-      if (String(t.id) === raw) opt.selected = true;
+      opt.textContent = `#${t.id} ${t.nome_tarefa.substring(0, 22)}`;
+      const tarefa = tarefas.find(x => x.id === tarefaId);
+      if (tarefa && String(t.id) === String(tarefa.predecessora_id)) opt.selected = true;
       sel.appendChild(opt);
     });
-
     el.innerHTML = '';
     el.appendChild(sel);
     sel.focus();
-
-    let selCommitted = false;
-    const commitSel = async () => {
-      if (selCommitted) return;
-      selCommitted = true;
+    let done = false;
+    const commit = async () => {
+      if (done) return; done = true;
       const val = sel.value;
-      if (val === raw) { restaurarCelula(el, campo, raw); return; }
-      await salvarCampo(tarefaId, campo, val, el, raw);
+      const tarefa = tarefas.find(t => t.id === tarefaId);
+      const oldVal = tarefa ? String(tarefa.predecessora_id || '') : '';
+      if (val === oldVal) { restaurarCelulaPred(el, tarefaId); return; }
+      await salvarCampo(tarefaId, campo, val, el, oldVal);
     };
-    sel.addEventListener('change', commitSel);
-    sel.addEventListener('blur', () => { if (!selCommitted) restaurarCelula(el, campo, raw); });
+    sel.addEventListener('change', commit);
+    sel.addEventListener('blur', () => { if (!done) { done = true; restaurarCelulaPred(el, tarefaId); } });
     sel.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { selCommitted = true; el.blur(); restaurarCelula(el, campo, raw); }
+      if (e.key === 'Escape') { done = true; restaurarCelulaPred(el, tarefaId); }
     });
     return;
   }
 
-  const input = document.createElement('input');
-  input.type = campo === 'nome_tarefa' ? 'text' : 'number';
-  input.value = raw;
-  input.className = 'cell-input';
-  input.style.cssText = 'width:90%;font-size:inherit';
-  el.innerHTML = '';
-  el.appendChild(input);
-  input.focus();
-  input.select();
+  if (campo === 'data_inicio') {
+    const inp = document.createElement('input');
+    inp.type = 'date'; inp.className = 'cell-input cell-input-date';
+    const tarefa = tarefas.find(t => t.id === tarefaId);
+    inp.value = tarefa ? tarefa.data_inicio || '' : '';
+    el.innerHTML = ''; el.appendChild(inp); inp.focus();
+    let done = false;
+    const commit = async () => {
+      if (done) return; done = true;
+      const val = inp.value;
+      if (!val || val === (tarefa ? tarefa.data_inicio : '')) { restaurarCelulaDate(el, tarefaId, 'inicio'); return; }
+      await salvarCampo(tarefaId, campo, val, el, '');
+    };
+    inp.addEventListener('blur', commit);
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+      if (e.key === 'Escape') { done = true; restaurarCelulaDate(el, tarefaId, 'inicio'); }
+    });
+    return;
+  }
 
+  // Text / number input
+  const inp = document.createElement('input');
+  inp.type = campo === 'nome_tarefa' ? 'text' : 'number';
+  if (campo === 'percentual_concluido') { inp.min = 0; inp.max = 100; }
+  if (campo === 'duracao_dias') { inp.min = 1; }
+  inp.value = raw;
+  inp.className = 'cell-input';
+  inp.style.cssText = `width:${campo === 'nome_tarefa' ? '95%' : '70px'};font-size:inherit`;
+  el.innerHTML = ''; el.appendChild(inp); inp.focus(); inp.select();
   const commit = async () => {
-    const val = input.value.trim();
-    if (val === raw) { restaurarCelula(el, campo, raw); return; }
+    const val = inp.value.trim();
+    if (val === raw) { restaurarCelula(el, campo, raw, tarefaId); return; }
     await salvarCampo(tarefaId, campo, val, el, raw);
   };
-  input.addEventListener('blur', commit);
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-    if (e.key === 'Escape') { restaurarCelula(el, campo, raw); }
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape') { restaurarCelula(el, campo, raw, tarefaId); }
   });
 }
 
-function restaurarCelula(el, campo, val) {
-  el.textContent = campo === 'duracao_dias' ? val+'d' : (val || '—');
+function restaurarCelula(el, campo, val, tarefaId) {
+  const tarefa = tarefas.find(t => t.id === tarefaId);
+  if (campo === 'duracao_dias') el.textContent = (tarefa ? tarefa.duracao_dias : val) + 'd';
+  else if (campo === 'percentual_concluido') el.textContent = (tarefa ? Math.round(tarefa.percentual_concluido || 0) : val) + '%';
+  else el.textContent = val || '—';
+}
+function restaurarCelulaPred(el, tarefaId) {
+  const tarefa = tarefas.find(t => t.id === tarefaId);
+  const pid = tarefa ? tarefa.predecessora_id : null;
+  el.innerHTML = pid ? `<span class="badge bg-light text-secondary border">#${pid}</span>` : '—';
+}
+function restaurarCelulaDate(el, tarefaId, tipo) {
+  const tarefa = tarefas.find(t => t.id === tarefaId);
+  const d = tipo === 'inicio' ? (tarefa ? tarefa.data_inicio : null) : (tarefa ? tarefa.data_fim : null);
+  el.textContent = d ? formatDate(d) : '—';
 }
 
 async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
   try {
     const body = {};
-    body[campo] = campo === 'nome_tarefa' ? valor : (valor === '' ? null : Number(valor));
+    if (campo === 'nome_tarefa') body[campo] = valor;
+    else if (campo === 'data_inicio') body[campo] = valor || null;
+    else body[campo] = valor === '' ? null : Number(valor);
+
     const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}`, {
-      method: 'PUT',
-      headers: {'Content-Type':'application/json'},
+      method: 'PUT', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body),
     });
     const data = await res.json();
     if (data.status === 'ok') {
-      const t = data.tarefa;
-      // Se o backend devolveu a lista completa (após recalc em cadeia), usar diretamente
       if (data.tarefas && data.tarefas.length) {
         tarefas = data.tarefas;
-        data.tarefas.forEach(tt => updateTarefaLocal(tt));
+        data.tarefas.forEach(t => updateTarefaLocal(t));
         renderGantt();
       } else {
-        updateTarefaLocal(t);
-        if (campo === 'duracao_dias' || campo === 'predecessora_id') {
+        updateTarefaLocal(data.tarefa);
+        if (['duracao_dias', 'predecessora_id', 'data_inicio'].includes(campo)) {
           await recalcularTudo(false);
         }
       }
-      restaurarCelula(el, campo, campo === 'duracao_dias' ? t.duracao_dias : (t[campo] ?? ''));
-      toast(campo === 'nome_tarefa' ? 'Nome atualizado' : 'Valor atualizado');
+      // Restaurar célula com valor atualizado
+      const t = tarefas.find(x => x.id === tarefaId);
+      if (campo === 'nome_tarefa') el.textContent = t ? t.nome_tarefa : valor;
+      else if (campo === 'duracao_dias') el.textContent = (t ? t.duracao_dias : valor) + 'd';
+      else if (campo === 'percentual_concluido') el.textContent = Math.round(t ? t.percentual_concluido || 0 : valor) + '%';
+      else if (campo === 'data_inicio') el.textContent = t && t.data_inicio ? formatDate(t.data_inicio) : '—';
+      else if (campo === 'predecessora_id') restaurarCelulaPred(el, tarefaId);
+      toast(campo === 'nome_tarefa' ? 'Nome atualizado' : 'Campo atualizado');
     } else {
-      restaurarCelula(el, campo, oldRaw);
+      restaurarCelula(el, campo, oldRaw, tarefaId);
       toast(data.msg || 'Erro ao salvar', 'error');
     }
   } catch(e) {
-    restaurarCelula(el, campo, oldRaw);
+    restaurarCelula(el, campo, oldRaw, tarefaId);
     toast('Erro de rede', 'error');
   }
 }
@@ -459,20 +789,32 @@ async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
 function updateTarefaLocal(t) {
   const idx = tarefas.findIndex(x => x.id === t.id);
   if (idx >= 0) tarefas[idx] = t;
-  // Update row cells
   const row = document.querySelector(`[data-id="${t.id}"]`);
   if (!row) return;
-  const ini = row.querySelector('.inicio-val');
-  const fim = row.querySelector('.fim-val');
+
+  const ini  = row.querySelector('.inicio-val');
+  const fim  = row.querySelector('.fim-val');
   const pred = row.querySelector('.pred-val');
   const perc = row.querySelector('.perc-val');
+  const dur  = row.querySelector('.dur-val');
+
   if (ini) ini.textContent = t.data_inicio ? formatDate(t.data_inicio) : '—';
   if (fim) fim.textContent = t.data_fim ? formatDate(t.data_fim) : '—';
-  if (pred) pred.textContent = t.predecessora_id || '—';
-  if (perc) perc.innerHTML = buildPercCell(t.percentual_concluido || 0);
+  if (pred) pred.innerHTML = t.predecessora_id
+    ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>`
+    : '—';
+  if (perc) perc.innerHTML = buildPercCell(t.percentual_concluido || 0, t.id);
+  if (dur)  dur.textContent = t.duracao_dias + 'd';
+
   row.dataset.inicio = t.data_inicio || '';
-  row.dataset.fim = t.data_fim || '';
-  row.dataset.perc = t.percentual_concluido || 0;
+  row.dataset.fim    = t.data_fim    || '';
+  row.dataset.perc   = t.percentual_concluido || 0;
+
+  // Row color
+  const p = Math.round(t.percentual_concluido || 0);
+  row.classList.remove('row-done','row-wip');
+  if (p >= 100) row.classList.add('row-done');
+  else if (p > 0) row.classList.add('row-wip');
 }
 
 function formatDate(iso) {
@@ -481,18 +823,18 @@ function formatDate(iso) {
   return `${d}/${m}/${y.slice(2)}`;
 }
 
-function buildPercCell(perc) {
+function buildPercCell(perc, tarefaId) {
   const p = Math.round(perc || 0);
-  const color = p >= 75 ? 'bg-success' : p >= 40 ? 'bg-primary' : 'bg-warning';
-  return `<div class="d-flex align-items-center gap-1">
-    <div class="progress flex-grow-1" style="height:5px;border-radius:4px">
-      <div class="progress-bar ${color}" style="width:${p}%"></div>
+  const fill = p >= 100 ? 'fill-done' : p >= 60 ? 'fill-good' : p >= 30 ? 'fill-mid' : 'fill-low';
+  return `<div class="perc-wrapper" ondblclick="iniciarEdicao(this.querySelector('.perc-text'),${tarefaId},'percentual_concluido')" title="Duplo-clique para editar">
+    <div class="perc-bar-wrap">
+      <div class="perc-bar-fill ${fill}" style="width:${p}%"></div>
     </div>
-    <span style="font-size:.7rem;min-width:26px;color:#333">${p}%</span>
+    <span class="perc-text">${p}%</span>
   </div>`;
 }
 
-// ── Recalcular tudo ──
+// ── Recalcular ──
 async function recalcularTudo(showToast=true) {
   const btn = document.getElementById('btnRecalcular');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>'; }
@@ -503,23 +845,23 @@ async function recalcularTudo(showToast=true) {
       tarefas = data.tarefas;
       data.tarefas.forEach(t => updateTarefaLocal(t));
       renderGantt();
-      if (showToast) toast('Cronograma recalculado com sucesso');
+      if (showToast) toast('Cronograma recalculado');
     } else {
       if (showToast) toast(data.msg || 'Erro ao recalcular', 'error');
     }
   } catch(e) {
-    if (showToast) toast('Erro de rede ao recalcular', 'error');
+    if (showToast) toast('Erro de rede', 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Recalcular'; }
   }
 }
 
-// ── Nova tarefa ──
-function _popularSelect(selectId, lista, placeholder) {
-  const sel = document.getElementById(selectId);
+// ── Modal Nova Tarefa ──
+function _popularSelect(id, lista, placeholder, excluirId=null) {
+  const sel = document.getElementById(id);
   if (!sel) return;
   sel.innerHTML = `<option value="">${placeholder}</option>`;
-  lista.forEach(t => {
+  lista.filter(t => !excluirId || t.id !== excluirId).forEach(t => {
     const opt = document.createElement('option');
     opt.value = t.id;
     opt.textContent = `#${t.id} — ${t.nome_tarefa}`;
@@ -533,28 +875,22 @@ function abrirModalNovaTarefa() {
   document.getElementById('nt_inicio').value = new Date().toISOString().slice(0,10);
   document.getElementById('nt_qtd').value = '';
   document.getElementById('nt_unidade').value = '';
-
-  // Popula dropdowns com tarefas existentes da obra
   _popularSelect('nt_pred', tarefas, '— Nenhuma —');
   _popularSelect('nt_pai',  tarefas, '— Nenhuma (tarefa raiz) —');
 
-  // Ao selecionar predecessora: limpa data início para o backend calcular próx. dia útil
   const predSel = document.getElementById('nt_pred');
-  const inicioInp = document.getElementById('nt_inicio');
-  predSel.onchange = function() {
+  predSel.onchange = () => {
     if (predSel.value) {
-      // Buscar data_fim da predecessora no array local
-      const predTarefa = tarefas.find(t => String(t.id) === String(predSel.value));
-      if (predTarefa && predTarefa.data_fim) {
-        // Sugerir data_fim + 1 dia como referência (backend corrige para dia útil)
-        const df = new Date(predTarefa.data_fim + 'T00:00:00');
+      const pred = tarefas.find(t => String(t.id) === predSel.value);
+      if (pred && pred.data_fim) {
+        const df = new Date(pred.data_fim + 'T00:00:00');
         df.setDate(df.getDate() + 1);
-        inicioInp.value = df.toISOString().slice(0, 10);
+        document.getElementById('nt_inicio').value = df.toISOString().slice(0,10);
       } else {
-        inicioInp.value = ''; // backend calcula
+        document.getElementById('nt_inicio').value = '';
       }
     } else {
-      inicioInp.value = new Date().toISOString().slice(0, 10);
+      document.getElementById('nt_inicio').value = new Date().toISOString().slice(0,10);
     }
   };
 
@@ -565,18 +901,17 @@ async function salvarNovaTarefa() {
   const nome = document.getElementById('nt_nome').value.trim();
   if (!nome) { toast('Informe o nome da tarefa', 'warning'); return; }
   const body = {
-    nome_tarefa: nome,
-    duracao_dias: parseInt(document.getElementById('nt_duracao').value) || 1,
-    data_inicio: document.getElementById('nt_inicio').value || null,
-    predecessora_id: document.getElementById('nt_pred').value || null,
-    tarefa_pai_id: document.getElementById('nt_pai').value || null,
+    nome_tarefa:      nome,
+    duracao_dias:     parseInt(document.getElementById('nt_duracao').value) || 1,
+    data_inicio:      document.getElementById('nt_inicio').value || null,
+    predecessora_id:  document.getElementById('nt_pred').value || null,
+    tarefa_pai_id:    document.getElementById('nt_pai').value || null,
     quantidade_total: document.getElementById('nt_qtd').value || null,
-    unidade_medida: document.getElementById('nt_unidade').value.trim() || null,
+    unidade_medida:   document.getElementById('nt_unidade').value.trim() || null,
   };
   try {
     const res = await fetch(`${URL_BASE}/tarefa`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body),
     });
     const data = await res.json();
@@ -585,54 +920,142 @@ async function salvarNovaTarefa() {
       tarefas.push(data.tarefa);
       adicionarLinhaTabela(data.tarefa);
       renderGantt();
-      toast('Tarefa criada com sucesso');
+      toast('Tarefa criada com sucesso', 'success');
       document.getElementById('emptyState')?.remove();
     } else {
       toast(data.msg || 'Erro ao criar tarefa', 'error');
     }
-  } catch(e) {
-    toast('Erro de rede', 'error');
-  }
+  } catch(e) { toast('Erro de rede', 'error'); }
 }
 
+// ── Offcanvas Editar ──
+function abrirEditar(tarefaId) {
+  const t = tarefas.find(x => x.id === tarefaId);
+  if (!t) return;
+
+  document.getElementById('ed_id').value      = t.id;
+  document.getElementById('ed_nome').value     = t.nome_tarefa;
+  document.getElementById('ed_duracao').value  = t.duracao_dias;
+  document.getElementById('ed_perc').value     = Math.round(t.percentual_concluido || 0);
+  document.getElementById('ed_inicio').value   = t.data_inicio || '';
+  document.getElementById('ed_fim').value      = t.data_fim || '';
+  document.getElementById('ed_qtd').value      = t.quantidade_total || '';
+  document.getElementById('ed_unidade').value  = t.unidade_medida || '';
+
+  _popularSelect('ed_pred', tarefas, '— Nenhuma —', tarefaId);
+  _popularSelect('ed_pai',  tarefas, '— Nenhuma (raiz) —', tarefaId);
+
+  const predSel = document.getElementById('ed_pred');
+  const paiSel  = document.getElementById('ed_pai');
+  Array.from(predSel.options).forEach(o => { if (String(o.value) === String(t.predecessora_id)) o.selected = true; });
+  Array.from(paiSel.options).forEach(o => { if (String(o.value) === String(t.tarefa_pai_id)) o.selected = true; });
+
+  // Progress preview
+  atualizarPercPreview();
+  document.getElementById('ed_perc').oninput = atualizarPercPreview;
+
+  // Delete button
+  document.getElementById('ed_btn_del').onclick = () => {
+    bootstrap.Offcanvas.getInstance(document.getElementById('offcanvasEditar'))?.hide();
+    excluirTarefa(t.id, t.nome_tarefa);
+  };
+
+  bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('offcanvasEditar')).show();
+}
+
+function atualizarPercPreview() {
+  const p = Math.min(100, Math.max(0, parseInt(document.getElementById('ed_perc').value) || 0));
+  document.getElementById('ed_perc_label').textContent = p + '%';
+  const bar = document.getElementById('ed_perc_bar');
+  bar.style.width = p + '%';
+  bar.className = 'progress-bar ' + (p >= 100 ? 'bg-success' : p >= 60 ? 'bg-primary' : p >= 30 ? 'bg-warning' : 'bg-danger');
+}
+
+async function salvarEditar() {
+  const id = parseInt(document.getElementById('ed_id').value);
+  const body = {
+    nome_tarefa:       document.getElementById('ed_nome').value.trim(),
+    duracao_dias:      parseInt(document.getElementById('ed_duracao').value) || 1,
+    percentual_concluido: parseFloat(document.getElementById('ed_perc').value) || 0,
+    data_inicio:       document.getElementById('ed_inicio').value || null,
+    predecessora_id:   document.getElementById('ed_pred').value || null,
+    tarefa_pai_id:     document.getElementById('ed_pai').value || null,
+    quantidade_total:  document.getElementById('ed_qtd').value || null,
+    unidade_medida:    document.getElementById('ed_unidade').value.trim() || null,
+  };
+  if (!body.nome_tarefa) { toast('Nome da tarefa obrigatório', 'warning'); return; }
+
+  try {
+    const res = await fetch(`${URL_BASE}/tarefa/${id}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('offcanvasEditar')).hide();
+      if (data.tarefas && data.tarefas.length) {
+        tarefas = data.tarefas;
+        data.tarefas.forEach(t => updateTarefaLocal(t));
+      } else {
+        updateTarefaLocal(data.tarefa);
+      }
+      // NÃO chama recalcularTudo aqui — o PUT já recalcula no backend e retorna tarefas atualizadas.
+      // Chamar recalcularTudo sobrescreveria o percentual_concluido com dados do RDO.
+      renderGantt();
+      toast('Tarefa atualizada com sucesso');
+    } else {
+      toast(data.msg || 'Erro ao salvar', 'error');
+    }
+  } catch(e) { toast('Erro de rede', 'error'); }
+}
+
+// ── Adicionar linha ──
 function adicionarLinhaTabela(t) {
-  const paiIdsSet = new Set(tarefas.filter(x=>x.tarefa_pai_id).map(x=>x.tarefa_pai_id));
+  const paiIdsSet = new Set(tarefas.filter(x => x.tarefa_pai_id).map(x => x.tarefa_pai_id));
   const isPai = paiIdsSet.has(t.id);
+  const p = Math.round(t.percentual_concluido || 0);
+  const ind = t.tarefa_pai_id ? '22px' : '0';
   const row = document.createElement('tr');
-  row.className = `tarefa-row${isPai?' tarefa-pai':''}${t.tarefa_pai_id?' tarefa-filho':''}`;
-  row.dataset.id = t.id;
-  row.dataset.pai = t.tarefa_pai_id || '';
-  row.dataset.perc = t.percentual_concluido || 0;
+  row.className = `tarefa-row${isPai ? ' tarefa-pai' : ''}${t.tarefa_pai_id ? ' tarefa-filho' : ''}`;
+  row.dataset.id    = t.id;
+  row.dataset.pai   = t.tarefa_pai_id || '';
+  row.dataset.perc  = p;
   row.dataset.inicio = t.data_inicio || '';
-  row.dataset.fim = t.data_fim || '';
+  row.dataset.fim    = t.data_fim    || '';
   row.draggable = true;
-  const ind = t.tarefa_pai_id ? '20px' : '0';
+
+  const qtdHtml = t.quantidade_total
+    ? `<span class="qty-chip">${Number.isInteger(t.quantidade_total) ? t.quantidade_total : t.quantidade_total.toFixed(1)} ${t.unidade_medida || ''}</span>`
+    : '—';
+
   row.innerHTML = `
-    <td class="text-center p-1"><span class="drag-handle" title="Arraste para reordenar"><i class="fas fa-grip-vertical fa-xs"></i></span></td>
-    <td class="text-muted small text-center">—</td>
-    <td class="text-center"><i class="fas fa-tasks fa-xs text-secondary"></i></td>
+    <td class="td-grip"><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span></td>
+    <td class="td-num text-muted">—</td>
     <td class="nome-cell">
-      <div class="d-flex align-items-center" style="padding-left:${ind}">
-        <span class="me-1" style="width:16px;display:inline-block"></span>
-        <span class="nome-tarefa" ondblclick="iniciarEdicao(this,${t.id},'nome_tarefa')">${t.nome_tarefa}</span>
+      <div class="d-flex align-items-center gap-1" style="padding-left:${ind}">
+        <span class="toggle-placeholder"></span>
+        <span class="nome-tarefa" ondblclick="iniciarEdicao(this,${t.id},'nome_tarefa')" title="Duplo-clique para editar">${t.nome_tarefa}</span>
       </div>
     </td>
-    <td class="text-center"><span class="dur-val" ondblclick="iniciarEdicao(this,${t.id},'duracao_dias')">${t.duracao_dias}d</span></td>
-    <td class="text-center small inicio-val">${t.data_inicio?formatDate(t.data_inicio):'—'}</td>
-    <td class="text-center small fim-val">${t.data_fim?formatDate(t.data_fim):'—'}</td>
-    <td class="text-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')">${t.predecessora_id||'—'}</span></td>
-    <td class="text-center small perc-val">${buildPercCell(t.percentual_concluido||0)}</td>
-    <td class="text-center">
-      <button class="btn btn-link btn-sm p-0 text-danger" onclick="excluirTarefa(${t.id},'${t.nome_tarefa.replace(/'/g,'')}')" title="Excluir">
-        <i class="fas fa-times fa-xs"></i>
-      </button>
+    <td class="td-center"><span class="badge-dur dur-val" ondblclick="iniciarEdicao(this,${t.id},'duracao_dias')" title="Duplo-clique para editar">${t.duracao_dias}d</span></td>
+    <td class="td-center small"><span class="date-chip inicio-val" ondblclick="iniciarEdicao(this,${t.id},'data_inicio')" title="Duplo-clique para editar">${t.data_inicio ? formatDate(t.data_inicio) : '—'}</span></td>
+    <td class="td-center small"><span class="date-chip fim-val">${t.data_fim ? formatDate(t.data_fim) : '—'}</span></td>
+    <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${t.predecessora_id ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>` : '—'}</span></td>
+    <td class="td-perc perc-val">${buildPercCell(p, t.id)}</td>
+    <td class="td-center small text-muted">${qtdHtml}</td>
+    <td class="td-actions">
+      <div class="actions-wrap">
+        <button class="btn-act btn-edit" onclick="abrirEditar(${t.id})" title="Editar"><i class="fas fa-pen-to-square"></i></button>
+        <button class="btn-act btn-del" onclick="excluirTarefa(${t.id},'${t.nome_tarefa.replace(/'/g,'')}')" title="Excluir"><i class="fas fa-trash-can"></i></button>
+      </div>
     </td>`;
+
   document.getElementById('tarefasBody').appendChild(row);
 }
 
-// ── Excluir tarefa ──
+// ── Excluir ──
 async function excluirTarefa(id, nome) {
-  if (!confirm(`Excluir "${nome}"?`)) return;
+  if (!confirm(`Excluir a tarefa "${nome}"?\nEsta ação não pode ser desfeita.`)) return;
   try {
     const res = await fetch(`${URL_BASE}/tarefa/${id}`, { method: 'DELETE' });
     const data = await res.json();
@@ -644,13 +1067,11 @@ async function excluirTarefa(id, nome) {
     } else {
       toast(data.msg || 'Erro ao excluir', 'error');
     }
-  } catch(e) {
-    toast('Erro de rede', 'error');
-  }
+  } catch(e) { toast('Erro de rede', 'error'); }
 }
 
-// ── Gantt Bar Drag (horizontal = mover data) ──
-let ganttDrag = null;  // { barEl, rowEl, tarefaId, startX, origLeft, origW, dMin }
+// ── Gantt Bar Drag ──
+let ganttDrag = null;
 
 function initGanttBarDrag(barEl, tarefaId, dMin) {
   barEl.addEventListener('mousedown', e => {
@@ -669,8 +1090,7 @@ document.addEventListener('mousemove', e => {
   if (!ganttDrag) return;
   const ganttPane = document.getElementById('ganttPane');
   const dx = (e.clientX + ganttPane.scrollLeft) - ganttDrag.startX;
-  const newLeft = Math.max(0, ganttDrag.origLeft + dx);
-  ganttDrag.barEl.style.left = newLeft + 'px';
+  ganttDrag.barEl.style.left = Math.max(0, ganttDrag.origLeft + dx) + 'px';
 });
 
 document.addEventListener('mouseup', async e => {
@@ -682,20 +1102,17 @@ document.addEventListener('mouseup', async e => {
   ganttDrag = null;
   barEl.classList.remove('dragging');
   document.body.style.cursor = '';
-
   if (daysDelta === 0) return;
 
   const tarefa = tarefas.find(t => t.id === tarefaId);
   if (!tarefa || !tarefa.data_inicio) return;
-
   const d = new Date(tarefa.data_inicio + 'T00:00:00');
   d.setDate(d.getDate() + daysDelta);
   const newInicio = d.toISOString().slice(0, 10);
 
   try {
     const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}`, {
-      method: 'PUT',
-      headers: {'Content-Type':'application/json'},
+      method: 'PUT', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ data_inicio: newInicio }),
     });
     const data = await res.json();
@@ -707,11 +1124,10 @@ document.addEventListener('mouseup', async e => {
         updateTarefaLocal(data.tarefa);
       }
       renderGantt();
-      toast('Tarefa movida — datas atualizadas');
+      toast('Tarefa movida');
     } else {
-      // Reverter barra
       barEl.style.left = origLeft + 'px';
-      toast(data.msg || 'Erro ao mover tarefa', 'error');
+      toast(data.msg || 'Erro ao mover', 'error');
     }
   } catch(err) {
     barEl.style.left = origLeft + 'px';
@@ -719,73 +1135,83 @@ document.addEventListener('mouseup', async e => {
   }
 });
 
-// ── renderGantt (com suporte a drag de barras) ──
+// ── renderGantt ──
 function renderGantt() {
   const container = document.getElementById('ganttContainer');
   const tarefasVisiveis = tarefas.filter(t => t.data_inicio && t.data_fim);
-  if (!tarefasVisiveis.length) { container.innerHTML = '<p class="text-muted small p-3">Sem datas para exibir no Gantt.</p>'; return; }
+  if (!tarefasVisiveis.length) {
+    container.innerHTML = '<p class="text-muted small p-4 text-center"><i class="fas fa-chart-gantt fa-2x mb-2 d-block opacity-25"></i>Sem datas para exibir no Gantt.</p>';
+    return;
+  }
 
   const tMin = tarefasVisiveis.reduce((a,b) => a.data_inicio < b.data_inicio ? a : b).data_inicio;
   const tMax = tarefasVisiveis.reduce((a,b) => a.data_fim > b.data_fim ? a : b).data_fim;
   const dMin = new Date(tMin + 'T00:00:00');
   const dMax = new Date(tMax + 'T00:00:00');
   dMin.setDate(dMin.getDate() - 2);
-  dMax.setDate(dMax.getDate() + 5);
+  dMax.setDate(dMax.getDate() + 6);
 
   const totalDays = Math.round((dMax - dMin) / 86400000) + 1;
-  const totalW = totalDays * DAY_W;
+  const totalW    = totalDays * DAY_W;
 
+  // Month headers
   const months = [];
   let cur = new Date(dMin);
   while (cur <= dMax) {
     const y = cur.getFullYear(), m = cur.getMonth();
-    const label = cur.toLocaleDateString('pt-BR', {month:'short', year:'2-digit'});
-    const daysInMonth = new Date(y, m+1, 0).getDate();
-    const startDay = new Date(y, m, 1);
-    const endDay   = new Date(y, m, daysInMonth);
-    const s = Math.max(startDay, dMin), e2 = Math.min(endDay, dMax);
-    const span = Math.round((e2 - s) / 86400000) + 1;
-    months.push({ label, span });
+    const label = cur.toLocaleDateString('pt-BR', { month:'short', year:'2-digit' });
+    const s = Math.max(new Date(y, m, 1), dMin);
+    const e2 = Math.min(new Date(y, m+1, 0), dMax);
+    months.push({ label, span: Math.round((e2 - s) / 86400000) + 1 });
     cur = new Date(y, m+1, 1);
   }
-
-  let monthHtml = months.map(m =>
+  const monthHtml = months.map(m =>
     `<div class="gantt-month-cell" style="width:${m.span*DAY_W}px;min-width:${m.span*DAY_W}px">${m.label}</div>`
   ).join('');
 
+  // Day headers
   let dayHtml = '';
   for (let i=0; i<totalDays; i++) {
-    const d = new Date(dMin); d.setDate(d.getDate()+i);
-    const wd = d.getDay();
-    const wk = wd===0||wd===6;
-    dayHtml += `<div class="gantt-day-cell${wk?' text-warning':''}" style="width:${DAY_W}px;min-width:${DAY_W}px">${d.getDate()}</div>`;
+    const d = new Date(dMin); d.setDate(d.getDate() + i);
+    const wk = d.getDay() === 0 || d.getDay() === 6;
+    dayHtml += `<div class="gantt-day-cell${wk ? ' gantt-day-weekend' : ''}" style="width:${DAY_W}px;min-width:${DAY_W}px">${d.getDate()}</div>`;
   }
 
   const todayD = new Date(); todayD.setHours(0,0,0,0);
   const todayOffset = Math.round((todayD - dMin) / 86400000);
-  const todayLeft = todayOffset * DAY_W;
+  const todayLeft   = todayOffset * DAY_W;
 
-  const paiIdsSet = new Set(tarefas.filter(t=>t.tarefa_pai_id).map(t=>t.tarefa_pai_id));
+  const paiIdsSet = new Set(tarefas.filter(t => t.tarefa_pai_id).map(t => t.tarefa_pai_id));
+
   let rowHtml = '';
   tarefas.forEach(t => {
-    const rowClass = paiIdsSet.has(t.id) ? 'gantt-row-pai' : '';
+    const isPai = paiIdsSet.has(t.id);
+    const perc  = Math.round(t.percentual_concluido || 0);
+    let rowClass = '';
+    if (isPai) rowClass = 'gantt-row-pai';
+    else if (perc >= 100) rowClass = 'gantt-row-done';
+
     let barHtml = '';
     if (t.data_inicio && t.data_fim) {
-      const dI = new Date(t.data_inicio+'T00:00:00');
-      const dF = new Date(t.data_fim+'T00:00:00');
+      const dI = new Date(t.data_inicio + 'T00:00:00');
+      const dF = new Date(t.data_fim    + 'T00:00:00');
       const leftPx = Math.round((dI - dMin) / 86400000) * DAY_W;
       const widPx  = (Math.round((dF - dI) / 86400000) + 1) * DAY_W;
-      const isPai = paiIdsSet.has(t.id);
-      const barClass = isPai ? 'gantt-bar-pai' : 'gantt-bar-leaf';
-      const perc = t.percentual_concluido || 0;
-      const progW = Math.round(perc/100*widPx);
-      barHtml = `<div class="gantt-bar ${barClass}" data-tarefa-id="${t.id}" style="left:${leftPx}px;width:${widPx}px" title="${t.nome_tarefa} (${perc}%) — arraste para mover">
+      const progW  = Math.round(perc / 100 * widPx);
+      const barClass = isPai ? 'gantt-bar-pai' : perc >= 100 ? 'gantt-bar-done' : perc < 20 ? 'gantt-bar-low' : 'gantt-bar-leaf';
+      barHtml = `<div class="gantt-bar ${barClass}" data-tarefa-id="${t.id}"
+        style="left:${leftPx}px;width:${widPx}px"
+        title="${t.nome_tarefa} — ${perc}% — ${formatDate(t.data_inicio)} → ${formatDate(t.data_fim)}">
         <div class="gantt-progress" style="width:${progW}px"></div>
+        ${widPx > 60 ? `<span class="gantt-bar-label">${perc}%</span>` : ''}
       </div>`;
     }
+
+    const todayMarker = (todayLeft >= 0 && todayLeft <= totalW)
+      ? `<div class="gantt-today" style="left:${todayLeft}px"></div>` : '';
+
     rowHtml += `<div class="gantt-row ${rowClass}" data-id="${t.id}" style="width:${totalW}px;min-width:${totalW}px">
-      ${todayLeft>=0&&todayLeft<=totalW?'<div class="gantt-today" style="left:'+todayLeft+'px"></div>':''}
-      ${barHtml}
+      ${todayMarker}${barHtml}
     </div>`;
   });
 
@@ -796,15 +1222,14 @@ function renderGantt() {
       <div id="ganttRows">${rowHtml}</div>
     </div>`;
 
-  // Bind drag to every bar
+  // Bind drag
   container.querySelectorAll('.gantt-bar[data-tarefa-id]').forEach(barEl => {
-    const tid = parseInt(barEl.dataset.tarefaId);
-    initGanttBarDrag(barEl, tid, dMin);
+    initGanttBarDrag(barEl, parseInt(barEl.dataset.tarefaId), dMin);
   });
 }
 
-// ── Row Drag & Drop (reordenar tarefas) ──
-let rowDrag = null;   // { el, startIdx }
+// ── Row Drag & Drop ──
+let rowDrag = null;
 
 function initRowDrag() {
   const tbody = document.getElementById('tarefasBody');
@@ -816,17 +1241,13 @@ function initRowDrag() {
     rowDrag = { el: row, id: parseInt(row.dataset.id) };
     row.classList.add('dragging-row');
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', row.dataset.id);
   });
 
   tbody.addEventListener('dragover', e => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
     const row = e.target.closest('.tarefa-row');
     tbody.querySelectorAll('.drag-over-row').forEach(r => r.classList.remove('drag-over-row'));
-    if (row && rowDrag && row !== rowDrag.el) {
-      row.classList.add('drag-over-row');
-    }
+    if (row && rowDrag && row !== rowDrag.el) row.classList.add('drag-over-row');
   });
 
   tbody.addEventListener('dragleave', e => {
@@ -837,57 +1258,42 @@ function initRowDrag() {
   tbody.addEventListener('drop', async e => {
     e.preventDefault();
     const targetRow = e.target.closest('.tarefa-row');
-    if (!rowDrag || !targetRow || targetRow === rowDrag.el) {
-      cleanupRowDrag();
-      return;
-    }
+    if (!rowDrag || !targetRow || targetRow === rowDrag.el) { cleanupRowDrag(); return; }
 
-    // Reorder DOM
     const rows = Array.from(tbody.querySelectorAll('.tarefa-row'));
-    const fromIdx = rows.indexOf(rowDrag.el);
-    const toIdx   = rows.indexOf(targetRow);
-    if (fromIdx < toIdx) {
-      targetRow.after(rowDrag.el);
-    } else {
-      targetRow.before(rowDrag.el);
-    }
+    if (rows.indexOf(rowDrag.el) < rows.indexOf(targetRow)) targetRow.after(rowDrag.el);
+    else targetRow.before(rowDrag.el);
 
     cleanupRowDrag();
-
-    // Collect new order
     const newOrder = Array.from(tbody.querySelectorAll('.tarefa-row')).map(r => parseInt(r.dataset.id));
 
     try {
       const res = await fetch(`${URL_BASE}/reordenar`, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ ordem: newOrder }),
       });
       const data = await res.json();
       if (data.status === 'ok') {
-        // Update local tarefas array order
         const byId = Object.fromEntries(tarefas.map(t => [t.id, t]));
         tarefas = newOrder.map(id => byId[id]).filter(Boolean);
         renderGantt();
-        toast('Ordem das tarefas salva');
+        toast('Ordem salva');
       } else {
         toast('Erro ao salvar ordem', 'error');
       }
-    } catch(err) {
-      toast('Erro de rede ao reordenar', 'error');
-    }
+    } catch(err) { toast('Erro de rede', 'error'); }
   });
 
   tbody.addEventListener('dragend', cleanupRowDrag);
 }
 
 function cleanupRowDrag() {
-  if (rowDrag) { rowDrag.el.classList.remove('dragging-row'); }
+  if (rowDrag) rowDrag.el.classList.remove('dragging-row');
   document.querySelectorAll('.drag-over-row').forEach(r => r.classList.remove('drag-over-row'));
   rowDrag = null;
 }
 
-// ── Inicialização ──
+// ── Init ──
 document.addEventListener('DOMContentLoaded', () => {
   renderGantt();
   syncScroll();
