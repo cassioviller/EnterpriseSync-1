@@ -15,7 +15,7 @@ from sqlalchemy import func
 
 from app import db
 from models import (GestaoCustoPai, GestaoCustoFilho,
-                    FluxoCaixa, Obra, TipoUsuario)
+                    FluxoCaixa, Obra, TipoUsuario, ContaPagar, Fornecedor)
 from utils.tenant import is_v2_active
 
 logger = logging.getLogger(__name__)
@@ -73,6 +73,7 @@ STATUS_BADGES = {
     'PENDENTE':   'secondary',
     'SOLICITADO': 'warning',
     'AUTORIZADO': 'success',
+    'PARCIAL':    'info',
     'PAGO':       'primary',
     'RECUSADO':   'danger',
 }
@@ -157,6 +158,7 @@ def novo():
         return err
 
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(Fornecedor.nome).all()
     today = date.today().strftime('%Y-%m-%d')
 
     if request.method == 'POST':
@@ -169,19 +171,33 @@ def novo():
             data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date() if data_ref_str else date.today()
             obra_id = request.form.get('obra_id', type=int)
 
-            # Campos extras para DESPESA_GERAL
+            # Campos opcionais para todos os tipos
             data_venc_str = request.form.get('data_vencimento', '').strip()
             data_venc = datetime.strptime(data_venc_str, '%Y-%m-%d').date() if data_venc_str else None
             numero_doc = request.form.get('numero_documento', '').strip() or None
+            fornecedor_id = request.form.get('fornecedor_id', type=int)
+            forma_pagamento = request.form.get('forma_pagamento', '').strip() or None
+            data_emissao_str = request.form.get('data_emissao', '').strip()
+            data_emissao = datetime.strptime(data_emissao_str, '%Y-%m-%d').date() if data_emissao_str else None
+            numero_parcela = request.form.get('numero_parcela', type=int) or 1
+            total_parcelas = request.form.get('total_parcelas', type=int) or 1
+            conta_contabil = request.form.get('conta_contabil_codigo', '').strip() or None
 
             if not entidade_nome or valor <= 0:
                 flash('Entidade e valor são obrigatórios.', 'warning')
                 return render_template('custos/gestao.html',
                                        modo='novo', obras=obras,
+                                       fornecedores=fornecedores,
                                        categoria_labels=CATEGORIA_LABELS,
                                        categorias_grupos=CATEGORIAS_GRUPOS,
                                        status_badges=STATUS_BADGES,
                                        registros=[], resumo={})
+
+            # Sincronizar entidade_nome com fornecedor se selecionado
+            if fornecedor_id:
+                forn = Fornecedor.query.get(fornecedor_id)
+                if forn and not entidade_nome:
+                    entidade_nome = forn.nome
 
             pai = GestaoCustoPai(
                 admin_id=admin_id,
@@ -189,9 +205,17 @@ def novo():
                 entidade_nome=entidade_nome,
                 entidade_id=None,
                 valor_total=valor,
+                valor_pago=Decimal('0'),
+                saldo=valor,
                 status='PENDENTE',
                 data_vencimento=data_venc,
                 numero_documento=numero_doc,
+                fornecedor_id=fornecedor_id,
+                forma_pagamento=forma_pagamento,
+                data_emissao=data_emissao,
+                numero_parcela=numero_parcela,
+                total_parcelas=total_parcelas,
+                conta_contabil_codigo=conta_contabil,
             )
             db.session.add(pai)
             db.session.flush()
@@ -218,6 +242,7 @@ def novo():
         'custos/gestao.html',
         modo='novo',
         obras=obras,
+        fornecedores=fornecedores,
         today=today,
         categoria_labels=CATEGORIA_LABELS,
         categorias_grupos=CATEGORIAS_GRUPOS,
@@ -271,8 +296,8 @@ def solicitar(pai_id):
 
     pai = GestaoCustoPai.query.filter_by(id=pai_id, admin_id=admin_id).first_or_404()
 
-    if pai.status != 'PENDENTE':
-        flash('Apenas registros PENDENTES podem ser solicitados.', 'warning')
+    if pai.status not in ('PENDENTE', 'PARCIAL'):
+        flash('Apenas registros PENDENTES ou PARCIAIS podem ser solicitados.', 'warning')
         return redirect(url_for('gestao_custos.index'))
 
     try:
@@ -350,12 +375,26 @@ def pagar(pai_id):
         data_pgto = (datetime.strptime(data_pgto_str, '%Y-%m-%d').date()
                      if data_pgto_str else date.today())
         conta = request.form.get('conta_bancaria', '').strip()
-        valor_pago = Decimal(str(request.form.get('valor_pago', '') or pai.valor_solicitado or pai.valor_total)
-                             .replace(',', '.'))
+
+        # Valor autorizado (solicitado ou total)
+        valor_autorizado = Decimal(str(pai.valor_solicitado or pai.valor_total))
+        valor_pago_str = request.form.get('valor_pago', '').replace(',', '.')
+        valor_pago_agora = Decimal(valor_pago_str) if valor_pago_str else valor_autorizado
+
+        # Acumular pagamentos parciais
+        valor_pago_anterior = Decimal(str(pai.valor_pago or 0))
+        novo_valor_pago = valor_pago_anterior + valor_pago_agora
+        novo_saldo = Decimal(str(pai.valor_total)) - novo_valor_pago
+
+        # Determinar status após pagamento
+        if novo_saldo <= Decimal('0.01'):
+            novo_status = 'PAGO'
+            novo_saldo = Decimal('0')
+        else:
+            novo_status = 'PARCIAL'
 
         # Mapear categoria → categoria FluxoCaixa
         cat_mapa = {
-            # Novas categorias
             'MATERIAL':           'custo_obra',
             'MAO_OBRA_DIRETA':    'salario',
             'EQUIPAMENTO':        'custo_obra',
@@ -369,7 +408,6 @@ def pagar(pai_id):
             'TRIBUTOS':           'custo_obra',
             'DESPESA_FINANCEIRA': 'custo_obra',
             'OUTROS':             'custo_obra',
-            # Categorias legadas
             'SALARIO':            'salario',
             'VEICULO':            'custo_obra',
             'COMPRA':             'custo_obra',
@@ -379,13 +417,13 @@ def pagar(pai_id):
         cat_fc = cat_mapa.get(pai.tipo_categoria, 'custo_obra')
         label = CATEGORIA_LABELS.get(pai.tipo_categoria, ('Custo',))[0]
 
-        # Criar FluxoCaixa
+        # Criar FluxoCaixa para o valor pago agora
         fc = FluxoCaixa(
             admin_id=admin_id,
             data_movimento=data_pgto,
             tipo_movimento='SAIDA',
             categoria=cat_fc,
-            valor=float(valor_pago),
+            valor=float(valor_pago_agora),
             descricao=f'{label} — {pai.entidade_nome}',
             referencia_id=pai.id,
             referencia_tabela='gestao_custo_pai',
@@ -394,10 +432,13 @@ def pagar(pai_id):
         db.session.add(fc)
         db.session.flush()
 
-        pai.status = 'PAGO'
-        pai.data_pagamento = data_pgto
+        pai.status = novo_status
+        pai.valor_pago = novo_valor_pago
+        pai.saldo = novo_saldo
+        if novo_status == 'PAGO':
+            pai.data_pagamento = data_pgto
+            pai.fluxo_caixa_id = fc.id
         pai.conta_bancaria = conta
-        pai.fluxo_caixa_id = fc.id
         db.session.commit()
 
         # Lançamento contábil (opcional, V2)
@@ -406,14 +447,21 @@ def pagar(pai_id):
             gerar_lancamento_contabil_automatico(
                 admin_id=admin_id,
                 tipo_operacao='DESPESA_GERAL',
-                valor=float(valor_pago),
+                valor=float(valor_pago_agora),
                 data=data_pgto,
                 descricao=f'{label} — {pai.entidade_nome}',
             )
         except Exception as e_cont:
             logger.warning(f"[WARN] Lançamento contábil falhou (não crítico): {e_cont}")
 
-        flash(f'Pagamento de R$ {valor_pago:,.2f} efetivado e registrado no Fluxo de Caixa.', 'success')
+        if novo_status == 'PAGO':
+            flash(f'Pagamento total de R$ {valor_pago_agora:,.2f} efetivado. Saldo zerado.', 'success')
+        else:
+            flash(
+                f'Pagamento parcial de R$ {valor_pago_agora:,.2f} registrado. '
+                f'Saldo restante: R$ {novo_saldo:,.2f}',
+                'info'
+            )
     except Exception as e:
         db.session.rollback()
         logger.error(f"[ERROR] efetivar pagamento: {e}", exc_info=True)
@@ -445,5 +493,120 @@ def excluir(pai_id):
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao excluir: {e}', 'danger')
+
+    return redirect(url_for('gestao_custos.index'))
+
+
+# ─────────────────────────────────────────────
+# MIGRAÇÃO: ContaPagar → GestaoCustoPai
+# ─────────────────────────────────────────────
+@gestao_custos_bp.route('/migrar-contas-pagar', methods=['POST'])
+@login_required
+def migrar_contas_pagar():
+    """
+    Migra registros ContaPagar PENDENTE/PARCIAL para GestaoCustoPai.
+    Registros já PAGO são mantidos em ContaPagar como histórico.
+    Idempotente: não duplica registros já migrados.
+    """
+    admin_id, err = _check_v2()
+    if err:
+        return err
+
+    migrados = 0
+    ignorados = 0
+    erros = 0
+
+    try:
+        contas = ContaPagar.query.filter(
+            ContaPagar.admin_id == admin_id,
+            ContaPagar.status.in_(['PENDENTE', 'PARCIAL'])
+        ).all()
+
+        for conta in contas:
+            # Verificar se já foi migrado pela referência de origem (idempotente)
+            existente = GestaoCustoFilho.query.filter_by(
+                admin_id=admin_id,
+                origem_tabela='conta_pagar',
+                origem_id=conta.id,
+            ).first()
+            if existente:
+                ignorados += 1
+                continue
+
+            try:
+                from models import Fornecedor as _Forn
+                forn_nome = conta.descricao or f"Conta #{conta.id}"
+                forn_id = conta.fornecedor_id
+                if forn_id:
+                    _forn = _Forn.query.get(forn_id)
+                    if _forn:
+                        forn_nome = _forn.razao_social or _forn.nome or forn_nome
+
+                # Mapear categorias por origem_tipo ou por heurística de descrição
+                _ORIGEM_CAT_MAP = {
+                    'COMPRA': 'MATERIAL',
+                    'FOLHA':  'MAO_OBRA_DIRETA',
+                    'RDO':    'MAO_OBRA_DIRETA',
+                }
+                origem_tipo = getattr(conta, 'origem_tipo', None) or ''
+                tipo_cat = _ORIGEM_CAT_MAP.get(origem_tipo.upper(), 'OUTROS')
+                # Fallback por descrição
+                if tipo_cat == 'OUTROS' and conta.descricao:
+                    desc_lower = conta.descricao.lower()
+                    if any(k in desc_lower for k in ('material', 'compra', 'nf ', 'fornec')):
+                        tipo_cat = 'MATERIAL'
+                    elif any(k in desc_lower for k in ('salário', 'salario', 'folha', 'funcionário')):
+                        tipo_cat = 'MAO_OBRA_DIRETA'
+
+                # Status mapping: PENDENTE → PENDENTE, PARCIAL → SOLICITADO
+                status_gcp = 'PENDENTE' if conta.status == 'PENDENTE' else 'SOLICITADO'
+                valor_original = float(conta.valor_original or 0)
+                valor_pago_cp = float(conta.valor_pago or 0)
+                saldo_cp = float(conta.saldo or (valor_original - valor_pago_cp))
+
+                gcp = GestaoCustoPai(
+                    admin_id=admin_id,
+                    tipo_categoria=tipo_cat,
+                    entidade_nome=forn_nome,
+                    entidade_id=forn_id,
+                    fornecedor_id=forn_id,
+                    valor_total=valor_original,
+                    valor_pago=valor_pago_cp,
+                    saldo=saldo_cp,
+                    status=status_gcp,
+                    data_emissao=conta.data_emissao,
+                    data_vencimento=conta.data_vencimento,
+                    numero_documento=conta.numero_documento or str(conta.id),
+                    observacoes=f"[Migrado de ContaPagar #{conta.id}] {conta.descricao or ''}",
+                )
+                db.session.add(gcp)
+                db.session.flush()
+
+                gcf = GestaoCustoFilho(
+                    pai_id=gcp.id,
+                    admin_id=admin_id,
+                    data_referencia=conta.data_vencimento or date.today(),
+                    descricao=conta.descricao or f"Conta a pagar #{conta.id}",
+                    valor=saldo_cp,
+                    obra_id=conta.obra_id if hasattr(conta, 'obra_id') else None,
+                    origem_tabela='conta_pagar',
+                    origem_id=conta.id,
+                )
+                db.session.add(gcf)
+                migrados += 1
+            except Exception as _e:
+                logger.error(f"Erro ao migrar ContaPagar #{conta.id}: {_e}")
+                erros += 1
+
+        db.session.commit()
+        flash(
+            f'Migração concluída: {migrados} registro(s) migrado(s), '
+            f'{ignorados} já existia(m), {erros} erro(s).',
+            'success' if erros == 0 else 'warning'
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro na migração ContaPagar→GestaoCusto: {e}")
+        flash(f'Erro durante migração: {e}', 'danger')
 
     return redirect(url_for('gestao_custos.index'))

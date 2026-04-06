@@ -203,188 +203,155 @@ def lancar_custo_material_obra(data: dict, admin_id: int):
 @event_handler('material_entrada')
 def criar_conta_pagar_entrada_material(data: dict, admin_id: int):
     """
-    Handler: Criar conta a pagar quando material entra no estoque com fornecedor
-    
-    Fluxo:
-    1. Buscar movimento de almoxarifado
-    2. Verificar se tem fornecedor_id
-    3. Calcular valor_total (quantidade * valor_unitario)
-    4. Verificar se NF já tem conta criada (evitar duplicação)
-    5. Criar ContaPagar automaticamente
-    
+    Handler: Registrar GestaoCustoPai quando material entra no estoque com fornecedor.
+    ContaPagar foi descontinuado; este handler agora usa GestaoCustoPai como fonte única.
+
     Args:
         data: {movimento_id: int, item_id: int, fornecedor_id: int}
         admin_id: ID do tenant
     """
     try:
-        from models import db, AlmoxarifadoMovimento, ContaPagar, Fornecedor, AlmoxarifadoItem
+        from models import (db, AlmoxarifadoMovimento, Fornecedor, AlmoxarifadoItem,
+                            GestaoCustoPai, GestaoCustoFilho)
         from datetime import datetime, timedelta
         from decimal import Decimal
-        
+
         movimento_id = data.get('movimento_id')
-        
+
         if not movimento_id:
-            logger.warning(f"⚠️ movimento_id não fornecido no evento material_entrada")
+            logger.warning("⚠️ movimento_id não fornecido no evento material_entrada")
             return
-        
-        # Buscar movimento com validação multi-tenant
+
         movimento = AlmoxarifadoMovimento.query.filter_by(
             id=movimento_id,
             admin_id=admin_id,
             tipo_movimento='ENTRADA'
         ).first()
-        
+
         if not movimento:
             logger.error(f"❌ Movimento {movimento_id} não encontrado ou tipo incorreto")
             return
-        
-        # CRÍTICO: Validar se tem fornecedor
+
         if not movimento.fornecedor_id:
-            logger.info(f"⏭️ Movimento {movimento_id}: sem fornecedor, conta a pagar não criada")
+            logger.info(f"⏭️ Movimento {movimento_id}: sem fornecedor, GestaoCusto não criado")
             return
-        
-        # Calcular valor total
+
         quantidade = float(movimento.quantidade or 0)
         valor_unitario = float(movimento.valor_unitario or 0)
         valor_total = Decimal(str(quantidade * valor_unitario))
-        
+
         if valor_total <= 0:
-            logger.warning(f"⚠️ Movimento {movimento_id}: valor zerado, conta não criada")
+            logger.warning(f"⚠️ Movimento {movimento_id}: valor zerado, GestaoCusto não criado")
             return
-        
-        # EVITAR DUPLICAÇÃO: Verificar se NF já tem conta
-        if movimento.nota_fiscal:
-            conta_existente = ContaPagar.query.filter_by(
-                admin_id=admin_id,
-                fornecedor_id=movimento.fornecedor_id,
-                numero_documento=movimento.nota_fiscal
-            ).first()
-            
-            if conta_existente:
-                logger.info(f"⏭️ Conta a pagar já existe para NF {movimento.nota_fiscal} (ID: {conta_existente.id})")
-                return
-        
-        # ✅ Buscar fornecedor com validação multi-tenant
+
+        # Evitar duplicação: verificar se já existe GestaoCustoPai para este movimento
+        existente = GestaoCustoFilho.query.filter_by(
+            origem_tabela='almoxarifado_movimento',
+            origem_id=movimento_id,
+            admin_id=admin_id,
+        ).first()
+        if existente:
+            logger.info(f"⏭️ GestaoCusto já existe para movimento {movimento_id}")
+            return
+
         fornecedor = Fornecedor.query.filter_by(
             id=movimento.fornecedor_id,
             admin_id=admin_id
         ).first()
-        
         if not fornecedor:
-            logger.error(f"❌ Fornecedor {movimento.fornecedor_id} não encontrado ou não pertence ao tenant {admin_id}")
+            logger.error(f"❌ Fornecedor {movimento.fornecedor_id} não encontrado para admin {admin_id}")
             return
-        
+
         item = AlmoxarifadoItem.query.get(movimento.item_id)
-        
-        # ✅ VERIFICAR se conta contábil existe antes de criar ContaPagar
-        from models import PlanoContas
-        conta_contabil = PlanoContas.query.filter_by(
-            codigo='2.1.01.001',
-            admin_id=admin_id
-        ).first()
-        
-        if not conta_contabil:
-            logger.warning(f"⚠️ Conta contábil 2.1.01.001 não encontrada para admin {admin_id}. ContaPagar será criada sem vinculação contábil.")
-        
-        # Criar conta a pagar (com ou sem conta contábil)
-        conta = ContaPagar(
+        item_nome = item.nome if item else 'Material'
+        data_mov = movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date()
+        data_venc = data_mov + timedelta(days=30)
+        nf = movimento.nota_fiscal or f"MOV-{movimento_id}"
+
+        gcp = GestaoCustoPai(
             admin_id=admin_id,
-            fornecedor_id=movimento.fornecedor_id,
-            numero_documento=movimento.nota_fiscal or f"MOV-{movimento_id}",
-            descricao=f"Compra de materiais - {item.nome if item else 'Material'} (Movimento #{movimento_id})",
-            valor_original=valor_total,
-            valor_pago=Decimal('0'),
+            tipo_categoria='MATERIAL',
+            entidade_nome=fornecedor.razao_social or fornecedor.nome,
+            entidade_id=fornecedor.id,
+            fornecedor_id=fornecedor.id,
+            valor_total=valor_total,
+            valor_pago=0,
             saldo=valor_total,
-            data_emissao=movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date(),
-            data_vencimento=(movimento.data_movimento + timedelta(days=30)).date() if movimento.data_movimento else (datetime.now() + timedelta(days=30)).date(),
             status='PENDENTE',
-            conta_contabil_codigo='2.1.01.001' if conta_contabil else None
+            data_emissao=data_mov,
+            data_vencimento=data_venc,
+            numero_documento=nf,
+            numero_parcela=1,
+            total_parcelas=1,
+            observacoes=f"Entrada almoxarifado: {item_nome} (Movimento #{movimento_id})",
         )
-        
-        db.session.add(conta)
+        db.session.add(gcp)
+        db.session.flush()
+
+        gcf = GestaoCustoFilho(
+            pai_id=gcp.id,
+            admin_id=admin_id,
+            data_referencia=data_mov,
+            descricao=f"Entrada de material - {item_nome} (Movimento #{movimento_id})",
+            valor=valor_total,
+            origem_tabela='almoxarifado_movimento',
+            origem_id=movimento_id,
+        )
+        db.session.add(gcf)
         db.session.commit()
-        
-        logger.info(f"✅ Conta a pagar criada: ID {conta.id} - R$ {valor_total} - Fornecedor: {fornecedor.razao_social if fornecedor else movimento.fornecedor_id}")
-        
-        # ✅ NOVO: Criar lançamento contábil (partidas dobradas) - COM VALIDAÇÃO DE CONTAS
+
+        logger.info(f"✅ GestaoCustoPai COMPRA criado (ID {gcp.id}) para movimento {movimento_id} - R$ {valor_total}")
+
+        # Lançamento contábil automático
         try:
             from models import LancamentoContabil, PartidaContabil, PlanoContas
             from sqlalchemy import func
-            
-            # ✅ VALIDAR se as contas contábeis existem ANTES de criar lançamentos
-            conta_estoque = PlanoContas.query.filter_by(
-                codigo='1.1.05.001',  # Estoque de Materiais
-                admin_id=admin_id
-            ).first()
-            
-            conta_fornecedores = PlanoContas.query.filter_by(
-                codigo='2.1.01.001',  # Fornecedores a Pagar
-                admin_id=admin_id
-            ).first()
-            
+
+            conta_estoque = PlanoContas.query.filter_by(codigo='1.1.05.001', admin_id=admin_id).first()
+            conta_fornecedores = PlanoContas.query.filter_by(codigo='2.1.01.001', admin_id=admin_id).first()
+
             if not conta_estoque or not conta_fornecedores:
-                contas_faltando = []
-                if not conta_estoque:
-                    contas_faltando.append('1.1.05.001 (Estoque de Materiais)')
-                if not conta_fornecedores:
-                    contas_faltando.append('2.1.01.001 (Fornecedores a Pagar)')
-                
-                logger.warning(f"⚠️ Lançamento contábil NÃO criado para movimento {movimento_id}: Contas contábeis não configuradas: {', '.join(contas_faltando)}")
-                logger.warning(f"⚠️ ContaPagar foi criada (ID {conta.id}), mas sem lançamento contábil. Configure o plano de contas para habilitar integração contábil.")
+                logger.warning(f"⚠️ Contas contábeis não configuradas — lançamento não criado para movimento {movimento_id}")
             else:
-                # Gerar número sequencial do lançamento
                 ultimo_numero = db.session.query(func.max(LancamentoContabil.numero)).filter_by(admin_id=admin_id).scalar()
                 numero_lancamento = (ultimo_numero + 1) if ultimo_numero else 1
-                
-                # Criar lançamento principal
+
                 lancamento = LancamentoContabil(
                     admin_id=admin_id,
                     numero=numero_lancamento,
-                    data_lancamento=movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date(),
-                    historico=f"Entrada de material - {item.nome if item else 'Material'} (Movimento #{movimento_id})",
+                    data_lancamento=data_mov,
+                    historico=f"Entrada de material - {item_nome} (Movimento #{movimento_id})",
                     origem='ALMOXARIFADO_ENTRADA',
                     origem_id=movimento_id,
                     valor_total=valor_total
                 )
                 db.session.add(lancamento)
-                db.session.flush()  # Gera lancamento.id
-                
-                # PARTIDA 1: DÉBITO - Estoque de Materiais (Ativo)
-                partida_debito = PartidaContabil(
-                    admin_id=admin_id,
-                    lancamento_id=lancamento.id,
-                    conta_codigo='1.1.05.001',  # Estoque de Materiais
-                    tipo_partida='DEBITO',
+                db.session.flush()
+
+                db.session.add(PartidaContabil(
+                    admin_id=admin_id, lancamento_id=lancamento.id,
+                    conta_codigo='1.1.05.001', tipo_partida='DEBITO',
                     valor=valor_total,
-                    historico_complementar=f"Entrada de material - {item.nome if item else 'Material'}",
+                    historico_complementar=f"Entrada de material - {item_nome}",
                     sequencia=1
-                )
-                db.session.add(partida_debito)
-                
-                # PARTIDA 2: CRÉDITO - Fornecedores a Pagar (Passivo)
-                partida_credito = PartidaContabil(
-                    admin_id=admin_id,
-                    lancamento_id=lancamento.id,
-                    conta_codigo='2.1.01.001',  # Fornecedores a Pagar
-                    tipo_partida='CREDITO',
+                ))
+                db.session.add(PartidaContabil(
+                    admin_id=admin_id, lancamento_id=lancamento.id,
+                    conta_codigo='2.1.01.001', tipo_partida='CREDITO',
                     valor=valor_total,
-                    historico_complementar=f"Compra de material - Fornecedor: {fornecedor.razao_social if fornecedor else movimento.fornecedor_id}",
+                    historico_complementar=f"Compra de material - {fornecedor.razao_social or fornecedor.nome}",
                     sequencia=2
-                )
-                db.session.add(partida_credito)
-                
+                ))
                 db.session.commit()
-                logger.info(f"✅ Lançamento contábil criado: ID {lancamento.id} (#{numero_lancamento}) - D: 1.1.05.001 / C: 2.1.01.001 - R$ {valor_total}")
-            
+                logger.info(f"✅ Lançamento contábil #{numero_lancamento} criado para movimento {movimento_id}")
+
         except Exception as e:
             db.session.rollback()
-            logger.error(f"❌ Erro ao criar lançamento contábil entrada: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-        
+            logger.error(f"❌ Erro ao criar lançamento contábil entrada: {e}")
+
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Erro ao criar conta a pagar para movimento {data.get('movimento_id')}: {str(e)}")
+        logger.error(f"❌ Erro ao processar evento material_entrada para movimento {data.get('movimento_id')}: {e}")
         import traceback
         logger.error(traceback.format_exc())
 
@@ -620,9 +587,14 @@ def lancar_custo_combustivel(data: dict, admin_id: int):
 
 @event_handler('rdo_finalizado')
 def lancar_custos_rdo(data: dict, admin_id: int):
-    """Handler: Lançar custos de mão de obra quando RDO é finalizado"""
+    """Handler: Lançar custos de mão de obra quando RDO é finalizado.
+    
+    Cria CustoObra (rastreamento operacional) e GestaoCustoPai/Filho
+    (fonte única de saídas financeiras) por funcionário no RDO.
+    Idempotência: pula CustoObra se já existe rdo_id+funcionario_id+data.
+    """
     try:
-        from models import db, RDO, RDOMaoObra, Funcionario, CustoObra
+        from models import db, RDO, RDOMaoObra, Funcionario, CustoObra, GestaoCustoPai, GestaoCustoFilho
         from decimal import Decimal
         
         rdo_id = data.get('rdo_id')
@@ -651,6 +623,7 @@ def lancar_custos_rdo(data: dict, admin_id: int):
             return
         
         custos_criados = 0
+        gestao_criados = 0
         valor_total_custos = 0
         
         for mao_obra in mao_obra_registros:
@@ -693,31 +666,76 @@ def lancar_custos_rdo(data: dict, admin_id: int):
             else:
                 descricao += f" ({horas_trabalhadas}h)"
             
-            # Criar registro de custo
-            custo = CustoObra(
-                obra_id=rdo.obra_id,
-                tipo='mao_obra',
-                descricao=descricao,
-                valor=valor_total,
-                data=data_rdo,
-                funcionario_id=mao_obra.funcionario_id,
+            # Criar registro de custo operacional (CustoObra) — idempotente por rdo_id+funcionario_id+data
+            existing_custo = CustoObra.query.filter_by(
                 rdo_id=rdo.id,
+                funcionario_id=mao_obra.funcionario_id,
+                data=data_rdo,
+                admin_id=admin_id
+            ).first()
+            if not existing_custo:
+                custo = CustoObra(
+                    obra_id=rdo.obra_id,
+                    tipo='mao_obra',
+                    descricao=descricao,
+                    valor=valor_total,
+                    data=data_rdo,
+                    funcionario_id=mao_obra.funcionario_id,
+                    rdo_id=rdo.id,
+                    admin_id=admin_id,
+                    horas_trabalhadas=Decimal(str(horas_trabalhadas)),
+                    horas_extras=Decimal(str(horas_extras)),
+                    valor_unitario=Decimal(str(salario_hora)),
+                    quantidade=Decimal(str(horas_trabalhadas + horas_extras)),
+                    categoria='RDO'
+                )
+                db.session.add(custo)
+                custos_criados += 1
+
+            # Criar GestaoCustoPai+Filho como fonte de verdade financeira — idempotente por origem_ref
+            origem_ref = f"rdo_{rdo.id}_func_{mao_obra.funcionario_id}"
+            existing_gestao = GestaoCustoFilho.query.filter_by(
+                origem_tabela='rdo_mao_obra',
+                origem_id=rdo.id,
                 admin_id=admin_id,
-                horas_trabalhadas=Decimal(str(horas_trabalhadas)),
-                horas_extras=Decimal(str(horas_extras)),
-                valor_unitario=Decimal(str(salario_hora)),
-                quantidade=Decimal(str(horas_trabalhadas + horas_extras)),
-                categoria='RDO'
-            )
-            
-            db.session.add(custo)
-            custos_criados += 1
+            ).filter(GestaoCustoFilho.descricao.contains(funcionario.nome)).first()
+
+            if not existing_gestao:
+                pai = GestaoCustoPai(
+                    admin_id=admin_id,
+                    tipo_categoria='MAO_OBRA_DIRETA',
+                    entidade_nome=funcionario.nome,
+                    entidade_id=funcionario.id,
+                    valor_total=Decimal(str(valor_total)),
+                    valor_pago=Decimal('0'),
+                    saldo=Decimal(str(valor_total)),
+                    status='PENDENTE',
+                    data_vencimento=data_rdo,
+                    numero_documento=f"RDO-{rdo.numero_rdo}",
+                    data_emissao=data_rdo,
+                )
+                db.session.add(pai)
+                db.session.flush()
+
+                filho = GestaoCustoFilho(
+                    pai_id=pai.id,
+                    admin_id=admin_id,
+                    data_referencia=data_rdo,
+                    descricao=descricao,
+                    valor=Decimal(str(valor_total)),
+                    obra_id=rdo.obra_id,
+                    origem_tabela='rdo_mao_obra',
+                    origem_id=rdo.id,
+                )
+                db.session.add(filho)
+                gestao_criados += 1
+
             valor_total_custos += valor_total
         
         # Commit de todos os custos de uma vez
         db.session.commit()
         
-        logger.info(f"✅ RDO {rdo.numero_rdo} finalizado: {custos_criados} custos de mão de obra lançados (Total: R$ {valor_total_custos:.2f})")
+        logger.info(f"✅ RDO {rdo.numero_rdo} finalizado: {custos_criados} CustoObra + {gestao_criados} GestaoCustoPai lançados (Total: R$ {valor_total_custos:.2f})")
         
     except Exception as e:
         logger.error(f"❌ Erro ao lançar custos do RDO: {e}", exc_info=True)

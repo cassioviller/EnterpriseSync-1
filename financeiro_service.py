@@ -436,28 +436,15 @@ class FinanceiroService:
             
             entradas_previstas = sum(c.saldo for c in contas_receber)
             
-            # Contas a pagar (saídas)
-            contas_pagar = ContaPagar.query.filter(
-                and_(
-                    ContaPagar.admin_id == admin_id,
-                    ContaPagar.data_vencimento >= data_inicio,
-                    ContaPagar.data_vencimento <= data_fim,
-                    ContaPagar.status.in_(['PENDENTE', 'PARCIAL'])
-                )
-            ).all()
-            
-            saidas_previstas = sum(c.saldo for c in contas_pagar)
-
-            # Gestão de Custos V2 — saídas previstas (SOLICITADO + AUTORIZADO) filtradas por período
-            # Usa data_vencimento (quando disponível) ou data_criacao como fallback
+            # Saídas previstas — exclusivamente de GestaoCustoPai (status PENDENTE, SOLICITADO, AUTORIZADO)
+            # ContaPagar foi descontinuado como fonte de saídas previstas
             dt_inicio = datetime.combine(data_inicio, datetime.min.time())
             dt_fim = datetime.combine(data_fim, datetime.max.time())
-            # Filtrar por data_vencimento OU (sem vencimento) data_criacao — SQL-side com OR
             from sqlalchemy import or_ as sql_or
             custos_v2_previstos = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
-                    GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO']),
+                    GestaoCustoPai.status.in_(['PENDENTE', 'SOLICITADO', 'AUTORIZADO']),
                     sql_or(
                         and_(
                             GestaoCustoPai.data_vencimento != None,
@@ -472,7 +459,7 @@ class FinanceiroService:
                     )
                 )
             ).all()
-            # Custos V2 já pagos (histórico realizado) — usar data_pagamento (campo Date)
+            # Custos já pagos (histórico realizado)
             custos_v2_pagos = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
@@ -481,12 +468,12 @@ class FinanceiroService:
                     GestaoCustoPai.data_pagamento <= data_fim,
                 )
             ).all()
-            # Regra canônica: valor_solicitado tem prioridade quando presente
-            # SOLICITADO/AUTORIZADO → saídas previstas (projeção)
-            saidas_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_previstos)
-            # PAGO → apenas histórico/detalhes, não entra na projeção de saídas previstas
+            # Saídas previstas: usar saldo explícito quando disponível, fallback valor_total
+            saidas_previstas = sum(
+                float(c.saldo if getattr(c, 'saldo', None) is not None else c.valor_total or 0)
+                for c in custos_v2_previstos
+            )
             saidas_v2_pagas = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_pagos)
-            saidas_previstas += saidas_v2
 
             # Projeção de saldo
             saldo_final = saldo_inicial + entradas_previstas - saidas_previstas
@@ -502,15 +489,6 @@ class FinanceiroService:
                     'origem': 'Conta a Receber'
                 })
             
-            for conta in contas_pagar:
-                detalhes.append({
-                    'data': conta.data_vencimento,
-                    'tipo': 'SAIDA',
-                    'descricao': conta.descricao,
-                    'valor': float(conta.saldo),
-                    'origem': 'Conta a Pagar'
-                })
-
             for custo in custos_v2_previstos:
                 # Priorizar data_vencimento (Despesa Geral); fallback para data_criacao
                 if custo.data_vencimento:
@@ -554,25 +532,9 @@ class FinanceiroService:
         try:
             hoje = date.today()
             
-            # Contas a pagar
-            total_pagar = db.session.query(
-                func.sum(ContaPagar.saldo)
-            ).filter(
-                and_(
-                    ContaPagar.admin_id == admin_id,
-                    ContaPagar.status.in_(['PENDENTE', 'PARCIAL'])
-                )
-            ).scalar() or Decimal('0')
-            
-            vencidas_pagar = db.session.query(
-                func.count(ContaPagar.id)
-            ).filter(
-                and_(
-                    ContaPagar.admin_id == admin_id,
-                    ContaPagar.status.in_(['PENDENTE', 'PARCIAL']),
-                    ContaPagar.data_vencimento < hoje
-                )
-            ).scalar() or 0
+            # Contas a pagar legadas (histórico apenas — mantidas para registros antigos)
+            total_pagar = Decimal('0')
+            vencidas_pagar = 0
             
             # Contas a receber
             total_receber = db.session.query(
@@ -604,15 +566,15 @@ class FinanceiroService:
                 )
             ).scalar() or Decimal('0')
 
-            # Gestão de Custos V2 — incluir SOLICITADO + AUTORIZADO no total a pagar
-            # Regra canônica: coalesce(valor_solicitado, valor_total)
+            # Gestão de Custos V2 — incluir PENDENTE + PARCIAL + SOLICITADO + AUTORIZADO no total a pagar
+            # Regra canônica: coalesce(saldo, valor_total) para refletir saldo real em aberto
             custos_v2_list = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
-                    GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
+                    GestaoCustoPai.status.in_(['PENDENTE', 'PARCIAL', 'SOLICITADO', 'AUTORIZADO'])
                 )
             ).all()
-            total_pagar_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_list)
+            total_pagar_v2 = sum(float(c.saldo if c.saldo is not None else c.valor_total) for c in custos_v2_list)
             qtd_pagar_v2 = len(custos_v2_list)
             # Vencidos V2: criados há mais de 30 dias sem pagamento (proxy para overdue)
             limite_vencimento_v2 = datetime.combine(hoje, datetime.min.time()) - timedelta(days=30)

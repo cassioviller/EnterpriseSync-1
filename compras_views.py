@@ -8,7 +8,8 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from models import (AlmoxarifadoItem, CentroCusto, ContaPagar, CustoObra,
-                    Fornecedor, Funcionario, Obra, PedidoCompra, PedidoCompraItem)
+                    Fornecedor, Funcionario, Obra, PedidoCompra, PedidoCompraItem,
+                    GestaoCustoPai, GestaoCustoFilho)
 from utils.tenant import get_tenant_admin_id, is_v2_active
 
 logger = logging.getLogger(__name__)
@@ -246,40 +247,57 @@ def nova_post():
             db.session.add(custo)
             logger.info(f"[OK] CustoObra criado para obra_id={obra_id} via compra")
 
-        # --- Contas a Pagar ---
+        # --- Gestão de Custos (substitui ContaPagar) ---
         fornecedor = Fornecedor.query.get(fornecedor_id)
         vencimentos = _vencimentos(data_compra, condicao, parcelas)
         n_parcelas = len(vencimentos)
         valor_parcela = round(valor_total / n_parcelas, 2)
+        forn_nome = fornecedor.nome if fornecedor else 'Fornecedor'
 
         for idx, (data_venc, _) in enumerate(vencimentos, start=1):
-            # Ajusta última parcela para absorver diferença de arredondamento
             v = valor_parcela if idx < n_parcelas else round(valor_total - valor_parcela * (n_parcelas - 1), 2)
-            status_cp = 'PAGO' if condicao == 'a_vista' else 'PENDENTE'
+            is_avista = (condicao == 'a_vista')
+            status_gcp = 'PAGO' if is_avista else 'PENDENTE'
             desc_cp = f"Compra{(' NF ' + numero) if numero else ''}"
             if n_parcelas > 1:
                 desc_cp += f" - Parcela {idx}/{n_parcelas}"
-            desc_cp += f" - {fornecedor.nome if fornecedor else 'Fornecedor'}"
+            desc_cp += f" - {forn_nome}"
 
-            cp = ContaPagar(
+            gcp = GestaoCustoPai(
+                admin_id=admin_id,
+                tipo_categoria='MATERIAL',
+                entidade_nome=forn_nome,
+                entidade_id=fornecedor_id,
                 fornecedor_id=fornecedor_id,
-                obra_id=obra_id,
-                numero_documento=numero,
-                descricao=desc_cp[:500],
-                valor_original=v,
-                valor_pago=v if condicao == 'a_vista' else 0,
-                saldo=0 if condicao == 'a_vista' else v,
+                valor_total=v,
+                valor_pago=v if is_avista else 0,
+                saldo=0 if is_avista else v,
+                status=status_gcp,
                 data_emissao=data_compra,
                 data_vencimento=data_venc,
-                data_pagamento=data_compra if condicao == 'a_vista' else None,
-                status=status_cp,
-                origem_tipo='COMPRA',
-                origem_id=pedido.id,
-                admin_id=admin_id,
+                data_pagamento=data_compra if is_avista else None,
+                numero_documento=numero,
+                numero_parcela=idx,
+                total_parcelas=n_parcelas,
+                observacoes=desc_cp[:300],
             )
-            db.session.add(cp)
+            db.session.add(gcp)
+            db.session.flush()
 
-        logger.info(f"[OK] {n_parcelas} ContaPagar criado(s) para pedido_id={pedido.id}")
+            gcf = GestaoCustoFilho(
+                pai_id=gcp.id,
+                admin_id=admin_id,
+                data_referencia=data_compra,
+                descricao=desc_cp[:300],
+                valor=v,
+                obra_id=obra_id,
+                centro_custo_id=centro_custo_id,
+                origem_tabela='pedido_compra',
+                origem_id=pedido.id,
+            )
+            db.session.add(gcf)
+
+        logger.info(f"[OK] {n_parcelas} GestaoCustoPai MATERIAL criado(s) para pedido_id={pedido.id}")
 
         db.session.commit()
 
@@ -296,30 +314,6 @@ def nova_post():
             )
         except Exception as _e:
             logger.warning(f"[WARN] Lancamento contabil compra nao gerado: {_e}")
-
-        # Integração automática: Gestão de Custos V2
-        try:
-            from utils.financeiro_integration import registrar_custo_automatico
-            _forn = Fornecedor.query.get(fornecedor_id)
-            _forn_nome = _forn.nome if _forn else 'Fornecedor'
-            registrar_custo_automatico(
-                admin_id=admin_id,
-                tipo_categoria='COMPRA',
-                entidade_nome=_forn_nome,
-                entidade_id=fornecedor_id,
-                data=data_compra,
-                descricao=f"Compra{(' NF ' + numero) if numero else ''} — {_forn_nome}",
-                valor=float(valor_total),
-                obra_id=obra_id,
-                centro_custo_id=centro_custo_id,
-                origem_tabela='pedido_compra',
-                origem_id=pedido.id,
-            )
-            from app import db as _db
-            _db.session.commit()
-            logger.info(f"[OK] GestaoCusto COMPRA registrado para {_forn_nome}")
-        except Exception as _e:
-            logger.warning(f"[WARN] Gestao custo compra nao registrado: {_e}")
 
         # Reembolso a Funcionários V2
         try:
@@ -340,7 +334,7 @@ def nova_post():
         except Exception as _re:
             logger.warning(f"[WARN] Reembolso compra nao processado: {_re}")
 
-        flash(f'Compra registrada com sucesso! {n_parcelas} conta(s) a pagar gerada(s).', 'success')
+        flash(f'Compra registrada com sucesso! {n_parcelas} registro(s) de custo gerado(s) na Gestão de Custos.', 'success')
         return redirect(url_for('compras.index'))
 
     except Exception as e:
@@ -363,13 +357,15 @@ def detalhe(pedido_id):
     admin_id = _admin_id()
     pedido = PedidoCompra.query.filter_by(id=pedido_id, admin_id=admin_id).first_or_404()
     itens = PedidoCompraItem.query.filter_by(pedido_id=pedido_id).all()
-    contas = ContaPagar.query.filter_by(origem_tipo='COMPRA', origem_id=pedido_id).all()
+    custos_gestao = GestaoCustoFilho.query.filter_by(
+        origem_tabela='pedido_compra', origem_id=pedido_id
+    ).all()
 
     return render_template(
         'compras/detalhe.html',
         pedido=pedido,
         itens=itens,
-        contas=contas,
+        custos_gestao=custos_gestao,
         CONDICOES=CONDICOES,
     )
 
@@ -387,11 +383,19 @@ def excluir(pedido_id):
     admin_id = _admin_id()
     pedido = PedidoCompra.query.filter_by(id=pedido_id, admin_id=admin_id).first_or_404()
     try:
-        # Remover ContaPagar vinculados
-        ContaPagar.query.filter_by(origem_tipo='COMPRA', origem_id=pedido_id).delete()
+        # Remover GestaoCustoPai vinculados (criados via filho origem_tabela=pedido_compra)
+        filhos = GestaoCustoFilho.query.filter_by(
+            origem_tabela='pedido_compra', origem_id=pedido_id
+        ).all()
+        pai_ids = list({f.pai_id for f in filhos})
+        for pai_id in pai_ids:
+            pai = GestaoCustoPai.query.get(pai_id)
+            if pai and pai.status in ('PENDENTE', 'RECUSADO'):
+                db.session.delete(pai)
+        # Manter ContaPagar legados (histórico) mas não criar novos
         db.session.delete(pedido)
         db.session.commit()
-        flash('Compra e contas a pagar vinculadas foram excluídas.', 'success')
+        flash('Compra e custos vinculados foram excluídos.', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao excluir: {e}', 'danger')

@@ -1,12 +1,11 @@
-from models import db
 """
 Views para o Módulo 6 - Sistema de Folha de Pagamento Automática
 Versão limpa e funcional
 """
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, make_response, send_file
-from models import (FolhaPagamento, ParametrosLegais, Funcionario, BeneficioFuncionario, 
-                    Adiantamento, CalculoHorasMensal)
+from models import (db, FolhaPagamento, ParametrosLegais, Funcionario, BeneficioFuncionario, 
+                    Adiantamento, CalculoHorasMensal, GestaoCustoPai, GestaoCustoFilho)
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta  # [OK] OTIMIZAÇÃO: Movido do inline (linha 41)
@@ -213,6 +212,57 @@ def processar_folha_mes(ano, mes):
                     }, admin_id=current_user.id)
                 except Exception as e:
                     logger.error(f"[ERROR] Erro ao emitir evento folha_processada: {e}")
+
+                # Registrar na Gestão de Custos V2
+                try:
+                    from utils.tenant import is_v2_active
+                    if is_v2_active():
+                        salario_liq = float(dados_folha.get('salario_liquido', 0) or 0)
+                        if salario_liq > 0:
+                            # Determinar categoria: MAO_OBRA_DIRETA vs SALARIO_ADMIN
+                            # Heurística: departamento com keywords adm → SALARIO_ADMIN, caso contrário MAO_OBRA_DIRETA
+                            _dept_nome = ''
+                            if funcionario.departamento_id:
+                                from models import Departamento
+                                _dept = Departamento.query.get(funcionario.departamento_id)
+                                _dept_nome = (_dept.nome if _dept else '').lower()
+                            _adm_keywords = ('admin', 'escrit', 'financ', 'rh', 'ti', 'gerenc', 'diret', 'contab')
+                            tipo_cat = 'SALARIO_ADMIN' if any(k in _dept_nome for k in _adm_keywords) else 'MAO_OBRA_DIRETA'
+
+                            mes_ref_str = mes_referencia.strftime('%m/%Y')
+                            # Vencimento = último dia do mês de referência
+                            import calendar as _cal
+                            ultimo_dia = _cal.monthrange(ano, mes)[1]
+                            data_venc_folha = date(ano, mes, ultimo_dia)
+
+                            gcp = GestaoCustoPai(
+                                admin_id=current_user.id,
+                                tipo_categoria=tipo_cat,
+                                entidade_nome=funcionario.nome,
+                                entidade_id=funcionario.id,
+                                valor_total=salario_liq,
+                                valor_pago=0,
+                                saldo=salario_liq,
+                                status='PENDENTE',
+                                data_emissao=date.today(),
+                                data_vencimento=data_venc_folha,
+                                numero_documento=f"FOLHA-{ano}-{mes:02d}-{funcionario.id}",
+                                observacoes=f"Folha {mes_ref_str} - {funcionario.nome}",
+                            )
+                            db.session.add(gcp)
+                            db.session.flush()
+                            gcf = GestaoCustoFilho(
+                                pai_id=gcp.id,
+                                admin_id=current_user.id,
+                                data_referencia=mes_referencia,
+                                descricao=f"Salário {mes_ref_str} - {funcionario.nome}",
+                                valor=salario_liq,
+                                origem_tabela='folha_pagamento',
+                                origem_id=folha.id,
+                            )
+                            db.session.add(gcf)
+                except Exception as _ge:
+                    logger.warning(f"[WARN] GestaoCusto folha não registrado para {funcionario.nome}: {_ge}")
             else:
                 erros += 1
         

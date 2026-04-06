@@ -176,160 +176,17 @@ def listar_contas_pagar():
 @financeiro_bp.route('/contas-pagar/criar', methods=['POST'])
 @login_required
 def criar_conta_pagar():
-    """Criar conta a pagar via formulário modal"""
-    try:
-        admin_id = get_admin_id()
-        
-        fornecedor_nome = request.form.get('fornecedor_nome')
-        fornecedor_cpf_cnpj = request.form.get('fornecedor_cpf_cnpj') or None
-        obra_id_input = request.form.get('obra_id', type=int) or None
-        descricao = request.form.get('descricao')
-        valor = Decimal(request.form.get('valor'))
-        data_vencimento = datetime.strptime(
-            request.form.get('data_vencimento'), 
-            '%Y-%m-%d'
-        ).date()
-        numero_documento = request.form.get('numero_documento') or None
-        conta_contabil_codigo = request.form.get('conta_contabil_codigo') or None
-        
-        # SEGURANÇA: Validar que obra_id pertence ao admin atual
-        obra_id = None
-        if obra_id_input:
-            obra = Obra.query.filter_by(id=obra_id_input, admin_id=admin_id).first()
-            if obra:
-                obra_id = obra_id_input
-            else:
-                logger.warning(f"⚠️ Tentativa de vincular obra {obra_id_input} de outro tenant pelo admin {admin_id}")
-        
-        # Buscar fornecedor existente por CNPJ (se fornecido) ou por razao_social exata
-        fornecedor = None
-        if fornecedor_cpf_cnpj:
-            fornecedor = Fornecedor.query.filter_by(
-                admin_id=admin_id,
-                cnpj=fornecedor_cpf_cnpj
-            ).first()
-        
-        if not fornecedor:
-            # Buscar por razao_social exata também (para fornecedores sem CNPJ)
-            fornecedor = Fornecedor.query.filter_by(
-                admin_id=admin_id,
-                razao_social=fornecedor_nome
-            ).first()
-        
-        if not fornecedor:
-            # Gerar CNPJ único se não fornecido (max 18 chars conforme coluna)
-            import uuid
-            if fornecedor_cpf_cnpj:
-                cnpj_unique = fornecedor_cpf_cnpj
-            else:
-                # Formato: S{admin_id 2 dig}{uuid 6 chars} = max 9 chars para caber em 18
-                cnpj_unique = f"S{str(admin_id)[-2:]}{uuid.uuid4().hex[:8].upper()}"
-            
-            # Criar fornecedor com todos os campos obrigatórios
-            # Nota: DB tem coluna 'nome' NOT NULL além de razao_social e nome_fantasia
-            fornecedor = db.session.execute(
-                db.text("""
-                    INSERT INTO fornecedor (nome, cnpj, razao_social, nome_fantasia, admin_id, ativo, created_at)
-                    VALUES (:nome, :cnpj, :razao_social, :nome_fantasia, :admin_id, true, NOW())
-                    RETURNING id
-                """),
-                {
-                    'nome': fornecedor_nome,
-                    'cnpj': cnpj_unique,
-                    'razao_social': fornecedor_nome,
-                    'nome_fantasia': fornecedor_nome,
-                    'admin_id': admin_id
-                }
-            ).fetchone()
-            
-            fornecedor_id = fornecedor[0]
-            db.session.flush()
-            logger.info(f"✅ Fornecedor criado: {fornecedor_nome} (ID: {fornecedor_id})")
-        else:
-            fornecedor_id = fornecedor.id
-        
-        # Criar conta com fornecedor_id
-        conta = ContaPagar(
-            admin_id=admin_id,
-            fornecedor_id=fornecedor_id,
-            obra_id=obra_id,
-            numero_documento=numero_documento,
-            descricao=descricao,
-            valor_original=valor,
-            valor_pago=Decimal('0'),
-            saldo=valor,
-            data_emissao=date.today(),
-            data_vencimento=data_vencimento,
-            status='PENDENTE',
-            conta_contabil_codigo=conta_contabil_codigo
-        )
-        
-        db.session.add(conta)
-        db.session.commit()
-        
-        flash(f'Conta a pagar criada com sucesso!', 'success')
-        return redirect(url_for('financeiro.listar_contas_pagar'))
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Erro ao criar conta a pagar: {str(e)}")
-        flash('Erro ao criar conta a pagar', 'danger')
-        return redirect(url_for('financeiro.listar_contas_pagar'))
+    """Redireciona criação de conta a pagar para Gestão de Custos"""
+    flash('O lançamento de novas despesas é feito pela Gestão de Custos. Use o botão "Novo Lançamento" abaixo.', 'info')
+    return redirect(url_for('gestao_custos.novo'))
 
 
 @financeiro_bp.route('/contas-pagar/nova', methods=['GET', 'POST'])
 @login_required
 def nova_conta_pagar():
-    """Criar nova conta a pagar"""
-    admin_id = get_admin_id()
-    
-    if request.method == 'POST':
-        try:
-            fornecedor_id = request.form.get('fornecedor_id', type=int)
-            obra_id = request.form.get('obra_id', type=int) or None
-            descricao = request.form.get('descricao')
-            valor = Decimal(request.form.get('valor'))
-            data_vencimento = datetime.strptime(
-                request.form.get('data_vencimento'), 
-                '%Y-%m-%d'
-            ).date()
-            numero_documento = request.form.get('numero_documento') or None
-            conta_contabil_codigo = request.form.get('conta_contabil_codigo') or None
-            
-            conta = FinanceiroService.criar_conta_pagar(
-                admin_id=admin_id,
-                fornecedor_id=fornecedor_id,
-                descricao=descricao,
-                valor=valor,
-                data_vencimento=data_vencimento,
-                obra_id=obra_id,
-                numero_documento=numero_documento,
-                conta_contabil_codigo=conta_contabil_codigo
-            )
-            
-            flash(f'Conta a pagar criada com sucesso! Vencimento: {data_vencimento}', 'success')
-            return redirect(url_for('financeiro.listar_contas_pagar'))
-            
-        except Exception as e:
-            logger.error(f"Erro ao criar conta a pagar: {str(e)}")
-            flash('Erro ao criar conta a pagar', 'danger')
-    
-    # GET - exibir formulário
-    fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).all()
-    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
-    contas_contabeis = PlanoContas.query.filter_by(
-        admin_id=admin_id, 
-        tipo_conta='DESPESA',
-        aceita_lancamento=True
-    ).all()
-    
-    return render_template(
-        'financeiro/nova_conta_pagar.html',
-        fornecedores=fornecedores,
-        obras=obras,
-        contas_contabeis=contas_contabeis,
-        is_v2=is_v2_active()
-    )
+    """Redireciona para Gestão de Custos"""
+    flash('O lançamento de novas despesas é feito pela Gestão de Custos.', 'info')
+    return redirect(url_for('gestao_custos.novo'))
 
 
 @financeiro_bp.route('/contas-pagar/<int:conta_id>/pagar', methods=['GET', 'POST'])

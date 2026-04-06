@@ -19,6 +19,12 @@
         <i class="fas fa-arrow-left me-1"></i> Voltar
       </a>
       {% else %}
+      <form method="post" action="{{ url_for('gestao_custos.migrar_contas_pagar') }}"
+            onsubmit="return confirm('Migrar contas a pagar pendentes para Gestão de Custos? Esta ação é segura e pode ser repetida.')">
+        <button type="submit" class="btn btn-outline-warning btn-sm">
+          <i class="fas fa-exchange-alt me-1"></i> Migrar Contas Antigas
+        </button>
+      </form>
       <a href="{{ url_for('gestao_custos.novo') }}" class="btn btn-success">
         <i class="fas fa-plus me-1"></i> Novo Lançamento
       </a>
@@ -49,11 +55,62 @@
                 {% endfor %}
               </select>
             </div>
+
+            {# Fornecedor #}
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Fornecedor</label>
+              <select name="fornecedor_id" class="form-select">
+                <option value="">— Selecione (opcional) —</option>
+                {% for f in fornecedores %}
+                <option value="{{ f.id }}">{{ f.nome }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Vincule ao fornecedor cadastrado ou preencha o nome manualmente abaixo.</div>
+            </div>
+
             <div class="mb-3">
               <label class="form-label fw-semibold" id="labelEntidade">Entidade / Nome *</label>
               <input type="text" name="entidade_nome" id="inputEntidade" class="form-control"
                      placeholder="Ex: João Silva, Fornecedor ABC, Obra Central…" required autocomplete="off">
               <div class="form-text" id="helpEntidade">Pessoa, fornecedor ou entidade a pagar.</div>
+            </div>
+
+            {# Dados do documento #}
+            <div class="row g-3 mb-3">
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold">Data de Emissão</label>
+                <input type="date" name="data_emissao" class="form-control">
+                <div class="form-text">Data da nota fiscal / documento.</div>
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label fw-semibold">Nº Documento</label>
+                <input type="text" name="numero_documento" class="form-control"
+                       placeholder="NF, boleto, contrato…" autocomplete="off">
+              </div>
+            </div>
+
+            {# Parcelas #}
+            <div class="row g-3 mb-3">
+              <div class="col-sm-4">
+                <label class="form-label fw-semibold">Parcela Nº</label>
+                <input type="number" name="numero_parcela" class="form-control" min="1" value="1">
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label fw-semibold">Total de Parcelas</label>
+                <input type="number" name="total_parcelas" class="form-control" min="1" value="1">
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label fw-semibold">Forma de Pagamento</label>
+                <select name="forma_pagamento" class="form-select">
+                  <option value="">— Selecione —</option>
+                  <option value="Boleto">Boleto</option>
+                  <option value="PIX">PIX</option>
+                  <option value="Transferência">Transferência</option>
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Cartão">Cartão</option>
+                </select>
+              </div>
             </div>
 
             {# Campos opcionais — disponíveis para todas as categorias #}
@@ -64,9 +121,9 @@
                 <div class="form-text">Usado para projeção no Fluxo de Caixa.</div>
               </div>
               <div class="col-sm-6">
-                <label class="form-label fw-semibold">Nº Documento</label>
-                <input type="text" name="numero_documento" class="form-control"
-                       placeholder="NF, boleto, contrato…" autocomplete="off">
+                <label class="form-label fw-semibold">Conta Contábil</label>
+                <input type="text" name="conta_contabil_codigo" class="form-control"
+                       placeholder="Ex: 3.1.1.01" autocomplete="off">
               </div>
             </div>
 
@@ -117,10 +174,11 @@
       ('PENDENTE',   'secondary', 'fas fa-clock'),
       ('SOLICITADO', 'warning',   'fas fa-paper-plane'),
       ('AUTORIZADO', 'success',   'fas fa-thumbs-up'),
+      ('PARCIAL',    'info',      'fas fa-adjust'),
       ('PAGO',       'primary',   'fas fa-check-circle'),
     ] %}
     {% for st, cor, icone in status_list %}
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md-2">
       <div class="card border-0 shadow-sm h-100" style="border-left:4px solid var(--bs-{{ cor }}) !important">
         <div class="card-body">
           <div class="d-flex align-items-center gap-3">
@@ -164,7 +222,7 @@
         <div class="col-sm-3">
           <select name="status" class="form-select form-select-sm">
             <option value="">Todos os status</option>
-            {% for s in ['PENDENTE','SOLICITADO','AUTORIZADO','PAGO','RECUSADO'] %}
+            {% for s in ['PENDENTE','SOLICITADO','AUTORIZADO','PARCIAL','PAGO','RECUSADO'] %}
             <option value="{{ s }}" {% if filtro_status == s %}selected{% endif %}>{{ s|title }}</option>
             {% endfor %}
           </select>
@@ -212,7 +270,7 @@
               <th>Categoria</th>
               <th>Entidade</th>
               <th class="text-end">Valor Total</th>
-              <th class="text-end">Solicitado</th>
+              <th class="text-end">Saldo</th>
               <th class="text-center">Status</th>
               <th class="text-center">Data</th>
               <th class="text-center">Ações</th>
@@ -238,7 +296,13 @@
             <td>{{ reg.entidade_nome }}</td>
             <td class="text-end fw-bold">R$ {{ '%.2f'|format(reg.valor_total|float) }}</td>
             <td class="text-end text-muted">
-              {% if reg.valor_solicitado %}R$ {{ '%.2f'|format(reg.valor_solicitado|float) }}{% else %}—{% endif %}
+              {% if reg.saldo is not none %}
+                <span class="{% if reg.saldo|float > 0 %}text-danger{% else %}text-success{% endif %}">
+                  R$ {{ '%.2f'|format(reg.saldo|float) }}
+                </span>
+              {% elif reg.valor_solicitado %}
+                R$ {{ '%.2f'|format(reg.valor_solicitado|float) }}
+              {% else %}—{% endif %}
             </td>
             <td class="text-center">
               <span class="badge bg-{{ badge_cor }}">{{ reg.status }}</span>
@@ -248,11 +312,11 @@
             </td>
             <td class="text-center">
               <div class="d-flex justify-content-center gap-1">
-                {# PENDENTE → Solicitar #}
-                {% if reg.status == 'PENDENTE' %}
+                {# PENDENTE / PARCIAL → Solicitar próximo pagamento #}
+                {% if reg.status in ('PENDENTE', 'PARCIAL') %}
                 <button class="btn btn-sm btn-outline-warning"
-                        onclick="abrirModalSolicitar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ reg.valor_total|float }})"
-                        title="Solicitar pagamento">
+                        onclick="abrirModalSolicitar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ (reg.saldo if reg.saldo is not none else reg.valor_total)|float }})"
+                        title="Solicitar pagamento{% if reg.status == 'PARCIAL' %} (saldo restante){% endif %}">
                   <i class="fas fa-paper-plane fa-xs"></i>
                 </button>
                 {% endif %}
@@ -264,11 +328,11 @@
                   <i class="fas fa-thumbs-up fa-xs"></i>
                 </button>
                 {% endif %}
-                {# AUTORIZADO → Pagar #}
+                {# AUTORIZADO → Pagar (total ou parcial) #}
                 {% if reg.status == 'AUTORIZADO' %}
                 <button class="btn btn-sm btn-primary btn-sm"
-                        onclick="abrirModalPagar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ (reg.valor_solicitado or reg.valor_total)|float }})"
-                        title="Efetivar pagamento">
+                        onclick="abrirModalPagar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ (reg.valor_solicitado or reg.valor_total)|float }}, {{ (reg.saldo if reg.saldo is not none else reg.valor_total)|float }})"
+                        title="Efetivar pagamento (total ou parcial)">
                   <i class="fas fa-dollar-sign fa-xs"></i>
                 </button>
                 {% endif %}
@@ -374,7 +438,7 @@
   </div>
 </div>
 
-{# ══ MODAL: EFETIVAR PAGAMENTO (AUTORIZADO → PAGO) ═══════════════ #}
+{# ══ MODAL: EFETIVAR PAGAMENTO (AUTORIZADO → PAGO/PARCIAL) ════════ #}
 <div class="modal fade" id="modalPagar" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -384,12 +448,17 @@
       </div>
       <form method="post" id="formPagar">
         <div class="modal-body">
-          <p class="text-muted mb-3" id="pagarInfo"></p>
+          <p class="text-muted mb-2" id="pagarInfo"></p>
+          <div class="alert alert-info py-2 small mb-3">
+            <i class="fas fa-info-circle me-1"></i>
+            Você pode registrar um pagamento parcial. O saldo restante ficará como <strong>PARCIAL</strong> até o próximo pagamento.
+          </div>
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Valor pago (R$)</label>
+              <label class="form-label fw-semibold">Valor pago agora (R$)</label>
               <input type="number" class="form-control" name="valor_pago"
                      id="pagarValor" step="0.01" min="0.01" required>
+              <div class="form-text" id="pagarSaldoInfo"></div>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">Data de pagamento</label>
@@ -433,12 +502,19 @@ function abrirModalAutorizar(paiId, entidade, valorSol) {
     new bootstrap.Modal(document.getElementById('modalAutorizar')).show();
 }
 
-// ── Efetivar pagamento (AUTORIZADO → PAGO) ───────────────────────
-function abrirModalPagar(paiId, entidade, valorSol) {
+// ── Efetivar pagamento (AUTORIZADO → PAGO/PARCIAL) ───────────────
+function abrirModalPagar(paiId, entidade, valorSol, saldo) {
     document.getElementById('formPagar').action = `/gestao-custos/${paiId}/pagar`;
+    const saldoDisp = saldo !== undefined ? saldo : valorSol;
     document.getElementById('pagarInfo').textContent =
         `Valor autorizado: R$ ${valorSol.toFixed(2).replace('.',',')} — ${entidade}`;
-    document.getElementById('pagarValor').value = valorSol.toFixed(2);
+    if (saldo !== undefined) {
+        document.getElementById('pagarSaldoInfo').textContent =
+            `Saldo atual: R$ ${saldo.toFixed(2).replace('.',',')}`;
+    } else {
+        document.getElementById('pagarSaldoInfo').textContent = '';
+    }
+    document.getElementById('pagarValor').value = saldoDisp.toFixed(2);
     document.getElementById('pagarData').value =
         new Date().toISOString().split('T')[0];
     new bootstrap.Modal(document.getElementById('modalPagar')).show();
