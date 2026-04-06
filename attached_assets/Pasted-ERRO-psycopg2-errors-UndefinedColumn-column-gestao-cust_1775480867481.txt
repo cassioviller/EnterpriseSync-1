@@ -1,0 +1,80 @@
+ERRO: (psycopg2.errors.UndefinedColumn) column gestao_custo_pai.fornecedor_id does not exist
+LINE 1: ...luxo_caixa_id AS gestao_custo_pai_fluxo_caixa_id, gestao_cus...
+                                                             ^
+
+[SQL: SELECT gestao_custo_pai.id AS gestao_custo_pai_id, gestao_custo_pai.tipo_categoria AS gestao_custo_pai_tipo_categoria, gestao_custo_pai.entidade_nome AS gestao_custo_pai_entidade_nome, gestao_custo_pai.entidade_id AS gestao_custo_pai_entidade_id, gestao_custo_pai.valor_total AS gestao_custo_pai_valor_total, gestao_custo_pai.valor_solicitado AS gestao_custo_pai_valor_solicitado, gestao_custo_pai.status AS gestao_custo_pai_status, gestao_custo_pai.data_pagamento AS gestao_custo_pai_data_pagamento, gestao_custo_pai.data_vencimento AS gestao_custo_pai_data_vencimento, gestao_custo_pai.numero_documento AS gestao_custo_pai_numero_documento, gestao_custo_pai.conta_bancaria AS gestao_custo_pai_conta_bancaria, gestao_custo_pai.observacoes AS gestao_custo_pai_observacoes, gestao_custo_pai.data_criacao AS gestao_custo_pai_data_criacao, gestao_custo_pai.admin_id AS gestao_custo_pai_admin_id, gestao_custo_pai.fluxo_caixa_id AS gestao_custo_pai_fluxo_caixa_id, gestao_custo_pai.fornecedor_id AS gestao_custo_pai_fornecedor_id, gestao_custo_pai.forma_pagamento AS gestao_custo_pai_forma_pagamento, gestao_custo_pai.valor_pago AS gestao_custo_pai_valor_pago, gestao_custo_pai.saldo AS gestao_custo_pai_saldo, gestao_custo_pai.conta_contabil_codigo AS gestao_custo_pai_conta_contabil_codigo, gestao_custo_pai.data_emissao AS gestao_custo_pai_data_emissao, gestao_custo_pai.numero_parcela AS gestao_custo_pai_numero_parcela, gestao_custo_pai.total_parcelas AS gestao_custo_pai_total_parcelas 
+FROM gestao_custo_pai 
+WHERE gestao_custo_pai.admin_id = %(admin_id_1)s ORDER BY gestao_custo_pai.data_criacao DESC]
+[parameters: {&#39;admin_id_1&#39;: 1640}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.UndefinedColumn: column gestao_custo_pai.fornecedor_id does not exist
+LINE 1: ...luxo_caixa_id AS gestao_custo_pai_fluxo_caixa_id, gestao_cus...
+                                                             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask/app.py&#34;, line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/flask_login/utils.py&#34;, line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/app/gestao_custos_views.py&#34;, line 117, in index
+    registros = q.order_by(GestaoCustoPai.data_criacao.desc()).all()
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2711, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/query.py&#34;, line 2864, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/session.py&#34;, line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/orm/context.py&#34;, line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1419, in execute
+    return meth(
+           ^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/elements.py&#34;, line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py&#34;, line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File &#34;/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py&#34;, line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column gestao_custo_pai.fornecedor_id does not exist
+LINE 1: ...luxo_caixa_id AS gestao_custo_pai_fluxo_caixa_id, gestao_cus...
+                                                             ^
+
+[SQL: SELECT gestao_custo_pai.id AS gestao_custo_pai_id, gestao_custo_pai.tipo_categoria AS gestao_custo_pai_tipo_categoria, gestao_custo_pai.entidade_nome AS gestao_custo_pai_entidade_nome, gestao_custo_pai.entidade_id AS gestao_custo_pai_entidade_id, gestao_custo_pai.valor_total AS gestao_custo_pai_valor_total, gestao_custo_pai.valor_solicitado AS gestao_custo_pai_valor_solicitado, gestao_custo_pai.status AS gestao_custo_pai_status, gestao_custo_pai.data_pagamento AS gestao_custo_pai_data_pagamento, gestao_custo_pai.data_vencimento AS gestao_custo_pai_data_vencimento, gestao_custo_pai.numero_documento AS gestao_custo_pai_numero_documento, gestao_custo_pai.conta_bancaria AS gestao_custo_pai_conta_bancaria, gestao_custo_pai.observacoes AS gestao_custo_pai_observacoes, gestao_custo_pai.data_criacao AS gestao_custo_pai_data_criacao, gestao_custo_pai.admin_id AS gestao_custo_pai_admin_id, gestao_custo_pai.fluxo_caixa_id AS gestao_custo_pai_fluxo_caixa_id, gestao_custo_pai.fornecedor_id AS gestao_custo_pai_fornecedor_id, gestao_custo_pai.forma_pagamento AS gestao_custo_pai_forma_pagamento, gestao_custo_pai.valor_pago AS gestao_custo_pai_valor_pago, gestao_custo_pai.saldo AS gestao_custo_pai_saldo, gestao_custo_pai.conta_contabil_codigo AS gestao_custo_pai_conta_contabil_codigo, gestao_custo_pai.data_emissao AS gestao_custo_pai_data_emissao, gestao_custo_pai.numero_parcela AS gestao_custo_pai_numero_parcela, gestao_custo_pai.total_parcelas AS gestao_custo_pai_total_parcelas 
+FROM gestao_custo_pai 
+WHERE gestao_custo_pai.admin_id = %(admin_id_1)s ORDER BY gestao_custo_pai.data_criacao DESC]
+[parameters: {&#39;admin_id_1&#39;: 1640}]
+(Background on this error at: https://sqlalche.me/e/20/f405)

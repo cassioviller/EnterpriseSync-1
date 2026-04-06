@@ -74,16 +74,16 @@ Cada lançamento de alimentação cria automaticamente um custo na **Gestão de 
 **Caminho:** Menu superior → **Alimentação** → botão **Novo Lançamento**
 
 **Preencha:**
-- Restaurante / Fornecedor
-- Obra vinculada (opcional)
-- Funcionários e itens consumidos
+- **Obra** (obrigatório)
+- Restaurante / Fornecedor (opcional em V2 — pode ser deixado em branco)
+- Itens consumidos com preços
 - Data e valores
 
-Clique em **Confirmar**.
+Clique em **Confirmar** / **Salvar Lançamento**.
 
 **O que acontece automaticamente:**
 - Lançamento de alimentação registrado
-- Custo criado na **Gestão de Custos V2** com status **PENDENTE**, vinculado ao restaurante e à obra
+- Custo criado na **Gestão de Custos V2** com status **PENDENTE**, vinculado à obra
 
 ---
 
@@ -143,7 +143,7 @@ Para funcionários com tipo de remuneração **Diária**, o ato de **bater o pon
 
 #### Pré-requisito: configurar o funcionário como diarista
 
-**Caminho:** Funcionários → selecionar funcionário → botão **Editar**
+**Caminho:** Menu → **Funcionários** → clicar no nome do funcionário para abrir o perfil → botão **Editar**
 - Campo "Tipo de Remuneração" → selecionar **Diária**
 - Campo "Valor da Diária" → informar o valor (ex: R$ 200,00)
 - Salvar
@@ -296,9 +296,11 @@ Clique em **Confirmar Pagamento**.
 
 **O que acontece automaticamente:**
 - Status muda para **PAGO**
-- Custo **sai das Saídas Previstas** do Fluxo de Caixa
+- Custo **sai da tabela de Movimentos Previstos** do Fluxo de Caixa
 - Um registro de **FluxoCaixa** histórico é criado (tipo SAIDA)
 - Se a obra tiver contabilidade configurada → **lançamento contábil criado** automaticamente
+
+> **Confirmado em teste:** após PAGAR, a linha some imediatamente de "Movimentos Previstos" no Fluxo de Caixa.
 
 ---
 

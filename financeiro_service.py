@@ -527,15 +527,8 @@ class FinanceiroService:
                     'origem': 'Gestão de Custos V2'
                 })
 
-            for custo in custos_v2_pagos:
-                pago_data = custo.data_pagamento if custo.data_pagamento else data_fim
-                detalhes.append({
-                    'data': pago_data,
-                    'tipo': 'SAIDA',
-                    'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}] (pago)',
-                    'valor': float(custo.valor_solicitado or custo.valor_total),
-                    'origem': 'Gestão de Custos V2'
-                })
+            # PAGO: não inclui em 'Movimentos Previstos' — já está no histórico FluxoCaixa
+            # (o registro é criado em gestao_custos_views.pagar via FluxoCaixa model)
             
             # Ordenar por data
             detalhes.sort(key=lambda x: x['data'])

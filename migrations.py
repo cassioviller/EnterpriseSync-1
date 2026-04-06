@@ -3783,6 +3783,7 @@ def executar_migracoes():
             (81, "Reembolso V2 - gestao_custo_pai_id FK", _migration_81_reembolso_gestao_custo_pai_id),
             (82, "Obra codigo - unique por tenant (codigo+admin_id)", _migration_82_obra_codigo_per_tenant),
             (83, "GestaoCustoPai - data_vencimento e numero_documento para DESPESA_GERAL", _migration_83_gestao_custo_vencimento),
+            (84, "AlimentacaoLancamento - restaurante_id nullable para V2", _migration_84_alimentacao_restaurante_nullable),
         ]
         
         # Executar cada migração com rastreamento
@@ -7163,6 +7164,41 @@ def _migration_83_gestao_custo_vencimento():
 
     except Exception as e:
         logger.error(f"Erro na migracao 83: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def _migration_84_alimentacao_restaurante_nullable():
+    """Migration 84: Torna restaurante_id nullable em alimentacao_lancamento para suportar V2 sem restaurante obrigatório"""
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_name = 'alimentacao_lancamento' AND column_name = 'restaurante_id'
+        """)
+        row = cursor.fetchone()
+        if row and row[0] == 'NO':
+            cursor.execute("ALTER TABLE alimentacao_lancamento ALTER COLUMN restaurante_id DROP NOT NULL")
+            logger.info("MIGRACAO 84: restaurante_id tornado nullable em alimentacao_lancamento")
+        else:
+            logger.info("MIGRACAO 84: restaurante_id ja e nullable, nada a fazer")
+
+        connection.close()
+        logger.info("MIGRACAO 84 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 84: {e}")
         if connection:
             try:
                 connection.rollback()

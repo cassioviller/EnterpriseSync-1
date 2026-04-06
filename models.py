@@ -935,7 +935,7 @@ class AlimentacaoLancamento(db.Model):
     descricao = db.Column(db.Text)
     
     # Chaves Estrangeiras - padrão multi-tenant com admin_id NOT NULL
-    restaurante_id = db.Column(db.Integer, db.ForeignKey('restaurante.id'), nullable=False)
+    restaurante_id = db.Column(db.Integer, db.ForeignKey('restaurante.id'), nullable=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     
