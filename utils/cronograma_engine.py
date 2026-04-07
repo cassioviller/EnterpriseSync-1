@@ -106,6 +106,111 @@ def verificar_ciclo(tarefa_id: int, proposta_pred_id: int, admin_id: int) -> boo
 # Motor principal de recálculo
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _atualizar_percentual_sem_commit(tarefa, admin_id: int) -> None:
+    """
+    Versão sem commit de atualizar_percentual_tarefa — para uso em batch.
+    Usa o apontamento mais recente (por data_relatorio) de cada tarefa.
+    """
+    from models import RDOApontamentoCronograma, RDO, db
+
+    ultimo = (
+        db.session.query(
+            RDOApontamentoCronograma.percentual_realizado,
+            RDOApontamentoCronograma.quantidade_acumulada,
+        )
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+        .filter(
+            RDOApontamentoCronograma.tarefa_cronograma_id == tarefa.id,
+            RDOApontamentoCronograma.admin_id == admin_id,
+        )
+        .order_by(RDO.data_relatorio.desc())
+        .first()
+    )
+
+    if ultimo is None:
+        tarefa.percentual_concluido = 0.0
+    elif tarefa.quantidade_total and tarefa.quantidade_total > 0:
+        tarefa.percentual_concluido = min(
+            100.0,
+            round(float(ultimo.quantidade_acumulada) / tarefa.quantidade_total * 100, 2)
+        )
+    else:
+        tarefa.percentual_concluido = min(100.0, float(ultimo.percentual_realizado or 0))
+
+
+def sincronizar_percentuais_obra(obra_id: int, admin_id: int) -> None:
+    """
+    Sincroniza percentual_concluido de todas as tarefas da obra
+    com o último apontamento do RDO, em uma única transação.
+    Mais leve que recalcular_cronograma (não toca nas datas).
+    """
+    from models import TarefaCronograma, RDOApontamentoCronograma, RDO, db
+    from sqlalchemy import func as sqlfunc
+
+    tarefas = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .all()
+    )
+    if not tarefas:
+        return
+
+    # Busca em batch: último apontamento por tarefa_cronograma_id
+    tarefa_ids = [t.id for t in tarefas]
+
+    # Subquery: max data_relatorio por tarefa
+    subq = (
+        db.session.query(
+            RDOApontamentoCronograma.tarefa_cronograma_id,
+            sqlfunc.max(RDO.data_relatorio).label('ultima_data'),
+        )
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+        .filter(
+            RDOApontamentoCronograma.tarefa_cronograma_id.in_(tarefa_ids),
+            RDOApontamentoCronograma.admin_id == admin_id,
+        )
+        .group_by(RDOApontamentoCronograma.tarefa_cronograma_id)
+        .subquery()
+    )
+
+    # Apontamento correspondente à data máxima
+    rows = (
+        db.session.query(
+            RDOApontamentoCronograma.tarefa_cronograma_id,
+            RDOApontamentoCronograma.quantidade_acumulada,
+            RDOApontamentoCronograma.percentual_realizado,
+        )
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+        .join(
+            subq,
+            (subq.c.tarefa_cronograma_id == RDOApontamentoCronograma.tarefa_cronograma_id)
+            & (subq.c.ultima_data == RDO.data_relatorio),
+        )
+        .filter(RDOApontamentoCronograma.admin_id == admin_id)
+        .all()
+    )
+
+    # Mapa tarefa_id → (quantidade_acumulada, percentual_realizado)
+    mapa = {r.tarefa_cronograma_id: r for r in rows}
+
+    for tarefa in tarefas:
+        r = mapa.get(tarefa.id)
+        if r is None:
+            tarefa.percentual_concluido = 0.0
+        elif tarefa.quantidade_total and tarefa.quantidade_total > 0:
+            tarefa.percentual_concluido = min(
+                100.0,
+                round(float(r.quantidade_acumulada) / tarefa.quantidade_total * 100, 2)
+            )
+        else:
+            tarefa.percentual_concluido = min(100.0, float(r.percentual_realizado or 0))
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
 def recalcular_cronograma(obra_id: int, admin_id: int) -> bool:
     """
     Recalcula as datas de todas as tarefas de uma obra.
@@ -198,6 +303,12 @@ def recalcular_cronograma(obra_id: int, admin_id: int) -> bool:
                 )
 
         db.session.commit()
+
+        # Sincronizar percentual_concluido de cada tarefa com o último apontamento do RDO
+        for tarefa in tarefas:
+            _atualizar_percentual_sem_commit(tarefa, admin_id)
+        db.session.commit()
+
         logger.info(
             f"[OK] Cronograma recalculado: obra_id={obra_id}, "
             f"{len(tarefas)} tarefas processadas"
@@ -268,29 +379,45 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dic
 
 def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
     """
-    Recalcula e persiste o percentual_concluido da TarefaCronograma
-    a partir de todos os apontamentos existentes.
+    Recalcula e persiste o percentual_concluido da TarefaCronograma.
+
+    Usa o `percentual_realizado` do apontamento mais recente (por data_relatorio),
+    que por sua vez é calculado com base em `quantidade_acumulada / quantidade_total`.
+    Isso evita dupla contagem ao somar `quantidade_executada_dia` de múltiplos dias.
     """
-    from models import TarefaCronograma, RDOApontamentoCronograma, db
-    from sqlalchemy import func as sqlfunc
+    from models import TarefaCronograma, RDOApontamentoCronograma, RDO, db
 
     tarefa = TarefaCronograma.query.get(tarefa_id)
     if not tarefa:
         return
 
-    total_executado = (
-        db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
+    # Busca o apontamento mais recente (maior data_relatorio do RDO)
+    ultimo = (
+        db.session.query(
+            RDOApontamentoCronograma.percentual_realizado,
+            RDOApontamentoCronograma.quantidade_acumulada,
+        )
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
         .filter(
             RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
             RDOApontamentoCronograma.admin_id == admin_id,
         )
-        .scalar()
-    ) or 0.0
+        .order_by(RDO.data_relatorio.desc())
+        .first()
+    )
 
-    if tarefa.quantidade_total and tarefa.quantidade_total > 0:
-        tarefa.percentual_concluido = min(100.0, round(total_executado / tarefa.quantidade_total * 100, 2))
-    else:
+    if ultimo is None:
+        # Sem apontamentos — mantém 0
         tarefa.percentual_concluido = 0.0
+    elif tarefa.quantidade_total and tarefa.quantidade_total > 0:
+        # Usa quantidade_acumulada do último RDO (mais preciso que somar qty_dia)
+        tarefa.percentual_concluido = min(
+            100.0,
+            round(float(ultimo.quantidade_acumulada) / tarefa.quantidade_total * 100, 2)
+        )
+    else:
+        # Sem quantidade_total: usa o percentual_realizado diretamente do apontamento
+        tarefa.percentual_concluido = min(100.0, float(ultimo.percentual_realizado or 0))
 
     db.session.add(tarefa)
     db.session.commit()

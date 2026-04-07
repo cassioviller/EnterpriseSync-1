@@ -18,6 +18,7 @@ from utils.cronograma_engine import (
     calcular_data_fim,
     calcular_progresso_rdo,
     atualizar_percentual_tarefa,
+    sincronizar_percentuais_obra,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,6 +122,9 @@ def cronograma_obra(obra_id: int):
 
     admin_id = _admin_id()
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+
+    # Sincroniza percentual_concluido com o último apontamento do RDO antes de exibir
+    sincronizar_percentuais_obra(obra_id, admin_id)
 
     tarefas = (
         TarefaCronograma.query
