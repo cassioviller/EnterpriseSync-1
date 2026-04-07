@@ -59,6 +59,7 @@ def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> d
         'unidade_medida': t.unidade_medida,
         'percentual_concluido': t.percentual_concluido or 0.0,
         'percentual_planejado': round(percentual_planejado, 1),
+        'responsavel': getattr(t, 'responsavel', 'empresa') or 'empresa',
     }
 
 
@@ -150,6 +151,11 @@ def cronograma_obra(obra_id: int):
     pai_ids = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
     tarefas_pred_map = {t.id: t.predecessora_id for t in tarefas}
 
+    # Nome da empresa para o campo "Responsável"
+    from models import ConfiguracaoEmpresa
+    config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    nome_empresa = config_empresa.nome_empresa if config_empresa else 'Empresa'
+
     return render_template(
         'obras/cronograma.html',
         obra=obra,
@@ -160,6 +166,7 @@ def cronograma_obra(obra_id: int):
         tarefas_pred_map=tarefas_pred_map,
         planejados_map=planejados_map,
         hoje=hoje,
+        nome_empresa=nome_empresa,
     )
 
 
@@ -243,6 +250,10 @@ def criar_tarefa(obra_id: int):
         data_inicio, duracao, cal.considerar_sabado, cal.considerar_domingo
     )
 
+    responsavel = (data.get('responsavel') or 'empresa').strip().lower()
+    if responsavel not in ('empresa', 'terceiros'):
+        responsavel = 'empresa'
+
     tarefa = TarefaCronograma(
         obra_id=obra_id,
         tarefa_pai_id=tarefa_pai_id,
@@ -255,6 +266,7 @@ def criar_tarefa(obra_id: int):
         quantidade_total=float(data.get('quantidade_total') or 0) or None,
         unidade_medida=(data.get('unidade_medida') or '').strip() or None,
         percentual_concluido=0.0,
+        responsavel=responsavel,
         admin_id=admin_id,
     )
     db.session.add(tarefa)
@@ -306,6 +318,11 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
 
     if 'unidade_medida' in data:
         tarefa.unidade_medida = str(data['unidade_medida']).strip() or None
+
+    if 'responsavel' in data:
+        resp = str(data['responsavel']).strip().lower()
+        if resp in ('empresa', 'terceiros'):
+            tarefa.responsavel = resp
 
     if 'percentual_concluido' in data:
         try:

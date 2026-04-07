@@ -4168,6 +4168,8 @@ class TarefaCronograma(db.Model):
     unidade_medida = db.Column(db.String(20), nullable=True)
     # Atualizado automaticamente pelo RDO
     percentual_concluido = db.Column(db.Float, default=0.0, nullable=False)
+    # 'empresa' = conta na produtividade; 'terceiros' = só check de conclusão
+    responsavel = db.Column(db.String(20), default='empresa', nullable=False)
     admin_id = db.Column(
         db.Integer,
         db.ForeignKey('usuario.id'),

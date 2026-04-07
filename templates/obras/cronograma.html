@@ -39,9 +39,10 @@
   {# ── Cards de estatísticas ── #}
   {% if tarefas %}
   <div class="row g-2 mb-3" id="statsRow">
-    {% set perc_total = (tarefas | map(attribute='percentual_concluido') | select | list | sum / tarefas|length) if tarefas else 0 %}
-    {% set concluidas = tarefas | selectattr('percentual_concluido', 'ge', 100) | list | length %}
-    {% set em_andamento = tarefas | selectattr('percentual_concluido', 'gt', 0) | selectattr('percentual_concluido', 'lt', 100) | list | length %}
+    {% set tarefas_empresa = tarefas | selectattr('responsavel', 'ne', 'terceiros') | list %}
+    {% set perc_total = (tarefas_empresa | map(attribute='percentual_concluido') | select | list | sum / tarefas_empresa|length) if tarefas_empresa else 0 %}
+    {% set concluidas = tarefas_empresa | selectattr('percentual_concluido', 'ge', 100) | list | length %}
+    {% set em_andamento = tarefas_empresa | selectattr('percentual_concluido', 'gt', 0) | selectattr('percentual_concluido', 'lt', 100) | list | length %}
     <div class="col-6 col-md-3">
       <div class="stat-card stat-card-blue">
         <div class="stat-icon"><i class="fas fa-list-check"></i></div>
@@ -97,6 +98,7 @@
               <th class="th-date">Início</th>
               <th class="th-date">Término</th>
               <th class="th-pred" title="ID da tarefa predecessora">Pred.</th>
+              <th class="th-resp" title="Responsável pela execução">Responsável</th>
               <th class="th-perc" title="Progresso planejado para hoje (cálculo linear de datas)">Planejado</th>
               <th class="th-perc" title="Progresso realizado, calculado automaticamente pelos apontamentos do RDO">Realizado</th>
               <th class="th-qty">Qtd / Un.</th>
@@ -186,18 +188,49 @@
                 </span>
               </td>
 
+              {# Responsável #}
+              {% set resp = t.responsavel if t.responsavel else 'empresa' %}
+              <td class="td-center td-resp small">
+                {% if resp == 'terceiros' %}
+                  <span class="badge bg-warning text-dark" style="font-size:.7rem">
+                    <i class="fas fa-hard-hat me-1"></i>Terceiros
+                  </span>
+                {% else %}
+                  <span class="badge bg-info text-dark" style="font-size:.7rem">
+                    <i class="fas fa-building me-1"></i>Empresa
+                  </span>
+                {% endif %}
+              </td>
+
               {# Planejado — calculado linearmente pelas datas da tarefa até hoje #}
               <td class="td-perc plan-val">
+                {% if resp == 'terceiros' %}
+                  <span class="text-muted small">—</span>
+                {% else %}
                 <div class="perc-wrapper" title="Progresso planejado para hoje (interpolação linear de dias úteis)">
                   <div class="perc-bar-wrap">
                     <div class="perc-bar-fill fill-plan" style="width:{{ plan }}%"></div>
                   </div>
                   <span class="perc-text text-secondary">{{ plan }}%</span>
                 </div>
+                {% endif %}
               </td>
 
-              {# Realizado — calculado automaticamente pelos apontamentos do RDO, somente leitura #}
+              {# Realizado — empresa: % via RDO | terceiros: checkbox manual #}
               <td class="td-perc perc-val">
+                {% if resp == 'terceiros' %}
+                  <div class="d-flex align-items-center justify-content-center gap-2" title="Marque quando concluído por terceiros">
+                    <div class="form-check form-check-inline mb-0">
+                      <input class="form-check-input" type="checkbox" id="chk-terc-{{ t.id }}"
+                             {% if perc >= 100 %}checked{% endif %}
+                             onchange="toggleTerceiros({{ t.id }}, this.checked)"
+                             style="width:1.2em;height:1.2em;cursor:pointer">
+                      <label class="form-check-label small fw-semibold {% if perc >= 100 %}text-success{% else %}text-muted{% endif %}" for="chk-terc-{{ t.id }}">
+                        {% if perc >= 100 %}Concluído{% else %}Pendente{% endif %}
+                      </label>
+                    </div>
+                  </div>
+                {% else %}
                 <div class="perc-wrapper" title="Progresso realizado via RDO">
                   <div class="perc-bar-wrap">
                     <div class="perc-bar-fill
@@ -209,6 +242,7 @@
                   </div>
                   <span class="perc-text {% if perc >= plan %}text-success{% elif perc > 0 %}text-warning{% else %}text-danger{% endif %}">{{ perc }}%</span>
                 </div>
+                {% endif %}
               </td>
 
               {# Quantidade / Unidade #}
@@ -297,6 +331,13 @@
               <option value="">— Nenhuma (tarefa raiz) —</option>
             </select>
           </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Responsável</label>
+            <select id="nt_resp" class="form-select">
+              <option value="empresa">🏢 {{ nome_empresa }} (conta na produtividade)</option>
+              <option value="terceiros">👷 Terceiros (somente confirmação)</option>
+            </select>
+          </div>
           <div class="col-md-3">
             <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Quantidade</label>
             <input type="number" id="nt_qtd" class="form-control" placeholder="ex: 250" step="any">
@@ -366,6 +407,13 @@
         <label class="form-label fw-semibold small text-uppercase text-muted">Tarefa Pai</label>
         <select id="ed_pai" class="form-select">
           <option value="">— Nenhuma (raiz) —</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold small text-uppercase text-muted">Responsável</label>
+        <select id="ed_resp" class="form-select">
+          <option value="empresa">🏢 {{ nome_empresa }} (conta na produtividade)</option>
+          <option value="terceiros">👷 Terceiros (somente confirmação)</option>
         </select>
       </div>
       <div class="col-6">
@@ -483,6 +531,8 @@
 .th-dur   { width: 68px; text-align: center; }
 .th-date  { width: 92px; text-align: center; }
 .th-pred  { width: 70px; text-align: center; }
+.th-resp  { width: 105px; text-align: center; }
+.td-resp  { text-align: center; }
 .th-perc  { width: 110px; }
 .th-qty   { width: 90px; text-align: center; }
 .th-act   { width: 64px; }
@@ -827,8 +877,26 @@ function updateTarefaLocal(t) {
   if (pred) pred.innerHTML = t.predecessora_id
     ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>`
     : '—';
-  if (percEl) percEl.innerHTML = buildRealCell(t.percentual_concluido || 0, t.percentual_planejado || 0);
-  if (planEl) planEl.innerHTML = buildPlanCell(t.percentual_planejado || 0);
+  const resp = t.responsavel || 'empresa';
+  if (percEl) {
+    if (resp === 'terceiros') {
+      const p = Math.round(t.percentual_concluido || 0);
+      percEl.innerHTML = `<div class="d-flex align-items-center justify-content-center gap-2">
+        <div class="form-check form-check-inline mb-0">
+          <input class="form-check-input" type="checkbox" id="chk-terc-${t.id}"
+                 ${p >= 100 ? 'checked' : ''}
+                 onchange="toggleTerceiros(${t.id}, this.checked)"
+                 style="width:1.2em;height:1.2em;cursor:pointer">
+          <label class="form-check-label small fw-semibold ${p >= 100 ? 'text-success' : 'text-muted'}" for="chk-terc-${t.id}">
+            ${p >= 100 ? 'Concluído' : 'Pendente'}
+          </label>
+        </div>
+      </div>`;
+    } else {
+      percEl.innerHTML = buildRealCell(t.percentual_concluido || 0, t.percentual_planejado || 0);
+    }
+  }
+  if (planEl) planEl.innerHTML = resp === 'terceiros' ? '<span class="text-muted small">—</span>' : buildPlanCell(t.percentual_planejado || 0);
   if (dur)    dur.textContent = t.duracao_dias + 'd';
 
   row.dataset.inicio    = t.data_inicio || '';
@@ -916,6 +984,7 @@ function abrirModalNovaTarefa() {
   document.getElementById('nt_inicio').value = new Date().toISOString().slice(0,10);
   document.getElementById('nt_qtd').value = '';
   document.getElementById('nt_unidade').value = '';
+  document.getElementById('nt_resp').value = 'empresa';
   _popularSelect('nt_pred', tarefas, '— Nenhuma —');
   _popularSelect('nt_pai',  tarefas, '— Nenhuma (tarefa raiz) —');
 
@@ -949,6 +1018,7 @@ async function salvarNovaTarefa() {
     tarefa_pai_id:    document.getElementById('nt_pai').value || null,
     quantidade_total: document.getElementById('nt_qtd').value || null,
     unidade_medida:   document.getElementById('nt_unidade').value.trim() || null,
+    responsavel:      document.getElementById('nt_resp').value || 'empresa',
   };
   try {
     const res = await fetch(`${URL_BASE}/tarefa`, {
@@ -982,6 +1052,7 @@ function abrirEditar(tarefaId) {
   document.getElementById('ed_fim').value      = t.data_fim || '';
   document.getElementById('ed_qtd').value      = t.quantidade_total || '';
   document.getElementById('ed_unidade').value  = t.unidade_medida || '';
+  document.getElementById('ed_resp').value     = t.responsavel || 'empresa';
 
   _popularSelect('ed_pred', tarefas, '— Nenhuma —', tarefaId);
   _popularSelect('ed_pai',  tarefas, '— Nenhuma (raiz) —', tarefaId);
@@ -1021,7 +1092,8 @@ async function salvarEditar() {
     tarefa_pai_id:     document.getElementById('ed_pai').value || null,
     quantidade_total:  document.getElementById('ed_qtd').value || null,
     unidade_medida:    document.getElementById('ed_unidade').value.trim() || null,
-    // percentual_concluido NÃO é enviado — calculado automaticamente pelo RDO
+    responsavel:       document.getElementById('ed_resp').value || 'empresa',
+    // percentual_concluido NÃO é enviado — calculado automaticamente pelo RDO (empresa) ou checkbox (terceiros)
   };
   if (!body.nome_tarefa) { toast('Nome da tarefa obrigatório', 'warning'); return; }
 
@@ -1069,6 +1141,29 @@ function adicionarLinhaTabela(t) {
     ? `<span class="qty-chip">${Number.isInteger(t.quantidade_total) ? t.quantidade_total : t.quantidade_total.toFixed(1)} ${t.unidade_medida || ''}</span>`
     : '—';
 
+  const resp = t.responsavel || 'empresa';
+  const respBadge = resp === 'terceiros'
+    ? `<span class="badge bg-warning text-dark" style="font-size:.7rem"><i class="fas fa-hard-hat me-1"></i>Terceiros</span>`
+    : `<span class="badge bg-info text-dark" style="font-size:.7rem"><i class="fas fa-building me-1"></i>Empresa</span>`;
+
+  const planCell = resp === 'terceiros'
+    ? `<span class="text-muted small">—</span>`
+    : buildPlanCell(t.percentual_planejado || 0);
+
+  const realCell = resp === 'terceiros'
+    ? `<div class="d-flex align-items-center justify-content-center gap-2">
+         <div class="form-check form-check-inline mb-0">
+           <input class="form-check-input" type="checkbox" id="chk-terc-${t.id}"
+                  ${p >= 100 ? 'checked' : ''}
+                  onchange="toggleTerceiros(${t.id}, this.checked)"
+                  style="width:1.2em;height:1.2em;cursor:pointer">
+           <label class="form-check-label small fw-semibold ${p >= 100 ? 'text-success' : 'text-muted'}" for="chk-terc-${t.id}">
+             ${p >= 100 ? 'Concluído' : 'Pendente'}
+           </label>
+         </div>
+       </div>`
+    : buildRealCell(p, t.percentual_planejado || 0);
+
   row.innerHTML = `
     <td class="td-grip"><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span></td>
     <td class="td-num text-muted">—</td>
@@ -1082,8 +1177,9 @@ function adicionarLinhaTabela(t) {
     <td class="td-center small"><span class="date-chip inicio-val" ondblclick="iniciarEdicao(this,${t.id},'data_inicio')" title="Duplo-clique para editar">${t.data_inicio ? formatDate(t.data_inicio) : '—'}</span></td>
     <td class="td-center small"><span class="date-chip fim-val">${t.data_fim ? formatDate(t.data_fim) : '—'}</span></td>
     <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${t.predecessora_id ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>` : '—'}</span></td>
-    <td class="td-perc plan-val">${buildPlanCell(t.percentual_planejado || 0)}</td>
-    <td class="td-perc perc-val">${buildRealCell(p, t.percentual_planejado || 0)}</td>
+    <td class="td-center td-resp small">${respBadge}</td>
+    <td class="td-perc plan-val">${planCell}</td>
+    <td class="td-perc perc-val">${realCell}</td>
     <td class="td-center small text-muted">${qtdHtml}</td>
     <td class="td-actions">
       <div class="actions-wrap">
@@ -1108,6 +1204,37 @@ async function excluirTarefa(id, nome) {
       toast('Tarefa excluída');
     } else {
       toast(data.msg || 'Erro ao excluir', 'error');
+    }
+  } catch(e) { toast('Erro de rede', 'error'); }
+}
+
+// ── Toggle Terceiros (checkbox de conclusão) ──
+async function toggleTerceiros(tarefaId, concluido) {
+  const perc = concluido ? 100 : 0;
+  try {
+    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ percentual_concluido: perc }),
+    });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      const t = tarefas.find(x => x.id === tarefaId);
+      if (t) t.percentual_concluido = perc;
+      // Atualizar label do checkbox
+      const lbl = document.querySelector(`label[for="chk-terc-${tarefaId}"]`);
+      if (lbl) {
+        lbl.textContent = concluido ? 'Concluído' : 'Pendente';
+        lbl.className = `form-check-label small fw-semibold ${concluido ? 'text-success' : 'text-muted'}`;
+      }
+      const row = document.querySelector(`[data-id="${tarefaId}"]`);
+      if (row) {
+        row.dataset.perc = perc;
+        if (perc >= 100) { row.classList.add('row-done'); row.classList.remove('row-wip'); }
+        else { row.classList.remove('row-done', 'row-wip'); }
+      }
+      toast(concluido ? 'Tarefa de terceiros marcada como concluída' : 'Tarefa de terceiros revertida para pendente', 'success');
+    } else {
+      toast(data.msg || 'Erro ao atualizar', 'error');
     }
   } catch(e) { toast('Erro de rede', 'error'); }
 }

@@ -3787,6 +3787,7 @@ def executar_migracoes():
             (85, "GestaoCustoPai - fornecedor_id, forma_pagamento, valor_pago, saldo, conta_contabil_codigo, data_emissao, numero_parcela, total_parcelas", _migration_85_gestao_custo_pai_novas_colunas),
             (86, "CustoObra - colunas extras (funcionario_id, rdo_id, categoria, horas, quantidade, veiculo, almoxarifado)", _migration_86_custo_obra_colunas_extras),
             (87, "Proposta - numero_proposta unique por tenant (numero_proposta + admin_id)", migration_87_proposta_numero_unique_por_tenant),
+            (88, "TarefaCronograma - campo responsavel (empresa/terceiros)", migration_88_tarefa_cronograma_responsavel),
         ]
         
         # Executar cada migração com rastreamento
@@ -7526,6 +7527,46 @@ def migration_87_proposta_numero_unique_por_tenant():
 
     except Exception as e:
         logger.error(f"Erro na migracao 87: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_88_tarefa_cronograma_responsavel():
+    """
+    Migração 88: tarefa_cronograma - adicionar coluna responsavel
+    Valores: 'empresa' (conta na produtividade) ou 'terceiros' (só check de conclusão)
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'tarefa_cronograma' AND column_name = 'responsavel'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando coluna responsavel em tarefa_cronograma...")
+            cursor.execute("""
+                ALTER TABLE tarefa_cronograma
+                ADD COLUMN responsavel VARCHAR(20) NOT NULL DEFAULT 'empresa'
+            """)
+            logger.info("  Coluna responsavel adicionada com sucesso.")
+        else:
+            logger.info("  Coluna responsavel já existe em tarefa_cronograma.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 88 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 88: {e}")
         if connection:
             try:
                 connection.rollback()

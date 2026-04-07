@@ -194,6 +194,10 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int) -> None:
     mapa = {r.tarefa_cronograma_id: r for r in rows}
 
     for tarefa in tarefas:
+        # Tarefas de terceiros: percentual é gerenciado manualmente (checkbox),
+        # não deve ser sobrescrito pela sincronização com o RDO
+        if getattr(tarefa, 'responsavel', 'empresa') == 'terceiros':
+            continue
         r = mapa.get(tarefa.id)
         if r is None:
             tarefa.percentual_concluido = 0.0
