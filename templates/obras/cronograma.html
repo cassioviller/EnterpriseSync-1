@@ -245,9 +245,11 @@
                 {% endif %}
               </td>
 
-              {# Quantidade / Unidade #}
+              {# Quantidade / Unidade — oculta para tarefas pai #}
               <td class="td-center small text-muted">
-                {% if t.quantidade_total %}
+                {% if is_pai %}
+                  <span class="text-muted" title="Tarefas pai não usam quantidade/unidade">—</span>
+                {% elif t.quantidade_total %}
                   <span class="qty-chip">
                     {{ t.quantidade_total | int if t.quantidade_total == t.quantidade_total|int else "%.1f"|format(t.quantidade_total) }}
                     {{ t.unidade_medida or '' }}
@@ -389,11 +391,19 @@
           <span class="input-group-text text-muted">%</span>
         </div>
       </div>
-      <div class="col-6">
+      {# Alerta visível apenas quando for tarefa pai #}
+      <div class="col-12 d-none" id="ed_pai_alert">
+        <div class="alert alert-info py-2 px-3 mb-0 small">
+          <i class="fas fa-sitemap me-2"></i>
+          <strong>Tarefa agrupadora:</strong> datas e % são calculados automaticamente a partir das subtarefas.
+        </div>
+      </div>
+
+      <div class="col-6" id="ed_inicio_row">
         <label class="form-label fw-semibold small text-uppercase text-muted">Data Início</label>
         <input type="date" id="ed_inicio" class="form-control">
       </div>
-      <div class="col-6">
+      <div class="col-6" id="ed_fim_row">
         <label class="form-label fw-semibold small text-uppercase text-muted">Data Término</label>
         <input type="date" id="ed_fim" class="form-control" disabled title="Calculado automaticamente pela duração">
       </div>
@@ -416,11 +426,11 @@
           <option value="terceiros">👷 Terceiros (somente confirmação)</option>
         </select>
       </div>
-      <div class="col-6">
+      <div class="col-6 d-none" id="ed_qtd_row">
         <label class="form-label fw-semibold small text-uppercase text-muted">Quantidade</label>
         <input type="number" id="ed_qtd" class="form-control" step="any" placeholder="ex: 250">
       </div>
-      <div class="col-6">
+      <div class="col-6 d-none" id="ed_unidade_row">
         <label class="form-label fw-semibold small text-uppercase text-muted">Unidade</label>
         <input type="text" id="ed_unidade" class="form-control" placeholder="ex: m²">
       </div>
@@ -1054,6 +1064,33 @@ function abrirEditar(tarefaId) {
   document.getElementById('ed_unidade').value  = t.unidade_medida || '';
   document.getElementById('ed_resp').value     = t.responsavel || 'empresa';
 
+  // Detectar se é tarefa pai (tem filhos)
+  const temFilhos = tarefas.some(x => x.tarefa_pai_id === tarefaId);
+  const paiAlert   = document.getElementById('ed_pai_alert');
+  const qtdRow     = document.getElementById('ed_qtd_row');
+  const unidRow    = document.getElementById('ed_unidade_row');
+  const inicioRow  = document.getElementById('ed_inicio_row');
+  const fimRow     = document.getElementById('ed_fim_row');
+  const duracaoEl  = document.getElementById('ed_duracao');
+
+  if (temFilhos) {
+    paiAlert?.classList.remove('d-none');
+    qtdRow?.classList.add('d-none');
+    unidRow?.classList.add('d-none');
+    inicioRow?.classList.add('d-none');
+    fimRow?.classList.add('d-none');
+    duracaoEl.disabled = true;
+    duracaoEl.title = 'Calculado automaticamente pelas subtarefas';
+  } else {
+    paiAlert?.classList.add('d-none');
+    qtdRow?.classList.remove('d-none');
+    unidRow?.classList.remove('d-none');
+    inicioRow?.classList.remove('d-none');
+    fimRow?.classList.remove('d-none');
+    duracaoEl.disabled = false;
+    duracaoEl.title = '';
+  }
+
   _popularSelect('ed_pred', tarefas, '— Nenhuma —', tarefaId);
   _popularSelect('ed_pai',  tarefas, '— Nenhuma (raiz) —', tarefaId);
 
@@ -1062,7 +1099,7 @@ function abrirEditar(tarefaId) {
   Array.from(predSel.options).forEach(o => { if (String(o.value) === String(t.predecessora_id)) o.selected = true; });
   Array.from(paiSel.options).forEach(o => { if (String(o.value) === String(t.tarefa_pai_id)) o.selected = true; });
 
-  // Progress preview (read-only, calculado pelo RDO)
+  // Progress preview (read-only, calculado pelo RDO ou filhos)
   atualizarPercPreview();
 
   // Delete button
@@ -1137,9 +1174,12 @@ function adicionarLinhaTabela(t) {
   row.dataset.fim      = t.data_fim    || '';
   row.draggable = true;
 
-  const qtdHtml = t.quantidade_total
-    ? `<span class="qty-chip">${Number.isInteger(t.quantidade_total) ? t.quantidade_total : t.quantidade_total.toFixed(1)} ${t.unidade_medida || ''}</span>`
-    : '—';
+  const ePai = tarefas.some(x => x.tarefa_pai_id === t.id);
+  const qtdHtml = ePai
+    ? '—'
+    : (t.quantidade_total
+        ? `<span class="qty-chip">${Number.isInteger(t.quantidade_total) ? t.quantidade_total : t.quantidade_total.toFixed(1)} ${t.unidade_medida || ''}</span>`
+        : '—');
 
   const resp = t.responsavel || 'empresa';
   const respBadge = resp === 'terceiros'

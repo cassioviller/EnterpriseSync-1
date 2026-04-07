@@ -209,6 +209,21 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int) -> None:
         else:
             tarefa.percentual_concluido = min(100.0, float(r.percentual_realizado or 0))
 
+    # ── Bottom-up: % dos pais calculado a partir dos filhos (média ponderada por duração) ──
+    pai_ids_set = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
+    tarefa_map_local = {t.id: t for t in tarefas}
+    pais_lista = [t for t in tarefas if t.id in pai_ids_set]
+    # Ordenar do mais profundo para a raiz usando a ordem reversa
+    for pai in sorted(pais_lista, key=lambda t: t.ordem, reverse=True):
+        filhas = [t for t in tarefas if t.tarefa_pai_id == pai.id]
+        if not filhas:
+            continue
+        total_dur = sum(max(f.duracao_dias or 1, 1) for f in filhas)
+        if total_dur > 0:
+            pai.percentual_concluido = round(
+                sum((f.percentual_concluido or 0) * max(f.duracao_dias or 1, 1) for f in filhas) / total_dur, 2
+            )
+
     try:
         db.session.commit()
     except Exception:
@@ -308,9 +323,22 @@ def recalcular_cronograma(obra_id: int, admin_id: int) -> bool:
 
         db.session.commit()
 
-        # Sincronizar percentual_concluido de cada tarefa com o último apontamento do RDO
+        # Sincronizar percentual_concluido de folhas com o último apontamento do RDO
         for tarefa in tarefas:
-            _atualizar_percentual_sem_commit(tarefa, admin_id)
+            if tarefa.id not in pai_ids:  # só folhas recebem sync do RDO
+                _atualizar_percentual_sem_commit(tarefa, admin_id)
+
+        # Bottom-up: % dos pais calculado a partir dos filhos (média ponderada por duração)
+        for pai in sorted(pais, key=lambda t: t.ordem, reverse=True):
+            filhas = [t for t in tarefas if t.tarefa_pai_id == pai.id]
+            if not filhas:
+                continue
+            total_dur = sum(max(f.duracao_dias or 1, 1) for f in filhas)
+            if total_dur > 0:
+                pai.percentual_concluido = round(
+                    sum((f.percentual_concluido or 0) * max(f.duracao_dias or 1, 1) for f in filhas) / total_dur, 2
+                )
+
         db.session.commit()
 
         logger.info(
