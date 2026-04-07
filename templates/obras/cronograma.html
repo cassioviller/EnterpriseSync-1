@@ -97,7 +97,8 @@
               <th class="th-date">Início</th>
               <th class="th-date">Término</th>
               <th class="th-pred" title="ID da tarefa predecessora">Pred.</th>
-              <th class="th-perc">Progresso</th>
+              <th class="th-perc" title="Progresso planejado para hoje (cálculo linear de datas)">Planejado</th>
+              <th class="th-perc" title="Progresso realizado, calculado automaticamente pelos apontamentos do RDO">Realizado</th>
               <th class="th-qty">Qtd / Un.</th>
               <th class="th-act"></th>
             </tr>
@@ -106,6 +107,7 @@
             {% for t in tarefas %}
             {% set is_pai = t.id in pai_ids %}
             {% set perc = (t.percentual_concluido or 0)|int %}
+            {% set plan = (planejados_map.get(t.id, 0))|int %}
             <tr class="tarefa-row
                   {% if is_pai %}tarefa-pai{% endif %}
                   {% if t.tarefa_pai_id %}tarefa-filho d-none{% endif %}
@@ -113,6 +115,7 @@
                 data-id="{{ t.id }}"
                 data-pai="{{ t.tarefa_pai_id or '' }}"
                 data-perc="{{ perc }}"
+                data-planejado="{{ plan }}"
                 data-inicio="{{ t.data_inicio.isoformat() if t.data_inicio else '' }}"
                 data-fim="{{ t.data_fim.isoformat() if t.data_fim else '' }}"
                 draggable="true">
@@ -183,9 +186,19 @@
                 </span>
               </td>
 
-              {# Progresso — calculado automaticamente pelo RDO, somente leitura #}
+              {# Planejado — calculado linearmente pelas datas da tarefa até hoje #}
+              <td class="td-perc plan-val">
+                <div class="perc-wrapper" title="Progresso planejado para hoje (interpolação linear de dias úteis)">
+                  <div class="perc-bar-wrap">
+                    <div class="perc-bar-fill fill-plan" style="width:{{ plan }}%"></div>
+                  </div>
+                  <span class="perc-text text-secondary">{{ plan }}%</span>
+                </div>
+              </td>
+
+              {# Realizado — calculado automaticamente pelos apontamentos do RDO, somente leitura #}
               <td class="td-perc perc-val">
-                <div class="perc-wrapper" title="Calculado automaticamente pelos apontamentos do RDO">
+                <div class="perc-wrapper" title="Progresso realizado via RDO">
                   <div class="perc-bar-wrap">
                     <div class="perc-bar-fill
                       {% if perc >= 100 %}fill-done
@@ -194,7 +207,7 @@
                       {% else %}fill-low{% endif %}"
                       style="width:{{ perc }}%"></div>
                   </div>
-                  <span class="perc-text">{{ perc }}%</span>
+                  <span class="perc-text {% if perc >= plan %}text-success{% elif perc > 0 %}text-warning{% else %}text-danger{% endif %}">{{ perc }}%</span>
                 </div>
               </td>
 
@@ -470,7 +483,7 @@
 .th-dur   { width: 68px; text-align: center; }
 .th-date  { width: 92px; text-align: center; }
 .th-pred  { width: 70px; text-align: center; }
-.th-perc  { width: 130px; }
+.th-perc  { width: 110px; }
 .th-qty   { width: 90px; text-align: center; }
 .th-act   { width: 64px; }
 
@@ -544,7 +557,9 @@
 .fill-good { background: linear-gradient(90deg,#3b82f6,#1d4ed8); }
 .fill-mid  { background: linear-gradient(90deg,#f59e0b,#d97706); }
 .fill-low  { background: linear-gradient(90deg,#ef4444,#dc2626); }
-.perc-text { font-size: .75rem; font-weight: 700; color: #333; min-width: 30px; text-align: right; }
+.fill-plan { background: linear-gradient(90deg,#94a3b8,#64748b); }
+.perc-text { font-size: .75rem; font-weight: 700; min-width: 30px; text-align: right; }
+.perc-text:not(.text-success):not(.text-warning):not(.text-danger):not(.text-secondary) { color: #333; }
 
 /* Pred badge */
 .pred-val .badge { font-size: .72rem; }
@@ -601,6 +616,12 @@
 .gantt-today::before {
   content: 'hoje'; position: absolute; top: 2px; left: 3px;
   font-size: .6rem; color: #e53935; font-weight: 700; white-space: nowrap;
+}
+.gantt-plan-marker {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: rgba(255,255,255,.75);
+  border-left: 2px dashed rgba(255,255,255,.9);
+  z-index: 4; pointer-events: none;
 }
 /* Row drag */
 .tarefa-row.dragging-row { opacity: .45; background: #fff3cd !important; }
@@ -797,20 +818,23 @@ function updateTarefaLocal(t) {
   const ini  = row.querySelector('.inicio-val');
   const fim  = row.querySelector('.fim-val');
   const pred = row.querySelector('.pred-val');
-  const perc = row.querySelector('.perc-val');
-  const dur  = row.querySelector('.dur-val');
+  const percEl = row.querySelector('.perc-val');
+  const planEl = row.querySelector('.plan-val');
+  const dur    = row.querySelector('.dur-val');
 
   if (ini) ini.textContent = t.data_inicio ? formatDate(t.data_inicio) : '—';
   if (fim) fim.textContent = t.data_fim ? formatDate(t.data_fim) : '—';
   if (pred) pred.innerHTML = t.predecessora_id
     ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>`
     : '—';
-  if (perc) perc.innerHTML = buildPercCell(t.percentual_concluido || 0);
-  if (dur)  dur.textContent = t.duracao_dias + 'd';
+  if (percEl) percEl.innerHTML = buildRealCell(t.percentual_concluido || 0, t.percentual_planejado || 0);
+  if (planEl) planEl.innerHTML = buildPlanCell(t.percentual_planejado || 0);
+  if (dur)    dur.textContent = t.duracao_dias + 'd';
 
-  row.dataset.inicio = t.data_inicio || '';
-  row.dataset.fim    = t.data_fim    || '';
-  row.dataset.perc   = t.percentual_concluido || 0;
+  row.dataset.inicio    = t.data_inicio || '';
+  row.dataset.fim       = t.data_fim    || '';
+  row.dataset.perc      = t.percentual_concluido || 0;
+  row.dataset.planejado = t.percentual_planejado || 0;
 
   // Row color
   const p = Math.round(t.percentual_concluido || 0);
@@ -825,16 +849,31 @@ function formatDate(iso) {
   return `${d}/${m}/${y.slice(2)}`;
 }
 
-function buildPercCell(perc) {
-  const p = Math.round(perc || 0);
-  const fill = p >= 100 ? 'fill-done' : p >= 60 ? 'fill-good' : p >= 30 ? 'fill-mid' : 'fill-low';
-  return `<div class="perc-wrapper" title="Calculado automaticamente pelos apontamentos do RDO">
+function buildPlanCell(planejado) {
+  const p = Math.round(planejado || 0);
+  return `<div class="perc-wrapper" title="Progresso planejado para hoje (interpolação linear de dias úteis)">
     <div class="perc-bar-wrap">
-      <div class="perc-bar-fill ${fill}" style="width:${p}%"></div>
+      <div class="perc-bar-fill fill-plan" style="width:${p}%"></div>
     </div>
-    <span class="perc-text">${p}%</span>
+    <span class="perc-text text-secondary">${p}%</span>
   </div>`;
 }
+
+function buildRealCell(realizado, planejado) {
+  const r = Math.round(realizado || 0);
+  const pl = Math.round(planejado || 0);
+  const fill = r >= 100 ? 'fill-done' : r >= 60 ? 'fill-good' : r >= 30 ? 'fill-mid' : 'fill-low';
+  const cor  = r >= pl ? 'text-success' : r > 0 ? 'text-warning' : 'text-danger';
+  return `<div class="perc-wrapper" title="Progresso realizado via RDO">
+    <div class="perc-bar-wrap">
+      <div class="perc-bar-fill ${fill}" style="width:${r}%"></div>
+    </div>
+    <span class="perc-text ${cor}">${r}%</span>
+  </div>`;
+}
+
+// Alias for compatibility
+function buildPercCell(perc, planejado) { return buildRealCell(perc, planejado || 0); }
 
 // ── Recalcular ──
 async function recalcularTudo(showToast=true) {
@@ -1018,11 +1057,12 @@ function adicionarLinhaTabela(t) {
   const ind = t.tarefa_pai_id ? '22px' : '0';
   const row = document.createElement('tr');
   row.className = `tarefa-row${isPai ? ' tarefa-pai' : ''}${t.tarefa_pai_id ? ' tarefa-filho' : ''}`;
-  row.dataset.id    = t.id;
-  row.dataset.pai   = t.tarefa_pai_id || '';
-  row.dataset.perc  = p;
-  row.dataset.inicio = t.data_inicio || '';
-  row.dataset.fim    = t.data_fim    || '';
+  row.dataset.id       = t.id;
+  row.dataset.pai      = t.tarefa_pai_id || '';
+  row.dataset.perc     = p;
+  row.dataset.planejado = Math.round(t.percentual_planejado || 0);
+  row.dataset.inicio   = t.data_inicio || '';
+  row.dataset.fim      = t.data_fim    || '';
   row.draggable = true;
 
   const qtdHtml = t.quantidade_total
@@ -1042,7 +1082,8 @@ function adicionarLinhaTabela(t) {
     <td class="td-center small"><span class="date-chip inicio-val" ondblclick="iniciarEdicao(this,${t.id},'data_inicio')" title="Duplo-clique para editar">${t.data_inicio ? formatDate(t.data_inicio) : '—'}</span></td>
     <td class="td-center small"><span class="date-chip fim-val">${t.data_fim ? formatDate(t.data_fim) : '—'}</span></td>
     <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${t.predecessora_id ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>` : '—'}</span></td>
-    <td class="td-perc perc-val">${buildPercCell(p)}</td>
+    <td class="td-perc plan-val">${buildPlanCell(t.percentual_planejado || 0)}</td>
+    <td class="td-perc perc-val">${buildRealCell(p, t.percentual_planejado || 0)}</td>
     <td class="td-center small text-muted">${qtdHtml}</td>
     <td class="td-actions">
       <div class="actions-wrap">
@@ -1199,11 +1240,18 @@ function renderGantt() {
       const leftPx = Math.round((dI - dMin) / 86400000) * DAY_W;
       const widPx  = (Math.round((dF - dI) / 86400000) + 1) * DAY_W;
       const progW  = Math.round(perc / 100 * widPx);
+      const plan   = Math.round(t.percentual_planejado || 0);
+      const planW  = Math.round(plan / 100 * widPx);
       const barClass = isPai ? 'gantt-bar-pai' : perc >= 100 ? 'gantt-bar-done' : perc < 20 ? 'gantt-bar-low' : 'gantt-bar-leaf';
+      // Indicador de planejado: linha vertical tracejada sobre a barra
+      const planMarker = (plan > 0 && plan < 100)
+        ? `<div class="gantt-plan-marker" style="left:${planW}px" title="Planejado hoje: ${plan}%"></div>`
+        : '';
       barHtml = `<div class="gantt-bar ${barClass}" data-tarefa-id="${t.id}"
         style="left:${leftPx}px;width:${widPx}px"
-        title="${t.nome_tarefa} — ${perc}% — ${formatDate(t.data_inicio)} → ${formatDate(t.data_fim)}">
+        title="${t.nome_tarefa} — Real: ${perc}% / Plan: ${plan}% — ${formatDate(t.data_inicio)} → ${formatDate(t.data_fim)}">
         <div class="gantt-progress" style="width:${progW}px"></div>
+        ${planMarker}
         ${widPx > 60 ? `<span class="gantt-bar-label">${perc}%</span>` : ''}
       </div>`;
     }

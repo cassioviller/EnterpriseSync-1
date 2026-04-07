@@ -44,7 +44,7 @@ def _admin_id() -> int:
     return get_tenant_admin_id()
 
 
-def _tarefa_to_dict(t: TarefaCronograma) -> dict:
+def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> dict:
     return {
         'id': t.id,
         'obra_id': t.obra_id,
@@ -58,6 +58,7 @@ def _tarefa_to_dict(t: TarefaCronograma) -> dict:
         'quantidade_total': t.quantidade_total,
         'unidade_medida': t.unidade_medida,
         'percentual_concluido': t.percentual_concluido or 0.0,
+        'percentual_planejado': round(percentual_planejado, 1),
     }
 
 
@@ -134,7 +135,16 @@ def cronograma_obra(obra_id: int):
     )
 
     cal = get_calendario(admin_id)
-    tarefas_dict = [_tarefa_to_dict(t) for t in tarefas]
+
+    # Calcula progresso planejado de hoje para cada tarefa
+    hoje = date.today()
+    tarefas_dict = []
+    planejados_map: dict[int, float] = {}
+    for t in tarefas:
+        prog = calcular_progresso_rdo(t.id, hoje, admin_id)
+        planejado = prog['percentual_planejado']
+        planejados_map[t.id] = planejado
+        tarefas_dict.append(_tarefa_to_dict(t, planejado))
 
     # Build lookup maps for rendering
     pai_ids = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
@@ -148,6 +158,8 @@ def cronograma_obra(obra_id: int):
         calendario=cal,
         pai_ids=pai_ids,
         tarefas_pred_map=tarefas_pred_map,
+        planejados_map=planejados_map,
+        hoje=hoje,
     )
 
 
