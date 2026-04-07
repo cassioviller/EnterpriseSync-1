@@ -183,11 +183,9 @@
                 </span>
               </td>
 
-              {# Progresso #}
+              {# Progresso — calculado automaticamente pelo RDO, somente leitura #}
               <td class="td-perc perc-val">
-                <div class="perc-wrapper"
-                     ondblclick="iniciarEdicao(this.querySelector('.perc-text'), {{ t.id }}, 'percentual_concluido')"
-                     title="Duplo-clique para editar">
+                <div class="perc-wrapper" title="Calculado automaticamente pelos apontamentos do RDO">
                   <div class="perc-bar-wrap">
                     <div class="perc-bar-fill
                       {% if perc >= 100 %}fill-done
@@ -327,9 +325,13 @@
         </div>
       </div>
       <div class="col-6">
-        <label class="form-label fw-semibold small text-uppercase text-muted">% Concluído</label>
+        <label class="form-label fw-semibold small text-uppercase text-muted">
+          % Concluído
+          <span class="badge bg-secondary ms-1" style="font-size:.65rem">via RDO</span>
+        </label>
         <div class="input-group">
-          <input type="number" id="ed_perc" class="form-control" min="0" max="100">
+          <input type="number" id="ed_perc" class="form-control bg-light" min="0" max="100"
+                 disabled title="Calculado automaticamente pelos apontamentos do RDO">
           <span class="input-group-text text-muted">%</span>
         </div>
       </div>
@@ -803,7 +805,7 @@ function updateTarefaLocal(t) {
   if (pred) pred.innerHTML = t.predecessora_id
     ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>`
     : '—';
-  if (perc) perc.innerHTML = buildPercCell(t.percentual_concluido || 0, t.id);
+  if (perc) perc.innerHTML = buildPercCell(t.percentual_concluido || 0);
   if (dur)  dur.textContent = t.duracao_dias + 'd';
 
   row.dataset.inicio = t.data_inicio || '';
@@ -823,10 +825,10 @@ function formatDate(iso) {
   return `${d}/${m}/${y.slice(2)}`;
 }
 
-function buildPercCell(perc, tarefaId) {
+function buildPercCell(perc) {
   const p = Math.round(perc || 0);
   const fill = p >= 100 ? 'fill-done' : p >= 60 ? 'fill-good' : p >= 30 ? 'fill-mid' : 'fill-low';
-  return `<div class="perc-wrapper" ondblclick="iniciarEdicao(this.querySelector('.perc-text'),${tarefaId},'percentual_concluido')" title="Duplo-clique para editar">
+  return `<div class="perc-wrapper" title="Calculado automaticamente pelos apontamentos do RDO">
     <div class="perc-bar-wrap">
       <div class="perc-bar-fill ${fill}" style="width:${p}%"></div>
     </div>
@@ -950,9 +952,8 @@ function abrirEditar(tarefaId) {
   Array.from(predSel.options).forEach(o => { if (String(o.value) === String(t.predecessora_id)) o.selected = true; });
   Array.from(paiSel.options).forEach(o => { if (String(o.value) === String(t.tarefa_pai_id)) o.selected = true; });
 
-  // Progress preview
+  // Progress preview (read-only, calculado pelo RDO)
   atualizarPercPreview();
-  document.getElementById('ed_perc').oninput = atualizarPercPreview;
 
   // Delete button
   document.getElementById('ed_btn_del').onclick = () => {
@@ -976,12 +977,12 @@ async function salvarEditar() {
   const body = {
     nome_tarefa:       document.getElementById('ed_nome').value.trim(),
     duracao_dias:      parseInt(document.getElementById('ed_duracao').value) || 1,
-    percentual_concluido: parseFloat(document.getElementById('ed_perc').value) || 0,
     data_inicio:       document.getElementById('ed_inicio').value || null,
     predecessora_id:   document.getElementById('ed_pred').value || null,
     tarefa_pai_id:     document.getElementById('ed_pai').value || null,
     quantidade_total:  document.getElementById('ed_qtd').value || null,
     unidade_medida:    document.getElementById('ed_unidade').value.trim() || null,
+    // percentual_concluido NÃO é enviado — calculado automaticamente pelo RDO
   };
   if (!body.nome_tarefa) { toast('Nome da tarefa obrigatório', 'warning'); return; }
 
@@ -1041,7 +1042,7 @@ function adicionarLinhaTabela(t) {
     <td class="td-center small"><span class="date-chip inicio-val" ondblclick="iniciarEdicao(this,${t.id},'data_inicio')" title="Duplo-clique para editar">${t.data_inicio ? formatDate(t.data_inicio) : '—'}</span></td>
     <td class="td-center small"><span class="date-chip fim-val">${t.data_fim ? formatDate(t.data_fim) : '—'}</span></td>
     <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${t.predecessora_id ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>` : '—'}</span></td>
-    <td class="td-perc perc-val">${buildPercCell(p, t.id)}</td>
+    <td class="td-perc perc-val">${buildPercCell(p)}</td>
     <td class="td-center small text-muted">${qtdHtml}</td>
     <td class="td-actions">
       <div class="actions-wrap">
