@@ -744,17 +744,31 @@ def dashboard():
             ).all()
             total_vehicle_expense = sum(c.valor or 0 for c in custos_veiculo)
             
-            # 1.2. Tabela CustoObra (tipo='transporte')
+            # 1.2. Tabela CustoObra (tipo='transporte' ou 'veiculo')
             custos_obra_transporte = CustoObra.query.filter(
                 CustoObra.admin_id == admin_id,
                 CustoObra.data >= data_inicio,
                 CustoObra.data <= data_fim,
-                CustoObra.tipo == 'transporte'
+                CustoObra.tipo.in_(['transporte', 'veiculo'])
             ).all()
             total_custo_obra = sum(float(c.valor or 0) for c in custos_obra_transporte)
             
-            total = total_vehicle_expense + total_custo_obra
-            logger.debug(f" DEBUG TRANSPORTE: VehicleExpense ({len(custos_veiculo)})=R${total_vehicle_expense:.2f}, CustoObra ({len(custos_obra_transporte)})=R${total_custo_obra:.2f}, Total=R${total:.2f}")
+            # 1.3. Tabela LancamentoTransporte (V2 - módulo de transporte dedicado)
+            total_lancamento_transporte = 0.0
+            try:
+                from models import LancamentoTransporte
+                lancamentos_transp = LancamentoTransporte.query.filter(
+                    LancamentoTransporte.admin_id == admin_id,
+                    LancamentoTransporte.data_lancamento >= data_inicio,
+                    LancamentoTransporte.data_lancamento <= data_fim
+                ).all()
+                total_lancamento_transporte = sum(float(lt.valor or 0) for lt in lancamentos_transp)
+                logger.debug(f" DEBUG TRANSPORTE V2: LancamentoTransporte ({len(lancamentos_transp)})=R${total_lancamento_transporte:.2f}")
+            except Exception as e:
+                logger.debug(f" DEBUG TRANSPORTE V2: LancamentoTransporte não disponível ({e})")
+            
+            total = total_vehicle_expense + total_custo_obra + total_lancamento_transporte
+            logger.debug(f" DEBUG TRANSPORTE: VehicleExpense ({len(custos_veiculo)})=R${total_vehicle_expense:.2f}, CustoObra ({len(custos_obra_transporte)})=R${total_custo_obra:.2f}, LancamentoTransporte=R${total_lancamento_transporte:.2f}, Total=R${total:.2f}")
             return total
         
         custo_transporte_real = safe_db_operation(calcular_custos_veiculo, 0)
