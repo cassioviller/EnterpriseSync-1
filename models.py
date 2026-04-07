@@ -2546,7 +2546,7 @@ class Proposta(db.Model):
     __tablename__ = 'propostas_comerciais'
     
     id = db.Column(db.Integer, primary_key=True)
-    numero = db.Column('numero_proposta', db.String(50), unique=True, nullable=False)  # Mapeado para coluna numero_proposta no banco
+    numero = db.Column('numero_proposta', db.String(50), nullable=False)  # Mapeado para coluna numero_proposta no banco
     data_proposta = db.Column(db.Date, nullable=False, default=date.today)
     
     # Dados do Cliente

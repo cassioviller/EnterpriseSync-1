@@ -3786,6 +3786,7 @@ def executar_migracoes():
             (84, "AlimentacaoLancamento - restaurante_id nullable para V2", _migration_84_alimentacao_restaurante_nullable),
             (85, "GestaoCustoPai - fornecedor_id, forma_pagamento, valor_pago, saldo, conta_contabil_codigo, data_emissao, numero_parcela, total_parcelas", _migration_85_gestao_custo_pai_novas_colunas),
             (86, "CustoObra - colunas extras (funcionario_id, rdo_id, categoria, horas, quantidade, veiculo, almoxarifado)", _migration_86_custo_obra_colunas_extras),
+            (87, "Proposta - numero_proposta unique por tenant (numero_proposta + admin_id)", migration_87_proposta_numero_unique_por_tenant),
         ]
         
         # Executar cada migração com rastreamento
@@ -7470,6 +7471,61 @@ def _migration_86_custo_obra_colunas_extras():
 
     except Exception as e:
         logger.error(f"Erro na migracao 86: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_87_proposta_numero_unique_por_tenant():
+    """
+    Migração 87: propostas_comerciais - numero_proposta único por tenant
+    Troca constraint global UNIQUE(numero_proposta) por UNIQUE(numero_proposta, admin_id)
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # 1. Remover constraint global (se existir)
+        cursor.execute("""
+            SELECT constraint_name FROM information_schema.table_constraints
+            WHERE table_name = 'propostas_comerciais'
+            AND constraint_name = 'propostas_comerciais_numero_proposta_key'
+        """)
+        if cursor.fetchone():
+            logger.info("  Removendo constraint global numero_proposta...")
+            cursor.execute("ALTER TABLE propostas_comerciais DROP CONSTRAINT propostas_comerciais_numero_proposta_key")
+            logger.info("  Constraint global removida.")
+        else:
+            logger.info("  Constraint global numero_proposta já removida ou não existe.")
+
+        # 2. Adicionar constraint composta (numero_proposta, admin_id)
+        cursor.execute("""
+            SELECT constraint_name FROM information_schema.table_constraints
+            WHERE table_name = 'propostas_comerciais'
+            AND constraint_name = 'uq_proposta_numero_admin'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando constraint composta (numero_proposta, admin_id)...")
+            cursor.execute("""
+                ALTER TABLE propostas_comerciais
+                ADD CONSTRAINT uq_proposta_numero_admin UNIQUE (numero_proposta, admin_id)
+            """)
+            logger.info("  Constraint composta criada.")
+        else:
+            logger.info("  Constraint composta já existe.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 87 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 87: {e}")
         if connection:
             try:
                 connection.rollback()

@@ -317,14 +317,38 @@ def criar():
         # Gerar número da proposta
         numero_proposta_input = request.form.get('numero_proposta', '').strip()
         if numero_proposta_input:
-            numero_proposta = numero_proposta_input
+            # Verificar se o número já existe para ESTE tenant (não global)
+            existente = Proposta.query.filter_by(
+                numero=numero_proposta_input,
+                admin_id=admin_id
+            ).first()
+            if existente:
+                # Gerar variante única: sufixo -A, -B, etc.
+                sufixos = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+                numero_proposta = None
+                for s in sufixos:
+                    candidato = f"{numero_proposta_input}-{s}"
+                    if not Proposta.query.filter_by(numero=candidato, admin_id=admin_id).first():
+                        numero_proposta = candidato
+                        flash(f'Número "{numero_proposta_input}" já existe. Usando "{candidato}" automaticamente.', 'warning')
+                        break
+                if not numero_proposta:
+                    flash(f'Número "{numero_proposta_input}" e suas variantes já estão em uso. Gere automaticamente.', 'danger')
+                    return redirect(url_for('propostas.nova'))
+            else:
+                numero_proposta = numero_proposta_input
         else:
             ano_atual = datetime.now().year
             last_numero = safe_db_operation(
                 lambda: Proposta.query.filter_by(admin_id=admin_id).count(),
                 0
             )
-            numero_proposta = f"PROP-{ano_atual}-{(last_numero + 1):04d}"
+            candidato_base = f"PROP-{ano_atual}-{(last_numero + 1):04d}"
+            # Garantir unicidade por tenant
+            while Proposta.query.filter_by(numero=candidato_base, admin_id=admin_id).first():
+                last_numero += 1
+                candidato_base = f"PROP-{ano_atual}-{(last_numero + 1):04d}"
+            numero_proposta = candidato_base
         
         # ===== PROCESSAR ITENS DA PROPOSTA (mesma lógica do /editar) =====
         item_descricoes = request.form.getlist('item_descricao')

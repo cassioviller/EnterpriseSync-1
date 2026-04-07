@@ -10,7 +10,7 @@ from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, PlanoContas,
     LancamentoContabil, PartidaContabil, Fornecedor, Obra,
-    FluxoCaixaContabil, GestaoCustoPai
+    FluxoCaixaContabil, GestaoCustoPai, FluxoCaixa
 )
 import logging
 
@@ -436,15 +436,15 @@ class FinanceiroService:
             
             entradas_previstas = sum(c.saldo for c in contas_receber)
             
-            # Saídas previstas — exclusivamente de GestaoCustoPai (status PENDENTE, SOLICITADO, AUTORIZADO)
-            # ContaPagar foi descontinuado como fonte de saídas previstas
+            # Saídas previstas — GestaoCustoPai em aberto (PENDENTE, SOLICITADO, AUTORIZADO, PARCIAL)
             dt_inicio = datetime.combine(data_inicio, datetime.min.time())
             dt_fim = datetime.combine(data_fim, datetime.max.time())
             from sqlalchemy import or_ as sql_or
+            STATUSES_ABERTOS = ['PENDENTE', 'SOLICITADO', 'AUTORIZADO', 'PARCIAL']
             custos_v2_previstos = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
-                    GestaoCustoPai.status.in_(['PENDENTE', 'SOLICITADO', 'AUTORIZADO']),
+                    GestaoCustoPai.status.in_(STATUSES_ABERTOS),
                     sql_or(
                         # Com data_vencimento: filtrar pelo período consultado
                         and_(
@@ -452,11 +452,10 @@ class FinanceiroService:
                             GestaoCustoPai.data_vencimento >= data_inicio,
                             GestaoCustoPai.data_vencimento <= data_fim,
                         ),
-                        # Sem data_vencimento + SOLICITADO/AUTORIZADO: sempre incluir
-                        # (obrigação aprovada pendente de pagamento, sem prazo definido)
+                        # Sem data_vencimento + SOLICITADO/AUTORIZADO/PARCIAL: sempre incluir
                         and_(
                             GestaoCustoPai.data_vencimento == None,
-                            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO']),
+                            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO', 'PARCIAL']),
                         ),
                         # Sem data_vencimento + PENDENTE: incluir se criado no período
                         and_(
@@ -468,7 +467,19 @@ class FinanceiroService:
                     )
                 )
             ).all()
-            # Custos já pagos (histórico realizado)
+
+            # Movimentos realizados: consultar tabela FluxoCaixa diretamente (captura PAGO e PARCIAL)
+            pagamentos_realizados = FluxoCaixa.query.filter(
+                and_(
+                    FluxoCaixa.admin_id == admin_id,
+                    FluxoCaixa.tipo_movimento == 'SAIDA',
+                    FluxoCaixa.referencia_tabela == 'gestao_custo_pai',
+                    FluxoCaixa.data_movimento >= data_inicio,
+                    FluxoCaixa.data_movimento <= data_fim,
+                )
+            ).all()
+
+            # Manter compatibilidade: PAGO via GestaoCustoPai.data_pagamento (fallback)
             custos_v2_pagos = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
@@ -477,12 +488,14 @@ class FinanceiroService:
                     GestaoCustoPai.data_pagamento <= data_fim,
                 )
             ).all()
-            # Saídas previstas: usar saldo explícito quando disponível, fallback valor_total
+            ids_pago_via_gc = {c.id for c in custos_v2_pagos}
+
+            # Saídas previstas: usar saldo (valor restante) para PARCIAL, total para demais
             saidas_previstas = sum(
                 float(c.saldo if getattr(c, 'saldo', None) is not None else c.valor_total or 0)
                 for c in custos_v2_previstos
             )
-            saidas_v2_pagas = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2_pagos)
+            saidas_v2_pagas = sum(float(c.valor_pago or c.valor_total) for c in custos_v2_pagos)
 
             # Projeção de saldo
             saldo_final = saldo_inicial + entradas_previstas - saidas_previstas
@@ -517,17 +530,32 @@ class FinanceiroService:
                     'realizado': False,
                 })
 
-            # PAGO: incluir no histórico de movimentos realizados
-            for custo in custos_v2_pagos:
+            # Pagamentos realizados: usar tabela FluxoCaixa diretamente (PAGO + PARCIAL)
+            # Isso garante que todo pagamento efetuado apareça no histórico realizado
+            ids_gc_no_fluxo = set()
+            for fc_mov in pagamentos_realizados:
+                ids_gc_no_fluxo.add(fc_mov.referencia_id)
                 detalhes.append({
-                    'data': custo.data_pagamento or data_fim,
+                    'data': fc_mov.data_movimento,
                     'tipo': 'SAIDA',
-                    'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}]',
-                    'valor': float(custo.valor_pago or custo.valor_total),
+                    'descricao': fc_mov.descricao or 'Pagamento Gestão de Custos',
+                    'valor': float(fc_mov.valor),
                     'origem': 'Gestão de Custos V2',
                     'status': 'PAGO',
                     'realizado': True,
                 })
+            # Fallback: PAGO via GestaoCustoPai.data_pagamento (entradas antigas sem FluxoCaixa)
+            for custo in custos_v2_pagos:
+                if custo.id not in ids_gc_no_fluxo:
+                    detalhes.append({
+                        'data': custo.data_pagamento or data_fim,
+                        'tipo': 'SAIDA',
+                        'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}]',
+                        'valor': float(custo.valor_pago or custo.valor_total),
+                        'origem': 'Gestão de Custos V2',
+                        'status': 'PAGO',
+                        'realizado': True,
+                    })
             
             # Ordenar por data
             detalhes.sort(key=lambda x: x['data'])

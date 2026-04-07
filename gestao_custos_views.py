@@ -435,8 +435,9 @@ def pagar(pai_id):
         pai.status = novo_status
         pai.valor_pago = novo_valor_pago
         pai.saldo = novo_saldo
+        # Registrar data do último pagamento para PAGO e PARCIAL (permite rastreio no FluxoCaixa)
+        pai.data_pagamento = data_pgto
         if novo_status == 'PAGO':
-            pai.data_pagamento = data_pgto
             pai.fluxo_caixa_id = fc.id
         pai.conta_bancaria = conta
         db.session.commit()
