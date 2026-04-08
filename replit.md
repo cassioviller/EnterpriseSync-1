@@ -40,7 +40,7 @@ The system employs a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wit
     -   **Fleet Management System:** Manages vehicles, expenses, TCO dashboards, and critical alerts.
     -   **Food Management System (Alimentação v2.0):** Mobile-first redesigned interface for managing restaurant and food entries with dynamic multi-item launching, searchable employee selection, and automatic cost calculation.
     -   **Warehouse Management:** Manages materials, tools, and PPE with traceability, full CRUD for suppliers, material flow workflows, manual batch/lot selection, serialized item status transitions, optimistic locking, and employee consumable tracking.
-    -   **Compras de Materiais V2:** Manages purchase orders with dynamic item tables, automatic cost and accounts payable integration, and file attachment support.
+    -   **Compras de Materiais V2:** Manages purchase orders with dynamic item tables, automatic cost registration via `GestaoCustoPai` as single source of truth (migration #92 adds `pedido_compra_id` FK to `AlmoxarifadoMovimento`). "Registrar Recebimento" route creates stock entries without duplicating cost. Dashboard `calcular_custo_material()` reads `GestaoCustoPai` (`tipo_categoria IN MATERIAL/COMPRA`) instead of legacy `CustoObra`.
     -   **Cronograma V2:** MS-Project-style Gantt chart with task hierarchy, planned vs actual progress, and interactive drag-and-drop for task duration and reordering with chain recalculation.
     -   **Gestão de Custos V2:** Centralized cost management with a 4-step approval workflow and integration with other modules for automatic cost registration.
     -   **Reembolsos V2:** Full CRUD for reimbursements, integrated with Gestão de Custos V2.

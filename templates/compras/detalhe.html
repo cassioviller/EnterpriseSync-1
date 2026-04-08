@@ -14,6 +14,22 @@
       </h1>
       <small class="text-muted">{{ pedido.data_compra.strftime('%d/%m/%Y') }} — {{ pedido.fornecedor.nome }}</small>
     </div>
+    {% if tem_itens_almox %}
+    <div class="ms-auto">
+      {% if todos_recebidos %}
+        <span class="badge bg-success fs-6 px-3 py-2">
+          <i class="fas fa-check-circle me-1"></i> Totalmente Recebido
+        </span>
+      {% else %}
+        <form method="POST" action="{{ url_for('compras.receber', pedido_id=pedido.id) }}" class="d-inline">
+          <button type="submit" class="btn btn-success"
+                  onclick="return confirm('Registrar recebimento dos itens pendentes no almoxarifado?')">
+            <i class="fas fa-boxes me-2"></i>Registrar Recebimento
+          </button>
+        </form>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
 
   <div class="row g-3">
@@ -84,16 +100,29 @@
       </div>
     </div>
 
-    <!-- Itens -->
+    <!-- Itens com status de recebimento -->
     <div class="col-12">
       <div class="card border-0 shadow-sm">
-        <div class="card-header bg-transparent fw-semibold py-3">
-          <i class="fas fa-list me-2 text-primary"></i>Itens da Compra
+        <div class="card-header bg-transparent fw-semibold py-3 d-flex align-items-center justify-content-between">
+          <span><i class="fas fa-list me-2 text-primary"></i>Itens da Compra</span>
+          {% if tem_itens_almox %}
+          <span class="small text-muted">
+            <i class="fas fa-info-circle me-1"></i>
+            Itens com catálogo podem ser recebidos no almoxarifado
+          </span>
+          {% endif %}
         </div>
         <div class="card-body p-0">
           <table class="table mb-0 align-middle">
             <thead class="table-light">
-              <tr><th>Descrição</th><th>Catálogo</th><th class="text-end">Qtd</th><th class="text-end">Preço Unit.</th><th class="text-end">Subtotal</th></tr>
+              <tr>
+                <th>Descrição</th>
+                <th>Catálogo (Almoxarifado)</th>
+                <th class="text-end">Qtd</th>
+                <th class="text-end">Preço Unit.</th>
+                <th class="text-end">Subtotal</th>
+                <th class="text-center">Recebimento</th>
+              </tr>
             </thead>
             <tbody>
               {% for item in itens %}
@@ -103,6 +132,23 @@
                 <td class="text-end">{{ item.quantidade }}</td>
                 <td class="text-end">R$ {{ '%.2f'|format(item.preco_unitario|float) }}</td>
                 <td class="text-end fw-semibold">R$ {{ '%.2f'|format(item.subtotal|float) }}</td>
+                <td class="text-center">
+                  {% if item.almoxarifado_item_id %}
+                    {% if item.almoxarifado_item_id in itens_recebidos_ids %}
+                      <span class="badge bg-success">
+                        <i class="fas fa-check me-1"></i>Recebido
+                      </span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">
+                        <i class="fas fa-clock me-1"></i>Pendente
+                      </span>
+                    {% endif %}
+                  {% else %}
+                    <span class="badge bg-secondary">
+                      <i class="fas fa-minus me-1"></i>Sem catálogo
+                    </span>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -110,9 +156,25 @@
               <tr>
                 <td colspan="4" class="text-end fw-bold">Total</td>
                 <td class="text-end fw-bold fs-5 text-dark">R$ {{ '%.2f'|format(pedido.valor_total|float) }}</td>
+                <td></td>
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aviso sobre política de custos -->
+    <div class="col-12">
+      <div class="alert alert-info d-flex align-items-start mb-0" role="alert">
+        <i class="fas fa-shield-alt me-3 mt-1 fs-5"></i>
+        <div>
+          <strong>Controle de Custo Único</strong><br>
+          <small>
+            O custo desta compra já foi reconhecido no momento do cadastro via Gestão de Custos.
+            Ao registrar o recebimento, os itens entram no estoque físico do almoxarifado
+            <strong>sem gerar novo lançamento financeiro</strong>, evitando duplicação de custo.
+          </small>
         </div>
       </div>
     </div>

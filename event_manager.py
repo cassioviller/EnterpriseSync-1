@@ -116,28 +116,16 @@ def lancar_custo_material_obra(data: dict, admin_id: int):
         # Buscar nome do produto para descrição
         produto = Produto.query.get(movimento.produto_id)
         descricao = f"Material: {produto.nome if produto else 'Item'} - Movimento #{movimento_id}"
-        
-        # Criar registro de custo na obra
-        custo = CustoObra(
-            obra_id=movimento.obra_id,
-            tipo='material',
-            descricao=descricao,
-            valor=valor_total,
-            data=movimento.data_movimentacao.date() if movimento.data_movimentacao else datetime.now().date(),
-            item_almoxarifado_id=movimento.produto_id,
-            admin_id=admin_id,
-            quantidade=Decimal(str(quantidade)),
-            valor_unitario=Decimal(str(valor_unitario)),
-            categoria='ALMOXARIFADO'
-        )
-        
-        db.session.add(custo)
-        db.session.commit()
-        
-        logger.info(f"✅ Custo de material lançado: R$ {valor_total:.2f} na obra {movimento.obra_id}")
-        logger.info(f"   📦 Produto: {produto.nome if produto else movimento.produto_id} | Qtd: {quantidade} | Movimento: {movimento_id}")
-        
-        # ✅ NOVO: Criar lançamento contábil (CMV - Custo de Materiais Vendidos)
+
+        # REENGENHARIA SUPRIMENTOS: CustoObra NÃO é criado na saída.
+        # O custo já foi registrado via GestaoCustoPai no momento da compra (PedidoCompra)
+        # ou da entrada direta no almoxarifado. A saída é apenas controle físico de estoque.
+        logger.info(f"✅ [SAIDA] Controle de estoque registrado: {produto.nome if produto else 'Item'} "
+                    f"| Qtd: {quantidade} | Obra: {movimento.obra_id} | Movimento: {movimento_id}")
+        logger.info(f"   💡 Custo NÃO duplicado (já registrado na entrada/compra)")
+
+        # Lançamento contábil (D:CMV / C:Estoque) — mantido para integridade contábil
+        # ✅ Criar lançamento contábil (CMV - Custo de Materiais Vendidos)
         try:
             from models import LancamentoContabil, PartidaContabil
             from sqlalchemy import func
@@ -230,6 +218,13 @@ def criar_conta_pagar_entrada_material(data: dict, admin_id: int):
 
         if not movimento:
             logger.error(f"❌ Movimento {movimento_id} não encontrado ou tipo incorreto")
+            return
+
+        # REENGENHARIA SUPRIMENTOS (T4): Se a entrada veio de um PedidoCompra,
+        # o GestaoCustoPai já foi criado pelo módulo de Compras. Não duplicar.
+        if movimento.pedido_compra_id:
+            logger.info(f"⏭️ Movimento {movimento_id}: vinculado a PedidoCompra #{movimento.pedido_compra_id} "
+                        f"— GestaoCusto já registrado na compra, ignorando entrada")
             return
 
         if not movimento.fornecedor_id:

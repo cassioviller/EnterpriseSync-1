@@ -3791,6 +3791,7 @@ def executar_migracoes():
             (89, "RDO - criado_por_id nullable (FK usuario)", migration_89_rdo_criado_por_nullable),
             (90, "RDOMaoObra - subatividade_id (FK cascade) + horas_extras", migration_90_rdo_mao_obra_subatividade),
             (91, "RDOMaoObra - tarefa_cronograma_id (FK SET NULL) para métricas por tarefa", migration_91_rdo_mao_obra_tarefa_cronograma),
+            (92, "AlmoxarifadoMovimento - pedido_compra_id FK opcional para rastreamento de origem", migration_92_almoxarifado_pedido_compra_id),
         ]
         
         # Executar cada migração com rastreamento
@@ -7651,6 +7652,48 @@ def migration_91_rdo_mao_obra_tarefa_cronograma():
 
     except Exception as e:
         logger.error(f"Erro na migracao 91: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_92_almoxarifado_pedido_compra_id():
+    """
+    Migração 92: almoxarifado_movimento — adicionar pedido_compra_id (FK SET NULL).
+    Permite rastrear se uma ENTRADA veio de um PedidoCompra, evitando duplicação
+    de GestaoCustoPai (custo já registrado pelo módulo de Compras).
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'almoxarifado_movimento' AND column_name = 'pedido_compra_id'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando coluna pedido_compra_id em almoxarifado_movimento...")
+            cursor.execute("""
+                ALTER TABLE almoxarifado_movimento
+                ADD COLUMN pedido_compra_id INTEGER
+                REFERENCES pedido_compra(id) ON DELETE SET NULL
+            """)
+            logger.info("  Coluna pedido_compra_id adicionada com FK SET NULL.")
+        else:
+            logger.info("  Coluna pedido_compra_id já existe em almoxarifado_movimento.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 92 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 92: {e}")
         if connection:
             try:
                 connection.rollback()

@@ -777,26 +777,19 @@ def dashboard():
         quantidade_faltas_justificadas, custo_faltas_justificadas = resultado_faltas
         logger.debug(f"DEBUG Faltas Justificadas: {quantidade_faltas_justificadas} faltas, R$ {custo_faltas_justificadas:.2f}")
         
-        # 3. Custo de Materiais — CustoObra tipo='material' + OutroCusto tipo='material'
+        # 3. Custo de Materiais — fonte única: GestaoCustoPai tipo_categoria IN (MATERIAL, COMPRA)
+        # Princípio: custo reconhecido na entrada/compra, nunca na saída de estoque.
         def calcular_custo_material():
-            from models import OutroCusto, CustoObra
-            custo_obra_mat = CustoObra.query.filter(
-                CustoObra.admin_id == admin_id,
-                CustoObra.data >= data_inicio,
-                CustoObra.data <= data_fim,
-                CustoObra.tipo == 'material'
+            from models import GestaoCustoPai
+            registros = GestaoCustoPai.query.filter(
+                GestaoCustoPai.admin_id == admin_id,
+                GestaoCustoPai.data_emissao >= data_inicio,
+                GestaoCustoPai.data_emissao <= data_fim,
+                GestaoCustoPai.tipo_categoria.in_(['MATERIAL', 'COMPRA']),
             ).all()
-            total_obra = sum(float(c.valor or 0) for c in custo_obra_mat)
-            outro_mat = OutroCusto.query.filter(
-                OutroCusto.admin_id == admin_id,
-                OutroCusto.data >= data_inicio,
-                OutroCusto.data <= data_fim,
-                OutroCusto.tipo == 'material'
-            ).all()
-            total_outro = sum(float(o.valor or 0) for o in outro_mat)
-            total = total_obra + total_outro
-            logger.debug(f"DEBUG Material: CustoObra=R${total_obra:.2f}, OutroCusto=R${total_outro:.2f}, Total=R${total:.2f}")
-            return total
+            total_gcp = sum(float(r.valor_total or 0) for r in registros)
+            logger.debug(f"DEBUG Material (GestaoCustoPai): {len(registros)} registros, Total=R${total_gcp:.2f}")
+            return total_gcp
 
         custo_material_real = safe_db_operation(calcular_custo_material, 0)
 

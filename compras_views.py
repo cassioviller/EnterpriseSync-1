@@ -7,7 +7,8 @@ from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
 from app import db
-from models import (AlmoxarifadoItem, CentroCusto, ContaPagar, CustoObra,
+from models import (AlmoxarifadoItem, AlmoxarifadoEstoque, AlmoxarifadoMovimento,
+                    CentroCusto, ContaPagar, CustoObra,
                     Fornecedor, Funcionario, Obra, PedidoCompra, PedidoCompraItem,
                     GestaoCustoPai, GestaoCustoFilho)
 from utils.tenant import get_tenant_admin_id, is_v2_active
@@ -227,27 +228,10 @@ def nova_post():
             )
             db.session.add(item)
 
-        # --- Apropriação de custo na obra ---
-        if obra_id:
-            fornecedor = Fornecedor.query.get(fornecedor_id)
-            desc_custo = f"Compra{(' NF ' + numero) if numero else ''} - {fornecedor.nome if fornecedor else 'Fornecedor'}"
-            if observacoes:
-                desc_custo += f" - {observacoes[:80]}"
-
-            custo = CustoObra(
-                obra_id=obra_id,
-                centro_custo_id=centro_custo_id,
-                tipo='material',
-                descricao=desc_custo[:200],
-                valor=float(valor_total),
-                data=data_compra,
-                admin_id=admin_id,
-                categoria='compra',
-            )
-            db.session.add(custo)
-            logger.info(f"[OK] CustoObra criado para obra_id={obra_id} via compra")
-
         # --- Gestão de Custos (substitui ContaPagar) ---
+        # NOTA: CustoObra NÃO é criado aqui. O GestaoCustoPai abaixo é a fonte única
+        # de custo de material, evitando duplicação com o handler material_saida
+        # do almoxarifado. O vínculo obra_id fica no GestaoCustoFilho.
         fornecedor = Fornecedor.query.get(fornecedor_id)
         vencimentos = _vencimentos(data_compra, condicao, parcelas)
         n_parcelas = len(vencimentos)
@@ -361,13 +345,118 @@ def detalhe(pedido_id):
         origem_tabela='pedido_compra', origem_id=pedido_id
     ).all()
 
+    # Verificar quais itens já tiveram recebimento registrado no almoxarifado
+    # Chave: almoxarifado_item_id → True/False
+    movs_recebidos = AlmoxarifadoMovimento.query.filter_by(
+        pedido_compra_id=pedido_id,
+        tipo_movimento='ENTRADA',
+        admin_id=admin_id,
+    ).all()
+    itens_recebidos_ids = {m.item_id for m in movs_recebidos}
+
+    # Itens do pedido que têm vínculo com o catálogo do almoxarifado
+    tem_itens_almox = any(i.almoxarifado_item_id for i in itens)
+    todos_recebidos = tem_itens_almox and all(
+        (not i.almoxarifado_item_id) or (i.almoxarifado_item_id in itens_recebidos_ids)
+        for i in itens
+    )
+
     return render_template(
         'compras/detalhe.html',
         pedido=pedido,
         itens=itens,
         custos_gestao=custos_gestao,
         CONDICOES=CONDICOES,
+        itens_recebidos_ids=itens_recebidos_ids,
+        tem_itens_almox=tem_itens_almox,
+        todos_recebidos=todos_recebidos,
     )
+
+
+# ─────────────────────────────────────────────
+# RECEBIMENTO NO ALMOXARIFADO
+# ─────────────────────────────────────────────
+@compras_bp.route('/receber/<int:pedido_id>', methods=['POST'])
+@login_required
+def receber(pedido_id):
+    """Registra o recebimento físico dos itens de um PedidoCompra no almoxarifado."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, admin_id=admin_id).first_or_404()
+    itens = PedidoCompraItem.query.filter_by(pedido_id=pedido_id).all()
+    itens_com_catalogo = [i for i in itens if i.almoxarifado_item_id]
+
+    if not itens_com_catalogo:
+        flash('Nenhum item deste pedido está vinculado ao catálogo do almoxarifado.', 'warning')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+    movimentos_criados = 0
+    try:
+        for item in itens_com_catalogo:
+            # Evitar recebimento duplicado por item
+            ja_recebido = AlmoxarifadoMovimento.query.filter_by(
+                pedido_compra_id=pedido_id,
+                item_id=item.almoxarifado_item_id,
+                tipo_movimento='ENTRADA',
+                admin_id=admin_id,
+            ).first()
+            if ja_recebido:
+                continue
+
+            qtd = float(item.quantidade or 0)
+            preco_unit = float(item.preco_unitario or 0)
+            lote_ref = pedido.numero or f"PC-{pedido_id}"
+
+            # Criar movimento de ENTRADA vinculado ao pedido
+            movimento = AlmoxarifadoMovimento(
+                item_id=item.almoxarifado_item_id,
+                tipo_movimento='ENTRADA',
+                quantidade=qtd,
+                valor_unitario=preco_unit,
+                nota_fiscal=pedido.numero,
+                observacao=f"Recebimento Compra {lote_ref}: {item.descricao[:100]}",
+                estoque_id=None,
+                fornecedor_id=pedido.fornecedor_id,
+                admin_id=admin_id,
+                usuario_id=current_user.id,
+                obra_id=pedido.obra_id,
+                pedido_compra_id=pedido_id,
+            )
+            db.session.add(movimento)
+            db.session.flush()
+
+            # Criar lote FIFO no estoque
+            estoque = AlmoxarifadoEstoque(
+                item_id=item.almoxarifado_item_id,
+                quantidade=qtd,
+                quantidade_inicial=qtd,
+                quantidade_disponivel=qtd,
+                entrada_movimento_id=movimento.id,
+                valor_unitario=preco_unit,
+                status='DISPONIVEL',
+                lote=lote_ref,
+                admin_id=admin_id,
+            )
+            db.session.add(estoque)
+            db.session.flush()
+            movimento.estoque_id = estoque.id
+            movimentos_criados += 1
+
+        db.session.commit()
+        if movimentos_criados:
+            flash(f'Recebimento registrado: {movimentos_criados} item(ns) lançado(s) no almoxarifado. '
+                  f'Custo já reconhecido na compra — sem duplicação.', 'success')
+        else:
+            flash('Todos os itens já haviam sido recebidos anteriormente.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] Falha ao registrar recebimento do pedido {pedido_id}: {e}")
+        flash(f'Erro ao registrar recebimento: {str(e)}', 'danger')
+
+    return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
 
 
 # ─────────────────────────────────────────────

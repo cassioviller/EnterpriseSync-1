@@ -3907,6 +3907,9 @@ class AlmoxarifadoMovimento(db.Model):
     origem_manual = db.Column(db.Boolean, default=False)
     impacta_estoque = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Vínculo com PedidoCompra: quando preenchido, indica que este movimento
+    # foi gerado a partir de um pedido de compra (evita duplicação de custo).
+    pedido_compra_id = db.Column(db.Integer, db.ForeignKey('pedido_compra.id', ondelete='SET NULL'), nullable=True)
     
     # Relationships
     item = db.relationship('AlmoxarifadoItem', backref='movimentos')
@@ -3916,6 +3919,7 @@ class AlmoxarifadoMovimento(db.Model):
     fornecedor = db.relationship('Fornecedor', backref='movimentos_almoxarifado')
     usuario = db.relationship('Usuario', foreign_keys=[usuario_id], backref='movimentos_almoxarifado_criados')
     admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='movimentos_almoxarifado_admin')
+    pedido_compra = db.relationship('PedidoCompra', backref='movimentos_almoxarifado', foreign_keys=[pedido_compra_id])
     
     __table_args__ = (
         db.Index('idx_almox_movimento_data', 'data_movimento'),
