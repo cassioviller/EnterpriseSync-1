@@ -1,0 +1,36 @@
+# LOGIC TASK: Reestruturação de Apropriação de Mão de Obra e Automação Financeira RDO V2
+
+Atue como um Arquiteto de Sistemas. Preciso refatorar a inteligência por trás do Relatório Diário de Obra (RDO V2) para que ele deixe de ser apenas um registro informativo e passe a ser um alimentador do custo real da obra.
+
+### 1. REESTRUTURAÇÃO DO MODELO RELACIONAL (DATA LOGIC)
+Atualmente, a mão de obra (`RDOMaoObra`) está ligada diretamente ao cabeçalho do RDO. Você deve alterar essa relação:
+- **Nova Hierarquia:** Cada registro de mão de obra deve agora obrigatoriamente pertencer a uma **Subatividade específica** (`RDOServicoSubatividade`) dentro daquele RDO.
+- **Cardinalidade:** Uma Subatividade pode ter N funcionários alocados. Um funcionário pode estar em N subatividades no mesmo dia (dividindo suas horas).
+- **Integridade:** Garanta que a exclusão de uma subatividade remova em cascata a mão de obra a ela atrelada.
+
+### 2. LÓGICA DE INTERFACE E CAPTURA (UX LOGIC)
+O formulário de preenchimento do RDO deve mudar seu comportamento de captura:
+- **Contexto de Alocação:** Remova a seção global de "Mão de Obra". Em vez disso, dentro de cada card de Atividade/Subatividade, adicione um seletor dinâmico de funcionários.
+- **Gestão de Horas:** Para cada funcionário alocado em uma subatividade, o sistema deve permitir informar as horas trabalhadas especificamente naquela tarefa.
+- **Data Payload:** O JSON enviado ao backend deve ser aninhado: `Atividades -> [Subatividades -> [Mão de Obra]]`.
+
+### 3. MOTOR DE AUTOMAÇÃO FINANCEIRA (BUSINESS LOGIC)
+Implemente um gatilho (Hook) que dispare exclusivamente quando o status do RDO mudar para **'Finalizado'**:
+
+**Algoritmo de Processamento de Custos:**
+1. **Varredura:** O sistema deve percorrer toda a árvore de subatividades do RDO finalizado.
+2. **Identificação:** Para cada funcionário encontrado em cada subatividade:
+   - Identifique o funcionário no cadastro e busque seu custo base (salário/hora).
+   - Calcule o valor daquela "fatia" de trabalho (Valor Hora x Horas na Atividade).
+3. **Integração V2:** Invoque o serviço de `registrar_custo_automatico` para cada um desses registros:
+   - **Categoria:** 'SALARIO'.
+   - **Status Inicial:** 'PENDENTE' (para conferência posterior no financeiro).
+   - **Metadados:** Vincule o `obra_id` do RDO e use uma descrição padronizada que cite o número do RDO e o nome da atividade executada.
+   - **Rastreabilidade:** Salve o ID de origem (`rdo_mao_obra_id`) para evitar lançamentos duplicados caso o RDO seja reaberto e finalizado novamente.
+
+### 4. REGRAS DE CONSISTÊNCIA E SEGURANÇA
+- **Multi-tenant:** Todas as consultas e inserções automáticas devem herdar o `admin_id` do RDO pai.
+- **Prevenção de Duplicidade:** Antes de gerar os custos, o sistema deve verificar se já existem lançamentos na Gestão de Custos V2 vinculados àquela origem (`rdo_mao_obra`) para aquele `admin_id`.
+- **Tratamento de Erros:** Se um funcionário não tiver salário cadastrado, o sistema deve logar um aviso, mas continuar processando os demais funcionários, alertando o usuário ao final.
+
+**IMPLEMENTE ESTA LÓGICA GARANTINDO QUE A PRODUÇÃO DO RDO AGORA ALIMENTE O PASSIVO TRABALHISTA DA OBRA EM TEMPO REAL.**
