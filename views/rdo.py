@@ -3713,43 +3713,53 @@ def salvar_rdo_flexivel():
                     mao_obra_count += 1
                     logger.info(f"[WORKER] Mão de obra: {funcionario.nome} → subat '{subat_obj.nome_subatividade}' ({horas}h)")
             
-            # PROCESSAR MÃO DE OBRA DO CRONOGRAMA V2 (formato: cron_func_{func_id}_horas)
-            _cron_func_pattern = _re.compile(r'^cron_func_(\d+)_horas$')
+            # PROCESSAR MÃO DE OBRA DO CRONOGRAMA V2 (formato: cron_tarefa_{tarefa_id}_func_{func_id}_horas)
+            # Formato legado também suportado: cron_func_{func_id}_horas
+            _cron_tarefa_pattern = _re.compile(r'^cron_tarefa_(\d+)_func_(\d+)_horas$')
+            _cron_func_pattern   = _re.compile(r'^cron_func_(\d+)_horas$')
             cron_func_count = 0
+            _seen_cron_func = set()   # dedup por func_id (um registro por funcionário por RDO)
             for field_name, field_value in request.form.items():
-                m2 = _cron_func_pattern.match(field_name)
-                if m2 and field_value:
-                    try:
-                        func_id_cron = int(m2.group(1))
-                        horas_cron = float(field_value) if field_value else 8.8
-                        funcionario = Funcionario.query.filter_by(id=func_id_cron, admin_id=admin_id).first()
-                        if not funcionario:
-                            logger.warning(f"[WARN] Funcionário cronograma ID {func_id_cron} não encontrado")
-                            continue
-                        funcao_exercida = 'Diarista'
-                        try:
-                            if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref:
-                                funcao_exercida = funcionario.funcao_ref.nome
-                            elif hasattr(funcionario, 'funcao') and funcionario.funcao:
-                                funcao_exercida = funcionario.funcao
-                        except Exception:
-                            pass
-                        mao_obra_cron = RDOMaoObra(
-                            rdo_id=rdo.id,
-                            funcionario_id=func_id_cron,
-                            horas_trabalhadas=horas_cron,
-                            funcao_exercida=funcao_exercida,
-                            admin_id=admin_id,
-                            subatividade_id=None,
-                            horas_extras=0.0
-                        )
-                        db.session.add(mao_obra_cron)
-                        mao_obra_count += 1
-                        cron_func_count += 1
-                        logger.info(f"[WORKER] Mão de obra cronograma: {funcionario.nome} ({horas_cron}h)")
-                    except (ValueError, TypeError) as e_cron:
-                        logger.warning(f"[WARN] Erro ao processar {field_name}: {e_cron}")
+                if not field_value:
+                    continue
+                m_tarefa = _cron_tarefa_pattern.match(field_name)
+                m_legacy = _cron_func_pattern.match(field_name) if not m_tarefa else None
+                if not m_tarefa and not m_legacy:
+                    continue
+                try:
+                    func_id_cron = int(m_tarefa.group(2) if m_tarefa else m_legacy.group(1))
+                    horas_cron = float(field_value) if field_value else 8.8
+                    if func_id_cron in _seen_cron_func:
+                        continue   # já lançou diária para esse funcionário neste RDO
+                    _seen_cron_func.add(func_id_cron)
+                    funcionario = Funcionario.query.filter_by(id=func_id_cron, admin_id=admin_id).first()
+                    if not funcionario:
+                        logger.warning(f"[WARN] Funcionário cronograma ID {func_id_cron} não encontrado")
                         continue
+                    funcao_exercida = 'Diarista'
+                    try:
+                        if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref:
+                            funcao_exercida = funcionario.funcao_ref.nome
+                        elif hasattr(funcionario, 'funcao') and funcionario.funcao:
+                            funcao_exercida = funcionario.funcao
+                    except Exception:
+                        pass
+                    mao_obra_cron = RDOMaoObra(
+                        rdo_id=rdo.id,
+                        funcionario_id=func_id_cron,
+                        horas_trabalhadas=horas_cron,
+                        funcao_exercida=funcao_exercida,
+                        admin_id=admin_id,
+                        subatividade_id=None,
+                        horas_extras=0.0
+                    )
+                    db.session.add(mao_obra_cron)
+                    mao_obra_count += 1
+                    cron_func_count += 1
+                    logger.info(f"[WORKER] Mão de obra cronograma: {funcionario.nome} ({horas_cron}h) [{field_name}]")
+                except (ValueError, TypeError) as e_cron:
+                    logger.warning(f"[WARN] Erro ao processar {field_name}: {e_cron}")
+                    continue
 
             if cron_func_count:
                 logger.info(f"[USERS] {cron_func_count} funcionário(s) alocados via cronograma V2")

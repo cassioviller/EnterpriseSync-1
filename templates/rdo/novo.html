@@ -339,31 +339,56 @@
                     <small>Acesse o Cronograma da obra para criar tarefas.</small>
                 </div>
                 <div id="cronogramaTarefasRDO"></div>
+            </div>
+        </div>
 
-                <!-- ── Equipe do dia (Cronograma V2) ── -->
-                <div class="border-top mt-0 px-3 pb-3 pt-3" id="cronogramaEquipeSection" style="display:none">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <h6 class="fw-bold mb-0 text-primary">
-                            <i class="fas fa-hard-hat me-1"></i> Equipe do Dia
-                        </h6>
-                        <div class="position-relative">
-                            <button type="button" class="btn btn-outline-primary btn-sm"
-                                    onclick="abrirSeletorFuncCron()" title="Adicionar funcionário">
-                                <i class="fas fa-user-plus me-1"></i> Adicionar
-                            </button>
-                            <div class="dropdown-menu dropdown-menu-end shadow" id="dd-func-cron"
-                                 style="max-height:260px;overflow-y:auto;min-width:240px;display:none;position:absolute;right:0;z-index:1060;">
-                                <div class="px-2 pt-1">
-                                    <input type="text" class="form-control form-control-sm mb-1"
-                                           placeholder="Filtrar funcionário…" id="filtro-func-cron"
-                                           oninput="filtrarListaFuncCron(this.value)">
-                                </div>
-                                <div id="lista-func-cron"></div>
+        <!-- ── Modal: Equipe por Atividade (Cronograma V2) ── -->
+        <div class="modal fade" id="modalEquipeTarefa" tabindex="-1" aria-labelledby="modalEquipeTarefaLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header text-white" style="background:linear-gradient(135deg,#0d6efd 0%,#0a58ca 100%)">
+                        <h5 class="modal-title fw-bold" id="modalEquipeTarefaLabel">
+                            <i class="fas fa-users me-2"></i>
+                            <span id="modalEquipeTarefaTitulo">Equipe da Atividade</span>
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="fecharModalEquipe()"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Busca -->
+                        <div class="mb-3">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="fas fa-search text-muted"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0 ps-0"
+                                       id="modalFuncFiltro"
+                                       placeholder="Buscar funcionário…"
+                                       autocomplete="off"
+                                       oninput="filtrarModalFunc(this.value)">
+                            </div>
+                        </div>
+                        <!-- Lista de disponíveis -->
+                        <div id="modalFuncLista"
+                             style="max-height:180px;overflow-y:auto;border:1px solid #e9ecef;border-radius:8px;background:#fafafa">
+                            <div class="text-center p-3 text-muted small">
+                                <i class="fas fa-spinner fa-spin"></i> Carregando…
+                            </div>
+                        </div>
+                        <!-- Funcionários selecionados para esta tarefa -->
+                        <div class="mt-3">
+                            <div class="d-flex align-items-center gap-1 mb-2">
+                                <i class="fas fa-hard-hat text-primary small"></i>
+                                <span class="small fw-bold text-primary">Alocados nesta atividade</span>
+                            </div>
+                            <div id="modalEquipeSelecionada">
+                                <p class="text-muted small fst-italic mb-0">Nenhum funcionário alocado</p>
                             </div>
                         </div>
                     </div>
-                    <div id="equipe-cron-lista">
-                        <p class="text-muted small mb-0 fst-italic">Nenhum funcionário alocado</p>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal" onclick="fecharModalEquipe()">
+                            <i class="fas fa-check me-1"></i> Confirmar
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1129,10 +1154,7 @@ async function carregarTarefasRDO() {
 
         rdoV2TarefasCache = json.tarefas;
         renderizarTarefasRDO(json.tarefas);
-        // Mostrar seção de equipe e pré-carregar funcionários
-        const equipeSection = document.getElementById('cronogramaEquipeSection');
-        if (equipeSection) equipeSection.style.display = '';
-        _carregarFuncCache();
+        _carregarFuncCache(); // pré-carregar cache para o modal
     } catch(e) {
         loading?.classList.add('d-none');
         empty?.classList.remove('d-none');
@@ -1165,6 +1187,7 @@ function renderizarTarefasRDO(tarefas) {
         // Só habilitar input em tarefas folha (sem filhas)
         const hasInput = !isPai;
 
+        const nomeTarefaEsc = t.nome_tarefa.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         html += `
         <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden">
           <div class="d-flex align-items-center gap-2 p-2 ps-3">
@@ -1184,6 +1207,15 @@ function renderizarTarefasRDO(tarefas) {
                      title="Quantidade executada hoje">
               <span class="text-muted small">${t.unidade_medida || ''}</span>
             </div>` : ''}
+            <!-- Botão equipe por atividade -->
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 px-2"
+                    id="btn-equipe-${t.id}"
+                    onclick="abrirModalEquipeTarefa(${t.id}, '${nomeTarefaEsc}')"
+                    title="Alocar equipe nesta atividade">
+                <i class="fas fa-users"></i>
+                <span class="badge rounded-pill bg-primary ms-1" id="badge-equipe-${t.id}" style="display:none;font-size:.7rem">0</span>
+            </button>
           </div>
           ${hasInput ? `
           <div class="px-3 pb-2">
@@ -1228,119 +1260,171 @@ async function apontarProducaoRDO(tarefaId, valor) {
     }
 }
 
-// ── Equipe do Dia — Cronograma V2 ────────────────────────────
-let _cronEquipe = [];   // [{id, nome, cargo, horas}]
+// ── Equipe por Atividade (Cronograma V2) — Modal ─────────────
+// Estado: { tarefa_id: [{id, nome, cargo, horas}] }
+let _cronTaskEquipe = {};
+let _modalTarefaId = null;
 
-async function abrirSeletorFuncCron() {
-    const dd = document.getElementById('dd-func-cron');
-    if (!dd) return;
-    const isOpen = dd.style.display !== 'none';
-    dd.style.display = isOpen ? 'none' : 'block';
-    if (!isOpen) {
-        const todos = await _carregarFuncCache();
-        _renderListaFuncCron(todos, '');
-        const filtro = document.getElementById('filtro-func-cron');
-        if (filtro) filtro.value = '';
-        setTimeout(() => {
-            document.addEventListener('click', function _closeCron(e) {
-                if (!dd.contains(e.target) && !e.target.closest('[onclick="abrirSeletorFuncCron()"]')) {
-                    dd.style.display = 'none';
-                    document.removeEventListener('click', _closeCron);
-                }
-            });
-        }, 120);
+async function abrirModalEquipeTarefa(tarefaId, nomeTarefa) {
+    _modalTarefaId = tarefaId;
+
+    // Título do modal
+    const titulo = document.getElementById('modalEquipeTarefaTitulo');
+    if (titulo) titulo.textContent = nomeTarefa || 'Equipe da Atividade';
+
+    // Limpar filtro
+    const filtro = document.getElementById('modalFuncFiltro');
+    if (filtro) filtro.value = '';
+
+    // Carregar funcionários e renderizar
+    await _carregarFuncCache();
+    _renderModalFuncLista('');
+    _renderModalEquipeSelecionada();
+
+    // Abrir modal Bootstrap
+    const el = document.getElementById('modalEquipeTarefa');
+    if (el) {
+        const modal = bootstrap.Modal.getOrCreateInstance(el);
+        modal.show();
     }
 }
 
-function filtrarListaFuncCron(query) {
-    const filtered = _funcCache.filter(f => f.nome.toLowerCase().includes(query.toLowerCase()));
-    _renderListaFuncCron(filtered, query);
+function fecharModalEquipe() {
+    if (_modalTarefaId === null) return;
+    _atualizarBotaoEquipe(_modalTarefaId);
+    _syncHiddenInputsTarefa();
+    _modalTarefaId = null;
 }
 
-function _renderListaFuncCron(lista, query) {
-    const container = document.getElementById('lista-func-cron');
+function filtrarModalFunc(query) {
+    _renderModalFuncLista(query);
+}
+
+function _renderModalFuncLista(query) {
+    const container = document.getElementById('modalFuncLista');
     if (!container) return;
-    const jaSel = _cronEquipe.map(f => f.id);
-    const disponiveis = lista.filter(f => !jaSel.includes(f.id));
-    if (disponiveis.length === 0) {
-        container.innerHTML = '<p class="text-muted small px-3 py-2 mb-0">Nenhum disponível</p>';
+
+    const q = (query || '').toLowerCase();
+    const jaSel = (_cronTaskEquipe[_modalTarefaId] || []).map(f => f.id);
+    const disponiveis = _funcCache.filter(f =>
+        !jaSel.includes(f.id) &&
+        (!q || f.nome.toLowerCase().includes(q))
+    );
+
+    if (_funcCache.length === 0) {
+        container.innerHTML = '<p class="text-muted small text-center p-3 mb-0">Nenhum funcionário cadastrado</p>';
         return;
     }
+    if (disponiveis.length === 0) {
+        container.innerHTML = '<p class="text-muted small text-center p-3 mb-0">Todos já alocados ou nenhum encontrado</p>';
+        return;
+    }
+
     container.innerHTML = disponiveis.map(f => {
-        const cargo = (f.funcao || f.cargo || '').replace(/'/g, "\\'");
-        const nome = f.nome.replace(/'/g, "\\'");
-        return `<button type="button" class="dropdown-item small py-1"
-                    onclick="adicionarFuncCron(${f.id}, '${nome}', '${cargo}')">
-                    ${f.nome} <small class="text-muted">${f.funcao || f.cargo || ''}</small>
-                </button>`;
+        const cargo = (f.funcao || f.cargo || '');
+        return `
+        <button type="button" class="btn btn-light btn-sm w-100 text-start d-flex align-items-center gap-2 border-0 border-bottom rounded-0 py-2 px-3"
+                onclick="adicionarFuncTarefa(${f.id}, '${f.nome.replace(/'/g,"\\'")}', '${cargo.replace(/'/g,"\\'")}')">
+            <span class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0"
+                  style="width:28px;height:28px;font-size:.7rem;font-weight:700">
+                ${f.nome.charAt(0).toUpperCase()}
+            </span>
+            <span class="flex-grow-1">
+                <span class="fw-semibold small">${f.nome}</span>
+                ${cargo ? `<br><small class="text-muted">${cargo}</small>` : ''}
+            </span>
+            <i class="fas fa-plus text-primary small"></i>
+        </button>`;
     }).join('');
 }
 
-function adicionarFuncCron(funcId, funcNome, funcCargo) {
-    if (!_cronEquipe.some(f => f.id === funcId)) {
-        _cronEquipe.push({ id: funcId, nome: funcNome, cargo: funcCargo, horas: 8.8 });
-        _renderEquipeCron();
-    }
-    const dd = document.getElementById('dd-func-cron');
-    if (dd) dd.style.display = 'none';
-}
-
-function removerFuncCron(funcId) {
-    _cronEquipe = _cronEquipe.filter(f => f.id !== funcId);
-    _renderEquipeCron();
-}
-
-function _renderEquipeCron() {
-    const container = document.getElementById('equipe-cron-lista');
+function _renderModalEquipeSelecionada() {
+    const container = document.getElementById('modalEquipeSelecionada');
     if (!container) return;
-    if (_cronEquipe.length === 0) {
-        container.innerHTML = '<p class="text-muted small mb-0 fst-italic">Nenhum funcionário alocado</p>';
-        // Remover hidden inputs
-        document.querySelectorAll('input[name^="cron_func_"]').forEach(el => el.remove());
+
+    const selecionados = _cronTaskEquipe[_modalTarefaId] || [];
+    if (selecionados.length === 0) {
+        container.innerHTML = '<p class="text-muted small fst-italic mb-0">Nenhum funcionário alocado</p>';
         return;
     }
-    const form = document.getElementById('formNovoRDO');
-    // Remover hidden inputs antigos
-    document.querySelectorAll('input[name^="cron_func_"]').forEach(el => el.remove());
-    container.innerHTML = _cronEquipe.map(f => `
-        <div class="d-flex align-items-center gap-2 mb-1 p-2 rounded" style="background:#f8f9ff;border:1px solid #dee2e6">
-            <i class="fas fa-user-hard-hat text-primary"></i>
+
+    container.innerHTML = selecionados.map(f => `
+        <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3" style="background:#f0f4ff;border:1px solid #c7d7fc">
+            <span class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0"
+                  style="width:28px;height:28px;font-size:.7rem;font-weight:700">
+                ${f.nome.charAt(0).toUpperCase()}
+            </span>
             <span class="flex-grow-1 small fw-semibold">${f.nome}</span>
-            <small class="text-muted">${f.cargo || ''}</small>
-            <label class="small text-muted mb-0 ms-2">Horas:</label>
-            <input type="number" class="form-control form-control-sm"
-                   style="width:70px" min="0.5" max="24" step="0.5"
+            <small class="text-muted me-1">${f.cargo || ''}</small>
+            <input type="number" class="form-control form-control-sm text-center"
+                   style="width:65px" min="0.5" max="24" step="0.5"
                    value="${f.horas}"
-                   onchange="_atualizarHorasCron(${f.id}, this.value)"
+                   onchange="_atualizarHorasTarefa(${f.id}, this.value)"
                    title="Horas trabalhadas">
-            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
-                    onclick="removerFuncCron(${f.id})" title="Remover">
-                <i class="fas fa-times"></i>
+            <small class="text-muted">h</small>
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1"
+                    onclick="removerFuncTarefa(${f.id})" title="Remover">
+                <i class="fas fa-times-circle"></i>
             </button>
         </div>`).join('');
-    // Recriar hidden inputs para envio
-    if (form) {
-        _cronEquipe.forEach(f => {
+}
+
+function adicionarFuncTarefa(funcId, funcNome, funcCargo) {
+    if (!_cronTaskEquipe[_modalTarefaId]) _cronTaskEquipe[_modalTarefaId] = [];
+    if (!_cronTaskEquipe[_modalTarefaId].some(f => f.id === funcId)) {
+        _cronTaskEquipe[_modalTarefaId].push({ id: funcId, nome: funcNome, cargo: funcCargo, horas: 8.8 });
+    }
+    _renderModalFuncLista(document.getElementById('modalFuncFiltro')?.value || '');
+    _renderModalEquipeSelecionada();
+}
+
+function removerFuncTarefa(funcId) {
+    if (_cronTaskEquipe[_modalTarefaId]) {
+        _cronTaskEquipe[_modalTarefaId] = _cronTaskEquipe[_modalTarefaId].filter(f => f.id !== funcId);
+    }
+    _renderModalFuncLista(document.getElementById('modalFuncFiltro')?.value || '');
+    _renderModalEquipeSelecionada();
+}
+
+function _atualizarHorasTarefa(funcId, valor) {
+    const lista = _cronTaskEquipe[_modalTarefaId];
+    if (!lista) return;
+    const entry = lista.find(f => f.id === funcId);
+    if (entry) entry.horas = parseFloat(valor) || 8.8;
+}
+
+function _atualizarBotaoEquipe(tarefaId) {
+    const btn = document.getElementById(`btn-equipe-${tarefaId}`);
+    const badge = document.getElementById(`badge-equipe-${tarefaId}`);
+    if (!btn || !badge) return;
+    const qtd = (_cronTaskEquipe[tarefaId] || []).length;
+    if (qtd > 0) {
+        badge.textContent = qtd;
+        badge.style.display = '';
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-primary', 'text-white');
+    } else {
+        badge.style.display = 'none';
+        btn.classList.remove('btn-primary', 'text-white');
+        btn.classList.add('btn-outline-secondary');
+    }
+}
+
+function _syncHiddenInputsTarefa() {
+    const form = document.getElementById('formNovoRDO');
+    if (!form) return;
+    // Remover todos os hidden inputs de tarefa-equipe
+    form.querySelectorAll('input[name^="cron_tarefa_"]').forEach(el => el.remove());
+    // Recriar com estado atual
+    Object.entries(_cronTaskEquipe).forEach(([tarefaId, lista]) => {
+        lista.forEach(f => {
             const h = document.createElement('input');
             h.type = 'hidden';
-            h.name = `cron_func_${f.id}_horas`;
+            h.name = `cron_tarefa_${tarefaId}_func_${f.id}_horas`;
             h.value = f.horas;
             form.appendChild(h);
         });
-    }
-}
-
-function _atualizarHorasCron(funcId, valor) {
-    const entry = _cronEquipe.find(f => f.id === funcId);
-    if (entry) {
-        entry.horas = parseFloat(valor) || 8.8;
-        // Atualizar apenas o hidden input correspondente
-        const form = document.getElementById('formNovoRDO');
-        if (form) {
-            const h = form.querySelector(`input[name="cron_func_${funcId}_horas"]`);
-            if (h) h.value = entry.horas;
-        }
-    }
+    });
 }
 {% endif %}
 </script>
