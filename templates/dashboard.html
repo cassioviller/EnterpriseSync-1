@@ -234,49 +234,42 @@ html[data-bs-theme="dark"] .header-btn i {
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
-                                <h6>Alimentação</h6>
-                                <h5 class="text-warning">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h5>
-                            </div>
+                    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-xl-7 g-3 text-center">
+                        <div class="col">
+                            <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
+                            <h6 class="mb-1">Alimentação</h6>
+                            <h5 class="text-warning mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h5>
                         </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-car fa-2x text-info mb-2"></i>
-                                <h6>Transporte</h6>
-                                <h5 class="text-info">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h5>
-                            </div>
+                        <div class="col">
+                            <i class="fas fa-car fa-2x text-info mb-2"></i>
+                            <h6 class="mb-1">Transporte</h6>
+                            <h5 class="text-info mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h5>
                         </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-users fa-2x text-success mb-2"></i>
-                                <h6>Mão de Obra</h6>
-                                <h5 class="text-success">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h5>
-                            </div>
+                        <div class="col">
+                            <i class="fas fa-users fa-2x text-success mb-2"></i>
+                            <h6 class="mb-1">Mão de Obra</h6>
+                            <h5 class="text-success mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h5>
                         </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
-                                <h6>Faltas Justificadas</h6>
-                                <h5 class="text-warning">{{ custos_detalhados.faltas_justificadas_qtd if custos_detalhados.faltas_justificadas_qtd is defined else 0 }} dias</h5>
-                                <small class="text-muted">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas if custos_detalhados.faltas_justificadas is defined else 0).replace(',', '.') }}</small>
-                            </div>
+                        <div class="col">
+                            <i class="fas fa-boxes fa-2x text-purple mb-2" style="color:#6f42c1"></i>
+                            <h6 class="mb-1">Material</h6>
+                            <h5 style="color:#6f42c1" class="mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.material if custos_detalhados.material is defined else 0).replace(',', '.') }}</h5>
                         </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-cogs fa-2x text-secondary mb-2"></i>
-                                <h6>Outros</h6>
-                                <h5 class="text-secondary">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</h5>
-                            </div>
+                        <div class="col">
+                            <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                            <h6 class="mb-1">Faltas</h6>
+                            <h5 class="text-warning mb-0">{{ custos_detalhados.faltas_justificadas_qtd if custos_detalhados.faltas_justificadas_qtd is defined else 0 }} dias</h5>
+                            <small class="text-muted">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas if custos_detalhados.faltas_justificadas is defined else 0).replace(',', '.') }}</small>
                         </div>
-                        <div class="col-md-2">
-                            <div class="text-center">
-                                <i class="fas fa-calculator fa-2x text-primary mb-2"></i>
-                                <h6>Total</h6>
-                                <h5 class="text-primary">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</h5>
-                            </div>
+                        <div class="col">
+                            <i class="fas fa-cogs fa-2x text-secondary mb-2"></i>
+                            <h6 class="mb-1">Outros</h6>
+                            <h5 class="text-secondary mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</h5>
+                        </div>
+                        <div class="col">
+                            <i class="fas fa-calculator fa-2x text-primary mb-2"></i>
+                            <h6 class="mb-1">Total</h6>
+                            <h5 class="text-primary mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</h5>
                         </div>
                     </div>
                 </div>

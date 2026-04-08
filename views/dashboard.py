@@ -777,32 +777,52 @@ def dashboard():
         quantidade_faltas_justificadas, custo_faltas_justificadas = resultado_faltas
         logger.debug(f"DEBUG Faltas Justificadas: {quantidade_faltas_justificadas} faltas, R$ {custo_faltas_justificadas:.2f}")
         
-        # 3. Outros Custos (não transporte nem alimentação) - usar safe_db_operation
+        # 3. Custo de Materiais — CustoObra tipo='material' + OutroCusto tipo='material'
+        def calcular_custo_material():
+            from models import OutroCusto, CustoObra
+            custo_obra_mat = CustoObra.query.filter(
+                CustoObra.admin_id == admin_id,
+                CustoObra.data >= data_inicio,
+                CustoObra.data <= data_fim,
+                CustoObra.tipo == 'material'
+            ).all()
+            total_obra = sum(float(c.valor or 0) for c in custo_obra_mat)
+            outro_mat = OutroCusto.query.filter(
+                OutroCusto.admin_id == admin_id,
+                OutroCusto.data >= data_inicio,
+                OutroCusto.data <= data_fim,
+                OutroCusto.tipo == 'material'
+            ).all()
+            total_outro = sum(float(o.valor or 0) for o in outro_mat)
+            total = total_obra + total_outro
+            logger.debug(f"DEBUG Material: CustoObra=R${total_obra:.2f}, OutroCusto=R${total_outro:.2f}, Total=R${total:.2f}")
+            return total
+
+        custo_material_real = safe_db_operation(calcular_custo_material, 0)
+
+        # 3b. Outros Custos (não transporte, alimentação nem material)
         def calcular_outros_custos():
             from models import OutroCusto, CustoObra
-            
-            # 3.1. Tabela OutroCusto (genérica)
+            # OutroCusto: tudo exceto transporte, alimentacao e material
             outros_custos = OutroCusto.query.filter(
                 OutroCusto.admin_id == admin_id,
                 OutroCusto.data >= data_inicio,
                 OutroCusto.data <= data_fim,
-                ~OutroCusto.tipo.in_(['transporte', 'alimentacao'])
+                ~OutroCusto.tipo.in_(['transporte', 'alimentacao', 'material'])
             ).all()
-            total_outro_custo = sum(o.valor or 0 for o in outros_custos)
-            
-            # 3.2. Tabela CustoObra (tipo='outros' ou 'servico' ou 'material')
+            total_outro_custo = sum(float(o.valor or 0) for o in outros_custos)
+            # CustoObra: apenas tipo 'outros' e 'servico' (material já separado)
             custos_obra_outros = CustoObra.query.filter(
                 CustoObra.admin_id == admin_id,
                 CustoObra.data >= data_inicio,
                 CustoObra.data <= data_fim,
-                CustoObra.tipo.in_(['outros', 'servico', 'material'])
+                CustoObra.tipo.in_(['outros', 'servico'])
             ).all()
             total_custo_obra = sum(float(c.valor or 0) for c in custos_obra_outros)
-            
             total = total_outro_custo + total_custo_obra
-            logger.debug(f" DEBUG OUTROS: OutroCusto ({len(outros_custos)})=R${total_outro_custo:.2f}, CustoObra ({len(custos_obra_outros)})=R${total_custo_obra:.2f}, Total=R${total:.2f}")
+            logger.debug(f"DEBUG Outros: OutroCusto=R${total_outro_custo:.2f}, CustoObra=R${total_custo_obra:.2f}, Total=R${total:.2f}")
             return total
-        
+
         custo_outros_real = safe_db_operation(calcular_outros_custos, 0)
         logger.debug(f"DEBUG Custos Outros FINAL: R$ {custo_outros_real:.2f}")
         
@@ -827,11 +847,14 @@ def dashboard():
             
         # [OK] CORREÇÃO 4: Veículos já calculados no início (linha 535) - removido daqui
         # Converter todos para float antes de somar (corrige erro float + Decimal)
-        custos_mes = float(total_custo_real) + float(custo_alimentacao_real) + float(custo_transporte_real) + float(custo_outros_real)
+        custos_mes = (float(total_custo_real) + float(custo_alimentacao_real) +
+                      float(custo_transporte_real) + float(custo_material_real) +
+                      float(custo_outros_real))
         custos_detalhados = {
             'alimentacao': custo_alimentacao_real,
             'transporte': custo_transporte_real,
             'mao_obra': total_custo_real,
+            'material': custo_material_real,
             'outros': custo_outros_real,
             'faltas_justificadas': custo_faltas_justificadas,
             'faltas_justificadas_qtd': quantidade_faltas_justificadas,
@@ -846,12 +869,14 @@ def dashboard():
         custo_alimentacao_real = 0
         custo_transporte_real = 0
         custo_outros_real = 0
+        custo_material_real = 0
         total_horas_real = 0
         custos_mes = 0
         custos_detalhados = {
             'alimentacao': 0,
             'transporte': 0,
             'mao_obra': 0,
+            'material': 0,
             'outros': 0,
             'faltas_justificadas': 0,
             'faltas_justificadas_qtd': 0,
