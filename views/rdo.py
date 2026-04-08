@@ -3687,7 +3687,8 @@ def salvar_rdo_flexivel():
                     logger.warning(f"[WARN] sub_mestre_id={sub_mestre_id_str} não encontrado no mapa de subatividades")
                     continue
                 for func_id_sel, horas in func_list:
-                    funcionario = Funcionario.query.get(func_id_sel)
+                    # Tenant-safe: validar que funcionário pertence ao mesmo admin
+                    funcionario = Funcionario.query.filter_by(id=func_id_sel, admin_id=admin_id).first()
                     if not funcionario:
                         logger.warning(f"[WARN] Funcionário ID {func_id_sel} não encontrado")
                         continue
@@ -3721,7 +3722,8 @@ def salvar_rdo_flexivel():
                         if not funcionario_id_str or not funcionario_id_str.strip():
                             continue
                         funcionario_id_sel = int(funcionario_id_str.strip())
-                        funcionario = Funcionario.query.get(funcionario_id_sel)
+                        # Tenant-safe: validar admin_id
+                        funcionario = Funcionario.query.filter_by(id=funcionario_id_sel, admin_id=admin_id).first()
                         if funcionario:
                             funcao_exercida = 'Funcionário'
                             try:

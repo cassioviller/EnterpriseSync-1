@@ -823,9 +823,10 @@ const _maoObraSubat = {};
 
 async function _carregarFuncCache() {
     const obraId = document.getElementById('obra_id')?.value;
-    if (obraId && _funcCacheObraId === obraId && _funcCache.length > 0) return _funcCache;
+    if (!obraId) return _funcCache;
+    if (_funcCacheObraId === obraId && _funcCache.length > 0) return _funcCache;
     try {
-        const resp = await fetch('/api/funcionarios');
+        const resp = await fetch(`/api/funcionarios/${obraId}`);
         const data = await resp.json();
         if (data.success && data.funcionarios) {
             _funcCache = data.funcionarios;

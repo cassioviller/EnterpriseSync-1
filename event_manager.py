@@ -590,17 +590,20 @@ def lancar_custos_rdo(data: dict, admin_id: int):
     """Handler: Lançar custos de mão de obra quando RDO é finalizado.
 
     Regras de negócio (v2):
-    - Custo base = funcionario.valor_diaria (não horário)
-    - UMA diária por funcionário por data_rdo (mesmo aparecendo em múltiplas subatividades)
-    - Deduplicação: pula se já existe CustoObra com rdo_id+funcionario_id+data
-    - GestaoCustoPai/Filho: idempotente por entidade_id+data_referencia+origem_tabela
+    - Custo base = funcionario.valor_diaria — sem fallback; se zero/nulo → skip
+    - UMA diária por funcionário por data_rdo (deduplicação por funcionário, não por registro)
+    - CustoObra: idempotente por rdo_id + funcionario_id + data + admin_id
+    - GestaoCustoPai/Filho: via registrar_custo_automatico (tipo_categoria='SALARIO')
+      deduplicado por origem_tabela + data_referencia + entidade_id + admin_id (sem orig_id)
+    - Descrição inclui RDO# + nome + cargo + data + subatividades trabalhadas
+    - Tenant-safe: funcionários validados com admin_id
     """
     try:
-        from models import db, RDO, RDOMaoObra, Funcionario, CustoObra, GestaoCustoPai, GestaoCustoFilho
+        from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Funcionario, CustoObra, GestaoCustoPai, GestaoCustoFilho
         from decimal import Decimal
+        from utils.financeiro_integration import registrar_custo_automatico
 
         rdo_id = data.get('rdo_id')
-
         if not rdo_id:
             logger.warning("⚠️ rdo_id não fornecido no evento rdo_finalizado")
             return
@@ -621,36 +624,39 @@ def lancar_custos_rdo(data: dict, admin_id: int):
 
         data_rdo = rdo.data_relatorio
 
-        # Deduplicar: uma diária por funcionário (pode estar em múltiplas subatividades)
-        funcionarios_vistos = {}  # funcionario_id → Funcionario
+        # Agrupar por funcionário (dedup) + coletar subatividades por funcionário
+        func_mo_map = {}  # func_id → [RDOMaoObra]
         for mo in mao_obra_registros:
-            if mo.funcionario_id and mo.funcionario_id not in funcionarios_vistos:
-                func = Funcionario.query.get(mo.funcionario_id)
-                if func:
-                    funcionarios_vistos[mo.funcionario_id] = func
+            if mo.funcionario_id:
+                func_mo_map.setdefault(mo.funcionario_id, []).append(mo)
 
         custos_criados = 0
         gestao_criados = 0
         valor_total_custos = 0.0
 
-        for func_id, funcionario in funcionarios_vistos.items():
-            # Valor base: diária do funcionário
-            valor_diaria = 0.0
-            try:
-                if hasattr(funcionario, 'valor_diaria') and funcionario.valor_diaria:
-                    valor_diaria = float(funcionario.valor_diaria)
-            except Exception:
-                pass
-
-            if valor_diaria <= 0:
-                # Fallback para cálculo horário se valor_diaria não configurado
-                salario_hora = calcular_valor_hora_periodo(funcionario, data_rdo, data_rdo)
-                valor_diaria = salario_hora * 8.8 if salario_hora > 0 else 0.0
-                logger.warning(f"⚠️ {funcionario.nome} sem valor_diaria — fallback horário: R$ {valor_diaria:.2f}")
-
-            if valor_diaria <= 0:
-                logger.info(f"⏭️ {funcionario.nome} sem custo configurado — pulando")
+        for func_id, mo_list in func_mo_map.items():
+            # Tenant-safe: verificar que o funcionário pertence ao mesmo admin
+            funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
+            if not funcionario:
+                logger.warning(f"⚠️ Funcionário {func_id} não encontrado para admin {admin_id} — ignorado")
                 continue
+
+            # Custo base: valor_diaria — sem fallback para horário
+            valor_diaria = float(getattr(funcionario, 'valor_diaria', 0) or 0)
+            if valor_diaria <= 0:
+                logger.warning(f"⚠️ {funcionario.nome}: valor_diaria não configurado (={valor_diaria}) — custo RDO não lançado")
+                continue
+
+            # Coletar nomes de subatividades trabalhadas por este funcionário
+            sub_nomes = []
+            for mo in mo_list:
+                if mo.subatividade_id:
+                    try:
+                        sub = RDOServicoSubatividade.query.get(mo.subatividade_id)
+                        if sub and sub.nome_subatividade and sub.nome_subatividade not in sub_nomes:
+                            sub_nomes.append(sub.nome_subatividade)
+                    except Exception:
+                        pass
 
             funcao = 'Diarista'
             try:
@@ -661,9 +667,13 @@ def lancar_custos_rdo(data: dict, admin_id: int):
             except Exception:
                 pass
 
-            descricao = f"RDO #{rdo.numero_rdo} - {funcionario.nome} ({funcao}) - {data_rdo.strftime('%d/%m/%Y')} - 1 diária"
+            sub_str = f" | {', '.join(sub_nomes)}" if sub_nomes else ""
+            descricao = (
+                f"RDO #{rdo.numero_rdo} - {funcionario.nome} ({funcao})"
+                f" - {data_rdo.strftime('%d/%m/%Y')} - 1 diária{sub_str}"
+            )
 
-            # CustoObra — idempotente por rdo_id + funcionario_id + data
+            # CustoObra — idempotente por rdo_id + funcionario_id + data + admin_id
             existing_custo = CustoObra.query.filter_by(
                 rdo_id=rdo.id,
                 funcionario_id=func_id,
@@ -689,52 +699,50 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                 db.session.add(custo)
                 custos_criados += 1
 
-            # GestaoCustoPai+Filho — idempotente por entidade_id+data_referencia+origem_tabela
-            existing_gestao = GestaoCustoFilho.query.filter_by(
-                origem_tabela='rdo_mao_obra',
-                origem_id=rdo.id,
-                admin_id=admin_id,
-                data_referencia=data_rdo,
-            ).join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id).filter(
-                GestaoCustoPai.entidade_id == func_id
-            ).first()
+            # GestaoCustoPai/Filho via registrar_custo_automatico (tipo_categoria='SALARIO')
+            # Idempotência: origem_tabela + data_referencia + entidade_id + admin_id (sem origem_id)
+            existing_filho = (
+                db.session.query(GestaoCustoFilho)
+                .filter(
+                    GestaoCustoFilho.origem_tabela == 'rdo_mao_obra',
+                    GestaoCustoFilho.data_referencia == data_rdo,
+                    GestaoCustoFilho.admin_id == admin_id,
+                )
+                .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+                .filter(
+                    GestaoCustoPai.entidade_id == func_id,
+                    GestaoCustoPai.tipo_categoria == 'SALARIO',
+                    GestaoCustoPai.admin_id == admin_id,
+                )
+                .first()
+            )
 
-            if not existing_gestao:
-                pai = GestaoCustoPai(
+            if not existing_filho:
+                filho = registrar_custo_automatico(
                     admin_id=admin_id,
-                    tipo_categoria='MAO_OBRA_DIRETA',
+                    tipo_categoria='SALARIO',
                     entidade_nome=funcionario.nome,
                     entidade_id=func_id,
-                    valor_total=Decimal(str(valor_diaria)),
-                    valor_pago=Decimal('0'),
-                    saldo=Decimal(str(valor_diaria)),
-                    status='PENDENTE',
-                    data_vencimento=data_rdo,
-                    numero_documento=f"RDO-{rdo.numero_rdo}",
-                    data_emissao=data_rdo,
-                )
-                db.session.add(pai)
-                db.session.flush()
-
-                filho = GestaoCustoFilho(
-                    pai_id=pai.id,
-                    admin_id=admin_id,
-                    data_referencia=data_rdo,
+                    data=data_rdo,
                     descricao=descricao,
-                    valor=Decimal(str(valor_diaria)),
+                    valor=valor_diaria,
                     obra_id=rdo.obra_id,
                     origem_tabela='rdo_mao_obra',
                     origem_id=rdo.id,
                 )
-                db.session.add(filho)
-                gestao_criados += 1
+                if filho:
+                    gestao_criados += 1
+                else:
+                    logger.warning(f"⚠️ registrar_custo_automatico retornou None para {funcionario.nome}")
+            else:
+                logger.info(f"⏭️ GestaoCustoFilho já existe para {funcionario.nome} em {data_rdo} — skip")
 
             valor_total_custos += valor_diaria
 
         db.session.commit()
         logger.info(
-            f"✅ RDO {rdo.numero_rdo}: {custos_criados} CustoObra + {gestao_criados} GestaoCustoPai "
-            f"lançados para {len(funcionarios_vistos)} funcionário(s) únicos "
+            f"✅ RDO {rdo.numero_rdo}: {custos_criados} CustoObra + {gestao_criados} GestaoCustoFilho "
+            f"lançados para {len(func_mo_map)} funcionário(s) únicos "
             f"(Total: R$ {valor_total_custos:.2f})"
         )
 

@@ -28,6 +28,30 @@ except ImportError:
         return decorator
 
 # ===== APIs PARA FRONTEND =====
+@main_bp.route('/api/funcionarios/<int:obra_id>')
+def api_funcionarios_por_obra(obra_id):
+    """API: Funcionários ativos do tenant para seleção em cards de subatividade do RDO."""
+    try:
+        admin_id = get_tenant_admin_id()
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id, ativo=True
+        ).order_by(Funcionario.nome).all()
+
+        result = []
+        for f in funcionarios:
+            funcao = 'N/A'
+            try:
+                funcao = f.funcao_ref.nome if (hasattr(f, 'funcao_ref') and f.funcao_ref) else (f.funcao or 'N/A')
+            except Exception:
+                pass
+            result.append({'id': f.id, 'nome': f.nome, 'funcao': funcao, 'cargo': funcao})
+
+        return jsonify({'success': True, 'funcionarios': result, 'total': len(result)})
+    except Exception as e:
+        logger.error(f"Erro api_funcionarios_por_obra: {e}")
+        return jsonify({'success': False, 'funcionarios': [], 'error': str(e)}), 500
+
+
 @main_bp.route('/api/funcionarios')
 def api_funcionarios_consolidada():
     """API CONSOLIDADA para funcionários - Unifica admin e mobile"""
