@@ -15,7 +15,7 @@ from sqlalchemy import func
 
 from app import db
 from models import (GestaoCustoPai, GestaoCustoFilho,
-                    FluxoCaixa, Obra, TipoUsuario, ContaPagar, Fornecedor)
+                    FluxoCaixa, Obra, TipoUsuario, ContaPagar, Fornecedor, BancoEmpresa)
 from utils.tenant import is_v2_active
 
 logger = logging.getLogger(__name__)
@@ -131,6 +131,7 @@ def index():
     resumo = {row[0]: {'qtd': row[1], 'total': float(row[2] or 0)} for row in totais}
 
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
 
     return render_template(
         'custos/gestao.html',
@@ -143,6 +144,7 @@ def index():
         filtro_categoria=filtro_categoria,
         filtro_busca=filtro_busca,
         obras=obras,
+        bancos=bancos,
     )
 
 
@@ -316,7 +318,7 @@ def solicitar(pai_id):
 
 
 # ───────────────────────────────────────────────────────────────
-# AUTORIZAR / RECUSAR    SOLICITADO → AUTORIZADO / PENDENTE
+# APROVAR / RECUSAR    SOLICITADO → PAGO/PARCIAL ou PENDENTE
 # ───────────────────────────────────────────────────────────────
 
 @gestao_custos_bp.route('/<int:pai_id>/autorizar', methods=['POST'])
@@ -329,7 +331,7 @@ def autorizar(pai_id):
     pai = GestaoCustoPai.query.filter_by(id=pai_id, admin_id=admin_id).first_or_404()
 
     if pai.status != 'SOLICITADO':
-        flash('Apenas registros SOLICITADOS podem ser autorizados.', 'warning')
+        flash('Apenas registros SOLICITADOS podem ser aprovados.', 'warning')
         return redirect(url_for('gestao_custos.index'))
 
     acao = request.form.get('acao', 'autorizar')
@@ -338,17 +340,105 @@ def autorizar(pai_id):
         pai.status = 'PENDENTE'
         pai.valor_solicitado = None
         db.session.commit()
-        flash('Solicitação recusada. Status voltou para PENDENTE.', 'info')
+        flash('Não aprovado. Registro voltou para Não Solicitado.', 'info')
         return redirect(url_for('gestao_custos.index'))
 
+    # ── Aprovação: executa o pagamento diretamente ──
     try:
-        pai.status = 'AUTORIZADO'
+        data_pgto_str = request.form.get('data_pagamento', '')
+        data_pgto = (datetime.strptime(data_pgto_str, '%Y-%m-%d').date()
+                     if data_pgto_str else date.today())
+
+        banco_id_str = request.form.get('banco_id', '').strip()
+        conta_bancaria_manual = request.form.get('conta_bancaria_manual', '').strip()
+        if banco_id_str:
+            banco = BancoEmpresa.query.filter_by(id=int(banco_id_str), admin_id=admin_id).first()
+            conta = f'{banco.nome_banco} — Ag {banco.agencia} / C {banco.conta}' if banco else conta_bancaria_manual
+        else:
+            conta = conta_bancaria_manual
+
+        valor_autorizado = Decimal(str(pai.valor_solicitado or pai.valor_total))
+        valor_pago_anterior = Decimal(str(pai.valor_pago or 0))
+        novo_valor_pago = valor_pago_anterior + valor_autorizado
+        novo_saldo = Decimal(str(pai.valor_total)) - novo_valor_pago
+
+        if novo_saldo <= Decimal('0.01'):
+            novo_status = 'PAGO'
+            novo_saldo = Decimal('0')
+        else:
+            novo_status = 'PARCIAL'
+
+        cat_mapa = {
+            'MATERIAL':           'custo_obra',
+            'MAO_OBRA_DIRETA':    'salario',
+            'EQUIPAMENTO':        'custo_obra',
+            'SUBEMPREITADA':      'custo_obra',
+            'ALIMENTACAO':        'alimentacao',
+            'TRANSPORTE':         'custo_obra',
+            'CANTEIRO':           'custo_obra',
+            'TAXAS_LICENCAS':     'custo_obra',
+            'SALARIO_ADMIN':      'salario',
+            'ALUGUEL_UTILITIES':  'custo_obra',
+            'TRIBUTOS':           'custo_obra',
+            'DESPESA_FINANCEIRA': 'custo_obra',
+            'OUTROS':             'custo_obra',
+            'SALARIO':            'salario',
+            'VEICULO':            'custo_obra',
+            'COMPRA':             'custo_obra',
+            'REEMBOLSO':          'custo_obra',
+            'DESPESA_GERAL':      'custo_obra',
+        }
+        cat_fc = cat_mapa.get(pai.tipo_categoria, 'custo_obra')
+        label = CATEGORIA_LABELS.get(pai.tipo_categoria, ('Custo',))[0]
+
+        fc = FluxoCaixa(
+            admin_id=admin_id,
+            data_movimento=data_pgto,
+            tipo_movimento='SAIDA',
+            categoria=cat_fc,
+            valor=float(valor_autorizado),
+            descricao=f'{label} — {pai.entidade_nome}',
+            referencia_id=pai.id,
+            referencia_tabela='gestao_custo_pai',
+            observacoes=conta or None,
+        )
+        db.session.add(fc)
+        db.session.flush()
+
+        pai.status = novo_status
+        pai.valor_pago = novo_valor_pago
+        pai.saldo = novo_saldo
+        pai.data_pagamento = data_pgto
+        pai.conta_bancaria = conta
+        if novo_status == 'PAGO':
+            pai.fluxo_caixa_id = fc.id
         db.session.commit()
-        flash(f'Pagamento de R$ {float(pai.valor_solicitado or pai.valor_total):,.2f} autorizado. Aguardando efetivação pelo financeiro.', 'success')
+
+        # Lançamento contábil (não crítico)
+        try:
+            from contabilidade_utils import gerar_lancamento_contabil_automatico
+            gerar_lancamento_contabil_automatico(
+                admin_id=admin_id,
+                tipo_operacao='DESPESA_GERAL',
+                valor=float(valor_autorizado),
+                data=data_pgto,
+                descricao=f'{label} — {pai.entidade_nome}',
+            )
+        except Exception as e_cont:
+            logger.warning(f"[WARN] Lançamento contábil falhou (não crítico): {e_cont}")
+
+        if novo_status == 'PAGO':
+            flash(f'Aprovado e pago: R$ {valor_autorizado:,.2f}. Saldo zerado.', 'success')
+        else:
+            flash(
+                f'Aprovado e pago: R$ {valor_autorizado:,.2f}. '
+                f'Saldo restante: R$ {novo_saldo:,.2f}',
+                'info'
+            )
     except Exception as e:
         db.session.rollback()
-        logger.error(f"[ERROR] autorizar pagamento: {e}", exc_info=True)
-        flash(f'Erro ao autorizar: {e}', 'danger')
+        logger.error(f"[ERROR] aprovar+pagar gestao_custo: {e}", exc_info=True)
+        flash(f'Erro ao aprovar: {e}', 'danger')
 
     return redirect(url_for('gestao_custos.index'))
 
