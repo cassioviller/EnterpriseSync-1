@@ -78,24 +78,22 @@ def event_handler(event_name: str):
 @event_handler('material_saida')
 def lancar_custo_material_obra(data: dict, admin_id: int):
     """
-    Handler: Rastrear saída de material do estoque para obra.
+    Handler: Registro de saída de material do estoque (controle físico apenas).
 
-    REENGENHARIA SUPRIMENTOS T5:
-    Cria GestaoCustoPai(tipo_categoria='TRANSFERENCIA') para rastrear a atribuição
-    de custo à obra específica quando material sai do almoxarifado. Esta é uma
-    entrada de rastreabilidade (não de despesa financeira) — a despesa financeira
-    já foi reconhecida na compra via GestaoCustoPai(MATERIAL).
-    O dashboard calcular_custo_material() lê apenas MATERIAL, evitando dupla contagem.
-    Mantém também lançamento contábil D:CMV / C:Estoque para integridade contábil.
+    REENGENHARIA SUPRIMENTOS — princípio central:
+    O custo de material é reconhecido UMA ÚNICA VEZ, na compra (GestaoCustoPai MATERIAL
+    criado em nova_post). A SAÍDA é exclusivamente controle físico de estoque —
+    nenhum lançamento financeiro ou contábil adicional é criado aqui.
+
+    Rastreabilidade de atribuição por obra (T5 — TRANSFERENCIA) deve ser implementada
+    em um fluxo explícito de transferência central→obra, com evento e handler próprios,
+    para não conflatar consumo genérico com transferência intencional.
     """
     try:
-        from models import (db, AlmoxarifadoMovimento, AlmoxarifadoItem,
-                            GestaoCustoPai, GestaoCustoFilho, Obra)
+        from models import db, AlmoxarifadoMovimento, AlmoxarifadoItem
         from datetime import datetime
-        from decimal import Decimal
 
         movimento_id = data.get('movimento_id')
-
         if not movimento_id:
             logger.warning("⚠️ movimento_id não fornecido no evento material_saida")
             return
@@ -105,110 +103,18 @@ def lancar_custo_material_obra(data: dict, admin_id: int):
             admin_id=admin_id,
             tipo_movimento='SAIDA',
         ).first()
-
         if not movimento:
-            logger.info(f"⏭️ [SAIDA] AlmoxarifadoMovimento #{movimento_id} não encontrado — evento ignorado")
+            logger.info(f"⏭️ [SAIDA] AlmoxarifadoMovimento #{movimento_id} não encontrado")
             return
-
-        if not movimento.obra_id:
-            logger.info(f"⏭️ [SAIDA] Movimento #{movimento_id} sem obra — rastreamento de transferência ignorado")
-            return
-
-        quantidade = float(movimento.quantidade or 0)
-        valor_unitario = float(movimento.valor_unitario or 0)
-        valor_total = round(quantidade * valor_unitario, 2)
 
         item = AlmoxarifadoItem.query.get(movimento.item_id)
-        item_nome = item.nome if item else 'Item'
-        data_mov = movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date()
-
-        # ─── T5: GestaoCustoPai TRANSFERENCIA — atribuição de custo à obra ──────
-        # Idempotente: só cria se não existir GestaoCustoFilho para este movimento.
-        if valor_total > 0:
-            existente = GestaoCustoFilho.query.filter_by(
-                origem_tabela='almoxarifado_movimento',
-                origem_id=movimento_id,
-                admin_id=admin_id,
-            ).first()
-            if not existente:
-                obra = Obra.query.get(movimento.obra_id)
-                gcp = GestaoCustoPai(
-                    admin_id=admin_id,
-                    tipo_categoria='TRANSFERENCIA',
-                    entidade_nome=obra.nome if obra else f'Obra #{movimento.obra_id}',
-                    entidade_id=movimento.obra_id,
-                    valor_total=Decimal(str(valor_total)),
-                    valor_pago=Decimal(str(valor_total)),
-                    saldo=Decimal('0'),
-                    status='PAGO',
-                    data_emissao=data_mov,
-                    data_vencimento=data_mov,
-                    numero_documento=f"MOV-{movimento_id}",
-                    numero_parcela=1,
-                    total_parcelas=1,
-                    observacoes=f"Consumo almox→obra: {item_nome} x{quantidade} (Movimento #{movimento_id})",
-                )
-                db.session.add(gcp)
-                db.session.flush()
-                db.session.add(GestaoCustoFilho(
-                    admin_id=admin_id,
-                    pai_id=gcp.id,
-                    obra_id=movimento.obra_id,
-                    descricao=f"Consumo: {item_nome} x{quantidade}",
-                    valor=Decimal(str(valor_total)),
-                    origem_tabela='almoxarifado_movimento',
-                    origem_id=movimento_id,
-                ))
-                db.session.commit()
-                logger.info(f"✅ [TRANSFERENCIA] GestaoCustoPai criado: obra {movimento.obra_id} | R$ {valor_total:.2f}")
-            else:
-                logger.info(f"⏭️ [TRANSFERENCIA] já existe para movimento #{movimento_id}")
-        else:
-            logger.info(f"⏭️ [SAIDA] Valor zerado — GestaoCustoPai TRANSFERENCIA não criado")
-
-        # ─── Lançamento contábil D:CMV / C:Estoque ──────────────────────────
-        if valor_total > 0:
-            try:
-                from models import LancamentoContabil, PartidaContabil
-                from sqlalchemy import func
-
-                ultimo_numero = db.session.query(func.max(LancamentoContabil.numero)).filter_by(admin_id=admin_id).scalar()
-                numero_lancamento = (ultimo_numero + 1) if ultimo_numero else 1
-
-                lancamento = LancamentoContabil(
-                    admin_id=admin_id,
-                    numero=numero_lancamento,
-                    data_lancamento=data_mov,
-                    historico=f"Saída almox→obra: {item_nome} (Movimento #{movimento_id})",
-                    origem='ALMOXARIFADO_SAIDA',
-                    origem_id=movimento_id,
-                    valor_total=Decimal(str(valor_total)),
-                )
-                db.session.add(lancamento)
-                db.session.flush()
-                obra = Obra.query.get(movimento.obra_id)
-                db.session.add(PartidaContabil(
-                    admin_id=admin_id, lancamento_id=lancamento.id,
-                    conta_codigo='5.1.02.001', tipo_partida='DEBITO',
-                    valor=Decimal(str(valor_total)),
-                    historico_complementar=f"Consumo: {item_nome}", sequencia=1,
-                ))
-                db.session.add(PartidaContabil(
-                    admin_id=admin_id, lancamento_id=lancamento.id,
-                    conta_codigo='1.1.05.001', tipo_partida='CREDITO',
-                    valor=Decimal(str(valor_total)),
-                    historico_complementar=f"Baixa estoque — {obra.nome if obra else 'Obra #' + str(movimento.obra_id)}",
-                    sequencia=2,
-                ))
-                db.session.commit()
-                logger.info(f"✅ Lançamento contábil #{numero_lancamento} D:CMV/C:Estoque — R$ {valor_total:.2f}")
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"❌ Erro no lançamento contábil saída: {e}")
+        item_nome = item.nome if item else f'Item #{movimento.item_id}'
+        quantidade = float(movimento.quantidade or 0)
+        obra_info = f"→ obra {movimento.obra_id}" if movimento.obra_id else "(sem obra)"
+        logger.info(f"✅ [SAIDA] {item_nome} x{quantidade} {obra_info} — controle físico registrado (sem lançamento financeiro)")
 
     except Exception as e:
         logger.error(f"❌ Erro no handler material_saida: {e}", exc_info=True)
-        db.session.rollback()
 
 
 @event_handler('material_entrada')
