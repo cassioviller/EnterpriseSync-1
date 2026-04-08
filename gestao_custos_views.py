@@ -330,8 +330,8 @@ def autorizar(pai_id):
 
     pai = GestaoCustoPai.query.filter_by(id=pai_id, admin_id=admin_id).first_or_404()
 
-    if pai.status != 'SOLICITADO':
-        flash('Apenas registros SOLICITADOS podem ser aprovados.', 'warning')
+    if pai.status not in ('SOLICITADO', 'AUTORIZADO'):
+        flash('Apenas registros SOLICITADOS ou AUTORIZADOS podem ser aprovados.', 'warning')
         return redirect(url_for('gestao_custos.index'))
 
     acao = request.form.get('acao', 'autorizar')
@@ -444,7 +444,10 @@ def autorizar(pai_id):
 
 
 # ───────────────────────────────────────────────────────────────
-# EFETIVAR PAGAMENTO    AUTORIZADO → PAGO
+# EFETIVAR PAGAMENTO  [LEGADO — mantido apenas para registros
+# já existentes no status AUTORIZADO. O fluxo normal vai direto
+# SOLICITADO → PAGO/PARCIAL via endpoint /autorizar. Nenhum
+# botão da UI atinge este endpoint no fluxo atual.]
 # ───────────────────────────────────────────────────────────────
 
 @gestao_custos_bp.route('/<int:pai_id>/pagar', methods=['POST'])

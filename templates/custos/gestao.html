@@ -11,7 +11,7 @@
         <i class="fas fa-coins me-2 text-warning"></i>Gestão de Custos
         <span class="badge bg-primary ms-2" style="font-size:.6rem">V2</span>
       </h2>
-      <small class="text-muted">Fluxo de aprovação: Pendente → Solicitado → Autorizado → Pago</small>
+      <small class="text-muted">Fluxo de aprovação: Pendente → Solicitado → Aprovado → Pago</small>
     </div>
     <div class="d-flex gap-2">
       {% if modo == 'novo' %}
@@ -173,7 +173,6 @@
     {% set status_list = [
       ('PENDENTE',   'secondary', 'fas fa-clock'),
       ('SOLICITADO', 'warning',   'fas fa-paper-plane'),
-      ('AUTORIZADO', 'success',   'fas fa-thumbs-up'),
       ('PARCIAL',    'info',      'fas fa-adjust'),
       ('PAGO',       'primary',   'fas fa-check-circle'),
     ] %}
@@ -222,7 +221,7 @@
         <div class="col-sm-3">
           <select name="status" class="form-select form-select-sm">
             <option value="">Todos os status</option>
-            {% for s in ['PENDENTE','SOLICITADO','AUTORIZADO','PARCIAL','PAGO','RECUSADO'] %}
+            {% for s in ['PENDENTE','SOLICITADO','PARCIAL','PAGO','RECUSADO'] %}
             <option value="{{ s }}" {% if filtro_status == s %}selected{% endif %}>{{ s|title }}</option>
             {% endfor %}
           </select>
@@ -305,7 +304,11 @@
               {% else %}—{% endif %}
             </td>
             <td class="text-center">
+              {% if reg.status == 'AUTORIZADO' %}
+              <span class="badge bg-success">Aprovado</span>
+              {% else %}
               <span class="badge bg-{{ badge_cor }}">{{ reg.status }}</span>
+              {% endif %}
             </td>
             <td class="text-center">
               <small class="text-muted">{{ (reg.data_pagamento or reg.data_vencimento or reg.data_criacao.date()).strftime('%d/%m/%Y') }}</small>
@@ -321,8 +324,8 @@
                   <i class="fas fa-paper-plane fa-xs"></i>
                 </button>
                 {% endif %}
-                {# SOLICITADO → Aprovar #}
-                {% if reg.status == 'SOLICITADO' %}
+                {# SOLICITADO / AUTORIZADO (legado) → Aprovar #}
+                {% if reg.status in ('SOLICITADO', 'AUTORIZADO') %}
                 <button class="btn btn-sm btn-outline-success"
                         onclick="abrirModalAprovar({{ reg.id }}, '{{ reg.entidade_nome }}', {{ (reg.valor_solicitado or reg.valor_total)|float }})"
                         title="Aprovar pagamento"
