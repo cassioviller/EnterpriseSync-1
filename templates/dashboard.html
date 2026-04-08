@@ -234,42 +234,42 @@ html[data-bs-theme="dark"] .header-btn i {
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-xl-7 g-3 text-center">
-                        <div class="col">
-                            <i class="fas fa-utensils fa-2x text-warning mb-2"></i>
-                            <h6 class="mb-1">Alimentação</h6>
-                            <h5 class="text-warning mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</h5>
+                    <div class="d-flex flex-nowrap text-center justify-content-between gap-1">
+                        <div class="flex-fill" style="min-width:0">
+                            <i class="fas fa-utensils fa-lg text-warning mb-1 d-block"></i>
+                            <div class="small fw-semibold">Alimentação</div>
+                            <div class="fw-bold text-warning small">R$ {{ '{:,.2f}'.format(custos_detalhados.alimentacao).replace(',', '.') }}</div>
                         </div>
-                        <div class="col">
-                            <i class="fas fa-car fa-2x text-info mb-2"></i>
-                            <h6 class="mb-1">Transporte</h6>
-                            <h5 class="text-info mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</h5>
+                        <div class="flex-fill" style="min-width:0">
+                            <i class="fas fa-car fa-lg text-info mb-1 d-block"></i>
+                            <div class="small fw-semibold">Transporte</div>
+                            <div class="fw-bold text-info small">R$ {{ '{:,.2f}'.format(custos_detalhados.transporte).replace(',', '.') }}</div>
                         </div>
-                        <div class="col">
-                            <i class="fas fa-users fa-2x text-success mb-2"></i>
-                            <h6 class="mb-1">Mão de Obra</h6>
-                            <h5 class="text-success mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</h5>
+                        <div class="flex-fill" style="min-width:0">
+                            <i class="fas fa-users fa-lg text-success mb-1 d-block"></i>
+                            <div class="small fw-semibold">Mão de Obra</div>
+                            <div class="fw-bold text-success small">R$ {{ '{:,.2f}'.format(custos_detalhados.mao_obra).replace(',', '.') }}</div>
                         </div>
-                        <div class="col">
-                            <i class="fas fa-boxes fa-2x text-purple mb-2" style="color:#6f42c1"></i>
-                            <h6 class="mb-1">Material</h6>
-                            <h5 style="color:#6f42c1" class="mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.material if custos_detalhados.material is defined else 0).replace(',', '.') }}</h5>
+                        <div class="flex-fill" style="min-width:0">
+                            <i class="fas fa-boxes fa-lg mb-1 d-block" style="color:#6f42c1"></i>
+                            <div class="small fw-semibold">Material</div>
+                            <div class="fw-bold small" style="color:#6f42c1">R$ {{ '{:,.2f}'.format(custos_detalhados.material if custos_detalhados.material is defined else 0).replace(',', '.') }}</div>
                         </div>
-                        <div class="col">
-                            <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
-                            <h6 class="mb-1">Faltas</h6>
-                            <h5 class="text-warning mb-0">{{ custos_detalhados.faltas_justificadas_qtd if custos_detalhados.faltas_justificadas_qtd is defined else 0 }} dias</h5>
-                            <small class="text-muted">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas if custos_detalhados.faltas_justificadas is defined else 0).replace(',', '.') }}</small>
+                        <div class="flex-fill" style="min-width:0">
+                            <i class="fas fa-exclamation-triangle fa-lg text-warning mb-1 d-block"></i>
+                            <div class="small fw-semibold">Faltas</div>
+                            <div class="fw-bold text-warning small">{{ custos_detalhados.faltas_justificadas_qtd if custos_detalhados.faltas_justificadas_qtd is defined else 0 }} dias</div>
+                            <div class="text-muted" style="font-size:.7rem">R$ {{ '{:,.2f}'.format(custos_detalhados.faltas_justificadas if custos_detalhados.faltas_justificadas is defined else 0).replace(',', '.') }}</div>
                         </div>
-                        <div class="col">
-                            <i class="fas fa-cogs fa-2x text-secondary mb-2"></i>
-                            <h6 class="mb-1">Outros</h6>
-                            <h5 class="text-secondary mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</h5>
+                        <div class="flex-fill" style="min-width:0">
+                            <i class="fas fa-cogs fa-lg text-secondary mb-1 d-block"></i>
+                            <div class="small fw-semibold">Outros</div>
+                            <div class="fw-bold text-secondary small">R$ {{ '{:,.2f}'.format(custos_detalhados.outros).replace(',', '.') }}</div>
                         </div>
-                        <div class="col">
-                            <i class="fas fa-calculator fa-2x text-primary mb-2"></i>
-                            <h6 class="mb-1">Total</h6>
-                            <h5 class="text-primary mb-0">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</h5>
+                        <div class="flex-fill border-start ps-2" style="min-width:0">
+                            <i class="fas fa-calculator fa-lg text-primary mb-1 d-block"></i>
+                            <div class="small fw-semibold">Total</div>
+                            <div class="fw-bold text-primary small">R$ {{ '{:,.2f}'.format(custos_detalhados.total).replace(',', '.') }}</div>
                         </div>
                     </div>
                 </div>
