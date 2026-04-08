@@ -1,0 +1,44 @@
+# LOGIC TASK: Refatoração do Dashboard SIGE - Apropriação de Custos por Competência
+
+Atue como um Arquiteto de Sistemas Especialista em ERP para Construção Civil. Preciso que você refatore a lógica de exibição de custos no Dashboard SIGE para refletir o **Custo Realizado (Gasto)** em vez do Custo Pago (Fluxo de Caixa), permitindo uma comparação fiel com o Orçamento da Obra.
+
+### 1. CUSTOS POR OBRA: REALIZADO VS. ORÇADO (DATA LOGIC)
+
+**Objetivo:** Mostrar o quanto da verba da obra já foi "consumida" por lançamentos de custos, independentemente de terem sido pagos ou não.
+
+**Lógica de Cálculo do "Custo Realizado":**
+1.  **Abrangência de Status:** Para cada obra, o sistema deve somar todos os lançamentos que representam um compromisso de gasto já assumido:
+    *   **Gestão de Custos V2 (`GestaoCustoPai`):** Somar todos os registros com status `SOLICITADO`, `AUTORIZADO` e `PAGO`. (Ignore apenas `PENDENTE` e `RECUSADO`, pois ainda não foram validados como custo real).
+    *   **Contas a Pagar V1 (`ContaPagar`):** Somar todos os registros vinculados à obra, independente do status (exceto se forem cancelados), pois o lançamento da conta já representa a apropriação do custo do material ou serviço na obra.
+2.  **Orçamento Base:** Recupere o `valor_total_orcado` da obra para servir como a barra de limite (100%).
+
+**Lógica de Visualização:**
+1.  **Barra de Progresso Comparativa:** 
+    *   A barra principal deve representar o **Custo Realizado** (Soma V1 + V2 validada).
+    *   Sobreponha ou adicione uma linha de referência (meta) que indique o **Orçamento**.
+2.  **Indicador de Comprometimento:** Exiba o percentual de consumo do orçamento: `(Custo Realizado / Orçamento) * 100`.
+3.  **Alerta de Estouro:** Se a soma dos custos (mesmo os não pagos) ultrapassar o orçamento, a visualização deve destacar o valor excedente em vermelho, sinalizando que a obra já "gastou" mais do que o planejado.
+
+### 2. FUNCIONÁRIOS POR DEPARTAMENTO: CUSTO OPERACIONAL (DATA LOGIC)
+
+**Objetivo:** Consolidar a força de trabalho por departamento, mostrando o impacto financeiro (custo de folha) e a densidade de pessoal.
+
+**Lógica de Agrupamento:**
+1.  **Custo Mensal:** Para cada departamento, some o custo fixo mensal (salário base) de todos os funcionários ativos alocados.
+2.  **Contagem:** Conte o número total de funcionários por departamento.
+
+**Lógica de Visualização:**
+1.  Substitua a lista simples por um widget analítico que apresente:
+    *   **Nome do Departamento.**
+    *   **Quantidade de Cabeças (Headcount):** Ex: "12 Funcionários".
+    *   **Custo Total do Departamento:** Valor em R$ que aquele departamento custa por mês para a empresa.
+
+### 3. LIMPEZA DE INTERFACE (UX LOGIC)
+1.  Remova o widget "Custos Recentes". Ele será substituído pela visão mais estratégica de custos por obra e departamento descrita acima.
+
+### 4. REGRAS DE SEGURANÇA E CONSISTÊNCIA
+- **Multi-tenant:** O filtro por `admin_id` é obrigatório em todas as queries de soma e contagem.
+- **Prevenção de Duplicidade:** Garanta que um custo lançado na V2 que gere uma `ContaPagar` (se houver essa integração automática) não seja somado duas vezes. A prioridade de soma deve ser sempre a origem primária do custo.
+- **Performance:** Use funções de agregação do banco de dados (`SUM`, `COUNT`) para que o Dashboard carregue instantaneamente, mesmo com milhares de lançamentos.
+
+**ESTA REFATORAÇÃO DEVE TRANSFORMAR O DASHBOARD EM UM PAINEL DE CONTROLE DE CUSTO POR COMPETÊNCIA, ESSENCIAL PARA A SAÚDE FINANCEIRA DAS OBRAS.**
