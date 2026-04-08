@@ -214,11 +214,11 @@
   <div class="card shadow-sm mb-4 border-0">
     <div class="card-body py-2">
       <form method="get" class="row g-2 align-items-end">
-        <div class="col-sm-4">
+        <div class="col-sm-3">
           <input type="text" name="busca" class="form-control form-control-sm"
                  placeholder="Buscar entidade…" value="{{ filtro_busca }}" autocomplete="off">
         </div>
-        <div class="col-sm-3">
+        <div class="col-sm-2">
           <select name="status" class="form-select form-select-sm">
             <option value="">Todos os status</option>
             {% for s in ['PENDENTE','SOLICITADO','PARCIAL','PAGO','RECUSADO'] %}
@@ -243,6 +243,14 @@
               {% endif %}
               {% endfor %}
             </optgroup>
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <select name="obra_id" class="form-select form-select-sm">
+            <option value="">Todas as obras</option>
+            {% for o in obras %}
+            <option value="{{ o.id }}" {% if filtro_obra_id == o.id %}selected{% endif %}>{{ o.nome }}</option>
+            {% endfor %}
           </select>
         </div>
         <div class="col-sm-2 d-flex gap-1">
@@ -292,7 +300,15 @@
               <i class="{{ cat_info[1] }} me-1 text-{{ cat_info[2] }}"></i>
               <span class="fw-semibold">{{ cat_info[0] }}</span>
             </td>
-            <td>{{ reg.entidade_nome }}</td>
+            <td>
+              <div class="fw-semibold">{{ reg.entidade_nome }}</div>
+              {% set obra_nome = obra_por_pai.get(reg.id) %}
+              {% if obra_nome %}
+              <small class="text-muted">
+                <i class="fas fa-hard-hat fa-xs me-1"></i>{{ obra_nome }}
+              </small>
+              {% endif %}
+            </td>
             <td class="text-end fw-bold">R$ {{ '%.2f'|format(reg.valor_total|float) }}</td>
             <td class="text-end text-muted">
               {% if reg.saldo is not none %}

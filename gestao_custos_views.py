@@ -105,6 +105,7 @@ def index():
     filtro_status = request.args.get('status', '')
     filtro_categoria = request.args.get('categoria', '')
     filtro_busca = request.args.get('busca', '').strip()
+    filtro_obra_id = request.args.get('obra_id', type=int)
 
     q = GestaoCustoPai.query.filter_by(admin_id=admin_id)
     if filtro_status:
@@ -114,8 +115,34 @@ def index():
         q = q.filter(GestaoCustoPai.tipo_categoria.in_(equivalentes))
     if filtro_busca:
         q = q.filter(GestaoCustoPai.entidade_nome.ilike(f'%{filtro_busca}%'))
+    if filtro_obra_id:
+        # Filtra GestaoCustoPai que têm ao menos um filho ligado à obra
+        sub = db.session.query(GestaoCustoFilho.pai_id).filter_by(
+            obra_id=filtro_obra_id, admin_id=admin_id
+        ).subquery()
+        q = q.filter(GestaoCustoPai.id.in_(sub))
 
     registros = q.order_by(GestaoCustoPai.data_criacao.desc()).all()
+
+    # Mapa pai_id → nome da obra (via primeiro filho com obra_id definido)
+    # Uma única query agregada — sem N+1
+    if registros:
+        pai_ids = [r.id for r in registros]
+        filhos_obra = (
+            db.session.query(
+                GestaoCustoFilho.pai_id,
+                Obra.nome.label('obra_nome'),
+                Obra.id.label('obra_id_val'),
+            )
+            .join(Obra, Obra.id == GestaoCustoFilho.obra_id)
+            .filter(GestaoCustoFilho.pai_id.in_(pai_ids))
+            .filter(GestaoCustoFilho.admin_id == admin_id)
+            .distinct(GestaoCustoFilho.pai_id)
+            .all()
+        )
+        obra_por_pai = {row.pai_id: row.obra_nome for row in filhos_obra}
+    else:
+        obra_por_pai = {}
 
     # Totais por status
     totais = (
@@ -143,8 +170,10 @@ def index():
         filtro_status=filtro_status,
         filtro_categoria=filtro_categoria,
         filtro_busca=filtro_busca,
+        filtro_obra_id=filtro_obra_id,
         obras=obras,
         bancos=bancos,
+        obra_por_pai=obra_por_pai,
     )
 
 
