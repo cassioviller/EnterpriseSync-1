@@ -209,13 +209,17 @@ def dashboard():
     if data_inicio_param:
         data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
     else:
-        # Período será determinado depois que admin_id for identificado
-        data_inicio = date(2024, 7, 1)  # Fallback temporário
-        
+        # Padrão: primeiro dia do mês atual
+        hoje = date.today()
+        data_inicio = date(hoje.year, hoje.month, 1)
+
     if data_fim_param:
         data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
     else:
-        data_fim = date(2024, 7, 31)  # Fallback temporário
+        # Padrão: último dia do mês atual
+        import calendar as _cal
+        ultimo_dia = _cal.monthrange(data_inicio.year, data_inicio.month)[1]
+        data_fim = date(data_inicio.year, data_inicio.month, ultimo_dia)
     
     # REDIRECIONAMENTO BASEADO NO TIPO DE USUÁRIO
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
@@ -283,33 +287,12 @@ def dashboard():
                 logger.error(f"[ERROR] Erro ao detectar admin_id automaticamente: {e}")
                 admin_id = 1  # Fallback absoluto
         
-        # [OK] CORREÇÃO: Determinar período com dados APÓS admin_id estar definido
+        # Padrão: mês atual (já definido acima antes do admin_id, confirmar aqui)
         if not data_inicio_param:
-            try:
-                # Buscar a data mais recente dentre TODAS as fontes de dados do tenant
-                ultimo_registro = db.session.execute(
-                    text("""
-                        SELECT GREATEST(
-                            (SELECT MAX(rp.data) FROM registro_ponto rp
-                             JOIN funcionario f ON rp.funcionario_id = f.id WHERE f.admin_id = :aid),
-                            (SELECT MAX(co.data) FROM custo_obra co WHERE co.admin_id = :aid),
-                            (SELECT MAX(gcf.data_referencia) FROM gestao_custo_filho gcf WHERE gcf.admin_id = :aid),
-                            (SELECT MAX(r.data_relatorio) FROM rdo r WHERE r.admin_id = :aid)
-                        )
-                    """),
-                    {"aid": admin_id}
-                ).scalar()
-                
-                if ultimo_registro:
-                    data_inicio = date(ultimo_registro.year, ultimo_registro.month, 1)
-                    logger.info(f"[OK] PERÍODO DINÂMICO (TENANT {admin_id}): {data_inicio} (último dado: {ultimo_registro})")
-                else:
-                    data_inicio = date(date.today().year, date.today().month, 1)
-                    logger.info(f"[OK] PERÍODO FALLBACK: mês atual ({data_inicio})")
-            except Exception as e:
-                logger.error(f"[WARN] Erro ao buscar período dinâmico: {e}")
-                data_inicio = date(date.today().year, date.today().month, 1)
-                
+            hoje = date.today()
+            data_inicio = date(hoje.year, hoje.month, 1)
+            logger.info(f"[OK] PERÍODO PADRÃO: mês atual ({data_inicio})")
+
         if not data_fim_param:
             ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
             data_fim = date(data_inicio.year, data_inicio.month, ultimo_dia)

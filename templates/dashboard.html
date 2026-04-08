@@ -187,13 +187,13 @@ html[data-bs-theme="dark"] .header-btn i {
                 <div class="col-md-3">
                     <label class="form-label">Data Inicial</label>
                     <input type="date" name="data_inicio" class="form-control" id="data_inicio_dash"
-                           value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '2025-07-01' }}" 
+                           value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}" 
                            onchange="aplicarFiltrosDashboard()">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Data Final</label>
                     <input type="date" name="data_fim" class="form-control" id="data_fim_dash"
-                           value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '2025-07-31' }}"
+                           value="{{ data_fim.strftime('%Y-%m-%d') if data_fim else '' }}"
                            onchange="aplicarFiltrosDashboard()">
                 </div>
                 <div class="col-md-3 d-flex align-items-end">
