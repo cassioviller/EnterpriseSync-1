@@ -217,8 +217,7 @@ def dashboard():
         data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
     else:
         # Padrão: último dia do mês atual
-        import calendar as _cal
-        ultimo_dia = _cal.monthrange(data_inicio.year, data_inicio.month)[1]
+        ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
         data_fim = date(data_inicio.year, data_inicio.month, ultimo_dia)
     
     # REDIRECIONAMENTO BASEADO NO TIPO DE USUÁRIO
@@ -287,16 +286,7 @@ def dashboard():
                 logger.error(f"[ERROR] Erro ao detectar admin_id automaticamente: {e}")
                 admin_id = 1  # Fallback absoluto
         
-        # Padrão: mês atual (já definido acima antes do admin_id, confirmar aqui)
-        if not data_inicio_param:
-            hoje = date.today()
-            data_inicio = date(hoje.year, hoje.month, 1)
-            logger.info(f"[OK] PERÍODO PADRÃO: mês atual ({data_inicio})")
-
-        if not data_fim_param:
-            ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
-            data_fim = date(data_inicio.year, data_inicio.month, ultimo_dia)
-            logger.info(f"[OK] PERÍODO FIM: {data_fim}")
+        logger.info(f"[OK] PERÍODO DASHBOARD: {data_inicio} → {data_fim}")
         
         # Estatísticas básicas
             logger.debug("DEBUG: Buscando funcionários...")
