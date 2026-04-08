@@ -80,11 +80,13 @@ def lancar_custo_material_obra(data: dict, admin_id: int):
     """
     Handler: Rastrear saída de material do estoque para obra.
 
-    REENGENHARIA SUPRIMENTOS: custo reconhecido na compra/entrada (GestaoCustoPai MATERIAL).
-    Na SAÍDA (para obra), este handler:
-    1. Cria GestaoCustoPai(tipo_categoria='TRANSFERENCIA') para rastrear atribuição de custo
-       à obra — sem criar nova despesa financeira.
-    2. Mantém lançamento contábil D:CMV / C:Estoque para integridade da contabilidade.
+    REENGENHARIA SUPRIMENTOS T5:
+    Cria GestaoCustoPai(tipo_categoria='TRANSFERENCIA') para rastrear a atribuição
+    de custo à obra específica quando material sai do almoxarifado. Esta é uma
+    entrada de rastreabilidade (não de despesa financeira) — a despesa financeira
+    já foi reconhecida na compra via GestaoCustoPai(MATERIAL).
+    O dashboard calcular_custo_material() lê apenas MATERIAL, evitando dupla contagem.
+    Mantém também lançamento contábil D:CMV / C:Estoque para integridade contábil.
     """
     try:
         from models import (db, AlmoxarifadoMovimento, AlmoxarifadoItem,
@@ -98,7 +100,6 @@ def lancar_custo_material_obra(data: dict, admin_id: int):
             logger.warning("⚠️ movimento_id não fornecido no evento material_saida")
             return
 
-        # NOVO: Buscar AlmoxarifadoMovimento (módulo almoxarifado V2)
         movimento = AlmoxarifadoMovimento.query.filter_by(
             id=movimento_id,
             admin_id=admin_id,
@@ -121,11 +122,49 @@ def lancar_custo_material_obra(data: dict, admin_id: int):
         item_nome = item.nome if item else 'Item'
         data_mov = movimento.data_movimento.date() if movimento.data_movimento else datetime.now().date()
 
-        # T5 — NOTA: TRANSFERENCIA GestaoCustoPai não é criado na saída genérica.
-        # O custo de material foi reconhecido na compra/entrada (GestaoCustoPai MATERIAL).
-        # A SAÍDA é registrada via AlmoxarifadoMovimento.obra_id para rastreabilidade física.
-        # Lançamento contábil (D:CMV/C:Estoque) abaixo registra o consumo contabilmente.
-        logger.info(f"✅ [SAIDA] Consumo registrado: {item_nome} x{quantidade} → obra {movimento.obra_id} | R$ {valor_total:.2f}")
+        # ─── T5: GestaoCustoPai TRANSFERENCIA — atribuição de custo à obra ──────
+        # Idempotente: só cria se não existir GestaoCustoFilho para este movimento.
+        if valor_total > 0:
+            existente = GestaoCustoFilho.query.filter_by(
+                origem_tabela='almoxarifado_movimento',
+                origem_id=movimento_id,
+                admin_id=admin_id,
+            ).first()
+            if not existente:
+                obra = Obra.query.get(movimento.obra_id)
+                gcp = GestaoCustoPai(
+                    admin_id=admin_id,
+                    tipo_categoria='TRANSFERENCIA',
+                    entidade_nome=obra.nome if obra else f'Obra #{movimento.obra_id}',
+                    entidade_id=movimento.obra_id,
+                    valor_total=Decimal(str(valor_total)),
+                    valor_pago=Decimal(str(valor_total)),
+                    saldo=Decimal('0'),
+                    status='PAGO',
+                    data_emissao=data_mov,
+                    data_vencimento=data_mov,
+                    numero_documento=f"MOV-{movimento_id}",
+                    numero_parcela=1,
+                    total_parcelas=1,
+                    observacoes=f"Consumo almox→obra: {item_nome} x{quantidade} (Movimento #{movimento_id})",
+                )
+                db.session.add(gcp)
+                db.session.flush()
+                db.session.add(GestaoCustoFilho(
+                    admin_id=admin_id,
+                    pai_id=gcp.id,
+                    obra_id=movimento.obra_id,
+                    descricao=f"Consumo: {item_nome} x{quantidade}",
+                    valor=Decimal(str(valor_total)),
+                    origem_tabela='almoxarifado_movimento',
+                    origem_id=movimento_id,
+                ))
+                db.session.commit()
+                logger.info(f"✅ [TRANSFERENCIA] GestaoCustoPai criado: obra {movimento.obra_id} | R$ {valor_total:.2f}")
+            else:
+                logger.info(f"⏭️ [TRANSFERENCIA] já existe para movimento #{movimento_id}")
+        else:
+            logger.info(f"⏭️ [SAIDA] Valor zerado — GestaoCustoPai TRANSFERENCIA não criado")
 
         # ─── Lançamento contábil D:CMV / C:Estoque ──────────────────────────
         if valor_total > 0:

@@ -283,54 +283,49 @@ def nova_post():
 
         logger.info(f"[OK] {n_parcelas} GestaoCustoPai MATERIAL criado(s) para pedido_id={pedido.id}")
 
-        db.session.commit()
-
-        # --- Entrada automática no almoxarifado para itens vinculados ao catálogo ---
-        # Princípio: recebimento reconhecido na compra; pedido_compra_id previne
-        # duplicação no handler material_entrada do EventManager.
+        # --- Entrada automática no almoxarifado (mesma transação) ---
+        # Atômico com o pedido: custo reconhecido na compra → estoque imediatamente disponível.
+        # pedido_compra_id previne duplicação no handler material_entrada do EventManager.
         itens_catalogo = [(desc, qtd, preco, almox_id, subtotal)
                           for desc, qtd, preco, almox_id, subtotal in itens_validos
                           if almox_id]
+        lote_ref = numero or f"PC-{pedido.id}"
+        for desc_item, qtd_item, preco_item, almox_id, _ in itens_catalogo:
+            mov = AlmoxarifadoMovimento(
+                item_id=almox_id,
+                tipo_movimento='ENTRADA',
+                quantidade=qtd_item,
+                valor_unitario=preco_item,
+                nota_fiscal=numero,
+                observacao=f"Entrada automática compra {lote_ref}: {desc_item[:100]}",
+                estoque_id=None,
+                fornecedor_id=fornecedor_id,
+                admin_id=admin_id,
+                usuario_id=current_user.id,
+                obra_id=obra_id,
+                pedido_compra_id=pedido.id,
+            )
+            db.session.add(mov)
+            db.session.flush()
+            estq = AlmoxarifadoEstoque(
+                item_id=almox_id,
+                quantidade=qtd_item,
+                quantidade_inicial=qtd_item,
+                quantidade_disponivel=qtd_item,
+                entrada_movimento_id=mov.id,
+                valor_unitario=preco_item,
+                status='DISPONIVEL',
+                lote=lote_ref,
+                obra_id=obra_id,
+                admin_id=admin_id,
+            )
+            db.session.add(estq)
+            db.session.flush()
+            mov.estoque_id = estq.id
+
+        db.session.commit()
         if itens_catalogo:
-            try:
-                lote_ref = numero or f"PC-{pedido.id}"
-                for desc_item, qtd_item, preco_item, almox_id, _ in itens_catalogo:
-                    mov = AlmoxarifadoMovimento(
-                        item_id=almox_id,
-                        tipo_movimento='ENTRADA',
-                        quantidade=qtd_item,
-                        valor_unitario=preco_item,
-                        nota_fiscal=numero,
-                        observacao=f"Entrada automática compra {lote_ref}: {desc_item[:100]}",
-                        estoque_id=None,
-                        fornecedor_id=fornecedor_id,
-                        admin_id=admin_id,
-                        usuario_id=current_user.id,
-                        obra_id=obra_id,
-                        pedido_compra_id=pedido.id,
-                    )
-                    db.session.add(mov)
-                    db.session.flush()
-                    estq = AlmoxarifadoEstoque(
-                        item_id=almox_id,
-                        quantidade=qtd_item,
-                        quantidade_inicial=qtd_item,
-                        quantidade_disponivel=qtd_item,
-                        entrada_movimento_id=mov.id,
-                        valor_unitario=preco_item,
-                        status='DISPONIVEL',
-                        lote=lote_ref,
-                        obra_id=obra_id,
-                        admin_id=admin_id,
-                    )
-                    db.session.add(estq)
-                    db.session.flush()
-                    mov.estoque_id = estq.id
-                db.session.commit()
-                logger.info(f"[OK] {len(itens_catalogo)} entrada(s) automática(s) no almoxarifado para pedido {pedido.id}")
-            except Exception as e_almox:
-                db.session.rollback()
-                logger.warning(f"[WARN] Entrada automática almoxarifado falhou (não crítico): {e_almox}")
+            logger.info(f"[OK] {len(itens_catalogo)} entrada(s) automática(s) no almoxarifado para pedido {pedido.id}")
 
         # Lançamento contábil automático V2
         try:
@@ -463,10 +458,8 @@ def receber(pedido_id):
         return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
 
     movimentos_criados = 0
-    # Pré-calcular quantidades já recebidas por item (soma, não contagem)
-    # para suportar corretamente múltiplas linhas com o mesmo almoxarifado_item_id
     from sqlalchemy import func as sqlfunc
-    from decimal import Decimal as D
+    # Quantidades já recebidas (somadas) por almoxarifado_item_id para este pedido
     rows_recebidos = (
         db.session.query(
             AlmoxarifadoMovimento.item_id,
@@ -478,29 +471,43 @@ def receber(pedido_id):
     )
     qtd_recebida_por_item = {r.item_id: float(r.qtd_recebida or 0) for r in rows_recebidos}
 
+    # Agregar quantidades totais pedidas por almoxarifado_item_id (suporta itens repetidos).
+    # Usar último preço e primeira descrição do grupo para o movimento.
+    from collections import OrderedDict
+    itens_agregados = OrderedDict()
+    for item in itens_com_catalogo:
+        aid = item.almoxarifado_item_id
+        if aid not in itens_agregados:
+            itens_agregados[aid] = {
+                'qtd_total': 0.0,
+                'preco': float(item.preco_unitario or 0),
+                'descricao': item.descricao,
+            }
+        itens_agregados[aid]['qtd_total'] += float(item.quantidade or 0)
+        itens_agregados[aid]['preco'] = float(item.preco_unitario or 0)
+
+    lote_ref = pedido.numero or f"PC-{pedido_id}"
+
     try:
-        for item in itens_com_catalogo:
-            qtd = float(item.quantidade or 0)
-            qtd_ja_recebida = qtd_recebida_por_item.get(item.almoxarifado_item_id, 0.0)
-            qtd_pendente = qtd - qtd_ja_recebida
-            # Atualizar mapa para que múltiplas linhas do mesmo item sejam processadas em sequência
-            qtd_recebida_por_item[item.almoxarifado_item_id] = qtd_recebida_por_item.get(item.almoxarifado_item_id, 0.0) + qtd_pendente
+        for almox_id, info in itens_agregados.items():
+            qtd_total_pedido = info['qtd_total']
+            qtd_ja_recebida = qtd_recebida_por_item.get(almox_id, 0.0)
+            qtd_pendente = round(qtd_total_pedido - qtd_ja_recebida, 6)
             if qtd_pendente <= 0:
-                logger.info(f"[SKIP] Item {item.almoxarifado_item_id} ({item.descricao[:40]}): já totalmente recebido")
+                logger.info(f"[SKIP] Item {almox_id}: já totalmente recebido ({qtd_ja_recebida}/{qtd_total_pedido})")
                 continue
 
-            preco_unit = float(item.preco_unitario or 0)
-            qtd = qtd_pendente
-            lote_ref = pedido.numero or f"PC-{pedido_id}"
+            preco_unit = info['preco']
+            desc_item = info['descricao']
 
-            # Criar movimento de ENTRADA vinculado ao pedido
+            # Um movimento por item_id consolidado
             movimento = AlmoxarifadoMovimento(
-                item_id=item.almoxarifado_item_id,
+                item_id=almox_id,
                 tipo_movimento='ENTRADA',
-                quantidade=qtd,
+                quantidade=qtd_pendente,
                 valor_unitario=preco_unit,
                 nota_fiscal=pedido.numero,
-                observacao=f"Recebimento Compra {lote_ref}: {item.descricao[:100]}",
+                observacao=f"Recebimento Compra {lote_ref}: {desc_item[:100]}",
                 estoque_id=None,
                 fornecedor_id=pedido.fornecedor_id,
                 admin_id=admin_id,
@@ -511,12 +518,12 @@ def receber(pedido_id):
             db.session.add(movimento)
             db.session.flush()
 
-            # Criar lote FIFO no estoque; obra_id direciona o estoque para a obra da compra
+            # Lote FIFO no estoque
             estoque = AlmoxarifadoEstoque(
-                item_id=item.almoxarifado_item_id,
-                quantidade=qtd,
-                quantidade_inicial=qtd,
-                quantidade_disponivel=qtd,
+                item_id=almox_id,
+                quantidade=qtd_pendente,
+                quantidade_inicial=qtd_pendente,
+                quantidade_disponivel=qtd_pendente,
                 entrada_movimento_id=movimento.id,
                 valor_unitario=preco_unit,
                 status='DISPONIVEL',
