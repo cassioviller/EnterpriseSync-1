@@ -655,8 +655,8 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                         sub = RDOServicoSubatividade.query.get(mo.subatividade_id)
                         if sub and sub.nome_subatividade and sub.nome_subatividade not in sub_nomes:
                             sub_nomes.append(sub.nome_subatividade)
-                    except Exception:
-                        pass
+                    except Exception as sub_err:
+                        logger.warning(f"⚠️ Erro ao ler subatividade {mo.subatividade_id} para {funcionario.nome}: {sub_err}")
 
             funcao = 'Diarista'
             try:
@@ -664,8 +664,8 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     funcao = funcionario.funcao_ref.nome
                 elif hasattr(funcionario, 'funcao') and funcionario.funcao:
                     funcao = funcionario.funcao
-            except Exception:
-                pass
+            except Exception as funcao_err:
+                logger.warning(f"⚠️ Erro ao ler função do funcionário {funcionario.nome}: {funcao_err}")
 
             sub_str = f" | {', '.join(sub_nomes)}" if sub_nomes else ""
             descricao = (
