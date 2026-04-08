@@ -285,6 +285,53 @@ def nova_post():
 
         db.session.commit()
 
+        # --- Entrada automática no almoxarifado para itens vinculados ao catálogo ---
+        # Princípio: recebimento reconhecido na compra; pedido_compra_id previne
+        # duplicação no handler material_entrada do EventManager.
+        itens_catalogo = [(desc, qtd, preco, almox_id, subtotal)
+                          for desc, qtd, preco, almox_id, subtotal in itens_validos
+                          if almox_id]
+        if itens_catalogo:
+            try:
+                lote_ref = numero or f"PC-{pedido.id}"
+                for desc_item, qtd_item, preco_item, almox_id, _ in itens_catalogo:
+                    mov = AlmoxarifadoMovimento(
+                        item_id=almox_id,
+                        tipo_movimento='ENTRADA',
+                        quantidade=qtd_item,
+                        valor_unitario=preco_item,
+                        nota_fiscal=numero,
+                        observacao=f"Entrada automática compra {lote_ref}: {desc_item[:100]}",
+                        estoque_id=None,
+                        fornecedor_id=fornecedor_id,
+                        admin_id=admin_id,
+                        usuario_id=current_user.id,
+                        obra_id=obra_id,
+                        pedido_compra_id=pedido.id,
+                    )
+                    db.session.add(mov)
+                    db.session.flush()
+                    estq = AlmoxarifadoEstoque(
+                        item_id=almox_id,
+                        quantidade=qtd_item,
+                        quantidade_inicial=qtd_item,
+                        quantidade_disponivel=qtd_item,
+                        entrada_movimento_id=mov.id,
+                        valor_unitario=preco_item,
+                        status='DISPONIVEL',
+                        lote=lote_ref,
+                        obra_id=obra_id,
+                        admin_id=admin_id,
+                    )
+                    db.session.add(estq)
+                    db.session.flush()
+                    mov.estoque_id = estq.id
+                db.session.commit()
+                logger.info(f"[OK] {len(itens_catalogo)} entrada(s) automática(s) no almoxarifado para pedido {pedido.id}")
+            except Exception as e_almox:
+                db.session.rollback()
+                logger.warning(f"[WARN] Entrada automática almoxarifado falhou (não crítico): {e_almox}")
+
         # Lançamento contábil automático V2
         try:
             from contabilidade_utils import gerar_lancamento_contabil_automatico
@@ -345,22 +392,40 @@ def detalhe(pedido_id):
         origem_tabela='pedido_compra', origem_id=pedido_id
     ).all()
 
-    # Verificar quais itens já tiveram recebimento registrado no almoxarifado
-    # Mapa: almoxarifado_item_id → movimento (com data e quantidade recebida)
-    movs_recebidos = AlmoxarifadoMovimento.query.filter_by(
-        pedido_compra_id=pedido_id,
-        tipo_movimento='ENTRADA',
-        admin_id=admin_id,
-    ).all()
-    # item_id → movimento mais recente
-    recebimento_por_item = {m.item_id: m for m in movs_recebidos}
-    itens_recebidos_ids = set(recebimento_por_item.keys())
+    # Calcular quantidades já recebidas por almoxarifado_item_id
+    from sqlalchemy import func as sqlfunc2
+    rows_det = (
+        db.session.query(
+            AlmoxarifadoMovimento.item_id,
+            sqlfunc2.sum(AlmoxarifadoMovimento.quantidade).label('qtd_tot'),
+            sqlfunc2.max(AlmoxarifadoMovimento.id).label('last_mov_id'),
+        )
+        .filter_by(pedido_compra_id=pedido_id, tipo_movimento='ENTRADA', admin_id=admin_id)
+        .group_by(AlmoxarifadoMovimento.item_id)
+        .all()
+    )
+    qtd_recebida_detalhe = {r.item_id: float(r.qtd_tot or 0) for r in rows_det}
+    last_mov_id_map = {r.item_id: r.last_mov_id for r in rows_det}
+    # Carregar o movimento mais recente por item para mostrar data e qtd no template
+    recebimento_por_item = {}
+    for item_id, mov_id in last_mov_id_map.items():
+        mov = AlmoxarifadoMovimento.query.get(mov_id)
+        if mov:
+            recebimento_por_item[item_id] = mov
+    itens_recebidos_ids = set(qtd_recebida_detalhe.keys())
 
     # Itens do pedido que têm vínculo com o catálogo do almoxarifado
     tem_itens_almox = any(i.almoxarifado_item_id for i in itens)
+    # todos_recebidos: baseado em quantidade total (suporta múltiplas linhas com mesmo item_id)
+    qtd_total_por_item_pedido = {}
+    for i in itens:
+        if i.almoxarifado_item_id:
+            qtd_total_por_item_pedido[i.almoxarifado_item_id] = (
+                qtd_total_por_item_pedido.get(i.almoxarifado_item_id, 0.0) + float(i.quantidade or 0)
+            )
     todos_recebidos = tem_itens_almox and all(
-        (not i.almoxarifado_item_id) or (i.almoxarifado_item_id in itens_recebidos_ids)
-        for i in itens
+        qtd_recebida_detalhe.get(item_id, 0.0) >= qtd_total
+        for item_id, qtd_total in qtd_total_por_item_pedido.items()
     )
 
     return render_template(
@@ -371,6 +436,7 @@ def detalhe(pedido_id):
         CONDICOES=CONDICOES,
         itens_recebidos_ids=itens_recebidos_ids,
         recebimento_por_item=recebimento_por_item,
+        qtd_recebida_detalhe=qtd_recebida_detalhe,
         tem_itens_almox=tem_itens_almox,
         todos_recebidos=todos_recebidos,
     )
@@ -397,20 +463,34 @@ def receber(pedido_id):
         return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
 
     movimentos_criados = 0
+    # Pré-calcular quantidades já recebidas por item (soma, não contagem)
+    # para suportar corretamente múltiplas linhas com o mesmo almoxarifado_item_id
+    from sqlalchemy import func as sqlfunc
+    from decimal import Decimal as D
+    rows_recebidos = (
+        db.session.query(
+            AlmoxarifadoMovimento.item_id,
+            sqlfunc.sum(AlmoxarifadoMovimento.quantidade).label('qtd_recebida')
+        )
+        .filter_by(pedido_compra_id=pedido_id, tipo_movimento='ENTRADA', admin_id=admin_id)
+        .group_by(AlmoxarifadoMovimento.item_id)
+        .all()
+    )
+    qtd_recebida_por_item = {r.item_id: float(r.qtd_recebida or 0) for r in rows_recebidos}
+
     try:
         for item in itens_com_catalogo:
-            # Evitar recebimento duplicado por item
-            ja_recebido = AlmoxarifadoMovimento.query.filter_by(
-                pedido_compra_id=pedido_id,
-                item_id=item.almoxarifado_item_id,
-                tipo_movimento='ENTRADA',
-                admin_id=admin_id,
-            ).first()
-            if ja_recebido:
+            qtd = float(item.quantidade or 0)
+            qtd_ja_recebida = qtd_recebida_por_item.get(item.almoxarifado_item_id, 0.0)
+            qtd_pendente = qtd - qtd_ja_recebida
+            # Atualizar mapa para que múltiplas linhas do mesmo item sejam processadas em sequência
+            qtd_recebida_por_item[item.almoxarifado_item_id] = qtd_recebida_por_item.get(item.almoxarifado_item_id, 0.0) + qtd_pendente
+            if qtd_pendente <= 0:
+                logger.info(f"[SKIP] Item {item.almoxarifado_item_id} ({item.descricao[:40]}): já totalmente recebido")
                 continue
 
-            qtd = float(item.quantidade or 0)
             preco_unit = float(item.preco_unitario or 0)
+            qtd = qtd_pendente
             lote_ref = pedido.numero or f"PC-{pedido_id}"
 
             # Criar movimento de ENTRADA vinculado ao pedido

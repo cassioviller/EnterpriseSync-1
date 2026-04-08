@@ -166,8 +166,9 @@
                   {% endif %}
                 </td>
                 <td class="text-end">
-                  {% if mov_rec %}
-                    <span class="text-success fw-semibold">{{ mov_rec.quantidade }}</span>
+                  {% if item.almoxarifado_item_id and item.almoxarifado_item_id in itens_recebidos_ids %}
+                    {% set qtd_rec = qtd_recebida_detalhe.get(item.almoxarifado_item_id, 0) %}
+                    <span class="text-success fw-semibold">{{ '%.3g'|format(qtd_rec|float) }}</span>
                   {% else %}
                     <span class="text-muted">—</span>
                   {% endif %}
