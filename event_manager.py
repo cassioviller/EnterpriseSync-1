@@ -690,15 +690,15 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     funcionario_id=func_id,
                     rdo_id=rdo.id,
                     admin_id=admin_id,
-                    horas_trabalhadas=Decimal('8.8'),
+                    horas_trabalhadas=Decimal('0'),    # Custo por diária (não por hora)
                     horas_extras=Decimal('0'),
                     valor_unitario=Decimal(str(valor_diaria)),
-                    quantidade=Decimal('1'),
+                    quantidade=Decimal('1'),            # 1 diária
                     categoria='RDO'
                 )
                 db.session.add(custo)
                 custos_criados += 1
-
+            
             # GestaoCustoPai/Filho via registrar_custo_automatico (tipo_categoria='SALARIO')
             # Idempotência: origem_tabela + data_referencia + entidade_id + admin_id (sem origem_id)
             existing_filho = (

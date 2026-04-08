@@ -30,9 +30,14 @@ except ImportError:
 # ===== APIs PARA FRONTEND =====
 @main_bp.route('/api/funcionarios/<int:obra_id>')
 def api_funcionarios_por_obra(obra_id):
-    """API: Funcionários ativos do tenant para seleção em cards de subatividade do RDO."""
+    """API: Funcionários ativos do tenant (escopo tenant-wide; obra_id reservado para filtragem futura)."""
     try:
         admin_id = get_tenant_admin_id()
+        # Retorna todos os funcionários ativos do tenant.
+        # obra_id recebido é verificado para segurança (deve pertencer ao tenant).
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'funcionarios': [], 'error': 'Obra não encontrada'}), 404
         funcionarios = Funcionario.query.filter_by(
             admin_id=admin_id, ativo=True
         ).order_by(Funcionario.nome).all()
