@@ -18,13 +18,13 @@
     <div class="ms-auto">
       {% if todos_recebidos %}
         <span class="badge bg-success fs-6 px-3 py-2">
-          <i class="fas fa-check-circle me-1"></i> Totalmente Recebido
+          <i class="fas fa-check-circle me-1"></i> Totalmente Recebido no Estoque
         </span>
       {% else %}
         <form method="POST" action="{{ url_for('compras.receber', pedido_id=pedido.id) }}" class="d-inline">
           <button type="submit" class="btn btn-success"
-                  onclick="return confirm('Registrar recebimento dos itens pendentes no almoxarifado?')">
-            <i class="fas fa-boxes me-2"></i>Registrar Recebimento
+                  onclick="return confirm('Registrar entrada dos itens pendentes no almoxarifado?')">
+            <i class="fas fa-boxes me-2"></i>Registrar Recebimento no Estoque
           </button>
         </form>
       {% endif %}
@@ -75,7 +75,9 @@
         <div class="card-body p-0">
           {% if custos_gestao %}
           <table class="table table-sm mb-0">
-            <thead class="table-light"><tr><th>Vencimento</th><th>Descrição</th><th class="text-end">Valor</th><th>Status</th></tr></thead>
+            <thead class="table-light">
+              <tr><th>Vencimento</th><th>Descrição</th><th class="text-end">Valor</th><th>Status</th></tr>
+            </thead>
             <tbody>
               {% for c in custos_gestao %}
               <tr>
@@ -85,7 +87,12 @@
                 <td class="small">{{ c.descricao[:50] }}</td>
                 <td class="text-end">R$ {{ '%.2f'|format(c.valor|float) }}</td>
                 <td>
-                  <span class="badge {% if c.pai.status == 'PAGO' %}bg-success{% elif c.pai.status == 'AUTORIZADO' %}bg-info{% elif c.pai.status == 'SOLICITADO' %}bg-primary{% elif c.pai.status == 'RECUSADO' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                  <span class="badge
+                    {% if c.pai.status == 'PAGO' %}bg-success
+                    {% elif c.pai.status == 'AUTORIZADO' %}bg-info
+                    {% elif c.pai.status == 'SOLICITADO' %}bg-primary
+                    {% elif c.pai.status == 'RECUSADO' %}bg-danger
+                    {% else %}bg-warning text-dark{% endif %}">
                     {{ c.pai.status }}
                   </span>
                 </td>
@@ -100,7 +107,7 @@
       </div>
     </div>
 
-    <!-- Itens com status de recebimento -->
+    <!-- Itens com status de recebimento detalhado -->
     <div class="col-12">
       <div class="card border-0 shadow-sm">
         <div class="card-header bg-transparent fw-semibold py-3 d-flex align-items-center justify-content-between">
@@ -108,7 +115,7 @@
           {% if tem_itens_almox %}
           <span class="small text-muted">
             <i class="fas fa-info-circle me-1"></i>
-            Itens com catálogo podem ser recebidos no almoxarifado
+            Itens com catálogo são recebidos fisicamente no almoxarifado
           </span>
           {% endif %}
         </div>
@@ -117,24 +124,33 @@
             <thead class="table-light">
               <tr>
                 <th>Descrição</th>
-                <th>Catálogo (Almoxarifado)</th>
-                <th class="text-end">Qtd</th>
+                <th>Item no Catálogo</th>
+                <th class="text-end">Qtd Comprada</th>
                 <th class="text-end">Preço Unit.</th>
                 <th class="text-end">Subtotal</th>
-                <th class="text-center">Recebimento</th>
+                <th class="text-center">Recebimento no Estoque</th>
+                <th class="text-end">Qtd Recebida</th>
+                <th>Data Recebimento</th>
               </tr>
             </thead>
             <tbody>
               {% for item in itens %}
+              {% set mov_rec = recebimento_por_item.get(item.almoxarifado_item_id) %}
               <tr>
                 <td>{{ item.descricao }}</td>
-                <td>{{ item.almoxarifado_item.nome if item.almoxarifado_item else '—' }}</td>
+                <td>
+                  {% if item.almoxarifado_item %}
+                    <span class="badge bg-light text-dark border">{{ item.almoxarifado_item.nome }}</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
                 <td class="text-end">{{ item.quantidade }}</td>
                 <td class="text-end">R$ {{ '%.2f'|format(item.preco_unitario|float) }}</td>
                 <td class="text-end fw-semibold">R$ {{ '%.2f'|format(item.subtotal|float) }}</td>
                 <td class="text-center">
                   {% if item.almoxarifado_item_id %}
-                    {% if item.almoxarifado_item_id in itens_recebidos_ids %}
+                    {% if mov_rec %}
                       <span class="badge bg-success">
                         <i class="fas fa-check me-1"></i>Recebido
                       </span>
@@ -145,8 +161,22 @@
                     {% endif %}
                   {% else %}
                     <span class="badge bg-secondary">
-                      <i class="fas fa-minus me-1"></i>Sem catálogo
+                      <i class="fas fa-minus me-1"></i>Sem vínculo
                     </span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  {% if mov_rec %}
+                    <span class="text-success fw-semibold">{{ mov_rec.quantidade }}</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if mov_rec and mov_rec.data_movimento %}
+                    <span class="small text-muted">{{ mov_rec.data_movimento.strftime('%d/%m/%Y %H:%M') }}</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
                   {% endif %}
                 </td>
               </tr>
@@ -156,7 +186,7 @@
               <tr>
                 <td colspan="4" class="text-end fw-bold">Total</td>
                 <td class="text-end fw-bold fs-5 text-dark">R$ {{ '%.2f'|format(pedido.valor_total|float) }}</td>
-                <td></td>
+                <td colspan="3"></td>
               </tr>
             </tfoot>
           </table>
@@ -164,16 +194,19 @@
       </div>
     </div>
 
-    <!-- Aviso sobre política de custos -->
+    <!-- Aviso sobre política de custos únicos -->
     <div class="col-12">
       <div class="alert alert-info d-flex align-items-start mb-0" role="alert">
-        <i class="fas fa-shield-alt me-3 mt-1 fs-5"></i>
+        <i class="fas fa-shield-alt me-3 mt-1 fs-5 text-info"></i>
         <div>
-          <strong>Controle de Custo Único</strong><br>
-          <small>
-            O custo desta compra já foi reconhecido no momento do cadastro via Gestão de Custos.
-            Ao registrar o recebimento, os itens entram no estoque físico do almoxarifado
-            <strong>sem gerar novo lançamento financeiro</strong>, evitando duplicação de custo.
+          <strong>Controle de Custo Único — Sem Duplicação</strong><br>
+          <small class="text-muted">
+            O custo desta compra foi reconhecido no momento do cadastro via Gestão de Custos (acima).
+            "Registrar Recebimento" cria a entrada física no estoque do almoxarifado
+            <strong>sem gerar novo lançamento financeiro</strong>.
+            {% if pedido.obra %}
+              Os itens serão associados à obra <strong>{{ pedido.obra.nome }}</strong>.
+            {% endif %}
           </small>
         </div>
       </div>

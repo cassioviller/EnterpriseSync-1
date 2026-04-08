@@ -777,7 +777,7 @@ def dashboard():
         quantidade_faltas_justificadas, custo_faltas_justificadas = resultado_faltas
         logger.debug(f"DEBUG Faltas Justificadas: {quantidade_faltas_justificadas} faltas, R$ {custo_faltas_justificadas:.2f}")
         
-        # 3. Custo de Materiais — fonte única: GestaoCustoPai tipo_categoria IN (MATERIAL, COMPRA)
+        # 3. Custo de Materiais — fonte única: GestaoCustoPai tipo_categoria='MATERIAL'
         # Princípio: custo reconhecido na entrada/compra, nunca na saída de estoque.
         def calcular_custo_material():
             from models import GestaoCustoPai
@@ -785,10 +785,10 @@ def dashboard():
                 GestaoCustoPai.admin_id == admin_id,
                 GestaoCustoPai.data_emissao >= data_inicio,
                 GestaoCustoPai.data_emissao <= data_fim,
-                GestaoCustoPai.tipo_categoria.in_(['MATERIAL', 'COMPRA']),
+                GestaoCustoPai.tipo_categoria == 'MATERIAL',
             ).all()
             total_gcp = sum(float(r.valor_total or 0) for r in registros)
-            logger.debug(f"DEBUG Material (GestaoCustoPai): {len(registros)} registros, Total=R${total_gcp:.2f}")
+            logger.debug(f"DEBUG Material (GestaoCustoPai MATERIAL): {len(registros)} registros, Total=R${total_gcp:.2f}")
             return total_gcp
 
         custo_material_real = safe_db_operation(calcular_custo_material, 0)

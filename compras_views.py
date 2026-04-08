@@ -346,13 +346,15 @@ def detalhe(pedido_id):
     ).all()
 
     # Verificar quais itens já tiveram recebimento registrado no almoxarifado
-    # Chave: almoxarifado_item_id → True/False
+    # Mapa: almoxarifado_item_id → movimento (com data e quantidade recebida)
     movs_recebidos = AlmoxarifadoMovimento.query.filter_by(
         pedido_compra_id=pedido_id,
         tipo_movimento='ENTRADA',
         admin_id=admin_id,
     ).all()
-    itens_recebidos_ids = {m.item_id for m in movs_recebidos}
+    # item_id → movimento mais recente
+    recebimento_por_item = {m.item_id: m for m in movs_recebidos}
+    itens_recebidos_ids = set(recebimento_por_item.keys())
 
     # Itens do pedido que têm vínculo com o catálogo do almoxarifado
     tem_itens_almox = any(i.almoxarifado_item_id for i in itens)
@@ -368,6 +370,7 @@ def detalhe(pedido_id):
         custos_gestao=custos_gestao,
         CONDICOES=CONDICOES,
         itens_recebidos_ids=itens_recebidos_ids,
+        recebimento_por_item=recebimento_por_item,
         tem_itens_almox=tem_itens_almox,
         todos_recebidos=todos_recebidos,
     )
@@ -428,7 +431,7 @@ def receber(pedido_id):
             db.session.add(movimento)
             db.session.flush()
 
-            # Criar lote FIFO no estoque
+            # Criar lote FIFO no estoque; obra_id direciona o estoque para a obra da compra
             estoque = AlmoxarifadoEstoque(
                 item_id=item.almoxarifado_item_id,
                 quantidade=qtd,
@@ -438,6 +441,7 @@ def receber(pedido_id):
                 valor_unitario=preco_unit,
                 status='DISPONIVEL',
                 lote=lote_ref,
+                obra_id=pedido.obra_id,
                 admin_id=admin_id,
             )
             db.session.add(estoque)
