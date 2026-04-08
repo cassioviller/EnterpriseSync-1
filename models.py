@@ -727,7 +727,7 @@ class RDO(db.Model):
     numero_rdo = db.Column(db.String(20), unique=True, nullable=False)  # Auto-gerado
     data_relatorio = db.Column(db.Date, nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
-    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     
     # Condições climáticas padronizadas

@@ -3582,8 +3582,21 @@ def salvar_rdo_flexivel():
             numero_rdo = f"RDO-{admin_id}-{data_relatorio.year}-{random.randint(1000, 9999):04d}"
             logger.warning(f"[FALLBACK] FALLBACK: Usando número aleatório {numero_rdo}")
         
-        # criado_por_id: use funcionario (Usuario) id or fall back to current_user.id for admin logins
-        _criado_por_id = funcionario_id or (current_user.id if current_user.is_authenticated else None)
+        # criado_por_id: must be a valid usuario.id (FK constraint)
+        # funcionario_id from session may be a Funcionario.id, not a Usuario.id
+        _criado_por_id = None
+        if current_user.is_authenticated:
+            _criado_por_id = current_user.id
+        elif funcionario_id:
+            from sqlalchemy import text as _text
+            _usuario_check = db.session.execute(
+                _text("SELECT id FROM usuario WHERE id = :uid LIMIT 1"),
+                {"uid": funcionario_id}
+            ).fetchone()
+            if _usuario_check:
+                _criado_por_id = funcionario_id
+            else:
+                logger.warning(f"[WARN] funcionario_id={funcionario_id} não existe em usuario - criado_por_id será None")
         rdo = RDO(
             numero_rdo=numero_rdo,
             obra_id=obra_id,

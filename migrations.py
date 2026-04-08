@@ -3788,6 +3788,7 @@ def executar_migracoes():
             (86, "CustoObra - colunas extras (funcionario_id, rdo_id, categoria, horas, quantidade, veiculo, almoxarifado)", _migration_86_custo_obra_colunas_extras),
             (87, "Proposta - numero_proposta unique por tenant (numero_proposta + admin_id)", migration_87_proposta_numero_unique_por_tenant),
             (88, "TarefaCronograma - campo responsavel (empresa/terceiros)", migration_88_tarefa_cronograma_responsavel),
+            (89, "RDO - criado_por_id nullable (FK usuario)", migration_89_rdo_criado_por_nullable),
         ]
         
         # Executar cada migração com rastreamento
@@ -7567,6 +7568,45 @@ def migration_88_tarefa_cronograma_responsavel():
 
     except Exception as e:
         logger.error(f"Erro na migracao 88: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_89_rdo_criado_por_nullable():
+    """
+    Migração 89: rdo.criado_por_id - tornar nullable
+    Funcionários do ponto eletrônico têm IDs de Funcionario, não de Usuario.
+    A FK rdo.criado_por_id -> usuario.id falha quando funcionario_id != usuario.id.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_name = 'rdo' AND column_name = 'criado_por_id'
+        """)
+        row = cursor.fetchone()
+        if row and row[0] == 'NO':
+            logger.info("  Tornando rdo.criado_por_id nullable...")
+            cursor.execute("ALTER TABLE rdo ALTER COLUMN criado_por_id DROP NOT NULL")
+            logger.info("  rdo.criado_por_id agora é nullable.")
+        else:
+            logger.info("  rdo.criado_por_id já é nullable.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 89 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 89: {e}")
         if connection:
             try:
                 connection.rollback()
