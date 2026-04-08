@@ -43,23 +43,15 @@
                 <input type="date" name="data_compra" class="form-control" value="{{ hoje }}" required>
               </div>
 
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Centro de Custo <span class="text-danger">*</span></label>
-                <select name="centro_custo_id" class="form-select" required>
-                  <option value="">Selecione...</option>
-                  {% for cc in centros_custo %}
-                    <option value="{{ cc.id }}">{{ cc.nome }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label fw-semibold">Obra <span class="text-muted fw-normal">(opcional)</span></label>
-                <select name="obra_id" class="form-select">
-                  <option value="">Sem obra específica</option>
+              <div class="col-md-12">
+                <label class="form-label fw-semibold">Obra <span class="text-danger">*</span></label>
+                <select name="obra_id" class="form-select" required>
+                  <option value="">Selecione a obra...</option>
                   {% for o in obras %}
                     <option value="{{ o.id }}">{{ o.nome }}</option>
                   {% endfor %}
                 </select>
+                <div class="form-text"><i class="fas fa-info-circle me-1"></i>A obra define o centro de custo do material na Gestão de Custos.</div>
               </div>
 
               <div class="col-md-6">

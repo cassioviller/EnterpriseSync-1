@@ -3792,6 +3792,7 @@ def executar_migracoes():
             (90, "RDOMaoObra - subatividade_id (FK cascade) + horas_extras", migration_90_rdo_mao_obra_subatividade),
             (91, "RDOMaoObra - tarefa_cronograma_id (FK SET NULL) para métricas por tarefa", migration_91_rdo_mao_obra_tarefa_cronograma),
             (92, "AlmoxarifadoMovimento - pedido_compra_id FK opcional para rastreamento de origem", migration_92_almoxarifado_pedido_compra_id),
+            (93, "PedidoCompra - centro_custo_id nullable (obra é o centro de custo principal)", migration_93_pedido_compra_centro_custo_nullable),
         ]
         
         # Executar cada migração com rastreamento
@@ -7694,6 +7695,48 @@ def migration_92_almoxarifado_pedido_compra_id():
 
     except Exception as e:
         logger.error(f"Erro na migracao 92: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_93_pedido_compra_centro_custo_nullable():
+    """
+    Migração 93: pedido_compra.centro_custo_id — tornar coluna nullable.
+    A obra passa a ser o identificador principal da compra. O centro de custo
+    não é mais obrigatório no formulário de nova compra.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_name = 'pedido_compra' AND column_name = 'centro_custo_id'
+        """)
+        row = cursor.fetchone()
+        if row and row[0] == 'NO':
+            logger.info("  Tornando pedido_compra.centro_custo_id nullable...")
+            cursor.execute("""
+                ALTER TABLE pedido_compra
+                ALTER COLUMN centro_custo_id DROP NOT NULL
+            """)
+            logger.info("  pedido_compra.centro_custo_id agora é nullable.")
+        else:
+            logger.info("  pedido_compra.centro_custo_id já é nullable ou não existe.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 93 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 93: {e}")
         if connection:
             try:
                 connection.rollback()

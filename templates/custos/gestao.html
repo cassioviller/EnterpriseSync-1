@@ -302,11 +302,17 @@
             </td>
             <td>
               <div class="fw-semibold">{{ reg.entidade_nome }}</div>
+              {% if reg.tipo_categoria == 'MATERIAL' and reg.fornecedor %}
+              <small class="text-muted">
+                <i class="fas fa-truck fa-xs me-1"></i>{{ reg.fornecedor.nome }}
+              </small>
+              {% elif reg.tipo_categoria != 'MATERIAL' %}
               {% set obra_nome = obra_por_pai.get(reg.id) %}
               {% if obra_nome %}
               <small class="text-muted">
                 <i class="fas fa-hard-hat fa-xs me-1"></i>{{ obra_nome }}
               </small>
+              {% endif %}
               {% endif %}
             </td>
             <td class="text-end fw-bold">R$ {{ '%.2f'|format(reg.valor_total|float) }}</td>

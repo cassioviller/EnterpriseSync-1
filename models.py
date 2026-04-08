@@ -4037,14 +4037,14 @@ FrotaDespesa = VehicleExpense
 # ================================
 
 class PedidoCompra(db.Model):
-    """Pedido / recibo de compra V2 — vinculado a fornecedor, centro de custo e obra"""
+    """Pedido / recibo de compra V2 — vinculado a fornecedor e obra (obra é o centro de custo)"""
     __tablename__ = 'pedido_compra'
 
     id = db.Column(db.Integer, primary_key=True)
     numero = db.Column(db.String(50))                        # Número da NF/recibo (livre)
     fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=False)
     data_compra = db.Column(db.Date, nullable=False)
-    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=False)
+    centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
     condicao_pagamento = db.Column(db.String(50), default='a_vista')  # a_vista, 30d, 60d, 90d, parcelado
     parcelas = db.Column(db.Integer, default=1)

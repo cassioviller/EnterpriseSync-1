@@ -118,7 +118,6 @@ def nova():
 
     admin_id = _admin_id()
     fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
-    centros_custo = CentroCusto.query.filter_by(admin_id=admin_id).order_by('nome').all()
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
     itens_catalogo = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by('nome').all()
     funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
@@ -127,7 +126,6 @@ def nova():
     return render_template(
         'compras/nova_compra.html',
         fornecedores=fornecedores,
-        centros_custo=centros_custo,
         obras=obras,
         itens_catalogo=itens_catalogo,
         funcionarios=funcionarios,
@@ -151,7 +149,6 @@ def nova_post():
 
     try:
         fornecedor_id = int(request.form.get('fornecedor_id'))
-        centro_custo_id = int(request.form.get('centro_custo_id'))
         data_compra = datetime.strptime(request.form.get('data_compra'), '%Y-%m-%d').date()
         condicao = request.form.get('condicao_pagamento', 'a_vista')
         parcelas = int(request.form.get('parcelas', 1))
@@ -203,7 +200,6 @@ def nova_post():
             numero=numero,
             fornecedor_id=fornecedor_id,
             data_compra=data_compra,
-            centro_custo_id=centro_custo_id,
             obra_id=obra_id,
             condicao_pagamento=condicao,
             parcelas=parcelas,
@@ -230,28 +226,31 @@ def nova_post():
 
         # --- Gestão de Custos (substitui ContaPagar) ---
         # NOTA: CustoObra NÃO é criado aqui. O GestaoCustoPai abaixo é a fonte única
-        # de custo de material, evitando duplicação com o handler material_saida
-        # do almoxarifado. O vínculo obra_id fica no GestaoCustoFilho.
+        # de custo de material. entidade_nome = nome da obra (identificador principal).
+        # O fornecedor fica registrado em fornecedor_id e nas observações.
         fornecedor = Fornecedor.query.get(fornecedor_id)
+        obra = Obra.query.get(obra_id) if obra_id else None
         vencimentos = _vencimentos(data_compra, condicao, parcelas)
         n_parcelas = len(vencimentos)
         valor_parcela = round(valor_total / n_parcelas, 2)
         forn_nome = fornecedor.nome if fornecedor else 'Fornecedor'
+        obra_nome = obra.nome if obra else 'Sem obra'
+        entidade_nome = obra_nome
+        entidade_id = obra_id
 
         for idx, (data_venc, _) in enumerate(vencimentos, start=1):
             v = valor_parcela if idx < n_parcelas else round(valor_total - valor_parcela * (n_parcelas - 1), 2)
             is_avista = (condicao == 'a_vista')
             status_gcp = 'PAGO' if is_avista else 'PENDENTE'
-            desc_cp = f"Compra{(' NF ' + numero) if numero else ''}"
+            desc_cp = f"Compra{(' NF ' + numero) if numero else ''} - {forn_nome}"
             if n_parcelas > 1:
                 desc_cp += f" - Parcela {idx}/{n_parcelas}"
-            desc_cp += f" - {forn_nome}"
 
             gcp = GestaoCustoPai(
                 admin_id=admin_id,
                 tipo_categoria='MATERIAL',
-                entidade_nome=forn_nome,
-                entidade_id=fornecedor_id,
+                entidade_nome=entidade_nome,
+                entidade_id=entidade_id,
                 fornecedor_id=fornecedor_id,
                 valor_total=v,
                 valor_pago=v if is_avista else 0,
@@ -275,7 +274,6 @@ def nova_post():
                 descricao=desc_cp[:300],
                 valor=v,
                 obra_id=obra_id,
-                centro_custo_id=centro_custo_id,
                 origem_tabela='pedido_compra',
                 origem_id=pedido.id,
             )
