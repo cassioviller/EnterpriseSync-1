@@ -3629,17 +3629,18 @@ def salvar_rdo_flexivel():
             
             logger.info(f"[SAVE] RDO {rdo.numero_rdo} criado com ID {rdo.id}")
             
-            # Salvar todas as subatividades no serviço correto
+            # Salvar todas as subatividades e montar mapa sub_mestre_id → obj
             logger.info(f"[SAVE] SALVANDO {len(subactivities)} SUBATIVIDADES")
+            # Mapeamento: str(sub_mestre_id) → RDOServicoSubatividade (preenchido após flush)
+            sub_id_to_obj = {}
             for i, sub_data in enumerate(subactivities):
                 try:
-                    # [OK] CORREÇÃO CRÍTICA: Usar original_service_id de cada subatividade
                     servico_id_correto = sub_data.get('original_service_id', target_service_id)
                     logger.info(f" [LIST] [{i+1}/{len(subactivities)}] {sub_data['nome']} = {sub_data['percentual']}% (servico_id={servico_id_correto})")
                     
                     subatividade = RDOServicoSubatividade(
                         rdo_id=rdo.id,
-                        servico_id=servico_id_correto,  # [OK] CORRIGIDO: Usa o servico_id específico de cada subatividade
+                        servico_id=servico_id_correto,
                         nome_subatividade=sub_data['nome'],
                         percentual_conclusao=sub_data['percentual'],
                         observacoes_tecnicas=sub_data['observacoes'],
@@ -3648,60 +3649,102 @@ def salvar_rdo_flexivel():
                     )
                     
                     db.session.add(subatividade)
-                    logger.info(f" [OK] Subatividade {sub_data['nome']} salva com servico_id={servico_id_correto}")
+                    # Guardar referência para linkar com mão de obra depois
+                    sub_id_to_obj[str(sub_data['sub_id'])] = subatividade
+                    logger.info(f" [OK] Subatividade {sub_data['nome']} salva (sub_mestre_id={sub_data['sub_id']})")
                     
                 except Exception as sub_error:
                     logger.error(f" [ERROR] Erro na subatividade {sub_data['nome']}: {sub_error}")
                     raise Exception(f"Erro ao criar subatividade {sub_data['nome']}: {sub_error}")
-                # Removido - lógica movida para o bloco anterior
             
-            # CORREÇÃO CRÍTICA: PROCESSAR FUNCIONÁRIOS SELECIONADOS
+            # Flush para obter IDs das subatividades antes de criar mão de obra
+            db.session.flush()
+            logger.info(f"[FLUSH] Subatividades persistidas. IDs disponíveis.")
+            
+            # PROCESSAR MÃO DE OBRA POR SUBATIVIDADE (novo formato: func_{sub_mestre_id}_{func_id}_horas)
+            import re as _re
+            _func_pattern = _re.compile(r'^func_(\d+)_(\d+)_horas$')
+            funcionarios_por_sub = {}  # sub_mestre_id_str → [(func_id, horas)]
+            for field_name, field_value in request.form.items():
+                m = _func_pattern.match(field_name)
+                if m and field_value:
+                    sub_mestre_id_str = m.group(1)
+                    func_id_str = m.group(2)
+                    try:
+                        horas = float(field_value) if field_value else 8.8
+                        if sub_mestre_id_str not in funcionarios_por_sub:
+                            funcionarios_por_sub[sub_mestre_id_str] = []
+                        funcionarios_por_sub[sub_mestre_id_str].append((int(func_id_str), horas))
+                    except (ValueError, TypeError):
+                        continue
+            
+            logger.info(f"[USERS] Campos func_*_*_horas encontrados: {len(funcionarios_por_sub)} subatividades com funcionários")
+            
+            mao_obra_count = 0
+            for sub_mestre_id_str, func_list in funcionarios_por_sub.items():
+                subat_obj = sub_id_to_obj.get(sub_mestre_id_str)
+                if not subat_obj:
+                    logger.warning(f"[WARN] sub_mestre_id={sub_mestre_id_str} não encontrado no mapa de subatividades")
+                    continue
+                for func_id_sel, horas in func_list:
+                    funcionario = Funcionario.query.get(func_id_sel)
+                    if not funcionario:
+                        logger.warning(f"[WARN] Funcionário ID {func_id_sel} não encontrado")
+                        continue
+                    funcao_exercida = 'Diarista'
+                    try:
+                        if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref:
+                            funcao_exercida = funcionario.funcao_ref.nome
+                        elif hasattr(funcionario, 'funcao') and funcionario.funcao:
+                            funcao_exercida = funcionario.funcao
+                    except Exception:
+                        pass
+                    mao_obra = RDOMaoObra(
+                        rdo_id=rdo.id,
+                        funcionario_id=func_id_sel,
+                        horas_trabalhadas=horas,
+                        funcao_exercida=funcao_exercida,
+                        admin_id=admin_id,
+                        subatividade_id=subat_obj.id,
+                        horas_extras=0.0
+                    )
+                    db.session.add(mao_obra)
+                    mao_obra_count += 1
+                    logger.info(f"[WORKER] Mão de obra: {funcionario.nome} → subat '{subat_obj.nome_subatividade}' ({horas}h)")
+            
+            # Fallback legado: processar funcionarios_selecionados (sem subatividade vinculada)
             funcionarios_selecionados = request.form.getlist('funcionarios_selecionados')
-            logger.info(f"[USERS] PROCESSANDO FUNCIONÁRIOS: {len(funcionarios_selecionados)} selecionados")
-            logger.info(f"[USERS] Lista de IDs: {funcionarios_selecionados}")
-            
-            for funcionario_id_str in funcionarios_selecionados:
-                try:
-                    if funcionario_id_str and funcionario_id_str.strip():
+            if funcionarios_selecionados and mao_obra_count == 0:
+                logger.info(f"[LEGACY] Processando {len(funcionarios_selecionados)} funcionários (modo legado sem subatividade)")
+                for funcionario_id_str in funcionarios_selecionados:
+                    try:
+                        if not funcionario_id_str or not funcionario_id_str.strip():
+                            continue
                         funcionario_id_sel = int(funcionario_id_str.strip())
-                        
-                        # Verificar se funcionário existe
                         funcionario = Funcionario.query.get(funcionario_id_sel)
                         if funcionario:
-                            # [OK] CORREÇÃO CRÍTICA: Criar registro seguro de mão de obra
-                            funcao_exercida = 'Funcionário'  # Padrão seguro
+                            funcao_exercida = 'Funcionário'
                             try:
                                 if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref:
                                     funcao_exercida = funcionario.funcao_ref.nome
                                 elif hasattr(funcionario, 'funcao') and funcionario.funcao:
                                     funcao_exercida = funcionario.funcao
-                                    logger.info(f"[WORKER] Função determinada para {funcionario.nome}: {funcao_exercida}")
-                            except Exception as e:
-                                logger.warning(f"[WARN] Erro ao buscar função do funcionário {funcionario.nome}: {e}")
-                            
-                            # [DEBUG] VERIFICAÇÃO SCHEMA RDOMaoObra
-                                logger.info(f"[DEBUG] Criando RDOMaoObra - rdo_id: {rdo.id}, funcionario_id: {funcionario_id_sel}, admin_id: {admin_id}")
-                            try:
-                                mao_obra = RDOMaoObra(
-                                    rdo_id=rdo.id,
-                                    funcionario_id=funcionario_id_sel,
-                                    horas_trabalhadas=8.8,  # Padrão
-                                    funcao_exercida=funcao_exercida,
-                                    admin_id=admin_id
-                                )
-                                
-                                # Teste de schema antes de adicionar
-                                logger.info(f" [OK] RDOMaoObra criado: {vars(mao_obra)}")
-                                db.session.add(mao_obra)
-                                logger.info(f"[WORKER] Funcionário salvo: {funcionario.nome} (ID: {funcionario_id_sel})")
-                            except Exception as mao_obra_error:
-                                logger.error(f"[ERROR] ERRO RDOMaoObra para funcionario {funcionario.nome}: {mao_obra_error}")
-                                raise Exception(f"Erro ao criar RDOMaoObra: {mao_obra_error}")
-                        else:
-                            logger.warning(f"[WARN] Funcionário ID {funcionario_id_sel} não encontrado")
-                except Exception as e:
-                    logger.error(f"[ERROR] Erro ao processar funcionário {funcionario_id_str}: {e}")
-                    continue
+                            except Exception:
+                                pass
+                            mao_obra = RDOMaoObra(
+                                rdo_id=rdo.id,
+                                funcionario_id=funcionario_id_sel,
+                                horas_trabalhadas=8.8,
+                                funcao_exercida=funcao_exercida,
+                                admin_id=admin_id
+                            )
+                            db.session.add(mao_obra)
+                            mao_obra_count += 1
+                    except Exception as e:
+                        logger.error(f"[ERROR] Erro ao processar funcionário legado {funcionario_id_str}: {e}")
+                        continue
+            
+            logger.info(f"[USERS] Total mão de obra registrada: {mao_obra_count} registro(s)")
             
             # [PHOTO] PROCESSAR FOTOS (v9.0) - CORREÇÃO COMPLETA + LEGENDAS v9.0.2
             if 'fotos[]' in request.files:

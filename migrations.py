@@ -3789,6 +3789,7 @@ def executar_migracoes():
             (87, "Proposta - numero_proposta unique por tenant (numero_proposta + admin_id)", migration_87_proposta_numero_unique_por_tenant),
             (88, "TarefaCronograma - campo responsavel (empresa/terceiros)", migration_88_tarefa_cronograma_responsavel),
             (89, "RDO - criado_por_id nullable (FK usuario)", migration_89_rdo_criado_por_nullable),
+            (90, "RDOMaoObra - subatividade_id (FK cascade) + horas_extras", migration_90_rdo_mao_obra_subatividade),
         ]
         
         # Executar cada migração com rastreamento
@@ -7607,6 +7608,62 @@ def migration_89_rdo_criado_por_nullable():
 
     except Exception as e:
         logger.error(f"Erro na migracao 89: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_90_rdo_mao_obra_subatividade():
+    """
+    Migração 90: rdo_mao_obra — adicionar subatividade_id (FK cascade) e horas_extras.
+    subatividade_id: nullable FK para rdo_servico_subatividade com ON DELETE CASCADE.
+    horas_extras: nullable Float com default 0.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'rdo_mao_obra' AND column_name = 'subatividade_id'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando coluna subatividade_id em rdo_mao_obra...")
+            cursor.execute("""
+                ALTER TABLE rdo_mao_obra
+                ADD COLUMN subatividade_id INTEGER
+                REFERENCES rdo_servico_subatividade(id) ON DELETE CASCADE
+            """)
+            logger.info("  Coluna subatividade_id adicionada com FK e cascade.")
+        else:
+            logger.info("  Coluna subatividade_id já existe em rdo_mao_obra.")
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'rdo_mao_obra' AND column_name = 'horas_extras'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando coluna horas_extras em rdo_mao_obra...")
+            cursor.execute("""
+                ALTER TABLE rdo_mao_obra
+                ADD COLUMN horas_extras FLOAT DEFAULT 0
+            """)
+            logger.info("  Coluna horas_extras adicionada.")
+        else:
+            logger.info("  Coluna horas_extras já existe em rdo_mao_obra.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 90 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 90: {e}")
         if connection:
             try:
                 connection.rollback()

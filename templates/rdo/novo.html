@@ -365,72 +365,7 @@
             </div>
         </div>
 
-        <!-- Seção de Mão de Obra -->  
-        <div class="rdo-card slide-in">
-            <div class="rdo-card-header">
-                <h3>
-                    <i class="fas fa-users"></i>
-                    Mão de Obra
-                </h3>
-            </div>
-            <div class="rdo-card-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    <strong>Seleção de Funcionários:</strong> Digite o nome do funcionário para buscar e adicionar à equipe.
-                </div>
-                
-                <!-- Interface Simples de Seleção -->
-                <div class="row">
-                    <div class="col-md-8">
-                        <div class="form-group mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-search"></i>
-                                Buscar e Selecionar Funcionário
-                            </label>
-                            <div class="input-group">
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="buscarFuncionario" 
-                                       placeholder="Digite o nome do funcionário..."
-                                       autocomplete="off">
-                                <button class="btn btn-success" type="button" onclick="buscarTodosFuncionarios()">
-                                    <i class="fas fa-users"></i> Ver Todos
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group mb-3">
-                            <label class="form-label">Ação</label>
-                            <button class="btn btn-outline-danger w-100" type="button" onclick="limparTodosFuncionarios()">
-                                <i class="fas fa-trash"></i> Limpar Todos
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Lista de sugestões visível -->
-                <div id="sugestoesFuncionarios" class="mb-4" style="display:none;">
-                    <div class="card">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">Funcionários Disponíveis - Clique para Selecionar</h6>
-                        </div>
-                        <div class="card-body" id="listaSugestoes">
-                            <!-- Sugestões aparecem aqui -->
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Funcionários selecionados -->
-                <div id="funcionarios-selecionados">
-                    <div class="text-center text-muted py-4" id="nenhumFuncionario">
-                        <i class="fas fa-user-plus fa-2x mb-2"></i>
-                        <p>Nenhum funcionário selecionado</p>
-                        <small>Use o campo de busca acima ou clique em "Ver Todos" para selecionar funcionários</small>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Mão de obra por subatividade: seletores embutidos nos cards de subatividade -->
 
         <!-- ===== SEÇÃO DE FOTOS DO RDO v9.0 ===== -->
         <div class="rdo-card slide-in">
@@ -712,6 +647,7 @@ function exibirServicosParaPrimeiraRDO(servicos) {
                                        name="nome_subatividade_${servico.id}_${subatividade.id}" 
                                        value="${subatividade.nome}"
                                        form="formNovoRDO">
+                                ${htmlEquipeSubatividade(subatividade.id)}
                             </div>
                         </div>
                     </div>
@@ -790,25 +726,30 @@ function exibirDadosUltimoRDO(ultimoRDO) {
                     
                     html += `
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                ${subatividade.nome}
-                                ${percentualAtual > 0 ? 
-                                  `<span class="badge bg-info ms-2">${percentualAtual}%</span>` : ''}
-                            </label>
-                            <div class="input-group">
-                                <input type="number" 
-                                       class="form-control" 
-                                       name="subatividade_${servico.id}_${subatividade.id}_percentual"
-                                       value="${percentualAtual}"
-                                       min="0" 
-                                       max="100" 
-                                       step="0.1"
-                                       form="formNovoRDO">
-                                <span class="input-group-text">%</span>
+                            <div class="card border-light h-100">
+                                <div class="card-body p-2">
+                                    <label class="form-label fw-bold small">
+                                        ${subatividade.nome}
+                                        ${percentualAtual > 0 ? 
+                                          `<span class="badge bg-info ms-2">${percentualAtual}%</span>` : ''}
+                                    </label>
+                                    <div class="input-group mb-2">
+                                        <input type="number" 
+                                               class="form-control form-control-sm" 
+                                               name="subatividade_${servico.id}_${subatividade.id}_percentual"
+                                               value="${percentualAtual}"
+                                               min="0" 
+                                               max="100" 
+                                               step="0.1"
+                                               form="formNovoRDO">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="form-text text-muted d-block mb-2">
+                                        Última RDO: ${percentualAtual}%
+                                    </small>
+                                    ${htmlEquipeSubatividade(subatividade.id)}
+                                </div>
                             </div>
-                            <small class="form-text text-muted">
-                                Última RDO: ${percentualAtual}% - ajustar conforme progresso
-                            </small>
                         </div>
                     `;
                 });
@@ -873,173 +814,148 @@ function exibirErroCarregamento() {
     `;
 }
 
-// === SISTEMA DE FUNCIONÁRIOS ===
-let funcionariosEscolhidos = [];
-let todosFuncionarios = [];
+// === SISTEMA DE MÃO DE OBRA POR SUBATIVIDADE ===
+// Cache global de funcionários (carregado uma vez por obra selecionada)
+let _funcCache = [];
+let _funcCacheObraId = null;
+// Estado por subatividade: { subId: [{id, nome, cargo, horas}] }
+const _maoObraSubat = {};
 
-function buscarTodosFuncionarios() {
-    console.log('📋 Carregando todos os funcionários disponíveis...');
-    
-    fetch('/api/funcionarios')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.funcionarios) {
-                todosFuncionarios = data.funcionarios;
-                console.log(`✅ ${todosFuncionarios.length} funcionários carregados`);
-                exibirListaFuncionarios(todosFuncionarios);
-            } else {
-                console.error('❌ Erro ao carregar funcionários:', data.error);
+async function _carregarFuncCache() {
+    const obraId = document.getElementById('obra_id')?.value;
+    if (obraId && _funcCacheObraId === obraId && _funcCache.length > 0) return _funcCache;
+    try {
+        const resp = await fetch('/api/funcionarios');
+        const data = await resp.json();
+        if (data.success && data.funcionarios) {
+            _funcCache = data.funcionarios;
+            _funcCacheObraId = obraId;
+        }
+    } catch(e) { console.error('Erro ao carregar funcionários:', e); }
+    return _funcCache;
+}
+
+function htmlEquipeSubatividade(subId) {
+    return `
+        <div class="mt-2 pt-2 border-top">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <small class="fw-bold text-muted"><i class="fas fa-hard-hat"></i> Equipe do dia</small>
+                <div class="position-relative">
+                    <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2"
+                            onclick="abrirSeletorFunc(${subId})" title="Adicionar funcionário">
+                        <i class="fas fa-user-plus"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end shadow" id="dd-func-${subId}"
+                         style="max-height:220px;overflow-y:auto;min-width:220px;display:none;position:absolute;right:0;z-index:1050;">
+                        <div class="px-2 pt-1">
+                            <input type="text" class="form-control form-control-sm mb-1"
+                                   placeholder="Filtrar..." id="filtro-func-${subId}"
+                                   oninput="filtrarListaFunc(${subId}, this.value)">
+                        </div>
+                        <div id="lista-func-${subId}"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="equipe-sub-${subId}">
+                <p class="text-muted small mb-0 fst-italic">Nenhum funcionário alocado</p>
+            </div>
+        </div>
+    `;
+}
+
+async function abrirSeletorFunc(subId) {
+    const dd = document.getElementById(`dd-func-${subId}`);
+    if (!dd) return;
+    const isOpen = dd.style.display !== 'none';
+    // Fechar todos os outros dropdowns
+    document.querySelectorAll('[id^="dd-func-"]').forEach(el => el.style.display = 'none');
+    if (isOpen) return;
+
+    const funcionarios = await _carregarFuncCache();
+    _renderListaFunc(subId, funcionarios, '');
+    dd.style.display = 'block';
+
+    // Fechar ao clicar fora
+    setTimeout(() => {
+        document.addEventListener('click', function _close(e) {
+            if (!dd.contains(e.target) && e.target.getAttribute('onclick') !== `abrirSeletorFunc(${subId})`) {
+                dd.style.display = 'none';
+                document.removeEventListener('click', _close);
             }
-        })
-        .catch(error => {
-            console.error('❌ Erro na requisição de funcionários:', error);
         });
+    }, 100);
 }
 
-function exibirListaFuncionarios(funcionarios) {
-    const container = document.getElementById('sugestoesFuncionarios');
-    const lista = document.getElementById('listaSugestoes');
-    
-    if (funcionarios.length === 0) {
-        lista.innerHTML = '<p class="text-center text-muted">Nenhum funcionário encontrado</p>';
-        container.style.display = 'block';
+function filtrarListaFunc(subId, query) {
+    const filtered = _funcCache.filter(f => f.nome.toLowerCase().includes(query.toLowerCase()));
+    _renderListaFunc(subId, filtered, query);
+}
+
+function _renderListaFunc(subId, lista, query) {
+    const container = document.getElementById(`lista-func-${subId}`);
+    if (!container) return;
+    const jaSelecionados = (_maoObraSubat[subId] || []).map(f => f.id);
+    const disponiveis = lista.filter(f => !jaSelecionados.includes(f.id));
+    if (disponiveis.length === 0) {
+        container.innerHTML = '<p class="text-muted small px-3 py-2 mb-0">Nenhum disponível</p>';
         return;
     }
-    
-    let html = '<div class="row">';
-    
-    funcionarios.forEach(func => {
-        const jaSelecionado = funcionariosEscolhidos.some(f => f.id === func.id);
-        const statusClass = jaSelecionado ? 'border-success bg-light' : 'border-light';
-        const btnClass = jaSelecionado ? 'btn-outline-danger' : 'btn-outline-success';
-        const btnText = jaSelecionado ? 'Remover' : 'Selecionar';
-        const btnAction = jaSelecionado ? `removerFuncionario(${func.id})` : `selecionarFuncionario(${func.id}, '${func.nome}', '${func.cargo || 'Função não definida'}')`;
-        
-        html += `
-            <div class="col-md-6 mb-2">
-                <div class="card ${statusClass}" style="font-size: 0.9em;">
-                    <div class="card-body p-2">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>${func.nome}</strong><br>
-                                <small class="text-muted">${func.cargo || 'Função não definida'}</small>
-                            </div>
-                            <button class="btn ${btnClass} btn-sm" onclick="${btnAction}">
-                                ${btnText}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    lista.innerHTML = html;
-    container.style.display = 'block';
+    container.innerHTML = disponiveis.map(f => {
+        const cargo = (f.funcao || f.cargo || '').replace(/'/g, "\\'");
+        const nome = f.nome.replace(/'/g, "\\'");
+        return `<button type="button" class="dropdown-item small py-1"
+                    onclick="adicionarFuncSubat(${subId}, ${f.id}, '${nome}', '${cargo}')">
+                    ${f.nome} <small class="text-muted">${f.funcao||f.cargo||''}</small>
+                </button>`;
+    }).join('');
 }
 
-function selecionarFuncionario(id, nome, cargo) {
-    const funcionario = { id, nome, cargo };
-    
-    if (!funcionariosEscolhidos.some(f => f.id === id)) {
-        funcionariosEscolhidos.push(funcionario);
-        console.log(`✅ Funcionário selecionado: ${nome}`);
-        
-        atualizarListaFuncionarios();
-        
-        if (todosFuncionarios.length > 0) {
-            exibirListaFuncionarios(todosFuncionarios);
-        }
+function adicionarFuncSubat(subId, funcId, funcNome, funcCargo) {
+    if (!_maoObraSubat[subId]) _maoObraSubat[subId] = [];
+    if (!_maoObraSubat[subId].some(f => f.id === funcId)) {
+        _maoObraSubat[subId].push({ id: funcId, nome: funcNome, cargo: funcCargo, horas: 8.8 });
+        _renderEquipeSubat(subId);
+    }
+    const dd = document.getElementById(`dd-func-${subId}`);
+    if (dd) dd.style.display = 'none';
+}
+
+function removerFuncSubat(subId, funcId) {
+    if (_maoObraSubat[subId]) {
+        _maoObraSubat[subId] = _maoObraSubat[subId].filter(f => f.id !== funcId);
+        _renderEquipeSubat(subId);
     }
 }
 
-function removerFuncionario(id) {
-    const index = funcionariosEscolhidos.findIndex(f => f.id === id);
-    if (index > -1) {
-        const funcionario = funcionariosEscolhidos[index];
-        funcionariosEscolhidos.splice(index, 1);
-        console.log(`❌ Funcionário removido: ${funcionario.nome}`);
-        
-        atualizarListaFuncionarios();
-        
-        if (todosFuncionarios.length > 0) {
-            exibirListaFuncionarios(todosFuncionarios);
-        }
-    }
-}
-
-function atualizarListaFuncionarios() {
-    const container = document.getElementById('funcionarios-selecionados');
-    const nenhumMsg = document.getElementById('nenhumFuncionario');
-    
-    if (funcionariosEscolhidos.length === 0) {
-        nenhumMsg.style.display = 'block';
-        const existentes = container.querySelectorAll('.funcionario-selected-card');
-        existentes.forEach(el => el.remove());
+function _renderEquipeSubat(subId) {
+    const container = document.getElementById(`equipe-sub-${subId}`);
+    if (!container) return;
+    const selecionados = _maoObraSubat[subId] || [];
+    if (selecionados.length === 0) {
+        container.innerHTML = '<p class="text-muted small mb-0 fst-italic">Nenhum funcionário alocado</p>';
         return;
     }
-    
-    nenhumMsg.style.display = 'none';
-    
-    const existentes = container.querySelectorAll('.funcionario-selected-card');
-    existentes.forEach(el => el.remove());
-    
-    funcionariosEscolhidos.forEach(func => {
-        const funcCard = document.createElement('div');
-        funcCard.className = 'funcionario-selected-card mb-3';
-        funcCard.innerHTML = `
-            <div class="card border-success">
-                <div class="card-body p-3">
-                    <div class="row align-items-center">
-                        <div class="col-md-4">
-                            <h6 class="mb-1">${func.nome}</h6>
-                            <small class="text-muted">${func.cargo}</small>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small">Função</label>
-                            <input type="text" class="form-control form-control-sm" 
-                                   name="funcao_${func.id}" value="${func.cargo}" form="formNovoRDO">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small">Horas</label>
-                            <input type="number" class="form-control form-control-sm" 
-                                   name="horas_${func.id}" value="8.8" step="0.1" 
-                                   min="0" max="12" form="formNovoRDO">
-                        </div>
-                        <div class="col-md-2 text-end">
-                            <button class="btn btn-outline-danger btn-sm" 
-                                    onclick="removerFuncionario(${func.id})" type="button">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <input type="checkbox" name="funcionarios_selecionados" 
-                           value="${func.id}" checked style="display:none;" form="formNovoRDO">
-                </div>
-            </div>
-        `;
-        container.appendChild(funcCard);
-    });
+    container.innerHTML = selecionados.map(func => `
+        <div class="d-flex align-items-center gap-1 mb-1">
+            <span class="badge bg-secondary text-truncate flex-grow-1" style="max-width:120px;" title="${func.nome}">${func.nome}</span>
+            <input type="number" step="0.5" min="0" max="24"
+                   name="func_${subId}_${func.id}_horas"
+                   value="${func.horas}"
+                   class="form-control form-control-sm"
+                   style="width:65px;"
+                   form="formNovoRDO"
+                   title="Horas nesta subatividade">
+            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1"
+                    onclick="removerFuncSubat(${subId}, ${func.id})">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
 }
 
-function limparTodosFuncionarios() {
-    if (funcionariosEscolhidos.length === 0) {
-        alert('Nenhum funcionário para remover!');
-        return;
-    }
-    
-    const total = funcionariosEscolhidos.length;
-    if (confirm(`Deseja remover todos os ${total} funcionários selecionados?`)) {
-        funcionariosEscolhidos = [];
-        atualizarListaFuncionarios();
-        
-        if (todosFuncionarios.length > 0) {
-            exibirListaFuncionarios(todosFuncionarios);
-        }
-        
-        console.log('Todos os funcionários foram removidos');
-    }
+// Inicializar sistema de funcionários (mantido por compatibilidade)
+function inicializarSistemaFuncionarios() {
+    console.log('Sistema de funcionários por subatividade inicializado');
 }
 
 // === SISTEMA DE FOTOS ===
@@ -1286,39 +1202,8 @@ async function apontarProducaoRDO(tarefaId, valor) {
 {% endif %}
 </script>
 
-<!-- Sistema de Autocomplete RDO -->
+<!-- Sistema de Mão de Obra por Subatividade inicializado -->
 <script>
-console.log('RDO Autocomplete System Loaded');
-
-// Inicializar sistema de funcionários  
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Sistema de funcionários inicializado');
-    
-    const inputBusca = document.getElementById('buscarFuncionario');
-    if (inputBusca) {
-        inputBusca.addEventListener('input', function() {
-            const termo = this.value.toLowerCase().trim();
-            
-            if (termo.length >= 2) {
-                const funcionariosFiltrados = todosFuncionarios.filter(func => 
-                    func.nome.toLowerCase().includes(termo) || 
-                    func.cargo.toLowerCase().includes(termo)
-                );
-                
-                if (funcionariosFiltrados.length > 0) {
-                    exibirListaFuncionarios(funcionariosFiltrados);
-                } else {
-                    document.getElementById('listaSugestoes').innerHTML = 
-                        '<p class="text-center text-muted">Nenhum funcionário encontrado</p>';
-                    document.getElementById('sugestoesFuncionarios').style.display = 'block';
-                }
-            } else if (termo.length === 0 && todosFuncionarios.length > 0) {
-                exibirListaFuncionarios(todosFuncionarios);
-            }
-        });
-    }
-});
-
 console.log('✅ RDO Autocomplete System Initialized');
 </script>
 

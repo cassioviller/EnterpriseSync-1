@@ -810,11 +810,14 @@ class RDOMaoObra(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
-    funcao_exercida = db.Column(db.String(100), nullable=False)  # Nome correto do database
+    funcao_exercida = db.Column(db.String(100), nullable=False)
     horas_trabalhadas = db.Column(db.Float, nullable=False)
+    horas_extras = db.Column(db.Float, nullable=True, default=0.0)
+    subatividade_id = db.Column(db.Integer, db.ForeignKey('rdo_servico_subatividade.id', ondelete='CASCADE'), nullable=True)
     
     # Relacionamentos
     funcionario = db.relationship('Funcionario', backref='rdos_mao_obra', overlaps="rdos_mao_obra")
+    subatividade = db.relationship('RDOServicoSubatividade', backref='mao_obra_registros', foreign_keys=[subatividade_id])
     
     # Compatibilidade com código legado
     @property
