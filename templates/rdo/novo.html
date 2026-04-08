@@ -339,6 +339,33 @@
                     <small>Acesse o Cronograma da obra para criar tarefas.</small>
                 </div>
                 <div id="cronogramaTarefasRDO"></div>
+
+                <!-- ── Equipe do dia (Cronograma V2) ── -->
+                <div class="border-top mt-0 px-3 pb-3 pt-3" id="cronogramaEquipeSection" style="display:none">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h6 class="fw-bold mb-0 text-primary">
+                            <i class="fas fa-hard-hat me-1"></i> Equipe do Dia
+                        </h6>
+                        <div class="position-relative">
+                            <button type="button" class="btn btn-outline-primary btn-sm"
+                                    onclick="abrirSeletorFuncCron()" title="Adicionar funcionário">
+                                <i class="fas fa-user-plus me-1"></i> Adicionar
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end shadow" id="dd-func-cron"
+                                 style="max-height:260px;overflow-y:auto;min-width:240px;display:none;position:absolute;right:0;z-index:1060;">
+                                <div class="px-2 pt-1">
+                                    <input type="text" class="form-control form-control-sm mb-1"
+                                           placeholder="Filtrar funcionário…" id="filtro-func-cron"
+                                           oninput="filtrarListaFuncCron(this.value)">
+                                </div>
+                                <div id="lista-func-cron"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="equipe-cron-lista">
+                        <p class="text-muted small mb-0 fst-italic">Nenhum funcionário alocado</p>
+                    </div>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -1102,6 +1129,10 @@ async function carregarTarefasRDO() {
 
         rdoV2TarefasCache = json.tarefas;
         renderizarTarefasRDO(json.tarefas);
+        // Mostrar seção de equipe e pré-carregar funcionários
+        const equipeSection = document.getElementById('cronogramaEquipeSection');
+        if (equipeSection) equipeSection.style.display = '';
+        _carregarFuncCache();
     } catch(e) {
         loading?.classList.add('d-none');
         empty?.classList.remove('d-none');
@@ -1181,14 +1212,10 @@ async function apontarProducaoRDO(tarefaId, valor) {
     const obraId = document.getElementById('obra_id')?.value;
     if (!obraId) { alert('Salve o RDO antes de apontar produção.'); return; }
 
-    // Neste ponto o RDO ainda não foi salvo — armazenamos localmente
-    // e eles serão salvos em bloco na submissão do formulário.
-    // Adicionamos campos hidden ao form para envio.
     const formId = 'formNovoRDO';
     const form = document.getElementById(formId);
     if (!form) return;
 
-    // Remove input hidden anterior desta tarefa (se houver)
     const prev = form.querySelector(`input[name="cronograma_tarefa_${tarefaId}"]`);
     if (prev) prev.remove();
 
@@ -1198,6 +1225,121 @@ async function apontarProducaoRDO(tarefaId, valor) {
         h.name = `cronograma_tarefa_${tarefaId}`;
         h.value = qty;
         form.appendChild(h);
+    }
+}
+
+// ── Equipe do Dia — Cronograma V2 ────────────────────────────
+let _cronEquipe = [];   // [{id, nome, cargo, horas}]
+
+async function abrirSeletorFuncCron() {
+    const dd = document.getElementById('dd-func-cron');
+    if (!dd) return;
+    const isOpen = dd.style.display !== 'none';
+    dd.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) {
+        const todos = await _carregarFuncCache();
+        _renderListaFuncCron(todos, '');
+        const filtro = document.getElementById('filtro-func-cron');
+        if (filtro) filtro.value = '';
+        setTimeout(() => {
+            document.addEventListener('click', function _closeCron(e) {
+                if (!dd.contains(e.target) && !e.target.closest('[onclick="abrirSeletorFuncCron()"]')) {
+                    dd.style.display = 'none';
+                    document.removeEventListener('click', _closeCron);
+                }
+            });
+        }, 120);
+    }
+}
+
+function filtrarListaFuncCron(query) {
+    const filtered = _funcCache.filter(f => f.nome.toLowerCase().includes(query.toLowerCase()));
+    _renderListaFuncCron(filtered, query);
+}
+
+function _renderListaFuncCron(lista, query) {
+    const container = document.getElementById('lista-func-cron');
+    if (!container) return;
+    const jaSel = _cronEquipe.map(f => f.id);
+    const disponiveis = lista.filter(f => !jaSel.includes(f.id));
+    if (disponiveis.length === 0) {
+        container.innerHTML = '<p class="text-muted small px-3 py-2 mb-0">Nenhum disponível</p>';
+        return;
+    }
+    container.innerHTML = disponiveis.map(f => {
+        const cargo = (f.funcao || f.cargo || '').replace(/'/g, "\\'");
+        const nome = f.nome.replace(/'/g, "\\'");
+        return `<button type="button" class="dropdown-item small py-1"
+                    onclick="adicionarFuncCron(${f.id}, '${nome}', '${cargo}')">
+                    ${f.nome} <small class="text-muted">${f.funcao || f.cargo || ''}</small>
+                </button>`;
+    }).join('');
+}
+
+function adicionarFuncCron(funcId, funcNome, funcCargo) {
+    if (!_cronEquipe.some(f => f.id === funcId)) {
+        _cronEquipe.push({ id: funcId, nome: funcNome, cargo: funcCargo, horas: 8.8 });
+        _renderEquipeCron();
+    }
+    const dd = document.getElementById('dd-func-cron');
+    if (dd) dd.style.display = 'none';
+}
+
+function removerFuncCron(funcId) {
+    _cronEquipe = _cronEquipe.filter(f => f.id !== funcId);
+    _renderEquipeCron();
+}
+
+function _renderEquipeCron() {
+    const container = document.getElementById('equipe-cron-lista');
+    if (!container) return;
+    if (_cronEquipe.length === 0) {
+        container.innerHTML = '<p class="text-muted small mb-0 fst-italic">Nenhum funcionário alocado</p>';
+        // Remover hidden inputs
+        document.querySelectorAll('input[name^="cron_func_"]').forEach(el => el.remove());
+        return;
+    }
+    const form = document.getElementById('formNovoRDO');
+    // Remover hidden inputs antigos
+    document.querySelectorAll('input[name^="cron_func_"]').forEach(el => el.remove());
+    container.innerHTML = _cronEquipe.map(f => `
+        <div class="d-flex align-items-center gap-2 mb-1 p-2 rounded" style="background:#f8f9ff;border:1px solid #dee2e6">
+            <i class="fas fa-user-hard-hat text-primary"></i>
+            <span class="flex-grow-1 small fw-semibold">${f.nome}</span>
+            <small class="text-muted">${f.cargo || ''}</small>
+            <label class="small text-muted mb-0 ms-2">Horas:</label>
+            <input type="number" class="form-control form-control-sm"
+                   style="width:70px" min="0.5" max="24" step="0.5"
+                   value="${f.horas}"
+                   onchange="_atualizarHorasCron(${f.id}, this.value)"
+                   title="Horas trabalhadas">
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
+                    onclick="removerFuncCron(${f.id})" title="Remover">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>`).join('');
+    // Recriar hidden inputs para envio
+    if (form) {
+        _cronEquipe.forEach(f => {
+            const h = document.createElement('input');
+            h.type = 'hidden';
+            h.name = `cron_func_${f.id}_horas`;
+            h.value = f.horas;
+            form.appendChild(h);
+        });
+    }
+}
+
+function _atualizarHorasCron(funcId, valor) {
+    const entry = _cronEquipe.find(f => f.id === funcId);
+    if (entry) {
+        entry.horas = parseFloat(valor) || 8.8;
+        // Atualizar apenas o hidden input correspondente
+        const form = document.getElementById('formNovoRDO');
+        if (form) {
+            const h = form.querySelector(`input[name="cron_func_${funcId}_horas"]`);
+            if (h) h.value = entry.horas;
+        }
     }
 }
 {% endif %}

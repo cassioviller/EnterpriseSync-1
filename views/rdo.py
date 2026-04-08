@@ -3713,6 +3713,47 @@ def salvar_rdo_flexivel():
                     mao_obra_count += 1
                     logger.info(f"[WORKER] Mão de obra: {funcionario.nome} → subat '{subat_obj.nome_subatividade}' ({horas}h)")
             
+            # PROCESSAR MÃO DE OBRA DO CRONOGRAMA V2 (formato: cron_func_{func_id}_horas)
+            _cron_func_pattern = _re.compile(r'^cron_func_(\d+)_horas$')
+            cron_func_count = 0
+            for field_name, field_value in request.form.items():
+                m2 = _cron_func_pattern.match(field_name)
+                if m2 and field_value:
+                    try:
+                        func_id_cron = int(m2.group(1))
+                        horas_cron = float(field_value) if field_value else 8.8
+                        funcionario = Funcionario.query.filter_by(id=func_id_cron, admin_id=admin_id).first()
+                        if not funcionario:
+                            logger.warning(f"[WARN] Funcionário cronograma ID {func_id_cron} não encontrado")
+                            continue
+                        funcao_exercida = 'Diarista'
+                        try:
+                            if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref:
+                                funcao_exercida = funcionario.funcao_ref.nome
+                            elif hasattr(funcionario, 'funcao') and funcionario.funcao:
+                                funcao_exercida = funcionario.funcao
+                        except Exception:
+                            pass
+                        mao_obra_cron = RDOMaoObra(
+                            rdo_id=rdo.id,
+                            funcionario_id=func_id_cron,
+                            horas_trabalhadas=horas_cron,
+                            funcao_exercida=funcao_exercida,
+                            admin_id=admin_id,
+                            subatividade_id=None,
+                            horas_extras=0.0
+                        )
+                        db.session.add(mao_obra_cron)
+                        mao_obra_count += 1
+                        cron_func_count += 1
+                        logger.info(f"[WORKER] Mão de obra cronograma: {funcionario.nome} ({horas_cron}h)")
+                    except (ValueError, TypeError) as e_cron:
+                        logger.warning(f"[WARN] Erro ao processar {field_name}: {e_cron}")
+                        continue
+
+            if cron_func_count:
+                logger.info(f"[USERS] {cron_func_count} funcionário(s) alocados via cronograma V2")
+
             # Fallback legado: processar funcionarios_selecionados (sem subatividade vinculada)
             funcionarios_selecionados = request.form.getlist('funcionarios_selecionados')
             if funcionarios_selecionados and mao_obra_count == 0:
@@ -3921,6 +3962,18 @@ def salvar_rdo_flexivel():
             success = False
         
         if success:
+            # Emitir evento rdo_finalizado para lançamento automático de custos V2
+            try:
+                from event_manager import EventManager
+                EventManager.emit('rdo_finalizado', {
+                    'rdo_id': rdo.id,
+                    'obra_id': rdo.obra_id,
+                    'data_relatorio': str(rdo.data_relatorio)
+                }, admin_id)
+                logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id} (salvar_rdo_flexivel)")
+            except Exception as ev_err:
+                logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {ev_err}")
+
             flash(f'RDO {numero_rdo} salvo com sucesso!', 'success')
             logger.info(f"[OK] RDO {numero_rdo} salvo com {len(subactivities)} subatividades")
             # Admins vão para visualização moderna; funcionários para o consolidado
