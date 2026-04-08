@@ -89,111 +89,112 @@ def safe_db_operation(operation, default_value=None):
 
 
 def _calcular_funcionarios_departamento(admin_id):
-    """Calcula funcionários por departamento com proteção de transação"""
+    """Calcula funcionários ativos por departamento com headcount e custo mensal de folha."""
     try:
-        from models import Departamento
-        funcionarios_por_departamento = {}
-        
-        departamentos = db.session.execute(text("""
-            SELECT d.nome as nome, COALESCE(COUNT(f.id), 0) as total
-            FROM departamento d 
-            LEFT JOIN funcionario f ON f.departamento_id = d.id 
-                AND f.ativo = true 
-                AND f.admin_id = :admin_id
-            GROUP BY d.nome 
+        rows = db.session.execute(text("""
+            SELECT
+                d.nome                            AS nome,
+                COUNT(f.id)                       AS total,
+                COALESCE(SUM(f.salario), 0)       AS custo_mensal
+            FROM departamento d
+            LEFT JOIN funcionario f
+                   ON f.departamento_id = d.id
+                  AND f.ativo = true
+                  AND f.admin_id = :admin_id
+            WHERE d.admin_id = :admin_id
+            GROUP BY d.nome
             ORDER BY total DESC
         """), {'admin_id': admin_id}).fetchall()
-        
-        funcionarios_por_departamento = {
-            dept[0]: dept[1] for dept in departamentos if dept[1] > 0
-        }
-        
-        sem_dept = Funcionario.query.filter_by(
-            admin_id=admin_id, 
-            ativo=True, 
-            departamento_id=None
-        ).count()
-        if sem_dept > 0:
-            funcionarios_por_departamento['Sem Departamento'] = sem_dept
-            
-        return funcionarios_por_departamento
+
+        result = [
+            {
+                'nome': row[0],
+                'total': int(row[1]),
+                'custo_mensal': float(row[2] or 0)
+            }
+            for row in rows if row[1] > 0
+        ]
+
+        # Funcionários sem departamento
+        sem_dept = db.session.execute(text("""
+            SELECT COUNT(*) AS total, COALESCE(SUM(salario), 0) AS custo
+            FROM funcionario
+            WHERE admin_id = :admin_id AND ativo = true AND departamento_id IS NULL
+        """), {'admin_id': admin_id}).first()
+        if sem_dept and sem_dept[0] > 0:
+            result.append({
+                'nome': 'Sem Departamento',
+                'total': int(sem_dept[0]),
+                'custo_mensal': float(sem_dept[1] or 0)
+            })
+
+        return result
     except Exception as e:
         logger.error(f"Erro funcionários por departamento: {e}")
         db.session.rollback()
-        return {}
+        return []
+
 
 def _calcular_custos_obra(admin_id, data_inicio, data_fim):
-    """Calcula custos por obra com proteção de transação — inclui CustoObra e GestaoCustoFilho"""
+    """Custo Realizado por obra no período.
+
+    Fontes (evitando dupla contagem):
+    - GestaoCustoFilho filtrado por status do pai IN (SOLICITADO, AUTORIZADO, PAGO, PARCIAL)
+    - ContaPagar V1 por obra_id (lançamentos originados diretamente de compras)
+
+    Retorna lista de dicts: {nome, realizado, orcamento, pct, estouro}
+    """
     try:
-        from models import VehicleExpense, RegistroPonto, CustoObra, GestaoCustoFilho
-        custos_por_obra = {}
+        rows = db.session.execute(text("""
+            SELECT
+                o.id                          AS obra_id,
+                o.nome                        AS obra_nome,
+                COALESCE(o.orcamento, 0)      AS orcamento,
+                COALESCE((
+                    SELECT SUM(gcf.valor)
+                    FROM gestao_custo_filho gcf
+                    JOIN gestao_custo_pai gcp ON gcp.id = gcf.pai_id
+                    WHERE gcf.obra_id = o.id
+                      AND gcf.admin_id = :admin_id
+                      AND gcp.status IN ('SOLICITADO','AUTORIZADO','PAGO','PARCIAL')
+                      AND gcf.data_referencia BETWEEN :data_inicio AND :data_fim
+                ), 0) AS custo_gestao,
+                COALESCE((
+                    SELECT SUM(cp.valor_original)
+                    FROM conta_pagar cp
+                    WHERE cp.obra_id = o.id
+                      AND cp.admin_id = :admin_id
+                      AND (cp.data_emissao IS NULL
+                           OR cp.data_emissao BETWEEN :data_inicio AND :data_fim)
+                ), 0) AS custo_conta_pagar
+            FROM obra o
+            WHERE o.admin_id = :admin_id
+            ORDER BY o.nome
+        """), {
+            'admin_id': admin_id,
+            'data_inicio': data_inicio,
+            'data_fim': data_fim
+        }).fetchall()
 
-        obras_admin = Obra.query.filter_by(admin_id=admin_id).all()
+        result = []
+        for row in rows:
+            realizado = float(row[3] or 0) + float(row[4] or 0)
+            orcamento = float(row[2] or 0)
+            if realizado > 0 or orcamento > 0:
+                pct = round(realizado / orcamento * 100, 1) if orcamento > 0 else 0.0
+                result.append({
+                    'nome': row[1],
+                    'realizado': round(realizado, 2),
+                    'orcamento': round(orcamento, 2),
+                    'pct': pct,
+                    'estouro': orcamento > 0 and realizado > orcamento,
+                })
 
-        for obra in obras_admin:
-            custo_total_obra = 0.0
-
-            # 1. RegistroPonto → custo de mão de obra por horas
-            try:
-                registros_obra = RegistroPonto.query.filter(
-                    RegistroPonto.obra_id == obra.id,
-                    RegistroPonto.data >= data_inicio,
-                    RegistroPonto.data <= data_fim
-                ).options(joinedload(RegistroPonto.funcionario_ref)).all()
-
-                for registro in registros_obra:
-                    funcionario = registro.funcionario_ref
-                    if funcionario and funcionario.salario:
-                        valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim)
-                        horas = (registro.horas_trabalhadas or 0) + (registro.horas_extras or 0) * 1.5
-                        custo_total_obra += horas * valor_hora
-            except Exception as e:
-                logger.error(f"Erro RegistroPonto obra {obra.id}: {e}")
-
-            # 2. VehicleExpense → custos de veículos
-            try:
-                if hasattr(VehicleExpense, 'obra_id'):
-                    veiculos_obra = VehicleExpense.query.filter(
-                        VehicleExpense.obra_id == obra.id,
-                        VehicleExpense.data_custo >= data_inicio,
-                        VehicleExpense.data_custo <= data_fim
-                    ).all()
-                    custo_total_obra += sum(float(v.valor or 0) for v in veiculos_obra)
-            except Exception as e:
-                logger.error(f"Erro VehicleExpense obra {obra.id}: {e}")
-
-            # 3. CustoObra → materiais, serviços, outros custos diretos
-            try:
-                custos_diretos = CustoObra.query.filter(
-                    CustoObra.obra_id == obra.id,
-                    CustoObra.admin_id == admin_id,
-                    CustoObra.data >= data_inicio,
-                    CustoObra.data <= data_fim
-                ).all()
-                custo_total_obra += sum(float(c.valor or 0) for c in custos_diretos)
-            except Exception as e:
-                logger.error(f"Erro CustoObra obra {obra.id}: {e}")
-
-            # 4. GestaoCustoFilho → diárias, transporte, alimentação vinculados à obra
-            try:
-                filhos = GestaoCustoFilho.query.filter(
-                    GestaoCustoFilho.obra_id == obra.id,
-                    GestaoCustoFilho.admin_id == admin_id,
-                    GestaoCustoFilho.data_referencia >= data_inicio,
-                    GestaoCustoFilho.data_referencia <= data_fim
-                ).all()
-                custo_total_obra += sum(float(f.valor or 0) for f in filhos)
-            except Exception as e:
-                logger.error(f"Erro GestaoCustoFilho obra {obra.id}: {e}")
-
-            if custo_total_obra > 0:
-                custos_por_obra[obra.nome] = round(custo_total_obra, 2)
-
-        return custos_por_obra
+        return result
     except Exception as e:
         logger.error(f"Erro custos por obra: {e}")
         db.session.rollback()
-        return {}
+        return []
 
 
 def get_admin_id_robusta(obra=None, current_user=None):

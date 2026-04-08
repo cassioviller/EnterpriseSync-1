@@ -284,50 +284,51 @@ html[data-bs-theme="dark"] .header-btn i {
         </div>
     </div>
 
-    <!-- Gráficos de Custos -->
+    <!-- Gráfico de Custos por Obra: Realizado vs Orçamento -->
     <div class="row mb-4">
-        <div class="col-md-6">
+        <div class="col-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">
-                        <i class="fas fa-chart-bar"></i> Custos por Obra
+                        <i class="fas fa-chart-bar"></i> Custos por Obra — Realizado vs Orçamento
                     </h5>
+                    {% if custos_obra %}
+                    <small class="text-muted">{{ data_inicio.strftime('%d/%m/%Y') }} a {{ data_fim.strftime('%d/%m/%Y') }}</small>
+                    {% endif %}
                 </div>
                 <div class="card-body">
-                    <canvas id="custosObraChart" width="400" height="200"></canvas>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-receipt"></i> Custos Recentes
-                    </h5>
-                </div>
-                <div class="card-body">
-                    {% if custos_recentes %}
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Obra</th>
-                                        <th>Custo Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for custo in custos_recentes %}
-                                    <tr>
-                                        <td>{{ custo.nome }}</td>
-                                        <td>R$ {{ '{:,.2f}'.format(custo.total_custo) }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                    {% if custos_obra %}
+                    <canvas id="custosObraChart" height="120"></canvas>
+                    <div class="row mt-3 g-2">
+                        {% for obra in custos_obra %}
+                        <div class="col-md-4 col-lg-3">
+                            <div class="border rounded p-2 {% if obra.estouro %}border-danger bg-danger bg-opacity-10{% else %}border-light{% endif %}">
+                                <div class="fw-semibold text-truncate small" title="{{ obra.nome }}">{{ obra.nome }}</div>
+                                <div class="d-flex justify-content-between mt-1 small">
+                                    <span class="text-muted">Realizado:</span>
+                                    <span class="fw-bold {% if obra.estouro %}text-danger{% endif %}">
+                                        R$ {{ '{:,.2f}'.format(obra.realizado).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                    </span>
+                                </div>
+                                {% if obra.orcamento > 0 %}
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-muted">Orçamento:</span>
+                                    <span>R$ {{ '{:,.2f}'.format(obra.orcamento).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
+                                </div>
+                                <div class="progress mt-1" style="height:4px">
+                                    <div class="progress-bar {% if obra.estouro %}bg-danger{% elif obra.pct > 80 %}bg-warning{% else %}bg-success{% endif %}"
+                                         style="width:{{ [obra.pct, 100]|min }}%"></div>
+                                </div>
+                                <div class="text-end small {% if obra.estouro %}text-danger{% else %}text-muted{% endif %}">
+                                    {{ obra.pct }}%{% if obra.estouro %} ⚠ estouro{% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
                         </div>
+                        {% endfor %}
+                    </div>
                     {% else %}
-                        <p class="text-muted mb-0">Nenhum custo registrado.</p>
+                    <p class="text-muted mb-0">Nenhum custo registrado no período.</p>
                     {% endif %}
                 </div>
             </div>
@@ -413,14 +414,32 @@ html[data-bs-theme="dark"] .header-btn i {
 
     <div class="row mb-4">
         <div class="col-md-6">
-            <div class="card">
+            <div class="card h-100">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i class="fas fa-chart-pie"></i> Funcionários por Departamento
+                        <i class="fas fa-sitemap"></i> Funcionários por Departamento
                     </h5>
                 </div>
                 <div class="card-body">
+                    {% if funcionarios_dept %}
+                    <div class="row g-2">
+                        {% for dept in funcionarios_dept %}
+                        <div class="col-6">
+                            <div class="border rounded p-2 text-center">
+                                <div class="fs-4 fw-bold text-primary">{{ dept.total }}</div>
+                                <div class="small fw-semibold text-truncate" title="{{ dept.nome }}">{{ dept.nome }}</div>
+                                {% if dept.custo_mensal > 0 %}
+                                <div class="small text-muted mt-1">
+                                    Folha: <span class="text-dark fw-semibold">R$ {{ '{:,.0f}'.format(dept.custo_mensal).replace(',', '.') }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
                     <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -797,15 +816,17 @@ function aplicarFiltrosDashboard() {
 
 // Gráficos
 document.addEventListener('DOMContentLoaded', function() {
-    // Gráfico de funcionários por departamento usando ChartConfigs
-    const ctxFuncionarios = document.getElementById('funcionariosDeptChart').getContext('2d');
+    // Gráfico de funcionários por departamento (fallback quando não há dados para cards)
+    const ctxFuncionarios = document.getElementById('funcionariosDeptChart') ?
+        document.getElementById('funcionariosDeptChart').getContext('2d') : null;
+    if (!ctxFuncionarios) { /* seção substituída por cards de departamento */ }
     const funcionariosLabels = [{% for dept in funcionarios_dept %}'{{ dept.nome }}'{% if not loop.last %},{% endif %}{% endfor %}];
     const funcionariosData = [{% for dept in funcionarios_dept %}{{ dept.total }}{% if not loop.last %},{% endif %}{% endfor %}];
     
-    if (typeof ChartConfigs !== 'undefined') {
+    if (ctxFuncionarios && typeof ChartConfigs !== 'undefined') {
         const funcionariosConfig = ChartConfigs.funcionariosPorDepartamento(funcionariosLabels, funcionariosData);
         new Chart(ctxFuncionarios, funcionariosConfig);
-    } else {
+    } else if (ctxFuncionarios) {
         // Fallback se ChartConfigs não estiver disponível
         new Chart(ctxFuncionarios, {
             type: 'doughnut',
@@ -869,43 +890,65 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Gráfico de custos por obra
-    const ctxCustos = document.getElementById('custosObraChart').getContext('2d');
-    new Chart(ctxCustos, {
-        type: 'bar',
-        data: {
-            labels: [{% for custo in custos_recentes %}'{{ custo.nome }}'{% if not loop.last %},{% endif %}{% endfor %}],
-            datasets: [{
-                label: 'Custo Total (R$)',
-                data: [{% for custo in custos_recentes %}{{ custo.total_custo }}{% if not loop.last %},{% endif %}{% endfor %}],
-                backgroundColor: 'rgba(13, 110, 253, 0.8)',
-                borderColor: 'rgba(13, 110, 253, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    display: false
-                }
+    // Gráfico de Custos por Obra — Realizado vs Orçamento (barras agrupadas)
+    const ctxCustos = document.getElementById('custosObraChart');
+    if (ctxCustos) {
+        const custosLabels = [{% for o in custos_obra %}'{{ o.nome | replace("'", "\\'") }}'{% if not loop.last %},{% endif %}{% endfor %}];
+        const custosRealizado = [{% for o in custos_obra %}{{ o.realizado }}{% if not loop.last %},{% endif %}{% endfor %}];
+        const custosOrcamento = [{% for o in custos_obra %}{{ o.orcamento }}{% if not loop.last %},{% endif %}{% endfor %}];
+        new Chart(ctxCustos.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: custosLabels,
+                datasets: [
+                    {
+                        label: 'Realizado (R$)',
+                        data: custosRealizado,
+                        backgroundColor: custosRealizado.map((v, i) =>
+                            custosOrcamento[i] > 0 && v > custosOrcamento[i]
+                                ? 'rgba(220,53,69,0.80)' : 'rgba(13,110,253,0.80)'),
+                        borderWidth: 0,
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Orçamento (R$)',
+                        data: custosOrcamento,
+                        backgroundColor: 'rgba(108,117,125,0.35)',
+                        borderColor: 'rgba(108,117,125,0.70)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }
+                ]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ctx.dataset.label + ': R$ ' +
+                                    ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { maxRotation: 30, minRotation: 0 } },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: v => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 0})
                         }
                     }
                 }
             }
-        }
-    });
+        });
+    }
     
     // Gráfico de Status de Propostas (com valores dinâmicos)
-    const ctxPropostasStatus = document.getElementById('propostasStatusChart').getContext('2d');
-    new Chart(ctxPropostasStatus, {
+    const ctxPropostasStatus = document.getElementById('propostasStatusChart');
+    if (ctxPropostasStatus) new Chart(ctxPropostasStatus.getContext('2d'), {
         type: 'doughnut',
         data: {
             labels: ['Aprovadas', 'Enviadas', 'Rascunho', 'Rejeitadas', 'Expiradas'],
@@ -952,8 +995,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Gráfico de Evolução de Propostas
-    const ctxEvolucaoPropostas = document.getElementById('evolucaoPropostasChart').getContext('2d');
-    new Chart(ctxEvolucaoPropostas, {
+    const ctxEvolucaoPropostas = document.getElementById('evolucaoPropostasChart');
+    if (ctxEvolucaoPropostas) new Chart(ctxEvolucaoPropostas.getContext('2d'), {
         type: 'line',
         data: {
             labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],

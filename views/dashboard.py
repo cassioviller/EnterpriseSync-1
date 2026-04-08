@@ -289,7 +289,7 @@ def dashboard():
         logger.info(f"[OK] PERÍODO DASHBOARD: {data_inicio} → {data_fim}")
         
         # Estatísticas básicas
-            logger.debug("DEBUG: Buscando funcionários...")
+        logger.debug("DEBUG: Buscando funcionários...")
         total_funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).count()
         logger.debug(f"DEBUG: {total_funcionarios} funcionários encontrados")
         
@@ -939,22 +939,14 @@ def dashboard():
         default_value=0
     )
     
-    # [OK] CORREÇÃO 5: Converter dicionários para listas com proteção
-    if isinstance(funcionarios_por_departamento, dict) and funcionarios_por_departamento:
-        funcionarios_dept = [{'nome': k, 'total': v} for k, v in funcionarios_por_departamento.items()]
-    else:
-        funcionarios_dept = []
-        logger.warning("[WARN] funcionarios_por_departamento vazio ou inválido")
-    
-    if isinstance(custos_por_obra, dict) and custos_por_obra:
-        custos_recentes = [{'nome': k, 'total_custo': v} for k, v in custos_por_obra.items()]
-    else:
-        custos_recentes = []
-        logger.warning("[WARN] custos_por_obra vazio ou inválido")
-    
-    # Debug final
-        logger.debug(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")
-        logger.debug(f"DEBUG FINAL - Custos por obra: {custos_recentes}")
+    # Normalizar retornos (novos helpers já retornam listas)
+    funcionarios_dept = funcionarios_por_departamento if isinstance(funcionarios_por_departamento, list) else []
+    custos_obra = custos_por_obra if isinstance(custos_por_obra, list) else []
+    # Compatibilidade com código legado que ainda referencie custos_recentes
+    custos_recentes = custos_obra
+
+    logger.debug(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")
+    logger.debug(f"DEBUG FINAL - Custos por obra: {custos_obra}")
     
     # Buscar obras em andamento para a tabela com tratamento de erro
     obras_andamento = safe_db_operation(
@@ -987,6 +979,7 @@ def dashboard():
                          funcionarios_por_departamento=funcionarios_por_departamento,
                          custos_por_obra=custos_por_obra,
                          funcionarios_dept=funcionarios_dept,
+                         custos_obra=custos_obra,
                          custos_recentes=custos_recentes,
                          obras_andamento=obras_andamento,
                          data_inicio=data_inicio,
