@@ -59,59 +59,120 @@
                     <i class="fas fa-info-circle"></i> Dados Cadastrais
                 </h5>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <table class="table table-borderless">
-                            <tr>
-                                <td class="fw-bold">CPF:</td>
-                                <td>{{ funcionario.cpf }}</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">RG:</td>
-                                <td>{{ funcionario.rg or '-' }}</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">Data de Nascimento:</td>
-                                <td>{{ funcionario.data_nascimento.strftime('%d/%m/%Y') if funcionario.data_nascimento else '-' }}</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">Telefone:</td>
-                                <td>{{ funcionario.telefone or '-' }}</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">Email:</td>
-                                <td>{{ funcionario.email or '-' }}</td>
-                            </tr>
-                        </table>
+            <div class="card-body p-0">
+                <!-- Linha 1: Identificação -->
+                <div class="border-bottom px-3 pt-3 pb-2">
+                    <small class="text-muted text-uppercase fw-bold" style="font-size:0.7rem; letter-spacing:0.05em;">Identificação</small>
+                    <div class="row mt-2">
+                        <div class="col-md-3">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Código</span><br>
+                                <strong class="text-dark">{{ funcionario.codigo or '-' }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">CPF</span><br>
+                                <strong class="text-dark">{{ funcionario.cpf }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">RG</span><br>
+                                <strong class="text-dark">{{ funcionario.rg or '-' }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Data de Nascimento</span><br>
+                                <strong class="text-dark">{{ funcionario.data_nascimento.strftime('%d/%m/%Y') if funcionario.data_nascimento else '-' }}</strong>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <table class="table table-borderless">
-                            <tr>
-                                <td class="fw-bold">Data de Admissão:</td>
-                                <td>{{ funcionario.data_admissao.strftime('%d/%m/%Y') }}</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">Salário:</td>
-                                <td>R$ {{ '{:,.2f}'.format(funcionario.salario) }}</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">Departamento:</td>
-                                <td>{{ funcionario.departamento_ref.nome if funcionario.departamento_ref else '-' }}</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">Função:</td>
-                                <td>{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else '-' }}</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">Horário de Trabalho:</td>
-                                <td>{{ funcionario.horario_trabalho.nome if funcionario.horario_trabalho else '-' }}</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">Endereço:</td>
-                                <td>{{ funcionario.endereco or '-' }}</td>
-                            </tr>
-                        </table>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Telefone</span><br>
+                                <strong class="text-dark">{{ funcionario.telefone or '-' }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">E-mail</span><br>
+                                <strong class="text-dark">{{ funcionario.email or '-' }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Linha 2: Dados Contratuais -->
+                <div class="border-bottom px-3 pt-3 pb-2">
+                    <small class="text-muted text-uppercase fw-bold" style="font-size:0.7rem; letter-spacing:0.05em;">Dados Contratuais</small>
+                    <div class="row mt-2">
+                        <div class="col-md-3">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Admissão</span><br>
+                                <strong class="text-dark">{{ funcionario.data_admissao.strftime('%d/%m/%Y') }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Tipo de Remuneração</span><br>
+                                {% if funcionario.tipo_remuneracao == 'diaria' %}
+                                    <span class="badge bg-info text-dark">Diária</span>
+                                {% else %}
+                                    <span class="badge bg-success">Salário CLT</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-2">
+                                {% if funcionario.tipo_remuneracao == 'diaria' %}
+                                    <span class="text-muted" style="font-size:0.78rem;">Valor Diária</span><br>
+                                    <strong class="text-dark">R$ {{ '{:,.2f}'.format(funcionario.valor_diaria or 0) }}</strong>
+                                {% else %}
+                                    <span class="text-muted" style="font-size:0.78rem;">Salário</span><br>
+                                    <strong class="text-dark">R$ {{ '{:,.2f}'.format(funcionario.salario or 0) }}</strong>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Jornada Semanal</span><br>
+                                <strong class="text-dark">{{ funcionario.jornada_semanal or 44 }}h/semana</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Departamento</span><br>
+                                <strong class="text-dark">{{ funcionario.departamento_ref.nome if funcionario.departamento_ref else '-' }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Função</span><br>
+                                <strong class="text-dark">{{ funcionario.funcao_ref.nome if funcionario.funcao_ref else '-' }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Horário de Trabalho</span><br>
+                                <strong class="text-dark">{{ funcionario.horario_trabalho.nome if funcionario.horario_trabalho else '-' }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Linha 3: Localização -->
+                <div class="px-3 pt-3 pb-3">
+                    <small class="text-muted text-uppercase fw-bold" style="font-size:0.7rem; letter-spacing:0.05em;">Localização</small>
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <div class="mb-1">
+                                <span class="text-muted" style="font-size:0.78rem;">Endereço</span><br>
+                                <strong class="text-dark">{{ funcionario.endereco or '-' }}</strong>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1306,9 +1367,35 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
+                                <label for="jornada_semanal" class="form-label">Jornada Semanal (horas)</label>
+                                <input type="number" class="form-control" id="jornada_semanal" name="jornada_semanal" min="1" max="60"
+                                       value="{{ funcionario.jornada_semanal or 44 }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="tipo_remuneracao" class="form-label">Tipo de Remuneração</label>
+                                <select class="form-select" id="tipo_remuneracao" name="tipo_remuneracao" onchange="toggleRemuneracao(this.value)">
+                                    <option value="salario" {{ 'selected' if funcionario.tipo_remuneracao == 'salario' else '' }}>Salário CLT</option>
+                                    <option value="diaria" {{ 'selected' if funcionario.tipo_remuneracao == 'diaria' else '' }}>Diária</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4" id="campo_salario">
+                            <div class="mb-3">
                                 <label for="salario" class="form-label">Salário</label>
                                 <input type="number" class="form-control" id="salario" name="salario" step="0.01" min="0" 
-                                       value="{{ funcionario.salario }}">
+                                       value="{{ funcionario.salario or 0 }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4" id="campo_diaria">
+                            <div class="mb-3">
+                                <label for="valor_diaria" class="form-label">Valor Diária</label>
+                                <input type="number" class="form-control" id="valor_diaria" name="valor_diaria" step="0.01" min="0" 
+                                       value="{{ funcionario.valor_diaria or 0 }}">
                             </div>
                         </div>
                     </div>
@@ -2823,7 +2910,25 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('outroCustoForm').reset();
         });
     }
+    // Inicializar exibição dos campos de remuneração
+    const tipoRemuneracao = document.getElementById('tipo_remuneracao');
+    if (tipoRemuneracao) {
+        toggleRemuneracao(tipoRemuneracao.value);
+    }
 });
+
+function toggleRemuneracao(tipo) {
+    const campoSalario = document.getElementById('campo_salario');
+    const campoDiaria = document.getElementById('campo_diaria');
+    if (!campoSalario || !campoDiaria) return;
+    if (tipo === 'diaria') {
+        campoSalario.style.display = 'none';
+        campoDiaria.style.display = '';
+    } else {
+        campoSalario.style.display = '';
+        campoDiaria.style.display = 'none';
+    }
+}
 </script>
 
 <!-- Modal Outros Custos -->

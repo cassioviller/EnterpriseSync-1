@@ -568,11 +568,15 @@ def editar_funcionario(funcionario_id):
         if request.form.get('salario'):
             funcionario.salario = float(request.form['salario'])
 
+        # Jornada semanal
+        if request.form.get('jornada_semanal'):
+            funcionario.jornada_semanal = int(request.form['jornada_semanal'])
+
         # Campos V2: remuneração por diária
         if request.form.get('tipo_remuneracao') in ('salario', 'diaria'):
             funcionario.tipo_remuneracao = request.form['tipo_remuneracao']
-        if request.form.get('valor_diaria'):
-            funcionario.valor_diaria = float(request.form['valor_diaria'])
+        if request.form.get('valor_diaria') is not None:
+            funcionario.valor_diaria = float(request.form.get('valor_diaria') or 0)
         
         # Atualizar IDs de relacionamentos
         funcionario.departamento_id = int(request.form['departamento_id']) if request.form.get('departamento_id') and request.form['departamento_id'] != '0' else None
