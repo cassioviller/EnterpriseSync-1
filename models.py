@@ -814,10 +814,12 @@ class RDOMaoObra(db.Model):
     horas_trabalhadas = db.Column(db.Float, nullable=False)
     horas_extras = db.Column(db.Float, nullable=True, default=0.0)
     subatividade_id = db.Column(db.Integer, db.ForeignKey('rdo_servico_subatividade.id', ondelete='CASCADE'), nullable=True)
-    
+    tarefa_cronograma_id = db.Column(db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'), nullable=True)
+
     # Relacionamentos
     funcionario = db.relationship('Funcionario', backref='rdos_mao_obra', overlaps="rdos_mao_obra")
     subatividade = db.relationship('RDOServicoSubatividade', backref='mao_obra_registros', foreign_keys=[subatividade_id])
+    tarefa_cronograma = db.relationship('TarefaCronograma', backref='mao_obra_registros', foreign_keys=[tarefa_cronograma_id])
     
     # Compatibilidade com código legado
     @property

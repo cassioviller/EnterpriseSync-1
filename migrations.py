@@ -3790,6 +3790,7 @@ def executar_migracoes():
             (88, "TarefaCronograma - campo responsavel (empresa/terceiros)", migration_88_tarefa_cronograma_responsavel),
             (89, "RDO - criado_por_id nullable (FK usuario)", migration_89_rdo_criado_por_nullable),
             (90, "RDOMaoObra - subatividade_id (FK cascade) + horas_extras", migration_90_rdo_mao_obra_subatividade),
+            (91, "RDOMaoObra - tarefa_cronograma_id (FK SET NULL) para métricas por tarefa", migration_91_rdo_mao_obra_tarefa_cronograma),
         ]
         
         # Executar cada migração com rastreamento
@@ -7608,6 +7609,48 @@ def migration_89_rdo_criado_por_nullable():
 
     except Exception as e:
         logger.error(f"Erro na migracao 89: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_91_rdo_mao_obra_tarefa_cronograma():
+    """
+    Migração 91: rdo_mao_obra — adicionar tarefa_cronograma_id (FK SET NULL).
+    Permite rastrear em qual tarefa do cronograma cada funcionário trabalhou,
+    habilitando métricas de produtividade por pessoa × tarefa.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'rdo_mao_obra' AND column_name = 'tarefa_cronograma_id'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando coluna tarefa_cronograma_id em rdo_mao_obra...")
+            cursor.execute("""
+                ALTER TABLE rdo_mao_obra
+                ADD COLUMN tarefa_cronograma_id INTEGER
+                REFERENCES tarefa_cronograma(id) ON DELETE SET NULL
+            """)
+            logger.info("  Coluna tarefa_cronograma_id adicionada com FK SET NULL.")
+        else:
+            logger.info("  Coluna tarefa_cronograma_id já existe em rdo_mao_obra.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 91 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 91: {e}")
         if connection:
             try:
                 connection.rollback()
