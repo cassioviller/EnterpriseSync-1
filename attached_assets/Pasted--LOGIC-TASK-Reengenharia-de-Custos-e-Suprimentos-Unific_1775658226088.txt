@@ -1,0 +1,29 @@
+# LOGIC TASK: Reengenharia de Custos e Suprimentos - Unificação Almoxarifado, Compras e Financeiro
+
+Atue como um Arquiteto de Sistemas Sênior, com expertise em otimização de processos de negócio para o setor de construção. Sua missão é eliminar a duplicação de informações e a redundância de módulos, unificando a gestão de suprimentos e a apropriação de custos no EnterpriseSync V2. O objetivo é fornecer ao gestor uma visão única e precisa do custo de material na obra, no momento da sua aquisição/entrada, e não do seu consumo ou pagamento.
+
+### 1. PRINCÍPIO CENTRAL: CUSTO POR AQUISIÇÃO/ENTRADA NA OBRA
+
+**Conceito:** O custo de material para uma obra é reconhecido e apropriado ao orçamento no momento em que o material é adquirido e destinado àquela obra, ou quando é transferido para o almoxarifado da obra. A saída do material do almoxarifado da obra para consumo não gera novo custo financeiro, apenas controle de estoque físico.
+
+### 2. FLUXO ÚNICO DE SUPRIMENTOS: PEDIDO DE COMPRA COMO GATILHO MESTRE
+
+**Objetivo:** Consolidar as funcionalidades de Compras e Almoxarifado em um fluxo integrado, onde o `PedidoCompra` (ou a Nota Fiscal de Entrada) é o único ponto de entrada para materiais e o gatilho para a apropriação de custos.
+
+**2.1. Módulo de Compras (`PedidoCompra` - `models.py` linha 4030):**
+*   **Nova Responsabilidade:** O `PedidoCompra` deixa de ser apenas um registro de transação e se torna o **módulo central de entrada de materiais e apropriação de custos**.
+*   **Fluxo de Entrada de Material:** Ao registrar um `PedidoCompra` (ou uma Nota Fiscal de Entrada associada a ele), o sistema deve:
+    1.  **Apropriação Financeira:** Gerar automaticamente um registro na `GestaoCustoPai` (V2) para cada item do pedido, com `tipo_categoria=\'COMPRA\'` e vinculado ao `obra_id` do pedido. O status inicial deve ser `SOLICITADO` ou `AUTORIZADO` (dependendo da política de aprovação de compras).
+    2.  **Controle de Estoque:** Para cada `PedidoCompraItem` que seja um `AlmoxarifadoItem` (ou seja, um item de estoque), o sistema deve gerar automaticamente um `AlmoxarifadoMovimento` do tipo `ENTRADA` e atualizar o `AlmoxarifadoEstoque` da `Obra` correspondente.
+*   **Campos Críticos:**
+    *   `PedidoCompra.obra_id`: Torna-se um campo crucial. Se preenchido, o custo é apropriado diretamente à obra. Se nulo, o material vai para o estoque central.
+    *   `GestaoCustoPai.origem_tabela` e `GestaoCustoPai.origem_id`: Devem ser preenchidos com `\'pedido_compra\'` e `PedidoCompra.id` para rastreabilidade.
+
+**2.2. Módulo de Almoxarifado (`AlmoxarifadoMovimento` - `models.py` linha 3881):**
+*   **Nova Responsabilidade:** O Almoxarifado passa a ser primariamente um **gerenciador de inventário físico**, não um gerador de custos financeiros para materiais.
+*   **Fluxo de Saída de Material (Consumo):** Quando um material é retirado do `AlmoxarifadoEstoque` de uma obra (seja via RDO, requisição interna, etc.), o sistema deve:
+    1.  Gerar um `AlmoxarifadoMovimento` do tipo `SAIDA`.
+    2.  **NÃO GERAR NENHUM NOVO LANÇAMENTO DE CUSTO FINANCEIRO.** O custo já foi apropriado na entrada via `PedidoCompra`.
+*   **Fluxo de Transferência:** Quando um material é transferido do Almoxarifado Central para o Almoxarifado de Obra:
+    1.  Gerar um `AlmoxarifadoMovimento` de `SAIDA` no estoque de origem e `ENTRADA` no estoque de destino.
+    2.  **Gerar um lançamento de custo** na `GestaoCustoPai` para a obra de destino, com `tipo_categoria=\'TRANSFERENCIA\'` e vinculando ao movimento de transferência para rastreabilidade.

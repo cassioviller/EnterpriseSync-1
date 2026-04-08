@@ -1,0 +1,60 @@
+# LOGIC TASK: Reengenharia de Custos e Suprimentos - Unificação Almoxarifado, Compras e Financeiro
+
+Atue como um Arquiteto de Sistemas Sênior, com expertise em otimização de processos de negócio para o setor de construção. Sua missão é eliminar a duplicação de informações e a redundância de módulos, unificando a gestão de suprimentos e a apropriação de custos no EnterpriseSync V2. O objetivo é fornecer ao gestor uma visão única e precisa do custo de material na obra, no momento da sua aquisição/entrada, e não do seu consumo ou pagamento.
+
+### 1. PRINCÍPIO CENTRAL: CUSTO POR AQUISIÇÃO/ENTRADA NA OBRA
+
+**Conceito:** O custo de material para uma obra é reconhecido e apropriado ao orçamento no momento em que o material é adquirido e destinado àquela obra, ou quando é transferido para o almoxarifado da obra. A saída do material do almoxarifado da obra para consumo não gera novo custo financeiro, apenas controle de estoque físico.
+
+### 2. FLUXO ÚNICO DE SUPRIMENTOS: PEDIDO DE COMPRA COMO GATILHO MESTRE
+
+**Objetivo:** Consolidar as funcionalidades de Compras e Almoxarifado em um fluxo integrado, onde o `PedidoCompra` (ou a Nota Fiscal de Entrada) é o único ponto de entrada para materiais e o gatilho para a apropriação de custos.
+
+**2.1. Módulo de Compras (`PedidoCompra` - `models.py` linha 4030):**
+*   **Nova Responsabilidade:** O `PedidoCompra` deixa de ser apenas um registro de transação e se torna o **módulo central de entrada de materiais e apropriação de custos**.
+*   **Fluxo de Entrada de Material:** Ao registrar um `PedidoCompra` (ou uma Nota Fiscal de Entrada associada a ele), o sistema deve:
+    1.  **Apropriação Financeira:** Gerar automaticamente um registro na `GestaoCustoPai` (V2) para cada item do pedido, com `tipo_categoria=\'COMPRA\'` e vinculado ao `obra_id` do pedido. O status inicial deve ser `SOLICITADO` ou `AUTORIZADO` (dependendo da política de aprovação de compras).
+    2.  **Controle de Estoque:** Para cada `PedidoCompraItem` que seja um `AlmoxarifadoItem` (ou seja, um item de estoque), o sistema deve gerar automaticamente um `AlmoxarifadoMovimento` do tipo `ENTRADA` e atualizar o `AlmoxarifadoEstoque` da `Obra` correspondente.
+*   **Campos Críticos:**
+    *   `PedidoCompra.obra_id`: Torna-se um campo crucial. Se preenchido, o custo é apropriado diretamente à obra. Se nulo, o material vai para o estoque central.
+    *   `GestaoCustoPai.origem_tabela` e `GestaoCustoPai.origem_id`: Devem ser preenchidos com `\'pedido_compra\'` e `PedidoCompra.id` para rastreabilidade.
+
+**2.2. Módulo de Almoxarifado (`AlmoxarifadoMovimento` - `models.py` linha 3881):**
+*   **Nova Responsabilidade:** O Almoxarifado passa a ser primariamente um **gerenciador de inventário físico**, não um gerador de custos financeiros para materiais.
+*   **Fluxo de Saída de Material (Consumo):** Quando um material é retirado do `AlmoxarifadoEstoque` de uma obra (seja via RDO, requisição interna, etc.), o sistema deve:
+    1.  Gerar um `AlmoxarifadoMovimento` do tipo `SAIDA`.
+    2.  **NÃO GERAR NENHUM NOVO LANÇAMENTO DE CUSTO FINANCEIRO.** O custo já foi apropriado na entrada via `PedidoCompra`.
+*   **Fluxo de Transferência:** Quando um material é transferido do Almoxarifado Central para o Almoxarifado de Obra:
+    1.  Gerar um `AlmoxarifadoMovimento` de `SAIDA` no estoque de origem e `ENTRADA` no estoque de destino.
+    2.  **Gerar um lançamento de custo** na `GestaoCustoPai` para a obra de destino, com `tipo_categoria=\'TRANSFERENCIA\'` e vinculando ao movimento de transferência para rastreabilidade.
+
+### 3. REDEFINIÇÃO DO PAPEL DO RDO V2
+
+**Objetivo:** O RDO V2 deve focar na medição da produção e no controle do consumo físico de materiais e mão de obra, sem duplicar lançamentos financeiros.
+
+**3.1. Mão de Obra (Conforme prompt anterior):**
+*   **Apropriação por Atividade:** `RDOMaoObra` vinculada a `RDOServicoSubatividade`.
+*   **Lançamento Automático:** Ao finalizar o RDO, o sistema gera automaticamente os custos de diária na `GestaoCustoPai` (`tipo_categoria=\'SALARIO\'`).
+
+**3.2. Materiais:**
+*   **Controle de Consumo:** Quando materiais são registrados como utilizados no RDO, o sistema deve apenas efetuar a baixa física do `AlmoxarifadoEstoque` da obra.
+*   **NÃO GERAR CUSTO FINANCEIRO:** O custo já foi apropriado na entrada via `PedidoCompra`.
+
+### 4. IMPACTO NO DASHBOARD SIGE (FINANCEIRO E CUSTOS)
+
+**Objetivo:** O Dashboard deve refletir o **Custo Comprometido/Realizado** por competência, não por desembolso.
+
+*   **Custo por Obra:** A barra de "Custo Realizado" deve somar:
+    *   Todos os registros na `GestaoCustoPai` (V2) vinculados à obra, com status `SOLICITADO`, `AUTORIZADO` e `PAGO` (incluindo compras de material, salários do RDO, etc.).
+    *   (Opcional, para legado) `ContaPagar` (V1) vinculadas à obra que não tenham correspondência na `GestaoCustoPai`.
+*   **Remoção de Redundâncias:** O widget "Custos Recentes" deve ser removido, pois a nova lógica de apropriação por obra e departamento fornecerá uma visão mais estratégica.
+
+### 5. REGRAS DE CONSISTÊNCIA, SEGURANÇA E PERFORMANCE
+
+*   **Multi-tenancy:** O `admin_id` é o filtro universal para todas as operações e consultas.
+*   **Rastreabilidade Total:** Todos os lançamentos na `GestaoCustoPai` devem ter `origem_tabela` e `origem_id` preenchidos, apontando para o registro original (`PedidoCompra`, `RDOMaoObra`, `AlmoxarifadoMovimento` de transferência, etc.).
+*   **Prevenção de Duplicidade:** Implemente validações robustas para garantir que um mesmo evento (ex: uma linha de `PedidoCompraItem`) não gere múltiplos lançamentos de custo financeiro.
+*   **Performance:** Otimize as queries de agregação para o Dashboard, utilizando índices e funções de soma do banco de dados.
+*   **Interface de Usuário:** Os formulários de `PedidoCompra` e `AlmoxarifadoMovimento` devem ser intuitivos, com campos claros para `obra_id` e tipo de movimento, guiando o usuário para o fluxo correto.
+
+**ESTA REENGENHARIA GARANTE QUE O GESTOR TENHA UMA VISÃO UNIFICADA, PRECISA E EM TEMPO REAL DOS CUSTOS DA OBRA, ELIMINANDO A CONFUSÃO E A DUPLICAÇÃO DE DADOS.**
