@@ -492,30 +492,82 @@ function editarRegistro(id) {
     });
 }
 
-function excluirRegistro(id) {
-    if (confirm('Tem certeza que deseja excluir este registro?')) {
-        $.ajax({
-            url: `/ponto/excluir/${id}`,
-            type: 'POST',
-            dataType: 'json',
-            success: function(data) {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Erro ao excluir registro: ' + (data.message || ''));
-                }
-            },
-            error: function(xhr) {
-                var contentType = xhr.getResponseHeader('content-type');
-                if (contentType && contentType.indexOf('text/html') !== -1) {
-                    alert('Sessão expirada. Por favor, recarregue a página.');
-                } else {
-                    alert('Erro ao excluir registro');
-                }
+var _pontoIdParaExcluir = null;
+
+function _executarExclusaoPonto(id, cascade) {
+    $.ajax({
+        url: `/ponto/excluir/${id}`,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ cascade: cascade }),
+        dataType: 'json',
+        success: function(data) {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao excluir registro: ' + (data.message || ''));
             }
-        });
-    }
+        },
+        error: function(xhr) {
+            var ct = xhr.getResponseHeader('content-type') || '';
+            alert(ct.indexOf('text/html') !== -1 ? 'Sessão expirada. Por favor, recarregue a página.' : 'Erro ao excluir registro');
+        }
+    });
 }
+
+function excluirRegistro(id) {
+    _pontoIdParaExcluir = id;
+    $.get(`/ponto/excluir-preview/${id}`, function(preview) {
+        if (!preview.success) {
+            if (confirm('Tem certeza que deseja excluir este registro de ponto?')) {
+                _executarExclusaoPonto(id, false);
+            }
+            return;
+        }
+        if (!preview.tem_vinculo) {
+            if (confirm('Tem certeza que deseja excluir este registro de ponto?')) {
+                _executarExclusaoPonto(id, false);
+            }
+            return;
+        }
+        // Montar detalhes dos vínculos
+        var linhas = '';
+        if (preview.gestao_custos && preview.gestao_custos.length) {
+            linhas += '<p class="mb-1 fw-semibold text-muted small">Gestão de Custos</p><ul class="list-unstyled mb-2">';
+            preview.gestao_custos.forEach(function(g) {
+                var aviso = g.pai_sera_excluido ? ' <span class="badge bg-warning text-dark">grupo será excluído</span>' : '';
+                linhas += `<li class="small">• ${g.descricao} — <strong>R$ ${g.valor.toFixed(2).replace('.', ',')}</strong>${aviso}</li>`;
+            });
+            linhas += '</ul>';
+        }
+        if (preview.fluxo_caixa && preview.fluxo_caixa.length) {
+            linhas += '<p class="mb-1 fw-semibold text-muted small">Fluxo de Caixa</p><ul class="list-unstyled mb-2">';
+            preview.fluxo_caixa.forEach(function(f) {
+                linhas += `<li class="small">• ${f.descricao} (${f.data}) — <strong>R$ ${f.valor.toFixed(2).replace('.', ',')}</strong></li>`;
+            });
+            linhas += '</ul>';
+        }
+        $('#modalExclusaoPontoDetalhes').html(linhas);
+        $('#modalExclusaoPonto').modal('show');
+    }).fail(function() {
+        // Se preview falhar, confirma simples
+        if (confirm('Tem certeza que deseja excluir este registro de ponto?')) {
+            _executarExclusaoPonto(id, false);
+        }
+    });
+}
+
+// Botão: excluir de TODOS os módulos
+$('#btnExcluirTodos').on('click', function() {
+    $('#modalExclusaoPonto').modal('hide');
+    if (_pontoIdParaExcluir) _executarExclusaoPonto(_pontoIdParaExcluir, true);
+});
+
+// Botão: excluir SÓ do ponto
+$('#btnExcluirSoPonto').on('click', function() {
+    $('#modalExclusaoPonto').modal('hide');
+    if (_pontoIdParaExcluir) _executarExclusaoPonto(_pontoIdParaExcluir, false);
+});
 
 // Envio do formulário via AJAX
 $('#pontoForm').submit(function(e) {
@@ -692,5 +744,33 @@ $('#exclusaoLoteModal').on('hidden.bs.modal', function() {
     $('#btn_confirmar_exclusao').prop('disabled', true);
 });
 </script>
+
+<!-- Modal: Confirmação exclusão em cascata do ponto -->
+<div class="modal fade" id="modalExclusaoPonto" tabindex="-1" aria-labelledby="modalExclusaoPontoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="modalExclusaoPontoLabel">
+          <i class="fas fa-exclamation-triangle me-2"></i>Excluir Registro de Ponto
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Este registro possui lançamentos vinculados em outros módulos:</p>
+        <div id="modalExclusaoPontoDetalhes" class="border rounded p-3 bg-light mb-3"></div>
+        <p class="mb-0 text-muted small">Escolha como deseja prosseguir:</p>
+      </div>
+      <div class="modal-footer flex-column gap-2 align-items-stretch">
+        <button id="btnExcluirTodos" type="button" class="btn btn-danger">
+          <i class="fas fa-trash-alt me-2"></i>Excluir de todos os módulos
+        </button>
+        <button id="btnExcluirSoPonto" type="button" class="btn btn-outline-secondary">
+          <i class="fas fa-times me-2"></i>Excluir só do Ponto
+        </button>
+        <button type="button" class="btn btn-link text-muted" data-bs-dismiss="modal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

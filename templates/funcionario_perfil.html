@@ -2192,37 +2192,76 @@ function mostrarSucesso(mensagem) {
     }
 }
 
-function excluirPonto(id) {
-    if (confirm('Tem certeza que deseja excluir este registro de ponto?\\n\\nEsta ação não pode ser desfeita.')) {
-        fetch(`/ponto/excluir/${id}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(response => {
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                throw new Error('Sessão expirada. Por favor, recarregue a página.');
-            }
-            if (!response.ok) throw new Error('Erro na requisição');
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                alert('Registro excluído com sucesso!');
-                location.reload();
-            } else {
-                throw new Error(data.message || 'Erro desconhecido');
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao excluir:', error);
-            alert('Erro ao excluir registro: ' + error.message);
-        });
-    }
+var _pontoIdParaExcluirPerfil = null;
+
+function _doExcluirPonto(id, cascade) {
+    fetch(`/ponto/excluir/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ cascade: cascade })
+    })
+    .then(r => {
+        const ct = r.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) throw new Error('Sessão expirada. Por favor, recarregue a página.');
+        if (!r.ok) throw new Error('Erro na requisição');
+        return r.json();
+    })
+    .then(data => {
+        if (data.success) { location.reload(); }
+        else { throw new Error(data.message || 'Erro desconhecido'); }
+    })
+    .catch(err => alert('Erro ao excluir registro: ' + err.message));
 }
+
+function excluirPonto(id) {
+    _pontoIdParaExcluirPerfil = id;
+    fetch(`/ponto/excluir-preview/${id}`)
+        .then(r => r.json())
+        .then(preview => {
+            if (!preview.success || !preview.tem_vinculo) {
+                if (confirm('Tem certeza que deseja excluir este registro de ponto?\n\nEsta ação não pode ser desfeita.')) {
+                    _doExcluirPonto(id, false);
+                }
+                return;
+            }
+            var linhas = '';
+            if (preview.gestao_custos && preview.gestao_custos.length) {
+                linhas += '<p class="mb-1 fw-semibold text-muted small">Gestão de Custos</p><ul class="list-unstyled mb-2">';
+                preview.gestao_custos.forEach(g => {
+                    var aviso = g.pai_sera_excluido ? ' <span class="badge bg-warning text-dark">grupo será excluído</span>' : '';
+                    linhas += `<li class="small">• ${g.descricao} — <strong>R$ ${g.valor.toFixed(2).replace('.', ',')}</strong>${aviso}</li>`;
+                });
+                linhas += '</ul>';
+            }
+            if (preview.fluxo_caixa && preview.fluxo_caixa.length) {
+                linhas += '<p class="mb-1 fw-semibold text-muted small">Fluxo de Caixa</p><ul class="list-unstyled mb-2">';
+                preview.fluxo_caixa.forEach(f => {
+                    linhas += `<li class="small">• ${f.descricao} (${f.data}) — <strong>R$ ${f.valor.toFixed(2).replace('.', ',')}</strong></li>`;
+                });
+                linhas += '</ul>';
+            }
+            document.getElementById('modalExclusaoPontoPerfilDetalhes').innerHTML = linhas;
+            new bootstrap.Modal(document.getElementById('modalExclusaoPontoPerfil')).show();
+        })
+        .catch(() => {
+            if (confirm('Tem certeza que deseja excluir este registro de ponto?')) {
+                _doExcluirPonto(id, false);
+            }
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var btnTodos = document.getElementById('btnPontoPerfilExcluirTodos');
+    var btnSo   = document.getElementById('btnPontoPerfilExcluirSo');
+    if (btnTodos) btnTodos.addEventListener('click', function() {
+        bootstrap.Modal.getInstance(document.getElementById('modalExclusaoPontoPerfil')).hide();
+        if (_pontoIdParaExcluirPerfil) _doExcluirPonto(_pontoIdParaExcluirPerfil, true);
+    });
+    if (btnSo) btnSo.addEventListener('click', function() {
+        bootstrap.Modal.getInstance(document.getElementById('modalExclusaoPontoPerfil')).hide();
+        if (_pontoIdParaExcluirPerfil) _doExcluirPonto(_pontoIdParaExcluirPerfil, false);
+    });
+});
 
 function editarOcorrencia(id) {
     alert('Funcionalidade de edição de ocorrência será implementada');
@@ -2863,6 +2902,34 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
     </div>
+</div>
+
+<!-- Modal: Confirmação exclusão em cascata do ponto (perfil funcionário) -->
+<div class="modal fade" id="modalExclusaoPontoPerfil" tabindex="-1" aria-labelledby="modalExclusaoPontoPerfilLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="modalExclusaoPontoPerfilLabel">
+          <i class="fas fa-exclamation-triangle me-2"></i>Excluir Registro de Ponto
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Este registro possui lançamentos vinculados em outros módulos:</p>
+        <div id="modalExclusaoPontoPerfilDetalhes" class="border rounded p-3 bg-light mb-3"></div>
+        <p class="mb-0 text-muted small">Escolha como deseja prosseguir:</p>
+      </div>
+      <div class="modal-footer flex-column gap-2 align-items-stretch">
+        <button id="btnPontoPerfilExcluirTodos" type="button" class="btn btn-danger">
+          <i class="fas fa-trash-alt me-2"></i>Excluir de todos os módulos
+        </button>
+        <button id="btnPontoPerfilExcluirSo" type="button" class="btn btn-outline-secondary">
+          <i class="fas fa-times me-2"></i>Excluir só do Ponto
+        </button>
+        <button type="button" class="btn btn-link text-muted" data-bs-dismiss="modal">Cancelar</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 {% endblock %}

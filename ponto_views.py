@@ -836,27 +836,139 @@ def excluir_registro_ponto(registro_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@ponto_bp.route('/excluir-preview/<int:registro_id>', methods=['GET'])
+@login_required
+def excluir_ponto_preview(registro_id):
+    """Retorna quais lançamentos em outros módulos serão afetados ao excluir este ponto."""
+    try:
+        admin_id = get_tenant_admin_id()
+        registro = RegistroPonto.query.filter_by(id=registro_id, admin_id=admin_id).first()
+        if not registro:
+            return jsonify({'success': False, 'message': 'Registro não encontrado'}), 404
+
+        from models import GestaoCustoFilho, GestaoCustoPai, FluxoCaixa
+
+        filhos = GestaoCustoFilho.query.filter_by(
+            origem_tabela='registro_ponto',
+            origem_id=registro_id,
+            admin_id=admin_id
+        ).all()
+
+        gestao_items = []
+        for f in filhos:
+            pai = GestaoCustoPai.query.get(f.pai_id)
+            gestao_items.append({
+                'filho_id': f.id,
+                'pai_id': f.pai_id,
+                'descricao': f.descricao,
+                'valor': float(f.valor),
+                'entidade': pai.entidade_nome if pai else '—',
+                'pai_sera_excluido': pai is not None and len(pai.itens) == 1
+            })
+
+        fluxos = FluxoCaixa.query.filter_by(
+            referencia_tabela='registro_ponto',
+            referencia_id=registro_id,
+            admin_id=admin_id
+        ).all()
+
+        fluxo_items = [
+            {
+                'id': fc.id,
+                'descricao': fc.descricao,
+                'valor': float(fc.valor),
+                'data': fc.data_movimento.strftime('%d/%m/%Y') if fc.data_movimento else ''
+            }
+            for fc in fluxos
+        ]
+
+        return jsonify({
+            'success': True,
+            'gestao_custos': gestao_items,
+            'fluxo_caixa': fluxo_items,
+            'tem_vinculo': bool(gestao_items or fluxo_items)
+        })
+
+    except Exception as e:
+        logger.error(f"Erro no preview de exclusão do ponto {registro_id}: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @ponto_bp.route('/excluir/<int:registro_id>', methods=['POST'])
 @login_required
 def excluir_registro_ponto_post(registro_id):
-    """Exclui um registro de ponto via POST (usado pelo template ponto.html)"""
+    """Exclui um registro de ponto via POST.
+    Parâmetro JSON: cascade (bool) — se True, exclui também lançamentos vinculados
+    em Gestão de Custos e Fluxo de Caixa.
+    """
     try:
         admin_id = get_tenant_admin_id()
-        
+
+        from flask import request as _req
+        payload = _req.get_json(silent=True) or {}
+        cascade = payload.get('cascade', False)
+
         registro = RegistroPonto.query.filter_by(
             id=registro_id,
             admin_id=admin_id
         ).first()
-        
+
         if not registro:
             return jsonify({'success': False, 'message': 'Registro não encontrado'}), 404
-        
+
+        modulos_excluidos = []
+
+        if cascade:
+            from models import GestaoCustoFilho, GestaoCustoPai, FluxoCaixa
+
+            # --- Gestão de Custos: filhos vinculados
+            filhos = GestaoCustoFilho.query.filter_by(
+                origem_tabela='registro_ponto',
+                origem_id=registro_id,
+                admin_id=admin_id
+            ).all()
+
+            pais_afetados = {}
+            for filho in filhos:
+                pais_afetados.setdefault(filho.pai_id, []).append(filho)
+
+            for pai_id, filhos_do_pai in pais_afetados.items():
+                pai = GestaoCustoPai.query.get(pai_id)
+                for filho in filhos_do_pai:
+                    db.session.delete(filho)
+                if pai:
+                    # Se o pai ficará vazio, exclui o pai também
+                    filhos_restantes = [f for f in pai.itens if f not in filhos_do_pai]
+                    if not filhos_restantes:
+                        db.session.delete(pai)
+                    else:
+                        novo_total = sum(float(f.valor) for f in filhos_restantes)
+                        pai.valor_total = novo_total
+
+            if filhos:
+                modulos_excluidos.append(f'Gestão de Custos ({len(filhos)} lançamento(s))')
+
+            # --- Fluxo de Caixa
+            fluxos = FluxoCaixa.query.filter_by(
+                referencia_tabela='registro_ponto',
+                referencia_id=registro_id,
+                admin_id=admin_id
+            ).all()
+            for fc in fluxos:
+                db.session.delete(fc)
+            if fluxos:
+                modulos_excluidos.append(f'Fluxo de Caixa ({len(fluxos)} registro(s))')
+
         db.session.delete(registro)
         db.session.commit()
-        
-        logger.info(f"Registro de ponto {registro_id} excluído com sucesso via POST")
-        return jsonify({'success': True, 'message': 'Registro excluído com sucesso'})
-        
+
+        msg = 'Registro excluído com sucesso'
+        if modulos_excluidos:
+            msg += '. Também excluído em: ' + ', '.join(modulos_excluidos)
+
+        logger.info(f"Ponto {registro_id} excluído (cascade={cascade}). {msg}")
+        return jsonify({'success': True, 'message': msg})
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao excluir registro de ponto {registro_id}: {e}")
