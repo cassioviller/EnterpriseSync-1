@@ -303,19 +303,21 @@ def filhos(pai_id):
     itens = GestaoCustoFilho.query.filter_by(pai_id=pai.id).order_by(
         GestaoCustoFilho.data_referencia.asc()).all()
 
-    # Resumo por obra: soma valor agrupada por obra (só quando ≥ 2 obras distintas)
+    # Resumo por obra: soma valor agrupada por obra_id (não por nome, evita colisão)
+    # Somente incluído quando há ≥ 2 obras distintas
     from collections import defaultdict as _dd
-    _totais_obra = _dd(float)
+    _totais_obra = _dd(float)   # obra_id → total
+    _nome_obra = {}              # obra_id → nome (para display)
     for f in itens:
-        obra_nome = f.obra.nome if f.obra else None
-        if obra_nome:
-            _totais_obra[obra_nome] += float(f.valor)
+        if f.obra_id and f.obra:
+            _totais_obra[f.obra_id] += float(f.valor)
+            _nome_obra[f.obra_id] = f.obra.nome
 
     obras_resumo = []
     if len(_totais_obra) >= 2:
         obras_resumo = [
-            {'obra': nome, 'total': round(total, 2)}
-            for nome, total in sorted(_totais_obra.items())
+            {'obra': _nome_obra[oid], 'total': round(total, 2)}
+            for oid, total in sorted(_totais_obra.items(), key=lambda x: _nome_obra[x[0]])
         ]
 
     return jsonify({
