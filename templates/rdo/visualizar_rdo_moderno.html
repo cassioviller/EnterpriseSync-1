@@ -953,7 +953,7 @@ console.log('Initializing RDO view with light theme...');
                             <div class="progress-bar">
                                 <div class="progress-fill" style="width: {{ subatividade.percentual_conclusao or 0 }}%"></div>
                             </div>
-                            {% if subatividade.quantidade_produzida is not none and subatividade.quantidade_produzida > 0 %}
+                            {% if subatividade.quantidade_produzida is not none %}
                             <div class="mt-2 px-1" style="font-size:.82rem">
                                 <span class="text-success fw-semibold">
                                     <i class="fas fa-ruler me-1"></i>

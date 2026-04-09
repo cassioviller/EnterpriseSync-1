@@ -679,7 +679,7 @@ function renderizarServicosParaEdicao(data) {
             
             (servico.subatividades || []).forEach((subatividade) => {
                 const valorAtual = subatividade.percentual_executado ?? subatividade.percentual ?? 0;
-                const temMeta = subatividade.meta_produtividade != null && subatividade.meta_produtividade > 0;
+                const temMeta = subatividade.subatividade_mestre_id != null;
                 const unidade = subatividade.unidade_medida || '';
                 const qtdAtual = subatividade.quantidade_produzida != null ? subatividade.quantidade_produzida : '';
 
@@ -754,7 +754,7 @@ function renderizarServicosParaEdicao(data) {
 
         subatividadesSalvas.forEach((subatividade) => {
             const valorAtual = subatividade.percentual_conclusao ?? 0;
-            const temMeta = subatividade.meta_produtividade_snapshot != null && subatividade.meta_produtividade_snapshot > 0;
+            const temMeta = subatividade.subatividade_mestre_id != null;
             const unidade = subatividade.unidade_medida_snapshot || '';
             const qtdAtual = subatividade.quantidade_produzida != null ? subatividade.quantidade_produzida : '';
 

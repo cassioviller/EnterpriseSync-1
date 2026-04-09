@@ -3123,6 +3123,7 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
                 'percentual_executado': float(sub_rdo.percentual_conclusao or 0),
                 'descricao': sub_rdo.descricao_subatividade or '',
                 'observacoes_tecnicas': sub_rdo.observacoes_tecnicas or '',
+                'subatividade_mestre_id': getattr(sub_rdo, 'subatividade_mestre_id', None),
                 'meta_produtividade': getattr(sub_rdo, 'meta_produtividade_snapshot', None),
                 'unidade_medida': getattr(sub_rdo, 'unidade_medida_snapshot', None) or '',
                 'quantidade_produzida': getattr(sub_rdo, 'quantidade_produzida', None),

@@ -1180,6 +1180,31 @@ class RDOServicoSubatividade(db.Model):
         return f'<RDOServicoSubatividade RDO:{self.rdo_id} Servico:{self.servico_id} - {self.percentual_conclusao}%>'
 
 
+from sqlalchemy import event as _sa_event
+
+@_sa_event.listens_for(RDOServicoSubatividade, 'before_insert')
+@_sa_event.listens_for(RDOServicoSubatividade, 'before_update')
+def _auto_fill_produtividade_snapshot(mapper, connection, target):
+    """Garante que os campos de snapshot são copiados do catálogo sempre que subatividade_mestre_id é definido."""
+    if target.subatividade_mestre_id is None:
+        return
+    if target.meta_produtividade_snapshot is not None and target.unidade_medida_snapshot is not None:
+        return
+    try:
+        from sqlalchemy import text
+        result = connection.execute(
+            text('SELECT meta_produtividade, unidade_medida FROM subatividade_mestre WHERE id = :id'),
+            {'id': target.subatividade_mestre_id}
+        ).fetchone()
+        if result:
+            if target.meta_produtividade_snapshot is None:
+                target.meta_produtividade_snapshot = result[0]
+            if target.unidade_medida_snapshot is None:
+                target.unidade_medida_snapshot = result[1]
+    except Exception:
+        pass
+
+
 class SubatividadeMestre(db.Model):
     """
     Modelo mestre de subatividades para cada serviço

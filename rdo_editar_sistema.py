@@ -69,6 +69,7 @@ def editar_rdo_form(rdo_id):
                 'rdo_sub_id': sub_rdo.id,
                 'nome': sub_rdo.nome_subatividade,
                 'percentual_conclusao': float(sub_rdo.percentual_conclusao or 0),
+                'subatividade_mestre_id': getattr(sub_rdo, 'subatividade_mestre_id', None),
                 'quantidade_produzida': getattr(sub_rdo, 'quantidade_produzida', None),
                 'meta_produtividade_snapshot': getattr(sub_rdo, 'meta_produtividade_snapshot', None),
                 'unidade_medida_snapshot': getattr(sub_rdo, 'unidade_medida_snapshot', '') or '',
