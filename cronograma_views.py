@@ -1001,6 +1001,10 @@ def _salvar_itens_template(tmpl: CronogramaTemplate, admin_id: int) -> None:
     Espera campos: item_nome[], item_ordem[], item_duracao_dias[],
                    item_quantidade_prevista[], item_responsavel[],
                    item_subatividade_mestre_id[]
+
+    SEGURANÇA: cada subatividade_mestre_id é validado contra admin_id para
+    garantir isolamento multi-tenant. IDs inválidos ou de outros tenants são
+    silenciosamente descartados (item criado sem vínculo de catálogo).
     """
     nomes = request.form.getlist('item_nome')
     ordens = request.form.getlist('item_ordem')
@@ -1008,6 +1012,9 @@ def _salvar_itens_template(tmpl: CronogramaTemplate, admin_id: int) -> None:
     quantidades = request.form.getlist('item_quantidade_prevista')
     responsaveis = request.form.getlist('item_responsavel')
     sub_ids = request.form.getlist('item_subatividade_mestre_id')
+
+    # Cache de SubatividadeMestre válidas para o tenant (evita N queries)
+    sub_ids_validos: dict[int, bool] = {}
 
     for i, nome in enumerate(nomes):
         nome = (nome or '').strip()
@@ -1027,9 +1034,24 @@ def _salvar_itens_template(tmpl: CronogramaTemplate, admin_id: int) -> None:
         except (ValueError, IndexError):
             qty = None
         responsavel = (responsaveis[i] if i < len(responsaveis) else 'empresa') or 'empresa'
+
+        # Validar subatividade_mestre_id pertence ao tenant
+        sub_id: int | None = None
         try:
             sub_id_raw = sub_ids[i] if i < len(sub_ids) else ''
-            sub_id = int(sub_id_raw) if sub_id_raw and sub_id_raw.strip() else None
+            raw_int = int(sub_id_raw) if sub_id_raw and sub_id_raw.strip() else None
+            if raw_int is not None:
+                if raw_int not in sub_ids_validos:
+                    existe = SubatividadeMestre.query.filter_by(
+                        id=raw_int, admin_id=admin_id
+                    ).first() is not None
+                    sub_ids_validos[raw_int] = existe
+                sub_id = raw_int if sub_ids_validos[raw_int] else None
+                if not sub_ids_validos.get(raw_int):
+                    logger.warning(
+                        f"SEGURANÇA: subatividade_mestre_id={raw_int} recusada "
+                        f"(não pertence a admin_id={admin_id})"
+                    )
         except (ValueError, IndexError):
             sub_id = None
 
@@ -1093,10 +1115,19 @@ def aplicar_template(obra_id: int):
         data_corrente = data_inicio
         for item in tmpl.itens:
             # unidade_medida e quantidade_total vêm da subatividade ou do item
+            # SEGURANÇA: verificar que a subatividade vinculada pertence ao mesmo tenant
             unidade = None
             quantidade = item.quantidade_prevista
-            if item.subatividade:
-                unidade = item.subatividade.unidade_medida
+            sub = item.subatividade
+            if sub and sub.admin_id == admin_id:
+                unidade = sub.unidade_medida
+            elif sub and sub.admin_id != admin_id:
+                # Dado de outro tenant — descartar silenciosamente
+                logger.warning(
+                    f"SEGURANÇA aplicar_template: subatividade_id={sub.id} "
+                    f"admin={sub.admin_id} != tenant={admin_id}. Ignorando vínculo."
+                )
+                sub = None
 
             tarefa = TarefaCronograma(
                 obra_id=obra_id,
