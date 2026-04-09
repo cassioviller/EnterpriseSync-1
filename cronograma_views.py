@@ -723,16 +723,19 @@ def catalogo_subatividades():
 
     admin_id = _admin_id()
     servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
-    subatividades = (
+    todos = (
         SubatividadeMestre.query
         .filter_by(admin_id=admin_id)
         .order_by(SubatividadeMestre.nome)
         .all()
     )
+    grupos = [s for s in todos if getattr(s, 'tipo', 'subatividade') == 'grupo']
+    subatividades = [s for s in todos if getattr(s, 'tipo', 'subatividade') != 'grupo']
     return render_template(
         'cronograma/catalogo.html',
         servicos=servicos,
         subatividades=subatividades,
+        grupos=grupos,
     )
 
 
@@ -745,30 +748,56 @@ def catalogo_nova_subatividade():
         return guard
 
     admin_id = _admin_id()
-    servico_id = request.form.get('servico_id', type=int)
+    tipo = (request.form.get('tipo') or 'subatividade').strip()
+    if tipo not in ('grupo', 'subatividade'):
+        tipo = 'subatividade'
     nome = (request.form.get('nome') or '').strip()
-    descricao = (request.form.get('descricao') or '').strip()
-    unidade_medida = (request.form.get('unidade_medida') or '').strip() or None
-    meta_produtividade_str = request.form.get('meta_produtividade') or ''
-    ordem_padrao = request.form.get('ordem_padrao', type=int, default=0)
-    obrigatoria = request.form.get('obrigatoria') == '1'
 
-    if not nome or not servico_id:
-        flash('Nome e serviço são obrigatórios.', 'warning')
+    if not nome:
+        flash('Nome é obrigatório.', 'warning')
         return redirect(url_for('cronograma.catalogo_subatividades'))
 
-    servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id).first()
-    if not servico:
-        flash('Serviço não encontrado.', 'error')
+    if tipo == 'grupo':
+        sub = SubatividadeMestre(
+            servico_id=None,
+            tipo='grupo',
+            nome=nome,
+            descricao=(request.form.get('descricao') or '').strip() or None,
+            obrigatoria=False,
+            admin_id=admin_id,
+        )
+        db.session.add(sub)
+        db.session.commit()
+        flash(f'Grupo "{nome}" criado com sucesso.', 'success')
+        return redirect(url_for('cronograma.catalogo_subatividades'))
+
+    # tipo == 'subatividade'
+    descricao = (request.form.get('descricao') or '').strip()
+    unidade_medida = (request.form.get('unidade_medida') or '').strip() or None
+    meta_produtividade_str = (request.form.get('meta_produtividade') or '').strip()
+    ordem_padrao = request.form.get('ordem_padrao', type=int, default=0)
+    obrigatoria = request.form.get('obrigatoria') == '1'
+    servico_id = request.form.get('servico_id', type=int)
+
+    if not unidade_medida:
+        flash('Unidade de Medida é obrigatória para subatividades.', 'warning')
+        return redirect(url_for('cronograma.catalogo_subatividades'))
+
+    if not meta_produtividade_str:
+        flash('Meta de Produtividade é obrigatória para subatividades.', 'warning')
         return redirect(url_for('cronograma.catalogo_subatividades'))
 
     try:
-        meta = float(meta_produtividade_str) if meta_produtividade_str else None
+        meta = float(meta_produtividade_str)
+        if meta <= 0:
+            raise ValueError("meta deve ser positiva")
     except ValueError:
-        meta = None
+        flash('Meta de Produtividade deve ser um número positivo.', 'warning')
+        return redirect(url_for('cronograma.catalogo_subatividades'))
 
     sub = SubatividadeMestre(
-        servico_id=servico_id,
+        servico_id=servico_id or None,
+        tipo='subatividade',
         nome=nome,
         descricao=descricao or None,
         unidade_medida=unidade_medida,
@@ -780,6 +809,34 @@ def catalogo_nova_subatividade():
     db.session.add(sub)
     db.session.commit()
     flash(f'Subatividade "{nome}" criada com sucesso.', 'success')
+    return redirect(url_for('cronograma.catalogo_subatividades'))
+
+
+@cronograma_bp.route('/catalogo/novo-grupo', methods=['POST'])
+@login_required
+def catalogo_novo_grupo():
+    """Criar novo grupo no catálogo (sem vínculo com Serviço)."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    nome = (request.form.get('nome') or '').strip()
+    if not nome:
+        flash('Nome é obrigatório.', 'warning')
+        return redirect(url_for('cronograma.catalogo_subatividades'))
+
+    grupo = SubatividadeMestre(
+        servico_id=None,
+        tipo='grupo',
+        nome=nome,
+        descricao=(request.form.get('descricao') or '').strip() or None,
+        obrigatoria=False,
+        admin_id=admin_id,
+    )
+    db.session.add(grupo)
+    db.session.commit()
+    flash(f'Grupo "{nome}" criado com sucesso.', 'success')
     return redirect(url_for('cronograma.catalogo_subatividades'))
 
 
@@ -796,13 +853,17 @@ def catalogo_editar_subatividade(sub_id: int):
 
     if request.method == 'POST':
         nome = (request.form.get('nome') or '').strip()
-        servico_id = request.form.get('servico_id', type=int)
-        if not nome or not servico_id:
-            flash('Nome e serviço são obrigatórios.', 'warning')
+        if not nome:
+            flash('Nome é obrigatório.', 'warning')
         else:
-            servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id).first()
-            if not servico:
-                flash('Serviço não encontrado.', 'error')
+            tipo_atual = getattr(sub, 'tipo', 'subatividade')
+            if tipo_atual == 'grupo':
+                sub.nome = nome
+                sub.descricao = (request.form.get('descricao') or '').strip() or None
+                sub.ativo = request.form.get('ativo') == '1'
+                db.session.commit()
+                flash(f'Grupo "{sub.nome}" atualizado.', 'success')
+                return redirect(url_for('cronograma.catalogo_subatividades'))
             else:
                 meta_str = request.form.get('meta_produtividade') or ''
                 try:
@@ -810,7 +871,9 @@ def catalogo_editar_subatividade(sub_id: int):
                 except ValueError:
                     meta = None
                 sub.nome = nome
-                sub.servico_id = servico_id
+                # Only update servico_id when the field is explicitly present in the submitted form
+                if 'servico_id' in request.form:
+                    sub.servico_id = request.form.get('servico_id', type=int) or None
                 sub.descricao = (request.form.get('descricao') or '').strip() or None
                 sub.unidade_medida = (request.form.get('unidade_medida') or '').strip() or None
                 sub.meta_produtividade = meta
@@ -845,6 +908,40 @@ def catalogo_excluir_subatividade(sub_id: int):
         logger.error(f"ERRO EXCLUIR SubatividadeMestre {sub_id}: {e}")
         flash('Erro ao excluir. Verifique se há itens vinculados.', 'error')
     return redirect(url_for('cronograma.catalogo_subatividades'))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CATÁLOGO — API JSON (painel esquerdo do template builder)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/api/catalogo')
+@login_required
+def api_catalogo():
+    """Retorna grupos e subatividades do catálogo separados (para o template builder)."""
+    guard = _check_v2()
+    if guard:
+        return jsonify({'error': 'V2 required'}), 403
+
+    admin_id = _admin_id()
+    todos = (
+        SubatividadeMestre.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(SubatividadeMestre.nome)
+        .all()
+    )
+
+    def _to_dict(s):
+        return {
+            'id': s.id,
+            'nome': s.nome,
+            'tipo': getattr(s, 'tipo', 'subatividade'),
+            'unidade_medida': s.unidade_medida or '',
+            'meta_produtividade': s.meta_produtividade,
+        }
+
+    grupos = [_to_dict(s) for s in todos if getattr(s, 'tipo', 'subatividade') == 'grupo']
+    subatividades = [_to_dict(s) for s in todos if getattr(s, 'tipo', 'subatividade') != 'grupo']
+    return jsonify({'grupos': grupos, 'subatividades': subatividades})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -893,25 +990,29 @@ def novo_template():
             admin_id=admin_id,
         )
         db.session.add(tmpl)
-        db.session.flush()  # gera o ID antes de adicionar itens
+        db.session.flush()
 
-        _salvar_itens_template(tmpl, admin_id)
+        itens_json = request.form.get('itens_json')
+        if itens_json:
+            import json as _json
+            try:
+                arvore = _json.loads(itens_json)
+                _salvar_arvore_template(tmpl, admin_id, arvore)
+            except Exception as e:
+                logger.warning(f"Erro ao parsear itens_json: {e}")
+                _salvar_itens_template(tmpl, admin_id)
+        else:
+            _salvar_itens_template(tmpl, admin_id)
 
         db.session.commit()
         flash(f'Template "{tmpl.nome}" criado com sucesso.', 'success')
         return redirect(url_for('cronograma.detalhe_template', template_id=tmpl.id))
 
-    subatividades = (
-        SubatividadeMestre.query
-        .filter_by(admin_id=admin_id, ativo=True)
-        .order_by(SubatividadeMestre.nome)
-        .all()
-    )
     return render_template(
         'cronograma/template_form.html',
         template=None,
-        subatividades=subatividades,
         itens=[],
+        itens_arvore=[],
     )
 
 
@@ -955,23 +1056,29 @@ def editar_template(template_id: int):
             db.session.delete(item)
         db.session.flush()
 
-        _salvar_itens_template(tmpl, admin_id)
+        itens_json = request.form.get('itens_json')
+        if itens_json:
+            import json as _json
+            try:
+                arvore = _json.loads(itens_json)
+                _salvar_arvore_template(tmpl, admin_id, arvore)
+            except Exception as e:
+                logger.warning(f"Erro ao parsear itens_json: {e}")
+                _salvar_itens_template(tmpl, admin_id)
+        else:
+            _salvar_itens_template(tmpl, admin_id)
 
         db.session.commit()
         flash(f'Template "{tmpl.nome}" atualizado.', 'success')
         return redirect(url_for('cronograma.detalhe_template', template_id=tmpl.id))
 
-    subatividades = (
-        SubatividadeMestre.query
-        .filter_by(admin_id=admin_id, ativo=True)
-        .order_by(SubatividadeMestre.nome)
-        .all()
-    )
+    # Montar árvore dos itens existentes para o template builder
+    itens_arvore = _construir_arvore_itens(list(tmpl.itens))
     return render_template(
         'cronograma/template_form.html',
         template=tmpl,
-        subatividades=subatividades,
         itens=list(tmpl.itens),
+        itens_arvore=itens_arvore,
     )
 
 
@@ -1068,6 +1175,124 @@ def _salvar_itens_template(tmpl: CronogramaTemplate, admin_id: int) -> None:
             admin_id=admin_id,
         )
         db.session.add(item)
+
+
+def _salvar_arvore_template(tmpl: CronogramaTemplate, admin_id: int, arvore: list, parent_db_id: int | None = None, ordem_base: int = 0) -> int:
+    """
+    Salva recursivamente a árvore hierárquica de itens do template.
+    Cada nó da arvore é um dict com:
+      catalogo_id: int | None  (SubatividadeMestre.id)
+      nome: str
+      tipo: 'grupo' | 'subatividade'
+      quantidade_prevista: float | None
+      filhos: list  (apenas grupos podem ter filhos)
+
+    Retorna a próxima ordem disponível.
+    """
+    ordem = ordem_base
+    # Cache: catalogo_id → SubatividadeMestre (or None) for admin_id validation
+    catalogo_cache: dict[int, object] = {}
+
+    def _buscar_catalogo(cid: int):
+        if cid not in catalogo_cache:
+            catalogo_cache[cid] = SubatividadeMestre.query.filter_by(
+                id=cid, admin_id=admin_id, ativo=True
+            ).first()
+        return catalogo_cache[cid]
+
+    for no in arvore:
+        catalogo_id = no.get('catalogo_id')
+        nome = (no.get('nome') or '').strip()
+        tipo_no = (no.get('tipo') or 'subatividade').strip()
+        if tipo_no not in ('grupo', 'subatividade'):
+            tipo_no = 'subatividade'
+        if not nome:
+            continue
+
+        sub_id: int | None = None
+        if catalogo_id:
+            try:
+                raw_int = int(catalogo_id)
+                sm = _buscar_catalogo(raw_int)
+                if sm is not None:
+                    # Validate catalog item tipo matches tree node tipo
+                    sm_tipo = getattr(sm, 'tipo', 'subatividade')
+                    if sm_tipo == tipo_no:
+                        sub_id = raw_int
+                    else:
+                        logger.warning(
+                            f"Template save: catalogo_id={raw_int} tipo={sm_tipo!r} "
+                            f"não corresponde ao nó tipo={tipo_no!r} — referência ignorada"
+                        )
+            except (ValueError, TypeError):
+                sub_id = None
+
+        filhos = no.get('filhos') or []
+
+        # Server-side rule: only grupos can have children
+        if tipo_no == 'subatividade' and filhos:
+            logger.warning(
+                f"Template save: nó '{nome}' (tipo=subatividade) tem filhos — filhos ignorados"
+            )
+            filhos = []
+
+        try:
+            qty = float(no.get('quantidade_prevista') or 0) or None
+        except (ValueError, TypeError):
+            qty = None
+
+        item = CronogramaTemplateItem(
+            template_id=tmpl.id,
+            subatividade_mestre_id=sub_id,
+            parent_item_id=parent_db_id,
+            nome_tarefa=nome,
+            ordem=ordem,
+            duracao_dias=1,
+            quantidade_prevista=qty,
+            responsavel='empresa',
+            admin_id=admin_id,
+        )
+        db.session.add(item)
+        db.session.flush()  # obtém item.id para usar como parent_item_id nos filhos
+
+        ordem += 1
+        if filhos:
+            _salvar_arvore_template(tmpl, admin_id, filhos, parent_db_id=item.id, ordem_base=0)
+
+    return ordem
+
+
+def _construir_arvore_itens(itens: list) -> list:
+    """
+    Converte lista plana de CronogramaTemplateItem em árvore aninhada (JSON-serializable).
+    """
+    import json as _json
+    by_id = {item.id: {
+        'id': item.id,
+        'nome': item.nome_tarefa,
+        'catalogo_id': item.subatividade_mestre_id,
+        'tipo': getattr(item.subatividade, 'tipo', 'subatividade') if item.subatividade else 'subatividade',
+        'quantidade_prevista': item.quantidade_prevista,
+        'parent_item_id': getattr(item, 'parent_item_id', None),
+        'ordem': item.ordem,
+        'filhos': [],
+    } for item in itens}
+
+    raizes = []
+    for node in by_id.values():
+        parent_id = node['parent_item_id']
+        if parent_id and parent_id in by_id:
+            by_id[parent_id]['filhos'].append(node)
+        else:
+            raizes.append(node)
+
+    def _sort(nodes):
+        nodes.sort(key=lambda n: n['ordem'])
+        for n in nodes:
+            _sort(n['filhos'])
+
+    _sort(raizes)
+    return raizes
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1171,6 +1396,47 @@ def aplicar_template(obra_id: int):
         flash(f'Erro ao aplicar template: {str(e)}', 'error')
 
     return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id))
+
+
+@cronograma_bp.route('/api/templates/<int:template_id>')
+@login_required
+def api_template_arvore(template_id: int):
+    """API JSON — retorna a árvore hierárquica de itens de um template."""
+    guard = _check_v2()
+    if guard:
+        return jsonify({'status': 'error', 'msg': 'V2 only'}), 403
+
+    admin_id = _admin_id()
+    template = CronogramaTemplate.query.filter_by(id=template_id, admin_id=admin_id, ativo=True).first()
+    if not template:
+        return jsonify({'status': 'error', 'msg': 'Template não encontrado'}), 404
+
+    arvore = _construir_arvore_itens(template.itens)
+
+    def _serializar(itens):
+        resultado = []
+        for item in itens:
+            node = {
+                'id': item['id'],
+                'tipo': item['tipo'],
+                'nome': item['nome'],
+                'ordem': item.get('ordem', 0),
+                'quantidade_prevista': item.get('quantidade_prevista'),
+                'catalogo_id': item.get('catalogo_id'),
+                'filhos': _serializar(item.get('filhos', [])),
+            }
+            resultado.append(node)
+        return resultado
+
+    return jsonify({
+        'status': 'ok',
+        'template': {
+            'id': template.id,
+            'nome': template.nome,
+            'categoria': template.categoria,
+        },
+        'arvore': _serializar(arvore),
+    })
 
 
 @cronograma_bp.route('/api/templates')

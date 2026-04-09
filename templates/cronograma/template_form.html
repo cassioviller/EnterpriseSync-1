@@ -29,6 +29,8 @@
 
   <form action="{{ url_for('cronograma.editar_template', template_id=template.id) if template else url_for('cronograma.novo_template') }}"
         method="POST" id="formTemplate">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="itens_json" id="itensJsonInput">
 
     <!-- Dados gerais do template -->
     <div class="card border-0 shadow-sm mb-4">
@@ -75,77 +77,68 @@
       </div>
     </div>
 
-    <!-- Itens do template -->
+    <!-- Template builder: dois painéis -->
     <div class="card border-0 shadow-sm mb-4">
-      <div class="card-header bg-transparent border-bottom py-2 d-flex justify-content-between align-items-center">
-        <h6 class="mb-0 fw-semibold"><i class="fas fa-list-check me-2 text-primary"></i>Tarefas do Template</h6>
-        <button type="button" class="btn btn-success btn-sm" onclick="adicionarItem()">
-          <i class="fas fa-plus me-1"></i> Adicionar Tarefa
-        </button>
+      <div class="card-header bg-transparent border-bottom py-2">
+        <h6 class="mb-0 fw-semibold">
+          <i class="fas fa-sitemap me-2 text-primary"></i>Montagem da Hierarquia
+          <small class="text-muted fw-normal ms-2">Arraste itens do catálogo para a área de montagem</small>
+        </h6>
       </div>
       <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0" id="tabelaItens">
-            <thead class="table-light">
-              <tr>
-                <th style="width:32px" class="ps-2"><i class="fas fa-grip-vertical text-muted"></i></th>
-                <th>Nome da Tarefa <span class="text-danger">*</span></th>
-                <th style="width:110px">Duração (dias)</th>
-                <th style="width:130px">Qtd. Prevista</th>
-                <th style="width:130px">Responsável</th>
-                <th style="width:220px">Subatividade do Catálogo</th>
-                <th style="width:48px"></th>
-              </tr>
-            </thead>
-            <tbody id="listaItens" class="sortable-items">
-              {% for item in itens %}
-              <tr class="item-row" data-index="{{ loop.index0 }}">
-                <td class="ps-2 handle" style="cursor:grab">
-                  <i class="fas fa-grip-vertical text-muted"></i>
-                </td>
-                <td>
-                  <input type="text" name="item_nome" class="form-control form-control-sm"
-                         value="{{ item.nome_tarefa }}" required placeholder="Nome da tarefa">
-                </td>
-                <td>
-                  <input type="number" name="item_duracao_dias" class="form-control form-control-sm"
-                         value="{{ item.duracao_dias }}" min="1" required>
-                </td>
-                <td>
-                  <input type="number" name="item_quantidade_prevista" class="form-control form-control-sm"
-                         value="{{ item.quantidade_prevista or '' }}" step="0.01" min="0" placeholder="—">
-                </td>
-                <td>
-                  <select name="item_responsavel" class="form-select form-select-sm">
-                    <option value="empresa" {{ 'selected' if item.responsavel != 'terceiros' }}>Empresa</option>
-                    <option value="terceiros" {{ 'selected' if item.responsavel == 'terceiros' }}>Terceiros</option>
-                  </select>
-                </td>
-                <td>
-                  <select name="item_subatividade_mestre_id" class="form-select form-select-sm">
-                    <option value="">Sem vínculo</option>
-                    {% for s in subatividades %}
-                      <option value="{{ s.id }}"
-                        {{ 'selected' if item.subatividade_mestre_id == s.id }}>
-                        {{ s.nome }}{% if s.unidade_medida %} ({{ s.unidade_medida }}){% endif %}
-                      </option>
-                    {% endfor %}
-                  </select>
-                </td>
-                <td>
-                  <button type="button" class="btn btn-outline-danger btn-sm"
-                          onclick="removerItem(this)" title="Remover">
-                    <i class="fas fa-times"></i>
-                  </button>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <div id="semItens" class="text-center py-4 text-muted {{ 'd-none' if itens }}" style="font-size:.9rem">
-          <i class="fas fa-list fa-2x mb-2 opacity-25 d-block"></i>
-          Nenhuma tarefa adicionada. Clique em <strong>Adicionar Tarefa</strong> para começar.
+        <div class="row g-0" style="min-height:420px">
+
+          <!-- Painel esquerdo: catálogo -->
+          <div class="col-md-4 border-end" style="background:#f8f9fa">
+            <div class="p-3 border-bottom">
+              <div class="fw-semibold text-dark small mb-2">
+                <i class="fas fa-book-open me-1 text-primary"></i>Catálogo de Atividades
+              </div>
+              <input type="text" id="buscaCatalogo" class="form-control form-control-sm"
+                     placeholder="Buscar item..." autocomplete="off">
+            </div>
+            <div class="p-2" id="painelCatalogo" style="overflow-y:auto;max-height:500px">
+              <!-- Seção Grupos -->
+              <div class="mb-2">
+                <div class="text-uppercase text-muted" style="font-size:.68rem;font-weight:600;letter-spacing:.05em;padding:.25rem .5rem">
+                  Grupos
+                </div>
+                <div id="listaGruposCatalogo">
+                  <div class="text-muted small text-center py-2" id="semGruposCatalogo">Carregando...</div>
+                </div>
+              </div>
+              <!-- Seção Subatividades -->
+              <div>
+                <div class="text-uppercase text-muted" style="font-size:.68rem;font-weight:600;letter-spacing:.05em;padding:.25rem .5rem">
+                  Subatividades
+                </div>
+                <div id="listaSubsCatalogo">
+                  <div class="text-muted small text-center py-2" id="semSubsCatalogo">Carregando...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Painel direito: área de montagem -->
+          <div class="col-md-8">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+              <div class="fw-semibold text-dark small">
+                <i class="fas fa-sitemap me-1 text-success"></i>Árvore do Template
+              </div>
+              <button type="button" class="btn btn-outline-danger btn-sm" id="btnLimparArvore">
+                <i class="fas fa-trash me-1"></i>Limpar
+              </button>
+            </div>
+            <div class="p-3" id="areaMontagem" style="min-height:380px">
+              <div id="semItensArvore" class="text-center py-5 text-muted">
+                <i class="fas fa-sitemap fa-3x mb-3 opacity-25 d-block"></i>
+                <div>Arraste Grupos e Subatividades do catálogo para cá</div>
+                <small>Grupos podem conter outros grupos e subatividades</small>
+              </div>
+              <ul class="sortable-tree list-unstyled mb-0" id="arvoreRaiz" data-tipo="raiz"></ul>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -163,112 +156,337 @@
 
   </form>
 </div>
-
-<!-- Template de linha oculto (usado pelo JS) -->
-<template id="rowTemplate">
-  <tr class="item-row">
-    <td class="ps-2 handle" style="cursor:grab">
-      <i class="fas fa-grip-vertical text-muted"></i>
-    </td>
-    <td>
-      <input type="text" name="item_nome" class="form-control form-control-sm"
-             required placeholder="Nome da tarefa">
-    </td>
-    <td>
-      <input type="number" name="item_duracao_dias" class="form-control form-control-sm"
-             value="1" min="1" required>
-    </td>
-    <td>
-      <input type="number" name="item_quantidade_prevista" class="form-control form-control-sm"
-             step="0.01" min="0" placeholder="—">
-    </td>
-    <td>
-      <select name="item_responsavel" class="form-select form-select-sm">
-        <option value="empresa">Empresa</option>
-        <option value="terceiros">Terceiros</option>
-      </select>
-    </td>
-    <td>
-      <select name="item_subatividade_mestre_id" class="form-select form-select-sm">
-        <option value="">Sem vínculo</option>
-        {% for s in subatividades %}
-          <option value="{{ s.id }}">
-            {{ s.nome }}{% if s.unidade_medida %} ({{ s.unidade_medida }}){% endif %}
-          </option>
-        {% endfor %}
-      </select>
-    </td>
-    <td>
-      <button type="button" class="btn btn-outline-danger btn-sm"
-              onclick="removerItem(this)" title="Remover">
-        <i class="fas fa-times"></i>
-      </button>
-    </td>
-  </tr>
-</template>
-
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
-const listaItens = document.getElementById('listaItens');
-const semItens = document.getElementById('semItens');
-const rowTemplate = document.getElementById('rowTemplate');
+// ─────────────────────────────────────────────────────────────────────────────
+// DADOS INICIAIS (árvore existente do template, se houver)
+// ─────────────────────────────────────────────────────────────────────────────
+const ARVORE_INICIAL = {{ itens_arvore | tojson }};
 
-// Sortable drag-and-drop
-Sortable.create(listaItens, {
-  handle: '.handle',
-  animation: 150,
-  onEnd: atualizarOrdens,
-});
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILITÁRIOS
+// ─────────────────────────────────────────────────────────────────────────────
 
-function adicionarItem() {
-  const clone = rowTemplate.content.cloneNode(true);
-  listaItens.appendChild(clone);
-  atualizarOrdens();
-  atualizarVisibilidade();
-  // Focus no nome
-  const ultima = listaItens.querySelectorAll('.item-row');
-  const nomeCampo = ultima[ultima.length - 1].querySelector('input[name="item_nome"]');
-  if (nomeCampo) nomeCampo.focus();
+function criarItemCatalogo(item) {
+  const div = document.createElement('div');
+  div.className = `catalog-item d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-white shadow-sm`
+    + (item.tipo === 'grupo' ? ' catalog-grupo' : ' catalog-sub');
+  div.style.cursor = 'grab';
+  div.setAttribute('data-catalogo-id', item.id);
+  div.setAttribute('data-nome', item.nome);
+  div.setAttribute('data-tipo', item.tipo);
+  div.innerHTML = `
+    <i class="fas ${item.tipo === 'grupo' ? 'fa-folder text-warning' : 'fa-tasks text-primary'} small"></i>
+    <span class="flex-grow-1 text-dark small fw-semibold">${escapeHtml(item.nome)}</span>
+    ${item.tipo === 'subatividade' && item.unidade_medida
+      ? `<code class="text-muted" style="font-size:.7rem">${escapeHtml(item.unidade_medida)}</code>`
+      : ''}
+    <span class="badge ${item.tipo === 'grupo' ? 'bg-warning-subtle text-warning' : 'bg-primary-subtle text-primary'} border"
+          style="font-size:.62rem">${item.tipo === 'grupo' ? 'Grupo' : 'Sub'}</span>
+  `;
+  return div;
 }
 
-function removerItem(btn) {
-  btn.closest('tr').remove();
-  atualizarOrdens();
-  atualizarVisibilidade();
+function criarNoArvore(nome, catalogoId, tipo, qtdPrevista) {
+  const li = document.createElement('li');
+  li.className = 'arvore-no mb-1';
+  li.setAttribute('data-catalogo-id', catalogoId || '');
+  li.setAttribute('data-nome', nome);
+  li.setAttribute('data-tipo', tipo || 'subatividade');
+
+  const isGrupo = (tipo === 'grupo');
+
+  li.innerHTML = `
+    <div class="arvore-no-header d-flex align-items-center gap-2 p-2 rounded border bg-white shadow-sm"
+         style="cursor:${isGrupo ? 'grab' : 'grab'}">
+      <i class="fas fa-grip-vertical text-muted small" style="cursor:grab"></i>
+      <i class="fas ${isGrupo ? 'fa-folder text-warning' : 'fa-tasks text-primary'} small"></i>
+      <span class="fw-semibold text-dark small flex-grow-1">${escapeHtml(nome)}</span>
+      ${isGrupo ? '' : `
+        <input type="number" class="form-control form-control-sm qtd-prevista" style="width:80px"
+               placeholder="Qtd" step="0.01" min="0" value="${qtdPrevista || ''}" title="Quantidade prevista">
+      `}
+      <span class="badge ${isGrupo ? 'bg-warning-subtle text-warning' : 'bg-primary-subtle text-primary'} border"
+            style="font-size:.62rem">${isGrupo ? 'Grupo' : 'Sub'}</span>
+      <button type="button" class="btn btn-link text-danger p-0 btn-remover-no" title="Remover">
+        <i class="fas fa-times small"></i>
+      </button>
+    </div>
+    ${isGrupo ? `
+      <ul class="sortable-tree list-unstyled ms-4 mt-1 arvore-filhos" data-tipo="grupo"></ul>
+    ` : ''}
+  `;
+
+  // Botão remover
+  li.querySelector('.btn-remover-no').addEventListener('click', () => {
+    li.remove();
+    atualizarVisibilidadeArvore();
+  });
+
+  return li;
 }
 
-function atualizarOrdens() {
-  const ordens = document.querySelectorAll('input[name="item_ordem"]');
-  // Remove os inputs de ordem antigos e recria
-  ordens.forEach(o => o.remove());
-  listaItens.querySelectorAll('.item-row').forEach((row, idx) => {
-    // Inserir hidden input de ordem — uso de dataset para simplificar
-    row.dataset.index = idx;
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+function atualizarVisibilidadeArvore() {
+  const arvore = document.getElementById('arvoreRaiz');
+  const semItens = document.getElementById('semItensArvore');
+  semItens.style.display = arvore.children.length === 0 ? '' : 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SORTABLE — inicializar lista sortable em qualquer UL da árvore
+// ─────────────────────────────────────────────────────────────────────────────
+
+function inicializarSortable(ul) {
+  Sortable.create(ul, {
+    group: {
+      name: 'arvore',
+      pull: true,
+      put: function(to, from, dragEl) {
+        // Subatividades não podem ter filhos
+        if (to.el.closest('.arvore-no') && to.el.classList.contains('arvore-filhos')) {
+          const parentNos = to.el.closest('.arvore-no');
+          if (parentNos && parentNos.getAttribute('data-tipo') === 'subatividade') return false;
+        }
+        return true;
+      }
+    },
+    animation: 150,
+    handle: '.fa-grip-vertical',
+    ghostClass: 'sortable-ghost',
+    dragClass: 'sortable-drag',
+    onEnd: atualizarVisibilidadeArvore,
   });
 }
 
-function atualizarVisibilidade() {
-  const linhas = listaItens.querySelectorAll('.item-row');
-  semItens.classList.toggle('d-none', linhas.length > 0);
+// ─────────────────────────────────────────────────────────────────────────────
+// SORTABLE DO CATÁLOGO — clone para a árvore
+// ─────────────────────────────────────────────────────────────────────────────
+
+function inicializarSortableCatalogo(container) {
+  Sortable.create(container, {
+    group: {
+      name: 'arvore',
+      pull: 'clone',
+      put: false,
+    },
+    sort: false,
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onClone: function(evt) {
+      // Transformar o clone em nó de árvore
+      const orig = evt.item;
+      const catalogoId = orig.getAttribute('data-catalogo-id');
+      const nome = orig.getAttribute('data-nome');
+      const tipo = orig.getAttribute('data-tipo');
+      const no = criarNoArvore(nome, catalogoId, tipo, null);
+      evt.clone.replaceWith(no);
+      // Inicializar sortable nos filhos do novo nó (se grupo)
+      const filhosUl = no.querySelector('.arvore-filhos');
+      if (filhosUl) inicializarSortable(filhosUl);
+      atualizarVisibilidadeArvore();
+    },
+    onEnd: function(evt) {
+      // O item original ficou no catálogo (clone foi para a árvore)
+      // Garantir que o item arrastado do catálogo não "suiu"
+      const item = evt.item;
+      if (!item.classList.contains('catalog-item')) return;
+      // Se o item foi para a árvore, remover da árvore e adicionar nó correto
+      if (item.closest('#arvoreRaiz') || item.closest('.arvore-filhos')) {
+        const catalogoId = item.getAttribute('data-catalogo-id');
+        const nome = item.getAttribute('data-nome');
+        const tipo = item.getAttribute('data-tipo');
+        const no = criarNoArvore(nome, catalogoId, tipo, null);
+        item.replaceWith(no);
+        const filhosUl = no.querySelector('.arvore-filhos');
+        if (filhosUl) inicializarSortable(filhosUl);
+        atualizarVisibilidadeArvore();
+      }
+    },
+  });
 }
 
-// Submissão: injetar os campos item_ordem antes de enviar
-document.getElementById('formTemplate').addEventListener('submit', function() {
-  // Remover campos item_ordem existentes
-  this.querySelectorAll('input[name="item_ordem"]').forEach(e => e.remove());
-  listaItens.querySelectorAll('.item-row').forEach((row, idx) => {
-    const hidden = document.createElement('input');
-    hidden.type = 'hidden';
-    hidden.name = 'item_ordem';
-    hidden.value = idx;
-    row.appendChild(hidden);
+// ─────────────────────────────────────────────────────────────────────────────
+// SERIALIZAR ÁRVORE → JSON
+// ─────────────────────────────────────────────────────────────────────────────
+
+function serializarNo(li) {
+  const catalogoId = li.getAttribute('data-catalogo-id') || null;
+  const nome = li.getAttribute('data-nome') || '';
+  const tipo = li.getAttribute('data-tipo') || 'subatividade';
+  const qtdInput = li.querySelector(':scope > .arvore-no-header .qtd-prevista');
+  const qtdPrevista = qtdInput ? (parseFloat(qtdInput.value) || null) : null;
+  const filhosUl = li.querySelector(':scope > .arvore-filhos');
+  const filhos = filhosUl
+    ? Array.from(filhosUl.children).filter(c => c.classList.contains('arvore-no')).map(serializarNo)
+    : [];
+  return {
+    catalogo_id: catalogoId ? parseInt(catalogoId) : null,
+    nome: nome,
+    tipo: tipo,
+    quantidade_prevista: qtdPrevista,
+    filhos: filhos,
+  };
+}
+
+function serializarArvore() {
+  const ul = document.getElementById('arvoreRaiz');
+  return Array.from(ul.children)
+    .filter(li => li.classList.contains('arvore-no'))
+    .map(serializarNo);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CARREGAR CATÁLOGO VIA API
+// ─────────────────────────────────────────────────────────────────────────────
+
+let todosGrupos = [];
+let todasSubs = [];
+
+async function carregarCatalogo() {
+  try {
+    const resp = await fetch('{{ url_for("cronograma.api_catalogo") }}');
+    const data = await resp.json();
+    todosGrupos = data.grupos || [];
+    todasSubs = data.subatividades || [];
+    renderizarCatalogo('');
+  } catch(e) {
+    document.getElementById('semGruposCatalogo').textContent = 'Erro ao carregar catálogo.';
+    document.getElementById('semSubsCatalogo').textContent = '';
+  }
+}
+
+function renderizarCatalogo(filtro) {
+  const listaG = document.getElementById('listaGruposCatalogo');
+  const listaS = document.getElementById('listaSubsCatalogo');
+  const semG = document.getElementById('semGruposCatalogo');
+  const semS = document.getElementById('semSubsCatalogo');
+
+  listaG.innerHTML = '';
+  listaS.innerHTML = '';
+
+  const f = filtro.toLowerCase();
+  const grupos = todosGrupos.filter(g => !f || g.nome.toLowerCase().includes(f));
+  const subs = todasSubs.filter(s => !f || s.nome.toLowerCase().includes(f));
+
+  if (grupos.length === 0) {
+    listaG.innerHTML = '<div class="text-muted small text-center py-1">Nenhum grupo</div>';
+  } else {
+    grupos.forEach(g => {
+      const el = criarItemCatalogo(g);
+      listaG.appendChild(el);
+    });
+    inicializarSortableCatalogo(listaG);
+  }
+
+  if (subs.length === 0) {
+    listaS.innerHTML = '<div class="text-muted small text-center py-1">Nenhuma subatividade</div>';
+  } else {
+    subs.forEach(s => {
+      const el = criarItemCatalogo(s);
+      listaS.appendChild(el);
+    });
+    inicializarSortableCatalogo(listaS);
+  }
+
+  semG.style.display = 'none';
+  semS.style.display = 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESTAURAR ÁRVORE INICIAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+function restaurarArvore(arvore, ulPai) {
+  arvore.forEach(no => {
+    const li = criarNoArvore(no.nome, no.catalogo_id, no.tipo, no.quantidade_prevista);
+    ulPai.appendChild(li);
+    const filhosUl = li.querySelector('.arvore-filhos');
+    if (filhosUl) {
+      inicializarSortable(filhosUl);
+      if (no.filhos && no.filhos.length > 0) {
+        restaurarArvore(no.filhos, filhosUl);
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INICIALIZAÇÃO
+// ─────────────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Inicializar sortable na raiz
+  const arvoreRaiz = document.getElementById('arvoreRaiz');
+  inicializarSortable(arvoreRaiz);
+
+  // Restaurar árvore existente (edição de template)
+  if (ARVORE_INICIAL && ARVORE_INICIAL.length > 0) {
+    restaurarArvore(ARVORE_INICIAL, arvoreRaiz);
+  }
+  atualizarVisibilidadeArvore();
+
+  // Carregar catálogo
+  carregarCatalogo();
+
+  // Busca/filtro no catálogo
+  document.getElementById('buscaCatalogo').addEventListener('input', function() {
+    renderizarCatalogo(this.value);
+  });
+
+  // Limpar árvore
+  document.getElementById('btnLimparArvore').addEventListener('click', () => {
+    if (confirm('Limpar toda a árvore do template?')) {
+      document.getElementById('arvoreRaiz').innerHTML = '';
+      atualizarVisibilidadeArvore();
+    }
+  });
+
+  // Submissão do formulário
+  document.getElementById('formTemplate').addEventListener('submit', function() {
+    const arvore = serializarArvore();
+    document.getElementById('itensJsonInput').value = JSON.stringify(arvore);
   });
 });
-
-// Inicializar visibilidade
-atualizarVisibilidade();
 </script>
+
+<style>
+.sortable-ghost {
+  opacity: .35;
+  background: #e0f0ff;
+  border: 2px dashed #3b82f6 !important;
+}
+.sortable-drag {
+  opacity: .95;
+}
+.catalog-item:hover {
+  background: #f0f4ff !important;
+  border-color: #93c5fd !important;
+}
+.arvore-no-header:hover {
+  background: #f0fdf4 !important;
+  border-color: #86efac !important;
+}
+.arvore-filhos {
+  border-left: 2px solid #e5e7eb;
+  padding-left: .5rem;
+  min-height: 28px;
+}
+.arvore-filhos:empty::before {
+  content: "Arraste itens aqui";
+  display: block;
+  color: #9ca3af;
+  font-size: .75rem;
+  padding: .35rem .5rem;
+  font-style: italic;
+}
+</style>
 {% endblock %}

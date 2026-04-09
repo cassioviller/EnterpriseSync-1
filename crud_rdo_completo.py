@@ -157,7 +157,9 @@ def novo_rdo():
         # Dados necessários para o formulário
         obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-        subatividades = SubatividadeMestre.query.order_by(SubatividadeMestre.servico_id, SubatividadeMestre.nome).all()
+        subatividades = SubatividadeMestre.query.filter_by(
+            admin_id=admin_id, ativo=True, tipo='subatividade'
+        ).order_by(SubatividadeMestre.servico_id, SubatividadeMestre.nome).all()
         
         # Obra pré-selecionada
         obra_id = request.args.get('obra_id', type=int)
@@ -283,7 +285,9 @@ def salvar_rdo():
                         obs_key = f'subatividade_{subatividade_id}_observacoes'
                         observacoes = request.form.get(obs_key, '').strip()
                         
-                        subatividade = SubatividadeMestre.query.get(subatividade_id)
+                        subatividade = SubatividadeMestre.query.filter_by(
+                            id=subatividade_id, admin_id=admin_id, ativo=True, tipo='subatividade'
+                        ).first()
                         if subatividade:
                             rdo_subativ = RDOServicoSubatividade(
                                 rdo_id=rdo.id,
@@ -516,9 +520,21 @@ def finalizar_rdo(rdo_id):
 @rdo_crud_bp.route('/api/subatividades/<int:servico_id>')
 @login_required
 def api_subatividades_por_servico(servico_id):
-    """API para buscar subatividades por serviço"""
+    """API para buscar subatividades por serviço (inclui subatividades sem servico_id)"""
     try:
-        subatividades = SubatividadeMestre.query.filter_by(servico_id=servico_id).order_by(SubatividadeMestre.nome).all()
+        admin_id = get_admin_id()
+        # Filtrar por servico_id OU subatividades sem serviço (tipo='subatividade')
+        from sqlalchemy import or_
+        subatividades = SubatividadeMestre.query.filter(
+            SubatividadeMestre.admin_id == admin_id,
+            SubatividadeMestre.ativo == True,
+            or_(
+                SubatividadeMestre.servico_id == servico_id,
+                SubatividadeMestre.servico_id == None,
+            )
+        ).filter(
+            SubatividadeMestre.tipo == 'subatividade'
+        ).order_by(SubatividadeMestre.nome).all()
         return jsonify([{
             'id': s.id,
             'nome': s.nome,

@@ -1130,7 +1130,7 @@ class RDOServicoSubatividade(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
-    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True)
     
     # Campos conforme estrutura real do database
     nome_subatividade = db.Column(db.String(255), nullable=False)
@@ -1216,7 +1216,8 @@ class SubatividadeMestre(db.Model):
     __tablename__ = 'subatividade_mestre'
     
     id = db.Column(db.Integer, primary_key=True)
-    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=False)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True)
+    tipo = db.Column(db.String(20), nullable=False, default='subatividade')  # 'grupo' ou 'subatividade'
     
     # Dados da subatividade
     nome = db.Column(db.String(200), nullable=False)
@@ -4457,6 +4458,11 @@ class CronogramaTemplateItem(db.Model):
         db.ForeignKey('subatividade_mestre.id', ondelete='SET NULL'),
         nullable=True,
     )
+    parent_item_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_template_item.id', ondelete='SET NULL'),
+        nullable=True,
+    )
     # Nome snapshot — para templates sem subatividade do catálogo
     nome_tarefa = db.Column(db.String(200), nullable=False)
     ordem = db.Column(db.Integer, default=0, nullable=False)
@@ -4468,6 +4474,12 @@ class CronogramaTemplateItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     subatividade = db.relationship('SubatividadeMestre', backref='template_itens')
+    filhos = db.relationship(
+        'CronogramaTemplateItem',
+        backref=db.backref('parent', remote_side='CronogramaTemplateItem.id'),
+        foreign_keys='CronogramaTemplateItem.parent_item_id',
+        lazy='dynamic',
+    )
 
     def __repr__(self):
         return f'<CronogramaTemplateItem {self.nome_tarefa}>'

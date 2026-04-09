@@ -1,12 +1,12 @@
 {% extends "base_completo.html" %}
-{% block title %}Editar Subatividade — {{ sub.nome }}{% endblock %}
+{% block title %}Editar {{ 'Grupo' if sub.tipo == 'grupo' else 'Subatividade' }} — {{ sub.nome }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid px-3 py-2">
   <div class="mb-4">
     <h4 class="mb-0 fw-bold">
-      <i class="fas fa-edit me-2 text-primary"></i>
-      Editar Subatividade
+      <i class="fas {{ 'fa-folder text-warning' if sub.tipo == 'grupo' else 'fa-edit text-primary' }} me-2"></i>
+      Editar {{ 'Grupo' if sub.tipo == 'grupo' else 'Subatividade' }}
     </h4>
     <nav aria-label="breadcrumb" class="mt-1">
       <ol class="breadcrumb mb-0 small">
@@ -29,18 +29,34 @@
   <div class="card border-0 shadow-sm" style="max-width:720px">
     <div class="card-body p-4">
       <form action="{{ url_for('cronograma.catalogo_editar_subatividade', sub_id=sub.id) }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% if sub.tipo == 'grupo' %}
+        <!-- Formulário de edição de GRUPO -->
         <div class="row g-3">
-          <div class="col-md-8">
-            <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Nome do Grupo <span class="text-danger">*</span></label>
             <input type="text" name="nome" class="form-control" value="{{ sub.nome }}" required>
           </div>
-          <div class="col-md-4">
-            <label class="form-label fw-semibold">Serviço <span class="text-danger">*</span></label>
-            <select name="servico_id" class="form-select" required>
-              {% for s in servicos %}
-                <option value="{{ s.id }}" {{ 'selected' if s.id == sub.servico_id }}>{{ s.nome }}</option>
-              {% endfor %}
-            </select>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Descrição</label>
+            <textarea name="descricao" class="form-control" rows="2">{{ sub.descricao or '' }}</textarea>
+          </div>
+          <div class="col-md-3 d-flex align-items-end pb-1">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="ativo" value="1"
+                     id="chkAtivo" {{ 'checked' if sub.ativo }}>
+              <label class="form-check-label" for="chkAtivo">Ativo</label>
+            </div>
+          </div>
+        </div>
+
+        {% else %}
+        <!-- Formulário de edição de SUBATIVIDADE -->
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+            <input type="text" name="nome" class="form-control" value="{{ sub.nome }}" required>
           </div>
           <div class="col-12">
             <label class="form-label fw-semibold">Descrição</label>
@@ -70,12 +86,7 @@
               <span class="input-group-text text-muted small">un/h por func.</span>
             </div>
           </div>
-          <div class="col-md-2">
-            <label class="form-label fw-semibold">Ordem</label>
-            <input type="number" name="ordem_padrao" class="form-control"
-                   value="{{ sub.ordem_padrao or 0 }}" min="0">
-          </div>
-          <div class="col-md-2 d-flex flex-column justify-content-end gap-2 pb-1">
+          <div class="col-md-4 d-flex flex-column justify-content-end gap-2 pb-1">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" name="obrigatoria" value="1"
                      id="chkObrig" {{ 'checked' if sub.obrigatoria }}>
@@ -88,6 +99,7 @@
             </div>
           </div>
         </div>
+        {% endif %}
 
         <div class="d-flex gap-2 mt-4">
           <button type="submit" class="btn btn-primary px-4">

@@ -254,6 +254,12 @@ def salvar_edicao_rdo(rdo_id):
                 ).first()
                 
                 if subatividade_mestre:
+                    # Validação: apenas tipo='subatividade' pode ser lançado no RDO (grupos são estrutura)
+                    tipo_sm = getattr(subatividade_mestre, 'tipo', 'subatividade')
+                    if tipo_sm == 'grupo':
+                        logger.warning(f"⚠️ SubatividadeMestre {subatividade_id} é do tipo 'grupo' — ignorada no RDO")
+                        continue
+
                     # Caminho V2: subatividade do catálogo com snapshot de produtividade
                     qtd_raw = request.form.get(f'qtd_{subatividade_id}', '').strip()
                     qtd_produzida = float(qtd_raw) if qtd_raw else None

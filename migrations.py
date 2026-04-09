@@ -3797,6 +3797,8 @@ def executar_migracoes():
             (95, "CronogramaTemplate e CronogramaTemplateItem - templates reutilizáveis de cronograma", migration_95_cronograma_templates),
             (96, "RDOServicoSubatividade - quantidade_produzida, subatividade_mestre_id e snapshots de produtividade", migration_96_rdo_servico_subatividade_produtividade),
             (97, "RDOMaoObra - produtividade_real e indice_produtividade calculados na finalização do RDO", migration_97_rdo_mao_obra_produtividade),
+            (98, "SubatividadeMestre tipo+servico_id nullable, CronogramaTemplateItem parent_item_id - catálogo hierárquico", migration_98_catalogo_hierarquico),
+            (99, "RDOServicoSubatividade servico_id nullable para suportar subatividades sem serviço vinculado", migration_99_rdo_servico_sub_nullable),
         ]
         
         # Executar cada migração com rastreamento
@@ -7994,6 +7996,125 @@ def migration_96_rdo_servico_subatividade_produtividade():
 
     except Exception as e:
         logger.error(f"Erro na migracao 96: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_99_rdo_servico_sub_nullable():
+    """
+    Migração 99: rdo_servico_subatividade — tornar servico_id nullable
+    para suportar subatividades do catálogo sem serviço vinculado (tipo='subatividade').
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_name = 'rdo_servico_subatividade' AND column_name = 'servico_id'
+        """)
+        row = cursor.fetchone()
+        if row and row[0] == 'NO':
+            logger.info("  Tornando rdo_servico_subatividade.servico_id nullable...")
+            cursor.execute("""
+                ALTER TABLE rdo_servico_subatividade
+                ALTER COLUMN servico_id DROP NOT NULL
+            """)
+            logger.info("  rdo_servico_subatividade.servico_id agora é nullable.")
+        else:
+            logger.info("  rdo_servico_subatividade.servico_id já é nullable.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 99 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 99: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_98_catalogo_hierarquico():
+    """
+    Migração 98: Catálogo hierárquico e template builder drag-and-drop:
+    - SubatividadeMestre: adicionar coluna 'tipo' (VARCHAR(20), default 'subatividade')
+    - SubatividadeMestre: tornar servico_id nullable (DROP NOT NULL)
+    - CronogramaTemplateItem: adicionar parent_item_id (FK self-referencing nullable)
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # 1. Adicionar coluna 'tipo' em subatividade_mestre
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'subatividade_mestre' AND column_name = 'tipo'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando coluna 'tipo' em subatividade_mestre...")
+            cursor.execute("""
+                ALTER TABLE subatividade_mestre
+                ADD COLUMN tipo VARCHAR(20) NOT NULL DEFAULT 'subatividade'
+            """)
+            logger.info("  Coluna 'tipo' adicionada.")
+        else:
+            logger.info("  Coluna 'tipo' já existe em subatividade_mestre.")
+
+        # 2. Tornar servico_id nullable em subatividade_mestre
+        cursor.execute("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_name = 'subatividade_mestre' AND column_name = 'servico_id'
+        """)
+        row = cursor.fetchone()
+        if row and row[0] == 'NO':
+            logger.info("  Tornando servico_id nullable em subatividade_mestre...")
+            cursor.execute("""
+                ALTER TABLE subatividade_mestre
+                ALTER COLUMN servico_id DROP NOT NULL
+            """)
+            logger.info("  servico_id agora é nullable.")
+        else:
+            logger.info("  servico_id já é nullable em subatividade_mestre.")
+
+        # 3. Adicionar parent_item_id em cronograma_template_item
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'cronograma_template_item' AND column_name = 'parent_item_id'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando coluna 'parent_item_id' em cronograma_template_item...")
+            cursor.execute("""
+                ALTER TABLE cronograma_template_item
+                ADD COLUMN parent_item_id INTEGER REFERENCES cronograma_template_item(id) ON DELETE SET NULL
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_cti_parent_item
+                ON cronograma_template_item(parent_item_id)
+            """)
+            logger.info("  Coluna 'parent_item_id' adicionada.")
+        else:
+            logger.info("  Coluna 'parent_item_id' já existe em cronograma_template_item.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 98 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 98: {e}")
         if connection:
             try:
                 connection.rollback()
