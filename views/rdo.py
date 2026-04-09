@@ -3090,12 +3090,19 @@ def _processar_rdo_existente(ultimo_rdo, admin_id):
                 logger.info(f"[OK] SERVICO_CARREGADO: {servico.nome} (ID: {servico_id})")
             
             # Adicionar subatividade ao serviço
+            # mestre_id é o SubatividadeMestre.id — usado como chave de formulário
+            mestre_id = getattr(sub_rdo, 'subatividade_mestre_id', None) or sub_rdo.id
             servicos_dict[servico_id]['subatividades'].append({
-                'id': sub_rdo.id,
+                'id': mestre_id,
+                'rdo_sub_id': sub_rdo.id,
                 'nome': sub_rdo.nome_subatividade,
                 'percentual': float(sub_rdo.percentual_conclusao or 0),
+                'percentual_executado': float(sub_rdo.percentual_conclusao or 0),
                 'descricao': sub_rdo.descricao_subatividade or '',
-                'observacoes_tecnicas': sub_rdo.observacoes_tecnicas or ''
+                'observacoes_tecnicas': sub_rdo.observacoes_tecnicas or '',
+                'meta_produtividade': getattr(sub_rdo, 'meta_produtividade_snapshot', None),
+                'unidade_medida': getattr(sub_rdo, 'unidade_medida_snapshot', None) or '',
+                'quantidade_produzida': getattr(sub_rdo, 'quantidade_produzida', None),
             })
             
         # Buscar funcionários do RDO

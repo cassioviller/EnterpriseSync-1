@@ -539,6 +539,8 @@ const obraIdAtual = {{ rdo.obra_id }};
 const subatividadesAtuais = {{ (subatividades_data or [])|tojson }};
 const funcionariosAtuais = {{ (funcionarios_data or [])|tojson }};
 const rdoId = {{ rdo.id }};
+// Subatividades já salvas no RDO (para V2 que não usa ServicoObraReal)
+const subatividadesSalvas = {{ (subatividades_rdo_lista or [])|tojson }};
 
 function carregarServicosParaEdicao() {
     const obraId = document.getElementById('obra_id').value || obraIdAtual;
@@ -572,19 +574,23 @@ function carregarServicosParaEdicao() {
 
 function renderizarServicosParaEdicao(data) {
     const container = document.getElementById('servicos-container');
-    
+
+    // Suporta tanto data.servicos (legado) quanto data.ultima_rdo.servicos (API V2)
+    const servicos = data.servicos || (data.ultima_rdo && data.ultima_rdo.servicos) || [];
+    const totalServicos = data.total || (data.ultima_rdo && data.ultima_rdo.total_servicos) || servicos.length;
+
     let html = `
         <div class="alert alert-info mb-4">
             <i class="fas fa-edit"></i> <strong>Modo Edição:</strong><br>
             Os valores atuais do RDO foram carregados. Modifique conforme necessário.
         </div>
         <div class="small text-muted mb-3">
-            ${data.total || 0} serviços, ${data.total_subatividades || 0} subatividades
+            ${totalServicos} serviço(s) carregado(s)
         </div>
     `;
     
-    if (data.servicos && data.servicos.length > 0) {
-        data.servicos.forEach((servico, index) => {
+    if (servicos.length > 0) {
+        servicos.forEach((servico, index) => {
             const servicoId = servico.nome.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
             
             html += `
@@ -593,10 +599,10 @@ function renderizarServicosParaEdicao(data) {
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h5 class="mb-0">${servico.nome}</h5>
-                                <span class="badge bg-success">${servico.categoria}</span>
+                                <span class="badge bg-success">${servico.categoria || 'Geral'}</span>
                             </div>
                             <div>
-                                <span class="text-muted me-2">${servico.subatividades.length} subatividades</span>
+                                <span class="text-muted me-2">${(servico.subatividades || []).length} subatividades</span>
                                 <i class="fas fa-chevron-down" id="chevron-${servicoId}"></i>
                             </div>
                         </div>
@@ -605,10 +611,35 @@ function renderizarServicosParaEdicao(data) {
                         <div class="row">
             `;
             
-            servico.subatividades.forEach((subatividade) => {
-                // Usar valor atual do RDO ou 0 se não existir
-                const valorAtual = subatividade.percentual_executado || 0;
-                
+            (servico.subatividades || []).forEach((subatividade) => {
+                const valorAtual = subatividade.percentual_executado ?? subatividade.percentual ?? 0;
+                const temMeta = subatividade.meta_produtividade != null && subatividade.meta_produtividade > 0;
+                const unidade = subatividade.unidade_medida || '';
+                const qtdAtual = subatividade.quantidade_produzida != null ? subatividade.quantidade_produzida : '';
+
+                const qtdField = temMeta ? `
+                    <div class="mt-2">
+                        <label class="form-label small text-success fw-semibold mb-1">
+                            <i class="fas fa-ruler me-1"></i>Quantidade Produzida
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <input type="number"
+                                   class="form-control form-control-sm"
+                                   name="qtd_${subatividade.id}"
+                                   value="${qtdAtual}"
+                                   step="0.01"
+                                   min="0"
+                                   placeholder="0,00"
+                                   form="formEditarRDO"
+                                   title="Meta: ${subatividade.meta_produtividade} ${unidade}/h">
+                            ${unidade ? `<span class="input-group-text">${unidade}</span>` : ''}
+                        </div>
+                        <div class="text-muted" style="font-size:.7rem">
+                            Meta: ${subatividade.meta_produtividade} ${unidade}/h
+                        </div>
+                    </div>
+                ` : '';
+
                 html += `
                     <div class="col-md-6 mb-3">
                         <label class="form-label">${subatividade.nome}</label>
@@ -623,6 +654,7 @@ function renderizarServicosParaEdicao(data) {
                                    form="formEditarRDO">
                             <span class="input-group-text">%</span>
                         </div>
+                        ${qtdField}
                     </div>
                 `;
             });
@@ -633,6 +665,77 @@ function renderizarServicosParaEdicao(data) {
                 </div>
             `;
         });
+    } else if (subatividadesSalvas && subatividadesSalvas.length > 0) {
+        // Fallback V2: renderizar subatividades já salvas no RDO sem precisar de ServicoObraReal
+        html += `
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-edit"></i> <strong>Subatividades do RDO:</strong>
+                Mostrando ${subatividadesSalvas.length} subatividade(s) já registrada(s).
+            </div>
+            <div class="servico-card mb-3">
+                <div class="servico-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-tasks me-1"></i> Subatividades Executadas</h5>
+                        <span class="badge bg-primary">${subatividadesSalvas.length} subatividade(s)</span>
+                    </div>
+                </div>
+                <div class="servico-body">
+                    <div class="row">
+        `;
+
+        subatividadesSalvas.forEach((subatividade) => {
+            const valorAtual = subatividade.percentual_conclusao ?? 0;
+            const temMeta = subatividade.meta_produtividade_snapshot != null && subatividade.meta_produtividade_snapshot > 0;
+            const unidade = subatividade.unidade_medida_snapshot || '';
+            const qtdAtual = subatividade.quantidade_produzida != null ? subatividade.quantidade_produzida : '';
+
+            const qtdField = temMeta ? `
+                <div class="mt-2">
+                    <label class="form-label small text-success fw-semibold mb-1">
+                        <i class="fas fa-ruler me-1"></i>Quantidade Produzida
+                    </label>
+                    <div class="input-group input-group-sm">
+                        <input type="number"
+                               class="form-control form-control-sm"
+                               name="qtd_${subatividade.id}"
+                               value="${qtdAtual}"
+                               step="0.01"
+                               min="0"
+                               placeholder="0,00"
+                               form="formEditarRDO"
+                               title="Meta: ${subatividade.meta_produtividade_snapshot} ${unidade}/h">
+                        ${unidade ? `<span class="input-group-text">${unidade}</span>` : ''}
+                    </div>
+                    <div class="text-muted" style="font-size:.7rem">
+                        Meta: ${subatividade.meta_produtividade_snapshot} ${unidade}/h
+                    </div>
+                </div>
+            ` : '';
+
+            html += `
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">${subatividade.nome}</label>
+                    <div class="input-group">
+                        <input type="number"
+                               class="form-control"
+                               name="subatividade_${subatividade.id}"
+                               value="${valorAtual}"
+                               step="0.1"
+                               min="0"
+                               max="100"
+                               form="formEditarRDO">
+                        <span class="input-group-text">%</span>
+                    </div>
+                    ${qtdField}
+                </div>
+            `;
+        });
+
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
     } else {
         html += `
             <div class="text-center p-4">
@@ -645,7 +748,7 @@ function renderizarServicosParaEdicao(data) {
     container.innerHTML = html;
     
     // Expandir todos os serviços por padrão
-    data.servicos?.forEach((servico, index) => {
+    servicos.forEach((servico) => {
         const servicoId = servico.nome.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
         const body = document.getElementById(`body-${servicoId}`);
         const chevron = document.getElementById(`chevron-${servicoId}`);

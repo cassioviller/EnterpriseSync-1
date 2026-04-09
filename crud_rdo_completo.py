@@ -520,12 +520,38 @@ def finalizar_rdo(rdo_id):
         rdo.status = 'Finalizado'
         rdo.finalizado_em = datetime.utcnow()
         rdo.finalizado_por_id = current_user.id
-        
+
+        # Calcular produtividade por funcionário (V2)
+        try:
+            subs_com_meta = RDOServicoSubatividade.query.filter(
+                RDOServicoSubatividade.rdo_id == rdo_id,
+                RDOServicoSubatividade.quantidade_produzida.isnot(None),
+                RDOServicoSubatividade.meta_produtividade_snapshot.isnot(None),
+                RDOServicoSubatividade.meta_produtividade_snapshot > 0,
+            ).all()
+
+            for sub in subs_com_meta:
+                maos_obra = RDOMaoObra.query.filter_by(
+                    rdo_id=rdo_id,
+                    subatividade_id=sub.id,
+                ).all()
+                for mo in maos_obra:
+                    if mo.horas_trabalhadas and mo.horas_trabalhadas > 0:
+                        mo.produtividade_real = sub.quantidade_produzida / mo.horas_trabalhadas
+                        mo.indice_produtividade = mo.produtividade_real / sub.meta_produtividade_snapshot
+                    else:
+                        mo.produtividade_real = None
+                        mo.indice_produtividade = None
+
+            logger.info(f"[PRODUTIVIDADE] RDO {rdo.numero_rdo}: {len(subs_com_meta)} subatividade(s) com meta calculadas.")
+        except Exception as e_prod:
+            logger.warning(f"[WARN] Cálculo de produtividade falhou para RDO {rdo_id}: {e_prod}")
+
         db.session.commit()
-        
+
         flash(f'RDO {rdo.numero_rdo} finalizado com sucesso.', 'success')
         return redirect(url_for('rdo_crud.visualizar_rdo', rdo_id=rdo_id))
-        
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"ERRO FINALIZAR RDO: {str(e)}")

@@ -55,10 +55,24 @@ def editar_rdo_form(rdo_id):
         # Buscar subatividades já preenchidas no RDO
         subatividades_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=rdo_id).all()
         
-        # Criar dicionário de subatividades com percentuais
+        # Criar dicionário de subatividades com percentuais (legado)
         subatividades_data = {}
         for sub_rdo in subatividades_rdo:
             subatividades_data[sub_rdo.nome_subatividade] = sub_rdo.percentual_conclusao
+
+        # Lista rica para renderização direta (V2 — evita dependência do API ServicoObraReal)
+        subatividades_rdo_lista = []
+        for sub_rdo in subatividades_rdo:
+            mestre_id = getattr(sub_rdo, 'subatividade_mestre_id', None) or sub_rdo.id
+            subatividades_rdo_lista.append({
+                'id': mestre_id,
+                'rdo_sub_id': sub_rdo.id,
+                'nome': sub_rdo.nome_subatividade,
+                'percentual_conclusao': float(sub_rdo.percentual_conclusao or 0),
+                'quantidade_produzida': getattr(sub_rdo, 'quantidade_produzida', None),
+                'meta_produtividade_snapshot': getattr(sub_rdo, 'meta_produtividade_snapshot', None),
+                'unidade_medida_snapshot': getattr(sub_rdo, 'unidade_medida_snapshot', '') or '',
+            })
         
         # Buscar funcionários já vinculados ao RDO
         from models import RDOMaoObra
@@ -105,6 +119,7 @@ def editar_rdo_form(rdo_id):
                              obras=obras,
                              obra_selecionada=obra_selecionada,
                              subatividades_data=subatividades_data,
+                             subatividades_rdo_lista=subatividades_rdo_lista,
                              funcionarios_data=funcionarios_data,
                              apontamentos_cronograma=apontamentos_cronograma)
 
@@ -213,6 +228,10 @@ def salvar_edicao_rdo(rdo_id):
                 ).first()
                 
                 if subatividade_mestre:
+                    # Ler quantidade_produzida do campo qtd_{subatividade_id}
+                    qtd_raw = request.form.get(f'qtd_{subatividade_id}', '').strip()
+                    qtd_produzida = float(qtd_raw) if qtd_raw else None
+
                     # Criar registro na tabela RDOServicoSubatividade
                     rdo_subatividade = RDOServicoSubatividade(
                         rdo_id=rdo_id,
@@ -222,11 +241,15 @@ def salvar_edicao_rdo(rdo_id):
                         percentual_conclusao=percentual,
                         observacoes_tecnicas=f'Editado em {percentual}% - {data_relatorio}',
                         admin_id=admin_id,
-                        ativo=True
+                        ativo=True,
+                        subatividade_mestre_id=subatividade_mestre.id,
+                        meta_produtividade_snapshot=subatividade_mestre.meta_produtividade,
+                        unidade_medida_snapshot=subatividade_mestre.unidade_medida,
+                        quantidade_produzida=qtd_produzida,
                     )
                     db.session.add(rdo_subatividade)
                     subatividades_salvas += 1
-                    logger.info(f"✅ Subatividade editada: {subatividade_mestre.nome} - {percentual}%")
+                    logger.info(f"✅ Subatividade editada: {subatividade_mestre.nome} - {percentual}% | qtd={qtd_produzida}")
                 else:
                     logger.warning(f"⚠️ Subatividade mestre {subatividade_id} não encontrada")
                     

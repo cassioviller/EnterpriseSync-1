@@ -3795,6 +3795,8 @@ def executar_migracoes():
             (93, "PedidoCompra - centro_custo_id nullable (obra é o centro de custo principal)", migration_93_pedido_compra_centro_custo_nullable),
             (94, "SubatividadeMestre - unidade_medida e meta_produtividade para catálogo de produtividade", migration_94_subatividade_mestre_produtividade),
             (95, "CronogramaTemplate e CronogramaTemplateItem - templates reutilizáveis de cronograma", migration_95_cronograma_templates),
+            (96, "RDOServicoSubatividade - quantidade_produzida, subatividade_mestre_id e snapshots de produtividade", migration_96_rdo_servico_subatividade_produtividade),
+            (97, "RDOMaoObra - produtividade_real e indice_produtividade calculados na finalização do RDO", migration_97_rdo_mao_obra_produtividade),
         ]
         
         # Executar cada migração com rastreamento
@@ -7932,6 +7934,105 @@ def migration_95_cronograma_templates():
 
     except Exception as e:
         logger.error(f"Erro na migracao 95: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_96_rdo_servico_subatividade_produtividade():
+    """
+    Migração 96: rdo_servico_subatividade — adicionar campos de produtividade V2:
+    - subatividade_mestre_id (FK opcional para subatividade_mestre)
+    - quantidade_produzida (Float nullable)
+    - meta_produtividade_snapshot (Float nullable)
+    - unidade_medida_snapshot (VARCHAR(50) nullable)
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        colunas = [
+            ("subatividade_mestre_id", "INTEGER REFERENCES subatividade_mestre(id) ON DELETE SET NULL"),
+            ("quantidade_produzida", "FLOAT"),
+            ("meta_produtividade_snapshot", "FLOAT"),
+            ("unidade_medida_snapshot", "VARCHAR(50)"),
+        ]
+
+        for col_name, col_def in colunas:
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'rdo_servico_subatividade' AND column_name = %s
+            """, (col_name,))
+            if not cursor.fetchone():
+                logger.info(f"  Adicionando coluna {col_name} em rdo_servico_subatividade...")
+                cursor.execute(f"ALTER TABLE rdo_servico_subatividade ADD COLUMN {col_name} {col_def}")
+                logger.info(f"  Coluna {col_name} adicionada.")
+            else:
+                logger.info(f"  Coluna {col_name} já existe em rdo_servico_subatividade.")
+
+        cursor.execute("""
+            SELECT indexname FROM pg_indexes
+            WHERE tablename = 'rdo_servico_subatividade'
+              AND indexname = 'idx_rdo_servico_sub_mestre_id'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("""
+                CREATE INDEX idx_rdo_servico_sub_mestre_id
+                ON rdo_servico_subatividade(subatividade_mestre_id)
+            """)
+            logger.info("  Índice idx_rdo_servico_sub_mestre_id criado.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 96 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 96: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_97_rdo_mao_obra_produtividade():
+    """
+    Migração 97: rdo_mao_obra — adicionar campos de produtividade calculados:
+    - produtividade_real (Float nullable)  = quantidade_produzida / horas_trabalhadas
+    - indice_produtividade (Float nullable) = produtividade_real / meta_produtividade_snapshot
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        for col_name in ("produtividade_real", "indice_produtividade"):
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'rdo_mao_obra' AND column_name = %s
+            """, (col_name,))
+            if not cursor.fetchone():
+                logger.info(f"  Adicionando coluna {col_name} em rdo_mao_obra...")
+                cursor.execute(f"ALTER TABLE rdo_mao_obra ADD COLUMN {col_name} FLOAT")
+                logger.info(f"  Coluna {col_name} adicionada.")
+            else:
+                logger.info(f"  Coluna {col_name} já existe em rdo_mao_obra.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 97 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 97: {e}")
         if connection:
             try:
                 connection.rollback()

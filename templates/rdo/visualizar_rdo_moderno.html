@@ -953,6 +953,71 @@ console.log('Initializing RDO view with light theme...');
                             <div class="progress-bar">
                                 <div class="progress-fill" style="width: {{ subatividade.percentual_conclusao or 0 }}%"></div>
                             </div>
+                            {% if subatividade.quantidade_produzida is not none and subatividade.quantidade_produzida > 0 %}
+                            <div class="mt-2 px-1" style="font-size:.82rem">
+                                <span class="text-success fw-semibold">
+                                    <i class="fas fa-ruler me-1"></i>
+                                    {{ "%.2f"|format(subatividade.quantidade_produzida) }}
+                                    {% if subatividade.unidade_medida_snapshot %}{{ subatividade.unidade_medida_snapshot }}{% endif %}
+                                </span>
+                                {% if subatividade.meta_produtividade_snapshot and subatividade.meta_produtividade_snapshot > 0 %}
+                                <span class="text-muted ms-1">
+                                    — meta: {{ "%.2f"|format(subatividade.meta_produtividade_snapshot) }}
+                                    {% if subatividade.unidade_medida_snapshot %}{{ subatividade.unidade_medida_snapshot }}{% endif %}/h
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
+                            {% if is_v2_active is defined and is_v2_active() and rdo.status == 'Finalizado' %}
+                            {% set maos_sub = subatividade.mao_obra_registros if subatividade.mao_obra_registros else [] %}
+                            {% set maos_com_prod = maos_sub | selectattr('produtividade_real') | list %}
+                            {% if maos_com_prod %}
+                            <div class="mt-2" style="font-size:.78rem">
+                                <table class="table table-sm table-borderless mb-0">
+                                    <thead><tr>
+                                        <th class="text-muted py-0">Funcionário</th>
+                                        <th class="text-muted py-0">Horas</th>
+                                        <th class="text-muted py-0">Produt.</th>
+                                        <th class="text-muted py-0">Índice</th>
+                                    </tr></thead>
+                                    <tbody>
+                                    {% for mo in maos_com_prod %}
+                                    {% set idx = mo.indice_produtividade %}
+                                    {% if idx is not none %}
+                                        {% if idx >= 1.0 %}
+                                            {% set badge_class = 'bg-success' %}
+                                        {% elif idx >= 0.8 %}
+                                            {% set badge_class = 'bg-warning text-dark' %}
+                                        {% else %}
+                                            {% set badge_class = 'bg-danger' %}
+                                        {% endif %}
+                                    {% else %}
+                                        {% set badge_class = 'bg-secondary' %}
+                                    {% endif %}
+                                    <tr>
+                                        <td class="py-0">{{ mo.funcionario.nome if mo.funcionario else '—' }}</td>
+                                        <td class="py-0">{{ "%.1f"|format(mo.horas_trabalhadas) }}h</td>
+                                        <td class="py-0">
+                                            {% if mo.produtividade_real is not none %}
+                                                {{ "%.2f"|format(mo.produtividade_real) }}
+                                                {% if subatividade.unidade_medida_snapshot %}{{ subatividade.unidade_medida_snapshot }}{% endif %}/h
+                                            {% else %}—{% endif %}
+                                        </td>
+                                        <td class="py-0">
+                                            {% if idx is not none %}
+                                            <span class="badge {{ badge_class }}" style="font-size:.7rem">
+                                                {{ "%.2f"|format(idx) }}×
+                                            </span>
+                                            {% else %}—{% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+                            {% endif %}
                         </div>
                         {% endfor %}
                         

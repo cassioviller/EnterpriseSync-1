@@ -816,6 +816,10 @@ class RDOMaoObra(db.Model):
     subatividade_id = db.Column(db.Integer, db.ForeignKey('rdo_servico_subatividade.id', ondelete='CASCADE'), nullable=True)
     tarefa_cronograma_id = db.Column(db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'), nullable=True)
 
+    # Produtividade V2 (migration #97)
+    produtividade_real = db.Column(db.Float, nullable=True)
+    indice_produtividade = db.Column(db.Float, nullable=True)
+
     # Relacionamentos
     funcionario = db.relationship('Funcionario', backref='rdos_mao_obra', overlaps="rdos_mao_obra")
     subatividade = db.relationship('RDOServicoSubatividade', backref='mao_obra_registros', foreign_keys=[subatividade_id])
@@ -1138,6 +1142,14 @@ class RDOServicoSubatividade(db.Model):
     ordem_execucao = db.Column(db.Integer)
     ativo = db.Column(db.Boolean, default=True)
     admin_id = db.Column(db.Integer, nullable=False)
+
+    # Produtividade V2 (migration #96)
+    subatividade_mestre_id = db.Column(db.Integer, db.ForeignKey('subatividade_mestre.id', ondelete='SET NULL'), nullable=True)
+    quantidade_produzida = db.Column(db.Float, nullable=True)
+    meta_produtividade_snapshot = db.Column(db.Float, nullable=True)
+    unidade_medida_snapshot = db.Column(db.String(50), nullable=True)
+
+    subatividade_mestre = db.relationship('SubatividadeMestre', backref='rdo_subatividades', foreign_keys=[subatividade_mestre_id])
     
     # Controle de tempo
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
