@@ -84,6 +84,13 @@ def editar_rdo_form(rdo_id):
                 'horas': func_rdo.horas_trabalhadas
             }
         
+        # Buscar lista de todos os funcionários ativos do admin (para seleção por subatividade)
+        from models import Funcionario
+        funcionarios_todos_list = [
+            {'id': f.id, 'nome': f.nome, 'cargo': f.funcao_ref.nome if f.funcao_ref else 'Operacional'}
+            for f in Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+        ]
+
         # Buscar dados completos da obra para carregar serviços
         obra_selecionada = rdo.obra_id
         
@@ -121,6 +128,7 @@ def editar_rdo_form(rdo_id):
                              subatividades_data=subatividades_data,
                              subatividades_rdo_lista=subatividades_rdo_lista,
                              funcionarios_data=funcionarios_data,
+                             funcionarios_todos_list=funcionarios_todos_list,
                              apontamentos_cronograma=apontamentos_cronograma)
 
     except Exception as e:
@@ -284,6 +292,19 @@ def salvar_edicao_rdo(rdo_id):
                 continue
         
         logger.info(f"💾 Total de {subatividades_salvas} subatividades salvas na edição")
+
+        # Flush para obter IDs das novas subatividades (necessário antes de criar RDOMaoObra)
+        db.session.flush()
+
+        # Construir mapeamento: sub_mestre_id → RDOServicoSubatividade.id (recém-criado)
+        sub_mestre_to_db_id = {}
+        novos_subs = RDOServicoSubatividade.query.filter_by(rdo_id=rdo_id).all()
+        for ns in novos_subs:
+            m_id = getattr(ns, 'subatividade_mestre_id', None)
+            if m_id:
+                sub_mestre_to_db_id[m_id] = ns.id
+
+        logger.info(f"🔗 Mapeamento sub_mestre→db_id: {sub_mestre_to_db_id}")
         
         # Processar funcionários selecionados
         funcionarios_selecionados = request.form.getlist('funcionarios_selecionados')
@@ -293,36 +314,59 @@ def salvar_edicao_rdo(rdo_id):
         from models import RDOMaoObra
         RDOMaoObra.query.filter_by(rdo_id=rdo_id).delete()
         
-        # Salvar novos funcionários
+        import re as _re
+        _sub_func_pattern = _re.compile(r'^sub_func_(\d+)_(\d+)_horas$')
+
+        # Processar vínculos per-subatividade (sub_func_{sub_mestre_id}_{func_id}_horas)
+        func_ids_vinculados = set()
         funcionarios_salvos = 0
-        for func_id in funcionarios_selecionados:
-            try:
-                func_id = int(func_id)
-                
-                # Buscar dados dos campos específicos do funcionário
-                funcao_campo = f'funcao_{func_id}'
-                horas_campo = f'horas_{func_id}'
-                
-                funcao_exercida = request.form.get(funcao_campo, 'Operacional')
-                horas_trabalhadas = float(request.form.get(horas_campo, 8.0))
-                
-                # Verificar se funcionário pertence ao admin
+        for campo, valor in request.form.items():
+            m = _sub_func_pattern.match(campo)
+            if m and valor:
+                sub_mestre_id = int(m.group(1))
+                func_id = int(m.group(2))
+                horas_trabalhadas = float(valor) if valor else 0.0
+                if horas_trabalhadas <= 0:
+                    continue
                 funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
                 if funcionario:
-                    # Criar registro na tabela RDOMaoObra
+                    sub_db_id = sub_mestre_to_db_id.get(sub_mestre_id)
+                    funcao_exercida = request.form.get(f'funcao_{func_id}', 'Operacional')
                     rdo_funcionario = RDOMaoObra(
                         rdo_id=rdo_id,
                         funcionario_id=func_id,
                         funcao_exercida=funcao_exercida,
                         horas_trabalhadas=horas_trabalhadas,
-                        admin_id=admin_id
+                        admin_id=admin_id,
+                        subatividade_id=sub_db_id,
+                    )
+                    db.session.add(rdo_funcionario)
+                    func_ids_vinculados.add(func_id)
+                    funcionarios_salvos += 1
+                    logger.info(f"✅ Funcionário por subatividade: {funcionario.nome} → sub_mestre={sub_mestre_id} sub_db={sub_db_id} {horas_trabalhadas}h")
+
+        # Processar funcionários sem vínculo de subatividade (campos horas_{func_id})
+        for func_id in funcionarios_selecionados:
+            try:
+                func_id = int(func_id)
+                if func_id in func_ids_vinculados:
+                    continue  # já criado com vínculo de subatividade
+                funcao_exercida = request.form.get(f'funcao_{func_id}', 'Operacional')
+                horas_trabalhadas = float(request.form.get(f'horas_{func_id}', 8.0))
+                funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
+                if funcionario:
+                    rdo_funcionario = RDOMaoObra(
+                        rdo_id=rdo_id,
+                        funcionario_id=func_id,
+                        funcao_exercida=funcao_exercida,
+                        horas_trabalhadas=horas_trabalhadas,
+                        admin_id=admin_id,
                     )
                     db.session.add(rdo_funcionario)
                     funcionarios_salvos += 1
-                    logger.info(f"✅ Funcionário editado: {funcionario.nome} - {funcao_exercida} - {horas_trabalhadas}h")
+                    logger.info(f"✅ Funcionário geral: {funcionario.nome} - {funcao_exercida} - {horas_trabalhadas}h")
                 else:
                     logger.warning(f"⚠️ Funcionário {func_id} não encontrado ou não pertence ao admin")
-                    
             except Exception as e:
                 logger.error(f"❌ Erro ao salvar funcionário {func_id}: {e}")
                 continue

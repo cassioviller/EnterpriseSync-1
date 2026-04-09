@@ -533,12 +533,8 @@ def finalizar_rdo(rdo_id):
         ).all()
 
         for sub in subs_com_meta:
-            # Tentar primeiro por subatividade_id; fallback para todas as mão de obra do RDO
+            # Calcular somente para registros explicitamente vinculados à subatividade
             maos_obra = RDOMaoObra.query.filter_by(rdo_id=rdo_id, subatividade_id=sub.id).all()
-            if not maos_obra:
-                # Fluxo de edição não vincula subatividade_id; distribuir para todos os funcionários
-                maos_obra = RDOMaoObra.query.filter_by(rdo_id=rdo_id).all()
-
             for mo in maos_obra:
                 if mo.horas_trabalhadas and mo.horas_trabalhadas > 0:
                     mo.produtividade_real = sub.quantidade_produzida / mo.horas_trabalhadas

@@ -541,6 +541,64 @@ const funcionariosAtuais = {{ (funcionarios_data or [])|tojson }};
 const rdoId = {{ rdo.id }};
 // Subatividades já salvas no RDO (para V2 que não usa ServicoObraReal)
 const subatividadesSalvas = {{ (subatividades_rdo_lista or [])|tojson }};
+// Lista de todos os funcionários ativos do admin (para seleção por subatividade)
+const funcionariosTodosLista = {{ (funcionarios_todos_list or [])|tojson }};
+
+/**
+ * Gera campos HTML para seleção de funcionários vinculados a uma subatividade específica.
+ * Usa o formato sub_func_{sub_mestre_id}_{func_id}_horas para criar RDOMaoObra com subatividade_id.
+ */
+function renderCamposEmpregadosPorSubatividade(subMestreId) {
+    if (!funcionariosTodosLista || funcionariosTodosLista.length === 0) return '';
+    let html = `
+        <div class="mt-2 pt-2 border-top border-success border-opacity-25">
+            <div class="fw-semibold small text-success mb-1">
+                <i class="fas fa-users me-1"></i>Funcionários nesta subatividade
+            </div>
+            <div class="row g-1">
+    `;
+    funcionariosTodosLista.forEach(func => {
+        const jaVinculado = funcionariosAtuais && funcionariosAtuais[func.id];
+        const horasAtual = jaVinculado ? funcionariosAtuais[func.id].horas : '';
+        html += `
+            <div class="col-12 col-sm-6" style="font-size:.8rem">
+                <div class="input-group input-group-sm">
+                    <div class="input-group-text p-1">
+                        <input class="form-check-input m-0"
+                               type="checkbox"
+                               id="chk_sub_${subMestreId}_${func.id}"
+                               onchange="toggleSubFuncHoras(${subMestreId},${func.id},this.checked)"
+                               ${jaVinculado ? 'checked' : ''}>
+                    </div>
+                    <label class="input-group-text flex-grow-1 text-start justify-content-start p-1"
+                           for="chk_sub_${subMestreId}_${func.id}">${func.nome}</label>
+                    <input type="number"
+                           class="form-control p-1"
+                           id="sub_func_horas_${subMestreId}_${func.id}"
+                           name="sub_func_${subMestreId}_${func.id}_horas"
+                           value="${horasAtual}"
+                           step="0.1" min="0" placeholder="h"
+                           form="formEditarRDO"
+                           style="max-width:60px"
+                           ${jaVinculado ? '' : 'disabled'}>
+                </div>
+            </div>
+        `;
+    });
+    html += `
+            </div>
+        </div>
+    `;
+    return html;
+}
+
+function toggleSubFuncHoras(subMestreId, funcId, checked) {
+    const input = document.getElementById(`sub_func_horas_${subMestreId}_${funcId}`);
+    if (input) {
+        input.disabled = !checked;
+        if (!checked) input.value = '';
+    }
+}
 
 function carregarServicosParaEdicao() {
     const obraId = document.getElementById('obra_id').value || obraIdAtual;
@@ -617,6 +675,8 @@ function renderizarServicosParaEdicao(data) {
                 const unidade = subatividade.unidade_medida || '';
                 const qtdAtual = subatividade.quantidade_produzida != null ? subatividade.quantidade_produzida : '';
 
+                const empField = temMeta ? renderCamposEmpregadosPorSubatividade(subatividade.id) : '';
+
                 const qtdField = temMeta ? `
                     <div class="mt-2">
                         <label class="form-label small text-success fw-semibold mb-1">
@@ -655,6 +715,7 @@ function renderizarServicosParaEdicao(data) {
                             <span class="input-group-text">%</span>
                         </div>
                         ${qtdField}
+                        ${empField}
                     </div>
                 `;
             });
@@ -688,6 +749,8 @@ function renderizarServicosParaEdicao(data) {
             const temMeta = subatividade.meta_produtividade_snapshot != null && subatividade.meta_produtividade_snapshot > 0;
             const unidade = subatividade.unidade_medida_snapshot || '';
             const qtdAtual = subatividade.quantidade_produzida != null ? subatividade.quantidade_produzida : '';
+
+            const empField = temMeta ? renderCamposEmpregadosPorSubatividade(subatividade.id) : '';
 
             const qtdField = temMeta ? `
                 <div class="mt-2">
@@ -727,6 +790,7 @@ function renderizarServicosParaEdicao(data) {
                         <span class="input-group-text">%</span>
                     </div>
                     ${qtdField}
+                    ${empField}
                 </div>
             `;
         });
