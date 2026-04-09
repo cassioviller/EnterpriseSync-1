@@ -1095,6 +1095,25 @@ def finalizar_rdo(id):
         
         # Finalizar RDO
         rdo.status = 'Finalizado'
+
+        # Calcular produtividade por funcionário vinculado (V2) — mesma transação
+        subs_com_meta = RDOServicoSubatividade.query.filter(
+            RDOServicoSubatividade.rdo_id == id,
+            RDOServicoSubatividade.quantidade_produzida.isnot(None),
+            RDOServicoSubatividade.meta_produtividade_snapshot.isnot(None),
+            RDOServicoSubatividade.meta_produtividade_snapshot > 0,
+        ).all()
+        for sub in subs_com_meta:
+            maos_obra = RDOMaoObra.query.filter_by(rdo_id=id, subatividade_id=sub.id).all()
+            for mo in maos_obra:
+                if mo.horas_trabalhadas and mo.horas_trabalhadas > 0:
+                    mo.produtividade_real = sub.quantidade_produzida / mo.horas_trabalhadas
+                    mo.indice_produtividade = mo.produtividade_real / sub.meta_produtividade_snapshot
+                else:
+                    mo.produtividade_real = None
+                    mo.indice_produtividade = None
+        logger.info(f"[PRODUTIVIDADE] RDO {rdo.numero_rdo}: {len(subs_com_meta)} subatividade(s) calculadas.")
+
         db.session.commit()
         
         # [OK] NOVO: Emitir evento rdo_finalizado para integração com módulo de custos

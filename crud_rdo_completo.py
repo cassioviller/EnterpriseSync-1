@@ -188,51 +188,8 @@ def editar_rdo(rdo_id):
 @rdo_crud_bp.route('/visualizar/<int:rdo_id>')
 @login_required
 def visualizar_rdo(rdo_id):
-    """Visualizar RDO em modo apenas leitura"""
-    try:
-        admin_id = get_admin_id()
-        
-        # Buscar RDO com dados completos
-        rdo = RDO.query.join(Obra).filter(
-            RDO.id == rdo_id,
-            Obra.admin_id == admin_id
-        ).first()
-        
-        if not rdo:
-            flash('RDO não encontrado ou sem permissão de acesso.', 'error')
-            return redirect(url_for('rdo_crud.listar_rdos'))
-        
-        # Carregar dados relacionados
-        rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo_id).all()
-        rdo_funcionarios = db.session.query(RDOMaoObra, Funcionario).join(
-            Funcionario, RDOMaoObra.funcionario_id == Funcionario.id
-        ).filter(RDOMaoObra.rdo_id == rdo_id).all()
-        rdo_equipamentos = RDOEquipamento.query.filter_by(rdo_id=rdo_id).all()
-        rdo_ocorrencias = RDOOcorrencia.query.filter_by(rdo_id=rdo_id).all()
-        
-        # FÓRMULA SIMPLES ESTATÍSTICAS
-        if rdo_subatividades:
-            soma_perc = sum(s.percentual_conclusao for s in rdo_subatividades)
-            total_sub = len(rdo_subatividades)
-            progresso_total = round(soma_perc / total_sub, 1)
-            logger.debug(f"[TARGET] CRUD VISUALIZAR PROGRESSO: {soma_perc}÷{total_sub} = {progresso_total}%")
-        else:
-            progresso_total = 0
-        horas_totais = sum(mo.horas_trabalhadas for mo, _ in rdo_funcionarios)
-        
-        return render_template('rdo_visualizar.html',
-                             rdo=rdo,
-                             rdo_subatividades=rdo_subatividades,
-                             rdo_funcionarios=rdo_funcionarios,
-                             rdo_equipamentos=rdo_equipamentos,
-                             rdo_ocorrencias=rdo_ocorrencias,
-                             progresso_total=round(progresso_total, 1),
-                             horas_totais=horas_totais)
-        
-    except Exception as e:
-        logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")
-        flash('Erro ao carregar RDO.', 'error')
-        return redirect(url_for('rdo_crud.listar_rdos'))
+    """Redirecionar para a visualização moderna unificada de RDO"""
+    return redirect(url_for('main.visualizar_rdo', id=rdo_id))
 
 @rdo_crud_bp.route('/salvar', methods=['POST'])
 @login_required
