@@ -1233,7 +1233,7 @@ function filtrarCatalogo(q) {
 
 function selecionarItemCatalogo(item) {
   document.getElementById('nt_nome').value = item.nome;
-  if (item.unidade_medida) document.getElementById('nt_unidade').value = item.unidade_medida;
+  document.getElementById('nt_unidade').value = item.unidade_medida || '';
   document.getElementById('nt_catalogo_id').value = item._tipo === 'subatividade' ? item.id : '';
   document.getElementById('nt_catalogo_dropdown').classList.add('d-none');
 
