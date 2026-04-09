@@ -137,7 +137,6 @@
                 <th>Tipo</th>
                 <th>Unidade</th>
                 <th>Meta (un/h)</th>
-                <th>Obrigatória</th>
                 <th>Status</th>
                 <th class="text-end pe-3">Ações</th>
               </tr>
@@ -162,13 +161,6 @@
                     {% if sub.unidade_medida %}<small class="text-muted"> {{ sub.unidade_medida }}/h</small>{% endif %}
                   {% else %}
                     <span class="text-muted small">Não definida</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if sub.obrigatoria %}
-                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Sim</span>
-                  {% else %}
-                    <span class="badge bg-light text-muted border">Não</span>
                   {% endif %}
                 </td>
                 <td>
@@ -280,13 +272,6 @@
                 <span class="input-group-text text-muted small">un/h por func.</span>
               </div>
               <div class="form-text">Produção esperada por hora por funcionário</div>
-            </div>
-            <div class="col-md-4 d-flex align-items-end">
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" name="obrigatoria" value="1" id="chkObrig" checked>
-                <label class="form-check-label fw-semibold" for="chkObrig">Obrigatória</label>
-                <div class="form-text">Sempre aparece nos RDOs</div>
-              </div>
             </div>
           </div>
         </div>
