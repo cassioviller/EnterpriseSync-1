@@ -1026,7 +1026,8 @@ def detalhe_template(template_id: int):
 
     admin_id = _admin_id()
     tmpl = CronogramaTemplate.query.filter_by(id=template_id, admin_id=admin_id).first_or_404()
-    return render_template('cronograma/template_detalhe.html', template=tmpl)
+    itens_arvore = _construir_arvore_itens(list(tmpl.itens))
+    return render_template('cronograma/template_detalhe.html', template=tmpl, itens_arvore=itens_arvore)
 
 
 @cronograma_bp.route('/templates/<int:template_id>/editar', methods=['GET', 'POST'])
@@ -1216,7 +1217,7 @@ def _salvar_arvore_template(tmpl: CronogramaTemplate, admin_id: int, arvore: lis
                 sm = _buscar_catalogo(raw_int)
                 if sm is not None:
                     # Validate catalog item tipo matches tree node tipo
-                    sm_tipo = getattr(sm, 'tipo', 'subatividade')
+                    sm_tipo = getattr(sm, 'tipo', None) or 'subatividade'
                     if sm_tipo == tipo_no:
                         sub_id = raw_int
                     else:
@@ -1265,13 +1266,13 @@ def _salvar_arvore_template(tmpl: CronogramaTemplate, admin_id: int, arvore: lis
 def _construir_arvore_itens(itens: list) -> list:
     """
     Converte lista plana de CronogramaTemplateItem em árvore aninhada (JSON-serializable).
+    Itens com filhos são automaticamente tratados como 'grupo'.
     """
-    import json as _json
     by_id = {item.id: {
         'id': item.id,
         'nome': item.nome_tarefa,
         'catalogo_id': item.subatividade_mestre_id,
-        'tipo': getattr(item.subatividade, 'tipo', 'subatividade') if item.subatividade else 'subatividade',
+        'tipo': (getattr(item.subatividade, 'tipo', None) or 'subatividade') if item.subatividade else 'subatividade',
         'quantidade_prevista': item.quantidade_prevista,
         'parent_item_id': getattr(item, 'parent_item_id', None),
         'ordem': item.ordem,
@@ -1286,12 +1287,14 @@ def _construir_arvore_itens(itens: list) -> list:
         else:
             raizes.append(node)
 
-    def _sort(nodes):
+    def _fixar_e_ordenar(nodes):
         nodes.sort(key=lambda n: n['ordem'])
         for n in nodes:
-            _sort(n['filhos'])
+            _fixar_e_ordenar(n['filhos'])
+            if n['filhos']:
+                n['tipo'] = 'grupo'
 
-    _sort(raizes)
+    _fixar_e_ordenar(raizes)
     return raizes
 
 

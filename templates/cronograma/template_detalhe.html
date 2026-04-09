@@ -69,77 +69,57 @@
   </div>
 
   <!-- Itens do template -->
-  {% if not template.itens %}
+  {% if not itens_arvore %}
   <div class="text-center py-4 text-muted">
     <i class="fas fa-list fa-2x mb-2 opacity-25 d-block"></i>
     Nenhum item cadastrado neste template.
     <a href="{{ url_for('cronograma.editar_template', template_id=template.id) }}" class="ms-2">Adicionar itens</a>
   </div>
   {% else %}
-  <div class="card border-0 shadow-sm">
-    <div class="card-header bg-transparent border-bottom py-2">
-      <h6 class="mb-0 fw-semibold"><i class="fas fa-list-check me-2 text-primary"></i>Itens do Template</h6>
-    </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th class="ps-3" style="width:40px">#</th>
-              <th>Tarefa</th>
-              <th>Duração</th>
-              <th>Qtd. Prevista</th>
-              <th>Responsável</th>
-              <th>Catálogo vinculado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in template.itens %}
-            <tr>
-              <td class="ps-3 text-muted small">{{ loop.index }}</td>
-              <td class="fw-semibold text-dark">{{ item.nome_tarefa }}</td>
-              <td>
-                <span class="badge bg-light text-dark border">
-                  {{ item.duracao_dias }} dia{{ 's' if item.duracao_dias != 1 }}
-                </span>
-              </td>
-              <td>
-                {% if item.quantidade_prevista %}
-                  <span class="fw-semibold">{{ "%.2f"|format(item.quantidade_prevista) }}</span>
-                  {% if item.subatividade and item.subatividade.unidade_medida %}
-                    <small class="text-muted"> {{ item.subatividade.unidade_medida }}</small>
-                  {% endif %}
-                {% else %}
-                  <span class="text-muted">—</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if item.responsavel == 'terceiros' %}
-                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Terceiros</span>
-                {% else %}
-                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Empresa</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if item.subatividade %}
-                  <span class="badge bg-success-subtle text-success border border-success-subtle small">
-                    <i class="fas fa-link me-1"></i>{{ item.subatividade.nome }}
-                  </span>
-                  {% if item.subatividade.meta_produtividade %}
-                    <small class="text-muted d-block">
-                      Meta: {{ "%.2f"|format(item.subatividade.meta_produtividade) }}
-                      {{ item.subatividade.unidade_medida or '' }}/h
-                    </small>
-                  {% endif %}
-                {% else %}
-                  <span class="text-muted small">Sem vínculo</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+
+  {# ── Macro recursivo para renderizar a árvore ── #}
+  {% macro render_arvore(nos, nivel=0) %}
+    {% for no in nos %}
+      {% set is_grupo = no.tipo == 'grupo' %}
+      <div class="template-no {% if nivel > 0 %}ms-4{% endif %} mb-1">
+        <div class="d-flex align-items-center gap-2 p-2 rounded border bg-white shadow-sm">
+          <i class="fas {% if is_grupo %}fa-folder text-warning{% else %}fa-tasks text-primary{% endif %} small"></i>
+          <span class="fw-semibold text-dark small flex-grow-1">{{ no.nome }}</span>
+          {% if not is_grupo %}
+            {% if no.quantidade_prevista %}
+              <span class="text-muted small">
+                Qtd: <strong>{{ "%.2f"|format(no.quantidade_prevista) }}</strong>
+              </span>
+            {% endif %}
+          {% endif %}
+          <span class="badge {% if is_grupo %}bg-warning-subtle text-warning{% else %}bg-primary-subtle text-primary{% endif %} border" style="font-size:.62rem">
+            {% if is_grupo %}Grupo{% else %}Sub{% endif %}
+          </span>
+          {# Catálogo vinculado — busca via template.itens pelo id #}
+          {% for item in template.itens %}
+            {% if item.id == no.id and item.subatividade %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:.62rem">
+                <i class="fas fa-link me-1"></i>{{ item.subatividade.nome }}
+              </span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% if no.filhos %}
+          <div class="ms-3 mt-1 border-start border-2 ps-2" style="border-color:#e5e7eb!important">
+            {{ render_arvore(no.filhos, nivel + 1) }}
+          </div>
+        {% endif %}
       </div>
+    {% endfor %}
+  {% endmacro %}
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-transparent border-bottom py-2 d-flex justify-content-between align-items-center">
+      <h6 class="mb-0 fw-semibold"><i class="fas fa-sitemap me-2 text-primary"></i>Itens do Template</h6>
+      <small class="text-muted">{{ template.itens|length }} item{{ 's' if template.itens|length != 1 }}</small>
+    </div>
+    <div class="card-body p-3">
+      {{ render_arvore(itens_arvore) }}
     </div>
   </div>
   {% endif %}
