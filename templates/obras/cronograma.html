@@ -102,10 +102,10 @@
               <th class="th-date">Início</th>
               <th class="th-date">Término</th>
               <th class="th-pred" title="ID da tarefa predecessora">Pred.</th>
+              <th class="th-qty" title="Quantidade prevista e unidade de medida">Qtd / Un.</th>
               <th class="th-resp" title="Responsável pela execução">Responsável</th>
               <th class="th-perc" title="Progresso planejado para hoje (cálculo linear de datas)">Planejado</th>
               <th class="th-perc" title="Progresso realizado, calculado automaticamente pelos apontamentos do RDO">Realizado</th>
-              <th class="th-qty">Qtd / Un.</th>
               <th class="th-act"></th>
             </tr>
           </thead>
@@ -192,6 +192,24 @@
                 </span>
               </td>
 
+              {# Quantidade / Unidade — oculta para tarefas pai #}
+              <td class="td-center small text-muted">
+                {% if is_pai %}
+                  <span class="text-muted" title="Tarefas pai não usam quantidade/unidade">—</span>
+                {% else %}
+                  <span class="qty-val"
+                        ondblclick="iniciarEdicao(this, {{ t.id }}, 'quantidade_total')"
+                        title="Duplo-clique para editar">
+                    {% if t.quantidade_total %}
+                      <span class="qty-chip">
+                        {{ t.quantidade_total | int if t.quantidade_total == t.quantidade_total|int else "%.1f"|format(t.quantidade_total) }}
+                        {{ t.unidade_medida or '' }}
+                      </span>
+                    {% else %}—{% endif %}
+                  </span>
+                {% endif %}
+              </td>
+
               {# Responsável #}
               {% set resp = t.responsavel if t.responsavel else 'empresa' %}
               <td class="td-center td-resp small">
@@ -247,18 +265,6 @@
                   <span class="perc-text {% if perc >= plan %}text-success{% elif perc > 0 %}text-warning{% else %}text-danger{% endif %}">{{ perc }}%</span>
                 </div>
                 {% endif %}
-              </td>
-
-              {# Quantidade / Unidade — oculta para tarefas pai #}
-              <td class="td-center small text-muted">
-                {% if is_pai %}
-                  <span class="text-muted" title="Tarefas pai não usam quantidade/unidade">—</span>
-                {% elif t.quantidade_total %}
-                  <span class="qty-chip">
-                    {{ t.quantidade_total | int if t.quantidade_total == t.quantidade_total|int else "%.1f"|format(t.quantidade_total) }}
-                    {{ t.unidade_medida or '' }}
-                  </span>
-                {% else %}—{% endif %}
               </td>
 
               {# Ações #}
@@ -794,6 +800,42 @@ function iniciarEdicao(el, tarefaId, campo) {
     return;
   }
 
+  if (campo === 'quantidade_total') {
+    const tarefa = tarefas.find(t => t.id === tarefaId);
+    const wrap = document.createElement('div');
+    wrap.className = 'd-flex gap-1 align-items-center';
+    wrap.style.cssText = 'min-width:120px';
+    const inpQtd = document.createElement('input');
+    inpQtd.type = 'number'; inpQtd.className = 'cell-input'; inpQtd.min = 0; inpQtd.step = 'any';
+    inpQtd.style.cssText = 'width:60px;font-size:inherit';
+    inpQtd.value = tarefa ? (tarefa.quantidade_total || '') : '';
+    inpQtd.placeholder = 'Qtd';
+    const inpUn = document.createElement('input');
+    inpUn.type = 'text'; inpUn.className = 'cell-input'; inpUn.maxLength = 20;
+    inpUn.style.cssText = 'width:48px;font-size:inherit';
+    inpUn.value = tarefa ? (tarefa.unidade_medida || '') : '';
+    inpUn.placeholder = 'Un';
+    wrap.appendChild(inpQtd); wrap.appendChild(inpUn);
+    el.innerHTML = ''; el.appendChild(wrap); inpQtd.focus(); inpQtd.select();
+    let done = false;
+    const commit = async () => {
+      if (done) return; done = true;
+      const qtd = inpQtd.value.trim();
+      const un = inpUn.value.trim();
+      const oldQtd = tarefa ? String(tarefa.quantidade_total || '') : '';
+      const oldUn = tarefa ? (tarefa.unidade_medida || '') : '';
+      if (qtd === oldQtd && un === oldUn) { restaurarCelulaQty(el, tarefaId); return; }
+      await salvarCampoQty(tarefaId, qtd, un, el);
+    };
+    inpQtd.addEventListener('blur', () => setTimeout(() => { if (!wrap.contains(document.activeElement)) commit(); }, 100));
+    inpUn.addEventListener('blur', () => setTimeout(() => { if (!wrap.contains(document.activeElement)) commit(); }, 100));
+    [inpQtd, inpUn].forEach(inp => inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { done = true; restaurarCelulaQty(el, tarefaId); }
+    }));
+    return;
+  }
+
   // Text / number input
   const inp = document.createElement('input');
   inp.type = campo === 'nome_tarefa' ? 'text' : 'number';
@@ -830,6 +872,38 @@ function restaurarCelulaDate(el, tarefaId, tipo) {
   const tarefa = tarefas.find(t => t.id === tarefaId);
   const d = tipo === 'inicio' ? (tarefa ? tarefa.data_inicio : null) : (tarefa ? tarefa.data_fim : null);
   el.textContent = d ? formatDate(d) : '—';
+}
+function restaurarCelulaQty(el, tarefaId) {
+  const tarefa = tarefas.find(t => t.id === tarefaId);
+  if (!tarefa || !tarefa.quantidade_total) { el.innerHTML = '—'; return; }
+  const n = tarefa.quantidade_total;
+  const disp = Number.isInteger(n) ? n : n.toFixed(1);
+  el.innerHTML = `<span class="qty-chip">${disp} ${tarefa.unidade_medida || ''}</span>`;
+}
+async function salvarCampoQty(tarefaId, qtdStr, un, el) {
+  try {
+    const body = {
+      quantidade_total: qtdStr === '' ? null : parseFloat(qtdStr) || null,
+      unidade_medida: un || null,
+    };
+    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      const t = data.tarefa || (data.tarefas && data.tarefas.find(x => x.id === tarefaId));
+      if (t) { const idx = tarefas.findIndex(x => x.id === tarefaId); if (idx >= 0) tarefas[idx] = {...tarefas[idx], ...t}; }
+      restaurarCelulaQty(el, tarefaId);
+      toast('Quantidade atualizada');
+    } else {
+      restaurarCelulaQty(el, tarefaId);
+      toast(data.msg || 'Erro ao salvar', 'error');
+    }
+  } catch(e) {
+    restaurarCelulaQty(el, tarefaId);
+    toast('Erro de rede', 'error');
+  }
 }
 
 async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
@@ -912,6 +986,17 @@ function updateTarefaLocal(t) {
   }
   if (planEl) planEl.innerHTML = resp === 'terceiros' ? '<span class="text-muted small">—</span>' : buildPlanCell(t.percentual_planejado || 0);
   if (dur)    dur.textContent = t.duracao_dias + 'd';
+
+  const qtyEl = row.querySelector('.qty-val');
+  if (qtyEl && !row.classList.contains('tarefa-pai')) {
+    if (t.quantidade_total) {
+      const n = t.quantidade_total;
+      const disp = Number.isInteger(n) ? n : n.toFixed(1);
+      qtyEl.innerHTML = `<span class="qty-chip">${disp} ${t.unidade_medida || ''}</span>`;
+    } else {
+      qtyEl.innerHTML = '—';
+    }
+  }
 
   row.dataset.inicio    = t.data_inicio || '';
   row.dataset.fim       = t.data_fim    || '';
@@ -1221,10 +1306,10 @@ function adicionarLinhaTabela(t) {
     <td class="td-center small"><span class="date-chip inicio-val" ondblclick="iniciarEdicao(this,${t.id},'data_inicio')" title="Duplo-clique para editar">${t.data_inicio ? formatDate(t.data_inicio) : '—'}</span></td>
     <td class="td-center small"><span class="date-chip fim-val">${t.data_fim ? formatDate(t.data_fim) : '—'}</span></td>
     <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${t.predecessora_id ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>` : '—'}</span></td>
+    <td class="td-center small text-muted"><span class="qty-val" ondblclick="iniciarEdicao(this,${t.id},'quantidade_total')" title="Duplo-clique para editar">${qtdHtml}</span></td>
     <td class="td-center td-resp small">${respBadge}</td>
     <td class="td-perc plan-val">${planCell}</td>
     <td class="td-perc perc-val">${realCell}</td>
-    <td class="td-center small text-muted">${qtdHtml}</td>
     <td class="td-actions">
       <div class="actions-wrap">
         <button class="btn-act btn-edit" onclick="abrirEditar(${t.id})" title="Editar"><i class="fas fa-pen-to-square"></i></button>
