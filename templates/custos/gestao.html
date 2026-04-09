@@ -528,7 +528,28 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
 
-                let html = `<table class="table table-sm mb-0" style="font-size:.85rem">
+                let html = '';
+
+                // Quadro de totais por obra (apenas quando há ≥ 2 obras)
+                if (json.obras_resumo && json.obras_resumo.length >= 2) {
+                    html += `<div class="mb-3">
+                      <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-hard-hat me-2 text-warning" style="font-size:.8rem"></i>
+                        <span class="fw-semibold text-muted" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.05em">Distribuição por Obra</span>
+                      </div>
+                      <div class="d-flex flex-wrap gap-2">`;
+                    json.obras_resumo.forEach(o => {
+                        html += `<div class="border rounded px-3 py-2 bg-white d-flex align-items-center gap-3" style="min-width:220px">
+                          <div style="flex:1">
+                            <div class="fw-semibold" style="font-size:.85rem">${o.obra}</div>
+                          </div>
+                          <div class="fw-bold text-dark" style="font-size:.9rem">R$ ${o.total.toFixed(2).replace('.',',')}</div>
+                        </div>`;
+                    });
+                    html += `</div></div><hr class="my-2">`;
+                }
+
+                html += `<table class="table table-sm mb-0" style="font-size:.85rem">
                   <thead class="table-light">
                     <tr>
                       <th>Data</th><th>Descrição</th><th>Obra</th>

@@ -124,23 +124,28 @@ def index():
 
     registros = q.order_by(GestaoCustoPai.data_criacao.desc()).all()
 
-    # Mapa pai_id → nome da obra (via primeiro filho com obra_id definido)
-    # Uma única query agregada — sem N+1
+    # Mapa pai_id → string com nome(s) de obra separados por vírgula
+    # Quando um pai tem filhos em múltiplas obras, todas aparecem (ex: "Obra A, Obra B")
+    # Uma única query — sem N+1, sem DISTINCT para não perder obras
     if registros:
         pai_ids = [r.id for r in registros]
         filhos_obra = (
             db.session.query(
                 GestaoCustoFilho.pai_id,
                 Obra.nome.label('obra_nome'),
-                Obra.id.label('obra_id_val'),
             )
             .join(Obra, Obra.id == GestaoCustoFilho.obra_id)
             .filter(GestaoCustoFilho.pai_id.in_(pai_ids))
             .filter(GestaoCustoFilho.admin_id == admin_id)
-            .distinct(GestaoCustoFilho.pai_id)
+            .order_by(GestaoCustoFilho.pai_id, Obra.nome)
             .all()
         )
-        obra_por_pai = {row.pai_id: row.obra_nome for row in filhos_obra}
+        from collections import defaultdict as _dd
+        _obras_acum = _dd(list)
+        for row in filhos_obra:
+            if row.obra_nome not in _obras_acum[row.pai_id]:
+                _obras_acum[row.pai_id].append(row.obra_nome)
+        obra_por_pai = {pid: ', '.join(nomes) for pid, nomes in _obras_acum.items()}
     else:
         obra_por_pai = {}
 
@@ -298,8 +303,24 @@ def filhos(pai_id):
     itens = GestaoCustoFilho.query.filter_by(pai_id=pai.id).order_by(
         GestaoCustoFilho.data_referencia.asc()).all()
 
+    # Resumo por obra: soma valor agrupada por obra (só quando ≥ 2 obras distintas)
+    from collections import defaultdict as _dd
+    _totais_obra = _dd(float)
+    for f in itens:
+        obra_nome = f.obra.nome if f.obra else None
+        if obra_nome:
+            _totais_obra[obra_nome] += float(f.valor)
+
+    obras_resumo = []
+    if len(_totais_obra) >= 2:
+        obras_resumo = [
+            {'obra': nome, 'total': round(total, 2)}
+            for nome, total in sorted(_totais_obra.items())
+        ]
+
     return jsonify({
         'status': 'ok',
+        'obras_resumo': obras_resumo,
         'itens': [
             {
                 'id': f.id,
