@@ -1356,11 +1356,11 @@ def api_produtividade():
     # ── Gráfico de barras: prod real vs meta por funcionário ───────────────
     barra_labels = [r['funcionario'] for r in ranking]
     barra_prod = [r['prod_media'] for r in ranking]
-    meta_ref = ranking[0]['meta'] if ranking and ranking[0]['meta'] else None
+    # Linha de meta só faz sentido quando há uma única subatividade selecionada (metas iguais)
+    metas_distintas = {r['meta'] for r in ranking if r['meta'] is not None}
+    meta_ref = metas_distintas.pop() if len(metas_distintas) == 1 else None
 
     # ── Gráfico de linha: evolução diária da prod média ───────────────────
-    from collections import OrderedDict
-
     dia_agg = defaultdict(lambda: {'soma': 0.0, 'count': 0})
     for mo, sub, rdo, func in rows:
         d = str(rdo.data_relatorio)
