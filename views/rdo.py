@@ -1224,6 +1224,10 @@ def duplicar_rdo(id):
             nova_sub.percentual_conclusao = sub_original.percentual_conclusao
             nova_sub.observacoes_tecnicas = sub_original.observacoes_tecnicas
             nova_sub.ordem_execucao = sub_original.ordem_execucao
+            # Copiar campos de produtividade do original (snapshot já capturado)
+            nova_sub.subatividade_mestre_id = getattr(sub_original, 'subatividade_mestre_id', None)
+            nova_sub.meta_produtividade_snapshot = getattr(sub_original, 'meta_produtividade_snapshot', None)
+            nova_sub.unidade_medida_snapshot = getattr(sub_original, 'unidade_medida_snapshot', None)
             # Detectar admin_id correto dinamicamente
             if hasattr(current_user, 'admin_id') and current_user.admin_id:
                 nova_sub.admin_id = current_user.admin_id
@@ -3645,6 +3649,9 @@ def salvar_rdo_flexivel():
                     servico_id_correto = sub_data.get('original_service_id', target_service_id)
                     logger.info(f" [LIST] [{i+1}/{len(subactivities)}] {sub_data['nome']} = {sub_data['percentual']}% (servico_id={servico_id_correto})")
                     
+                    # Buscar snapshot de produtividade do catálogo
+                    _sub_mestre = SubatividadeMestre.query.get(sub_data['sub_id']) if sub_data.get('sub_id') else None
+
                     subatividade = RDOServicoSubatividade(
                         rdo_id=rdo.id,
                         servico_id=servico_id_correto,
@@ -3652,7 +3659,10 @@ def salvar_rdo_flexivel():
                         percentual_conclusao=sub_data['percentual'],
                         observacoes_tecnicas=sub_data['observacoes'],
                         admin_id=admin_id,
-                        ativo=True
+                        ativo=True,
+                        subatividade_mestre_id=_sub_mestre.id if _sub_mestre else None,
+                        meta_produtividade_snapshot=_sub_mestre.meta_produtividade if _sub_mestre else None,
+                        unidade_medida_snapshot=_sub_mestre.unidade_medida if _sub_mestre else None,
                     )
                     
                     db.session.add(subatividade)

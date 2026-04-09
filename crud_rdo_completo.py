@@ -334,7 +334,10 @@ def salvar_rdo():
                                 percentual_conclusao=percentual,
                                 observacoes_tecnicas=observacoes,
                                 admin_id=admin_id,
-                                servico_id=subatividade.servico_id
+                                servico_id=subatividade.servico_id,
+                                subatividade_mestre_id=subatividade.id,
+                                meta_produtividade_snapshot=subatividade.meta_produtividade,
+                                unidade_medida_snapshot=subatividade.unidade_medida,
                             )
                             db.session.add(rdo_subativ)
                             subatividades_salvas += 1
@@ -521,31 +524,30 @@ def finalizar_rdo(rdo_id):
         rdo.finalizado_em = datetime.utcnow()
         rdo.finalizado_por_id = current_user.id
 
-        # Calcular produtividade por funcionário (V2)
-        try:
-            subs_com_meta = RDOServicoSubatividade.query.filter(
-                RDOServicoSubatividade.rdo_id == rdo_id,
-                RDOServicoSubatividade.quantidade_produzida.isnot(None),
-                RDOServicoSubatividade.meta_produtividade_snapshot.isnot(None),
-                RDOServicoSubatividade.meta_produtividade_snapshot > 0,
-            ).all()
+        # Calcular produtividade por funcionário (V2) — parte da mesma transação
+        subs_com_meta = RDOServicoSubatividade.query.filter(
+            RDOServicoSubatividade.rdo_id == rdo_id,
+            RDOServicoSubatividade.quantidade_produzida.isnot(None),
+            RDOServicoSubatividade.meta_produtividade_snapshot.isnot(None),
+            RDOServicoSubatividade.meta_produtividade_snapshot > 0,
+        ).all()
 
-            for sub in subs_com_meta:
-                maos_obra = RDOMaoObra.query.filter_by(
-                    rdo_id=rdo_id,
-                    subatividade_id=sub.id,
-                ).all()
-                for mo in maos_obra:
-                    if mo.horas_trabalhadas and mo.horas_trabalhadas > 0:
-                        mo.produtividade_real = sub.quantidade_produzida / mo.horas_trabalhadas
-                        mo.indice_produtividade = mo.produtividade_real / sub.meta_produtividade_snapshot
-                    else:
-                        mo.produtividade_real = None
-                        mo.indice_produtividade = None
+        for sub in subs_com_meta:
+            # Tentar primeiro por subatividade_id; fallback para todas as mão de obra do RDO
+            maos_obra = RDOMaoObra.query.filter_by(rdo_id=rdo_id, subatividade_id=sub.id).all()
+            if not maos_obra:
+                # Fluxo de edição não vincula subatividade_id; distribuir para todos os funcionários
+                maos_obra = RDOMaoObra.query.filter_by(rdo_id=rdo_id).all()
 
-            logger.info(f"[PRODUTIVIDADE] RDO {rdo.numero_rdo}: {len(subs_com_meta)} subatividade(s) com meta calculadas.")
-        except Exception as e_prod:
-            logger.warning(f"[WARN] Cálculo de produtividade falhou para RDO {rdo_id}: {e_prod}")
+            for mo in maos_obra:
+                if mo.horas_trabalhadas and mo.horas_trabalhadas > 0:
+                    mo.produtividade_real = sub.quantidade_produzida / mo.horas_trabalhadas
+                    mo.indice_produtividade = mo.produtividade_real / sub.meta_produtividade_snapshot
+                else:
+                    mo.produtividade_real = None
+                    mo.indice_produtividade = None
+
+        logger.info(f"[PRODUTIVIDADE] RDO {rdo.numero_rdo}: {len(subs_com_meta)} subatividade(s) com meta calculadas.")
 
         db.session.commit()
 

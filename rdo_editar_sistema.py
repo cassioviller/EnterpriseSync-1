@@ -213,6 +213,9 @@ def salvar_edicao_rdo(rdo_id):
         for sub_id, percentual in subatividades_processadas.items():
             logger.info(f"  - Subatividade {sub_id}: {percentual}%")
         
+        # Salvar referências das subatividades antigas ANTES de deletar (fallback para registros legados)
+        old_subs = {s.id: s for s in RDOServicoSubatividade.query.filter_by(rdo_id=rdo_id).all()}
+
         # Limpar subatividades existentes do RDO
         RDOServicoSubatividade.query.filter_by(rdo_id=rdo_id).delete()
         
@@ -228,11 +231,10 @@ def salvar_edicao_rdo(rdo_id):
                 ).first()
                 
                 if subatividade_mestre:
-                    # Ler quantidade_produzida do campo qtd_{subatividade_id}
+                    # Caminho V2: subatividade do catálogo com snapshot de produtividade
                     qtd_raw = request.form.get(f'qtd_{subatividade_id}', '').strip()
                     qtd_produzida = float(qtd_raw) if qtd_raw else None
 
-                    # Criar registro na tabela RDOServicoSubatividade
                     rdo_subatividade = RDOServicoSubatividade(
                         rdo_id=rdo_id,
                         servico_id=subatividade_mestre.servico_id,
@@ -249,9 +251,33 @@ def salvar_edicao_rdo(rdo_id):
                     )
                     db.session.add(rdo_subatividade)
                     subatividades_salvas += 1
-                    logger.info(f"✅ Subatividade editada: {subatividade_mestre.nome} - {percentual}% | qtd={qtd_produzida}")
+                    logger.info(f"✅ Subatividade V2 editada: {subatividade_mestre.nome} - {percentual}% | qtd={qtd_produzida}")
+
                 else:
-                    logger.warning(f"⚠️ Subatividade mestre {subatividade_id} não encontrada")
+                    # Caminho legado: reconstruir a partir do registro original salvo antes da deleção
+                    old_sub = old_subs.get(subatividade_id)
+                    if old_sub:
+                        qtd_raw = request.form.get(f'qtd_{subatividade_id}', '').strip()
+                        qtd_produzida = float(qtd_raw) if qtd_raw else getattr(old_sub, 'quantidade_produzida', None)
+                        rdo_subatividade = RDOServicoSubatividade(
+                            rdo_id=rdo_id,
+                            servico_id=old_sub.servico_id,
+                            nome_subatividade=old_sub.nome_subatividade,
+                            descricao_subatividade=old_sub.descricao_subatividade,
+                            percentual_conclusao=percentual,
+                            observacoes_tecnicas=f'Editado em {percentual}% - {data_relatorio}',
+                            admin_id=admin_id,
+                            ativo=True,
+                            subatividade_mestre_id=getattr(old_sub, 'subatividade_mestre_id', None),
+                            meta_produtividade_snapshot=getattr(old_sub, 'meta_produtividade_snapshot', None),
+                            unidade_medida_snapshot=getattr(old_sub, 'unidade_medida_snapshot', None),
+                            quantidade_produzida=qtd_produzida,
+                        )
+                        db.session.add(rdo_subatividade)
+                        subatividades_salvas += 1
+                        logger.info(f"✅ Subatividade legada preservada: {old_sub.nome_subatividade} - {percentual}%")
+                    else:
+                        logger.warning(f"⚠️ Subatividade {subatividade_id} não encontrada em mestre nem em registros antigos — ignorada")
                     
             except Exception as e:
                 logger.error(f"❌ Erro ao salvar subatividade {subatividade_id}: {e}")
