@@ -1161,6 +1161,49 @@ function onNomeInput(el) {
   filtrarCatalogo(el.value);
 }
 
+function _makeCatalogHeader(text) {
+  const div = document.createElement('div');
+  div.className = 'list-group-item list-group-item-secondary py-1 px-3';
+  div.style.cssText = 'font-size:.7rem;font-weight:600;letter-spacing:.05em;pointer-events:none';
+  div.textContent = text;
+  return div;
+}
+
+function _makeCatalogButton(item) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'list-group-item list-group-item-action py-2 px-3 border-0';
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'fw-medium';
+  nameSpan.textContent = item.nome;
+  btn.appendChild(nameSpan);
+
+  if (item.unidade_medida) {
+    const unSpan = document.createElement('span');
+    unSpan.className = 'text-muted ms-1 small';
+    unSpan.textContent = '(' + item.unidade_medida + ')';
+    btn.appendChild(unSpan);
+  }
+
+  if (item._tipo === 'subatividade' && item.meta_produtividade) {
+    const metaSpan = document.createElement('span');
+    metaSpan.className = 'float-end text-primary small';
+    metaSpan.textContent = item.meta_produtividade + ' ' + (item.unidade_medida || '') + '/h';
+    btn.appendChild(metaSpan);
+  }
+
+  if (item._tipo === 'servico') {
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-tools me-1 text-muted';
+    icon.style.fontSize = '.75rem';
+    btn.insertBefore(icon, nameSpan);
+  }
+
+  btn.addEventListener('click', () => selecionarItemCatalogo(item));
+  return btn;
+}
+
 function filtrarCatalogo(q) {
   const dd = document.getElementById('nt_catalogo_dropdown');
   if (!catalogoCache) { dd.classList.add('d-none'); return; }
@@ -1171,32 +1214,20 @@ function filtrarCatalogo(q) {
     : todos.filter(i => i.nome.toLowerCase().includes(query)).slice(0, 30);
   if (matches.length === 0) { dd.classList.add('d-none'); return; }
 
-  let html = '';
   const subs = matches.filter(i => i._tipo === 'subatividade');
   const svcs = matches.filter(i => i._tipo === 'servico');
 
+  dd.replaceChildren();
+
   if (subs.length) {
-    html += `<div class="list-group-item list-group-item-secondary py-1 px-3" style="font-size:.7rem;font-weight:600;letter-spacing:.05em;pointer-events:none">SUBATIVIDADES</div>`;
-    subs.forEach(i => {
-      const meta = i.meta_produtividade ? `<span class="float-end text-primary small">${i.meta_produtividade} ${i.unidade_medida}/h</span>` : '';
-      const un = i.unidade_medida ? `<span class="text-muted ms-1 small">(${i.unidade_medida})</span>` : '';
-      html += `<button type="button" class="list-group-item list-group-item-action py-2 px-3 border-0" onclick="selecionarItemCatalogo(${JSON.stringify(i).replace(/"/g,'&quot;')})">
-        <span class="fw-medium">${i.nome}</span>${un}${meta}
-      </button>`;
-    });
+    dd.appendChild(_makeCatalogHeader('SUBATIVIDADES'));
+    subs.forEach(i => dd.appendChild(_makeCatalogButton(i)));
   }
   if (svcs.length) {
-    html += `<div class="list-group-item list-group-item-secondary py-1 px-3" style="font-size:.7rem;font-weight:600;letter-spacing:.05em;pointer-events:none">SERVIÇOS</div>`;
-    svcs.forEach(i => {
-      const un = i.unidade_medida ? `<span class="text-muted ms-1 small">(${i.unidade_medida})</span>` : '';
-      html += `<button type="button" class="list-group-item list-group-item-action py-2 px-3 border-0" onclick="selecionarItemCatalogo(${JSON.stringify(i).replace(/"/g,'&quot;')})">
-        <i class="fas fa-tools me-1 text-muted" style="font-size:.75rem"></i>
-        <span class="fw-medium">${i.nome}</span>${un}
-      </button>`;
-    });
+    dd.appendChild(_makeCatalogHeader('SERVIÇOS'));
+    svcs.forEach(i => dd.appendChild(_makeCatalogButton(i)));
   }
 
-  dd.innerHTML = html;
   dd.classList.remove('d-none');
 }
 
