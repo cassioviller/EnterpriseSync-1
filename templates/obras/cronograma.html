@@ -187,7 +187,7 @@
                       ondblclick="iniciarEdicao(this, {{ t.id }}, 'predecessora_id')"
                       title="Duplo-clique para editar">
                   {% if t.predecessora_id %}
-                    <span class="badge bg-light text-secondary border">#{{ t.predecessora_id }}</span>
+                    <span class="badge bg-light text-secondary border" data-pred-id="{{ t.predecessora_id }}">#{{ t.predecessora_id }}</span>
                   {% else %}—{% endif %}
                 </span>
               </td>
@@ -754,7 +754,7 @@ function iniciarEdicao(el, tarefaId, campo) {
     tarefas.filter(t => t.id !== tarefaId).forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.id;
-      opt.textContent = `#${t.id} ${t.nome_tarefa.substring(0, 22)}`;
+      opt.textContent = `${getIndiceTabela(t.id)} ${t.nome_tarefa.substring(0, 22)}`;
       const tarefa = tarefas.find(x => x.id === tarefaId);
       if (tarefa && String(t.id) === String(tarefa.predecessora_id)) opt.selected = true;
       sel.appendChild(opt);
@@ -866,7 +866,7 @@ function restaurarCelula(el, campo, val, tarefaId) {
 function restaurarCelulaPred(el, tarefaId) {
   const tarefa = tarefas.find(t => t.id === tarefaId);
   const pid = tarefa ? tarefa.predecessora_id : null;
-  el.innerHTML = pid ? `<span class="badge bg-light text-secondary border">#${pid}</span>` : '—';
+  el.innerHTML = pid ? `<span class="badge bg-light text-secondary border">${getIndiceTabela(pid)}</span>` : '—';
 }
 function restaurarCelulaDate(el, tarefaId, tipo) {
   const tarefa = tarefas.find(t => t.id === tarefaId);
@@ -963,7 +963,7 @@ function updateTarefaLocal(t) {
   if (ini) ini.textContent = t.data_inicio ? formatDate(t.data_inicio) : '—';
   if (fim) fim.textContent = t.data_fim ? formatDate(t.data_fim) : '—';
   if (pred) pred.innerHTML = t.predecessora_id
-    ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>`
+    ? `<span class="badge bg-light text-secondary border">${getIndiceTabela(t.predecessora_id)}</span>`
     : '—';
   const resp = t.responsavel || 'empresa';
   if (percEl) {
@@ -1065,6 +1065,11 @@ async function recalcularTudo(showToast=true) {
 }
 
 // ── Modal Nova Tarefa ──
+function getIndiceTabela(tarefaId) {
+  const idx = tarefas.findIndex(t => t.id === Number(tarefaId));
+  return idx >= 0 ? idx + 1 : tarefaId;
+}
+
 function _popularSelect(id, lista, placeholder, excluirId=null) {
   const sel = document.getElementById(id);
   if (!sel) return;
@@ -1072,7 +1077,7 @@ function _popularSelect(id, lista, placeholder, excluirId=null) {
   lista.filter(t => !excluirId || t.id !== excluirId).forEach(t => {
     const opt = document.createElement('option');
     opt.value = t.id;
-    opt.textContent = `#${t.id} — ${t.nome_tarefa}`;
+    opt.textContent = `${getIndiceTabela(t.id)} — ${t.nome_tarefa}`;
     sel.appendChild(opt);
   });
 }
@@ -1305,7 +1310,7 @@ function adicionarLinhaTabela(t) {
     <td class="td-center"><span class="badge-dur dur-val" ondblclick="iniciarEdicao(this,${t.id},'duracao_dias')" title="Duplo-clique para editar">${t.duracao_dias}d</span></td>
     <td class="td-center small"><span class="date-chip inicio-val" ondblclick="iniciarEdicao(this,${t.id},'data_inicio')" title="Duplo-clique para editar">${t.data_inicio ? formatDate(t.data_inicio) : '—'}</span></td>
     <td class="td-center small"><span class="date-chip fim-val">${t.data_fim ? formatDate(t.data_fim) : '—'}</span></td>
-    <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${t.predecessora_id ? `<span class="badge bg-light text-secondary border">#${t.predecessora_id}</span>` : '—'}</span></td>
+    <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${t.predecessora_id ? `<span class="badge bg-light text-secondary border">${getIndiceTabela(t.predecessora_id)}</span>` : '—'}</span></td>
     <td class="td-center small text-muted"><span class="qty-val" ondblclick="iniciarEdicao(this,${t.id},'quantidade_total')" title="Duplo-clique para editar">${qtdHtml}</span></td>
     <td class="td-center td-resp small">${respBadge}</td>
     <td class="td-perc plan-val">${planCell}</td>
@@ -1599,7 +1604,15 @@ function cleanupRowDrag() {
 }
 
 // ── Init ──
+function updatePredBadges() {
+  document.querySelectorAll('[data-pred-id]').forEach(badge => {
+    const pid = Number(badge.dataset.predId);
+    badge.textContent = getIndiceTabela(pid);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  updatePredBadges();
   renderGantt();
   syncScroll();
   initRowDrag();
