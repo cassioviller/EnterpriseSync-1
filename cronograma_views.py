@@ -10,7 +10,10 @@ from datetime import date, datetime
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for, flash
 from flask_login import current_user, login_required
 
-from models import db, Obra, TarefaCronograma, CalendarioEmpresa, RDOApontamentoCronograma
+from models import (
+    db, Obra, TarefaCronograma, CalendarioEmpresa, RDOApontamentoCronograma,
+    CronogramaTemplate, CronogramaTemplateItem, SubatividadeMestre, Servico,
+)
 from utils.cronograma_engine import (
     recalcular_cronograma,
     verificar_ciclo,
@@ -703,3 +706,456 @@ def listar_apontamentos(rdo_id: int):
         })
 
     return jsonify({'status': 'ok', 'apontamentos': resultado})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CATÁLOGO DE SUBATIVIDADES — CRUD SubatividadeMestre com unidade/meta
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/catalogo')
+@login_required
+def catalogo_subatividades():
+    """Página de gestão do catálogo de subatividades com metas de produtividade."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+    subatividades = (
+        SubatividadeMestre.query
+        .filter_by(admin_id=admin_id)
+        .order_by(SubatividadeMestre.nome)
+        .all()
+    )
+    return render_template(
+        'cronograma/catalogo.html',
+        servicos=servicos,
+        subatividades=subatividades,
+    )
+
+
+@cronograma_bp.route('/catalogo/nova', methods=['POST'])
+@login_required
+def catalogo_nova_subatividade():
+    """Criar nova subatividade no catálogo."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    servico_id = request.form.get('servico_id', type=int)
+    nome = (request.form.get('nome') or '').strip()
+    descricao = (request.form.get('descricao') or '').strip()
+    unidade_medida = (request.form.get('unidade_medida') or '').strip() or None
+    meta_produtividade_str = request.form.get('meta_produtividade') or ''
+    ordem_padrao = request.form.get('ordem_padrao', type=int, default=0)
+    obrigatoria = request.form.get('obrigatoria') == '1'
+
+    if not nome or not servico_id:
+        flash('Nome e serviço são obrigatórios.', 'warning')
+        return redirect(url_for('cronograma.catalogo_subatividades'))
+
+    servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id).first()
+    if not servico:
+        flash('Serviço não encontrado.', 'error')
+        return redirect(url_for('cronograma.catalogo_subatividades'))
+
+    try:
+        meta = float(meta_produtividade_str) if meta_produtividade_str else None
+    except ValueError:
+        meta = None
+
+    sub = SubatividadeMestre(
+        servico_id=servico_id,
+        nome=nome,
+        descricao=descricao or None,
+        unidade_medida=unidade_medida,
+        meta_produtividade=meta,
+        ordem_padrao=ordem_padrao,
+        obrigatoria=obrigatoria,
+        admin_id=admin_id,
+    )
+    db.session.add(sub)
+    db.session.commit()
+    flash(f'Subatividade "{nome}" criada com sucesso.', 'success')
+    return redirect(url_for('cronograma.catalogo_subatividades'))
+
+
+@cronograma_bp.route('/catalogo/<int:sub_id>/editar', methods=['GET', 'POST'])
+@login_required
+def catalogo_editar_subatividade(sub_id: int):
+    """Editar subatividade do catálogo."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    sub = SubatividadeMestre.query.filter_by(id=sub_id, admin_id=admin_id).first_or_404()
+
+    if request.method == 'POST':
+        nome = (request.form.get('nome') or '').strip()
+        servico_id = request.form.get('servico_id', type=int)
+        if not nome or not servico_id:
+            flash('Nome e serviço são obrigatórios.', 'warning')
+        else:
+            servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id).first()
+            if not servico:
+                flash('Serviço não encontrado.', 'error')
+            else:
+                meta_str = request.form.get('meta_produtividade') or ''
+                try:
+                    meta = float(meta_str) if meta_str else None
+                except ValueError:
+                    meta = None
+                sub.nome = nome
+                sub.servico_id = servico_id
+                sub.descricao = (request.form.get('descricao') or '').strip() or None
+                sub.unidade_medida = (request.form.get('unidade_medida') or '').strip() or None
+                sub.meta_produtividade = meta
+                sub.ordem_padrao = request.form.get('ordem_padrao', type=int, default=0)
+                sub.obrigatoria = request.form.get('obrigatoria') == '1'
+                sub.ativo = request.form.get('ativo') == '1'
+                db.session.commit()
+                flash(f'Subatividade "{sub.nome}" atualizada.', 'success')
+                return redirect(url_for('cronograma.catalogo_subatividades'))
+
+    servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
+    return render_template('cronograma/catalogo_editar.html', sub=sub, servicos=servicos)
+
+
+@cronograma_bp.route('/catalogo/<int:sub_id>/excluir', methods=['POST'])
+@login_required
+def catalogo_excluir_subatividade(sub_id: int):
+    """Excluir subatividade do catálogo."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    sub = SubatividadeMestre.query.filter_by(id=sub_id, admin_id=admin_id).first_or_404()
+    nome = sub.nome
+    try:
+        db.session.delete(sub)
+        db.session.commit()
+        flash(f'Subatividade "{nome}" excluída.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO EXCLUIR SubatividadeMestre {sub_id}: {e}")
+        flash('Erro ao excluir. Verifique se há itens vinculados.', 'error')
+    return redirect(url_for('cronograma.catalogo_subatividades'))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TEMPLATES DE CRONOGRAMA — CRUD
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/templates')
+@login_required
+def listar_templates():
+    """Lista todos os templates de cronograma do tenant."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    templates = (
+        CronogramaTemplate.query
+        .filter_by(admin_id=admin_id)
+        .order_by(CronogramaTemplate.nome)
+        .all()
+    )
+    return render_template('cronograma/templates.html', templates=templates)
+
+
+@cronograma_bp.route('/templates/novo', methods=['GET', 'POST'])
+@login_required
+def novo_template():
+    """Criar novo template de cronograma."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+
+    if request.method == 'POST':
+        nome = (request.form.get('nome') or '').strip()
+        if not nome:
+            flash('O nome do template é obrigatório.', 'warning')
+            return redirect(url_for('cronograma.novo_template'))
+
+        tmpl = CronogramaTemplate(
+            nome=nome,
+            descricao=(request.form.get('descricao') or '').strip() or None,
+            categoria=(request.form.get('categoria') or '').strip() or None,
+            admin_id=admin_id,
+        )
+        db.session.add(tmpl)
+        db.session.flush()  # gera o ID antes de adicionar itens
+
+        _salvar_itens_template(tmpl, admin_id)
+
+        db.session.commit()
+        flash(f'Template "{tmpl.nome}" criado com sucesso.', 'success')
+        return redirect(url_for('cronograma.detalhe_template', template_id=tmpl.id))
+
+    subatividades = (
+        SubatividadeMestre.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(SubatividadeMestre.nome)
+        .all()
+    )
+    return render_template(
+        'cronograma/template_form.html',
+        template=None,
+        subatividades=subatividades,
+        itens=[],
+    )
+
+
+@cronograma_bp.route('/templates/<int:template_id>')
+@login_required
+def detalhe_template(template_id: int):
+    """Exibe detalhes e itens de um template."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    tmpl = CronogramaTemplate.query.filter_by(id=template_id, admin_id=admin_id).first_or_404()
+    return render_template('cronograma/template_detalhe.html', template=tmpl)
+
+
+@cronograma_bp.route('/templates/<int:template_id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_template(template_id: int):
+    """Editar template de cronograma."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    tmpl = CronogramaTemplate.query.filter_by(id=template_id, admin_id=admin_id).first_or_404()
+
+    if request.method == 'POST':
+        nome = (request.form.get('nome') or '').strip()
+        if not nome:
+            flash('O nome do template é obrigatório.', 'warning')
+            return redirect(url_for('cronograma.editar_template', template_id=template_id))
+
+        tmpl.nome = nome
+        tmpl.descricao = (request.form.get('descricao') or '').strip() or None
+        tmpl.categoria = (request.form.get('categoria') or '').strip() or None
+        tmpl.ativo = request.form.get('ativo') == '1'
+
+        # Remover itens antigos e recriar
+        for item in list(tmpl.itens):
+            db.session.delete(item)
+        db.session.flush()
+
+        _salvar_itens_template(tmpl, admin_id)
+
+        db.session.commit()
+        flash(f'Template "{tmpl.nome}" atualizado.', 'success')
+        return redirect(url_for('cronograma.detalhe_template', template_id=tmpl.id))
+
+    subatividades = (
+        SubatividadeMestre.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(SubatividadeMestre.nome)
+        .all()
+    )
+    return render_template(
+        'cronograma/template_form.html',
+        template=tmpl,
+        subatividades=subatividades,
+        itens=list(tmpl.itens),
+    )
+
+
+@cronograma_bp.route('/templates/<int:template_id>/excluir', methods=['POST'])
+@login_required
+def excluir_template(template_id: int):
+    """Excluir template de cronograma."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    tmpl = CronogramaTemplate.query.filter_by(id=template_id, admin_id=admin_id).first_or_404()
+    nome = tmpl.nome
+    try:
+        db.session.delete(tmpl)
+        db.session.commit()
+        flash(f'Template "{nome}" excluído.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO EXCLUIR TEMPLATE {template_id}: {e}")
+        flash('Erro ao excluir o template.', 'error')
+    return redirect(url_for('cronograma.listar_templates'))
+
+
+def _salvar_itens_template(tmpl: CronogramaTemplate, admin_id: int) -> None:
+    """
+    Lê as listas de campos do formulário e salva os itens do template.
+    Espera campos: item_nome[], item_ordem[], item_duracao_dias[],
+                   item_quantidade_prevista[], item_responsavel[],
+                   item_subatividade_mestre_id[]
+    """
+    nomes = request.form.getlist('item_nome')
+    ordens = request.form.getlist('item_ordem')
+    duracoes = request.form.getlist('item_duracao_dias')
+    quantidades = request.form.getlist('item_quantidade_prevista')
+    responsaveis = request.form.getlist('item_responsavel')
+    sub_ids = request.form.getlist('item_subatividade_mestre_id')
+
+    for i, nome in enumerate(nomes):
+        nome = (nome or '').strip()
+        if not nome:
+            continue
+        try:
+            ordem = int(ordens[i]) if i < len(ordens) else i
+        except (ValueError, IndexError):
+            ordem = i
+        try:
+            duracao = max(1, int(duracoes[i])) if i < len(duracoes) else 1
+        except (ValueError, IndexError):
+            duracao = 1
+        try:
+            qty_str = quantidades[i] if i < len(quantidades) else ''
+            qty = float(qty_str) if qty_str and qty_str.strip() else None
+        except (ValueError, IndexError):
+            qty = None
+        responsavel = (responsaveis[i] if i < len(responsaveis) else 'empresa') or 'empresa'
+        try:
+            sub_id_raw = sub_ids[i] if i < len(sub_ids) else ''
+            sub_id = int(sub_id_raw) if sub_id_raw and sub_id_raw.strip() else None
+        except (ValueError, IndexError):
+            sub_id = None
+
+        item = CronogramaTemplateItem(
+            template_id=tmpl.id,
+            subatividade_mestre_id=sub_id,
+            nome_tarefa=nome,
+            ordem=ordem,
+            duracao_dias=duracao,
+            quantidade_prevista=qty,
+            responsavel=responsavel,
+            admin_id=admin_id,
+        )
+        db.session.add(item)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# APLICAR TEMPLATE AO CRONOGRAMA DE UMA OBRA
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/obra/<int:obra_id>/aplicar-template', methods=['POST'])
+@login_required
+def aplicar_template(obra_id: int):
+    """
+    Aplica um template ao cronograma da obra, criando TarefaCronograma para
+    cada item do template. As tarefas são inseridas sequencialmente após as
+    já existentes, e o cronograma é recalculado ao final.
+    """
+    guard = _check_v2()
+    if guard:
+        flash('Funcionalidade disponível apenas no plano V2.', 'warning')
+        return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id))
+
+    admin_id = _admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+
+    template_id = request.form.get('template_id', type=int)
+    if not template_id:
+        flash('Selecione um template.', 'warning')
+        return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id))
+
+    tmpl = CronogramaTemplate.query.filter_by(id=template_id, admin_id=admin_id).first()
+    if not tmpl:
+        flash('Template não encontrado.', 'error')
+        return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id))
+
+    # Data de início: form ou hoje
+    data_inicio_str = request.form.get('data_inicio_template') or ''
+    data_inicio = _parse_date(data_inicio_str) or date.today()
+
+    # Offset de ordem para não sobrescrever tarefas existentes
+    max_ordem_row = (
+        db.session.query(db.func.max(TarefaCronograma.ordem))
+        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .scalar()
+    )
+    ordem_base = (max_ordem_row or 0) + 10
+
+    try:
+        criadas = 0
+        data_corrente = data_inicio
+        for item in tmpl.itens:
+            # unidade_medida e quantidade_total vêm da subatividade ou do item
+            unidade = None
+            quantidade = item.quantidade_prevista
+            if item.subatividade:
+                unidade = item.subatividade.unidade_medida
+
+            tarefa = TarefaCronograma(
+                obra_id=obra_id,
+                nome_tarefa=item.nome_tarefa,
+                duracao_dias=item.duracao_dias,
+                data_inicio=data_corrente,
+                quantidade_total=quantidade,
+                unidade_medida=unidade,
+                responsavel=item.responsavel or 'empresa',
+                ordem=ordem_base + (item.ordem * 10),
+                admin_id=admin_id,
+            )
+            db.session.add(tarefa)
+            # Avança data para a próxima tarefa (sequencial simples)
+            from datetime import timedelta
+            data_corrente = data_corrente + timedelta(days=item.duracao_dias)
+            criadas += 1
+
+        db.session.commit()
+
+        # Recalcular datas do cronograma
+        recalcular_cronograma(obra_id, admin_id)
+
+        flash(
+            f'Template "{tmpl.nome}" aplicado com sucesso! {criadas} tarefa(s) criada(s).',
+            'success',
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO APLICAR TEMPLATE obra={obra_id} tmpl={template_id}: {e}")
+        flash(f'Erro ao aplicar template: {str(e)}', 'error')
+
+    return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id))
+
+
+@cronograma_bp.route('/api/templates')
+@login_required
+def api_listar_templates():
+    """API JSON — lista templates para o modal de aplicação."""
+    guard = _check_v2()
+    if guard:
+        return jsonify({'status': 'error', 'msg': 'V2 only'}), 403
+
+    admin_id = _admin_id()
+    templates = (
+        CronogramaTemplate.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(CronogramaTemplate.nome)
+        .all()
+    )
+    return jsonify({
+        'status': 'ok',
+        'templates': [
+            {
+                'id': t.id,
+                'nome': t.nome,
+                'categoria': t.categoria,
+                'total_itens': len(t.itens),
+            }
+            for t in templates
+        ],
+    })

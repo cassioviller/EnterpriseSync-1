@@ -541,8 +541,8 @@ def api_subatividades_por_servico(servico_id):
         return jsonify([{
             'id': s.id,
             'nome': s.nome,
-            'unidade_medida': s.unidade_medida,
-            'quantidade_estimada': s.quantidade_estimada
+            'unidade_medida': getattr(s, 'unidade_medida', None) or '',
+            'meta_produtividade': getattr(s, 'meta_produtividade', None),
         } for s in subatividades])
     except Exception as e:
         logger.error(f"ERRO API SUBATIVIDADES: {str(e)}")

@@ -1187,6 +1187,10 @@ class SubatividadeMestre(db.Model):
     obrigatoria = db.Column(db.Boolean, default=True)  # Sempre aparece nos RDOs
     duracao_estimada_horas = db.Column(db.Float)  # Para planejamento
     complexidade = db.Column(db.Integer, default=1)  # 1-5
+
+    # Catálogo de produtividade (Migration #94)
+    unidade_medida = db.Column(db.String(30))        # ex: m², m linear, un, m³
+    meta_produtividade = db.Column(db.Float)          # ex: 5.0 → 5 m²/h por funcionário
     
     # Multi-tenant
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
@@ -1218,6 +1222,8 @@ class SubatividadeMestre(db.Model):
             'obrigatoria': self.obrigatoria,
             'duracao_estimada_horas': self.duracao_estimada_horas,
             'complexidade': self.complexidade,
+            'unidade_medida': self.unidade_medida or '',
+            'meta_produtividade': self.meta_produtividade,
             'servico_id': self.servico_id,
             'servico_nome': self.servico.nome if self.servico else None
         }
@@ -4355,3 +4361,73 @@ class ReembolsoFuncionario(db.Model):
 
     def __repr__(self):
         return f'<ReembolsoFuncionario func={self.funcionario_id} R${self.valor}>'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MÓDULO V2: TEMPLATES DE CRONOGRAMA — Migration #95
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CronogramaTemplate(db.Model):
+    """
+    Template reutilizável de cronograma.
+    O gestor define um conjunto de tarefas/subatividades padrão (ex: "Fachada",
+    "Fundação") que pode ser aplicado a qualquer obra, criando TarefaCronograma
+    automaticamente.
+    """
+    __tablename__ = 'cronograma_template'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(200), nullable=False)
+    descricao = db.Column(db.Text)
+    categoria = db.Column(db.String(100))   # ex: Fachada, Fundação, Cobertura
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    admin = db.relationship('Usuario', backref='cronograma_templates')
+    itens = db.relationship(
+        'CronogramaTemplateItem',
+        backref='template',
+        cascade='all, delete-orphan',
+        order_by='CronogramaTemplateItem.ordem',
+    )
+
+    def __repr__(self):
+        return f'<CronogramaTemplate {self.nome}>'
+
+
+class CronogramaTemplateItem(db.Model):
+    """
+    Item de um template de cronograma.
+    Cada item corresponde a uma SubatividadeMestre (catálogo) e define
+    duração estimada e quantidade prevista para a tarefa que será criada.
+    """
+    __tablename__ = 'cronograma_template_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    template_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_template.id', ondelete='CASCADE'),
+        nullable=False,
+    )
+    subatividade_mestre_id = db.Column(
+        db.Integer,
+        db.ForeignKey('subatividade_mestre.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    # Nome snapshot — para templates sem subatividade do catálogo
+    nome_tarefa = db.Column(db.String(200), nullable=False)
+    ordem = db.Column(db.Integer, default=0, nullable=False)
+    duracao_dias = db.Column(db.Integer, default=1, nullable=False)
+    quantidade_prevista = db.Column(db.Float)          # unidade vem da SubatividadeMestre
+    responsavel = db.Column(db.String(20), default='empresa')  # empresa | terceiros
+
+    admin_id = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    subatividade = db.relationship('SubatividadeMestre', backref='template_itens')
+
+    def __repr__(self):
+        return f'<CronogramaTemplateItem {self.nome_tarefa}>'

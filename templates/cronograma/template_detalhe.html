@@ -1,0 +1,164 @@
+{% extends "base_completo.html" %}
+{% block title %}Template — {{ template.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 py-2">
+
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="mb-0 fw-bold">
+        <i class="fas fa-layer-group me-2 text-primary"></i>
+        {{ template.nome }}
+        {% if template.categoria %}
+          <span class="badge bg-light text-dark border ms-2" style="font-size:.7rem">{{ template.categoria }}</span>
+        {% endif %}
+      </h4>
+      <nav aria-label="breadcrumb" class="mt-1">
+        <ol class="breadcrumb mb-0 small">
+          <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{{ url_for('cronograma.index') }}">Cronograma</a></li>
+          <li class="breadcrumb-item"><a href="{{ url_for('cronograma.listar_templates') }}">Templates</a></li>
+          <li class="breadcrumb-item active">{{ template.nome }}</li>
+        </ol>
+      </nav>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('cronograma.editar_template', template_id=template.id) }}" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-edit me-1"></i> Editar
+      </a>
+      <form action="{{ url_for('cronograma.excluir_template', template_id=template.id) }}"
+            method="POST" class="d-inline"
+            onsubmit="return confirm('Excluir este template? Esta ação não pode ser desfeita.')">
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+          <i class="fas fa-trash me-1"></i> Excluir
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ 'danger' if cat == 'error' else cat }} alert-dismissible fade show" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Resumo do template -->
+  <div class="row g-3 mb-4">
+    <div class="col-sm-4 col-md-3">
+      <div class="card border-0 shadow-sm text-center p-3">
+        <div class="fs-2 fw-bold text-primary">{{ template.itens|length }}</div>
+        <div class="small text-muted">Tarefas</div>
+      </div>
+    </div>
+    <div class="col-sm-4 col-md-3">
+      <div class="card border-0 shadow-sm text-center p-3">
+        {% set duracao = template.itens | sum(attribute='duracao_dias') %}
+        <div class="fs-2 fw-bold text-success">{{ duracao }}</div>
+        <div class="small text-muted">Dias estimados</div>
+      </div>
+    </div>
+    <div class="col-sm-4 col-md-3">
+      <div class="card border-0 shadow-sm text-center p-3">
+        {% set com_meta = template.itens | selectattr('subatividade') | selectattr('subatividade.meta_produtividade') | list | length %}
+        <div class="fs-2 fw-bold text-warning">{{ com_meta }}</div>
+        <div class="small text-muted">Com meta de produtividade</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Itens do template -->
+  {% if not template.itens %}
+  <div class="text-center py-4 text-muted">
+    <i class="fas fa-list fa-2x mb-2 opacity-25 d-block"></i>
+    Nenhum item cadastrado neste template.
+    <a href="{{ url_for('cronograma.editar_template', template_id=template.id) }}" class="ms-2">Adicionar itens</a>
+  </div>
+  {% else %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-transparent border-bottom py-2">
+      <h6 class="mb-0 fw-semibold"><i class="fas fa-list-check me-2 text-primary"></i>Itens do Template</h6>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3" style="width:40px">#</th>
+              <th>Tarefa</th>
+              <th>Duração</th>
+              <th>Qtd. Prevista</th>
+              <th>Responsável</th>
+              <th>Catálogo vinculado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in template.itens %}
+            <tr>
+              <td class="ps-3 text-muted small">{{ loop.index }}</td>
+              <td class="fw-semibold text-dark">{{ item.nome_tarefa }}</td>
+              <td>
+                <span class="badge bg-light text-dark border">
+                  {{ item.duracao_dias }} dia{{ 's' if item.duracao_dias != 1 }}
+                </span>
+              </td>
+              <td>
+                {% if item.quantidade_prevista %}
+                  <span class="fw-semibold">{{ "%.2f"|format(item.quantidade_prevista) }}</span>
+                  {% if item.subatividade and item.subatividade.unidade_medida %}
+                    <small class="text-muted"> {{ item.subatividade.unidade_medida }}</small>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if item.responsavel == 'terceiros' %}
+                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Terceiros</span>
+                {% else %}
+                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Empresa</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if item.subatividade %}
+                  <span class="badge bg-success-subtle text-success border border-success-subtle small">
+                    <i class="fas fa-link me-1"></i>{{ item.subatividade.nome }}
+                  </span>
+                  {% if item.subatividade.meta_produtividade %}
+                    <small class="text-muted d-block">
+                      Meta: {{ "%.2f"|format(item.subatividade.meta_produtividade) }}
+                      {{ item.subatividade.unidade_medida or '' }}/h
+                    </small>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted small">Sem vínculo</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="mt-4 p-3 bg-light rounded border">
+    <div class="d-flex align-items-center gap-3">
+      <i class="fas fa-info-circle text-primary fs-5"></i>
+      <div>
+        <div class="fw-semibold text-dark small">Como aplicar este template</div>
+        <div class="text-muted small">
+          Acesse o cronograma de uma obra e clique em
+          <strong>"Aplicar Template"</strong> para criar todas essas tarefas automaticamente.
+        </div>
+      </div>
+      <a href="{{ url_for('cronograma.index') }}" class="btn btn-primary btn-sm ms-auto">
+        <i class="fas fa-project-diagram me-1"></i> Ver Obras
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

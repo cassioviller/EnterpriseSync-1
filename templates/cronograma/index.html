@@ -18,7 +18,13 @@
         </ol>
       </nav>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('cronograma.catalogo_subatividades') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-book-open me-1"></i> Catálogo
+      </a>
+      <a href="{{ url_for('cronograma.listar_templates') }}" class="btn btn-outline-info btn-sm">
+        <i class="fas fa-layer-group me-1"></i> Templates
+      </a>
       <a href="{{ url_for('cronograma.calendario') }}" class="btn btn-outline-secondary btn-sm">
         <i class="fas fa-calendar-alt me-1"></i> Calendário
         {% if calendario.considerar_sabado or calendario.considerar_domingo %}

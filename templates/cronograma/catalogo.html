@@ -1,0 +1,204 @@
+{% extends "base_completo.html" %}
+{% block title %}Catálogo de Subatividades{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 py-2">
+
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="mb-0 fw-bold">
+        <i class="fas fa-book-open me-2 text-primary"></i>
+        Catálogo de Subatividades
+        <span class="badge bg-primary ms-2" style="font-size:.65rem;vertical-align:middle">V2</span>
+      </h4>
+      <nav aria-label="breadcrumb" class="mt-1">
+        <ol class="breadcrumb mb-0 small">
+          <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{{ url_for('cronograma.index') }}">Cronograma</a></li>
+          <li class="breadcrumb-item active">Catálogo</li>
+        </ol>
+      </nav>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('cronograma.listar_templates') }}" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-layer-group me-1"></i> Templates
+      </a>
+      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovaSubatividade">
+        <i class="fas fa-plus me-1"></i> Nova Subatividade
+      </button>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ 'danger' if cat == 'error' else cat }} alert-dismissible fade show" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if not subatividades %}
+  <div class="text-center py-5">
+    <i class="fas fa-book-open fa-4x text-muted opacity-25 mb-3 d-block"></i>
+    <h5 class="text-muted">Nenhuma subatividade cadastrada</h5>
+    <p class="text-muted small">Cadastre subatividades com unidade de medida e meta de produtividade<br>para monitorar o desempenho da equipe nos RDOs.</p>
+    <button class="btn btn-primary btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#modalNovaSubatividade">
+      <i class="fas fa-plus me-1"></i> Cadastrar Primeira Subatividade
+    </button>
+  </div>
+  {% else %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Nome</th>
+              <th>Serviço</th>
+              <th>Unidade</th>
+              <th>Meta (un/h)</th>
+              <th>Obrigatória</th>
+              <th>Status</th>
+              <th class="text-end pe-3">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sub in subatividades %}
+            <tr>
+              <td class="ps-3 fw-semibold text-dark">{{ sub.nome }}</td>
+              <td>
+                <span class="badge bg-light text-dark border" style="font-size:.78rem">
+                  {{ sub.servico.nome if sub.servico else '—' }}
+                </span>
+              </td>
+              <td>
+                {% if sub.unidade_medida %}
+                  <code class="text-primary">{{ sub.unidade_medida }}</code>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if sub.meta_produtividade %}
+                  <span class="fw-semibold text-success">{{ "%.2f"|format(sub.meta_produtividade) }}</span>
+                  {% if sub.unidade_medida %}<small class="text-muted"> {{ sub.unidade_medida }}/h</small>{% endif %}
+                {% else %}
+                  <span class="text-muted small">Não definida</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if sub.obrigatoria %}
+                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Sim</span>
+                {% else %}
+                  <span class="badge bg-light text-muted border">Não</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if sub.ativo %}
+                  <span class="badge bg-success-subtle text-success border border-success-subtle">Ativo</span>
+                {% else %}
+                  <span class="badge bg-secondary-subtle text-secondary border">Inativo</span>
+                {% endif %}
+              </td>
+              <td class="text-end pe-3">
+                <a href="{{ url_for('cronograma.catalogo_editar_subatividade', sub_id=sub.id) }}"
+                   class="btn btn-outline-primary btn-sm">
+                  <i class="fas fa-edit"></i>
+                </a>
+                <form action="{{ url_for('cronograma.catalogo_excluir_subatividade', sub_id=sub.id) }}"
+                      method="POST" class="d-inline"
+                      onsubmit="return confirm('Excluir subatividade &quot;{{ sub.nome }}&quot;? Esta ação não pode ser desfeita.')">
+                  <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Modal Nova Subatividade -->
+<div class="modal fade" id="modalNovaSubatividade" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form action="{{ url_for('cronograma.catalogo_nova_subatividade') }}" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">
+            <i class="fas fa-plus-circle me-2 text-primary"></i> Nova Subatividade
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+              <input type="text" name="nome" class="form-control" placeholder="Ex: Assentamento de cerâmica" required autocomplete="off">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Serviço <span class="text-danger">*</span></label>
+              <select name="servico_id" class="form-select" required>
+                <option value="">Selecione...</option>
+                {% for s in servicos %}
+                  <option value="{{ s.id }}">{{ s.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label fw-semibold">Descrição</label>
+              <textarea name="descricao" class="form-control" rows="2" placeholder="Detalhamento da subatividade..."></textarea>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Unidade de Medida</label>
+              <input type="text" name="unidade_medida" class="form-control" placeholder="Ex: m², m lin, un, m³"
+                     list="unidades-list" autocomplete="off">
+              <datalist id="unidades-list">
+                <option value="m²">
+                <option value="m³">
+                <option value="m lin">
+                <option value="un">
+                <option value="kg">
+                <option value="t">
+                <option value="h">
+                <option value="m">
+              </datalist>
+              <div class="form-text">Unidade de produção (ex: m² assentado)</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Meta de Produtividade</label>
+              <div class="input-group">
+                <input type="number" name="meta_produtividade" class="form-control"
+                       placeholder="Ex: 5.0" step="0.01" min="0">
+                <span class="input-group-text text-muted small">un/h por func.</span>
+              </div>
+              <div class="form-text">Produção esperada por hora por funcionário</div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Ordem</label>
+              <input type="number" name="ordem_padrao" class="form-control" value="0" min="0">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="obrigatoria" value="1" id="chkObrig" checked>
+                <label class="form-check-label" for="chkObrig">Obrigatória</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-1"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

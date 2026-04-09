@@ -24,6 +24,10 @@
       <button class="btn btn-success btn-sm px-3" onclick="abrirModalNovaTarefa()">
         <i class="fas fa-plus me-1"></i> Nova Tarefa
       </button>
+      <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#modalAplicarTemplate"
+              title="Aplicar template de cronograma">
+        <i class="fas fa-layer-group me-1"></i> Aplicar Template
+      </button>
       <button class="btn btn-outline-primary btn-sm" id="btnRecalcular" onclick="recalcularTudo()">
         <i class="fas fa-sync-alt me-1"></i> Recalcular
       </button>
@@ -1515,5 +1519,74 @@ document.addEventListener('DOMContentLoaded', () => {
   syncScroll();
   initRowDrag();
 });
+
+// ── Carregar templates ao abrir o modal ──
+document.getElementById('modalAplicarTemplate')?.addEventListener('show.bs.modal', async () => {
+  const sel = document.getElementById('selectTemplate');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Carregando...</option>';
+  try {
+    const res = await fetch(`{{ url_for('cronograma.api_listar_templates') }}`);
+    const data = await res.json();
+    if (data.status === 'ok' && data.templates.length) {
+      sel.innerHTML = '<option value="">Selecione um template...</option>' +
+        data.templates.map(t =>
+          `<option value="${t.id}">${t.nome}${t.categoria ? ' — ' + t.categoria : ''} (${t.total_itens} tarefas)</option>`
+        ).join('');
+    } else {
+      sel.innerHTML = '<option value="">Nenhum template disponível</option>';
+    }
+  } catch (e) {
+    sel.innerHTML = '<option value="">Erro ao carregar templates</option>';
+  }
+});
 </script>
+
+{# ── Modal Aplicar Template ── #}
+<div class="modal fade" id="modalAplicarTemplate" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('cronograma.aplicar_template', obra_id=obra.id) }}" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">
+            <i class="fas fa-layer-group me-2 text-info"></i>
+            Aplicar Template ao Cronograma
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info border-0 py-2 small mb-3">
+            <i class="fas fa-info-circle me-1"></i>
+            As tarefas do template serão <strong>adicionadas</strong> ao cronograma existente,
+            sem remover tarefas já cadastradas.
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Template <span class="text-danger">*</span></label>
+            <select id="selectTemplate" name="template_id" class="form-select" required>
+              <option value="">Selecione um template...</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Data de Início</label>
+            <input type="date" name="data_inicio_template" class="form-control"
+                   value="{{ hoje.isoformat() }}">
+            <div class="form-text">As tarefas serão encadeadas sequencialmente a partir desta data.</div>
+          </div>
+          <div class="text-end">
+            <a href="{{ url_for('cronograma.listar_templates') }}" target="_blank" class="small text-muted">
+              <i class="fas fa-external-link-alt me-1"></i> Gerenciar templates
+            </a>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-info text-white">
+            <i class="fas fa-layer-group me-1"></i> Aplicar Template
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

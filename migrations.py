@@ -3793,6 +3793,8 @@ def executar_migracoes():
             (91, "RDOMaoObra - tarefa_cronograma_id (FK SET NULL) para métricas por tarefa", migration_91_rdo_mao_obra_tarefa_cronograma),
             (92, "AlmoxarifadoMovimento - pedido_compra_id FK opcional para rastreamento de origem", migration_92_almoxarifado_pedido_compra_id),
             (93, "PedidoCompra - centro_custo_id nullable (obra é o centro de custo principal)", migration_93_pedido_compra_centro_custo_nullable),
+            (94, "SubatividadeMestre - unidade_medida e meta_produtividade para catálogo de produtividade", migration_94_subatividade_mestre_produtividade),
+            (95, "CronogramaTemplate e CronogramaTemplateItem - templates reutilizáveis de cronograma", migration_95_cronograma_templates),
         ]
         
         # Executar cada migração com rastreamento
@@ -7793,6 +7795,143 @@ def migration_90_rdo_mao_obra_subatividade():
 
     except Exception as e:
         logger.error(f"Erro na migracao 90: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_94_subatividade_mestre_produtividade():
+    """
+    Migração 94: subatividade_mestre — adicionar unidade_medida e meta_produtividade
+    para suportar o catálogo de produtividade do RDO V2.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'subatividade_mestre' AND column_name = 'unidade_medida'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando coluna unidade_medida em subatividade_mestre...")
+            cursor.execute("""
+                ALTER TABLE subatividade_mestre
+                ADD COLUMN unidade_medida VARCHAR(30)
+            """)
+            logger.info("  Coluna unidade_medida adicionada.")
+        else:
+            logger.info("  Coluna unidade_medida já existe em subatividade_mestre.")
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'subatividade_mestre' AND column_name = 'meta_produtividade'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando coluna meta_produtividade em subatividade_mestre...")
+            cursor.execute("""
+                ALTER TABLE subatividade_mestre
+                ADD COLUMN meta_produtividade FLOAT
+            """)
+            logger.info("  Coluna meta_produtividade adicionada.")
+        else:
+            logger.info("  Coluna meta_produtividade já existe em subatividade_mestre.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 94 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 94: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_95_cronograma_templates():
+    """
+    Migração 95: criar tabelas cronograma_template e cronograma_template_item
+    para templates reutilizáveis de cronograma (V2).
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # Tabela cronograma_template
+        cursor.execute("""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_name = 'cronograma_template'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Criando tabela cronograma_template...")
+            cursor.execute("""
+                CREATE TABLE cronograma_template (
+                    id SERIAL PRIMARY KEY,
+                    nome VARCHAR(200) NOT NULL,
+                    descricao TEXT,
+                    categoria VARCHAR(100),
+                    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_cronograma_template_admin ON cronograma_template(admin_id)
+            """)
+            logger.info("  Tabela cronograma_template criada.")
+        else:
+            logger.info("  Tabela cronograma_template já existe.")
+
+        # Tabela cronograma_template_item
+        cursor.execute("""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_name = 'cronograma_template_item'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Criando tabela cronograma_template_item...")
+            cursor.execute("""
+                CREATE TABLE cronograma_template_item (
+                    id SERIAL PRIMARY KEY,
+                    template_id INTEGER NOT NULL
+                        REFERENCES cronograma_template(id) ON DELETE CASCADE,
+                    subatividade_mestre_id INTEGER
+                        REFERENCES subatividade_mestre(id) ON DELETE SET NULL,
+                    nome_tarefa VARCHAR(200) NOT NULL,
+                    ordem INTEGER NOT NULL DEFAULT 0,
+                    duracao_dias INTEGER NOT NULL DEFAULT 1,
+                    quantidade_prevista FLOAT,
+                    responsavel VARCHAR(20) DEFAULT 'empresa',
+                    admin_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_cronograma_template_item_template
+                ON cronograma_template_item(template_id)
+            """)
+            logger.info("  Tabela cronograma_template_item criada.")
+        else:
+            logger.info("  Tabela cronograma_template_item já existe.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 95 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 95: {e}")
         if connection:
             try:
                 connection.rollback()
