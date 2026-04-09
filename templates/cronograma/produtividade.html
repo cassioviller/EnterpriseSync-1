@@ -1,0 +1,417 @@
+{% extends "base_completo.html" %}
+{% block title %}Dashboard de Produtividade{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 py-2">
+
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="mb-0 fw-bold">
+        <i class="fas fa-chart-line me-2 text-success"></i>
+        Dashboard de Produtividade
+        <span class="badge bg-primary ms-2" style="font-size:.65rem;vertical-align:middle">V2</span>
+      </h4>
+      <nav aria-label="breadcrumb" class="mt-1">
+        <ol class="breadcrumb mb-0 small">
+          <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{{ url_for('cronograma.index') }}">Cronograma</a></li>
+          <li class="breadcrumb-item active">Produtividade</li>
+        </ol>
+      </nav>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-clipboard-list me-1"></i> RDOs
+      </a>
+      <a href="{{ url_for('cronograma.index') }}" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-project-diagram me-1"></i> Cronograma
+      </a>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:12px">
+    <div class="card-body py-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-6 col-md-3">
+          <label class="form-label small fw-semibold mb-1">Obra</label>
+          <select id="filtroObra" class="form-select form-select-sm">
+            <option value="">Todas as obras</option>
+            {% for o in obras %}
+            <option value="{{ o.id }}">{{ o.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <label class="form-label small fw-semibold mb-1">Subatividade</label>
+          <select id="filtroSub" class="form-select form-select-sm">
+            <option value="">Todas</option>
+            {% for s in subatividades %}
+            <option value="{{ s.id }}">{{ s.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-6 col-md-2">
+          <label class="form-label small fw-semibold mb-1">Data início</label>
+          <input type="date" id="filtroDataInicio" class="form-control form-control-sm">
+        </div>
+        <div class="col-sm-6 col-md-2">
+          <label class="form-label small fw-semibold mb-1">Data fim</label>
+          <input type="date" id="filtroDataFim" class="form-control form-control-sm">
+        </div>
+        <div class="col-sm-6 col-md-2">
+          <label class="form-label small fw-semibold mb-1">Funcionário</label>
+          <select id="filtroFuncionario" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for f in funcionarios %}
+            <option value="{{ f.id }}">{{ f.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-12 d-flex gap-2 mt-1">
+          <button class="btn btn-success btn-sm px-3" onclick="carregarDados()">
+            <i class="fas fa-search me-1"></i> Aplicar Filtros
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="limparFiltros()">
+            <i class="fas fa-times me-1"></i> Limpar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cards de Resumo -->
+  <div id="cardsResumo" class="row g-3 mb-4" style="display:none!important">
+    <div class="col-sm-6 col-lg-3">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:12px;border-left:4px solid #198754!important">
+        <div class="card-body py-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="text-muted small fw-semibold">Melhor Performer</div>
+              <div id="cardMelhorNome" class="fw-bold text-truncate" style="max-width:140px">—</div>
+              <div id="cardMelhorIndice" class="text-success fw-bold fs-5">—</div>
+              <div id="cardMelhorSub" class="text-muted" style="font-size:.75rem">—</div>
+            </div>
+            <i class="fas fa-trophy text-warning fa-2x opacity-50"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:12px;border-left:4px solid #dc3545!important">
+        <div class="card-body py-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="text-muted small fw-semibold">Pior Performer</div>
+              <div id="cardPiorNome" class="fw-bold text-truncate" style="max-width:140px">—</div>
+              <div id="cardPiorIndice" class="text-danger fw-bold fs-5">—</div>
+              <div id="cardPiorSub" class="text-muted" style="font-size:.75rem">—</div>
+            </div>
+            <i class="fas fa-arrow-trend-down text-danger fa-2x opacity-50"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:12px;border-left:4px solid #0d6efd!important">
+        <div class="card-body py-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="text-muted small fw-semibold">Índice Médio Equipe</div>
+              <div id="cardMedia" class="fw-bold fs-3">—</div>
+              <div id="cardMediaLabel" class="text-muted" style="font-size:.75rem">vs meta = 1,0</div>
+            </div>
+            <i class="fas fa-users text-primary fa-2x opacity-50"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card border-0 shadow-sm h-100" style="border-radius:12px;border-left:4px solid #6c757d!important">
+        <div class="card-body py-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="text-muted small fw-semibold">Total de Registros</div>
+              <div id="cardTotal" class="fw-bold fs-3">—</div>
+              <div class="text-muted" style="font-size:.75rem">apontamentos analisados</div>
+            </div>
+            <i class="fas fa-database text-secondary fa-2x opacity-50"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado vazio inicial -->
+  <div id="estadoVazio" class="text-center py-5">
+    <i class="fas fa-chart-bar fa-4x text-muted opacity-25 mb-3"></i>
+    <h5 class="text-muted">Selecione os filtros e clique em "Aplicar Filtros"</h5>
+    <p class="text-muted small">Os dados de produtividade aparecem somente em RDOs finalizados com subatividades do catálogo.</p>
+  </div>
+
+  <!-- Loading -->
+  <div id="estadoCarregando" class="text-center py-5" style="display:none">
+    <div class="spinner-border text-success" role="status"></div>
+    <p class="mt-2 text-muted">Carregando dados...</p>
+  </div>
+
+  <!-- Sem dados -->
+  <div id="estadoSemDados" class="text-center py-5" style="display:none">
+    <i class="fas fa-search fa-4x text-muted opacity-25 mb-3"></i>
+    <h5 class="text-muted">Nenhum dado de produtividade encontrado</h5>
+    <p class="text-muted small">Tente outros filtros ou finalize RDOs com subatividades do catálogo e quantidade produzida preenchida.</p>
+  </div>
+
+  <!-- Conteúdo com dados -->
+  <div id="conteudoDados" style="display:none">
+
+    <!-- Gráficos -->
+    <div class="row g-3 mb-4">
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm" style="border-radius:12px">
+          <div class="card-body">
+            <h6 class="fw-semibold mb-3">
+              <i class="fas fa-chart-bar me-1 text-primary"></i>
+              Produtividade Real vs Meta por Funcionário
+            </h6>
+            <div style="position:relative;height:260px">
+              <canvas id="graficoBarras"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm" style="border-radius:12px">
+          <div class="card-body">
+            <h6 class="fw-semibold mb-3">
+              <i class="fas fa-chart-line me-1 text-success"></i>
+              Evolução da Produtividade Média
+            </h6>
+            <div style="position:relative;height:260px">
+              <canvas id="graficoLinha"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela Ranking -->
+    <div class="card border-0 shadow-sm" style="border-radius:12px">
+      <div class="card-body">
+        <h6 class="fw-semibold mb-3">
+          <i class="fas fa-list-ol me-1 text-warning"></i>
+          Ranking de Produtividade
+        </h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="text-muted small">#</th>
+                <th class="text-muted small">Funcionário</th>
+                <th class="text-muted small">Subatividade</th>
+                <th class="text-muted small text-end">Horas</th>
+                <th class="text-muted small text-end">Qtd Produzida</th>
+                <th class="text-muted small text-end">Prod. Média</th>
+                <th class="text-muted small text-end">Índice Médio</th>
+                <th class="text-muted small text-center">Performance</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaRankingBody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /conteudoDados -->
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+let graficoBarras = null;
+let graficoLinha = null;
+
+function limparFiltros() {
+    document.getElementById('filtroObra').value = '';
+    document.getElementById('filtroSub').value = '';
+    document.getElementById('filtroDataInicio').value = '';
+    document.getElementById('filtroDataFim').value = '';
+    document.getElementById('filtroFuncionario').value = '';
+    document.getElementById('estadoVazio').style.display = '';
+    document.getElementById('estadoSemDados').style.display = 'none';
+    document.getElementById('conteudoDados').style.display = 'none';
+    document.getElementById('cardsResumo').style.display = 'none';
+}
+
+async function carregarDados() {
+    const params = new URLSearchParams();
+    const obraId = document.getElementById('filtroObra').value;
+    const subId = document.getElementById('filtroSub').value;
+    const dataInicio = document.getElementById('filtroDataInicio').value;
+    const dataFim = document.getElementById('filtroDataFim').value;
+    const funcId = document.getElementById('filtroFuncionario').value;
+    if (obraId) params.append('obra_id', obraId);
+    if (subId) params.append('subatividade_id', subId);
+    if (dataInicio) params.append('data_inicio', dataInicio);
+    if (dataFim) params.append('data_fim', dataFim);
+    if (funcId) params.append('funcionario_id', funcId);
+
+    document.getElementById('estadoVazio').style.display = 'none';
+    document.getElementById('estadoSemDados').style.display = 'none';
+    document.getElementById('conteudoDados').style.display = 'none';
+    document.getElementById('cardsResumo').style.display = 'none';
+    document.getElementById('estadoCarregando').style.display = '';
+
+    try {
+        const resp = await fetch(`{{ url_for('cronograma.api_produtividade') }}?${params}`);
+        const data = await resp.json();
+        document.getElementById('estadoCarregando').style.display = 'none';
+
+        if (!data.ranking || data.ranking.length === 0) {
+            document.getElementById('estadoSemDados').style.display = '';
+            return;
+        }
+
+        renderCards(data.resumo);
+        renderTabela(data.ranking);
+        renderBarras(data.barra);
+        renderLinha(data.linha);
+
+        document.getElementById('cardsResumo').style.display = '';
+        document.getElementById('conteudoDados').style.display = '';
+    } catch (err) {
+        console.error('Erro ao carregar produtividade:', err);
+        document.getElementById('estadoCarregando').style.display = 'none';
+        document.getElementById('estadoSemDados').style.display = '';
+    }
+}
+
+function renderCards(resumo) {
+    const m = resumo.melhor;
+    const p = resumo.pior;
+    if (m) {
+        document.getElementById('cardMelhorNome').textContent = m.funcionario;
+        document.getElementById('cardMelhorIndice').textContent = (m.indice_medio * 100).toFixed(1) + '%';
+        document.getElementById('cardMelhorSub').textContent = m.subatividade;
+    }
+    if (p) {
+        document.getElementById('cardPiorNome').textContent = p.funcionario;
+        document.getElementById('cardPiorIndice').textContent = (p.indice_medio * 100).toFixed(1) + '%';
+        document.getElementById('cardPiorSub').textContent = p.subatividade;
+    }
+    if (resumo.media_equipe !== null) {
+        const me = resumo.media_equipe;
+        const el = document.getElementById('cardMedia');
+        el.textContent = (me * 100).toFixed(1) + '%';
+        el.className = 'fw-bold fs-3 ' + (me >= 1.0 ? 'text-success' : me >= 0.8 ? 'text-warning' : 'text-danger');
+    }
+    document.getElementById('cardTotal').textContent = resumo.total_registros;
+}
+
+function renderTabela(ranking) {
+    const tbody = document.getElementById('tabelaRankingBody');
+    const badgeClass = { success: 'bg-success', warning: 'bg-warning text-dark', danger: 'bg-danger' };
+    const badgeLabel = { success: 'Acima da Meta', warning: 'Próximo da Meta', danger: 'Abaixo da Meta' };
+    tbody.innerHTML = ranking.map((r, i) => `
+        <tr>
+            <td class="text-muted small">${i + 1}</td>
+            <td class="fw-semibold">${r.funcionario}</td>
+            <td class="text-muted small">${r.subatividade}</td>
+            <td class="text-end">${r.total_horas.toFixed(1)}h</td>
+            <td class="text-end">${r.total_qtd.toFixed(2)} ${r.unidade || ''}</td>
+            <td class="text-end">${r.prod_media.toFixed(3)} ${r.unidade || ''}/h</td>
+            <td class="text-end fw-semibold">${(r.indice_medio * 100).toFixed(1)}%</td>
+            <td class="text-center">
+                <span class="badge ${badgeClass[r.badge] || 'bg-secondary'}" style="font-size:.7rem">
+                    ${badgeLabel[r.badge] || '—'}
+                </span>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderBarras(barra) {
+    if (graficoBarras) graficoBarras.destroy();
+    const ctx = document.getElementById('graficoBarras').getContext('2d');
+    const datasets = [
+        {
+            label: 'Produtividade Real',
+            data: barra.prod,
+            backgroundColor: barra.prod.map(v => {
+                if (barra.meta === null) return 'rgba(13,110,253,.6)';
+                return v >= barra.meta ? 'rgba(25,135,84,.6)' : v >= barra.meta * 0.8 ? 'rgba(255,193,7,.7)' : 'rgba(220,53,69,.6)';
+            }),
+            borderRadius: 4,
+        },
+    ];
+    if (barra.meta !== null) {
+        datasets.push({
+            type: 'line',
+            label: 'Meta',
+            data: Array(barra.labels.length).fill(barra.meta),
+            borderColor: 'rgba(220,53,69,.8)',
+            borderDash: [5, 5],
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false,
+        });
+    }
+    graficoBarras = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: barra.labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+                y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                x: { ticks: { font: { size: 10 }, maxRotation: 30 } },
+            },
+        },
+    });
+}
+
+function renderLinha(linha) {
+    if (graficoLinha) graficoLinha.destroy();
+    const ctx = document.getElementById('graficoLinha').getContext('2d');
+    const datasets = [
+        {
+            label: 'Prod. Média Diária',
+            data: linha.valores,
+            borderColor: 'rgba(13,110,253,.8)',
+            backgroundColor: 'rgba(13,110,253,.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+        },
+    ];
+    if (linha.meta !== null) {
+        datasets.push({
+            label: 'Meta',
+            data: Array(linha.labels.length).fill(linha.meta),
+            borderColor: 'rgba(220,53,69,.7)',
+            borderDash: [5, 5],
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false,
+        });
+    }
+    graficoLinha = new Chart(ctx, {
+        type: 'line',
+        data: { labels: linha.labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+                y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                x: { ticks: { font: { size: 10 }, maxRotation: 30 } },
+            },
+        },
+    });
+}
+</script>
+{% endblock %}

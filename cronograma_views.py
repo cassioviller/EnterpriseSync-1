@@ -13,6 +13,7 @@ from flask_login import current_user, login_required
 from models import (
     db, Obra, TarefaCronograma, CalendarioEmpresa, RDOApontamentoCronograma,
     CronogramaTemplate, CronogramaTemplateItem, SubatividadeMestre, Servico,
+    RDO, RDOMaoObra, RDOServicoSubatividade, Funcionario,
 )
 from utils.cronograma_engine import (
     recalcular_cronograma,
@@ -1198,4 +1199,203 @@ def api_listar_templates():
             }
             for t in templates
         ],
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dashboard de Produtividade (V2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/produtividade')
+@login_required
+def produtividade_dashboard():
+    """Página do dashboard de produtividade de funcionários (V2)."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    subatividades = (
+        SubatividadeMestre.query
+        .join(Servico, SubatividadeMestre.servico_id == Servico.id)
+        .filter(Servico.admin_id == admin_id)
+        .order_by(SubatividadeMestre.nome)
+        .all()
+    )
+    funcionarios = (
+        Funcionario.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(Funcionario.nome)
+        .all()
+    )
+    return render_template(
+        'cronograma/produtividade.html',
+        obras=obras,
+        subatividades=subatividades,
+        funcionarios=funcionarios,
+    )
+
+
+@cronograma_bp.route('/api/produtividade')
+@login_required
+def api_produtividade():
+    """Endpoint JSON: agrega dados de produtividade por funcionário × subatividade."""
+    guard = _check_v2()
+    if guard:
+        return jsonify({'status': 'error', 'msg': 'V2 only'}), 403
+
+    admin_id = _admin_id()
+
+    obra_id = request.args.get('obra_id', type=int)
+    sub_mestre_id = request.args.get('subatividade_id', type=int)
+    func_id_filtro = request.args.get('funcionario_id', type=int)
+    data_inicio_str = request.args.get('data_inicio', '')
+    data_fim_str = request.args.get('data_fim', '')
+
+    from datetime import date as _date, datetime as _dt
+
+    try:
+        data_inicio = _dt.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else None
+    except ValueError:
+        data_inicio = None
+    try:
+        data_fim = _dt.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else None
+    except ValueError:
+        data_fim = None
+
+    # Base query: RDOMaoObra → subatividade com mestre_id → RDO finalizado
+    q = (
+        db.session.query(
+            RDOMaoObra,
+            RDOServicoSubatividade,
+            RDO,
+            Funcionario,
+        )
+        .join(RDOServicoSubatividade, RDOMaoObra.subatividade_id == RDOServicoSubatividade.id)
+        .join(RDO, RDOMaoObra.rdo_id == RDO.id)
+        .join(Funcionario, RDOMaoObra.funcionario_id == Funcionario.id)
+        .filter(
+            RDO.admin_id == admin_id,
+            RDO.status == 'Finalizado',
+            RDOServicoSubatividade.subatividade_mestre_id.isnot(None),
+            RDOMaoObra.produtividade_real.isnot(None),
+        )
+    )
+
+    if obra_id:
+        q = q.filter(RDO.obra_id == obra_id)
+    if sub_mestre_id:
+        q = q.filter(RDOServicoSubatividade.subatividade_mestre_id == sub_mestre_id)
+    if func_id_filtro:
+        q = q.filter(RDOMaoObra.funcionario_id == func_id_filtro)
+    if data_inicio:
+        q = q.filter(RDO.data_relatorio >= data_inicio)
+    if data_fim:
+        q = q.filter(RDO.data_relatorio <= data_fim)
+
+    rows = q.order_by(RDO.data_relatorio).all()
+
+    # ── Agregação por (funcionario, subatividade) ──────────────────────────
+    from collections import defaultdict
+
+    agg = defaultdict(lambda: {
+        'func_nome': '',
+        'sub_nome': '',
+        'sub_mestre_id': None,
+        'meta': None,
+        'unidade': '',
+        'total_horas': 0.0,
+        'total_qtd': 0.0,
+        'soma_prod': 0.0,
+        'soma_indice': 0.0,
+        'count': 0,
+    })
+
+    for mo, sub, rdo, func in rows:
+        key = (func.id, sub.subatividade_mestre_id)
+        entry = agg[key]
+        entry['func_nome'] = func.nome
+        entry['sub_nome'] = sub.nome_subatividade
+        entry['sub_mestre_id'] = sub.subatividade_mestre_id
+        entry['meta'] = sub.meta_produtividade_snapshot
+        entry['unidade'] = sub.unidade_medida_snapshot or ''
+        entry['total_horas'] += mo.horas_trabalhadas or 0.0
+        entry['total_qtd'] += sub.quantidade_produzida or 0.0
+        entry['soma_prod'] += mo.produtividade_real or 0.0
+        entry['soma_indice'] += mo.indice_produtividade or 0.0
+        entry['count'] += 1
+
+    ranking = []
+    for (fid, sid), e in agg.items():
+        n = e['count']
+        prod_media = round(e['soma_prod'] / n, 3) if n else 0
+        indice_medio = round(e['soma_indice'] / n, 3) if n else 0
+        if indice_medio >= 1.0:
+            badge = 'success'
+        elif indice_medio >= 0.8:
+            badge = 'warning'
+        else:
+            badge = 'danger'
+        ranking.append({
+            'funcionario_id': fid,
+            'funcionario': e['func_nome'],
+            'subatividade': e['sub_nome'],
+            'sub_mestre_id': e['sub_mestre_id'],
+            'meta': e['meta'],
+            'unidade': e['unidade'],
+            'total_horas': round(e['total_horas'], 1),
+            'total_qtd': round(e['total_qtd'], 2),
+            'prod_media': prod_media,
+            'indice_medio': indice_medio,
+            'badge': badge,
+            'registros': n,
+        })
+    ranking.sort(key=lambda x: x['indice_medio'], reverse=True)
+
+    # ── Gráfico de barras: prod real vs meta por funcionário ───────────────
+    barra_labels = [r['funcionario'] for r in ranking]
+    barra_prod = [r['prod_media'] for r in ranking]
+    meta_ref = ranking[0]['meta'] if ranking and ranking[0]['meta'] else None
+
+    # ── Gráfico de linha: evolução diária da prod média ───────────────────
+    from collections import OrderedDict
+
+    dia_agg = defaultdict(lambda: {'soma': 0.0, 'count': 0})
+    for mo, sub, rdo, func in rows:
+        d = str(rdo.data_relatorio)
+        if mo.produtividade_real is not None:
+            dia_agg[d]['soma'] += mo.produtividade_real
+            dia_agg[d]['count'] += 1
+
+    linha_labels = sorted(dia_agg.keys())
+    linha_valores = [
+        round(dia_agg[d]['soma'] / dia_agg[d]['count'], 3) if dia_agg[d]['count'] else 0
+        for d in linha_labels
+    ]
+
+    # ── Cards de resumo ───────────────────────────────────────────────────
+    melhor = ranking[0] if ranking else None
+    pior = ranking[-1] if ranking else None
+    media_equipe = round(sum(r['indice_medio'] for r in ranking) / len(ranking), 3) if ranking else None
+
+    return jsonify({
+        'status': 'ok',
+        'ranking': ranking,
+        'barra': {
+            'labels': barra_labels,
+            'prod': barra_prod,
+            'meta': meta_ref,
+        },
+        'linha': {
+            'labels': linha_labels,
+            'valores': linha_valores,
+            'meta': meta_ref,
+        },
+        'resumo': {
+            'melhor': melhor,
+            'pior': pior,
+            'media_equipe': media_equipe,
+            'total_registros': len(rows),
+        },
     })

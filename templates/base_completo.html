@@ -704,6 +704,9 @@
                               <li><a class="dropdown-item" href="{{ url_for('cronograma.index') }}">
                                 <i class="fas fa-project-diagram me-1 text-primary"></i> Cronograma <span class="badge bg-primary ms-1" style="font-size:.65rem">V2</span>
                               </a></li>
+                              <li><a class="dropdown-item" href="{{ url_for('cronograma.produtividade_dashboard') }}">
+                                <i class="fas fa-chart-line me-1 text-success"></i> Produtividade <span class="badge bg-success ms-1" style="font-size:.65rem">V2</span>
+                              </a></li>
                             </ul>
                           {% else %}
                             <a class="nav-link" href="{{ url_for('main.obras') }}">
