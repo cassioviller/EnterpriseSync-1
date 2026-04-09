@@ -322,7 +322,7 @@
               <input type="text" id="nt_nome" class="form-control form-control-lg"
                      placeholder="Digite ou busque no catálogo..."
                      autocomplete="off"
-                     oninput="filtrarCatalogo(this.value)"
+                     oninput="onNomeInput(this)"
                      onfocus="filtrarCatalogo(this.value)">
               <input type="hidden" id="nt_catalogo_id">
               <div id="nt_catalogo_dropdown"
@@ -1150,6 +1150,15 @@ async function carregarCatalogo() {
       servicos: (data.servicos || []).map(s => ({...s, _tipo: 'servico'})),
     };
   } catch(e) { /* silently ignore */ }
+}
+
+function onNomeInput(el) {
+  const catId = document.getElementById('nt_catalogo_id').value;
+  if (catId) {
+    document.getElementById('nt_catalogo_id').value = '';
+    document.getElementById('nt_meta_badge').classList.add('d-none');
+  }
+  filtrarCatalogo(el.value);
 }
 
 function filtrarCatalogo(q) {

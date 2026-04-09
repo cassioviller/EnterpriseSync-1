@@ -264,6 +264,12 @@ def criar_tarefa(obra_id: int):
         sub_mestre_id = int(sub_mestre_id) if sub_mestre_id else None
     except (ValueError, TypeError):
         sub_mestre_id = None
+    if sub_mestre_id is not None:
+        sub_obj = SubatividadeMestre.query.filter_by(
+            id=sub_mestre_id, admin_id=admin_id, ativo=True
+        ).first()
+        if sub_obj is None:
+            sub_mestre_id = None
 
     tarefa = TarefaCronograma(
         obra_id=obra_id,
@@ -334,8 +340,15 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
     if 'subatividade_mestre_id' in data:
         try:
             val = data['subatividade_mestre_id']
-            tarefa.subatividade_mestre_id = int(val) if val else None
+            parsed_id = int(val) if val else None
         except (ValueError, TypeError):
+            parsed_id = None
+        if parsed_id is not None:
+            sub_obj = SubatividadeMestre.query.filter_by(
+                id=parsed_id, admin_id=admin_id, ativo=True
+            ).first()
+            tarefa.subatividade_mestre_id = sub_obj.id if sub_obj else None
+        else:
             tarefa.subatividade_mestre_id = None
 
     if 'responsavel' in data:
