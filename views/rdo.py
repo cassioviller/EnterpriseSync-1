@@ -704,11 +704,15 @@ def visualizar_rdo(id):
         logger.info("[DOC] TEMPLATE: rdo/visualizar_rdo_moderno.html (MODERNO)")
         logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
         # Buscar RDO diretamente sem verificação de acesso
+        admin_id_atual = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         rdo = RDO.query.options(
             db.joinedload(RDO.obra),
             db.joinedload(RDO.criado_por),
             db.joinedload(RDO.fotos)
-        ).filter(RDO.id == id).first()
+        ).join(Obra).filter(
+            RDO.id == id,
+            Obra.admin_id == admin_id_atual
+        ).first()
         
         if not rdo:
             flash('RDO não encontrado.', 'error')

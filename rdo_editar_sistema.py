@@ -257,6 +257,8 @@ def salvar_edicao_rdo(rdo_id):
                     # Caminho V2: subatividade do catálogo com snapshot de produtividade
                     qtd_raw = request.form.get(f'qtd_{subatividade_id}', '').strip()
                     qtd_produzida = float(qtd_raw) if qtd_raw else None
+                    if qtd_produzida is not None and qtd_produzida < 0:
+                        qtd_produzida = 0.0
 
                     rdo_subatividade = RDOServicoSubatividade(
                         rdo_id=rdo_id,
@@ -282,6 +284,8 @@ def salvar_edicao_rdo(rdo_id):
                     if old_sub:
                         qtd_raw = request.form.get(f'qtd_{subatividade_id}', '').strip()
                         qtd_produzida = float(qtd_raw) if qtd_raw else getattr(old_sub, 'quantidade_produzida', None)
+                        if qtd_produzida is not None and qtd_produzida < 0:
+                            qtd_produzida = 0.0
                         rdo_subatividade = RDOServicoSubatividade(
                             rdo_id=rdo_id,
                             servico_id=old_sub.servico_id,
@@ -367,7 +371,7 @@ def salvar_edicao_rdo(rdo_id):
                 if func_id in func_ids_vinculados:
                     continue  # já criado com vínculo de subatividade
                 funcao_exercida = request.form.get(f'funcao_{func_id}', 'Operacional')
-                horas_trabalhadas = float(request.form.get(f'horas_{func_id}', 8.0))
+                horas_trabalhadas = max(0.0, float(request.form.get(f'horas_{func_id}', 8.0)))
                 funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
                 if funcionario:
                     rdo_funcionario = RDOMaoObra(
