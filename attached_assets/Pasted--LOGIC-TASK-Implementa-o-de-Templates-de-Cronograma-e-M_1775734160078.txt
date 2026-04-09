@@ -1,0 +1,70 @@
+# LOGIC TASK: Implementação de Templates de Cronograma e Métricas de Produtividade no RDO V2
+
+Atue como um Arquiteto de Sistemas Sênior, especialista em Business Intelligence para construção civil. Sua missão é refatorar o módulo de Cronograma e RDO V2 para permitir a definição de métricas de produtividade padronizadas por subatividade e o cálculo automatizado da performance de funcionários.
+
+### 1. REESTRUTURAÇÃO DO MODELO DE DADOS (DATA LOGIC)
+
+**Objetivo:** Criar um catálogo centralizado de subatividades com suas métricas e permitir a criação de templates de cronograma reutilizáveis.
+
+1.  **Catálogo Global de Subatividades (`SubatividadeCatalogo`):**
+    *   **Campos:** `id`, `admin_id`, `nome` (ex: "Tratamento de Juntas"), `unidade_medida` (ex: "m²", "m linear", "un"), `meta_produtividade` (valor numérico, ex: 5.0 para 5 m²/hora), `descricao`.
+    *   **Propósito:** Este será o repositório único de todas as subatividades e suas metas de produtividade, garantindo consistência em todo o sistema.
+
+2.  **Templates de Cronograma (`CronogramaTemplate`):**
+    *   **Campos:** `id`, `admin_id`, `nome_template` (ex: "Cronograma de Fachada"), `descricao`.
+    *   **Propósito:** Agrupar subatividades do catálogo para criar modelos de cronogramas que podem ser aplicados a novas obras.
+
+3.  **Itens do Template de Cronograma (`CronogramaTemplateItem`):**
+    *   **Campos:** `id`, `cronograma_template_id` (FK para `CronogramaTemplate`), `subatividade_catalogo_id` (FK para `SubatividadeCatalogo`), `ordem`, `quantidade_prevista` (para o template, se aplicável).
+    *   **Propósito:** Definir quais subatividades fazem parte de um template e em que ordem.
+
+4.  **Ajuste no `RDOServicoSubatividade` (Modelo Existente):**
+    *   **Novo Campo:** Adicione `quantidade_produzida` (numérico, ex: 10.5 para 10.5 m²).
+    *   **Vínculo:** Adicione `subatividade_catalogo_id` (FK para `SubatividadeCatalogo`). Este campo é crucial para buscar a `unidade_medida` e `meta_produtividade`.
+
+### 2. LÓGICA DE NEGÓCIO (BUSINESS LOGIC)
+
+**Objetivo:** Automatizar a criação de cronogramas a partir de templates e calcular a produtividade em tempo real no RDO.
+
+1.  **Criação de Cronograma a partir de Template:**
+    *   Ao criar um novo cronograma para uma `Obra`, o sistema deve permitir selecionar um `CronogramaTemplate`.
+    *   Ao aplicar o template, o sistema deve popular o cronograma da obra com as `Subatividade`s e suas informações (unidade de medida, meta de produtividade) vindas do `SubatividadeCatalogo`.
+
+2.  **Cálculo de Produtividade no RDO (Gatilho: Finalização do RDO):**
+    *   Quando um RDO é finalizado, o sistema deve iterar sobre cada `RDOServicoSubatividade` registrada.
+    *   Para cada `RDOServicoSubatividade`:
+        *   Recupere a `quantidade_produzida` informada no RDO.
+        *   Recupere a `meta_produtividade` e `unidade_medida` do `SubatividadeCatalogo` vinculado.
+        *   Para cada `RDOMaoObra` (funcionário) alocada a esta `RDOServicoSubatividade`:
+            *   Recupere as `horas_trabalhadas` do funcionário naquela subatividade.
+            *   **Calcule a Produtividade Real:** `produtividade_real = quantidade_produzida / horas_trabalhadas` (garantir tratamento para `horas_trabalhadas = 0`).
+            *   **Calcule o Índice de Produtividade:** `indice_produtividade = produtividade_real / meta_produtividade`.
+            *   **Armazenamento:** Armazene `produtividade_real` e `indice_produtividade` (ex: em novos campos no `RDOMaoObra` ou em um novo modelo `RDOProdutividadeFuncionario`).
+
+### 3. LÓGICA DE INTERFACE (UX LOGIC)
+
+**Objetivo:** Fornecer ferramentas para gerenciar o catálogo, templates e visualizar a produtividade.
+
+1.  **Tela de Gerenciamento de `SubatividadeCatalogo`:**
+    *   CRUD completo para `SubatividadeCatalogo`, permitindo definir `nome`, `unidade_medida` e `meta_produtividade`.
+
+2.  **Tela de Gerenciamento de `CronogramaTemplate`:**
+    *   CRUD para criar e editar templates.
+    *   Interface para adicionar `Subatividade`s a um template, puxando do `SubatividadeCatalogo`.
+
+3.  **Formulário de RDO V2:**
+    *   Para cada `RDOServicoSubatividade` listada, adicione um campo de entrada para `quantidade_produzida` (com a `unidade_medida` do catálogo exibida ao lado).
+    *   A interface de alocação de `RDOMaoObra` deve garantir que as horas sejam associadas corretamente à `RDOServicoSubatividade`.
+
+4.  **Visualização do RDO V2 e Dashboards:**
+    *   Na tela de visualização do RDO, exiba a `quantidade_produzida` e, para cada funcionário, sua `produtividade_real` e `indice_produtividade` para a atividade.
+    *   Crie um novo dashboard ou widget que mostre o ranking de produtividade dos funcionários por `Subatividade` ao longo do tempo, comparando com a `meta_produtividade`.
+
+### 4. REGRAS DE CONSISTÊNCIA E SEGURANÇA
+
+*   **Multi-tenancy:** Todos os novos modelos e queries devem incluir o filtro `admin_id`.
+*   **Validação:** Valide a entrada de `quantidade_produzida` e `horas_trabalhadas` para garantir que sejam valores numéricos válidos e não negativos.
+*   **Performance:** Otimize as queries para o cálculo de produtividade, especialmente em RDOs com muitas atividades e funcionários.
+*   **Flexibilidade:** O sistema deve permitir que a `meta_produtividade` seja atualizada no `SubatividadeCatalogo` sem afetar os cálculos de RDOs já finalizados (o cálculo deve usar a meta vigente no momento da finalização do RDO, ou uma cópia da meta no `RDOServicoSubatividade`).
+
+Esta lógica transformará o RDO em uma ferramenta poderosa para medir e otimizar a produtividade da sua equipe. O que você acha dessa abordagem para o Replit?
