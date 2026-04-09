@@ -1341,49 +1341,77 @@ def aplicar_template(obra_id: int):
     ordem_base = (max_ordem_row or 0) + 10
 
     try:
+        from datetime import timedelta
+
+        # Construir árvore hierárquica dos itens do template
+        arvore_template = _construir_arvore_itens(list(tmpl.itens))
+
+        # Mapa: CronogramaTemplateItem.id → TarefaCronograma.id (para setar tarefa_pai_id)
+        item_id_para_tarefa_id: dict[int, int] = {}
         criadas = 0
-        data_corrente = data_inicio
-        for item in tmpl.itens:
-            # Verificação de tenant no próprio item (defesa em profundidade)
-            if item.admin_id != admin_id:
-                logger.warning(
-                    f"SEGURANÇA aplicar_template: item_id={item.id} "
-                    f"admin={item.admin_id} != tenant={admin_id}. Pulando."
+
+        # Cache por id para acesso rápido a admin_id e subatividade
+        item_by_id = {item.id: item for item in tmpl.itens}
+
+        def _criar_tarefas(nos: list, pai_tarefa_id, data_ref, ordem_offset: int) -> tuple[int, object]:
+            """
+            Cria TarefaCronograma recursivamente.
+            Retorna (total_criadas, data_após_último_filho).
+            """
+            nonlocal criadas
+            total = 0
+            data_corrente = data_ref
+            for i, no in enumerate(nos):
+                item = item_by_id.get(no['id'])
+                if item is None or item.admin_id != admin_id:
+                    continue
+
+                # Segurança: validar subatividade vinculada
+                unidade = None
+                quantidade = item.quantidade_prevista
+                sub = item.subatividade
+                if sub and sub.admin_id == admin_id:
+                    unidade = sub.unidade_medida
+                elif sub:
+                    sub = None
+
+                is_grupo = no['tipo'] == 'grupo'
+
+                tarefa = TarefaCronograma(
+                    obra_id=obra_id,
+                    nome_tarefa=item.nome_tarefa,
+                    duracao_dias=item.duracao_dias,
+                    data_inicio=data_corrente,
+                    quantidade_total=None if is_grupo else quantidade,
+                    unidade_medida=None if is_grupo else unidade,
+                    responsavel=item.responsavel or 'empresa',
+                    tarefa_pai_id=pai_tarefa_id,
+                    ordem=ordem_base + (ordem_offset + i) * 10,
+                    admin_id=admin_id,
                 )
-                continue
+                db.session.add(tarefa)
+                db.session.flush()  # obtém tarefa.id para os filhos
 
-            # unidade_medida e quantidade_total vêm da subatividade ou do item
-            # SEGURANÇA: verificar que a subatividade vinculada pertence ao mesmo tenant
-            unidade = None
-            quantidade = item.quantidade_prevista
-            sub = item.subatividade
-            if sub and sub.admin_id == admin_id:
-                unidade = sub.unidade_medida
-            elif sub and sub.admin_id != admin_id:
-                # Dado de outro tenant — descartar silenciosamente
-                logger.warning(
-                    f"SEGURANÇA aplicar_template: subatividade_id={sub.id} "
-                    f"admin={sub.admin_id} != tenant={admin_id}. Ignorando vínculo."
-                )
-                sub = None
+                item_id_para_tarefa_id[item.id] = tarefa.id
+                criadas += 1
+                total += 1
 
-            tarefa = TarefaCronograma(
-                obra_id=obra_id,
-                nome_tarefa=item.nome_tarefa,
-                duracao_dias=item.duracao_dias,
-                data_inicio=data_corrente,
-                quantidade_total=quantidade,
-                unidade_medida=unidade,
-                responsavel=item.responsavel or 'empresa',
-                ordem=ordem_base + (item.ordem * 10),
-                admin_id=admin_id,
-            )
-            db.session.add(tarefa)
-            # Avança data para a próxima tarefa (sequencial simples)
-            from datetime import timedelta
-            data_corrente = data_corrente + timedelta(days=item.duracao_dias)
-            criadas += 1
+                if no['filhos']:
+                    # Filhos herdam data_corrente e têm pai = tarefa.id
+                    _criar_tarefas(no['filhos'], tarefa.id, data_corrente, 0)
+                    # Data avança pela duração total dos filhos (soma)
+                    duracao_filhos = sum(
+                        item_by_id[f['id']].duracao_dias
+                        for f in no['filhos']
+                        if item_by_id.get(f['id'])
+                    )
+                    data_corrente = data_corrente + timedelta(days=max(duracao_filhos, item.duracao_dias))
+                else:
+                    data_corrente = data_corrente + timedelta(days=item.duracao_dias)
 
+            return total, data_corrente
+
+        _criar_tarefas(arvore_template, None, data_inicio, 0)
         db.session.commit()
 
         # Recalcular datas do cronograma
