@@ -154,6 +154,23 @@ Material de Obra   Obra Comercial Bloco A        ← nome da obra (principal)
 
 Você verá todas as compras de material associadas àquela obra, com o valor, status e fornecedor de cada uma.
 
+### Compras com Itens de Múltiplas Obras
+
+Uma mesma compra pode incluir itens destinados a obras diferentes. Nesse caso:
+
+- **Na lista fechada:** a coluna **Entidade** exibe todas as obras envolvidas separadas por vírgula (ex: *"Obra Residencial A, Obra Comercial B"*).
+- **Ao expandir a linha:** antes da tabela de itens, aparece um **mini-quadro de totais por obra**, mostrando quanto de custo cada obra absorveu nessa compra.
+
+**Exemplo de mini-quadro ao expandir:**
+
+| Obra | Total |
+|------|-------|
+| Obra Residencial A | R$ 1.200,00 |
+| Obra Comercial B | R$ 800,00 |
+| **Total da Compra** | **R$ 2.000,00** |
+
+Isso facilita a análise de rateio de materiais entre obras sem precisar abrir cada compra separadamente.
+
 ### Fluxo de Aprovação de Pagamento
 
 Para compras com prazo (boleto, parcelado):

@@ -11,12 +11,10 @@ Módulos Operacionais          Gestão de Custos V2           Fluxo de Caixa
 ─────────────────────         ───────────────────           ──────────────
 Transporte      ──────┐
 Alimentação     ──────┤──→  PENDENTE → SOLICITADO  ──→  Saídas Previstas
-Diária (Ponto)  ──────┘              → AUTORIZADO  ──→  Saídas Previstas
-                                     → PAGO        ──→  Histórico (FluxoCaixa)
+Diária (Ponto)  ──────┘              → PAGO        ──→  Histórico (FluxoCaixa)
 
-Material (Almox) ─────────────────────────────────→  Custo da Obra (direto)
+Material (Almox) ─────────────────────────────────→  Gestão de Custos (via Compra)
 
-Conta a Pagar (manual) ───────────────────────────→  Saídas Previstas
 Conta a Receber (manual) ─────────────────────────→  Entradas Previstas
 ```
 
@@ -87,51 +85,60 @@ Clique em **Confirmar** / **Salvar Lançamento**.
 
 ---
 
-### A3. Material (Almoxarifado) → Custo da Obra
+### A3. Material (Almoxarifado) → Custo da Obra via Compra
 
-A saída de material do estoque cria o custo **diretamente na obra**, sem passar pelo fluxo de aprovação da Gestão de Custos V2.
+O custo do material é reconhecido **no momento da compra**, quando a compra é registrada no módulo **Compras/Almoxarifado → Nova Compra → Registrar Compra**. A compra cria automaticamente um lançamento na **Gestão de Custos V2** com categoria **Material de Obra**, vinculado à obra informada na compra.
 
-> **Atenção:** Este é o único módulo que não passa pelo Fluxo de Caixa. O custo vai para o relatório de "Custos por Obra", não para as Saídas Previstas.
+> **Atenção:** A saída de material do estoque é apenas rastreamento físico — registra quem retirou e qual material foi usado. A saída **não gera novo lançamento financeiro** e não duplica o custo.
 
-#### Pré-requisito: cadastrar o item no Almoxarifado
+#### Fluxograma
 
-Antes de dar saída, o material precisa estar cadastrado como **Item do Almoxarifado** e ter estoque registrado via entrada.
+```
+COMPRA (Compras → Nova Compra → Registrar Compra)
+  ├── Obra + Fornecedor informados
+  ├── Lançamento "Material de Obra" criado na Gestão de Custos  ← custo reconhecido aqui
+  │   ├── Se À Vista → status PAGO
+  │   └── Se prazo/boleto → status PENDENTE (entra no fluxo de aprovação)
+  └── Para cada item vinculado ao catálogo:
+        └── Estoque (lote FIFO) atualizado automaticamente
 
-**Cadastrar item:**
-**Caminho:** Menu → **Almoxarifado** → **Itens/Produtos** → botão **Novo Item**
-- Nome do item (ex: "Cimento CP-II 50kg")
-- Código interno
-- Unidade (saca, m², kg, un, etc.)
-- Tipo: Consumível ou Serializado
-- Estoque mínimo
+SAÍDA DE MATERIAL (Almoxarifado → Saída de Materiais)
+  ├── Estoque do item diminui
+  └── Rastreamento físico: funcionário, obra e lote registrados
+      (nenhum custo novo é gerado)
+```
 
-**Registrar entrada (adicionar ao estoque):**
-**Caminho:** Menu → **Almoxarifado** → **Entrada de Material**
-- Selecionar o item cadastrado
-- Quantidade, valor unitário, fornecedor, nota fiscal
-- Clicar em confirmar
+#### Registrar a Compra
 
-#### Realizar a Saída
-
-**Caminho:** Menu → **Almoxarifado** → **Saída de Material**
+**Caminho:** Menu → **Compras** → **Nova Compra**
 
 **Preencha:**
-- Item (selecionar da lista — só aparecem itens com estoque disponível)
-- Quantidade
-- **Obra de destino** (obrigatório para que o custo seja lançado)
-- Responsável / Funcionário (opcional)
-- Número do lote (para rastreabilidade)
+- Fornecedor
+- Nº da NF / Recibo (opcional)
+- Data da Compra
+- **Obra** (obrigatório — define o centro de custo)
+- Condição de Pagamento (À Vista, 30/60/90 dias, parcelado)
+- Itens da compra (vinculados ao catálogo do almoxarifado)
+
+Clique em **Registrar Compra**.
+
+#### Realizar a Saída (rastreamento físico)
+
+**Caminho:** Menu → **Almoxarifado** → **Saída de Materiais**
+
+**Preencha:**
+- Funcionário responsável pelo recebimento
+- Obra destino (opcional, recomendado para rastreabilidade)
+- Item do catálogo e quantidade
 
 Clique em **Processar Saída**.
 
-**O que acontece automaticamente:**
+**O que acontece:**
 - Estoque do item diminui
-- **Custo da Obra criado** com o valor (quantidade × preço unitário)
-- Esse custo aparece em: Obras → selecionar obra → aba **Custos** → categoria ALMOXARIFADO
+- Rastreamento físico registrado (funcionário, obra, lote)
+- **Nenhum novo lançamento financeiro é criado**
 
-> Se a saída não tiver obra vinculada, o custo **não é lançado** em lugar nenhum.
-
-> **Diferença importante:** o custo de material vai direto para a obra e **não aparece em Gestão de Custos nem no Fluxo de Caixa**. Para acompanhar o gasto de materiais, use o relatório de Custos por Obra.
+> **Para acompanhar o gasto de materiais:** use a **Gestão de Custos** (filtrando por obra e categoria "Material de Obra") ou o relatório de Custos por Obra.
 
 ---
 
@@ -178,8 +185,6 @@ O funcionário pode se identificar por:
 
 Para despesas que não têm módulo próprio no SIGE — **aluguel de escritório, energia elétrica, água, IPTU, honorários contábeis, assinaturas de software, manutenção de equipamentos** — use a **Gestão de Custos V2** com a categoria adequada. Assim a despesa passa pelo fluxo de aprovação antes de ser paga.
 
-> **Diferença do ContaPagar manual:** o ContaPagar tradicional registra a despesa diretamente no financeiro sem aprovação. A Gestão de Custos exige aprovação (Solicitar → Autorizar → Pagar), dando mais controle ao gestor.
-
 #### Categorias disponíveis para despesas avulsas
 
 As categorias são organizadas em três grupos contábeis (padrão SINAPI/NBC TG):
@@ -213,8 +218,6 @@ As categorias são organizadas em três grupos contábeis (padrão SINAPI/NBC TG
 
 **Caminho:** Menu → **Gestão de Custos** → botão **Novo Lançamento**
 
-> Para tenants V2, também há um link direto na tela de **Contas a Pagar** e **Nova Conta a Pagar**, com botão "Lançar via Gestão de Custos".
-
 1. Selecionar o **Grupo de categoria** e a **Categoria** correta (ex: Despesa Administrativa → Aluguel / Utilities)
 2. Preencher **Fornecedor / Credor** (ex: "Imobiliária Central", "Copel Distribuição")
 3. Preencher **Data de Vencimento** — aparecerá como Saída Prevista no Fluxo de Caixa no mês correto
@@ -228,8 +231,7 @@ As categorias são organizadas em três grupos contábeis (padrão SINAPI/NBC TG
 **O que acontece:**
 - Custo criado com status **PENDENTE** (não aparece no Fluxo de Caixa ainda)
 - Após **Solicitar**: aparece nas Saídas Previstas do Fluxo de Caixa, na data de vencimento informada
-- Após **Autorizar**: permanece nas Saídas Previstas
-- Após **Pagar**: sai das Saídas Previstas, vai para histórico do Fluxo de Caixa
+- Após **Aprovar**: status muda para PAGO; sai das Saídas Previstas, vai para histórico do Fluxo de Caixa
 
 #### Exemplos de uso
 
@@ -257,7 +259,6 @@ A lista mostra todos os custos agrupados por entidade (funcionário, restaurante
 |---|---|---|
 | Cinza | PENDENTE | Criado, aguardando solicitação |
 | Amarelo | SOLICITADO | Solicitado ao aprovador, aparece no Fluxo de Caixa |
-| Verde | AUTORIZADO | Aprovado, pronto para pagamento, aparece no Fluxo de Caixa |
 | Azul | PAGO | Pago, registrado no histórico de FluxoCaixa |
 
 ---
@@ -274,33 +275,25 @@ A lista mostra todos os custos agrupados por entidade (funcionário, restaurante
 
 ---
 
-### Passo 2 — Autorizar ou Recusar (SOLICITADO → AUTORIZADO ou PENDENTE)
+### Passo 2 — Aprovar ou Recusar (SOLICITADO → PAGO ou PENDENTE)
 
-**Caminho:** Gestão de Custos → localizar o registro SOLICITADO → botão **Autorizar** ou **Recusar**
+**Caminho:** Gestão de Custos → localizar o registro SOLICITADO → botão **Aprovar** ou **Recusar**
 
-- **Autorizar** → status muda para **AUTORIZADO**; continua em Saídas Previstas
+- **Aprovar** → um formulário aparece; preencha:
+  - **Data do Pagamento** (preenche com hoje automaticamente)
+  - **Conta Bancária** (texto livre — ex: "BB Conta Corrente 1234-5", "Caixa Física")
+  - **Valor Pago** (preenche automaticamente com o valor solicitado)
+  - Clique em **Confirmar Pagamento**
+  - Status muda para **PAGO**; custo sai das Saídas Previstas e vai para o histórico de FluxoCaixa
 - **Recusar** → status volta para **PENDENTE**; sai do Fluxo de Caixa
 
----
-
-### Passo 3 — Pagar (AUTORIZADO → PAGO)
-
-**Caminho:** Gestão de Custos → localizar o registro AUTORIZADO → botão **Pagar**
-
-Um formulário aparece. Preencha:
-- **Data do Pagamento** (preenche com hoje automaticamente)
-- **Conta Bancária** (texto livre — ex: "BB Conta Corrente 1234-5", "Caixa Física")
-- **Valor Pago** (preenche automaticamente com o valor solicitado)
-
-Clique em **Confirmar Pagamento**.
-
-**O que acontece automaticamente:**
+**O que acontece automaticamente ao Aprovar:**
 - Status muda para **PAGO**
 - Custo **sai da tabela de Movimentos Previstos** do Fluxo de Caixa
 - Um registro de **FluxoCaixa** histórico é criado (tipo SAIDA)
 - Se a obra tiver contabilidade configurada → **lançamento contábil criado** automaticamente
 
-> **Confirmado em teste:** após PAGAR, a linha some imediatamente de "Movimentos Previstos" no Fluxo de Caixa.
+> **Confirmado em teste:** após APROVAR, a linha some imediatamente de "Movimentos Previstos" no Fluxo de Caixa.
 
 ---
 
@@ -316,7 +309,7 @@ Use os filtros de **Data Início** e **Data Fim** para o período que deseja ana
 |---|---|---|
 | Saldo Inicial | Azul | Soma do saldo atual de todos os bancos cadastrados |
 | Entradas Previstas | Verde | Contas a Receber com status PENDENTE ou PARCIAL no período |
-| Saídas Previstas | Vermelho | Contas a Pagar PENDENTES + Gestão de Custos SOLICITADO/AUTORIZADO no período |
+| Saídas Previstas | Vermelho | Gestão de Custos SOLICITADO no período |
 | Saldo Final Projetado | Azul/Amarelo | Saldo Inicial + Entradas − Saídas |
 
 ### Tabela de Movimentos Previstos
@@ -326,8 +319,7 @@ Cada linha da tabela representa um lançamento individual:
 | Cor da linha | Tipo | Origem |
 |---|---|---|
 | Verde | ENTRADA | Conta a Receber pendente |
-| Vermelho | SAÍDA | Conta a Pagar pendente |
-| Vermelho | SAÍDA | Gestão de Custos (qualquer categoria) SOLICITADO ou AUTORIZADO |
+| Vermelho | SAÍDA | Gestão de Custos (qualquer categoria) SOLICITADO |
 
 > **Gestão de Custos com Data de Vencimento:** quando o lançamento tem data de vencimento preenchida (ex: Aluguel, Energia), ele aparece no período que inclui essa data — não a data de criação. Isso garante que a projeção de caixa esteja no mês correto.
 
@@ -335,22 +327,15 @@ Cada linha da tabela representa um lançamento individual:
 
 ## PARTE D — Fluxo Manual (sem módulos operacionais)
 
-Para despesas que não passam pelos módulos de Transporte, Alimentação etc., use o lançamento direto:
-
-### Conta a Pagar (manual)
-**Caminho:** Financeiro → Contas a Pagar → **Nova Conta a Pagar**
-- Preencha: Descrição, Valor, Vencimento, Fornecedor (opcional), Obra (opcional)
-- Aparece imediatamente em Saídas Previstas
-
-> **Tenants V2:** para despesas que precisam de aprovação antes do pagamento, use a **Gestão de Custos** em vez de Conta a Pagar diretamente. Há um banner com link direto na tela de Contas a Pagar.
+Para entradas financeiras que não passam pelos módulos operacionais, use o lançamento direto:
 
 ### Conta a Receber (manual)
 **Caminho:** Financeiro → Contas a Receber → **Nova Conta a Receber**
 - Preencha: Descrição, Cliente, Valor, Vencimento, Obra (opcional)
 - Aparece imediatamente em Entradas Previstas
 
-### Dar baixa (pagar ou receber)
-**Caminho:** na lista → botão **Pagar** ou **Receber** → preencher valor, data, forma e banco → confirmar
+### Dar baixa (receber)
+**Caminho:** na lista → botão **Receber** → preencher valor, data, forma e banco → confirmar
 
 ---
 
@@ -358,14 +343,13 @@ Para despesas que não passam pelos módulos de Transporte, Alimentação etc., 
 
 | Módulo | Como lançar | Vai para | Aprovação necessária | Aparece no Fluxo de Caixa |
 |---|---|---|---|---|
-| **Transporte** | Menu Transporte → Novo Lançamento | Gestão de Custos PENDENTE (cat: TRANSPORTE) | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
-| **Transporte Lote** | Menu Transporte → Lançamento em Lote | Gestão de Custos PENDENTE (cat: TRANSPORTE) | Sim | Quando SOLICITADO ou AUTORIZADO |
-| **Alimentação** | Menu Alimentação → Novo Lançamento | Gestão de Custos PENDENTE (cat: ALIMENTACAO) | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
-| **Material (Saída)** | Almoxarifado → Cadastrar Item → Entrada → Saída de Material | Custo da Obra (direto) | Não | Não aparece (só em Custos por Obra) |
-| **Diária Funcionário** | **Ponto Eletrônico** (dispositivo compartilhado) → bater ponto (entrada) | Gestão de Custos PENDENTE (cat: MAO_OBRA_DIRETA) | Sim (Solicitar → Autorizar → Pagar) | Quando SOLICITADO ou AUTORIZADO |
-| **Reembolso** | Financeiro → Gestão de Custos → Reembolsos | Gestão de Custos PENDENTE (cat: OUTROS) | Sim | Quando SOLICITADO ou AUTORIZADO |
-| **Despesa Avulsa (V2)** | Gestão de Custos → Novo → categoria adequada | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO ou AUTORIZADO (pela data de vencimento) |
-| **Conta a Pagar** | Financeiro → Contas a Pagar → Nova | Saídas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
+| **Transporte** | Menu Transporte → Novo Lançamento | Gestão de Custos PENDENTE (cat: TRANSPORTE) | Sim (Solicitar → Aprovar) | Quando SOLICITADO |
+| **Transporte Lote** | Menu Transporte → Lançamento em Lote | Gestão de Custos PENDENTE (cat: TRANSPORTE) | Sim | Quando SOLICITADO |
+| **Alimentação** | Menu Alimentação → Novo Lançamento | Gestão de Custos PENDENTE (cat: ALIMENTACAO) | Sim (Solicitar → Aprovar) | Quando SOLICITADO |
+| **Material (Compra)** | Compras → Nova Compra → Registrar Compra | Gestão de Custos (cat: Material de Obra) | Sim (para compras a prazo) | Quando SOLICITADO |
+| **Diária Funcionário** | **Ponto Eletrônico** (dispositivo compartilhado) → bater ponto (entrada) | Gestão de Custos PENDENTE (cat: MAO_OBRA_DIRETA) | Sim (Solicitar → Aprovar) | Quando SOLICITADO |
+| **Reembolso** | Financeiro → Gestão de Custos → Reembolsos | Gestão de Custos PENDENTE (cat: OUTROS) | Sim | Quando SOLICITADO |
+| **Despesa Avulsa (V2)** | Gestão de Custos → Novo → categoria adequada | Gestão de Custos PENDENTE | Sim | Quando SOLICITADO (pela data de vencimento) |
 | **Conta a Receber** | Financeiro → Contas a Receber → Nova | Entradas Previstas (direto) | Não | Imediatamente (status PENDENTE) |
 
 ---
@@ -405,11 +389,12 @@ As categorias seguem o padrão contábil da construção civil (SINAPI / NBC TG 
 
 ## PARTE G — Dicas Práticas
 
-- **O custo de material (almoxarifado) não aparece no Fluxo de Caixa.** Ele é registrado como custo realizado da obra. Para ver: Obras → selecionar a obra → aba Custos.
+- **O custo de material (almoxarifado) é reconhecido na compra.** Ele é registrado na Gestão de Custos quando a compra é salva, vinculado à obra. Para ver: Gestão de Custos → filtrar por obra e categoria "Material de Obra".
+- **A saída de material não gera custo.** É apenas rastreamento físico de quem retirou o material.
 - **Sem Solicitar, o custo não aparece no Fluxo de Caixa.** Um lançamento de Transporte ou Alimentação recém-criado fica invisível no Fluxo até ser Solicitado.
 - **Recusar não apaga o custo.** Ele volta para PENDENTE e pode ser Solicitado novamente depois de corrigido.
 - **O Saldo Inicial do Fluxo de Caixa é o saldo real dos bancos.** Mantenha os bancos atualizados dando baixa correta nas contas (selecionando o banco ao pagar).
 - **Pagamento parcial:** informe só o valor pago hoje; o saldo restante continua nas Saídas Previstas.
 - **Diária duplicada:** o sistema protege automaticamente — bater o ponto duas vezes no mesmo dia não gera dois custos.
-- **Data de vencimento importa:** ao lançar despesas com data de vencimento (aluguel, energy, IPTU), preencha o campo para que o Fluxo de Caixa projete a saída no mês correto.
+- **Data de vencimento importa:** ao lançar despesas com data de vencimento (aluguel, energia, IPTU), preencha o campo para que o Fluxo de Caixa projete a saída no mês correto.
 - **Escolha a categoria correta:** use a hierarquia contábil para classificar corretamente. Isso impacta relatórios de Custo da Obra vs. Despesa Administrativa.
