@@ -1201,8 +1201,11 @@ def _auto_fill_produtividade_snapshot(mapper, connection, target):
                 target.meta_produtividade_snapshot = result[0]
             if target.unidade_medida_snapshot is None:
                 target.unidade_medida_snapshot = result[1]
-    except Exception:
-        pass
+    except Exception as _snap_err:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            f"[WARN] Falha ao preencher snapshot de produtividade para subatividade_mestre_id={target.subatividade_mestre_id}: {_snap_err}"
+        )
 
 
 class SubatividadeMestre(db.Model):
