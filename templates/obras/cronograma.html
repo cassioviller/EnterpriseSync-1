@@ -318,7 +318,28 @@
         <div class="row g-3">
           <div class="col-12">
             <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Nome da Tarefa <span class="text-danger">*</span></label>
-            <input type="text" id="nt_nome" class="form-control form-control-lg" placeholder="Ex: Fundação">
+            <div class="position-relative">
+              <input type="text" id="nt_nome" class="form-control form-control-lg"
+                     placeholder="Digite ou busque no catálogo..."
+                     autocomplete="off"
+                     oninput="filtrarCatalogo(this.value)"
+                     onfocus="filtrarCatalogo(this.value)">
+              <input type="hidden" id="nt_catalogo_id">
+              <div id="nt_catalogo_dropdown"
+                   class="list-group shadow position-absolute w-100 d-none"
+                   style="z-index:1060;max-height:240px;overflow-y:auto;top:100%;left:0;border-radius:0 0 .375rem .375rem"></div>
+            </div>
+            <div id="nt_meta_badge" class="d-none mt-1">
+              <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle small">
+                <i class="fas fa-bullseye me-1"></i>Meta:
+                <strong id="nt_meta_valor"></strong>
+                <span id="nt_meta_unidade"></span>/hora
+              </span>
+              <span class="badge bg-secondary-subtle text-secondary-emphasis small ms-1">Do catálogo</span>
+              <button type="button" class="btn btn-link btn-sm p-0 ms-2 text-danger small" onclick="limparSelecaoCatalogo()" title="Limpar seleção">
+                <i class="fas fa-times-circle"></i> limpar
+              </button>
+            </div>
           </div>
           <div class="col-md-4">
             <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Duração (dias úteis)</label>
@@ -1089,8 +1110,12 @@ function abrirModalNovaTarefa() {
   document.getElementById('nt_qtd').value = '';
   document.getElementById('nt_unidade').value = '';
   document.getElementById('nt_resp').value = 'empresa';
+  document.getElementById('nt_catalogo_id').value = '';
+  document.getElementById('nt_catalogo_dropdown').classList.add('d-none');
+  document.getElementById('nt_meta_badge').classList.add('d-none');
   _popularSelect('nt_pred', tarefas, '— Nenhuma —');
   _popularSelect('nt_pai',  tarefas, '— Nenhuma (tarefa raiz) —');
+  carregarCatalogo();
 
   const predSel = document.getElementById('nt_pred');
   predSel.onchange = () => {
@@ -1111,18 +1136,106 @@ function abrirModalNovaTarefa() {
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNovaTarefa')).show();
 }
 
+// ── Catálogo autocomplete ──
+let catalogoCache = null;
+
+async function carregarCatalogo() {
+  if (catalogoCache) return;
+  try {
+    const res = await fetch('{{ url_for("cronograma.api_catalogo") }}');
+    if (!res.ok) return;
+    const data = await res.json();
+    catalogoCache = {
+      subatividades: (data.subatividades || []).map(s => ({...s, _tipo: 'subatividade'})),
+      servicos: (data.servicos || []).map(s => ({...s, _tipo: 'servico'})),
+    };
+  } catch(e) { /* silently ignore */ }
+}
+
+function filtrarCatalogo(q) {
+  const dd = document.getElementById('nt_catalogo_dropdown');
+  if (!catalogoCache) { dd.classList.add('d-none'); return; }
+  const query = (q || '').toLowerCase().trim();
+  const todos = [...catalogoCache.subatividades, ...catalogoCache.servicos];
+  const matches = query.length === 0
+    ? todos.slice(0, 30)
+    : todos.filter(i => i.nome.toLowerCase().includes(query)).slice(0, 30);
+  if (matches.length === 0) { dd.classList.add('d-none'); return; }
+
+  let html = '';
+  const subs = matches.filter(i => i._tipo === 'subatividade');
+  const svcs = matches.filter(i => i._tipo === 'servico');
+
+  if (subs.length) {
+    html += `<div class="list-group-item list-group-item-secondary py-1 px-3" style="font-size:.7rem;font-weight:600;letter-spacing:.05em;pointer-events:none">SUBATIVIDADES</div>`;
+    subs.forEach(i => {
+      const meta = i.meta_produtividade ? `<span class="float-end text-primary small">${i.meta_produtividade} ${i.unidade_medida}/h</span>` : '';
+      const un = i.unidade_medida ? `<span class="text-muted ms-1 small">(${i.unidade_medida})</span>` : '';
+      html += `<button type="button" class="list-group-item list-group-item-action py-2 px-3 border-0" onclick="selecionarItemCatalogo(${JSON.stringify(i).replace(/"/g,'&quot;')})">
+        <span class="fw-medium">${i.nome}</span>${un}${meta}
+      </button>`;
+    });
+  }
+  if (svcs.length) {
+    html += `<div class="list-group-item list-group-item-secondary py-1 px-3" style="font-size:.7rem;font-weight:600;letter-spacing:.05em;pointer-events:none">SERVIÇOS</div>`;
+    svcs.forEach(i => {
+      const un = i.unidade_medida ? `<span class="text-muted ms-1 small">(${i.unidade_medida})</span>` : '';
+      html += `<button type="button" class="list-group-item list-group-item-action py-2 px-3 border-0" onclick="selecionarItemCatalogo(${JSON.stringify(i).replace(/"/g,'&quot;')})">
+        <i class="fas fa-tools me-1 text-muted" style="font-size:.75rem"></i>
+        <span class="fw-medium">${i.nome}</span>${un}
+      </button>`;
+    });
+  }
+
+  dd.innerHTML = html;
+  dd.classList.remove('d-none');
+}
+
+function selecionarItemCatalogo(item) {
+  document.getElementById('nt_nome').value = item.nome;
+  if (item.unidade_medida) document.getElementById('nt_unidade').value = item.unidade_medida;
+  document.getElementById('nt_catalogo_id').value = item._tipo === 'subatividade' ? item.id : '';
+  document.getElementById('nt_catalogo_dropdown').classList.add('d-none');
+
+  const badge = document.getElementById('nt_meta_badge');
+  if (item.meta_produtividade && item._tipo === 'subatividade') {
+    document.getElementById('nt_meta_valor').textContent = item.meta_produtividade;
+    document.getElementById('nt_meta_unidade').textContent = item.unidade_medida || '';
+    badge.classList.remove('d-none');
+  } else {
+    badge.classList.add('d-none');
+  }
+}
+
+function limparSelecaoCatalogo() {
+  document.getElementById('nt_catalogo_id').value = '';
+  document.getElementById('nt_meta_badge').classList.add('d-none');
+  document.getElementById('nt_nome').value = '';
+  document.getElementById('nt_unidade').value = '';
+  document.getElementById('nt_nome').focus();
+}
+
+document.addEventListener('click', e => {
+  const dd = document.getElementById('nt_catalogo_dropdown');
+  if (dd && !dd.contains(e.target) && e.target.id !== 'nt_nome') {
+    dd.classList.add('d-none');
+  }
+});
+
 async function salvarNovaTarefa() {
   const nome = document.getElementById('nt_nome').value.trim();
   if (!nome) { toast('Informe o nome da tarefa', 'warning'); return; }
+  const catId = document.getElementById('nt_catalogo_id').value;
   const body = {
-    nome_tarefa:      nome,
-    duracao_dias:     parseInt(document.getElementById('nt_duracao').value) || 1,
-    data_inicio:      document.getElementById('nt_inicio').value || null,
-    predecessora_id:  document.getElementById('nt_pred').value || null,
-    tarefa_pai_id:    document.getElementById('nt_pai').value || null,
-    quantidade_total: document.getElementById('nt_qtd').value || null,
-    unidade_medida:   document.getElementById('nt_unidade').value.trim() || null,
-    responsavel:      document.getElementById('nt_resp').value || 'empresa',
+    nome_tarefa:             nome,
+    duracao_dias:            parseInt(document.getElementById('nt_duracao').value) || 1,
+    data_inicio:             document.getElementById('nt_inicio').value || null,
+    predecessora_id:         document.getElementById('nt_pred').value || null,
+    tarefa_pai_id:           document.getElementById('nt_pai').value || null,
+    quantidade_total:        document.getElementById('nt_qtd').value || null,
+    unidade_medida:          document.getElementById('nt_unidade').value.trim() || null,
+    responsavel:             document.getElementById('nt_resp').value || 'empresa',
+    subatividade_mestre_id:  catId ? parseInt(catId) : null,
   };
   try {
     const res = await fetch(`${URL_BASE}/tarefa`, {

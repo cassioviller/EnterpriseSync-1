@@ -4222,6 +4222,12 @@ class TarefaCronograma(db.Model):
     data_fim = db.Column(db.Date, nullable=True)
     quantidade_total = db.Column(db.Float, nullable=True)
     unidade_medida = db.Column(db.String(20), nullable=True)
+    subatividade_mestre_id = db.Column(
+        db.Integer,
+        db.ForeignKey('subatividade_mestre.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    subatividade_mestre = db.relationship('SubatividadeMestre', backref='tarefas_cronograma')
     # Atualizado automaticamente pelo RDO
     percentual_concluido = db.Column(db.Float, default=0.0, nullable=False)
     # 'empresa' = conta na produtividade; 'terceiros' = só check de conclusão

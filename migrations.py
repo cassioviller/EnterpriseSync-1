@@ -3799,6 +3799,7 @@ def executar_migracoes():
             (97, "RDOMaoObra - produtividade_real e indice_produtividade calculados na finalização do RDO", migration_97_rdo_mao_obra_produtividade),
             (98, "SubatividadeMestre tipo+servico_id nullable, CronogramaTemplateItem parent_item_id - catálogo hierárquico", migration_98_catalogo_hierarquico),
             (99, "RDOServicoSubatividade servico_id nullable para suportar subatividades sem serviço vinculado", migration_99_rdo_servico_sub_nullable),
+            (100, "TarefaCronograma - subatividade_mestre_id FK para rastreamento de catálogo", migration_100_tarefa_cronograma_subatividade_mestre_id),
         ]
         
         # Executar cada migração com rastreamento
@@ -7996,6 +7997,47 @@ def migration_96_rdo_servico_subatividade_produtividade():
 
     except Exception as e:
         logger.error(f"Erro na migracao 96: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_100_tarefa_cronograma_subatividade_mestre_id():
+    """
+    Migração 100: tarefa_cronograma — adicionar subatividade_mestre_id FK opcional
+    para rastrear qual item do catálogo originou a tarefa.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'tarefa_cronograma' AND column_name = 'subatividade_mestre_id'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando tarefa_cronograma.subatividade_mestre_id...")
+            cursor.execute("""
+                ALTER TABLE tarefa_cronograma
+                ADD COLUMN subatividade_mestre_id INTEGER
+                REFERENCES subatividade_mestre(id) ON DELETE SET NULL
+            """)
+            logger.info("  Coluna subatividade_mestre_id adicionada com sucesso.")
+        else:
+            logger.info("  tarefa_cronograma.subatividade_mestre_id já existe.")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 100 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 100: {e}")
         if connection:
             try:
                 connection.rollback()

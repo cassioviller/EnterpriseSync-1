@@ -61,6 +61,7 @@ def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> d
         'data_fim': t.data_fim.isoformat() if t.data_fim else None,
         'quantidade_total': t.quantidade_total,
         'unidade_medida': t.unidade_medida,
+        'subatividade_mestre_id': getattr(t, 'subatividade_mestre_id', None),
         'percentual_concluido': t.percentual_concluido or 0.0,
         'percentual_planejado': round(percentual_planejado, 1),
         'responsavel': getattr(t, 'responsavel', 'empresa') or 'empresa',
@@ -258,6 +259,12 @@ def criar_tarefa(obra_id: int):
     if responsavel not in ('empresa', 'terceiros'):
         responsavel = 'empresa'
 
+    sub_mestre_id = data.get('subatividade_mestre_id')
+    try:
+        sub_mestre_id = int(sub_mestre_id) if sub_mestre_id else None
+    except (ValueError, TypeError):
+        sub_mestre_id = None
+
     tarefa = TarefaCronograma(
         obra_id=obra_id,
         tarefa_pai_id=tarefa_pai_id,
@@ -269,6 +276,7 @@ def criar_tarefa(obra_id: int):
         data_fim=data_fim,
         quantidade_total=float(data.get('quantidade_total') or 0) or None,
         unidade_medida=(data.get('unidade_medida') or '').strip() or None,
+        subatividade_mestre_id=sub_mestre_id,
         percentual_concluido=0.0,
         responsavel=responsavel,
         admin_id=admin_id,
@@ -322,6 +330,13 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
 
     if 'unidade_medida' in data:
         tarefa.unidade_medida = str(data['unidade_medida']).strip() or None
+
+    if 'subatividade_mestre_id' in data:
+        try:
+            val = data['subatividade_mestre_id']
+            tarefa.subatividade_mestre_id = int(val) if val else None
+        except (ValueError, TypeError):
+            tarefa.subatividade_mestre_id = None
 
     if 'responsavel' in data:
         resp = str(data['responsavel']).strip().lower()
@@ -917,7 +932,7 @@ def catalogo_excluir_subatividade(sub_id: int):
 @cronograma_bp.route('/api/catalogo')
 @login_required
 def api_catalogo():
-    """Retorna grupos e subatividades do catálogo separados (para o template builder)."""
+    """Retorna grupos, subatividades e serviços do catálogo (para autocomplete e template builder)."""
     guard = _check_v2()
     if guard:
         return jsonify({'error': 'V2 required'}), 403
@@ -930,7 +945,7 @@ def api_catalogo():
         .all()
     )
 
-    def _to_dict(s):
+    def _sub_to_dict(s):
         return {
             'id': s.id,
             'nome': s.nome,
@@ -939,9 +954,21 @@ def api_catalogo():
             'meta_produtividade': s.meta_produtividade,
         }
 
-    grupos = [_to_dict(s) for s in todos if getattr(s, 'tipo', 'subatividade') == 'grupo']
-    subatividades = [_to_dict(s) for s in todos if getattr(s, 'tipo', 'subatividade') != 'grupo']
-    return jsonify({'grupos': grupos, 'subatividades': subatividades})
+    grupos = [_sub_to_dict(s) for s in todos if getattr(s, 'tipo', 'subatividade') == 'grupo']
+    subatividades = [_sub_to_dict(s) for s in todos if getattr(s, 'tipo', 'subatividade') != 'grupo']
+
+    servicos = (
+        Servico.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(Servico.nome)
+        .all()
+    )
+    servicos_list = [
+        {'id': sv.id, 'nome': sv.nome, 'unidade_medida': sv.unidade_medida or ''}
+        for sv in servicos
+    ]
+
+    return jsonify({'grupos': grupos, 'subatividades': subatividades, 'servicos': servicos_list})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
